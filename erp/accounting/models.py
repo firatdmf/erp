@@ -611,64 +611,6 @@ class FinishedGoodsReceiptItem(models.Model):
 # ----------------------------------------------------------------------------------------------------------------
 
 
-class AssetAccountsReceivable(models.Model):
-    class Meta:
-        verbose_name_plural = "Asset Accounts Receivables"
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    currency = models.ForeignKey(
-        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
-    )
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    contact = models.ForeignKey(
-        Contact,
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-        related_name="accounts_receivable",
-    )
-    company = models.ForeignKey(
-        Company,
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-        related_name="accounts_receivable",
-    )
-    supplier = models.ForeignKey(
-        Supplier,
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-        related_name="accounts_receivable",
-    )
-    paid = models.BooleanField(default=False)
-    paid_to_cash_account = models.ForeignKey(
-        "CashAccount", on_delete=models.CASCADE, blank=True, null=True
-    )
-
-    # Overriding the clean method that is called during the model's validation process.
-    # So we can manually add additional measures.
-    def clean(self):
-        # Ensure that you call super().clean() to maintain the default validation behavior.
-        super().clean()
-        # Only one of contact, company, or supplier can be set
-        fields = [self.contact, self.company, self.supplier]
-        set_fields = [f for f in fields if f]
-        if len(set_fields) > 1:
-            raise ValidationError(
-                "Only one of 'contact', 'company', or 'supplier' can be assigned."
-            )
-
-    def __str__(self):
-        if self.company:
-            return f"{self.book} | {self.company} now owes you {self.currency.symbol}{self.amount} "
-        elif self.contact:
-            return f"{self.book} | {self.contact} now owes you {self.currency.symbol}{self.amount} "
-        else:
-            return f"{self.book} |{self.currency.symbol}{self.amount} "
-
-
 class AssetFixedAsset(models.Model):
     class Meta:
         verbose_name_plural = "Fixed Assets"
@@ -691,68 +633,6 @@ class AssetFixedAsset(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.currency.symbol}{self.value} ({self.book})"
-
-
-class LiabilityAccountsPayable(models.Model):
-    from operating.models import RawMaterialGoodReceipt
-
-    class Meta:
-        verbose_name_plural = "Liability Accounts Payables"
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    currency = models.ForeignKey(
-        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
-    )
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    # balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    paid = models.BooleanField(default=False)
-    paid_with_cash_account = models.ForeignKey(
-        "CashAccount", on_delete=models.CASCADE, blank=True, null=True
-    )
-    supplier = supplier = models.ForeignKey(
-        Supplier, on_delete=models.RESTRICT, null=True, blank=True
-    )
-    # receipt = models.CharField(null=True, blank=True)
-    # raw_goods_receipt = models.ForeignKey(
-    #     RawMaterialGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
-    # )
-    raw_material_good_receipt = models.ForeignKey(
-        RawMaterialGoodReceipt, on_delete=models.CASCADE, blank=True, null=True
-    )
-    finished_goods_receipt = models.ForeignKey(
-        FinishedGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
-    )
-
-    def __str__(self):
-        return f"{self.book} | you now owe {self.currency.symbol}{self.amount} to {self.supplier}"
-
-    def clean(self):
-        super().clean()  # run parent first
-        if self.raw_material_good_receipt and self.finished_goods_receipt:
-            raise ValidationError(
-                {
-                    "receipt": "You cannot submit two different types of receipts at once. Pick either raw goods, or finished goods."
-                }
-            )
-
-        if self.paid:
-            if not self.paid_with_cash_account:
-                raise ValidationError(
-                    {
-                        "CashAccount": "You cannot alter balance without specifying a valid cash account that makes the payment."
-                    }
-                )
-            elif self.paid_with_cash_account.currency != self.currency:
-                raise ValidationError(
-                    {
-                        "CashAccount": "Paid with Cash Account does not match the receipts currency."
-                    }
-                )
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
 
 
 # List all your cash accounts: bank, and on hand. Each account has its own currency, and balance.
@@ -916,8 +796,37 @@ class ExpenseCategory(models.Model):
 
 
 class EquityExpense(models.Model):
+    """An expense, and the one thing that funded it.
+
+    Every expense has a credit somewhere, and until now that credit could
+    only be cash: the row demanded a cash account and
+    handle_equity_transaction always took the money out of it. An expense
+    somebody else settled on the book's behalf had no way in. Recording it
+    against a cash account credited money that never moved, and the
+    matching debt to whoever paid — already on their current account —
+    left the entry with two credits against a single debit.
+
+    So the funding source is now one of two, and exactly one: a cash
+    account, or the current account of whoever paid. The second leaves
+    cash alone and posts the credit to that account instead, which is
+    where the book already says it owes them. The check constraint is what
+    makes "exactly one" a fact about the table rather than a convention
+    the views happen to keep.
+    """
+
     class Meta:
         verbose_name_plural = "Equity Expenses"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(cash_account__isnull=False,
+                             paid_by_cari__isnull=True)
+                    | models.Q(cash_account__isnull=True,
+                               paid_by_cari__isnull=False)
+                ),
+                name="equityexpense_one_funding_source",
+            )
+        ]
 
     def __str__(self):
         try:
@@ -930,8 +839,22 @@ class EquityExpense(models.Model):
     category = models.ForeignKey(
         ExpenseCategory, on_delete=models.CASCADE, blank=True, null=True
     )
+    # Nullable now, and only because paid_by_cari can stand in its place —
+    # see the constraint above. An expense funded by neither is rejected.
     cash_account = models.ForeignKey(
-        CashAccount, on_delete=models.CASCADE, blank=False, null=False
+        CashAccount, on_delete=models.CASCADE, blank=True, null=True
+    )
+    # The account of whoever settled this out of their own pocket. PROTECT
+    # rather than CASCADE: deleting the account they are owed through must
+    # not quietly delete the expense that explains the debt.
+    paid_by_cari = models.ForeignKey(
+        "accounting.CariAccount",
+        on_delete=models.PROTECT,
+        blank=True, null=True,
+        related_name="funded_expenses",
+        verbose_name="Paid by (current account)",
+        help_text="Somebody settled this for the book. Leave the cash "
+                  "account blank; the book ends up owing them instead.",
     )
     currency = models.ForeignKey(
         CurrencyCategory,
@@ -954,6 +877,44 @@ class EquityExpense(models.Model):
     # account_balance = models.DecimalField(
     #     max_digits=10, decimal_places=2, unique=False, blank=True
     # )
+
+    def clean(self):
+        """Exactly one funding source, said once.
+
+        The check constraint is the guarantee; this is the sentence a
+        person reads. Both errors are keyed to a real field on purpose:
+        Model.full_clean skips constraint validation for fields that
+        already failed, so keying them here is what stops the same
+        problem being reported twice — once in these words and once as
+        "constraint equityexpense_one_funding_source is violated".
+        """
+        super().clean()
+        if self.cash_account_id and self.paid_by_cari_id:
+            raise ValidationError(
+                {
+                    "cash_account": "An expense is funded once. Name the cash "
+                                    "account it left, or the current account "
+                                    "of whoever paid it — not both."
+                }
+            )
+        if not self.cash_account_id and not self.paid_by_cari_id:
+            raise ValidationError(
+                {
+                    "cash_account": "Say what funded this expense: a cash "
+                                    "account, or the current account of "
+                                    "whoever paid it for the book."
+                }
+            )
+
+    def ledger_exchange_rate(self):
+        """The rate the cari movement this expense posts converts at.
+
+        None means nobody typed one and the published rate for the date
+        applies — see CariMovement.entered_rate, which is what asks. Only
+        reached on the paid_by_cari path; an expense taken out of cash
+        posts no movement to convert.
+        """
+        return self.exchange_rate
 
 
 class EquityDivident(models.Model):

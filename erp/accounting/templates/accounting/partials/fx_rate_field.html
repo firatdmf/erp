@@ -5,8 +5,11 @@
   own currency. Either box can be typed and the other follows.
 
   Written to work on a form rendered generically rather than field by field,
-  because these three forms are, so it finds the inputs by their auto ids and
+  because these forms are, so it finds the inputs by their auto ids and
   builds the companion box itself. Include it after the form.
+
+  The entry's currency comes from whatever funds it: a cash account on every
+  form, or — on the expense form — the current account of whoever paid.
 
   Needs `base_currency` in the context (JSON from views.fx_context_json) and
   a `date_field` — capital calls its date `date_invested`, the others `date`.
@@ -15,10 +18,18 @@
 (function () {
   var BASE = {{ base_currency|default:"null"|safe }};
   var rateEl = document.getElementById('id_exchange_rate');
-  var accountEl = document.getElementById('id_cash_account');
+  // The selects that can denominate the entry. Capital, revenue and
+  // dividend have only a cash account; the expense form also offers the
+  // current account of whoever paid, and that account carries a currency
+  // of its own. Whichever one is filled decides — asking only about cash
+  // would hide the rate row on a TRY expense somebody settled, and hiding
+  // it clears the rate.
+  var accountEls = ['id_cash_account', 'id_paid_by_cari']
+    .map(function (id) { return document.getElementById(id); })
+    .filter(Boolean);
   var amountEl = document.getElementById('id_amount');
   var dateEl = document.getElementById('id_{{ date_field|default:"date" }}');
-  if (!BASE || !rateEl || !accountEl || !amountEl) return;
+  if (!BASE || !rateEl || !accountEls.length || !amountEl) return;
 
   // The <p> the rate sits in, so the whole labelled row can be hidden when
   // there is nothing to convert.
@@ -67,12 +78,21 @@
     eqEl.textContent = '\u00d7 ' + lhs + (code ? ' ' + code : '') + ' =';
   }
 
+  // The currency of whichever funding select actually has a choice in it.
+  // Only one ever does: picking either clears the other (see below), which
+  // is the same "exactly one" the model's check constraint enforces.
   function selectedCurrency() {
-    var opt = accountEl.options[accountEl.selectedIndex];
-    return opt ? {
-      id: opt.getAttribute('data-currency'),
-      code: opt.getAttribute('data-currency-code')
-    } : null;
+    for (var i = 0; i < accountEls.length; i++) {
+      var el = accountEls[i];
+      var opt = el.options[el.selectedIndex];
+      if (opt && opt.value && opt.getAttribute('data-currency')) {
+        return {
+          id: opt.getAttribute('data-currency'),
+          code: opt.getAttribute('data-currency-code')
+        };
+      }
+    }
+    return null;
   }
 
   function applies() {
@@ -157,7 +177,20 @@
   resetBtn.addEventListener('click', function () { fetchRate(true); });
   amountEl.addEventListener('input', recalcTotal);
   amountEl.addEventListener('change', recalcTotal);
-  accountEl.addEventListener('change', sync);
+  accountEls.forEach(function (el) {
+    el.addEventListener('change', function () {
+      // One funding source at a time. Enforced here as well as server-side
+      // so the answer is "the other box emptied" rather than a validation
+      // error after submit — and so the rate row below reads the currency
+      // of the account just chosen, not the one left behind.
+      if (el.value) {
+        accountEls.forEach(function (other) {
+          if (other !== el) { other.value = ''; }
+        });
+      }
+      sync();
+    });
+  });
   if (dateEl) dateEl.addEventListener('change', function () { fetchRate(false); });
 
   sync();

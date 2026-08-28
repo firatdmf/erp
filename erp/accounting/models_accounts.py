@@ -11,7 +11,7 @@ Phase 2: Invoicing.
     - InvoiceItem    : Per-line item with quantity, price, KDV, discount.
                        Items recompute Invoice totals on save.
     - Issuing a non-draft, non-proforma invoice automatically creates a
-      CariMovement (which in turn mirrors to legacy AR/AP via signals).
+      CariMovement.
     - Cancelling a posted invoice DELETES its CariMovement (terminal — no restore).
 
 Phase 3: Payments (tahsilat / ödeme).
@@ -53,11 +53,10 @@ Sign convention for CariMovement.amount:
 
 CariAccount.cached_balance follows the same sign convention.
 
-Sync with legacy accounting (signals_accounts.py):
-    A CariMovement automatically mirrors itself into
-    accounting.AssetAccountsReceivable (when amount > 0)
-    or LiabilityAccountsPayable (when amount < 0)
-    so existing dashboards keep working.
+A movement is the only record of what an account is owed or owes. It used
+to copy itself into the old AssetAccountsReceivable / LiabilityAccountsPayable
+tables as well, for dashboards that have since been removed; those tables
+are gone, and cached_balance is the single answer.
 """
 from decimal import Decimal, ROUND_HALF_UP
 from functools import lru_cache
@@ -347,6 +346,11 @@ class CariMovement(models.Model):
         ("adjustment",       _("Offset / Adjustment")),
         ("check_in",         _("Check/Note Received")),
         ("check_out",        _("Check/Note Given")),
+        # Import markers, stamped by migration 0086's backfill on rows
+        # carried over from the old system. Unrelated to the removed
+        # AssetAccountsReceivable / LiabilityAccountsPayable tables, and
+        # kept because live rows still carry them. Never user-picked —
+        # see views_accounts._HIDDEN_MOVEMENT_TYPES.
         ("legacy_ar",        _("Legacy - Receivable")),
         ("legacy_ap",        _("Legacy - Payable")),
     ]
@@ -371,11 +375,6 @@ class CariMovement(models.Model):
 
     description = models.CharField(max_length=300, blank=True)
     reference   = models.CharField(max_length=50,  blank=True, help_text="Invoice no, check no, etc.")
-
-    # Back-reference to the legacy accounting row this movement mirrors into.
-    # Populated by signals.py so updates/deletes stay in lock-step.
-    legacy_ar_id = models.PositiveIntegerField(null=True, blank=True)
-    legacy_ap_id = models.PositiveIntegerField(null=True, blank=True)
 
     # Kept for history, excluded from every total. Set on both halves of
     # a cancelled document's pair — see CariMovementQuerySet. Stored
@@ -1286,9 +1285,9 @@ class Payment(models.Model):
         """Refresh the ledger row after an edit to an already-confirmed payment.
 
         The SAME CariMovement is updated in place — never delete+recreate,
-        because `posted_movement`, the statement and the legacy AR/AP
-        mirror all reference it by id. Draft payments have posted nothing
-        yet and cancelled ones are terminal, so both are no-ops.
+        because `posted_movement` and the statement both reference it by
+        id. Draft payments have posted nothing yet and cancelled ones are
+        terminal, so both are no-ops.
 
         If `posted_movement` is somehow missing on a confirmed payment
         (confirm() always sets it in the same transaction, so this should
@@ -1320,14 +1319,6 @@ class Payment(models.Model):
             self.save(update_fields=["posted_movement", "updated_at"])
             return mv
 
-        # Changing the type flips the ledger sign, which moves the row from
-        # the receivable side of the legacy mirror to the payable side (or
-        # back). Drop the row it used to mirror into first — the post_save
-        # mirror only ever writes the side that matches the new sign, so
-        # the old one would otherwise linger forever.
-        if (mv.amount > 0) != (amount > 0):
-            self._drop_legacy_mirror(mv)
-
         mv.amount = amount
         mv.amount_base = Decimal("0")   # force recompute on save
         mv.date = self.date
@@ -1337,18 +1328,6 @@ class Payment(models.Model):
         mv.reference = self.number
         mv.save()   # CariMovement.save() already calls recompute_balance
         return mv
-
-    @staticmethod
-    def _drop_legacy_mirror(mv):
-        """Delete the legacy AR/AP row this movement mirrors into and clear
-        the back-references, so the caller's mv.save() re-mirrors clean."""
-        from accounting.models import AssetAccountsReceivable, LiabilityAccountsPayable
-        if mv.legacy_ar_id:
-            AssetAccountsReceivable.objects.filter(pk=mv.legacy_ar_id).delete()
-        if mv.legacy_ap_id:
-            LiabilityAccountsPayable.objects.filter(pk=mv.legacy_ap_id).delete()
-        mv.legacy_ar_id = None
-        mv.legacy_ap_id = None
 
     def cancel(self, user=None, reason=""):
         """Cancel a confirmed payment. Removes the CariMovement, reverses

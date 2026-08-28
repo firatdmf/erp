@@ -154,16 +154,6 @@ def validate_share_allocation(book, shares, exclude_pk=None):
     return None
 
 
-class AssetAccountsReceivableForm(forms.ModelForm):
-    class Meta:
-        model = AssetAccountsReceivable
-        fields = "__all__"
-
-        widgets = {
-            "book": forms.HiddenInput(),
-        }
-
-
 class AssetFixedAssetForm(forms.ModelForm):
     class Meta:
         model = AssetFixedAsset
@@ -175,32 +165,32 @@ class AssetFixedAssetForm(forms.ModelForm):
         }
 
 
-class LiabilityAccountsPayableForm(forms.ModelForm):
-    class Meta:
-        model = LiabilityAccountsPayable
-        fields = "__all__"
-
-        widgets = {
-            "book": forms.HiddenInput(),
-            "balance": forms.HiddenInput(),
-        }
-
-
-class CashAccountCurrencySelect(forms.Select):
-    """A cash-account select whose options carry their currency.
+class CurrencyTaggedSelect(forms.Select):
+    """An account select whose options carry their currency.
 
     The equity forms derive an entry's currency from the account it moves
     through, and decide server-side. The browser has to make the same call
     to know whether a conversion applies, so each option says which currency
     it is in rather than the script having to guess from the label text.
+
+    Serves both kinds of account the expense form now offers, which name
+    the field differently: a cash account IS a currency (`currency`), while
+    a current account merely trades in one by default
+    (`default_currency`). The script downstream only needs the answer, not
+    which attribute it came from.
     """
 
     def create_option(self, name, value, *args, **kwargs):
         option = super().create_option(name, value, *args, **kwargs)
         account = getattr(value, "instance", None)
-        if account is not None and account.currency_id:
-            option["attrs"]["data-currency"] = account.currency_id
-            option["attrs"]["data-currency-code"] = account.currency.code
+        if account is None:
+            return option
+        currency = getattr(account, "currency", None) or getattr(
+            account, "default_currency", None
+        )
+        if currency is not None:
+            option["attrs"]["data-currency"] = currency.pk
+            option["attrs"]["data-currency-code"] = currency.code
         return option
 
 
@@ -221,11 +211,12 @@ class ExchangeRateFormMixin:
             rate.widget.attrs.update({
                 "step": "0.000001", "min": "0", "placeholder": "0.000000",
             })
-        account = self.fields.get("cash_account")
-        if account is not None:
-            account.widget = CashAccountCurrencySelect(
-                choices=account.widget.choices
-            )
+        for name in ("cash_account", "paid_by_cari"):
+            account = self.fields.get(name)
+            if account is not None:
+                account.widget = CurrencyTaggedSelect(
+                    choices=account.widget.choices
+                )
         if book is not None:
             self.book_base_currency = book.effective_base_currency
 
@@ -302,6 +293,14 @@ class EquityRevenueForm(forms.ModelForm):
 
 
 class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
+    """Record an expense, and say what funded it.
+
+    Two funding fields, exactly one of which is filled — the pairing the
+    model's check constraint enforces, asked for here so the answer comes
+    back as a form error rather than an IntegrityError. Neither field is
+    required on its own, because either one alone is a complete answer.
+    """
+
     class Meta:
         model = EquityExpense
         fields = "__all__"
@@ -319,14 +318,44 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         # Set to today's date
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
 
+        # Neither funding field stands alone as "required": clean() below
+        # asks the real question, which is whether exactly one was given.
+        # Left required, the cash account would reject every expense
+        # somebody else paid before clean() ever got to look.
+        self.fields["cash_account"].required = False
+        self.fields["paid_by_cari"].required = False
+        self.fields["cash_account"].empty_label = "— paid from cash —"
+        self.fields["paid_by_cari"].empty_label = "— paid by someone else —"
+
         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
             ).select_related("currency", "book").order_by("name")
+            # Same restriction, same reason: an expense belongs to one
+            # book, so the account that funded it has to be that book's.
+            self.fields["paid_by_cari"].queryset = CariAccount.objects.filter(
+                book=book, is_active=True
+            ).select_related("default_currency").order_by("name")
             # self.fields["book"].queryset = Book.objects.filter(book=book)
 
         self._setup_exchange_rate(book)
+
+    def clean(self):
+        """Denominate the entry by whatever funded it.
+
+        Which of the two that is, and whether it is exactly one, is
+        EquityExpense.clean's question — asked of the instance in
+        _post_clean, just after this runs. Repeating it here would report
+        the same problem twice, so this only acts on the case where the
+        answer is already settled.
+        """
+        cleaned = super().clean()
+        cash = cleaned.get("cash_account")
+        cari = cleaned.get("paid_by_cari")
+        if bool(cash) != bool(cari):
+            cleaned["currency"] = cash.currency if cash else cari.default_currency
+        return cleaned
 
 
 class EquityDividentForm(ExchangeRateFormMixin, forms.ModelForm):
@@ -658,52 +687,3 @@ FinishedGoodsReceiptItemFormSet = inlineformset_factory(
     extra=1,
     can_delete=True,
 )
-
-
-class PayLiabilityAccountsPayableForm(forms.Form):
-    liability_accounts_payable = forms.ModelChoiceField(
-        queryset=LiabilityAccountsPayable.objects.all(), label="Liability to Pay"
-    )
-    cash_account = forms.ModelChoiceField(
-        queryset=CashAccount.objects.all(), label="Cash Account Used"
-    )
-
-    # This pre-populates form fields with given variables
-    def __init__(self, *args, **kwargs):
-        # You get the book variable from kwargs that was sent through the views.py file
-        book = kwargs.pop("book", None)
-        super(PayLiabilityAccountsPayableForm, self).__init__(*args, **kwargs)
-
-        # # This ensures only the same book from the model can be selected with the cash categories (accounts)
-        if book:
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(
-                book=book
-            ).order_by("name")
-            self.fields["liability_accounts_payable"].queryset = LiabilityAccountsPayable.objects.filter(
-                book=book, paid=False
-            ).order_by(("-pk"))
-            # self.fields["book"].queryset = Book.objects.filter(book=book)
-
-class GetAssetAccountsReceivableForm(forms.Form):
-    asset_accounts_receivable = forms.ModelChoiceField(
-        queryset=AssetAccountsReceivable.objects.all(), label="Receivable to get"
-    )
-    cash_account = forms.ModelChoiceField(
-        queryset=CashAccount.objects.all(), label="Cash Account to deposit"
-    )
-
-    # This pre-populates form fields with given variables
-    def __init__(self, *args, **kwargs):
-        # You get the book variable from kwargs that was sent through the views.py file
-        book = kwargs.pop("book", None)
-        super(GetAssetAccountsReceivableForm, self).__init__(*args, **kwargs)
-
-        # # This ensures only the same book from the model can be selected with the cash categories (accounts)
-        if book:
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(
-                book=book
-            ).order_by("name")
-            self.fields["asset_accounts_receivable"].queryset = AssetAccountsReceivable.objects.filter(
-                book=book, paid=False
-            ).order_by(("-pk"))
-            # self.fields["book"].queryset = Book.objects.filter(book=book)

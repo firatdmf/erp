@@ -57,7 +57,7 @@
   "Account is closed",
   "Account movement",
   "Add line items (each row has a VAT rate)",
-  "All of them were <strong>automatically</strong> migrated to Account cards (Phase 1 migration). The old tables still exist and new account movements are automatically written to them as well. We didn't break the old dashboards.",
+  "All of them were <strong>automatically</strong> migrated to Account cards. The old tables have since been removed: they were only ever a copy, and an incomplete one, so every receivable and payable now lives on the account card and nowhere else.",
   "Available actions",
   "B — I bought goods from a supplier, I will make a payment",
   "B: Purchase + Payment",

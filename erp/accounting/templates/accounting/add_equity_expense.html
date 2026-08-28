@@ -1,14 +1,567 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% load i18n %}
+{% load l10n %}
+
+{% comment %}
+  Gider ekle — the book's expense entry page.
+
+  Built on the same pf-* system as the payment form (accounts/payment_form.html)
+  so the two read as one application, and the account picker is the np-sup-*
+  one from the goods-receipt page (accounts/goods_receipt_form.html): a hidden
+  <select> as the single source of truth, type-to-search over its options with
+  Turkish-aware folding, keyboard nav, and a chip once something is picked.
+
+  The controls are hand-rendered rather than {{ form.as_p }}, but every name
+  and id is EquityExpenseForm's own — id_amount, id_date, id_cash_account,
+  id_paid_by_cari, id_exchange_rate — because partials/fx_rate_field.html
+  finds its inputs by those ids, and the view still posts through the form.
+{% endcomment %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .pf { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 1280px; margin: 0 auto; }
+  .pf, .pf * { box-sizing: border-box; }
+
+  .pf-back { display:inline-flex; align-items:center; gap:6px; padding: 6px 12px; background: white; border: 1px solid #E0E6EE; border-radius: 8px; font: 600 12.5px var(--font-sans); color: var(--gray-700); text-decoration: none; box-shadow: 0 1px 2px rgba(15,23,31,0.04); margin-bottom: 14px; transition: all 140ms; }
+  .pf-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+
+  .pf-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom: 22px; gap: 16px; }
+  .pf-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .pf-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
+
+  .pf-grid { display:grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: flex-start; }
+  @media (max-width: 1100px) { .pf-grid { grid-template-columns: 1fr; } }
+
+  .pf-card { background: white; border: 1px solid #E2E8EE; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); overflow: visible; }
+  .pf-card + .pf-card { margin-top: 14px; }
+  .pf-sect { padding: 18px 22px; }
+  .pf-sect + .pf-sect { border-top: 1px solid #EEF1F5; }
+  .pf-sect-h { display:flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .pf-sect-h .ico { display:inline-flex; align-items:center; justify-content:center; width: 28px; height: 28px; border-radius: 8px; background: var(--nejum-teal-50); color: var(--nejum-teal-700); font-size: 13px; }
+  .pf-sect-h h3 { font: 700 14px var(--font-sans); color: var(--ink); margin: 0; letter-spacing: -0.01em; }
+  .pf-sect-h .sub { font: 500 12px var(--font-sans); color: var(--gray-500); margin-left: 4px; }
+
+  .pf-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding: 9px 16px; border-radius: 10px; font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms; white-space: nowrap; text-decoration: none; border: none; }
+  .pf-btn.ghost { background: white; border:1px solid #E0E6EE; color: var(--gray-700); box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  .pf-btn.ghost:hover { background:#F8FAFC; border-color:#C5CCD3; }
+  .pf-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18); }
+  .pf-btn.primary:hover { filter: brightness(1.04); color: white; }
+
+  .pf-row { display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px 16px; }
+  .pf-row.two { grid-template-columns: 1fr 1fr; }
+  .pf-row.wide { grid-template-columns: 1fr; }
+  .pf-row + .pf-row { margin-top: 14px; }
+  @media (max-width: 720px) { .pf-row, .pf-row.two { grid-template-columns: 1fr; } }
+
+  .pf-f { display:flex; flex-direction: column; gap: 6px; }
+  .pf-f label { font: 600 11.5px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--gray-600); }
+  .pf-f .hint { font: 400 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .pf-f input, .pf-f select, .pf-f textarea {
+    width: 100%; padding: 10px 12px; background: white; border: 1px solid #E0E6EE; border-radius: 8px;
+    font: 500 13px var(--font-sans); color: var(--ink); outline: none; transition: all 140ms;
+    font-family: var(--font-sans);
+  }
+  .pf-f input:focus, .pf-f select:focus, .pf-f textarea:focus {
+    border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); background: white;
+  }
+  .pf-f input[type=date], .pf-f input[type=number] { font-variant-numeric: tabular-nums; }
+
+  /* Errors */
+  .pf-err { display:flex; gap:10px; align-items:flex-start; background: #FEF2F2; border: 1px solid #FCA5A5; color: #7F1D1D; border-radius: 10px; padding: 12px 14px; font: 500 12.5px var(--font-sans); margin-bottom: 16px; }
+  .pf-err ul { margin: 0; padding-left: 18px; }
+
+  /* Funding-source toggle — the model allows exactly one, so the control
+     offers exactly one. Radios, not JS state: the browser already enforces
+     "pick one of these", and a radio group survives a failed submit. */
+  .pf-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  @media (max-width: 720px) { .pf-seg { grid-template-columns: 1fr; } }
+  .pf-seg label {
+    display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+    border: 1px solid #E0E6EE; border-radius: 10px; padding: 12px 14px; background: white;
+    transition: all 140ms;
+  }
+  .pf-seg label:hover { border-color: #C5CCD3; background: #F8FAFC; }
+  .pf-seg input { margin: 2px 0 0; accent-color: var(--nejum-teal-500); flex: 0 0 auto; }
+  .pf-seg .t { font: 700 13px var(--font-sans); color: var(--ink); display: block; }
+  .pf-seg .d { font: 500 11.5px var(--font-sans); color: var(--gray-500); display: block; margin-top: 3px; line-height: 1.45; }
+  .pf-seg label:has(input:checked) { border-color: var(--nejum-teal-500); background: var(--nejum-teal-50); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .pf-fund[hidden] { display: none; }
+
+  /* Account type-to-search + chip — lifted verbatim from the goods-receipt
+     page so the two pickers are the same control, not two that resemble
+     each other. */
+  .np-sup { position: relative; }
+  .np-sup-results {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40;
+    background: #fff; border: 1px solid #DDE3EA; border-radius: 10px;
+    box-shadow: 0 10px 26px rgba(15,20,25,.13); max-height: 236px; overflow-y: auto; padding: 4px;
+  }
+  .np-sup-opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 10px; border-radius: 7px; cursor: pointer;
+    font: 600 13px var(--font-sans); color: #0F1419;
+  }
+  .np-sup-opt:hover, .np-sup-opt.active { background: #EFF6F5; }
+  .np-sup-opt .pfx { font: 700 10.5px var(--font-mono); color: #A9852F; letter-spacing: .5px;
+                     background: #FDF6E7; border: 1px solid #F2E2BC; border-radius: 5px; padding: 2px 6px; }
+  .np-sup-empty { padding: 9px 10px; font: 500 12.5px var(--font-sans); color: var(--gray-500); }
+  .np-sup-chip {
+    display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 12px;
+    border: 1px solid #BFE0DB; background: #EFF6F5; border-radius: 9px;
+    font: 700 13.5px var(--font-sans); color: #0B5F60;
+  }
+  .np-sup-chip > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Drawn, not typed: a "×" glyph is baseline-aligned, so it never lands in
+     the middle of its box. */
+  .np-sup-clear {
+    flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 6px; cursor: pointer;
+    background: transparent; color: #0B5F60; padding: 0; position: relative;
+    font-size: 0; line-height: 0;
+  }
+  .np-sup-clear::before, .np-sup-clear::after {
+    content: ''; position: absolute; top: 50%; left: 50%; width: 11px; height: 1.8px;
+    background: currentColor; border-radius: 2px;
+  }
+  .np-sup-clear::before { transform: translate(-50%, -50%) rotate(45deg); }
+  .np-sup-clear::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+  .np-sup-clear:hover { background: #DCEBE9; }
+  /* An author `display` beats the UA sheet's [hidden] rule, so the chip has
+     to opt back out explicitly or it shows up empty before an account is
+     picked. */
+  .np-sup-chip[hidden] { display: none; }
+  .np-input {
+    width: 100%; height: 40px; box-sizing: border-box;
+    padding: 0 12px; border: 1px solid #DDE3EA; border-radius: 9px;
+    background: white; font: 500 13.5px var(--font-sans); color: #0F1419; outline: none;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .np-input:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
+
+  /* Summary */
+  .pf-sum .row { display:flex; justify-content: space-between; align-items:center; padding: 9px 0; border-bottom: 1px dashed #E7ECF2; font: 500 13px var(--font-sans); }
+  .pf-sum .row:last-child { border-bottom: none; }
+  .pf-sum .lbl { color: var(--gray-600); }
+  .pf-sum .val { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
+  .pf-sum .row.grand { border-top: 1px solid #E2E8EE; margin-top: 6px; padding-top: 12px; }
+  .pf-effect { margin-top: 14px; background: #F8FAFC; border: 1px solid #E7ECF2; border-radius: 10px; padding: 12px 14px; font: 500 12.5px var(--font-sans); color: var(--gray-600); line-height: 1.55; }
+  .pf-effect b { color: var(--ink); }
+  .pf-actions { margin-top: 16px; display: grid; gap: 8px; }
+
+  /* The rate converter that partials/fx_rate_field.html appends, dressed to
+     match the payment form's version of the same control. */
+  .fx-extra { display: grid; grid-template-columns: auto 1.4fr auto; gap: 8px; align-items: center; margin-top: 8px; }
+  .fx-extra .fx-eq { color: var(--gray-500); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  .fx-extra .fx-total { width: 100%; padding: 10px 12px; border: 1px solid #E0E6EE; border-radius: 8px; font: 500 13px var(--font-sans); font-variant-numeric: tabular-nums; outline: none; }
+  .fx-extra .fx-total:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
+  .fx-extra .fx-code { display: none; }
+  .fx-extra .fx-reset { border: 1px solid #D7DFE8; background: #fff; border-radius: 8px; padding: .55rem .7rem; font: 600 11.5px var(--font-sans); color: #46546A; cursor: pointer; white-space: nowrap; }
+  .fx-extra .fx-reset:hover { border-color: #B9C6D4; }
+  .fx-extra .fx-note { grid-column: 1 / -1; font: 400 11.5px var(--font-sans); color: var(--gray-500); }
+  @media (max-width: 720px) { .fx-extra { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
 {% block content %}
-  {% load static %}
-  {% block css %}
-    {% comment %} <link rel="stylesheet" href="{% static 'accounting/cs/index.css' %}" /> {% endcomment %}
-  {% endblock %}
-  <form method="post">
+<div class="pf">
+  <a href="{% url 'accounting:book_detail' pk=book.pk %}" class="pf-back">&larr; {{ book.name }}</a>
+
+  <div class="pf-head">
+    <div>
+      <div class="pf-eyebrow">{% trans "Expense" %}</div>
+      <h1 class="pf-title">{% trans "Record an expense" %}</h1>
+    </div>
+  </div>
+
+  {% if form.errors %}
+  <div class="pf-err">
+    <div>
+      <strong>{% trans "This expense was not saved." %}</strong>
+      <ul>
+        {% for err in form.non_field_errors %}<li>{{ err }}</li>{% endfor %}
+        {% for field in form %}{% for err in field.errors %}<li>{{ field.label }}: {{ err }}</li>{% endfor %}{% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" id="expenseForm">
     {% csrf_token %}
-    {{ form.as_p }}
-    <input type="submit" value="Save" />
+    {% comment %}
+      Set by the view from the URL; the funding account decides the currency
+      server-side, so this is only the fallback the model default carries.
+    {% endcomment %}
+    <input type="hidden" name="book" value="{{ book.pk }}">
+    <input type="hidden" name="currency" id="id_currency" value="{{ form.currency.value|default:'' }}">
+
+    <div class="pf-grid">
+      <div>
+        <div class="pf-card">
+          <div class="pf-sect">
+            <div class="pf-sect-h">
+              <span class="ico"><i class="fa fa-receipt"></i></span>
+              <h3>{% trans "The expense" %}</h3>
+              <span class="sub">{% trans "What was spent, when, and on what" %}</span>
+            </div>
+
+            <div class="pf-row">
+              <div class="pf-f">
+                <label>{% trans "Amount" %}</label>
+                {# unlocalized: a number input only accepts a dot decimal, never 1234,56 #}
+                <input type="number" step="0.01" min="0.01" required
+                       name="amount" id="id_amount"
+                       value="{% if form.amount.value %}{{ form.amount.value|unlocalize }}{% endif %}"
+                       placeholder="{{ 0|floatformat:2 }}">
+              </div>
+              <div class="pf-f">
+                <label>{% trans "Date" %}</label>
+                {% comment %}
+                  form.data is the raw POST (empty on a fresh GET), so a
+                  rejected submit keeps what was typed and a new form opens on
+                  today — without a date object being localized into something
+                  the input cannot parse.
+                {% endcomment %}
+                <input type="date" name="date" id="id_date" required
+                       value="{{ form.data.date|default:today }}">
+              </div>
+              <div class="pf-f">
+                <label>{% trans "Category" %}</label>
+                <select name="category" id="id_category">
+                  <option value="">{% trans "— None —" %}</option>
+                  {% for c in categories %}
+                    <option value="{{ c.pk }}" {% if form.category.value|stringformat:'s' == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <div class="pf-row wide" style="margin-top:14px;">
+              <div class="pf-f">
+                <label>{% trans "Description" %}</label>
+                <input type="text" name="description" maxlength="200"
+                       value="{{ form.description.value|default_if_none:'' }}"
+                       placeholder="{% trans 'What was this expense for?' %}">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pf-card">
+          <div class="pf-sect">
+            <div class="pf-sect-h">
+              <span class="ico"><i class="fa fa-wallet"></i></span>
+              <h3>{% trans "Funded by" %}</h3>
+              <span class="sub">{% trans "Every expense has one source" %}</span>
+            </div>
+
+            <div class="pf-seg">
+              <label>
+                <input type="radio" name="funding_source" value="cash" id="fundCash"
+                       {% if not form.paid_by_cari.value %}checked{% endif %}>
+                <span>
+                  <span class="t">{% trans "Paid from cash" %}</span>
+                  <span class="d">{% trans "The money left one of the book's own accounts." %}</span>
+                </span>
+              </label>
+              <label>
+                <input type="radio" name="funding_source" value="cari" id="fundCari"
+                       {% if form.paid_by_cari.value %}checked{% endif %}>
+                <span>
+                  <span class="t">{% trans "Someone paid it for the book" %}</span>
+                  <span class="d">{% trans "Cash is untouched; the book ends up owing them instead." %}</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="pf-fund" id="fundCashPane">
+              <div class="pf-row wide">
+                <div class="pf-f">
+                  <label>{% trans "Cash Account" %}</label>
+                  <select name="cash_account" id="id_cash_account">
+                    <option value="">{% trans "— Select account —" %}</option>
+                    {% for ca in cash_accounts %}
+                      <option value="{{ ca.pk }}"
+                              data-currency="{{ ca.currency_id }}"
+                              data-currency-code="{{ ca.currency.code }}"
+                              data-label="{{ ca.name }} ({{ ca.currency.code }})"
+                              {% if form.cash_account.value|stringformat:'s' == ca.pk|stringformat:'s' %}selected{% endif %}>
+                        {{ ca.name }} ({{ ca.currency.code }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <span class="hint">{% trans "The expense is recorded in this account's currency." %}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pf-fund" id="fundCariPane" hidden>
+              <div class="pf-row wide">
+                <div class="pf-f">
+                  <label>{% trans "Current Account" %}</label>
+
+                  {% comment %}
+                    The hidden <select> is the single source of truth: the form
+                    validates this name, and fx_rate_field.html reads the
+                    currency off the selected option. The search box and chip
+                    below are only ways of setting it.
+                  {% endcomment %}
+                  <select name="paid_by_cari" id="id_paid_by_cari" style="display:none;">
+                    <option value=""></option>
+                    {% for c in cari_options %}
+                      <option value="{{ c.id }}"
+                              data-currency="{{ c.currency_id }}"
+                              data-currency-code="{{ c.currency_code }}"
+                              data-type="{{ c.type }}"
+                              data-label="{{ c.code }} — {{ c.name }}"
+                              {% if form.paid_by_cari.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                  </select>
+
+                  <div class="np-sup" id="cariBox">
+                    <input type="text" id="cariSearch" class="np-input" autocomplete="off"
+                           placeholder="{% trans 'Type an account name…' %}">
+                    <div class="np-sup-results" id="cariResults" hidden></div>
+                  </div>
+
+                  <div class="np-sup-chip" id="cariChip" hidden>
+                    <i class="fa fa-user"></i>
+                    <span id="cariChipName"></span>
+                    <button type="button" class="np-sup-clear" id="cariClear"
+                            title="{% trans 'Change account' %}">&times;</button>
+                  </div>
+
+                  <span class="hint">{% trans "The book will owe this account the amount above." %}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pf-row wide" style="margin-top:14px;">
+              <div class="pf-f">
+                <label>{% trans "Exchange rate" %}</label>
+                <input type="number" step="0.000001" min="0"
+                       name="exchange_rate" id="id_exchange_rate"
+                       value="{% if form.exchange_rate.value %}{{ form.exchange_rate.value|unlocalize }}{% endif %}"
+                       placeholder="0.000000">
+                <span class="hint">{% trans "Leave as fetched, or type the rate you actually got — either box updates the other." %}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="pf-card" style="position: sticky; top: 16px;">
+          <div class="pf-sect">
+            <div class="pf-sect-h">
+              <span class="ico"><i class="fa fa-calculator"></i></span>
+              <h3>{% trans "Summary" %}</h3>
+            </div>
+            <div class="pf-sum">
+              <div class="row"><span class="lbl">{% trans "Amount" %}</span><span class="val" id="sumAmount">{{ 0|floatformat:2 }}</span></div>
+              <div class="row grand"><span class="lbl">{% trans "Currency" %}</span><span class="val" id="sumCurrency">—</span></div>
+            </div>
+
+            <div class="pf-effect" id="sumEffect">
+              {% trans "Choose what funded this expense." %}
+            </div>
+
+            <div class="pf-actions">
+              <button type="submit" class="pf-btn primary">{% trans "Save expense" %}</button>
+              <a href="{% url 'accounting:book_detail' pk=book.pk %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </form>
+</div>
 
 {% include "accounting/partials/fx_rate_field.html" with date_field="date" %}
+
+<script>
+(function () {
+  var cashPane = document.getElementById('fundCashPane');
+  var cariPane = document.getElementById('fundCariPane');
+  var cashSel  = document.getElementById('id_cash_account');
+  var cariSel  = document.getElementById('id_paid_by_cari');
+  var amountEl = document.getElementById('id_amount');
+
+  // ── Funding source ────────────────────────────────────────────────
+  // Showing one pane and clearing the other is what makes "exactly one"
+  // true of the POST, not just of the layout: a hidden select still
+  // submits its value, and two funding sources is the one thing
+  // EquityExpense's check constraint refuses.
+  function applyFunding() {
+    var cari = document.getElementById('fundCari').checked;
+    cariPane.hidden = !cari;
+    cashPane.hidden = cari;
+    if (cari) { cashSel.value = ''; } else { setCari(''); }
+    cashSel.dispatchEvent(new Event('change'));
+    syncSummary();
+  }
+  ['fundCash', 'fundCari'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', applyFunding);
+  });
+
+  // ── Account picker ────────────────────────────────────────────────
+  // Type-to-search over the hidden <select>'s options — the whole list is
+  // already on the page, so filtering is instant and costs no round trip.
+  var search  = document.getElementById('cariSearch');
+  var results = document.getElementById('cariResults');
+  var chip    = document.getElementById('cariChip');
+  var box     = document.getElementById('cariBox');
+  var active  = -1;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  // Match the Turkish-aware folding the server does, so typing "kizil"
+  // finds "Kızılırmak" and "OZ" finds "Öz".
+  function fold(s) {
+    return (s || '').toLocaleUpperCase('tr')
+      .replace(/[ÇĞİIÖŞÜ]/g, function (c) {
+        return { 'Ç':'C','Ğ':'G','İ':'I','I':'I','Ö':'O','Ş':'S','Ü':'U' }[c];
+      }).trim();
+  }
+
+  function options() {
+    return Array.prototype.slice.call(cariSel.options).filter(function (o) { return o.value; });
+  }
+
+  function labelOf(o) { return o.getAttribute('data-label') || o.textContent; }
+
+  function render(q) {
+    var needle = fold(q);
+    var matches = options().filter(function (o) {
+      return !needle || fold(labelOf(o)).indexOf(needle) !== -1;
+    });
+    active = -1;
+    var html = matches.map(function (o, i) {
+      // The list spans every account type — show it, so a same-named
+      // customer account isn't picked by mistake.
+      var t = o.getAttribute('data-type') || '';
+      return '<div class="np-sup-opt" data-id="' + esc(o.value) + '" data-i="' + i + '">' +
+             '<span>' + esc(labelOf(o)) +
+             (t ? ' <span style="color:var(--gray-500);font-size:11px;">· ' + esc(t) + '</span>' : '') +
+             '</span>' +
+             '<span class="pfx">' + esc(o.getAttribute('data-currency-code') || '') + '</span></div>';
+    }).join('');
+    if (!matches.length) {
+      html = '<div class="np-sup-empty">{% trans "No account matches" %}</div>';
+    }
+    results.innerHTML = html;
+    results.hidden = false;
+    Array.prototype.forEach.call(results.querySelectorAll('.np-sup-opt'), function (el) {
+      el.addEventListener('mousedown', function (e) {
+        e.preventDefault();   // keep focus so blur doesn't close first
+        setCari(el.dataset.id);
+      });
+    });
+  }
+
+  // Every path funnels through here, so the hidden <select> and the chip
+  // can never disagree — and the `change` it fires is what lets
+  // fx_rate_field.html pick the rate up (assigning .value never fires one).
+  function setCari(id) {
+    cariSel.value = id || '';
+    syncChip();
+    cariSel.dispatchEvent(new Event('change'));
+    syncSummary();
+  }
+
+  function syncChip() {
+    var opt = cariSel.options[cariSel.selectedIndex];
+    var picked = !!(opt && opt.value);
+    chip.hidden = !picked;
+    box.hidden = picked;
+    results.hidden = true;
+    if (picked) { document.getElementById('cariChipName').textContent = labelOf(opt); }
+    else { search.value = ''; }
+  }
+
+  document.getElementById('cariClear').addEventListener('click', function () {
+    setCari('');
+    search.focus();
+  });
+  search.addEventListener('input', function () { render(this.value); });
+  search.addEventListener('focus', function () { render(this.value); });
+  search.addEventListener('blur', function () {
+    setTimeout(function () { results.hidden = true; }, 120);
+  });
+  search.addEventListener('keydown', function (e) {
+    var rows = results.hidden ? [] : results.querySelectorAll('.np-sup-opt[data-id]');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!rows.length) return;
+      e.preventDefault();
+      active = (active + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length;
+      Array.prototype.forEach.call(rows, function (r, i) { r.classList.toggle('active', i === active); });
+      rows[active].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      var row = rows[active] || rows[0];
+      if (row) setCari(row.dataset.id);
+    } else if (e.key === 'Escape') {
+      results.hidden = true;
+    }
+  });
+
+  // The fx script clears whichever funding select the user did not pick;
+  // the chip has to hear about it or it goes on naming an account the
+  // form is no longer submitting.
+  cariSel.addEventListener('change', function () { syncChip(); syncSummary(); });
+  cashSel.addEventListener('change', syncSummary);
+  amountEl.addEventListener('input', syncSummary);
+
+  // ── Summary ───────────────────────────────────────────────────────
+  function syncSummary() {
+    var amount = parseFloat(amountEl.value);
+    document.getElementById('sumAmount').textContent =
+      isFinite(amount) ? amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00';
+
+    var usingCari = document.getElementById('fundCari').checked;
+    var sel = usingCari ? cariSel : cashSel;
+    var opt = sel.options[sel.selectedIndex];
+    var picked = !!(opt && opt.value);
+    document.getElementById('sumCurrency').textContent =
+      picked ? (opt.getAttribute('data-currency-code') || '—') : '—';
+
+    // Whole sentences with a placeholder, not fragments concatenated around
+    // the name: Turkish puts the account where English puts the verb, and a
+    // translator handed "The balance of" + "goes down by this amount" has no
+    // way to reorder them.
+    var effect = document.getElementById('sumEffect');
+    if (!picked) {
+      effect.innerHTML = '{% trans "Choose what funded this expense." %}';
+    } else {
+      var tpl = usingCari
+        ? '{% trans "Cash is untouched. The book will owe {name} this amount." %}'
+        : '{% trans "The balance of {name} goes down by this amount." %}';
+      effect.innerHTML = esc(tpl).replace('{name}', '<b>' + esc(labelOf(opt)) + '</b>');
+    }
+  }
+
+  // Opening state — an edit or a rejected submit can arrive with either
+  // source already filled.
+  syncChip();
+  applyFunding();
+})();
+</script>
 {% endblock %}

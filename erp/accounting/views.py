@@ -522,20 +522,6 @@ class BookDetail(generic.DetailView):
         context["is_my_working_book"] = bool(
             member and member.default_book_id == book.pk)
         context["my_working_book"] = getattr(member, "default_book", None)
-        # Legacy Asset Accounts Receivable + Liability Accounts Payable for this book
-        context["accounts_receivable"] = (
-            AssetAccountsReceivable.objects
-            .filter(book=book)
-            .select_related("currency", "contact", "company", "supplier",
-                            "paid_to_cash_account")
-            .order_by("-created_at")
-        )
-        context["accounts_payable"] = (
-            LiabilityAccountsPayable.objects
-            .filter(book=book)
-            .select_related("currency", "supplier", "paid_with_cash_account")
-            .order_by("-created_at")
-        )
         context["cash_accounts"] = (
             CashAccount.objects.filter(book=book)
             .select_related("currency")
@@ -595,14 +581,15 @@ class BookDetail(generic.DetailView):
         """Assets = Liabilities + Equity, as far as the data supports it.
 
         Receivables and payables are read off CariAccount.cached_balance,
-        NOT the AssetAccountsReceivable / LiabilityAccountsPayable tables.
-        Those two are append-only mirrors that signals_accounts writes on
-        every CariMovement, and _mirror_to_legacy silently skips the
-        movement types it has no side for — so the payable mirror holds ten
-        rows where the ledger has three hundred. Summing them reports a
-        position that is off by six figures. cached_balance is the netted
-        figure the rest of the app already trusts, and it reconciles to the
-        Excel export to the cent.
+        which is now the only place they live. They were also mirrored into
+        AssetAccountsReceivable / LiabilityAccountsPayable tables, which
+        this function pointedly did not sum: those mirrors were written per
+        movement and never netted, and a payable was skipped outright
+        unless the account carried a supplier FK, so the payable table held
+        ten rows where the ledger had three hundred. Summing them reported
+        a position off by six figures. The tables are gone; cached_balance
+        is the netted figure the rest of the app already trusts, and it
+        reconciles to the Excel export to the cent.
 
         The equation will NOT balance, and that is a property of the data
         rather than of this function. Equity here is only the four figures
@@ -869,24 +856,44 @@ def handle_equity_transaction(
     return True
 
 
-def handle_payable_and_receivable(
-    book, amount, currency, model_instance, model_pk, cash_account
-):
-    is_amount_positive = False  # initialize the value
-    if isinstance(model_instance, AssetAccountsReceivable):
-        is_amount_positive = True
-    elif isinstance(model_instance, LiabilityAccountsPayable):
-        is_amount_positive = False
+def handle_expense_on_account(book, expense, member=None):
+    """Post the credit for an expense somebody else settled.
 
-    content_type = ContentType.objects.get_for_model(model_instance)
-    cash_transaction_entry = CashTransactionEntry.objects.create(
+    The cash path (handle_equity_transaction) credits a cash account and
+    writes a CashTransactionEntry. There is nothing to credit here: the
+    money left somebody's own pocket, not the book's. What the book gained
+    is a debt to them, so the credit goes to their current account and the
+    cash ledger is left alone — which is the whole point, since a cash
+    entry would report money leaving an account it never sat in.
+
+    Typed `adjustment` rather than `collection`, deliberately. A collection
+    means money came in, and signals_accounts mirrors one into a Payment
+    row that then shows in the tahsilat list; nothing was collected here,
+    so nothing should appear there. `adjustment` is mirrored to no Payment
+    at all.
+
+    The movement points back at the expense through the generic source FK,
+    so the two halves are one document rather than two rows that happen to
+    agree — and so CariMovement.entered_rate can ask the expense what rate
+    it was recorded at, via EquityExpense.ledger_exchange_rate.
+    """
+    return CariMovement.objects.create(
+        cari=expense.paid_by_cari,
         book=book,
-        content_type=content_type,
-        content_pk=model_pk,
-        amount=amount,
-        is_amount_positive=is_amount_positive,
-        currency=currency,
-        cash_account=cash_account,
+        date=expense.date,
+        # Negative: the book owes them. Same sign convention the cari
+        # detail page reads, where a negative balance is a payable.
+        amount=-abs(expense.amount),
+        currency=expense.currency,
+        movement_type="adjustment",
+        source_type=ContentType.objects.get_for_model(EquityExpense),
+        source_id=expense.pk,
+        description=(
+            expense.description
+            or (expense.category.name if expense.category else "")
+            or "Expense paid on the book's behalf"
+        )[:300],
+        created_by=member,
     )
 
 
@@ -1103,6 +1110,30 @@ class AddEquityExpense(generic.edit.CreateView):
         context = super().get_context_data(**kwargs)
         book = Book.objects.filter(pk=self.kwargs.get("pk")).first()
         context["base_currency"] = fx_context_json(book)
+        context["book"] = book
+        # ISO, because <input type="date"> accepts nothing else — the
+        # localized rendering a date object would get here is exactly what
+        # leaves the field blank in a Turkish locale.
+        context["today"] = timezone.localdate().isoformat()
+        # The full page renders its own controls rather than {{ form.as_p }},
+        # so it needs the options as data. The form's querysets stay the
+        # authority on what is ACCEPTED — these only decide what is offered,
+        # and both are scoped to the same book.
+        form = context.get("form")
+        if form is not None:
+            context["cash_accounts"] = form.fields["cash_account"].queryset
+            context["cari_options"] = [
+                {
+                    "id": c.pk,
+                    "code": c.code,
+                    "name": c.name,
+                    "type": c.get_type_display(),
+                    "currency_id": c.default_currency_id,
+                    "currency_code": c.default_currency.code,
+                }
+                for c in form.fields["paid_by_cari"].queryset
+            ]
+            context["categories"] = form.fields["category"].queryset
         return context
 
     def get_template_names(self):
@@ -1135,23 +1166,33 @@ class AddEquityExpense(generic.edit.CreateView):
 
         # expense amount
         amount = form.cleaned_data.get("amount")
+        # Exactly one of these is set — the form's clean() and the model's
+        # check constraint both say so, so the branch below is a choice
+        # between two funded expenses, never a check for an unfunded one.
         cash_account = form.cleaned_data.get("cash_account")
-        if not cash_account:
-            form.add_error("cash_account", "Please select a valid cash account.")
-            return self.form_invalid(form)
-            # Set the currency to the deposited_cash_account's currency
-        currency = cash_account.currency
+        cari = form.cleaned_data.get("paid_by_cari")
+        # The entry is denominated by whatever funded it; the form settled
+        # which that is.
+        currency = form.cleaned_data.get("currency")
         self.object = form.save(commit=False)
         self.object.currency = currency
         self.object.save()
         equity_pk = self.object.pk
         equity_instance = self.object
-        result = handle_equity_transaction(
-            book, amount, currency, equity_instance, equity_pk, cash_account
-        )
-        if result is not True:
-            form.add_error(None, "Form error: in handle_equity_transaction function")
-            return self.form_invalid(form)
+        if cash_account:
+            result = handle_equity_transaction(
+                book, amount, currency, equity_instance, equity_pk, cash_account
+            )
+            if result is not True:
+                form.add_error(None, "Form error: in handle_equity_transaction function")
+                return self.form_invalid(form)
+        else:
+            # No cash moved, so no CashTransactionEntry and no account
+            # balance to touch. The credit goes to the account of whoever
+            # paid — see handle_expense_on_account.
+            handle_expense_on_account(
+                book, equity_instance, getattr(self.request.user, "member", None)
+            )
 
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
@@ -1276,32 +1317,6 @@ class AddEquityDivident(generic.edit.CreateView):
 
 
 @method_decorator(login_required, name="dispatch")
-class AddAccountsReceivable(generic.edit.CreateView):
-    model = AssetAccountsReceivable
-    form_class = AssetAccountsReceivableForm
-    template_name = "accounting/add_accounts_receivable.html"
-    # fields = "__all__"
-
-    # below preselected the book field of the capital model (independent of the above function)
-    def get_initial(self):
-        # Get the book by primary key from the URL
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved, and currency to usd
-        return {"book": book, "currency": 1}
-
-    def get_success_url(self) -> str:
-        return reverse_lazy(
-            "accounting:add_accounts_receivable", kwargs={"pk": self.kwargs.get("pk")}
-        )
-
-    # def get_form_kwargs(self):
-    #     book =
-    #     self.kwargs['book'] = book
-    #     return super().get_form_kwargs()
-
-
-@method_decorator(login_required, name="dispatch")
 class AddFixedAsset(generic.edit.CreateView):
     model = AssetFixedAsset
     form_class = AssetFixedAssetForm
@@ -1328,27 +1343,6 @@ class EditFixedAsset(generic.edit.UpdateView):
     def get_success_url(self) -> str:
         return reverse_lazy(
             "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
-        )
-
-
-@method_decorator(login_required, name="dispatch")
-class AddAccountsPayable(generic.edit.CreateView):
-    model = LiabilityAccountsPayable
-    form_class = LiabilityAccountsPayableForm
-    template_name = "accounting/add_accounts_payable.html"
-    # fields = "__all__"
-
-    # below preselected the book field of the capital model (independent of the above function)
-    def get_initial(self):
-        # Get the book by primary key from the URL
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved, and currency to usd
-        return {"book": book, "currency": 1}
-
-    def get_success_url(self) -> str:
-        return reverse_lazy(
-            "accounting:add_accounts_payable", kwargs={"pk": self.kwargs.get("pk")}
         )
 
 
@@ -1382,7 +1376,7 @@ class EquityExpenseList(generic.ListView):
         book_pk = self.kwargs.get("pk")
         return (
             EquityExpense.objects.filter(book=book_pk)
-            .select_related("category", "cash_account", "currency")
+            .select_related("category", "cash_account", "paid_by_cari", "currency")
             .order_by("-date", "-pk")
         )
 
@@ -2066,104 +2060,6 @@ class CreateAssetInventoryRawMaterialGood(generic.CreateView):
 #         return self.form_invalid(request, form, formset)
 
 
-class FinishedGoodsReceipt(View):
-    template_name = "accounting/finished_goods_receipt.html"
-
-    def form_invalid(self, request, form, formset, error_message=None):
-        return render(
-            request,
-            self.template_name,
-            {
-                "form": form,
-                "formset": formset,
-                "error_message": error_message
-                or "There were errors in your submission.",
-            },
-        )
-
-    def get(self, request, *args, **kwargs):
-        book_pk = kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        form = FinishedGoodsReceiptForm(book=book)
-        # formset = GoodsReceiptItemFormSet()
-        formset = FinishedGoodsReceiptItemFormSet(prefix="receiveditem_set")
-        return render(request, self.template_name, {"form": form, "formset": formset})
-
-    def post(self, request, *args, **kwargs):
-        book_pk = kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        form = FinishedGoodsReceiptForm(request.POST, book=book)
-        formset = FinishedGoodsReceiptItemFormSet(
-            request.POST, prefix="receiveditem_set"
-        )
-        if form.is_valid() and formset.is_valid():
-            try:
-                with transaction.atomic():
-                    # Process the form and formset data
-                    # Save the raw goods receipt and items
-                    finished_goods_receipt = form.save(commit=False)
-                    finished_goods_receipt.book = book
-                    finished_goods_receipt.save()
-                    items = formset.save(commit=False)
-                    for item in items:
-                        item.goods_receipt = finished_goods_receipt
-                        item.finished_good.unit_cost = item.unit_cost
-                        item.finished_good.save(update_fields=["unit_cost"])
-                        item.save()
-
-                    payment_status = form.cleaned_data.get("payment_status")
-                    receipt_total_cost = finished_goods_receipt.total_cost
-                    if payment_status:
-                        # If the payment status is paid, update the cash account
-                        cash_account = form.cleaned_data.get("cash_account")
-                        # cash_account = CashAccount.objects.get(pk=cash_account.pk)
-
-                        new_cash_account_balance = (
-                            cash_account.balance - receipt_total_cost
-                        )
-                        cash_account.balance = new_cash_account_balance
-                        cash_account.save(update_fields=["balance"])
-                        CashTransactionEntry_object = (
-                            CashTransactionEntry.objects.create(
-                                book=book,
-                                value=receipt_total_cost,
-                                is_amount_positive=False,
-                                type="purchase",
-                                account=cash_account,
-                                account_balance=cash_account.balance,
-                            )
-                        )
-                        CashTransactionEntry_object.save()
-                    else:
-                        liability_accounts_payable = LiabilityAccountsPayable.objects.create(
-                            supplier=finished_goods_receipt.supplier,
-                            book=book,
-                            amount=receipt_total_cost,
-                            is_amount_positive=False,
-                            finished_goods_receipt=finished_goods_receipt,
-                            # invoice
-                            # currency=raw_goods_receipt.currency,
-                        )
-                        liability_accounts_payable.save()
-                    return render(
-                        request,
-                        self.template_name,
-                        {
-                            "form": form,
-                            "formset": formset,
-                            "message": "Receipt created successfully!",
-                        },
-                    )
-            except Exception as e:
-                form.add_error(None, f"An unexpected error occurred: {e}")
-                return self.form_invalid(form)
-
-        # If invalid, print errors for debugging
-        print("Form errors:", form.errors)
-        print("Formset errors:", formset.errors)
-        return self.form_invalid(request, form, formset)
-
-
 # # api calls
 # def asset_inventory_raw_material_lookup(request, pk):
 #     book = get_object_or_404(Book, pk=pk)
@@ -2183,154 +2079,6 @@ class FinishedGoodsReceipt(View):
 #             {"materials": matches, "query": query},
 #         )
 #     return HttpResponse("<p class='error'>Invalid request method</p>", status=400)
-
-
-# create pay accounts payable
-# add transaction
-# deduct from cash account.
-
-
-class PayLiabilityAccountsPayable(generic.edit.FormView):
-    # book = self.kwargs.get()
-    # model = LiabilityAccountsPayable
-    form_class = PayLiabilityAccountsPayableForm
-    template_name = "accounting/pay_liability_accounts_payable.html"
-
-    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        kwargs["book"] = book
-        return kwargs
-
-    # below pre-selecting the book field in the form according to the pk in the url
-    # get initial is a function that is applicable to update and create views like these forms.
-    def get_initial(self):
-        # Get the book by primary key from the URL
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved
-        # By default make the currency US Dollars (which is 1)
-        return {"book": book}
-
-    def form_valid(self, form):
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        with transaction.atomic():
-            try:
-                liability_accounts_payable = form.cleaned_data[
-                    "liability_accounts_payable"
-                ]
-                cash_account = form.cleaned_data["cash_account"]
-            except KeyError as e:
-                raise ValidationError({str(e): "This field is required."})
-            except LiabilityAccountsPayable.DoesNotExist:
-                raise ValidationError(
-                    {"liability_accounts_payable": "Liability record not found."}
-                )
-            except CashAccount.DoesNotExist:
-                raise ValidationError({"cash_account": "Cash account not found."})
-
-            liability_accounts_payable.paid = True
-            liability_accounts_payable.paid_with_cash_account = cash_account
-            cash_account.balance -= liability_accounts_payable.amount
-            liability_accounts_payable.save(
-                update_fields=["paid", "paid_with_cash_account"]
-            )
-            cash_account.save(update_fields=["balance"])
-
-            # later add cash_transaction_entry
-
-            handle_payable_and_receivable(
-                book=book,
-                amount=liability_accounts_payable.amount,
-                currency=cash_account.currency,
-                model_instance=liability_accounts_payable,
-                model_pk=liability_accounts_payable.pk,
-                cash_account=cash_account,
-            )
-
-            # continue logic...
-            return super().form_valid(form)
-
-    # Takes you to the newly created book's detail page
-    def get_success_url(self) -> str:
-        return reverse_lazy("accounting:index")
-
-
-# create get accounts receivable
-# add transaction
-# add to cash account.
-
-
-class GetAssetAccountsReceivable(generic.edit.FormView):
-    # book = self.kwargs.get()
-    # model = LiabilityAccountsPayable
-    form_class = GetAssetAccountsReceivableForm
-    template_name = "accounting/get_asset_accounts_receivable.html"
-
-    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        kwargs["book"] = book
-        return kwargs
-
-    # below pre-selecting the book field in the form according to the pk in the url
-    # get initial is a function that is applicable to update and create views like these forms.
-    def get_initial(self):
-        # Get the book by primary key from the URL
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved
-        # By default make the currency US Dollars (which is 1)
-        return {"book": book}
-
-    def form_valid(self, form):
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        with transaction.atomic():
-            try:
-                asset_accounts_receivable = form.cleaned_data[
-                    "asset_accounts_receivable"
-                ]
-                cash_account = form.cleaned_data["cash_account"]
-            except KeyError as e:
-                raise ValidationError({str(e): "This field is required."})
-            except LiabilityAccountsPayable.DoesNotExist:
-                raise ValidationError(
-                    {"asset_accounts_receivable": "Liability record not found."}
-                )
-            except CashAccount.DoesNotExist:
-                raise ValidationError({"cash_account": "Cash account not found."})
-
-            asset_accounts_receivable.paid = True
-            asset_accounts_receivable.paid_to_cash_account = cash_account
-            cash_account.balance += asset_accounts_receivable.amount
-            asset_accounts_receivable.save(
-                update_fields=["paid", "paid_to_cash_account"]
-            )
-            cash_account.save(update_fields=["balance"])
-
-            # later add cash_transaction_entry
-
-            handle_payable_and_receivable(
-                book=book,
-                amount=asset_accounts_receivable.amount,
-                currency=cash_account.currency,
-                model_instance=asset_accounts_receivable,
-                model_pk=asset_accounts_receivable.pk,
-                cash_account=cash_account,
-            )
-
-            # continue logic...
-            return super().form_valid(form)
-
-    # Takes you to the newly created book's detail page
-    def get_success_url(self) -> str:
-        return reverse_lazy("accounting:index")
 
 
 # def kpi_dashboard(request, pk):

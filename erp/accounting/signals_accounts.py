@@ -4,12 +4,17 @@ Signals for the accounting cari ledger.
 Two responsibilities:
 
 1. Auto-assign CARI-XXX code when a CariAccount is being created without one.
-2. Mirror CariMovement → legacy accounting.AssetAccountsReceivable /
-   LiabilityAccountsPayable so existing accounting dashboards & reports keep
-   working without modification.
+2. Mirror collection/payment CariMovements into Payment rows, so a movement
+   entered anywhere still appears on the payments list.
 
-The mirror is one-way (Cari → legacy). Once we deprecate the legacy AR/AP
-views we can remove this. For now both worlds coexist safely.
+There used to be a third: a one-way mirror of every movement into the old
+AssetAccountsReceivable / LiabilityAccountsPayable tables, kept so the
+legacy accounting dashboards would go on working. Those tables are gone.
+They were append-only and lossy — a payable was skipped outright unless
+the account happened to carry a supplier FK, and gross rows were never
+netted — which is why the accounting equation stopped reading them long
+before this. Receivables and payables are CariAccount.cached_balance now,
+and that is the only place they are.
 """
 from decimal import Decimal
 
@@ -53,81 +58,7 @@ def assign_cari_code(sender, instance, **kwargs):
 
 
 # ---------------------------------------------------------------------------
-# 2. Mirror to legacy accounting AR/AP
-# ---------------------------------------------------------------------------
-def _mirror_to_legacy(movement):
-    """
-    Mirror a CariMovement into AssetAccountsReceivable (if amount > 0)
-    or LiabilityAccountsPayable (if amount < 0).
-
-    Skipped silently if neither side applies (zero amount, adjustment etc).
-    """
-    from accounting.models import AssetAccountsReceivable, LiabilityAccountsPayable
-
-    cari = movement.cari
-
-    if movement.amount > 0:
-        # Cari owes us → Accounts Receivable
-        ar_kwargs = dict(
-            book=movement.book,
-            currency=movement.currency,
-            amount=movement.amount,
-            paid=False,
-        )
-        # AR accepts contact/company/supplier — pick whichever cari has
-        if cari.contact_id:
-            ar_kwargs["contact"] = cari.contact
-        elif cari.company_id:
-            ar_kwargs["company"] = cari.company
-        elif cari.supplier_id:
-            ar_kwargs["supplier"] = cari.supplier
-
-        if movement.legacy_ar_id:
-            AssetAccountsReceivable.objects.filter(pk=movement.legacy_ar_id).update(
-                **{k: v for k, v in ar_kwargs.items() if k != "paid"}
-            )
-        else:
-            ar = AssetAccountsReceivable.objects.create(**ar_kwargs)
-            CariMovement.objects.filter(pk=movement.pk).update(legacy_ar_id=ar.pk)
-
-    elif movement.amount < 0:
-        # We owe cari → Accounts Payable (supplier-only in legacy schema)
-        if not cari.supplier_id:
-            return  # legacy AP requires a supplier; skip if not applicable
-        ap_kwargs = dict(
-            book=movement.book,
-            currency=movement.currency,
-            amount=abs(movement.amount),
-            supplier=cari.supplier,
-            paid=False,
-        )
-        if movement.legacy_ap_id:
-            LiabilityAccountsPayable.objects.filter(pk=movement.legacy_ap_id).update(
-                **{k: v for k, v in ap_kwargs.items() if k != "paid"}
-            )
-        else:
-            ap = LiabilityAccountsPayable.objects.create(**ap_kwargs)
-            CariMovement.objects.filter(pk=movement.pk).update(legacy_ap_id=ap.pk)
-
-
-@receiver(post_save, sender=CariMovement)
-def mirror_movement_to_legacy(sender, instance, created, **kwargs):
-    # Avoid mirroring during the backfill migration — it sets movement_type
-    # to legacy_ar / legacy_ap and we don't want to write duplicates back.
-    if instance.movement_type in ("legacy_ar", "legacy_ap"):
-        return
-    try:
-        _mirror_to_legacy(instance)
-    except Exception as exc:
-        # Never block the save if the legacy mirror fails — log and continue.
-        import logging
-        logging.getLogger("accounting.accounts").warning(
-            "Legacy mirror failed for CariMovement %s: %s", instance.pk, exc
-        )
-
-
-# ---------------------------------------------------------------------------
-# 3. Mirror collection/payment CariMovements into Payment rows
+# 2. Mirror collection/payment CariMovements into Payment rows
 #
 # Without this, anything that creates a "collection" or "payment" type
 # CariMovement directly (Add Movement form, manual code, scripts, etc.)
@@ -197,12 +128,14 @@ def mirror_movement_to_payment(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=CariMovement)
-def unmirror_movement(sender, instance, **kwargs):
-    from accounting.models import AssetAccountsReceivable, LiabilityAccountsPayable
-    if instance.legacy_ar_id:
-        AssetAccountsReceivable.objects.filter(pk=instance.legacy_ar_id).delete()
-    if instance.legacy_ap_id:
-        LiabilityAccountsPayable.objects.filter(pk=instance.legacy_ap_id).delete()
+def recompute_after_delete(sender, instance, **kwargs):
+    """A deleted movement leaves a balance that no longer counts it.
+
+    This used to also delete the legacy AR/AP rows the movement mirrored
+    into; those tables are gone, so recomputing is all that is left — and
+    it is the part that always mattered, since cached_balance is what the
+    account page and the accounting equation both read.
+    """
     # Refresh cached balance on the parent cari (movement is gone now)
     if instance.cari_id:
         try:

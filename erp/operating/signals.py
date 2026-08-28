@@ -316,32 +316,12 @@ def update_receipt_liability(sender, instance, **kwargs):
         instance.receipt.save()
 
 
-# create liability accounts payable when we create a receipt with items.
-@receiver(post_save, sender=RawMaterialGoodReceipt)
-def create_or_update_liability_for_receipt(sender, instance, created, **kwargs):
-    from accounting.models import LiabilityAccountsPayable
-
-    """
-    Sync LiabilityAccountsPayable whenever a RawMaterialGoodReceipt is saved.
-    """
-    # only process if receipt has items
-    if not instance.items.exists():
-        return
-    
-    print("your instance amount is: ", instance.amount)
-
-    with transaction.atomic():
-        liability_accounts_payable, created = (
-            LiabilityAccountsPayable.objects.update_or_create(
-                raw_material_good_receipt=instance,
-                defaults={
-                    "book": instance.book,
-                    "paid":False,
-                    "amount": "%.2f" % instance.amount, #2 decimal fields only.
-                    "supplier": instance.supplier,
-                },
-            )
-        )
+# A raw-material receipt used to sync a LiabilityAccountsPayable row here.
+# That table is gone, and nothing replaces the receiver: a purchase now
+# posts its debt to a current account through the intake panel, which
+# writes a purchase Invoice against the cari the operator picks (see
+# accounting.views_purchase.GoodsReceipt). Reviving this would post the
+# same debt twice.
 
 
 # Order audit trail — signal receivers live in audit.py; importing

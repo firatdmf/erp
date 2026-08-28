@@ -2648,6 +2648,9 @@ msgstr "İlk"
 msgid "Folder"
 msgstr "Klasör"
 
+msgid "Funded by"
+msgstr "Ödeyen"
+
 msgid "Follow"
 msgstr "Takip Et"
 
@@ -4759,16 +4762,6 @@ msgstr "Tüm cariler"
 
 msgid "All invoices are paid."
 msgstr "Tüm faturalar ödendi."
-
-msgid ""
-"All of them were <strong>automatically</strong> migrated to Account cards "
-"(Phase 1 migration). The old tables still exist and new account movements "
-"are automatically written to them as well. We didn't break the old "
-"dashboards."
-msgstr ""
-"Hepsi <strong>otomatik olarak</strong> Cari kartlarına taşındı (Faz 1 "
-"migrasyonu). Eski tablolar hâlâ duruyor ve yeni cari hareketleri onlara da "
-"otomatik yazılıyor. Eski panoları bozmadık."
 
 msgid "All sales / purchase / return / proforma invoices"
 msgstr "Tüm satış / alış / iade / proforma faturaları"
@@ -8796,3 +8789,57 @@ msgstr "Ne alındı, hangi cariden ve hangi toplar geldi — genel fatura görü
 
 msgid "This permanently deletes the physical stock this purchase brought in and cannot be undone. Type the purchase number to confirm:"
 msgstr "Bu işlem alımla giren fiziksel stoğu kalıcı olarak siler ve geri alınamaz. Onaylamak için alım numarasını yazın:"
+
+msgid "Record an expense"
+msgstr "Gider kaydet"
+
+msgid "This expense was not saved."
+msgstr "Bu gider kaydedilmedi."
+
+msgid "The expense"
+msgstr "Gider"
+
+msgid "What was spent, when, and on what"
+msgstr "Ne kadar, ne zaman ve ne için harcandı"
+
+msgid "Every expense has one source"
+msgstr "Her giderin tek bir kaynağı vardır"
+
+msgid "Paid from cash"
+msgstr "Kasadan ödendi"
+
+msgid "The money left one of the book's own accounts."
+msgstr "Para, defterin kendi kasalarından birinden çıktı."
+
+msgid "Someone paid it for the book"
+msgstr "Defter adına başkası ödedi"
+
+msgid "Cash is untouched; the book ends up owing them instead."
+msgstr "Kasaya dokunulmaz; defter bunun yerine o kişiye borçlanır."
+
+msgid "The expense is recorded in this account's currency."
+msgstr "Gider bu hesabın para biriminde kaydedilir."
+
+msgid "The book will owe this account the amount above."
+msgstr "Defter bu hesaba yukarıdaki tutarı borçlanacak."
+
+msgid "Exchange rate"
+msgstr "Kur"
+
+msgid "Leave as fetched, or type the rate you actually got — either box updates the other."
+msgstr "Çekilen kuru bırakın ya da gerçekte aldığınız kuru yazın — biri diğerini günceller."
+
+msgid "Choose what funded this expense."
+msgstr "Bu gideri neyin karşıladığını seçin."
+
+msgid "Save expense"
+msgstr "Gideri kaydet"
+
+msgid "Cash is untouched. The book will owe {name} this amount."
+msgstr "Kasaya dokunulmaz. Defter {name} hesabına bu tutarı borçlanır."
+
+msgid "The balance of {name} goes down by this amount."
+msgstr "{name} bakiyesi bu tutar kadar azalır."
+
+msgid "All of them were <strong>automatically</strong> migrated to Account cards. The old tables have since been removed: they were only ever a copy, and an incomplete one, so every receivable and payable now lives on the account card and nowhere else."
+msgstr "Hepsi <strong>otomatik olarak</strong> Cari kartlarına taşındı. Eski tablolar bu arada kaldırıldı: yalnızca bir kopyaydılar, üstelik eksik bir kopya — artık her alacak ve borç yalnızca cari kartında duruyor."

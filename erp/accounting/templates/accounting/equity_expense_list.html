@@ -16,7 +16,7 @@
         <th>{% trans "Category" %}</th>
         <th>{% trans "Amount" %}</th>
         <th>{% trans "Description" %}</th>
-        <th>{% trans "Cash Account" %}</th>
+        <th>{% trans "Funded by" %}</th>
       </tr>
 
       {% for expense in object_list %}
@@ -26,7 +26,14 @@
           <td>{{ expense.category|default:"—" }}</td>
           <td style="color:red;">{{ expense.currency.symbol }}{{ expense.amount|format_money }}</td>
           <td>{{ expense.description|default:"—" }}</td>
-          <td>{{ expense.cash_account.name }} <span class="ccy">{{ expense.cash_account.currency.code }}</span></td>
+          {# Exactly one of the two is set — see EquityExpense's check constraint. #}
+          <td>
+            {% if expense.cash_account %}
+              {{ expense.cash_account.name }} <span class="ccy">{{ expense.cash_account.currency.code }}</span>
+            {% else %}
+              {{ expense.paid_by_cari.name }} <span class="ccy">{{ expense.currency.code }}</span>
+            {% endif %}
+          </td>
         </tr>
       {% empty %}
         <tr>

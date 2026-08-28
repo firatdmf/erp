@@ -64,6 +64,8 @@
   .pf-btn.primary:hover { filter: brightness(1.04); color: white; }
 
   .pf-row { display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px 16px; }
+  .pf-row.four { grid-template-columns: 1.2fr .8fr 1fr 1.2fr; }
+  @media (max-width: 980px) { .pf-row.four { grid-template-columns: 1fr 1fr; } }
   .pf-row.two { grid-template-columns: 1fr 1fr; }
   .pf-row.wide { grid-template-columns: 1fr; }
   .pf-row + .pf-row { margin-top: 14px; }
@@ -81,6 +83,7 @@
     border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); background: white;
   }
   .pf-f input[type=date], .pf-f input[type=number] { font-variant-numeric: tabular-nums; }
+  .pf-f select[disabled] { background: #F5F7FA; color: var(--gray-600); cursor: not-allowed; }
 
   /* Errors */
   .pf-err { display:flex; gap:10px; align-items:flex-start; background: #FEF2F2; border: 1px solid #FCA5A5; color: #7F1D1D; border-radius: 10px; padding: 12px 14px; font: 500 12.5px var(--font-sans); margin-bottom: 16px; }
@@ -202,12 +205,7 @@
 
   <form method="post" id="expenseForm">
     {% csrf_token %}
-    {% comment %}
-      Set by the view from the URL; the funding account decides the currency
-      server-side, so this is only the fallback the model default carries.
-    {% endcomment %}
     <input type="hidden" name="book" value="{{ book.pk }}">
-    <input type="hidden" name="currency" id="id_currency" value="{{ form.currency.value|default:'' }}">
 
     <div class="pf-grid">
       <div>
@@ -219,7 +217,7 @@
               <span class="sub">{% trans "What was spent, when, and on what" %}</span>
             </div>
 
-            <div class="pf-row">
+            <div class="pf-row four">
               <div class="pf-f">
                 <label>{% trans "Amount" %}</label>
                 {# unlocalized: a number input only accepts a dot decimal, never 1234,56 #}
@@ -227,6 +225,24 @@
                        name="amount" id="id_amount"
                        value="{% if form.amount.value %}{{ form.amount.value|unlocalize }}{% endif %}"
                        placeholder="{{ 0|floatformat:2 }}">
+              </div>
+              <div class="pf-f">
+                <label>{% trans "Currency" %}</label>
+                {% comment %}
+                  Free to choose while a current account is funding this: a
+                  cari holds a mix of currencies by design, so a USD account
+                  can have settled a lira bill. Locked to the account on the
+                  cash path, because a cash balance is decremented without
+                  converting — see EquityExpenseForm.clean. Disabled submits
+                  nothing, which is why `currency` is not a required field.
+                {% endcomment %}
+                <select name="currency" id="id_currency">
+                  {% for c in currencies %}
+                    <option value="{{ c.pk }}" data-code="{{ c.code }}"
+                            {% if form.currency.value|stringformat:'s' == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.code }}</option>
+                  {% endfor %}
+                </select>
+                <span class="hint" id="currencyHint"></span>
               </div>
               <div class="pf-f">
                 <label>{% trans "Date" %}</label>
@@ -389,6 +405,23 @@
       </div>
     </div>
   </form>
+
+  {% comment %}
+    Every string the script below shows, carried as data attributes rather
+    than interpolated into JS literals. A {% templatetag openblock %} trans {% templatetag closeblock %} tag inside '...' breaks
+    the moment its text contains an apostrophe — "the account's own
+    currency" does, and Turkish attaches suffixes with one all the time
+    (FIRAT'a), so a translation could break the page long after this was
+    written. Attributes are HTML-escaped by Django and come back decoded
+    through .dataset.
+  {% endcomment %}
+  <span id="expenseStrings" hidden
+        data-no-match="{% trans "No account matches" %}"
+        data-choose="{% trans "Choose what funded this expense." %}"
+        data-owe="{% trans "Cash is untouched. The book will owe {name} this amount." %}"
+        data-cash-down="{% trans "The balance of {name} goes down by this amount." %}"
+        data-ccy-cari="{% trans "Defaults to the account's own currency — change it if the money was actually spent in another." %}"
+        data-ccy-cash="{% trans "Set by the cash account." %}"></span>
 </div>
 
 {% include "accounting/partials/fx_rate_field.html" with date_field="date" %}
@@ -400,6 +433,14 @@
   var cashSel  = document.getElementById('id_cash_account');
   var cariSel  = document.getElementById('id_paid_by_cari');
   var amountEl = document.getElementById('id_amount');
+  var ccySel   = document.getElementById('id_currency');
+  var ccyHint  = document.getElementById('currencyHint');
+  // Only true once the person edits the currency themselves. Until then,
+  // picking an account sets it; after, picking an account leaves it alone,
+  // because the currency they typed is the one they meant.
+  var ccyTouched = false;
+  var S = document.getElementById('expenseStrings').dataset;
+  ccySel.addEventListener('change', function () { ccyTouched = true; syncSummary(); });
 
   // ── Funding source ────────────────────────────────────────────────
   // Showing one pane and clearing the other is what makes "exactly one"
@@ -412,7 +453,26 @@
     cashPane.hidden = cari;
     if (cari) { cashSel.value = ''; } else { setCari(''); }
     cashSel.dispatchEvent(new Event('change'));
+    syncCurrency();
     syncSummary();
+  }
+
+  // A cash balance is decremented without converting, so an expense out of
+  // a TRY kasa is a TRY expense and there is nothing to choose. A current
+  // account only has a DEFAULT currency — it can hold a mix — so there the
+  // account merely proposes and the person disposes.
+  function syncCurrency() {
+    var usingCari = document.getElementById('fundCari').checked;
+    var sel = usingCari ? cariSel : cashSel;
+    var opt = sel.options[sel.selectedIndex];
+    var accountCcy = opt && opt.value ? opt.getAttribute('data-currency') : null;
+
+    ccySel.disabled = !usingCari;
+    if (accountCcy && (!usingCari || !ccyTouched)) { ccySel.value = accountCcy; }
+
+    ccyHint.textContent = usingCari ? S.ccyCari : S.ccyCash;
+    // The fx converter reads this select, and assigning .value fires nothing.
+    ccySel.dispatchEvent(new Event('change'));
   }
   ['fundCash', 'fundCari'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', applyFunding);
@@ -465,7 +525,7 @@
              '<span class="pfx">' + esc(o.getAttribute('data-currency-code') || '') + '</span></div>';
     }).join('');
     if (!matches.length) {
-      html = '<div class="np-sup-empty">{% trans "No account matches" %}</div>';
+      html = '<div class="np-sup-empty">' + esc(S.noMatch) + '</div>';
     }
     results.innerHTML = html;
     results.hidden = false;
@@ -526,8 +586,8 @@
   // The fx script clears whichever funding select the user did not pick;
   // the chip has to hear about it or it goes on naming an account the
   // form is no longer submitting.
-  cariSel.addEventListener('change', function () { syncChip(); syncSummary(); });
-  cashSel.addEventListener('change', syncSummary);
+  cariSel.addEventListener('change', function () { syncChip(); syncCurrency(); syncSummary(); });
+  cashSel.addEventListener('change', function () { syncCurrency(); syncSummary(); });
   amountEl.addEventListener('input', syncSummary);
 
   // ── Summary ───────────────────────────────────────────────────────
@@ -540,8 +600,11 @@
     var sel = usingCari ? cariSel : cashSel;
     var opt = sel.options[sel.selectedIndex];
     var picked = !!(opt && opt.value);
+    // Off the currency control, which on the cari path need not agree with
+    // the account — that disagreement is exactly what it is there for.
+    var ccyOpt = ccySel.options[ccySel.selectedIndex];
     document.getElementById('sumCurrency').textContent =
-      picked ? (opt.getAttribute('data-currency-code') || '—') : '—';
+      ccyOpt ? (ccyOpt.getAttribute('data-code') || '—') : '—';
 
     // Whole sentences with a placeholder, not fragments concatenated around
     // the name: Turkish puts the account where English puts the verb, and a
@@ -549,11 +612,9 @@
     // way to reorder them.
     var effect = document.getElementById('sumEffect');
     if (!picked) {
-      effect.innerHTML = '{% trans "Choose what funded this expense." %}';
+      effect.textContent = S.choose;
     } else {
-      var tpl = usingCari
-        ? '{% trans "Cash is untouched. The book will owe {name} this amount." %}'
-        : '{% trans "The balance of {name} goes down by this amount." %}';
+      var tpl = usingCari ? S.owe : S.cashDown;
       effect.innerHTML = esc(tpl).replace('{name}', '<b>' + esc(labelOf(opt)) + '</b>');
     }
   }
@@ -561,6 +622,7 @@
   // Opening state — an edit or a rejected submit can arrive with either
   // source already filled.
   syncChip();
+  ccyTouched = Boolean({{ form.data.currency|yesno:"1,0,0" }});
   applyFunding();
 })();
 </script>

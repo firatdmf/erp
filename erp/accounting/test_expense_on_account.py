@@ -3,6 +3,7 @@
 
 import re
 from decimal import Decimal
+from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -97,14 +98,40 @@ class ExpensePaidOnAccountTests(TestCase):
             reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk})
         )
         html = response.content.decode()
-        # The tag spans several lines in the template, so match the whole
-        # element rather than a line of it.
+        # Scoped to this select: the page has several, and an account pk can
+        # collide with a currency pk in another one.
+        block = re.search(
+            r'id="id_paid_by_cari".*?</select>', html, re.S
+        )
+        self.assertIsNotNone(block, "no paid_by_cari select on the page")
         match = re.search(
-            r'<option value="%d"(.*?)>' % self.lira_cari.pk, html, re.S
+            r'<option value="%d"(.*?)>' % self.lira_cari.pk, block.group(0), re.S
         )
         self.assertIsNotNone(match, "no option rendered for the TRY account")
         self.assertIn(f'data-currency="{self.try_.pk}"', match.group(1))
         self.assertIn('data-currency-code="TRY"', match.group(1))
+
+    def test_the_script_carries_no_translatable_literals(self):
+        """A {% trans %} tag inside a JS '...' literal breaks the page the
+        moment its text has an apostrophe — and Turkish attaches suffixes
+        with one (FIRAT'a), so a translation could break it later."""
+        tpl = (
+            Path(__file__).parent
+            / "templates/accounting/add_equity_expense.html"
+        ).read_text(encoding="utf-8")
+        script = tpl[tpl.index("<script>"):tpl.rindex("</script>")]
+        self.assertNotIn("{% trans", script)
+        self.assertNotIn("{% translate", script)
+
+    def test_the_page_offers_a_currency_control(self):
+        response = self.client.get(
+            reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk})
+        )
+        html = response.content.decode()
+        block = re.search(r'id="id_currency".*?</select>', html, re.S)
+        self.assertIsNotNone(block, "currency is not a select on the page")
+        self.assertIn('data-code="TRY"', block.group(0))
+        self.assertIn('data-code="USD"', block.group(0))
 
     def test_the_page_opens_on_today_and_offers_the_search_picker(self):
         response = self.client.get(
@@ -155,11 +182,46 @@ class ExpensePaidOnAccountTests(TestCase):
         self.assertEqual(movement.movement_type, "adjustment")
         self.assertFalse(Payment.objects.exists())
 
-    # -- currency and rate follow the account that funded it ---------------
+    # -- currency and rate -------------------------------------------------
+    def test_a_current_account_only_proposes_its_currency(self):
+        """The reason the control exists: Firat's account is in dollars, but
+        the tax he settled was a lira bill."""
+        with mock.patch("accounting.services.get_exchange_rate") as published:
+            published.return_value = Decimal("0.025")
+            self._post(currency=self.try_.pk, amount="8689.69")
+
+        expense = EquityExpense.objects.get()
+        self.assertEqual(expense.paid_by_cari, self.firat)   # a USD account
+        self.assertEqual(expense.currency, self.try_)
+        movement = CariMovement.objects.get(cari=self.firat)
+        self.assertEqual(movement.currency, self.try_)
+        self.assertEqual(movement.amount, Decimal("-8689.69"))
+
+    def test_a_current_account_fills_its_own_currency_in_when_none_is_sent(self):
+        self._post(currency="", amount="800.00")
+        self.assertEqual(EquityExpense.objects.get().currency, self.usd)
+
+    def test_a_cash_account_overrules_the_currency_it_was_sent(self):
+        """A cash balance is decremented without converting, so 180.59 USD
+        out of a lira kasa would subtract 180.59 lira."""
+        lira_kasa = CashAccount.objects.create(
+            book=self.book, name="Lira Kasa", currency=self.try_,
+            balance=Decimal("10000.00"),
+        )
+        with mock.patch("accounting.services.get_exchange_rate") as published:
+            published.return_value = Decimal("0.025")
+            self._post(cash_account=lira_kasa.pk, paid_by_cari="",
+                       currency=self.usd.pk, amount="800.00")
+
+        expense = EquityExpense.objects.get()
+        self.assertEqual(expense.currency, self.try_)
+        lira_kasa.refresh_from_db()
+        self.assertEqual(lira_kasa.balance, Decimal("9200.00"))
+
     def test_the_entry_is_denominated_by_the_account_that_funded_it(self):
         with mock.patch("accounting.services.get_exchange_rate") as published:
             published.return_value = Decimal("0.025")
-            self._post(paid_by_cari=self.lira_cari.pk, amount="800.00")
+            self._post(paid_by_cari=self.lira_cari.pk, currency="", amount="800.00")
 
         expense = EquityExpense.objects.get()
         self.assertEqual(expense.currency, self.try_)
@@ -168,8 +230,8 @@ class ExpensePaidOnAccountTests(TestCase):
         with mock.patch("accounting.services.get_exchange_rate") as published:
             published.return_value = Decimal("0.025")
             self._post(
-                paid_by_cari=self.lira_cari.pk, amount="800.00",
-                exchange_rate="0.030000",
+                paid_by_cari=self.lira_cari.pk, currency=self.try_.pk,
+                amount="800.00", exchange_rate="0.030000",
             )
 
         movement = CariMovement.objects.get(cari=self.lira_cari)
@@ -180,7 +242,8 @@ class ExpensePaidOnAccountTests(TestCase):
         with mock.patch("accounting.services.get_exchange_rate") as published:
             published.return_value = Decimal("0.025")
             self._post(
-                paid_by_cari=self.lira_cari.pk, amount="800.00", exchange_rate="",
+                paid_by_cari=self.lira_cari.pk, currency=self.try_.pk,
+                amount="800.00", exchange_rate="",
             )
 
         movement = CariMovement.objects.get(cari=self.lira_cari)

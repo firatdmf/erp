@@ -1134,6 +1134,7 @@ class AddEquityExpense(generic.edit.CreateView):
                 for c in form.fields["paid_by_cari"].queryset
             ]
             context["categories"] = form.fields["category"].queryset
+            context["currencies"] = CurrencyCategory.objects.all().order_by("code")
         return context
 
     def get_template_names(self):

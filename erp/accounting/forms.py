@@ -307,7 +307,12 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
             "book": forms.HiddenInput(),
-            "currency": forms.HiddenInput(),
+            # Currency is NOT hidden here, unlike its siblings. Theirs is
+            # always the cash account's and there is nothing to ask; this
+            # one can be funded by a current account, which holds a mix by
+            # design — see clean(). Hidden, it posted the model default and
+            # a lira bill settled through a dollar account was recorded in
+            # dollars.
         }
 
     # This pre-populates form fields with given variables
@@ -317,6 +322,15 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         super(EquityExpenseForm, self).__init__(*args, **kwargs)
         # Set to today's date
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        self.fields["currency"].help_text = (
+            "An expense paid from cash is always in that account's own "
+            "currency; this is asked for the money somebody else spent."
+        )
+        if book is not None:
+            # The book's own currency beats the model's default of 1 — on a
+            # book that does not keep its accounts in dollars, that default
+            # is wrong on every single entry.
+            self.fields["currency"].initial = book.effective_base_currency
 
         # Neither funding field stands alone as "required": clean() below
         # asks the real question, which is whether exactly one was given.
@@ -324,6 +338,10 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         # somebody else paid before clean() ever got to look.
         self.fields["cash_account"].required = False
         self.fields["paid_by_cari"].required = False
+        # Derived in clean() from whatever funded the expense, so the POST
+        # need not carry it — which is what lets the page lock the control
+        # on the cash path (a disabled <select> submits nothing).
+        self.fields["currency"].required = False
         self.fields["cash_account"].empty_label = "— paid from cash —"
         self.fields["paid_by_cari"].empty_label = "— paid by someone else —"
 
@@ -342,19 +360,36 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         self._setup_exchange_rate(book)
 
     def clean(self):
-        """Denominate the entry by whatever funded it.
+        """Settle which currency the entry is denominated in.
 
-        Which of the two that is, and whether it is exactly one, is
+        Whether exactly one funding source was named is
         EquityExpense.clean's question — asked of the instance in
         _post_clean, just after this runs. Repeating it here would report
-        the same problem twice, so this only acts on the case where the
-        answer is already settled.
+        the same problem twice, so this only acts once the answer is
+        settled.
+
+        The two paths differ, and not arbitrarily:
+
+        A cash account IS a currency. Its balance is a single figure that
+        handle_equity_transaction decrements without converting, so paying
+        180.59 USD out of a TRY kasa would subtract 180.59 lira. The
+        account's own currency is the only correct answer, and anything
+        the form was sent is overruled.
+
+        A current account merely has a DEFAULT currency. CariMovement
+        carries its own currency and recompute_balance sums amount_base, so
+        an account holds a mix by design — which is the whole point here: a
+        USD account can perfectly well have settled a lira tax bill. The
+        chosen currency stands, and the account's default only fills in
+        when nothing was chosen.
         """
         cleaned = super().clean()
         cash = cleaned.get("cash_account")
         cari = cleaned.get("paid_by_cari")
-        if bool(cash) != bool(cari):
-            cleaned["currency"] = cash.currency if cash else cari.default_currency
+        if cash and not cari:
+            cleaned["currency"] = cash.currency
+        elif cari and not cash:
+            cleaned["currency"] = cleaned.get("currency") or cari.default_currency
         return cleaned
 
 

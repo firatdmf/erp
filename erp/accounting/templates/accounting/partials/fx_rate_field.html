@@ -27,9 +27,17 @@
   var accountEls = ['id_cash_account', 'id_paid_by_cari']
     .map(function (id) { return document.getElementById(id); })
     .filter(Boolean);
+  // An explicit currency control, where the form offers one. The expense
+  // form does, because a current account holds a mix of currencies and the
+  // account therefore cannot answer for the entry; capital, revenue and
+  // dividend keep theirs hidden, so this finds an <input> there and falls
+  // through to reading the account instead.
+  var ccyEl = document.getElementById('id_currency');
+  if (ccyEl && ccyEl.tagName !== 'SELECT') ccyEl = null;
   var amountEl = document.getElementById('id_amount');
   var dateEl = document.getElementById('id_{{ date_field|default:"date" }}');
-  if (!BASE || !rateEl || !accountEls.length || !amountEl) return;
+  if (!BASE || !rateEl || !amountEl) return;
+  if (!ccyEl && !accountEls.length) return;
 
   // The <p> the rate sits in, so the whole labelled row can be hidden when
   // there is nothing to convert.
@@ -78,10 +86,19 @@
     eqEl.textContent = '\u00d7 ' + lhs + (code ? ' ' + code : '') + ' =';
   }
 
-  // The currency of whichever funding select actually has a choice in it.
-  // Only one ever does: picking either clears the other (see below), which
-  // is the same "exactly one" the model's check constraint enforces.
+  // What the entry is denominated in. The currency control answers when
+  // there is one — it is the entry's own currency, which on the expense
+  // form need not be the funding account's. Otherwise the funding select
+  // does: only one ever has a choice in it, since picking either clears
+  // the other (see below), the same "exactly one" the check constraint
+  // enforces.
   function selectedCurrency() {
+    if (ccyEl) {
+      var c = ccyEl.options[ccyEl.selectedIndex];
+      return (c && c.value)
+        ? { id: c.value, code: c.getAttribute('data-code') || c.textContent.trim() }
+        : null;
+    }
     for (var i = 0; i < accountEls.length; i++) {
       var el = accountEls[i];
       var opt = el.options[el.selectedIndex];
@@ -191,6 +208,7 @@
       sync();
     });
   });
+  if (ccyEl) ccyEl.addEventListener('change', sync);
   if (dateEl) dateEl.addEventListener('change', function () { fetchRate(false); });
 
   sync();

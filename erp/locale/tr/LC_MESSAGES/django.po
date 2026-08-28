@@ -8843,3 +8843,9 @@ msgstr "{name} bakiyesi bu tutar kadar azalır."
 
 msgid "All of them were <strong>automatically</strong> migrated to Account cards. The old tables have since been removed: they were only ever a copy, and an incomplete one, so every receivable and payable now lives on the account card and nowhere else."
 msgstr "Hepsi <strong>otomatik olarak</strong> Cari kartlarına taşındı. Eski tablolar bu arada kaldırıldı: yalnızca bir kopyaydılar, üstelik eksik bir kopya — artık her alacak ve borç yalnızca cari kartında duruyor."
+
+msgid "Defaults to the account's own currency — change it if the money was actually spent in another."
+msgstr "Varsayılan olarak hesabın kendi para birimi — para başka bir birimde harcandıysa değiştirin."
+
+msgid "Set by the cash account."
+msgstr "Kasa hesabına göre belirlenir."

@@ -195,10 +195,16 @@ class CariAccount(models.Model):
     opening_balance      = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     opening_balance_date = models.DateField(null=True, blank=True)
 
-    # Cached aggregates — kept in sync by CariMovement signals
-    cached_balance      = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
-    cached_balance_base = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
-    last_movement_at    = models.DateTimeField(null=True, blank=True)
+    # Cached aggregate — kept in step by recompute_balance(). A sum over
+    # this account's live movements, in the base currency.
+    #
+    # There used to be a cached_balance_base beside it holding the SAME
+    # number, set from the same expression, with the account list summing
+    # one while filtering on the other. Two columns for one value is how
+    # a balance and a statement came to disagree one level up; the
+    # duplicate was dropped in migration 0087.
+    cached_balance   = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    last_movement_at = models.DateTimeField(null=True, blank=True)
 
     # Meta
     is_active  = models.BooleanField(default=True)
@@ -234,21 +240,21 @@ class CariAccount(models.Model):
         an account holds. For a USD-only account the two are identical (rate
         1.0), which is why this changes nothing for almost every account.
 
-        cached_balance_base is kept as-is rather than dropped: it is what the
-        list view aggregates over, and the two staying equal makes the
-        redundancy harmless.
+        Voided rows are excluded, via the same .live() the statement uses.
+        Both numbers therefore come from one rule instead of two that were
+        only ever equal by argument.
         """
-        agg = self.movements.aggregate(
+        # .live() — the same rule the statement asks, so the two can never
+        # print different numbers for this account. See CariMovementQuerySet.
+        agg = self.movements.live().aggregate(
             total_base=Sum("amount_base"),
             last=models.Max("created_at"),
         )
-        self.cached_balance      = (agg["total_base"] or Decimal("0.00"))
-        self.cached_balance_base = (agg["total_base"] or Decimal("0.00"))
-        self.last_movement_at    = agg["last"]
+        self.cached_balance   = (agg["total_base"] or Decimal("0.00"))
+        self.last_movement_at = agg["last"]
         if save:
             CariAccount.objects.filter(pk=self.pk).update(
                 cached_balance=self.cached_balance,
-                cached_balance_base=self.cached_balance_base,
                 last_movement_at=self.last_movement_at,
             )
         return self.cached_balance
@@ -289,6 +295,31 @@ class CariAccount(models.Model):
 # ---------------------------------------------------------------------------
 # 2. CariMovement — the atomic ledger row
 # ---------------------------------------------------------------------------
+class CariMovementQuerySet(models.QuerySet):
+    """The one definition of which rows count.
+
+    Balances and statements are two views of the same ledger, and they
+    used to decide membership separately: recompute_balance summed EVERY
+    row, while the statement re-derived "is this half of a cancelled
+    document's pair?" from the documents themselves on each render. The
+    two agreed only while the excluded set happened to sum to zero, and
+    a deleted payment broke that — the statement closed 150.00 below the
+    account page it belonged to, with nothing in the code able to notice.
+
+    Membership is now a stored fact on the row (`is_void`) rather than a
+    predicate recomputed from elsewhere, and both callers ask here. They
+    cannot disagree, because there is only one answer.
+    """
+
+    def live(self):
+        """Rows that count toward a balance — everything not voided."""
+        return self.filter(is_void=False)
+
+    def void(self):
+        """Rows kept for history but excluded from every total."""
+        return self.filter(is_void=True)
+
+
 class CariMovement(models.Model):
     class Meta:
         verbose_name = _("Account Movement")
@@ -346,13 +377,67 @@ class CariMovement(models.Model):
     legacy_ar_id = models.PositiveIntegerField(null=True, blank=True)
     legacy_ap_id = models.PositiveIntegerField(null=True, blank=True)
 
+    # Kept for history, excluded from every total. Set on both halves of
+    # a cancelled document's pair — see CariMovementQuerySet. Stored
+    # rather than derived so a balance and a statement cannot reach
+    # different answers about the same row; migration 0086 backfills it
+    # from the predicate the statement used to recompute per render.
+    is_void = models.BooleanField(
+        default=False, db_index=True,
+        help_text="Excluded from balances and statements, but kept on the "
+                  "record — one half of a cancelled document's pair.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name="created_cari_movements")
 
+    objects = CariMovementQuerySet.as_manager()
+
     def __str__(self):
         sign = "+" if self.amount >= 0 else ""
         return f"{self.cari.code} | {self.date} | {sign}{self.amount} {self.currency.code}"
+
+    def entered_rate(self):
+        """A rate the document that posted this row says applies.
+
+        The same precedence CashTransactionEntry.resolve_exchange_rate has
+        always used, which this model was missing: whoever recorded the
+        transaction was there, and a cash exchange at the döviz bürosu is
+        not the mid-market rate. Without this the rate typed on the payment
+        form reached the cash ledger and stopped — the cari movement went on
+        converting at the published rate, so the figure the operator
+        corrected was not the figure their balance moved by.
+
+        Only documents that opt in are asked, via `ledger_exchange_rate()`.
+        Merely HAVING an exchange_rate field is not enough to be consulted:
+        Invoice's carries a default of 1.000000 and no view ever sets it, so
+        reading that field would convert every foreign-currency invoice at
+        par — which is the very confusion between "unset" and "one to one"
+        that Payment.exchange_rate is nullable to avoid.
+
+        Returns None for "nobody said", which is what lets the published
+        rate apply instead.
+        """
+        if not (self.source_type_id and self.source_id):
+            return None
+        model = self.source_type.model_class()
+        if model is None or not callable(getattr(model, "ledger_exchange_rate", None)):
+            # Asked of the CLASS, so the common case — an invoice, an
+            # order — costs no query at all.
+            return None
+        # Deliberately NOT self.source: the generic FK caches its target on
+        # first access, and this method is what first accesses it. An edit
+        # then re-saves the very same movement instance
+        # (resync_posted_movement reuses payment.posted_movement), so the
+        # cache would hand back the payment as it was BEFORE the new rate
+        # was typed — and the correction would appear to save while the
+        # balance kept the old figure.
+        source = model.objects.filter(pk=self.source_id).first()
+        if source is None:
+            return None
+        rate = source.ledger_exchange_rate()
+        return Decimal(str(rate)) if rate else None
 
     def save(self, *args, **kwargs):
         base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
@@ -360,12 +445,14 @@ class CariMovement(models.Model):
             self.exchange_rate = Decimal("1.000000")
             self.amount_base = self.amount.quantize(Decimal("0.01"))
         elif not self.amount_base:
-            from accounting.services import get_exchange_rate
-            # The rate on the movement's own date — a backdated row is worth
-            # what it was worth then.
-            rate = get_exchange_rate(
-                self.currency.code, base_code, on_date=self.date
-            ) or Decimal("1.000000")
+            rate = self.entered_rate()
+            if rate is None:
+                from accounting.services import get_exchange_rate
+                # The rate on the movement's own date — a backdated row is
+                # worth what it was worth then.
+                rate = get_exchange_rate(
+                    self.currency.code, base_code, on_date=self.date
+                ) or Decimal("1.000000")
             self.exchange_rate = Decimal(str(rate))
             self.amount_base = (self.amount * self.exchange_rate).quantize(Decimal("0.01"))
 
@@ -1063,6 +1150,14 @@ class Payment(models.Model):
     def __str__(self):
         return f"{self.number} | {self.cari.name} | {self.amount} {self.currency.code}"
 
+    def ledger_exchange_rate(self):
+        """The rate this payment's ledger row converts at.
+
+        None means nobody typed one and the published rate for the date
+        applies — see CariMovement.entered_rate, which is what asks.
+        """
+        return self.exchange_rate
+
     # -- lifecycle ---------------------------------------------------------
     def confirm(self, user=None):
         """Draft → Confirmed. Posts to CariMovement and CashAccount."""
@@ -1591,3 +1686,202 @@ class CheckOrPromissoryNote(models.Model):
                                      "endorse_movement", "updated_at"])
 
 
+
+# ---------------------------------------------------------------------------
+# CariTransfer — move a balance from one current account to another
+# ---------------------------------------------------------------------------
+class CariTransfer(models.Model):
+    """A virman: the debt moves, the money does not.
+
+    Transferring X from A to B posts -X on A and +X on B, so whatever A
+    owed us is now owed by B and the book's total receivable is
+    unchanged. Nothing touches a CashAccount — no cash has moved, only
+    the question of who owes it.
+
+    Both legs are posted in ONE currency on ONE date, which is what makes
+    them cancel: CariMovement derives its base-currency amount from the
+    rate of its own date, so a pair sharing both fields converts at the
+    same rate and nets to zero in USD as well as in the currency typed.
+    Posting each leg in its own account's default currency would leave a
+    silent FX residue on the book.
+
+    The two movements are kept on the transfer so `unpost()` can take
+    back exactly the rows it wrote rather than guessing from a
+    description.
+    """
+
+    class Meta:
+        verbose_name = _("Account Transfer")
+        verbose_name_plural = _("Account Transfers")
+        ordering = ["-date", "-id"]
+        indexes = [
+            models.Index(fields=["book", "-date"]),
+        ]
+
+    book = models.ForeignKey("accounting.Book", on_delete=models.CASCADE,
+                             related_name="cari_transfers")
+    date = models.DateField()
+
+    from_cari = models.ForeignKey(CariAccount, on_delete=models.PROTECT,
+                                  related_name="transfers_out")
+    to_cari   = models.ForeignKey(CariAccount, on_delete=models.PROTECT,
+                                  related_name="transfers_in")
+
+    amount   = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.ForeignKey("accounting.CurrencyCategory",
+                                 on_delete=models.PROTECT,
+                                 related_name="cari_transfers")
+
+    # The rate the person recording this transfer says applies, to the
+    # book's base currency. Null means they did not say, and the published
+    # rate for `date` is used instead.
+    #
+    # Nullable rather than defaulting to 1.000000, for the same reason
+    # Payment.exchange_rate is: a default cannot be told apart from a
+    # deliberate entry, so a transfer in lira carrying "1.000000" would
+    # read as an instruction to treat one lira as one dollar. Null says
+    # nothing, which is what an untouched field means.
+    exchange_rate = models.DecimalField(max_digits=14, decimal_places=6,
+                                        null=True, blank=True,
+                                        help_text="Rate to the book's base "
+                                                  "currency. Blank → the "
+                                                  "published rate for the date.")
+
+    description = models.CharField(max_length=300, blank=True)
+
+    # The rows this transfer wrote — set by post(), cleared by unpost().
+    from_movement = models.OneToOneField(CariMovement, on_delete=models.SET_NULL,
+                                         null=True, blank=True,
+                                         related_name="transfer_from")
+    to_movement   = models.OneToOneField(CariMovement, on_delete=models.SET_NULL,
+                                         null=True, blank=True,
+                                         related_name="transfer_to")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(Member, on_delete=models.SET_NULL,
+                                   null=True, blank=True,
+                                   related_name="created_cari_transfers")
+
+    def __str__(self):
+        return (f"{self.from_cari.code} → {self.to_cari.code} | "
+                f"{self.amount} {self.currency.code}")
+
+    def clean(self):
+        super().clean()
+        if self.from_cari_id and self.from_cari_id == self.to_cari_id:
+            raise ValidationError(
+                _("Pick two different accounts — a transfer to itself moves nothing.")
+            )
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({"amount": _("Amount must be greater than zero.")})
+        # Zero would convert the whole transfer to nothing; negative would
+        # flip which side of the book each leg lands on.
+        if self.exchange_rate is not None and self.exchange_rate <= 0:
+            raise ValidationError({
+                "exchange_rate": _("Exchange rate must be greater than zero.")
+            })
+        # The page is per-book and the balances are per-book, so a transfer
+        # spanning two books would silently move a balance out of one set of
+        # books and into another.
+        if self.book_id:
+            for field in ("from_cari", "to_cari"):
+                cari = getattr(self, field, None)
+                if cari and cari.book_id != self.book_id:
+                    raise ValidationError({
+                        field: _("This account belongs to another book.")
+                    })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @transaction.atomic
+    def post(self, user=None):
+        """Write the two ledger rows. Idempotent — a second call is a no-op."""
+        if self.from_movement_id and self.to_movement_id:
+            return
+
+        member = getattr(user, "member", None) if user else self.created_by
+        source_type = ContentType.objects.get_for_model(CariTransfer)
+        label = self.description or _("Account transfer")
+        rate = self.resolved_rate()
+
+        def leg(cari, signed, other):
+            mv = CariMovement(
+                cari=cari,
+                book=self.book,
+                date=self.date,
+                amount=signed,
+                currency=self.currency,
+                movement_type="adjustment",
+                description=f"{label} — {other.code} {other.name}",
+                reference=f"TRANSFER {self.pk}",
+                source_type=source_type,
+                source_id=self.pk,
+                created_by=member,
+            )
+            # Both legs are stamped from ONE rate, resolved once above,
+            # rather than each fetching its own. Same currency and same
+            # date would normally get the same answer, but "normally" is
+            # not good enough here: if the two lookups ever disagreed —
+            # a cache expiring between them, a rate source flapping — the
+            # pair would stop cancelling and leave a residue on the book
+            # that nobody entered.
+            mv.exchange_rate = rate
+            mv.amount_base = (signed * rate).quantize(Decimal("0.01"))
+            mv.save()
+            return mv
+
+        # The debt moves: the source owes us less, the destination more.
+        self.from_movement = leg(self.from_cari, -self.amount, self.to_cari)
+        self.to_movement   = leg(self.to_cari,    self.amount, self.from_cari)
+        # update_fields, so full_clean() in save() is not re-run on rows the
+        # form has already validated.
+        super().save(update_fields=["from_movement", "to_movement"])
+
+    def ledger_exchange_rate(self):
+        """The rate this transfer's legs convert at, for any path that
+        recomputes one. post() stamps both legs directly, so this is a
+        floor rather than the normal route — but a leg recomputed without
+        it would fall back to the published rate and stop cancelling
+        against its pair.
+        """
+        return self.exchange_rate
+
+    def resolved_rate(self):
+        """The rate these legs convert at: the one typed, or the published
+        rate for the date when nobody typed one.
+
+        Falls back to 1.0 only when the lookup itself comes back empty,
+        which is what CariMovement.save() does on its own — a transfer
+        should not be blocked because a rate source is unreachable.
+        """
+        base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
+        if self.currency.code == base_code:
+            return Decimal("1.000000")
+        if self.exchange_rate:
+            return Decimal(str(self.exchange_rate))
+        from accounting.services import get_exchange_rate
+        rate = get_exchange_rate(
+            self.currency.code, base_code, on_date=self.date
+        ) or Decimal("1.000000")
+        return Decimal(str(rate))
+
+    @transaction.atomic
+    def unpost(self):
+        """Delete both legs and re-derive the two balances.
+
+        Deleted rather than reversed with counter-movements, matching
+        Payment.cancel() and CheckOrPromissoryNote.cancel(): an undone
+        transfer should leave both statements as if it never happened,
+        not as two lines that cancel.
+        """
+        touched = [self.from_cari, self.to_cari]
+        for field in ("from_movement", "to_movement"):
+            mv = getattr(self, field)
+            if mv:
+                mv.delete()
+                setattr(self, field, None)
+        super().save(update_fields=["from_movement", "to_movement"])
+        for cari in {c.pk: c for c in touched if c}.values():
+            cari.recompute_balance(save=True)

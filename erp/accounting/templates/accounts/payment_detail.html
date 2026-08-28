@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% load accounts_tags %}
 {% load humanize %}
 
 {% block css %}
@@ -89,6 +90,8 @@
   .pd-info .val.mono { font-family: var(--font-mono); }
   .pd-info .val.muted { color: var(--gray-500); font-weight: 500; }
   .pd-info .val.amt { font-variant-numeric: tabular-nums; }
+  .pd-info .fx-pair { display:block; font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .pd-info .fx-pending { display:block; font: 500 11px var(--font-sans); color: #92400E; margin-top: 2px; }
 
   .pd-desc { margin-top: 14px; padding-top: 14px; border-top: 1px solid #EEF1F5; color: var(--gray-700); font: 500 13px var(--font-sans); white-space: pre-wrap; line-height: 1.55; }
 
@@ -203,6 +206,9 @@
           <div class="pd-info">
             <div class="row"><div class="lbl">{% trans "Date" %}</div><div class="val">{{ payment.date|date:"d.m.Y" }}</div></div>
             <div class="row"><div class="lbl">{% trans "Amount" %}</div><div class="val amt">{{ payment.currency.symbol }}{{ payment.amount|floatformat:2|intcomma }} {{ payment.currency.code }}</div></div>
+            {# Only for a payment that is not already in the book's own currency. #}
+            {% conversion_facts payment as fx %}
+            {% include "accounts/partials/fx_conversion.html" with fx=fx %}
             <div class="row"><div class="lbl">{% trans "Cash Account" %}</div><div class="val {% if not payment.cash_account %}muted{% endif %}">{% if payment.cash_account %}{{ payment.cash_account.name }}{% else %}—{% endif %}</div></div>
             <div class="row"><div class="lbl">{% trans "Book" %}</div><div class="val">{{ payment.book.name }}</div></div>
             {% if payment.posted_movement %}

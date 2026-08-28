@@ -75,3 +75,15 @@ def signed(value):
         return f"{v:,.2f}"
     except (TypeError, ValueError):
         return value
+
+
+@register.simple_tag(name="conversion_facts")
+def conversion_facts_tag(obj):
+    """What `obj` converted at, or None when it is already in base currency.
+
+    Thin wrapper so a template can say
+    `{% conversion_facts payment as fx %}{% if fx %}…{% endif %}` — see
+    accounting.services_accounts.conversion_facts for the rules.
+    """
+    from accounting.services_accounts import conversion_facts
+    return conversion_facts(obj)

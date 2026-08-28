@@ -167,8 +167,12 @@ class CariList(View):
         # Aggregate totals across the filtered set (positive vs negative legs)
         totals = qs.aggregate(
             n=Count("id"),
-            owes_us=Sum("cached_balance_base", filter=Q(cached_balance__gt=0)),
-            we_owe=Sum("cached_balance_base", filter=Q(cached_balance__lt=0)),
+            # Summed and filtered on the SAME column. These used to sum
+            # cached_balance_base while filtering on cached_balance — two
+            # columns holding one number, correct only for as long as they
+            # agreed. The duplicate is gone; there is one balance now.
+            owes_us=Sum("cached_balance", filter=Q(cached_balance__gt=0)),
+            we_owe=Sum("cached_balance", filter=Q(cached_balance__lt=0)),
         )
 
         # One count per tab. Previously a single badge sat on the "All" tab and
@@ -423,6 +427,11 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
         if model is not None and model.__name__ == "Order":
             return (_("Order"),
                     reverse("operating:order_detail", args=[mv.source_id]), False)
+        if model is not None and model.__name__ == "CariTransfer":
+            # One leg of a pair. Editing it alone would move a balance out
+            # of one account without moving it into the other, so the row
+            # is read-only here and the transfer is undone as a whole.
+            return _("Account transfer"), None, False
         # Some other document we don't have a route for — still not ours
         # to edit, since whatever posted it can repost it.
         return _("Linked document"), None, False
@@ -460,54 +469,21 @@ def _row_description(mv, linked_payment=None, linked_invoice=None, is_cancel_row
     return (mv.description or "").strip()
 
 
-def _cancelled_movement_q():
-    """Ledger rows that belong to a cancelled payment, invoice or check.
-
-    Both shapes are historical. Payment.cancel(), Invoice.cancel() and
-    CheckOrPromissoryNote.cancel() all delete the posted rows outright
-    now, so a cancellation made from here on leaves no ledger trace at
-    all — but the database still holds pairs from before that:
-
-      (a) the CANCEL counter-adjustment Payment.cancel() used to post,
-          matched by its source FK plus the CANCEL prefix, and
-      (b) the original row of a document cancelled back then, linked
-          either by source FK or by the posted_movement reverse
-          OneToOne (movements added by hand and mirrored into a Payment
-          only ever had the reverse leg — without it, cancelled manual
-          collections leaked into Girişler).
-
-    Excluding both halves is safe for a running balance: they sum to
-    zero.
-    """
-    from django.contrib.contenttypes.models import ContentType
-    from .models_accounts import CheckOrPromissoryNote
-
-    pay_ct = ContentType.objects.get_for_model(Payment)
-    inv_ct = ContentType.objects.get_for_model(Invoice)
-    chk_ct = ContentType.objects.get_for_model(CheckOrPromissoryNote)
-    counter_q = (
-        Q(movement_type="adjustment")
-        & Q(source_type__in=[pay_ct, inv_ct, chk_ct])
-        & Q(source_id__isnull=False)
-        & (Q(reference__startswith="CANCEL") | Q(description__startswith="CANCEL"))
-    )
-    cancelled_pay_ids = list(
-        Payment.objects.filter(status="cancelled").values_list("pk", flat=True))
-    cancelled_inv_ids = list(
-        Invoice.objects.filter(status="cancelled").values_list("pk", flat=True))
-    cancelled_chk_ids = list(
-        CheckOrPromissoryNote.objects.filter(status="cancelled")
-        .values_list("pk", flat=True))
-    original_q = (
-        (Q(source_type=pay_ct) & Q(source_id__in=cancelled_pay_ids))
-        | (Q(source_type=inv_ct) & Q(source_id__in=cancelled_inv_ids))
-        | (Q(source_type=chk_ct) & Q(source_id__in=cancelled_chk_ids))
-        | Q(payment__status="cancelled")
-        | Q(invoice__status="cancelled")
-        | Q(check_initial__status="cancelled")
-        | Q(check_endorsement__status="cancelled")
-    )
-    return counter_q | original_q
+# ---------------------------------------------------------------------------
+# Which rows count is no longer decided here.
+#
+# This file used to carry _cancelled_movement_q(), which re-derived "is
+# this half of a cancelled document's pair?" from the documents on every
+# render. The account page did not use it, so the two printed different
+# numbers for the same account whenever the excluded set failed to sum to
+# zero — which a hard-deleted payment caused, because the CANCEL half was
+# matched on reference text that outlived the document while its partner
+# was matched on a status that did not.
+#
+# The answer is now stored on the row as CariMovement.is_void, backfilled
+# once by migration 0086, and read through CariMovementQuerySet.live() by
+# both the statement and recompute_balance. One rule, one answer.
+# ---------------------------------------------------------------------------
 
 
 def _attach_links(rows):
@@ -632,17 +608,11 @@ class CariDetail(View):
             movements_with_balance.append({"mv": mv, "balance_after": running})
             running -= mv.amount_base
         # Old cancel pairs read as the same collection listed twice, one
-        # of the halves looking live. The statement has always hidden
-        # them; hide them here too. Dropping AFTER the walk keeps every
+        # of the halves looking live. Dropping AFTER the walk keeps every
         # surviving row's balance the one it actually had, and a pair
         # sums to zero so nothing downstream shifts.
-        cancelled_ids = set(
-            cari.movements.filter(_cancelled_movement_q())
-            .values_list("pk", flat=True)
-        )
         movements_with_balance = [
-            r for r in movements_with_balance
-            if r["mv"].pk not in cancelled_ids
+            r for r in movements_with_balance if not r["mv"].is_void
         ][:20]
         _attach_links(movements_with_balance)
 
@@ -683,11 +653,6 @@ class CariStatement(View):
         direction = (request.GET.get("direction") or "").strip()   # in / out
         status_f  = (request.GET.get("status") or "").strip()      # cancelled
 
-        # Both halves of any pre-existing cancel pair — see
-        # _cancelled_movement_q. Cancelling now deletes the row instead,
-        # so this only filters history.
-        all_cancel_q = _cancelled_movement_q()
-
         # Base queryset — date range first so the prior-balance
         # calculation stays correct.
         base = cari.movements.select_related("currency", "created_by__user").all()
@@ -701,10 +666,13 @@ class CariStatement(View):
         #   default / direction filters → ACTIVE only (cancelled hidden
         #     from list and totals)
         #   status=cancelled → ONLY cancelled rows
+        # is_void is the SAME rule CariAccount.recompute_balance sums by,
+        # so an unfiltered statement closes on the account's balance by
+        # construction rather than by argument. See CariMovementQuerySet.
         if status_f == "cancelled":
-            qs = qs.filter(all_cancel_q)
+            qs = qs.void()
         else:
-            qs = qs.exclude(all_cancel_q)
+            qs = qs.live()
 
         # Direction (only meaningful when status != cancelled):
         if status_f != "cancelled":
@@ -723,7 +691,7 @@ class CariStatement(View):
         else:
             prior_qs = prior_qs.none()
         if status_f != "cancelled":
-            prior_qs = prior_qs.exclude(all_cancel_q)
+            prior_qs = prior_qs.live()
         # Base currency throughout — see CariAccount.recompute_balance.
         opening = prior_qs.aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00")
         running = opening

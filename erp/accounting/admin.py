@@ -88,7 +88,7 @@ class CariAccountAdmin(admin.ModelAdmin):
     list_filter   = ("type", "is_active", "book")
     search_fields = ("code", "name", "tax_number", "identity_number", "email", "phone")
     raw_id_fields = ("contact", "company", "supplier")
-    readonly_fields = ("cached_balance", "cached_balance_base", "last_movement_at",
+    readonly_fields = ("cached_balance", "last_movement_at",
                        "created_at", "updated_at")
 
 

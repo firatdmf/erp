@@ -1,3 +1,4 @@
+{% load i18n humanize accounting_tags accounts_tags %}
 {% load i18n %}
 {% load humanize %}
 <div class="st-summary">
@@ -89,8 +90,26 @@
             <span class="st-ref">{{ r.mv.reference|default:"—" }}</span>
           {% endif %}
         </td>
-        <td class="num {% if r.mv.amount > 0 %}pos{% else %}muted{% endif %}">{% if r.mv.amount > 0 %}{{ r.mv.amount|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
-        <td class="num {% if r.mv.amount < 0 %}neg{% else %}muted{% endif %}">{% if r.mv.amount < 0 %}{{ r.mv.amount|floatformat:2|intcomma|cut:'-' }}{% else %}—{% endif %}</td>
+        {% comment %}
+          The debit/credit figure is in the movement's OWN currency while
+          the running balance beside it is a base-currency sum, so a lira
+          row used to read "200.00" against a balance that moved by 4.16
+          with nothing on the page to connect them. Stated only when a
+          conversion actually happened — see conversion_facts.
+        {% endcomment %}
+        {% conversion_facts r.mv as fx %}
+        <td class="num {% if r.mv.amount > 0 %}pos{% else %}muted{% endif %}">
+          {% if r.mv.amount > 0 %}
+            {{ r.mv.amount|floatformat:2|intcomma }}
+            {% if fx %}<span class="st-fx">{{ fx.currency.code }} · {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td class="num {% if r.mv.amount < 0 %}neg{% else %}muted{% endif %}">
+          {% if r.mv.amount < 0 %}
+            {{ r.mv.amount|floatformat:2|intcomma|cut:'-' }}
+            {% if fx %}<span class="st-fx">{{ fx.currency.code }} · {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
         <td class="num">{{ r.balance_after|floatformat:2|intcomma }}</td>
         <td class="st-actions no-print">
           {% if r.editable %}

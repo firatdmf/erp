@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse
 
@@ -33,7 +34,7 @@ import json
 from decimal import Decimal, ROUND_HALF_UP
 import math
 import time
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.contrib.contenttypes.models import ContentType
 
 # add functions here
@@ -1683,45 +1684,81 @@ class CashTransactionEntryList(generic.ListView):
 
 
 @method_decorator(login_required, name="dispatch")
-class MakeInTransfer(generic.edit.CreateView):
-    model = InTransfer
-    form_class = InTransferForm
+class MakeInTransfer(View):
+    """One page, two kinds of transfer.
+
+    Cash mode moves money between the book's own cash accounts — the
+    balances and the cash ledger both change. Account mode moves a
+    balance between two current accounts (a virman): the debt is
+    reassigned, no cash goes anywhere.
+
+    They share a page because the operator's question is the same one
+    ("move X from here to there") and splitting it into two menu entries
+    only makes them hunt. They do NOT share a form: the fields, the
+    validation and the rows written have nothing in common, so each mode
+    binds its own form and the other renders unbound beside it.
+
+    Was a CreateView. Two models with two forms is exactly what that
+    class cannot express — get_form_class() has no access to the POST
+    that decides which one applies.
+    """
+
     template_name = "accounting/make_in_transfer.html"
+    MODES = ("cash", "cari")
 
-    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        kwargs["book"] = book
-        return kwargs
+    def get_book(self):
+        return get_object_or_404(Book, pk=self.kwargs.get("pk"))
 
-    # below preselected the book field of the capital model (independent of the above function)
-    def get_initial(self):
-        # Get the book by primary key from the URL
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved
-        return {"book": book}
+    def _mode(self, source):
+        mode = source.get("mode") or "cash"
+        return mode if mode in self.MODES else "cash"
 
+    def render_page(self, book, mode, cash_form=None, cari_form=None):
+        return render(self.request, self.template_name, {
+            "book": book,
+            "mode": mode,
+            "form": cash_form or InTransferForm(book=book, initial={"book": book}),
+            "cari_form": cari_form or CariTransferForm(book=book, initial={"book": book}),
+            "cash_accounts": CashAccount.objects.filter(book=book).order_by("name"),
+            # A cari's cached balance is a BASE-currency figure while the
+            # transfer is typed in whichever currency is picked, so the
+            # page needs to know which currency that is to convert.
+            #
+            # Deliberately settings.BASE_CURRENCY_CODE and NOT the book's
+            # own base: CariMovement.save() and CariAccount's balances
+            # convert against the former, so taking the latter here would
+            # let the page label and convert against one currency while the
+            # ledger used another — invisible today, since every book is
+            # USD, and silently wrong the day one is not.
+            "base_currency": CurrencyCategory.objects.filter(
+                code=getattr(settings, "BASE_CURRENCY_CODE", "USD")
+            ).first(),
+        })
+
+    def get(self, request, pk):
+        book = self.get_book()
+        return self.render_page(book, self._mode(request.GET))
+
+    def post(self, request, pk):
+        book = self.get_book()
+        mode = self._mode(request.POST)
+        if mode == "cari":
+            return self.post_cari(request, book)
+        return self.post_cash(request, book)
+
+    # -- cash → cash ------------------------------------------------------
     @transaction.atomic
-    def form_valid(self, form):
-        # Process the form data
-        # get the book pk from the url:
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        # transfer amount
-        amount = form.cleaned_data["amount"]
+    def post_cash(self, request, book):
+        form = InTransferForm(request.POST, book=book)
+        if not form.is_valid():
+            return self.render_page(book, "cash", cash_form=form)
 
+        amount = form.cleaned_data["amount"]
         from_cash_account = form.cleaned_data["from_cash_account"]
         to_cash_account = form.cleaned_data["to_cash_account"]
         if not from_cash_account or not to_cash_account:
-            form.add_error(
-                "Cash Account",
-                "Please select a valid cash accounts for the in transfer.",
-            )
-            return self.form_invalid(form)
-        # from_cash_account = CashAccount.objects.get(pk=from_cash_account.pk)
+            form.add_error(None, "Please select valid cash accounts for the transfer.")
+            return self.render_page(book, "cash", cash_form=form)
 
         from_cash_account.balance -= amount
         from_cash_account.save(update_fields=["balance"])
@@ -1729,49 +1766,69 @@ class MakeInTransfer(generic.edit.CreateView):
         to_cash_account.balance += amount
         to_cash_account.save(update_fields=["balance"])
 
-        self.object = form.save(commit=False)
-        self.object.currency = from_cash_account.currency
-        self.object = form.save()
+        obj = form.save(commit=False)
+        obj.currency = from_cash_account.currency
+        obj = form.save()
 
-        content_instance = self.object
-        content_pk = self.object.pk
-        content_type = ContentType.objects.get_for_model(content_instance)
+        content_type = ContentType.objects.get_for_model(obj)
 
-        from_cash_account_transaction_entry = CashTransactionEntry.objects.create(
+        CashTransactionEntry.objects.create(
             book=book,
             content_type=content_type,
-            content_pk=content_pk,
+            content_pk=obj.pk,
             amount=amount,
             is_amount_positive=False,
             currency=from_cash_account.currency,
             cash_account=from_cash_account,
         )
 
-        to_cash_account_transaction_entry = CashTransactionEntry.objects.create(
+        CashTransactionEntry.objects.create(
             book=book,
             content_type=content_type,
-            content_pk=content_pk,
+            content_pk=obj.pk,
             amount=amount,
             is_amount_positive=True,
             currency=to_cash_account.currency,
             cash_account=to_cash_account,
         )
-        # cash_transaction_entry_2.save()
-        return super().form_valid(form)
 
-    def get_success_url(self) -> str:
-        return reverse_lazy(
-            "accounting:make_in_transfer", kwargs={"pk": self.kwargs.get("pk")}
-        )
+        messages.success(request, _g("Moved %(amount)s from %(src)s to %(dst)s.") % {
+            "amount": f"{from_cash_account.currency.symbol}{amount}",
+            "src": from_cash_account.name,
+            "dst": to_cash_account.name,
+        })
+        return redirect(self.success_url(book, "cash"))
 
-    def form_invalid(self, form):
-        # Optionally log errors here
-        for field in form:
-            for error in field.errors:
-                print(f"Error in field {field.name}: {error}")
-        for error in form.non_field_errors():
-            print(f"Form error: {error}")
-        return super().form_invalid(form)
+    # -- cari → cari ------------------------------------------------------
+    @transaction.atomic
+    def post_cari(self, request, book):
+        form = CariTransferForm(request.POST, book=book)
+        if not form.is_valid():
+            return self.render_page(book, "cari", cari_form=form)
+
+        transfer = form.save(commit=False)
+        transfer.book = book
+        transfer.created_by = getattr(request.user, "member", None)
+        try:
+            transfer.save()
+        except ValidationError as exc:
+            # The model's own clean() guards the same rules the form does,
+            # so this is the belt to the form's braces rather than a path
+            # the UI can normally reach.
+            form.add_error(None, exc.messages)
+            return self.render_page(book, "cari", cari_form=form)
+        transfer.post(user=request.user)
+
+        messages.success(request, _g("Moved %(amount)s from %(src)s to %(dst)s.") % {
+            "amount": f"{transfer.amount} {transfer.currency.code}",
+            "src": transfer.from_cari.name,
+            "dst": transfer.to_cari.name,
+        })
+        return redirect(self.success_url(book, "cari"))
+
+    def success_url(self, book, mode):
+        base = reverse("accounting:make_in_transfer", kwargs={"pk": book.pk})
+        return f"{base}?mode={mode}"
 
 
 @method_decorator(login_required, name="dispatch")

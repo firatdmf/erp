@@ -755,9 +755,16 @@ def reverse_order_movement(order):
 # returns None and their revenue would vanish from the books entirely.
 # Instead they all post to ONE shared system cari ("Perakende
 # Satışları") when the order COMPLETES (moves to shipped): the sale
-# movement plus an automatic cash collection for whatever a deposit
-# hasn't already covered — retail is paid at the counter, so the cari
-# balance nets to ~0 and the account reads as a retail revenue journal.
+# movement, and nothing else.
+#
+# Completion used to also auto-collect the total, so the account netted
+# to ~0 and read as a revenue journal. It double-collected any sale
+# somebody had already recorded a collection for by hand — see
+# post_retail_order_financials — and the automatic leg was removed
+# rather than patched: retail collections are now entered by whoever
+# took the money, like every other account's. The account therefore
+# carries a real receivable, and a retail sale is only closed out once
+# a collection is recorded against it.
 #
 # That cari IS the retail record — there is no second copy. Completion
 # used to also mirror the sale into a separate "Perakende" accounting
@@ -784,32 +791,28 @@ def get_or_create_retail_cari(member=None) -> CariAccount:
     )
 
 
-def _order_confirmed_collections(order, cari):
-    """Sum of confirmed collections already tagged to this order on the
-    retail cari (deposits + a possibly-existing auto collection)."""
-    from .models import Payment
-    from django.db.models import Sum, Count
-    return (Payment.objects.filter(
-        cari=cari, type="collection", status="confirmed",
-        notes=f"ORD-{order.pk}",
-    ).aggregate(s=Sum("amount"))["s"] or Decimal("0"))
-
-
 def post_retail_order_financials(order, user=None):
-    """Idempotent completion posting for a retail order:
-      1. attach the shared retail cari + post the order_sale movement;
-      2. auto-collect the not-yet-collected remainder (cash, no
-         cash_account — the counter till is not modelled separately).
-    Safe to re-run (re-ship after un-ship): each leg checks its own
-    marker before writing."""
-    from .models import Payment
-    from .views_payment import _next_payment_number
+    """Completion posting for a retail order: attach the shared retail
+    cari and post the order_sale movement. Idempotent — post_order_movement
+    checks its own marker, so a re-ship after an un-ship writes nothing new.
 
+    Collections are NOT posted here. Retail used to auto-collect the
+    order total on completion so the account would net to ~0 and read as
+    a revenue journal. It decided how much had already been collected by
+    looking for payments whose `notes` was exactly "ORD-<pk>" — a tag only
+    it ever wrote — so a collection entered by hand was invisible to it
+    and the whole total got taken a second time. ORD-286 was collected
+    57.00 by hand at 12:19 and another 57.01 automatically at 12:20,
+    leaving the shared account reading "we owe the customer 57.01"; the
+    cancelled TAH-015/016, TAH-017/018 and TAH-034/035 pairs on that
+    statement are older instances of the same thing, cleaned up by hand.
+
+    Retail collections are now recorded like every other account's: by
+    the person who took the money. The consequence is deliberate — the
+    PERAKENDE account no longer nets to zero on its own, and carries a
+    real receivable until each sale is collected against.
+    """
     member = getattr(user, "member", None) if user else None
-    # Collect exactly what the sale leg debited. Both are the order
-    # total now, so the two net to zero by construction; reading a
-    # different figure here is what once parked a phantom -75.00 "we owe
-    # the customer" on the shared retail cari.
     total = Decimal(str(order.billable_value() or 0))
     if total <= 0:
         return
@@ -820,30 +823,17 @@ def post_retail_order_financials(order, user=None):
         order.save(update_fields=["cari", "updated_at"])
     post_order_movement(order, member=member)
 
-    # ── auto collection for the remainder ────────────────────────
-    currency = _resolve_currency(order)
-    collected = _order_confirmed_collections(order, cari)
-    remainder = total - collected
-    if remainder > 0:
-        # Same rule as the movement above: the collection belongs to the
-        # book its cari is in.
-        book = cari.book
-        pay = Payment.objects.create(
-            cari=cari, book=book,
-            number=_next_payment_number(book, "collection"),
-            type="collection", method="cash", status="draft",
-            date=date.today(), amount=remainder, currency=currency,
-            description=f"{_RETAIL_AUTO_DESC} — Sipariş #{order.pk}",
-            notes=f"ORD-{order.pk}",
-            created_by=member,
-        )
-        pay.confirm(user=user)
-
 
 def reverse_retail_order_financials(order, user=None):
     """Undo post_retail_order_financials when a retail order leaves the
-    shipped state (un-ship / cancel): remove the sale movement and
-    cancel the AUTO collection (manual deposits are left alone)."""
+    shipped state (un-ship / cancel): remove the sale movement.
+
+    Collections are left alone — every one of them is now somebody's
+    hand-entered record of money that actually changed hands, and un-
+    shipping an order does not un-receive it. Historical AUTO collections
+    are still cleaned up, so un-shipping an order shipped before this
+    change still reverses cleanly.
+    """
     from .models import Payment
 
     reverse_order_movement(order)
@@ -856,3 +846,81 @@ def reverse_retail_order_financials(order, user=None):
                 notes=f"ORD-{order.pk}",
                 description__startswith=_RETAIL_AUTO_DESC):
             pay.cancel(user=user, reason="Sipariş sevk iptali")
+
+
+# ---------------------------------------------------------------------------
+# What a foreign-currency record converted at
+# ---------------------------------------------------------------------------
+def conversion_facts(obj):
+    """The rate a record converted at and what it came to in base currency.
+
+    Returns None when there is nothing worth stating — the record is
+    already in the base currency, so a rate of 1 beside a repeated figure
+    tells the reader nothing.
+
+    The figures are read from the LEDGER ROW the record posted wherever
+    there is one, not from the record's own fields. The row is what
+    actually moved the balance, and the two genuinely can differ: a draft
+    has posted nothing yet, and a rate corrected on a confirmed document
+    only reaches the balance when it is resynced. Showing the document's
+    intention while the ledger holds another number is how a page comes to
+    disagree with the statement it is describing.
+
+    Every model that carries money in a currency is handled by shape
+    rather than by name, so a new one needs no change here:
+      * a posted-movement link  → ask the movement (Payment, Invoice)
+      * amount_base             → CariMovement
+      * amount_in_base_currency → CashTransactionEntry
+      * an exchange_rate alone  → compute, and say it is not posted yet
+    """
+    if obj is None:
+        return None
+
+    base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
+    currency = getattr(obj, "currency", None)
+    if currency is None or getattr(currency, "code", None) == base_code:
+        return None
+
+    from accounting.models import CurrencyCategory
+    base = CurrencyCategory.objects.filter(code=base_code).first()
+
+    def facts(rate, base_amount, posted):
+        if rate is None:
+            return None
+        return {
+            "currency": currency,
+            "rate": Decimal(str(rate)),
+            "base_amount": base_amount,
+            "base_code": base_code,
+            "base_symbol": (base.symbol if base else "") or base_code,
+            # False means the figure is what the ledger holds; True means
+            # it is what this record would post if it were.
+            "pending": posted is False,
+        }
+
+    # A document that posted a ledger row — the row is the authority.
+    movement = getattr(obj, "posted_movement", None)
+    if movement is not None:
+        return facts(movement.exchange_rate, movement.amount_base, True)
+
+    # The ledger rows themselves.
+    if getattr(obj, "amount_base", None) is not None and hasattr(obj, "exchange_rate"):
+        return facts(obj.exchange_rate, obj.amount_base, True)
+    if getattr(obj, "amount_in_base_currency", None) is not None:
+        return facts(obj.exchange_rate, obj.amount_in_base_currency, True)
+
+    # Nothing posted yet. Say what it would convert at, and mark it so the
+    # page can word it as a projection rather than a fact.
+    rate = getattr(obj, "exchange_rate", None)
+    amount = getattr(obj, "amount", None)
+    if not rate:
+        from accounting.services import get_exchange_rate
+        rate = get_exchange_rate(
+            currency.code, base_code, on_date=getattr(obj, "date", None)
+        )
+    if not rate:
+        return None
+    base_amount = None
+    if amount is not None:
+        base_amount = (Decimal(amount) * Decimal(str(rate))).quantize(Decimal("0.01"))
+    return facts(rate, base_amount, False)

@@ -1009,17 +1009,18 @@ class InTransfer(models.Model):
         return f"{self.from_cash_account.name} -> {self.to_cash_account.name} | {self.currency.symbol}{self.amount}"
 
     def clean(self):
+        # Guarded on the *_id, not the relation: reaching through an unset
+        # non-nullable FK raises RelatedObjectDoesNotExist, not None, so
+        # submitting the form with one account left blank used to 500 here
+        # instead of coming back with "this field is required".
+        if not self.from_cash_account_id or not self.to_cash_account_id:
+            return
 
         self.currency = self.from_cash_account.currency
-        if self.from_cash_account and self.to_cash_account:
-            currency = CurrencyCategory.objects.get(
-                pk=self.from_cash_account.currency.pk
+        if self.from_cash_account.currency != self.to_cash_account.currency:
+            raise ValidationError(
+                "The currencies of the source and destination accounts must match."
             )
-            self.currency = currency
-            if self.from_cash_account.currency != self.to_cash_account.currency:
-                raise ValidationError(
-                    "The currencies of the source and destination accounts must match."
-                )
 
         # return cleaned_data
         # return super().clean()

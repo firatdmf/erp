@@ -381,6 +381,132 @@ class InTransferForm(forms.ModelForm):
             self.fields["to_cash_account"].queryset = CashAccount.objects.filter(
                 book=book
             ).order_by("name")
+        for name in ("from_cash_account", "to_cash_account"):
+            self.fields[name].empty_label = "Select a cash account"
+            self.fields[name].widget = BalanceSelect(
+                choices=self.fields[name].choices, balance_attr="balance"
+            )
+
+
+class BalanceSelect(forms.Select):
+    """A <select> whose options carry the account's balance and currency.
+
+    The transfer page shows what each side stands at before and after as
+    soon as both are picked, and the direction of a virman is exactly the
+    thing an operator can get backwards. Reading it off the option the
+    browser already holds beats a round-trip or a second endpoint.
+    """
+
+    def __init__(self, *args, balance_attr="cached_balance", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.balance_attr = balance_attr
+
+    def create_option(self, name, value, *args, **kwargs):
+        option = super().create_option(name, value, *args, **kwargs)
+        # ModelChoiceField hands the option an object carrying `instance`;
+        # the blank choice is a plain "" and has none.
+        instance = getattr(value, "instance", None)
+        if instance is not None:
+            balance = getattr(instance, self.balance_attr, None)
+            if balance is not None:
+                option["attrs"]["data-balance"] = str(balance)
+            currency = getattr(instance, "currency", None)
+            symbol = getattr(currency, "symbol", None)
+            if symbol is None:
+                symbol = getattr(instance, "display_currency_symbol", "")
+            option["attrs"]["data-symbol"] = symbol or ""
+        return option
+
+
+class CurrencyCodeSelect(forms.Select):
+    """A currency <select> whose options carry their ISO code.
+
+    The rate converter asks the server for a pair by code, and the option
+    label is a display string ("USD — US Dollar") that must not be parsed
+    for one.
+    """
+
+    def create_option(self, name, value, *args, **kwargs):
+        option = super().create_option(name, value, *args, **kwargs)
+        instance = getattr(value, "instance", None)
+        if instance is not None and getattr(instance, "code", None):
+            option["attrs"]["data-code"] = instance.code
+        return option
+
+
+class CariTransferForm(forms.ModelForm):
+    """Move a balance from one current account to another.
+
+    The currency is asked for rather than inferred from either account:
+    the two sides can trade in different currencies, and picking one of
+    them silently would decide, without saying so, which account the
+    figure the operator typed actually belongs to.
+    """
+
+    class Meta:
+        model = CariTransfer
+        fields = ["book", "date", "from_cari", "to_cari", "amount",
+                  "currency", "exchange_rate", "description"]
+        widgets = {
+            "book": forms.HiddenInput(),
+            "date": forms.DateInput(attrs={"type": "date"}),
+            "description": forms.TextInput(
+                attrs={"placeholder": "Why the balance is moving"}
+            ),
+        }
+        labels = {
+            "from_cari": "From account (owes us less after)",
+            "to_cari": "To account (owes us more after)",
+        }
+
+    def __init__(self, *args, **kwargs):
+        book = kwargs.pop("book", None)
+        super().__init__(*args, **kwargs)
+        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        self.fields["description"].required = False
+        # Blank means "nobody said" — the published rate for the date
+        # applies. Only shown at all when the currency differs from the
+        # book's own, since there is nothing to convert otherwise.
+        self.fields["exchange_rate"].required = False
+        self.fields["exchange_rate"].widget = forms.NumberInput(attrs={
+            "step": "0.000001", "min": "0", "placeholder": "0.000000",
+        })
+        self.fields["currency"].widget = CurrencyCodeSelect(
+            choices=self.fields["currency"].choices
+        )
+        if book:
+            # Only this book's accounts, and only live ones — a transfer
+            # onto an archived account hides the balance it just moved.
+            accounts = (CariAccount.objects
+                        .filter(book=book, is_active=True)
+                        .order_by("code"))
+            self.fields["from_cari"].queryset = accounts
+            self.fields["to_cari"].queryset = accounts
+            self.fields["currency"].initial = book.effective_base_currency
+        # Balances on the options, so the page can show what each side
+        # stands at before and after — see BalanceSelect.
+        for name in ("from_cari", "to_cari"):
+            self.fields[name].empty_label = "Select an account"
+            self.fields[name].widget = BalanceSelect(
+                choices=self.fields[name].choices
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+        # Duplicated from the model so the page comes back with the error
+        # on the field instead of a 500 out of full_clean() in save().
+        if cleaned.get("from_cari") and cleaned.get("from_cari") == cleaned.get("to_cari"):
+            self.add_error(
+                "to_cari",
+                "Pick two different accounts — a transfer to itself moves nothing.",
+            )
+        amount = cleaned.get("amount")
+        if amount is not None and amount <= 0:
+            self.add_error("amount", "Amount must be greater than zero.")
+        rate = cleaned.get("exchange_rate")
+        if rate is not None and rate <= 0:
+            self.add_error("exchange_rate", "Exchange rate must be greater than zero.")
+        return cleaned
 
 
 class CurrencyExchangeForm(forms.ModelForm):

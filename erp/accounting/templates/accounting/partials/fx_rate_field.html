@@ -28,13 +28,14 @@
   var extra = document.createElement('span');
   extra.className = 'fx-extra';
   extra.innerHTML =
-    '<span class="fx-eq">=</span>' +
+    '<span class="fx-eq"></span>' +
     '<input type="number" step="0.01" min="0" class="fx-total" placeholder="0.00">' +
     '<span class="fx-code"></span>' +
     '<button type="button" class="fx-reset">{% translate "Use published" %}</button>' +
     '<span class="fx-note"></span>';
   rateEl.insertAdjacentElement('afterend', extra);
 
+  var eqEl = extra.querySelector('.fx-eq');
   var totalEl = extra.querySelector('.fx-total');
   var noteEl = extra.querySelector('.fx-note');
   var resetBtn = extra.querySelector('.fx-reset');
@@ -45,7 +46,26 @@
   var userSet = Boolean(rateEl.value);
   var lastKey = null;
 
-  function amount() { return parseFloat(amountEl.value) || 0; }
+  // null, not 0, when the box is empty. Coercing it to zero is what made
+  // the row read "0.020800 = 0.00": an equation whose right-hand side sits
+  // after an "=" states something about the rate, and 0.00 there says the
+  // rate is nothing. An amount nobody has typed has no product yet.
+  function amount() {
+    var v = parseFloat(amountEl.value);
+    return isFinite(v) ? v : null;
+  }
+
+  // "× 400 TRY =" — the multiplicand said out loud, so the row is an
+  // equation that holds rather than two numbers either side of an "=".
+  function syncEquation() {
+    var a = amount();
+    var cur = selectedCurrency();
+    var code = (cur && cur.code) ? cur.code : '';
+    var lhs = (a === null)
+      ? '{% translate "amount" %}'
+      : a.toLocaleString(undefined, {maximumFractionDigits: 2});
+    eqEl.textContent = '\u00d7 ' + lhs + (code ? ' ' + code : '') + ' =';
+  }
 
   function selectedCurrency() {
     var opt = accountEl.options[accountEl.selectedIndex];
@@ -62,12 +82,17 @@
 
   function recalcTotal() {
     var rate = parseFloat(rateEl.value);
-    totalEl.value = rate > 0 ? (amount() * rate).toFixed(2) : '';
+    var a = amount();
+    // Blank, not 0.00, while there is no amount to multiply.
+    totalEl.value = (rate > 0 && a !== null) ? (a * rate).toFixed(2) : '';
+    syncEquation();
   }
 
   function recalcRate() {
     var total = parseFloat(totalEl.value);
-    rateEl.value = total > 0 && amount() > 0 ? (total / amount()).toFixed(6) : '';
+    var a = amount();
+    rateEl.value = (total > 0 && a) ? (total / a).toFixed(6) : '';
+    syncEquation();
   }
 
   function fetchRate(force) {
@@ -115,6 +140,7 @@
       return;
     }
     row.style.display = '';
+    syncEquation();
     fetchRate(false);
   }
 
@@ -130,6 +156,7 @@
   });
   resetBtn.addEventListener('click', function () { fetchRate(true); });
   amountEl.addEventListener('input', recalcTotal);
+  amountEl.addEventListener('change', recalcTotal);
   accountEl.addEventListener('change', sync);
   if (dateEl) dateEl.addEventListener('change', function () { fetchRate(false); });
 
@@ -141,7 +168,8 @@
 <style>
   .fx-extra { display: flex; align-items: center; gap: .5rem; margin-top: .5rem;
               flex-wrap: wrap; }
-  .fx-extra .fx-eq { color: #8A96A6; font-weight: 600; }
+  .fx-extra .fx-eq { color: #6B7280; font-weight: 600; white-space: nowrap;
+                     font-variant-numeric: tabular-nums; }
   .fx-extra .fx-total { flex: 1 1 8rem; min-width: 6rem; }
   .fx-extra .fx-code { font-size: .85rem; color: #6B7280; }
   .fx-extra .fx-reset { padding: .45rem .7rem; font-size: .78rem; color: #374151;

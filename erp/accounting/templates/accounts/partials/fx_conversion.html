@@ -1,0 +1,44 @@
+{% load i18n humanize accounting_tags accounts_tags %}
+{% comment %}
+  Two rows stating what a foreign-currency record converted at and what it
+  came to in the book's own currency. Renders nothing at all for a record
+  already in base currency — a rate of 1 beside a repeated figure tells the
+  reader nothing.
+
+  Expects `fx` from the conversion_facts tag. `layout` picks the wrapper:
+  "rows" (default) for a .pd-info style grid, "inline" for a single line.
+{% endcomment %}
+{% if fx %}
+  {% if layout == "inline" %}
+    <span class="fx-inline">
+      <span class="fx-rate">1 {{ fx.currency.code }} = {{ fx.rate|format_rate }} {{ fx.base_code }}</span>
+      {% if fx.base_amount != None %}
+        <span class="fx-base">{{ fx.base_symbol }}{{ fx.base_amount|format_money }}</span>
+      {% endif %}
+      {% if fx.pending %}<span class="fx-pending">{% trans "not posted yet" %}</span>{% endif %}
+    </span>
+  {% else %}
+    <div class="row">
+      <div class="lbl">{% trans "Exchange Rate" %}</div>
+      <div class="val amt">
+        {{ fx.rate|format_rate }}
+        <span class="fx-pair">1 {{ fx.currency.code }} = {{ fx.rate|format_rate }} {{ fx.base_code }}</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lbl">
+        {% blocktrans with code=fx.base_code %}Value in {{ code }}{% endblocktrans %}
+      </div>
+      <div class="val amt">
+        {% if fx.base_amount != None %}
+          {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }}
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+        {% if fx.pending %}
+          <span class="fx-pending">{% trans "not posted yet — this is what it would convert at" %}</span>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% endif %}

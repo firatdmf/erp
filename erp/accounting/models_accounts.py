@@ -825,11 +825,23 @@ class Invoice(models.Model):
         if not self.items.exists():
             raise ValidationError("Cannot issue an invoice with no items.")
 
-        # Order-attached invoice → info-only (amount=0); standalone → real posting.
+        # An invoice raised against an order posts NOTHING. The order_sale
+        # movement already carries the receivable, so this used to write a
+        # 0.00 row purely to record that a document existed — a line on the
+        # statement that could never explain how the balance got from the
+        # row above it to the row below, which is the only job a statement
+        # row has. Invoices are listed on the account page in their own
+        # card, which is where "was this invoiced?" belongs.
+        #
+        # A STANDALONE invoice is a different animal and still posts: for a
+        # purchase receipt or a sale with no order behind it, this movement
+        # IS the debt and nothing else would create it.
         if self.order_id:
-            amount_signed = Decimal("0.00")
-        else:
-            amount_signed = self.total * Decimal(self.ledger_sign)
+            self.status = "issued"
+            self.save(update_fields=["status", "updated_at"])
+            return None
+
+        amount_signed = self.total * Decimal(self.ledger_sign)
 
         movement = CariMovement.objects.create(
             cari=self.cari,
@@ -852,10 +864,11 @@ class Invoice(models.Model):
 
     def resync_posted_movement(self, user=None):
         """Refresh the ledger row after totals/date/currency change on an
-        already-issued invoice. Order-attached invoices stay at amount=0
-        (no double counting); standalone invoices get amount/desc/date
-        refreshed in place on the SAME CariMovement (never delete+recreate —
-        that would break anything referencing it by id).
+        already-issued invoice. Order-attached invoices post no row at all
+        (the order carries the receivable); standalone invoices get
+        amount/desc/date refreshed in place on the SAME CariMovement
+        (never delete+recreate — that would break anything referencing it
+        by id).
 
         If `posted_movement` is somehow missing on a non-draft/non-cancelled
         invoice (should not happen in normal flow, since issue() always sets
@@ -865,7 +878,15 @@ class Invoice(models.Model):
         """
         if self.status in ("draft", "cancelled"):
             return None
-        amount = Decimal("0.00") if self.order_id else self.total * Decimal(self.ledger_sign)
+        # Nothing to keep in step for an order-attached invoice — it posts
+        # no row. Returning early matters as much as issue() not creating
+        # one: the `mv is None` branch below exists to repost a movement
+        # that went missing, and without this guard every edit would
+        # resurrect exactly the 0.00 row we stopped writing.
+        if self.order_id:
+            return None
+
+        amount = self.total * Decimal(self.ledger_sign)
 
         mv = self.posted_movement
         if mv is None:
@@ -897,8 +918,9 @@ class Invoice(models.Model):
         Cancel an issued invoice. DELETES the posted CariMovement outright
         (mirroring reverse_order_movement's semantics for orders) so the
         cari history shows no trace of the dead invoice, then recomputes
-        the balance. For order-attached invoices the movement is the
-        0-amount marker, so the balance is untouched either way.
+        the balance. An order-attached invoice has no movement to delete —
+        it never posted one — so this is a no-op for those beyond the
+        status flip.
 
         Cancellation is TERMINAL — there is no restore path (restore()
         below refuses), which is exactly why deleting beats posting an

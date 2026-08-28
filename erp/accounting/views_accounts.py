@@ -640,6 +640,61 @@ class CariDetail(View):
 # ---------------------------------------------------------------------------
 # Statement (Ekstre)
 # ---------------------------------------------------------------------------
+def _cancelled_documents(cari, date_from="", date_to=""):
+    """This account's cancelled documents, for the statement's cancelled view.
+
+    That view filters movements on is_void, and a cancelled INVOICE leaves
+    such rows behind. A cancelled PAYMENT does not: Payment.cancel deletes
+    the movement outright rather than voiding it, deliberately, so the
+    account's history is not padded with a dead line for every correction —
+    the record lives on the Payment, which keeps its number and status.
+
+    Which left the page half-answering its own question. Asking for what
+    was cancelled returned the invoices and silently omitted the payments,
+    with nothing to say the rest existed. The documents are listed here
+    beside the rows, so the answer is complete without either of those
+    cancellation policies having to change.
+    """
+    from django.urls import reverse as _reverse
+
+    def _window(qs, field):
+        if date_from:
+            qs = qs.filter(**{f"{field}__gte": date_from})
+        if date_to:
+            qs = qs.filter(**{f"{field}__lte": date_to})
+        return qs
+
+    docs = []
+    for inv in _window(
+        cari.invoices.filter(status="cancelled").select_related("currency"), "date"
+    ):
+        docs.append({
+            "kind": _("Invoice"), "label": inv.display_number, "date": inv.date,
+            "amount": inv.total, "currency": inv.currency,
+            "url": _reverse("accounts:invoice_detail", args=[inv.pk]),
+        })
+    for pay in _window(
+        cari.payments.filter(status="cancelled").select_related("currency"), "date"
+    ):
+        docs.append({
+            "kind": pay.get_type_display(), "label": pay.number, "date": pay.date,
+            "amount": pay.amount, "currency": pay.currency,
+            "url": _reverse("accounts:payment_detail", args=[pay.pk]),
+        })
+    for chk in _window(
+        cari.checks.filter(status="cancelled").select_related("currency"), "issue_date"
+    ):
+        docs.append({
+            "kind": chk.get_instrument_display(), "label": chk.serial_no,
+            "date": chk.issue_date, "amount": chk.amount, "currency": chk.currency,
+            "url": _reverse("accounts:check_detail", args=[chk.pk]),
+        })
+    # date can be None on nothing here, but a stable order beats three
+    # queries' worth of arbitrary interleaving.
+    docs.sort(key=lambda d: (d["date"], d["label"]), reverse=True)
+    return docs
+
+
 @method_decorator(login_required, name="dispatch")
 class CariStatement(View):
     template_name = "accounts/cari_statement.html"
@@ -726,6 +781,10 @@ class CariStatement(View):
         ctx = {
             "cari":         cari,
             "rows":         rows,
+            "cancelled_documents": (
+                _cancelled_documents(cari, date_from, date_to)
+                if status_f == "cancelled" else []
+            ),
             "sort":         sort,
             "opening":      opening,
             "closing":      running,

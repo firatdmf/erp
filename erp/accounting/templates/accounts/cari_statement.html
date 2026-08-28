@@ -166,6 +166,14 @@
   .st-stat .val.neg { color: #0E6E4A; }
 
   .st-card { background: white; border:1px solid #E2E8EE; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  /* Cancelled documents — a record, not a ledger, so it is set apart from
+     the table above rather than reading as more of it. */
+  .st-cancelled { margin-top: 16px; }
+  .st-cancelled-h { padding: 14px 16px; border-bottom: 1px solid #EEF1F5; background: #FAFBFD; }
+  .st-cancelled-h h3 { margin: 0; font: 700 13.5px var(--font-sans); color: var(--ink); }
+  .st-cancelled-h span { display: block; margin-top: 3px; font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .st-cancelled .st-tbl tbody td { color: var(--gray-600); }
+  .st-cancelled .st-tbl tbody a { color: var(--gray-700); }
 
   .st-tbl { width: 100%; border-collapse: collapse; font: 400 13px var(--font-sans); }
   .st-tbl thead th { background: #FAFBFD; border-bottom: 1px solid #E2E8EE; font: 600 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); padding: 11px 14px; text-align: left; }

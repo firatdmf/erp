@@ -169,10 +169,62 @@
     <div class="st-empty">
       <div class="ico"><i data-lucide="inbox"></i></div>
       <h3>{% trans "No movements" %}</h3>
-      <p>{% trans "No movements in the selected range." %}</p>
+      <p>
+        {% if filter_status == 'cancelled' and cancelled_documents %}
+          {% trans "Nothing cancelled here left a ledger row — the documents below are the record." %}
+        {% else %}
+          {% trans "No movements in the selected range." %}
+        {% endif %}
+      </p>
     </div>
   {% endif %}
 </div>
+
+{% if filter_status == 'cancelled' %}
+{% comment %}
+  A cancelled invoice leaves voided rows in the table above; a cancelled
+  payment leaves none at all, because Payment.cancel deletes its movement
+  rather than voiding it. Listing the documents is what makes the answer to
+  "what was cancelled on this account" complete either way — see
+  views_accounts._cancelled_documents.
+{% endcomment %}
+<div class="st-card st-cancelled no-print-break">
+  <div class="st-cancelled-h">
+    <h3>{% trans "Cancelled documents" %}</h3>
+    <span>{% trans "Kept as a record. None of these count toward the balance." %}</span>
+  </div>
+  {% if cancelled_documents %}
+  <table class="st-tbl">
+    <thead>
+      <tr>
+        <th>{% trans "Date" %}</th>
+        <th>{% trans "Type" %}</th>
+        <th>{% trans "Reference" %}</th>
+        <th class="num">{% trans "Amount" %}</th>
+        <th class="st-actions-h no-print"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in cancelled_documents %}
+      <tr class="mv-link" data-href="{{ d.url }}">
+        <td>{{ d.date }}</td>
+        <td>{{ d.kind }}</td>
+        <td><a href="{{ d.url }}">{{ d.label }}</a></td>
+        <td class="num">{{ d.amount|floatformat:2|intcomma }} {{ d.currency.code }}</td>
+        <td class="no-print"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div class="st-empty">
+      <div class="ico"><i data-lucide="file-x"></i></div>
+      <h3>{% trans "Nothing cancelled" %}</h3>
+      <p>{% trans "No cancelled invoices, payments or notes on this account." %}</p>
+    </div>
+  {% endif %}
+</div>
+{% endif %}
 
 <script>
   // Re-render icons + re-bind row click after HTMX swap.

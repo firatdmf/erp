@@ -8864,3 +8864,18 @@ msgstr "%(amount)s tutarında gider kaydedildi, %(account)s hesabından ödendi.
 
 msgid "That account does not hold enough: %s"
 msgstr "Bu hesapta yeterli bakiye yok: %s"
+
+msgid "Cancelled documents"
+msgstr "İptal edilen belgeler"
+
+msgid "Kept as a record. None of these count toward the balance."
+msgstr "Kayıt olarak tutulur. Hiçbiri bakiyeye dahil değildir."
+
+msgid "Nothing cancelled"
+msgstr "İptal edilen yok"
+
+msgid "No cancelled invoices, payments or notes on this account."
+msgstr "Bu hesapta iptal edilmiş fatura, ödeme ya da senet yok."
+
+msgid "Nothing cancelled here left a ledger row — the documents below are the record."
+msgstr "Burada iptal edilenlerin hiçbiri defterde satır bırakmadı — kayıt, aşağıdaki belgelerdir."

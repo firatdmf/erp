@@ -98,13 +98,17 @@ class BookHeaderStakeholdersTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.context["stakeholders"][0]["pct"])
 
-    def test_a_book_with_none_offers_to_add_one(self):
+    def test_a_book_with_none_points_at_the_cap_table(self):
+        """Empty state sends you to the cap table, which is where shares
+        are issued. The book page itself no longer carries the add
+        action — that moved to the Accounting menu with the rest of the
+        entry actions when this page became a report."""
         response = self.client.get(self.url())
         self.assertEqual(response.context["stakeholders"], [])
         html = response.content.decode()
         self.assertIn("Add a stakeholder", html)
         self.assertIn(
-            reverse("accounting:add_stakeholderbook", kwargs={"pk": self.book.pk}), html
+            reverse("accounting:book_shares", kwargs={"pk": self.book.pk}), html
         )
 
     def test_the_bottom_card_is_gone(self):

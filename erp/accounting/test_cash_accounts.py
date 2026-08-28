@@ -72,7 +72,13 @@ class CashAccountModelTest(CashAccountTestBase):
 
 
 class CashAccountListingTest(CashAccountTestBase):
-    """The Cash Accounts card on the book detail page."""
+    """The Cash Accounts card on the book detail page.
+
+    The card reports balances and nothing else. The book page became a
+    report — the add and edit affordances moved into the Accounting menu
+    (accounting:go_add_cash_account), so the assertions below check the
+    figures are right and that the page no longer offers to change them.
+    """
 
     def test_book_detail_lists_only_this_books_accounts(self):
         response = self.client.get(self.detail_url())
@@ -81,24 +87,27 @@ class CashAccountListingTest(CashAccountTestBase):
         self.assertEqual(listed, [self.kasa, self.usd_kasa])
         self.assertNotIn(self.foreign, listed)
 
-    def test_card_renders_names_balances_and_an_edit_link(self):
+    def test_card_renders_names_and_balances(self):
         html = self.client.get(self.detail_url()).content.decode()
         self.assertIn("Ziraat", html)
         self.assertIn("₺12,500.00", html)
-        self.assertIn(self.edit_url(), html)
         self.assertNotIn("Yapı Kredi", html)
 
-    def test_book_with_no_accounts_says_so_and_offers_to_add_one(self):
+    def test_card_does_not_offer_to_edit_an_account(self):
+        """The page reports the position; it does not change it."""
+        html = self.client.get(self.detail_url()).content.decode()
+        self.assertNotIn(self.edit_url(), html)
+
+    def test_book_with_no_accounts_says_so(self):
         empty = Book.objects.create(name="Boş Defter")
         response = self.client.get(self.detail_url(empty))
         self.assertEqual(list(response.context["cash_accounts"]), [])
-        html = response.content.decode()
-        self.assertIn("no cash accounts yet", html)
-        self.assertIn(self.add_url(empty), html)
+        self.assertIn("no cash accounts yet", response.content.decode())
 
-    def test_card_offers_an_add_link(self):
+    def test_card_does_not_offer_to_add_an_account(self):
+        """Creating one is a menu action now, not a button on the report."""
         html = self.client.get(self.detail_url()).content.decode()
-        self.assertIn(self.add_url(), html)
+        self.assertNotIn(self.add_url(), html)
 
 
 class CashAccountCreateTest(CashAccountTestBase):

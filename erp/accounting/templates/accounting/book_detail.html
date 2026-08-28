@@ -333,48 +333,6 @@
     {% endif %}
   </div>
 
-  <!-- ============ STAKEHOLDERS ============ -->
-  <div class="financial-overview-card">
-    <div class="card-header-title">
-      <span><i class="fas fa-users purple-icon"></i> Stakeholders</span>
-      <a class="cash-account-add" href="{% url 'accounting:book_shares' book.pk %}">
-        <i class="fas fa-arrow-right"></i> Cap table
-      </a>
-    </div>
-    {% if stakeholders %}
-    <table class="assets-table">
-      <thead>
-        <tr>
-          <th>Member</th>
-          <th class="num">Shares</th>
-          <th class="num">Stake</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in stakeholders %}
-        <tr>
-          <td>{{ s.member|default:"Unassigned" }}</td>
-          <td class="num">{{ s.shares|intcomma }}</td>
-          <td class="num">{% if s.pct is not None %}{{ s.pct }}%{% else %}&mdash;{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-      <tfoot>
-        <tr>
-          <td>{{ stakeholders|length }} holder{{ stakeholders|length|pluralize }}</td>
-          <td class="num">{{ shares_issued|intcomma }}</td>
-          <td class="num">of {{ shares_pool|intcomma }}</td>
-        </tr>
-      </tfoot>
-    </table>
-    {% else %}
-    <div class="cash-accounts-empty">
-      No shares have been issued for this book yet.
-      <a href="{% url 'accounting:book_shares' book.pk %}">Open the cap table</a>.
-    </div>
-    {% endif %}
-  </div>
-
   <!-- ============ OUTSTANDING BALANCES ============ -->
   <style>
     .bal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }

@@ -346,13 +346,12 @@
               <div class="pf-f">
                 <label>{% trans "Date" %}</label>
                 {% comment %}
-                  form.data is the raw POST (empty on a fresh GET), so a
-                  rejected submit keeps what was typed and a new form opens on
-                  today — without a date object being localized into something
-                  the input cannot parse.
+                  Decided in the view — what was typed on a rejected submit,
+                  else the stored date, else today, always ISO. See
+                  EquityExpensePage._date_value for why not form.date.value.
                 {% endcomment %}
                 <input type="date" name="date" id="id_date" required
-                       value="{{ form.data.date|default:today }}">
+                       value="{{ date_value }}">
               </div>
               <div class="pf-f">
                 <label>{% trans "Category" %}</label>
@@ -469,7 +468,9 @@
   // Only true once the person edits the currency themselves. Until then,
   // picking an account sets it; after, picking an account leaves it alone,
   // because the currency they typed is the one they meant.
-  var ccyTouched = false;
+  // Starts true when the row already has a currency — an edit, or a
+  // rejected submit that carried one. See _currency_is_settled.
+  var ccyTouched = {% if currency_is_settled %}true{% else %}false{% endif %};
   var S = document.getElementById('expenseStrings').dataset;
   ccySel.addEventListener('change', function () { ccyTouched = true; syncSummary(); });
 
@@ -653,7 +654,6 @@
   // Opening state — an edit or a rejected submit can arrive with either
   // source already filled.
   syncChip();
-  ccyTouched = Boolean({{ form.data.currency|yesno:"1,0,0" }});
   applyFunding();
 })();
 </script>

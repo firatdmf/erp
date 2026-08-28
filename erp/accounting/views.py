@@ -1166,10 +1166,14 @@ class EquityExpensePage:
         book = Book.objects.filter(pk=self.kwargs.get("pk")).first()
         context["base_currency"] = fx_context_json(book)
         context["book"] = book
-        # ISO, because <input type="date"> accepts nothing else — the
-        # localized rendering a date object would get here is exactly what
-        # leaves the field blank in a Turkish locale.
-        context["today"] = timezone.localdate().isoformat()
+        context["date_value"] = self._date_value(context.get("form"))
+        # Whether the currency is already decided — see the JS that reads
+        # it. An expense being edited HAS a currency, chosen deliberately,
+        # and the account it was funded through must not be allowed to
+        # propose over the top of it.
+        context["currency_is_settled"] = self._currency_is_settled(
+            context.get("form")
+        )
         # The full page renders its own controls rather than {{ form.as_p }},
         # so it needs the options as data. The form's querysets stay the
         # authority on what is ACCEPTED — these only decide what is offered,
@@ -1195,6 +1199,40 @@ class EquityExpensePage:
         # that both halves of it exist.
         context["ledger_movement"] = self.ledger_movement()
         return context
+
+    def _date_value(self, form):
+        """What the date input shows — always ISO, whatever the locale.
+
+        The raw POST first, so a rejected submit keeps what was typed; then
+        the stored date, which is the whole reason an edit does not open on
+        today; then today, for a new one.
+
+        Never form.date.value: on an edit that hands back a date object,
+        which the template renders through the active locale as
+        "26 Ağustos 2026" — and <input type="date"> silently drops anything
+        that is not ISO, so the field would come up empty and the edit would
+        look like it had lost the date.
+        """
+        posted = form.data.get("date") if form is not None else None
+        if posted:
+            return posted
+        stored = getattr(self.object, "date", None) if self.object else None
+        if stored:
+            return stored.isoformat()
+        return timezone.localdate().isoformat()
+
+    def _currency_is_settled(self, form) -> bool:
+        """True when the currency must be left exactly as it is.
+
+        The page proposes the funding account's currency as you pick one,
+        which is right while an expense is being written and wrong the
+        moment one already exists: expense 54 is 939.70 TRY settled through
+        a dollar account, and proposing over it turned it back into dollars
+        on open. A stored currency is an answer already given.
+        """
+        if self.object is not None and self.object.pk:
+            return True
+        return bool(form is not None and form.data.get("currency"))
 
     def ledger_movement(self):
         """The cari movement this expense posted, if it posted one."""

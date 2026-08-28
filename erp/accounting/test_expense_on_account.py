@@ -296,6 +296,95 @@ class ExpensePaidOnAccountTests(TestCase):
         self.assertContains(response, self.firat.code)
         self.assertContains(response, "180.59")
 
+    def _select_block(self, html, select_id):
+        m = re.search(r'id="%s".*?</select>' % select_id, html, re.S)
+        self.assertIsNotNone(m, f"no {select_id} select on the page")
+        return m.group(0)
+
+    def test_the_edit_page_keeps_the_currency_that_was_recorded(self):
+        """939.70 TRY settled through a DOLLAR account. The page proposes the
+        account's currency as you pick one, which is right while writing an
+        expense and wrong once one exists — it turned this back into USD.
+
+        The overwrite happened in the browser, which this cannot run, so the
+        assertion that matters is on `currency_is_settled`: that flag is the
+        one thing the script consults before proposing. The rendered
+        `selected` was always right; it just did not survive page load.
+        """
+        with mock.patch("accounting.services.get_exchange_rate") as published:
+            published.return_value = Decimal("0.020790")
+            self._post(currency=self.try_.pk, amount="939.70")
+        expense = EquityExpense.objects.get()
+        self.assertEqual(expense.currency, self.try_)
+        self.assertEqual(expense.paid_by_cari.default_currency, self.usd)
+
+        response = self.client.get(
+            reverse("accounting:edit_equity_expense",
+                    kwargs={"pk": self.book.pk, "expense_pk": expense.pk})
+        )
+
+        self.assertTrue(response.context["currency_is_settled"])
+        block = self._select_block(response.content.decode(), "id_currency")
+        chosen = re.search(r'<option value="(\d+)"[^>]*\bselected\b', block)
+        self.assertIsNotNone(chosen, "no currency is selected")
+        self.assertEqual(int(chosen.group(1)), self.try_.pk)
+
+    def test_the_edit_page_keeps_the_date_that_was_recorded(self):
+        """form.data is empty on a GET, so falling back to today meant an
+        edit opened on today and saved that over the real date."""
+        self._post(date="2026-08-26")
+        expense = EquityExpense.objects.get()
+
+        response = self.client.get(
+            reverse("accounting:edit_equity_expense",
+                    kwargs={"pk": self.book.pk, "expense_pk": expense.pk})
+        )
+
+        self.assertEqual(response.context["date_value"], "2026-08-26")
+        self.assertContains(response, 'value="2026-08-26"')
+
+    def test_a_new_expense_still_opens_on_today_with_nothing_settled(self):
+        response = self.client.get(
+            reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk})
+        )
+
+        self.assertFalse(response.context["currency_is_settled"])
+        self.assertEqual(
+            response.context["date_value"], timezone.localdate().isoformat()
+        )
+
+    def test_a_rejected_submit_keeps_what_was_typed(self):
+        response = self.client.post(
+            reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk}),
+            {
+                "book": self.book.pk, "category": self.taxes.pk,
+                "cash_account": "", "paid_by_cari": "",   # rejected: unfunded
+                "currency": self.try_.pk, "amount": "939.70",
+                "date": "2026-08-26", "exchange_rate": "", "description": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["date_value"], "2026-08-26")
+        self.assertTrue(response.context["currency_is_settled"])
+
+    def test_editing_without_touching_the_currency_leaves_it_alone(self):
+        with mock.patch("accounting.services.get_exchange_rate") as published:
+            published.return_value = Decimal("0.020790")
+            self._post(currency=self.try_.pk, amount="939.70")
+        expense = EquityExpense.objects.get()
+
+        with mock.patch("accounting.services.get_exchange_rate") as published:
+            published.return_value = Decimal("0.020790")
+            self._edit(expense, description="stopaj")
+
+        expense.refresh_from_db()
+        self.assertEqual(expense.currency, self.try_)
+        self.assertEqual(expense.amount, Decimal("939.70"))
+        self.assertEqual(
+            CariMovement.objects.get(cari=self.firat).currency, self.try_
+        )
+
     def test_changing_the_amount_moves_the_debt_with_it(self):
         self._post()
         expense = EquityExpense.objects.get()

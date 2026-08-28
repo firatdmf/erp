@@ -1637,11 +1637,12 @@ def catalog_product_variants(request, pk, product_id):
 
 @login_required
 def catalog_variant_match(request, pk, product_id):
-    """Classify a variant NAME being typed into the "Yeni ürün" panel as
-    EXISTING (adds stock to an already-catalogued variant) or NEW (will
-    create one), using the SAME parse/translate logic sync_roll_to_catalog
-    uses at save time — so the preview badge and the actual save never
-    disagree on what counts as "the same variant".
+    """Classify a variant being typed into the "Yeni ürün" panel as
+    EXISTING (adds stock to an already-catalogued variant), CONFLICTING
+    (the SKU belongs to another product, and the save will refuse it) or
+    NEW (will create one), using the SAME parse/translate logic
+    sync_roll_to_catalog uses at save time — so the preview badge and the
+    actual save never disagree on what counts as "the same variant".
 
     The real-WarehouseProduct requirement applies to the NAME/attribute
     match only — see catalog_product_variants for why. Matching an orphaned
@@ -1690,6 +1691,33 @@ def catalog_variant_match(request, pk, product_id):
                          product_variant_attribute_values__product_variant_attribute__name=_norm_attr(attribute_name),
                          product_variant_attribute_values__product_variant_attribute_value=_norm_value(attribute_value))
                  .first())
+
+    # A SKU already spoken for by ANOTHER product is not "new" either.
+    # variant_sku is globally unique, so sync_roll_to_catalog refuses it
+    # outright (CatalogSyncConflict, step 2) — the batch comes back with a
+    # warning after the operator has typed the whole delivery in. Saying so
+    # here, while the box is still under the cursor, is the difference
+    # between a correction and a re-entry.
+    #
+    # Not scoped to hidden products the way the match above is: the save's
+    # lookup is global, so a clash with a featured web product's variant
+    # stops the intake just the same and has to be reported just the same.
+    if match is None and sku:
+        clash = (ProductVariant.objects
+                 .filter(variant_sku__iexact=sku)
+                 .exclude(product_id=product_id)
+                 .select_related("product")
+                 .first())
+        if clash is not None:
+            return JsonResponse({
+                "exists": False,
+                "conflict": True,
+                "attribute_name": attribute_name,
+                "attribute_value": attribute_value,
+                "variant_sku": clash.variant_sku,
+                "conflict_product": clash.product.title,
+                "conflict_product_sku": clash.product.sku or "",
+            })
 
     if match:
         return JsonResponse({

@@ -276,6 +276,8 @@
   }
   .np-v-match.show { display: flex; }
   .np-v-match.new { background: #FEF3C7; color: #8B5A00; border-color: #F5D78B; }
+  .np-v-match.bad { background: #FDF3F2; color: #8C2D0E; border-color: #F0C9C2; }
+  .np-v-sku.bad { border-color: #C0392B; background: #FDF3F2; }
   .np-tops { display: flex; flex-direction: column; gap: 7px; }
   .np-top { display: flex; align-items: center; gap: 8px; }
   .np-top-no { font: 600 11px var(--font-sans); color: var(--gray-500); min-width: 42px; }
@@ -1132,7 +1134,8 @@
     // gets re-set below if the (possibly new) name/SKU still matches.
     delete skuI.dataset.matchLocked;
     if (card._npMode !== 'existing' || !productId || (!name && !sku)) {
-      badge.classList.remove('show', 'new'); badge.innerHTML = '';
+      badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = '';
+      skuI.classList.remove('bad');
       return;
     }
     // Token guard: only the LAST-SENT request for this card may apply its
@@ -1146,21 +1149,38 @@
       .then(function (d) {
         if (vEl._npMatchToken !== reqToken) return;
         if (d.exists) {
-          badge.classList.add('show'); badge.classList.remove('new');
+          badge.classList.add('show'); badge.classList.remove('new', 'bad');
+          skuI.classList.remove('bad');
           badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "exists" %} — ' +
             '{% trans "will add stock to this variant" %} (' +
             (Math.round((d.variant_quantity || 0) * 100) / 100) + ')';
           skuI.value = d.variant_sku || skuI.value;
           skuI.dataset.matchLocked = '1';
+        } else if (d.conflict) {
+          // The save refuses this outright, so the page does too — see
+          // npCollect. Naming the product that holds the SKU is the whole
+          // point: "already used" without saying where sends the operator
+          // hunting through the catalog for it.
+          badge.classList.add('show', 'bad'); badge.classList.remove('new');
+          skuI.classList.add('bad');
+          const owner = d.conflict_product_sku
+            ? d.conflict_product_sku + ' — ' + d.conflict_product
+            : d.conflict_product;
+          badge.innerHTML = '<i class="fa fa-exclamation-triangle"></i> ' +
+            '{% trans "in use" %} — {% trans "this variant SKU is already used on" %} ' +
+            npEsc(owner);
+          delete skuI.dataset.matchLocked;
         } else {
-          badge.classList.add('show', 'new');
+          badge.classList.add('show', 'new'); badge.classList.remove('bad');
+          skuI.classList.remove('bad');
           badge.innerHTML = '<i class="fa fa-plus-circle"></i> {% trans "new" %} — {% trans "will create a new variant" %}';
           delete skuI.dataset.matchLocked;
           npSuggestVariantSku(vEl);
         }
       }).catch(function () {
         if (vEl._npMatchToken !== reqToken) return;
-        badge.classList.remove('show', 'new'); badge.innerHTML = '';
+        badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = '';
+        skuI.classList.remove('bad');
       });
   };
 
@@ -1175,7 +1195,8 @@
     const vEl = skuI.closest('.np-variant');
     if (wasLocked) {
       const badge = vEl && vEl.querySelector('.np-v-match');
-      if (badge) { badge.classList.remove('show', 'new'); badge.innerHTML = ''; }
+      if (badge) { badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = ''; }
+      skuI.classList.remove('bad');
     }
     // Typing an existing variant's SKU is the most direct way to say "add to
     // that one" — so re-classify on the SKU, not only on the name.
@@ -1394,7 +1415,10 @@
     const box = cardEl.querySelector('.np-existing-variants');
     if (box) { box.style.display = 'none'; box.innerHTML = ''; }
     cardEl.querySelectorAll('.np-variants .np-v-match').forEach(function (m) {
-      m.classList.remove('show', 'new'); m.innerHTML = '';
+      m.classList.remove('show', 'new', 'bad'); m.innerHTML = '';
+    });
+    cardEl.querySelectorAll('.np-variants .np-v-sku').forEach(function (sk) {
+      sk.classList.remove('bad');
     });
   };
 
@@ -1733,6 +1757,21 @@
       alert('{% trans "Fix the marked barcodes first" %}: ' +
             badBc.map(function (el) { return (el.value || '').trim(); }).join(', '));
       badBc[0].focus();
+      return;
+    }
+
+    // Same rule for a variant SKU another product already holds. The save
+    // raises CatalogSyncConflict on it, so letting the batch go would cost
+    // the operator the whole delivery they just typed in — and the badge
+    // has already said which product holds the code.
+    const badSku = Array.prototype.filter.call(
+      document.querySelectorAll('#npProducts .np-v-sku.bad'),
+      function (el) { return (el.value || '').trim(); }
+    );
+    if (badSku.length) {
+      alert('{% trans "This variant SKU is already used on another product" %}: ' +
+            badSku.map(function (el) { return (el.value || '').trim(); }).join(', '));
+      badSku[0].focus();
       return;
     }
 

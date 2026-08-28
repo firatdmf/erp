@@ -299,6 +299,42 @@ class VariantMatchBySkuTest(TestCase):
 
         self.assertFalse(self._match(name="Beyaz")["exists"])
 
+    def test_a_sku_another_product_holds_is_reported_as_a_conflict(self):
+        """variant_sku is globally unique, so the save refuses this outright
+        (CatalogSyncConflict). Calling it "new" sent the operator on to type
+        the rest of a delivery the batch was always going to reject."""
+        from marketing.models import Product, ProductVariant
+        other = Product.objects.create(title="K24861T  YARIMAT ALTIN",
+                                       sku="K24861T", featured=False)
+        ProductVariant.objects.create(product=other, variant_sku="K24861T.G77")
+
+        d = self._match(sku="K24861T.G77", name="YARIMAT ALTIN")
+        self.assertFalse(d["exists"])
+        self.assertTrue(d["conflict"])
+        self.assertEqual(d["conflict_product"], "K24861T  YARIMAT ALTIN")
+        self.assertEqual(d["conflict_product_sku"], "K24861T")
+
+    def test_a_featured_web_products_sku_conflicts_too(self):
+        """The save's lookup is global, so a clash with a real web product
+        stops the intake just the same — the badge must say so."""
+        from marketing.models import Product, ProductVariant
+        web = Product.objects.create(title="Florenza", sku="K12767", featured=True)
+        ProductVariant.objects.create(product=web, variant_sku="K12767.G28")
+
+        d = self._match(sku="K12767.G28", name="MAVI")
+        self.assertTrue(d["conflict"])
+        self.assertEqual(d["conflict_product"], "Florenza")
+
+    def test_this_products_own_sku_is_a_match_not_a_conflict(self):
+        d = self._match(sku="N1464T.G54", name="MARLETTOO")
+        self.assertTrue(d["exists"])
+        self.assertFalse(d.get("conflict", False))
+
+    def test_an_unknown_sku_is_still_plainly_new(self):
+        d = self._match(sku="N1464T.G99", name="YENİ RENK")
+        self.assertFalse(d["exists"])
+        self.assertFalse(d.get("conflict", False))
+
 
 class LongVariantSkuTest(TestCase):
     """A SKU must survive being typed.

@@ -327,7 +327,9 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
     # the default book here would post the alım into a different ledger
     # than the balance it's supposed to move.
     book = cari.book
-    currency = _currency_by_code(lines[0].get("currency") if lines else None)
+    # The account's own currency, not lines[0]'s. Every line reaching here
+    # has already been restated into it by convert_lines_to_currency.
+    currency = _currency_by_code(invoice_currency_for(cari))
     settings_obj = CariSettings.for_book(book)
     mark_as_supplier(cari)
 
@@ -492,6 +494,74 @@ def _invoice_line_desc(order_item):
     elif getattr(it, "product_id", None) and it.product:
         desc = it.product.title
     return (desc or "Item")[:300]
+
+
+class MixedCurrencyError(Exception):
+    """A line needs converting and there is no rate to do it with."""
+
+
+def invoice_currency_for(cari):
+    """What an alım to this account is denominated in: what we owe THEM.
+
+    Their own default currency, falling back to the book's base when an
+    account has never been given one.
+    """
+    from django.conf import settings as _s
+    code = getattr(getattr(cari, "default_currency", None), "code", "") or ""
+    return (code or getattr(_s, "BASE_CURRENCY_CODE", "USD")).upper()
+
+
+def convert_lines_to_currency(lines, target_code, rates=None, *, on_date=None):
+    """Restate every line in `target_code`, at the rate the receipt supplied.
+
+    An invoice carries ONE currency. Lines used to be handed over in
+    whatever each was priced in, and create_purchase_invoice_for_intake
+    took the FIRST line's currency and summed the rest into it untouched —
+    so a delivery priced part in dollars and part in lira was billed as
+    though ₺100 were $100. Silently, with no conversion and no warning.
+
+    `rates` maps a line currency to its rate INTO target_code, as typed on
+    the receipt. Anything not given falls back to the published rate for
+    the date. A line that needs converting and has NEITHER raises, because
+    the one thing that must not happen here is a number being carried
+    across a currency boundary as if it were already in the right one.
+
+    The original price and its rate are appended to the line's description:
+    it is the only place the converted figure can be checked back against
+    what was actually agreed.
+    """
+    from decimal import Decimal as _D
+    target = (target_code or "").upper()
+    rates = {(k or "").upper(): v for k, v in (rates or {}).items()}
+    out = []
+    for line in lines:
+        code = (line.get("currency") or target).upper()
+        price = line.get("unit_price") or _D("0")
+        if code == target or not price:
+            out.append({**line, "currency": target})
+            continue
+        rate = rates.get(code)
+        if rate in (None, ""):
+            from accounting.services import get_exchange_rate
+            rate = get_exchange_rate(code, target, on_date=on_date)
+        try:
+            rate = _D(str(rate)) if rate not in (None, "") else None
+        except Exception:
+            rate = None
+        if not rate or rate <= 0:
+            raise MixedCurrencyError(
+                f"{code} → {target}: no rate for this receipt's date. "
+                f"Enter one on the form, or price the line in {target}."
+            )
+        converted = (price * rate).quantize(_D("0.01"))
+        note = f" ({price} {code} @ {rate.normalize()})"
+        out.append({
+            **line,
+            "unit_price": converted,
+            "currency": target,
+            "description": ((line.get("description") or "") + note)[:300],
+        })
+    return out
 
 
 def mark_as_supplier(cari):

@@ -352,9 +352,24 @@
     font: 500 12.5px var(--font-sans); color: var(--gray-600);
   }
   .np-gate.show { display: flex; }
+  .np-fx { margin: 0 0 12px; padding: 14px 16px; border: 1px solid #E2E8EE; border-radius: 12px; background: white; }
+  .np-fx-head { display:flex; align-items:center; gap:8px; font: 500 12.5px var(--font-sans); color: var(--gray-600); margin-bottom: 10px; }
+  .np-fx-head b { color: var(--ink); }
+  .np-fx-row { display:grid; grid-template-columns: auto 1fr auto 1.1fr auto; gap: 8px; align-items:center; padding: 7px 0; border-top: 1px dashed #EEF1F5; }
+  .np-fx-row:first-child { border-top: none; }
+  .np-fx-pair { font: 600 12px var(--font-mono, monospace); color: var(--nejum-teal-700, #005354); white-space: nowrap; }
+  .np-fx-row input { width: 100%; height: 34px; padding: 0 10px; border: 1px solid #DDE3EA; border-radius: 8px; font: 500 13px var(--font-sans); }
+  .np-fx-row input:focus { border-color: var(--nejum-teal-500, #147F74); outline: none; }
+  .np-fx-eq { font: 500 12px var(--font-sans); color: #8A96A6; white-space: nowrap; }
+  .np-fx-out { font: 700 13px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .np-fx-pub { border: 1px solid #E0E6EE; background:#fff; border-radius: 8px; height: 34px; padding: 0 10px; font: 600 11.5px var(--font-sans); color: var(--gray-700); cursor: pointer; white-space: nowrap; }
+  .np-fx-pub:hover { border-color: var(--nejum-teal-500, #147F74); }
+  .np-fx-note { font: 500 11px var(--font-sans); color: var(--gray-500); }
+  @media (max-width: 720px) { .np-fx-row { grid-template-columns: 1fr; } }
   .np-gate i { color: var(--gray-400); }
   .np-add-product[disabled] { opacity: .45; cursor: not-allowed; }
   .np-summary .np-sum-money { font-weight: 700; color: var(--nejum-teal-700, #005354); }
+  .np-summary .np-sum-pending { font-weight: 600; color: #8B5A00; }
 </style>
 {% endblock %}
 
@@ -449,7 +464,7 @@
           <select id="npSupplier" style="display:none;" onchange="npUpdatePrefix(); npGateUpdate();">
             <option value="">{% trans "Select account…" %}</option>
             {% for s in accounts %}
-              <option value="{{ s.id }}" data-prefix="{{ s.prefix }}" data-type="{{ s.type }}">{{ s.name }}</option>
+              <option value="{{ s.id }}" data-prefix="{{ s.prefix }}" data-type="{{ s.type }}" data-currency="{{ s.currency }}">{{ s.name }}</option>
             {% endfor %}
           </select>
 
@@ -561,6 +576,22 @@
         <i class="fa fa-plus"></i> {% trans "Add product" %}
       </button>
     </section>
+  </div>
+
+  {% comment %}
+    One alım, one currency — the account's own, because that is what we owe
+    them. A line priced in anything else needs a rate to reach the invoice,
+    and this is where that rate is shown and can be corrected. It appears
+    only when a batch actually carries a second currency; a delivery priced
+    entirely in the account's currency never sees it.
+  {% endcomment %}
+  <div class="np-fx" id="npFx" style="display:none;">
+    <div class="np-fx-head">
+      <i class="fa fa-exchange-alt"></i>
+      <span>{% trans "This delivery is billed in" %} <b id="npFxTarget"></b> —
+            {% trans "these lines are converted into it" %}</span>
+    </div>
+    <div id="npFxRows"></div>
   </div>
 
   <div class="gr-bar">
@@ -936,6 +967,9 @@
     const a = document.getElementById('npPrefix'); if (a) a.textContent = p;
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) { npFetchNextSku(card); });
     if (window.npGateUpdate) npGateUpdate();
+    // A different account can bill in a different currency, which changes
+    // which lines need converting at all.
+    npSummaryUpdate();
   };
 
   // ── Account picker ───────────────────────────────────────────────
@@ -1501,17 +1535,120 @@
       el.style.color = '';
       let html = '<b>' + pcount + '</b> {% trans "products" %} · <b>' + vcount + '</b> {% trans "variants" %} · ' +
         '<b>' + tcount + '</b> {% trans "rolls" %} · <b>' + (Math.round(total * 100) / 100) + '</b> ' + unitShort();
-      const codes = Object.keys(money).filter(function (c) { return money[c] > 0; });
-      if (codes.length) {
-        html += ' · <span class="np-sum-money">' + codes.sort().map(function (c) {
-          return (NP_CUR_SYMBOL[c] || '') +
-                 money[c].toLocaleString(undefined, { minimumFractionDigits: 2,
-                                                      maximumFractionDigits: 2 }) +
-                 (NP_CUR_SYMBOL[c] ? '' : ' ' + c);
-        }).join(' + ') + '</span>';
+      // One figure, in the currency the alım is actually cut in, because
+      // that is the number the operator is about to commit to. A line whose
+      // rate is still missing is NAMED rather than folded in at par — the
+      // whole bug this replaces was lira counted as dollars.
+      const target = window.npBillingCurrency ? npBillingCurrency() : 'USD';
+      let billed = 0, pending = [];
+      Object.keys(money).forEach(function (c) {
+        if (!(money[c] > 0)) return;
+        if (c === target) { billed += money[c]; return; }
+        const rate = npFxRates[c];
+        if (rate > 0) billed += money[c] * rate;
+        else pending.push(c);
+      });
+      if (billed > 0 || pending.length) {
+        html += ' · <span class="np-sum-money">' +
+          (NP_CUR_SYMBOL[target] || '') +
+          billed.toLocaleString(undefined, { minimumFractionDigits: 2,
+                                             maximumFractionDigits: 2 }) +
+          (NP_CUR_SYMBOL[target] ? '' : ' ' + target) + '</span>';
+        if (pending.length) {
+          html += ' <span class="np-sum-pending">+ ' + pending.sort().join(', ') +
+                  ' {% trans "awaiting a rate" %}</span>';
+        }
       }
       el.innerHTML = html;
     }
+    if (window.npFxUpdate) npFxUpdate(money);
+  };
+
+  // ── Rates for the lines that are not in the account's currency ──────
+  // The invoice carries ONE currency: the account's, because that is what
+  // we owe them. Anything priced otherwise is converted at the rate shown
+  // here, which starts from the published one for today and can be typed
+  // over — the person receiving the delivery knows what they actually
+  // agreed better than a published source does.
+  const NP_FX_LOOKUP = "{% url 'accounts:fx_rate_lookup' %}";
+  const npFxRates = {};   // currency code -> rate typed or fetched
+
+  window.npBillingCurrency = function () {
+    const sel = document.getElementById('npSupplier');
+    const opt = sel && sel.options[sel.selectedIndex];
+    return ((opt && opt.getAttribute('data-currency')) || '').toUpperCase() || 'USD';
+  };
+
+  function npFxFetch(code, onDone) {
+    const target = npBillingCurrency();
+    fetch(NP_FX_LOOKUP + '?from=' + encodeURIComponent(code) +
+          '&to=' + encodeURIComponent(target),
+      { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { onDone(d && d.rate ? parseFloat(d.rate) : null); })
+      .catch(function () { onDone(null); });
+  }
+
+  window.npFxUpdate = function (money) {
+    const panel = document.getElementById('npFx');
+    const rows = document.getElementById('npFxRows');
+    if (!panel || !rows) return;
+    const target = npBillingCurrency();
+    const foreign = Object.keys(money || {}).filter(function (c) {
+      return c !== target && money[c] > 0;
+    }).sort();
+
+    document.getElementById('npFxTarget').textContent = target;
+    if (!foreign.length) { panel.style.display = 'none'; rows.innerHTML = ''; return; }
+    panel.style.display = '';
+
+    // Rebuilt from scratch, but a rate already typed is carried across —
+    // adding a roll must not silently discard the rate someone entered.
+    rows.innerHTML = foreign.map(function (code) {
+      const rate = npFxRates[code];
+      const sub = money[code];
+      const out = (rate > 0) ? (sub * rate) : null;
+      return '<div class="np-fx-row" data-code="' + code + '">' +
+        '<span class="np-fx-pair">' + code + ' &rarr; ' + target + '</span>' +
+        '<input type="number" step="0.00000001" min="0" class="np-fx-rate" placeholder="0.00000000"' +
+          (rate > 0 ? ' value="' + rate + '"' : '') + '>' +
+        '<span class="np-fx-eq">&times; ' +
+          sub.toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' ' + code + ' =</span>' +
+        '<span class="np-fx-out">' + (out === null
+            ? '<span class="np-fx-note">{% trans "enter a rate" %}</span>'
+            : out.toLocaleString(undefined, { minimumFractionDigits: 2,
+                                              maximumFractionDigits: 2 }) + ' ' + target) + '</span>' +
+        '<button type="button" class="np-fx-pub">{% trans "Use published" %}</button>' +
+      '</div>';
+    }).join('');
+
+    rows.querySelectorAll('.np-fx-row').forEach(function (row) {
+      const code = row.getAttribute('data-code');
+      const input = row.querySelector('.np-fx-rate');
+      // Both events, for the same reason the transfer page gives: `input`
+      // alone misses autofill, the number spinner and a restored value.
+      ['input', 'change'].forEach(function (evt) {
+        input.addEventListener(evt, function () {
+          const v = parseFloat(input.value);
+          npFxRates[code] = (isFinite(v) && v > 0) ? v : undefined;
+          npSummaryUpdate();
+        });
+      });
+      row.querySelector('.np-fx-pub').addEventListener('click', function () {
+        npFxFetch(code, function (rate) {
+          npFxRates[code] = rate || undefined;
+          npSummaryUpdate();
+        });
+      });
+      // Nothing typed yet and nothing fetched yet — ask once, so the row
+      // arrives filled rather than empty.
+      if (npFxRates[code] === undefined && !row._npAsked) {
+        row._npAsked = true;
+        npFxFetch(code, function (rate) {
+          if (rate) { npFxRates[code] = rate; npSummaryUpdate(); }
+        });
+      }
+    });
   };
 
   // Clear the existing-variants chip row and every match badge for ONE
@@ -1949,6 +2086,10 @@
       cari_id: sel.value,
       barcode_prefix: (opt && opt.getAttribute('data-prefix')) || '',
       unit: document.getElementById('npUnit').value || 'mt',
+      // What the rate boxes above say, so the alım is cut at the rate the
+      // page showed. Without these the server falls back to the published
+      // rate and the total that posts is not the total that was agreed to.
+      rates: npFxRates,
       products: products
     };
   }

@@ -29,7 +29,10 @@ from django.views import View
 
 from .models import Invoice, InvoiceItem
 from .models_accounts import CariAccount, CariSettings
-from .services_accounts import _currency_by_code, mark_as_supplier
+from .services_accounts import (
+    _currency_by_code, convert_lines_to_currency, invoice_currency_for,
+    mark_as_supplier, MixedCurrencyError,
+)
 from marketing.models import SKU_MAX_LENGTH
 
 
@@ -369,9 +372,21 @@ class PurchaseOrderSave(View):
             else:
                 invoice = Invoice(type="purchase", status="draft")
 
+            # Same rule as the received alım: one currency, the account's
+            # own, and any line priced in another restated into it at the
+            # rate the order carried. A draft that billed lira as dollars
+            # would only be discovered when it was confirmed.
+            try:
+                lines = convert_lines_to_currency(
+                    lines, invoice_currency_for(cari),
+                    rates=data.get("rates"), on_date=order_date,
+                )
+            except MixedCurrencyError as exc:
+                return JsonResponse({"success": False, "error": str(exc)}, status=400)
+
             invoice.cari = cari
             invoice.book = cari.book
-            invoice.currency = _currency_by_code(lines[0]["currency"])
+            invoice.currency = _currency_by_code(invoice_currency_for(cari))
             invoice.date = order_date
             invoice.delivery_date = delivery
             invoice.due_date = order_date + timedelta(days=cari.payment_term_days or 30)

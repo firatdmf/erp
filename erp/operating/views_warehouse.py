@@ -1,6 +1,7 @@
 """Warehouse views — list, detail, create, import products from Excel."""
 import json
 from decimal import Decimal, InvalidOperation
+from django.conf import settings as _dj_settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum, F, DecimalField, Q
@@ -322,9 +323,17 @@ def _account_choices():
         from accounting.services_accounts import get_default_book
         rows = (CariAccount.objects
                 .filter(book=get_default_book(), is_active=True)
+                .select_related("default_currency")
                 .order_by("name")[:1000])
+        base = getattr(_dj_settings, "BASE_CURRENCY_CODE", "USD")
         return [{"id": c.id, "name": c.name,
                  "type": c.get_type_display(),
+                 # What the alım is denominated in: what we actually owe
+                 # THEM. A line priced in anything else is converted into
+                 # it at intake, at a rate the receipt shows and lets the
+                 # operator override.
+                 "currency": ((c.default_currency.code if c.default_currency_id else "")
+                              or base),
                  "prefix": _consonant_prefix(c.name)}
                 for c in rows]
     except Exception:
@@ -1896,6 +1905,26 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
         prefix = _consonant_prefix(account_name) if account_name else _fallback_prefix()
     prefix = (prefix[:6] or _fallback_prefix())
 
+    # ── Rates, before any stock is written ──
+    # A line priced in another currency needs one to reach the alım. Finding
+    # that out after the rolls are in leaves stock standing against no
+    # invoice at all, so it is checked here with the rest of pass 1 rather
+    # than at the bookkeeping step, where the failure is only a warning.
+    from accounting.services_accounts import (
+        convert_lines_to_currency, invoice_currency_for, MixedCurrencyError,
+    )
+    _billing_code = invoice_currency_for(cari_obj)
+    _priced = [
+        {"unit_price": Decimal("1"), "currency": (v.get("currency") or "USD")}
+        for p_in in products_in
+        for v in (p_in.get("variants") or [])
+    ]
+    try:
+        convert_lines_to_currency(_priced, _billing_code,
+                                  rates=data.get("rates"), on_date=None)
+    except MixedCurrencyError as exc:
+        raise IntakeError({"success": False, "error": str(exc)}, status=400)
+
     # ── Pass 1: resolve + validate EVERY product before writing anything,
     # so a mistake on product #3 never leaves #1/#2 half-saved. ──
     from marketing.models import ProductCategory as _PCat
@@ -2214,8 +2243,19 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     if purchase_lines:
         try:
             from accounting.services_accounts import create_purchase_invoice_for_intake
+            from accounting.services_accounts import (
+                convert_lines_to_currency, invoice_currency_for,
+            )
+            # One invoice, one currency. A line priced in anything else is
+            # restated into the account's currency HERE, at the rate the
+            # receipt showed the operator — not summed in as though the
+            # numbers already matched.
+            billed_lines = convert_lines_to_currency(
+                purchase_lines, invoice_currency_for(cari_obj),
+                rates=data.get("rates"), on_date=None,
+            )
             inv = create_purchase_invoice_for_intake(
-                cari_obj, purchase_lines, member=member, user=user,
+                cari_obj, billed_lines, member=member, user=user,
                 invoice=invoice,
             )
             purchase_info = {
@@ -2228,6 +2268,8 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
             # received against — items are created in the same order
             # as purchase_lines, so zipping by line_no is exact.
             inv_items = list(inv.items.order_by("line_no"))
+            # purchase_lines, not billed_lines: same order and count, and
+            # roll_ids is carried through the conversion untouched either way.
             for line, item in zip(purchase_lines, inv_items):
                 roll_ids = line.get("roll_ids") or []
                 if roll_ids:

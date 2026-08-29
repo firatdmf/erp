@@ -2006,7 +2006,13 @@ class MakeInTransfer(View):
             "src": transfer.from_cari.name,
             "dst": transfer.to_cari.name,
         })
-        return redirect(self.success_url(book, "cari"))
+        # The transfer it just made, not the empty form again. A virman is a
+        # document — it has two legs in two accounts and a rate they both
+        # converted at — and none of that is visible from the page that
+        # entered it. Cash mode still returns here: an InTransfer writes cash
+        # ledger entries rather than a document, so there is nothing to land
+        # on and entering several in a row is the normal way it is used.
+        return redirect("accounts:transfer_detail", pk=transfer.pk)
 
     def success_url(self, book, mode):
         base = reverse("accounting:make_in_transfer", kwargs={"pk": book.pk})

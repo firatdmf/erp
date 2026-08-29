@@ -239,6 +239,33 @@ class TransferPageModeTest(TransferTestBase):
         self.assertEqual(self.balances(), (Decimal("1000.00"), Decimal("0.00")))
         self.assertEqual(CariTransfer.objects.count(), 0)
 
+    def test_making_one_lands_on_the_transfer_it_made(self):
+        """A virman is a document — two legs in two accounts and a rate they
+        both converted at — and none of that shows on the page that entered
+        it."""
+        response = self.client.post(self.url(), {
+            "mode": "cari", "book": self.book.pk, "date": "2026-02-01",
+            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "amount": "400.00", "currency": self.usd.pk,
+        })
+        transfer = CariTransfer.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("accounts:transfer_detail", args=[transfer.pk]),
+            fetch_redirect_response=False,
+        )
+
+    def test_cash_mode_still_returns_to_the_form(self):
+        """An InTransfer writes cash ledger entries rather than a document,
+        so there is nothing to land on — and several in a row is the normal
+        way that mode is used."""
+        response = self.client.post(self.url(), {
+            "mode": "cash", "book": self.book.pk, "date": "2026-02-01",
+            "from_cash_account": self.kasa.pk, "to_cash_account": self.banka.pk,
+            "amount": "250.00", "currency": self.usd.pk,
+        })
+        self.assertIn("make_in_transfer", response["Location"])
+
     def test_posting_cash_mode_still_moves_cash(self):
         """The mode the page grew was added beside the one it had, not
         over it."""

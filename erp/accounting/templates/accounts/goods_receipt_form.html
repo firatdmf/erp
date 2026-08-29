@@ -346,6 +346,7 @@
 
   .np-summary { font: 500 12px var(--font-sans); color: var(--gray-600); min-height: 16px; }
   .np-summary b { color: #0F1419; }
+  .np-summary .np-sum-money { font-weight: 700; color: var(--nejum-teal-700, #005354); }
 </style>
 {% endblock %}
 
@@ -591,7 +592,7 @@
   const NP_CSRF = "{{ csrf_token }}";
   const NP_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
   const NP_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="lock-ico"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
-  const NP_CUR = '<select class="np-select np-v-cur"><option>USD</option><option>TRY</option><option>EUR</option></select>';
+  const NP_CUR = '<select class="np-select np-v-cur" onchange="npSummaryUpdate()"><option>USD</option><option>TRY</option><option>EUR</option></select>';
   // Roll rows repeat, so their columns are captioned once above the list.
   // The empty spans hold the gutter/unit/state/remove columns so each
   // caption lines up with the field under it.
@@ -1228,7 +1229,7 @@
         '<div class="np-col">' +
           '<label>{% trans "Purchase price" %}</label>' +
           '<div class="np-price-pair">' +
-            '<input class="np-input np-v-price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">' +
+            '<input class="np-input np-v-price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
             NP_CUR +
           '</div>' +
         '</div>' +
@@ -1381,11 +1382,39 @@
 
   // Aggregate across EVERY product card — the whole batch's totals, so the
   // action bar reflects everything on the page, not just one product.
+  const NP_CUR_SYMBOL = { USD: '$', TRY: '\u20BA', EUR: '\u20AC' };
+
+  // What the batch costs, per currency it was entered in.
+  //
+  // Per currency, and not one converted figure, because that is what the
+  // page actually knows. create_purchase_invoice denominates the alım in
+  // the FIRST line's currency and sums every line into it, so a batch
+  // carrying two currencies has no single true total — printing one here
+  // would be inventing a rate the invoice never applies. Two subtotals
+  // side by side say so on their own.
+  function npMoney(scope, priceSel) {
+    const priceEl = scope.querySelector(priceSel);
+    const curEl = scope.querySelector('.np-v-cur');
+    const price = parseFloat(((priceEl && priceEl.value) || '').replace(',', '.'));
+    if (!isFinite(price) || price <= 0) return null;
+    let qty = 0;
+    scope.querySelectorAll('.np-top-qty').forEach(function (q) {
+      const v = parseFloat((q.value || '').replace(',', '.'));
+      if (!isNaN(v) && v > 0) qty += v;
+    });
+    if (!qty) return null;
+    return { code: ((curEl && curEl.value) || 'USD').toUpperCase(), amount: qty * price };
+  }
+
   window.npSummaryUpdate = function () {
     let pcount = 0, vcount = 0, tcount = 0, total = 0;
+    const money = {};
     function addQ(q) {
       const val = parseFloat((q.value || '').replace(',', '.'));
       if (!isNaN(val) && val > 0) { tcount++; total += val; }
+    }
+    function addMoney(m) {
+      if (m) money[m.code] = (money[m.code] || 0) + m.amount;
     }
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
       pcount++;
@@ -1393,16 +1422,29 @@
         card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
           vcount++;
           v.querySelectorAll('.np-top-qty').forEach(addQ);
+          addMoney(npMoney(v, '.np-v-price'));
         });
       } else {
         card.querySelectorAll('.np-nv-tops .np-top-qty').forEach(addQ);
+        const block = card.querySelector('.np-no-variant');
+        if (block) addMoney(npMoney(block, '.np-nv-price'));
       }
     });
     const el = document.getElementById('npSummary');
     if (el) {
       el.style.color = '';
-      el.innerHTML = '<b>' + pcount + '</b> {% trans "products" %} · <b>' + vcount + '</b> {% trans "variants" %} · ' +
+      let html = '<b>' + pcount + '</b> {% trans "products" %} · <b>' + vcount + '</b> {% trans "variants" %} · ' +
         '<b>' + tcount + '</b> {% trans "rolls" %} · <b>' + (Math.round(total * 100) / 100) + '</b> ' + unitShort();
+      const codes = Object.keys(money).filter(function (c) { return money[c] > 0; });
+      if (codes.length) {
+        html += ' · <span class="np-sum-money">' + codes.sort().map(function (c) {
+          return (NP_CUR_SYMBOL[c] || '') +
+                 money[c].toLocaleString(undefined, { minimumFractionDigits: 2,
+                                                      maximumFractionDigits: 2 }) +
+                 (NP_CUR_SYMBOL[c] ? '' : ' ' + c);
+        }).join(' + ') + '</span>';
+      }
+      el.innerHTML = html;
     }
   };
 
@@ -1576,7 +1618,7 @@
         '<div class="np-col">' +
           '<label>{% trans "Purchase price" %}</label>' +
           '<div class="np-price-pair">' +
-            '<input class="np-input np-v-price" type="number" inputmode="decimal" min="0" step="0.01" value="' +
+            '<input class="np-input np-v-price" type="number" inputmode="decimal" min="0" step="0.01" oninput="npSummaryUpdate()" value="' +
               (v.unit_price || '') + '">' +
           '</div>' +
         '</div>' +

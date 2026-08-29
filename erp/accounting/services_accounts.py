@@ -309,7 +309,7 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
                 "currency", "product" (marketing.Product|None),
                 "variant" (marketing.ProductVariant|None)}, ...]
 
-    Creates Invoice(type="purchase", series="Purchase") + one InvoiceItem per
+    Creates Invoice(type="purchase", series="PUR") + one InvoiceItem per
     line (tax 0 — the entered price is what we owe), then issue()s it,
     which posts the CariMovement(invoice_purchase, -total) with a source
     link so the cari statement row is clickable through to the invoice.
@@ -359,8 +359,8 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
         from datetime import timedelta
         inv = Invoice.objects.create(
             cari=cari, book=book,
-            series="Purchase",
-            number=settings_obj.next_invoice_number(series="Purchase"),
+            series="PUR",
+            number=settings_obj.next_invoice_number(series="PUR"),
             type="purchase", status="draft",
             date=today, due_date=today + timedelta(days=term_days),
             currency=currency,

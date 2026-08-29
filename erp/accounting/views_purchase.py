@@ -369,8 +369,8 @@ class PurchaseOrderSave(View):
             invoice.notes = (data.get("notes") or "")[:2000]
             if not invoice.pk:
                 settings_obj = CariSettings.for_book(cari.book)
-                invoice.series = "Purchase"
-                invoice.number = settings_obj.next_invoice_number(series="Purchase")
+                invoice.series = "PUR"
+                invoice.number = settings_obj.next_invoice_number(series="PUR")
                 invoice.created_by = getattr(request.user, "member", None)
             invoice.save()
 

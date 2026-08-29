@@ -220,7 +220,10 @@ class TransferPageModeTest(TransferTestBase):
         transfer = CariTransfer.objects.get()
         self.assertIsNotNone(transfer.from_movement)
         self.assertIsNotNone(transfer.to_movement)
-        self.assertEqual(transfer.from_movement.reference, f"TRANSFER {transfer.pk}")
+        # Same shape as COL-…/PUR-… so the Reference column reads down.
+        self.assertEqual(transfer.from_movement.reference,
+                         f"TRA-2026-{str(transfer.pk).zfill(6)}")
+        self.assertEqual(transfer.to_movement.reference, transfer.reference)
 
     def test_a_rejected_cari_transfer_moves_nothing(self):
         response = self.client.post(self.url(), {

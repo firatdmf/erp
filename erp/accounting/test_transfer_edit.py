@@ -91,7 +91,7 @@ class TransferEditPageTest(TransferTestBase):
             "amount": "250.00", "currency": self.usd.pk,
         })
         self.assertEqual(
-            CariMovement.objects.filter(reference=f"TRANSFER {self.transfer.pk}").count(), 2)
+            CariMovement.objects.filter(reference=self.transfer.reference).count(), 2)
 
     def test_redirecting_the_transfer_moves_the_balance_to_the_new_account(self):
         c = self.b.__class__.objects.create(
@@ -122,12 +122,13 @@ class TransferEditPageTest(TransferTestBase):
     # --- undoing it ------------------------------------------------------
 
     def test_undo_removes_both_legs_and_the_transfer(self):
+        ref = self.transfer.reference
         r = self.client.post(self.undo_url())
         self.assertEqual(r.status_code, 302)
         self.assertEqual(self.balances(), (Decimal("1000.00"), Decimal("0.00")))
         self.assertEqual(CariTransfer.objects.count(), 0)
         self.assertEqual(
-            CariMovement.objects.filter(reference=f"TRANSFER {self.transfer.pk}").count(), 0)
+            CariMovement.objects.filter(reference=ref).count(), 0)
 
     def test_undo_is_post_only(self):
         self.assertEqual(self.client.get(self.undo_url()).status_code, 405)
@@ -320,6 +321,36 @@ class TransferEditRateTest(TransferTestBase):
         for leg in (self.transfer.from_movement, self.transfer.to_movement):
             self.assertEqual(leg.exchange_rate, rate)
         self.assertEqual(CariMovement._meta.get_field("exchange_rate").decimal_places, 8)
+
+    def test_a_backdated_transfer_is_referenced_with_its_own_year(self):
+        """The year belongs to the transfer, not to whoever opened the page."""
+        old = CariTransfer.objects.create(
+            book=self.book, date="2024-11-03",
+            from_cari=self.a, to_cari=self.b,
+            amount=Decimal("10.00"), currency=self.usd,
+        )
+        old.post()
+        self.assertEqual(old.reference, f"TRA-2024-{str(old.pk).zfill(6)}")
+        self.assertEqual(old.from_movement.reference, old.reference)
+
+    def test_the_detail_page_prints_the_reference(self):
+        html = self.client.get(
+            reverse("accounts:transfer_detail", args=[self.transfer.pk])).content.decode()
+        self.assertIn(self.transfer.reference, html)
+
+    def test_correcting_a_transfer_keeps_its_reference(self):
+        """repost() rewrites the legs, so the reference has to survive it —
+        the whole point of citing a row is that the citation keeps working."""
+        ref = self.transfer.reference
+        self.client.post(reverse("accounts:transfer_edit", args=[self.transfer.pk]), {
+            "book": self.book.pk, "date": "2026-02-01",
+            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "amount": "500.00", "currency": self.try_.pk,
+            "exchange_rate": "0.03000000",
+        })
+        self.transfer.refresh_from_db()
+        self.assertEqual(self.transfer.from_movement.reference, ref)
+        self.assertEqual(self.transfer.to_movement.reference, ref)
 
     def test_the_rate_box_accepts_eight_decimals(self):
         from accounting.forms import CariTransferForm

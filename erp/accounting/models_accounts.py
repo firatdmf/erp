@@ -1779,6 +1779,24 @@ class CariTransfer(models.Model):
         return (f"{self.from_cari.code} → {self.to_cari.code} | "
                 f"{self.amount} {self.currency.code}")
 
+    @property
+    def reference(self):
+        """How this transfer is cited on the two rows it writes.
+
+        The same shape as every other document on the ledger —
+        COL-2026-000052, PUR-2026-000093 — because the Reference column is
+        read down a statement, and "TRANSFER 4" beside those was the one
+        entry that said neither what it was nor when.
+
+        Numbered from the pk rather than a counter of its own. Undo DELETES
+        a transfer (see unpost), so a strict sequence would carry gaps
+        regardless, and the pk is already the identity both legs point at
+        through source_id — a counter would be a second name for the same
+        thing, free to disagree with it. The year is the transfer's own, so
+        a backdated one reads with the year it belongs to.
+        """
+        return f"TRA-{self.date.year}-{str(self.pk).zfill(6)}"
+
     def clean(self):
         super().clean()
         if self.from_cari_id and self.from_cari_id == self.to_cari_id:
@@ -1828,7 +1846,7 @@ class CariTransfer(models.Model):
                 currency=self.currency,
                 movement_type="adjustment",
                 description=f"{label} — {other.code} {other.name}",
-                reference=f"TRANSFER {self.pk}",
+                reference=self.reference,
                 source_type=source_type,
                 source_id=self.pk,
                 created_by=member,
@@ -1923,7 +1941,7 @@ class CariTransfer(models.Model):
             mv.amount = signed
             mv.currency = self.currency
             mv.description = f"{label} — {other.code} {other.name}"
-            mv.reference = f"TRANSFER {self.pk}"
+            mv.reference = self.reference
             # Stamped, not left to CariMovement.save() to derive: it only
             # fills amount_base when falsy and would otherwise re-look-up a
             # rate per leg, which is the pair drifting apart — see post().

@@ -169,6 +169,7 @@
           <span class="v mono">{{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }}</span>
         </div>
         {% endif %}
+        <div class="md-fact"><span class="k">{% trans "Reference" %}</span><span class="v mono">{{ transfer.reference }}</span></div>
         <div class="md-fact"><span class="k">{% trans "Book" %}</span><span class="v">{{ transfer.book.name }}</span></div>
         <div class="md-fact"><span class="k">{% trans "Entered by" %}</span><span class="v">{% if transfer.created_by %}{{ transfer.created_by }}{% else %}—{% endif %}</span></div>
       </div>

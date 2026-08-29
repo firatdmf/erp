@@ -5,7 +5,7 @@ import json
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
@@ -334,6 +334,50 @@ class VariantMatchBySkuTest(TestCase):
         d = self._match(sku="N1464T.G99", name="YENİ RENK")
         self.assertFalse(d["exists"])
         self.assertFalse(d.get("conflict", False))
+
+
+class FallbackCodePrefixTest(TestCase):
+    """When there is no supplier name to abbreviate, an auto-minted code
+    falls back to the HOUSE's own prefix rather than a generic one.
+
+    It comes from the brand profile, not a literal: a second brand on this
+    codebase minting DMF001 would be signing another company's goods.
+    """
+
+    def setUp(self):
+        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.user = get_user_model().objects.create_superuser(
+            username="prefix_tester", password="pw", email="p@r.t")
+        self.client.force_login(self.user)
+
+    def test_a_name_with_no_consonants_falls_back_to_the_brand_code(self):
+        from operating.views_warehouse import _consonant_prefix
+        for nothing_to_abbreviate in ("", None, "AEIOU", "Öüıae"):
+            self.assertEqual(_consonant_prefix(nothing_to_abbreviate), "DMF")
+
+    def test_a_real_supplier_name_still_wins(self):
+        from operating.views_warehouse import _consonant_prefix
+        self.assertEqual(_consonant_prefix("Kızılırmak"), "KZL")
+        self.assertEqual(_consonant_prefix("Acme"), "CM")
+
+    def test_the_minted_product_sku_carries_it(self):
+        from operating.views_warehouse import _product_sku_minter, _fallback_prefix
+        self.assertEqual(_product_sku_minter(_fallback_prefix())(), "DMF001")
+
+    def test_the_previewed_sku_carries_it(self):
+        """The goods-receipt page asks for the next code before saving."""
+        r = self.client.get(
+            reverse("operating:warehouse_next_sku", args=[self.warehouse.pk]),
+            headers={"x-requested-with": "XMLHttpRequest"})
+        self.assertEqual(r.json()["prefix"], "DMF")
+        self.assertTrue(r.json()["sku"].startswith("DMF"))
+
+    @override_settings(BRAND_CODE_PREFIX="XYZ")
+    def test_another_brand_gets_its_own(self):
+        """The point of reading it from the brand profile."""
+        from operating.views_warehouse import _consonant_prefix, _fallback_prefix
+        self.assertEqual(_fallback_prefix(), "XYZ")
+        self.assertEqual(_consonant_prefix("AEIOU"), "XYZ")
 
 
 class LongVariantSkuTest(TestCase):

@@ -78,15 +78,24 @@ def _get_usd_try_rate():
     return Decimal('1')
 
 
+# Last resort for an auto-minted code, when there is no supplier name to
+# abbreviate. Read from the brand profile rather than written here five
+# times over: it is the house's own code, and a second brand minting
+# DMF001 would be signing another company's goods.
+def _fallback_prefix():
+    from django.conf import settings as _s
+    return (getattr(_s, "BRAND_CODE_PREFIX", "DMF") or "DMF").upper()[:6]
+
+
 def _consonant_prefix(name):
     """Barcode prefix = the first 3 CONSONANTS of a supplier name, upper-cased
     and ASCII-folded (Turkish-aware). "Kızılırmak" -> "KZL", "Acme" -> "CM".
-    Falls back to "GEN" when a name has no usable consonants."""
+    Falls back to the brand's own code when a name has no usable consonants."""
     from .catalog_sync import _fold
     folded = _fold(name or "")               # Turkish-aware UPPER + ASCII fold
     vowels = set("AEIOU")
     cons = [c for c in folded if c.isalpha() and c not in vowels]
-    return ("".join(cons[:3]) or "GEN")[:6]
+    return ("".join(cons[:3]) or _fallback_prefix())[:6]
 
 
 def _roll_reservation_info(roll):
@@ -250,7 +259,7 @@ def _barcode_minter(prefix, reserved=()):
     top could be handed a code a manual top in the same batch is about to
     claim, and the two would collide only at write time."""
     import re as _re
-    prefix = (prefix or "GEN").upper()[:6] or "GEN"
+    prefix = (prefix or "").upper()[:6] or _fallback_prefix()
     existing = set(str(r).strip() for r in (reserved or ()) if str(r).strip())
     for qs in (
         WarehouseProductRoll.objects.filter(barcode__startswith=prefix)
@@ -463,7 +472,7 @@ def _product_sku_minter(prefix):
     UNIQUE constraint is the final arbiter under concurrency."""
     import re as _re
     from marketing.models import Product as _Prod
-    prefix = (prefix or "GEN").upper()[:6] or "GEN"
+    prefix = (prefix or "").upper()[:6] or _fallback_prefix()
     existing = set()
     for s in _Prod.objects.filter(sku__istartswith=prefix).values_list("sku", flat=True):
         if s:
@@ -1739,7 +1748,7 @@ def warehouse_next_sku(request, pk):
     """Preview the next auto product SKU for a supplier prefix so the goods-receipt
     page can show it (and root the variant SKUs on it) BEFORE saving. Indicative
     only — the final SKU is minted authoritatively on save."""
-    prefix = (request.GET.get("prefix") or "").strip().upper()[:6] or "GEN"
+    prefix = (request.GET.get("prefix") or "").strip().upper()[:6] or _fallback_prefix()
     try:
         sku = _product_sku_minter(prefix)()
     except Exception:
@@ -1884,8 +1893,8 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
 
     prefix = (data.get("barcode_prefix") or "").strip().upper()
     if not prefix:
-        prefix = _consonant_prefix(account_name) if account_name else "GEN"
-    prefix = (prefix[:6] or "GEN")
+        prefix = _consonant_prefix(account_name) if account_name else _fallback_prefix()
+    prefix = (prefix[:6] or _fallback_prefix())
 
     # ── Pass 1: resolve + validate EVERY product before writing anything,
     # so a mistake on product #3 never leaves #1/#2 half-saved. ──

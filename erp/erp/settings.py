@@ -270,6 +270,11 @@ BRAND_DEFAULTS = {
         # (see CariSettings.next_invoice_number). Set a non-empty value
         # to switch to the compact PREFIX+YEAR+SEQ shape.
         "BRAND_INVOICE_PREFIX": "",
+        # Last resort for an auto-minted product SKU or roll barcode, used
+        # when the supplier's name yields no consonants to abbreviate — see
+        # operating.views_warehouse._consonant_prefix. It reads as the
+        # house's own code because that is whose goods they became.
+        "BRAND_CODE_PREFIX": "DMF",
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3000",
     },
@@ -300,6 +305,9 @@ BRAND_TAX_OFFICE = config("BRAND_TAX_OFFICE", default=_brand_cfg.get("BRAND_TAX_
 BRAND_TAX_NUMBER = config("BRAND_TAX_NUMBER", default=_brand_cfg.get("BRAND_TAX_NUMBER", "")).strip()
 BRAND_LOGO_URL = config("BRAND_LOGO_URL", default=_brand_cfg.get("BRAND_LOGO_URL", "")).strip()
 BRAND_INVOICE_PREFIX = config("BRAND_INVOICE_PREFIX", default=_brand_cfg.get("BRAND_INVOICE_PREFIX", "")).strip()
+BRAND_CODE_PREFIX = config(
+    "BRAND_CODE_PREFIX", default=_brand_cfg.get("BRAND_CODE_PREFIX", "DMF")
+).strip().upper() or "DMF"
 CLIENT_PUBLIC_URL = config("CLIENT_PUBLIC_URL", default=_brand_cfg["CLIENT_PUBLIC_URL"]).strip()
 print(f"[BRAND] Active brand: {BRAND} (schema={DB_SCHEMA})")
 

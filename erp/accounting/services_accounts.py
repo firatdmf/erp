@@ -329,6 +329,7 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
     book = cari.book
     currency = _currency_by_code(lines[0].get("currency") if lines else None)
     settings_obj = CariSettings.for_book(book)
+    mark_as_supplier(cari)
 
     if invoice is not None:
         with transaction.atomic():
@@ -491,6 +492,32 @@ def _invoice_line_desc(order_item):
     elif getattr(it, "product_id", None) and it.product:
         desc = it.product.title
     return (desc or "Item")[:300]
+
+
+def mark_as_supplier(cari):
+    """An account we have bought from is a supplier, and its type should say so.
+
+    Buying does not stop someone being a customer — a mill that weaves for
+    us and buys our seconds is both, which is why "both" is already a type
+    and already has a badge on the account page. So a customer is PROMOTED
+    rather than reclassified; only an account that is neither yet becomes a
+    plain supplier.
+
+    Staff is left alone deliberately. A staff account settles expenses on
+    the book's behalf, and turning a colleague into a vendor because one
+    receipt was posted through them is a classification nobody asked for.
+
+    Returns True when the type actually moved.
+    """
+    if cari is None or not cari.pk:
+        return False
+    current = (cari.type or "").strip()
+    if current in ("supplier", "both", "staff"):
+        return False
+    new_type = "both" if current == "customer" else "supplier"
+    cari.type = new_type
+    cari.save(update_fields=["type"])
+    return True
 
 
 def refresh_invoice_lines_for_variant(variant):

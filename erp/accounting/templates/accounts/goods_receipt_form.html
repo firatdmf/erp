@@ -346,6 +346,14 @@
 
   .np-summary { font: 500 12px var(--font-sans); color: var(--gray-600); min-height: 16px; }
   .np-summary b { color: #0F1419; }
+  .np-gate {
+    display: none; align-items: center; gap: 10px; padding: 14px 16px; margin-bottom: 4px;
+    border: 1px dashed #D5DCE5; border-radius: 10px; background: #FAFBFD;
+    font: 500 12.5px var(--font-sans); color: var(--gray-600);
+  }
+  .np-gate.show { display: flex; }
+  .np-gate i { color: var(--gray-400); }
+  .np-add-product[disabled] { opacity: .45; cursor: not-allowed; }
   .np-summary .np-sum-money { font-weight: 700; color: var(--nejum-teal-700, #005354); }
 </style>
 {% endblock %}
@@ -438,7 +446,7 @@
              nothing else had to change. -->
         <div class="np-field">
           <label>{% trans "Account" %} <span style="color:#C0392B;">*</span></label>
-          <select id="npSupplier" style="display:none;" onchange="npUpdatePrefix()">
+          <select id="npSupplier" style="display:none;" onchange="npUpdatePrefix(); npGateUpdate();">
             <option value="">{% trans "Select account…" %}</option>
             {% for s in accounts %}
               <option value="{{ s.id }}" data-prefix="{{ s.prefix }}" data-type="{{ s.type }}">{{ s.name }}</option>
@@ -529,10 +537,26 @@
         <span class="gr-sec-d">{% trans "A delivery can carry several unrelated products — they're all entered here and saved together." %}</span>
       </div>
 
+      {% comment %}
+        Products stay shut until the warehouse and the account are settled.
+        Both decide what a product row MEANS — the warehouse is the stock it
+        lands in and keys the catalog lookups and SKU previews, the account
+        is who the alım is billed to and supplies the code prefix the SKUs
+        are minted from. Entered first, they were answered before anything
+        depended on them; entered last, they invalidated a delivery already
+        typed in. npWarehouseChanged wiping the list on a switch was the
+        symptom of asking in the wrong order.
+      {% endcomment %}
+      <div class="np-gate" id="npGate">
+        <i class="fa fa-lock"></i>
+        <span>{% trans "Pick the warehouse and the account above first — they decide where this stock lands and who it is billed to." %}</span>
+      </div>
+
       <div class="np-products" id="npProducts"></div>
       {% comment %}Hidden outright while editing — an existing purchase's product
       lines are fixed; only its rolls (and an emptied line's price) change.{% endcomment %}
       <button type="button" class="np-add-product" id="npAddProductBtn" onclick="npAddProduct()"
+              disabled
               {% if edit_invoice %}style="display:none;"{% endif %}>
         <i class="fa fa-plus"></i> {% trans "Add product" %}
       </button>
@@ -618,6 +642,10 @@
   const GR_ORDER_UPDATE_TPL = "{% url 'accounts:purchase_order_update' 0 %}";
   const GR_CONFIRM_TPL = "{% url 'accounts:purchase_order_confirm' 0 %}";
   const GR_PLAN = JSON.parse((document.getElementById('gr-plan-data') || {}).textContent || 'null');
+  // The house's own code, from the brand profile — the same value
+  // views_warehouse._fallback_prefix() mints with, so the SKU previewed
+  // here is the SKU the save writes.
+  const GR_CODE_PREFIX = "{{ code_prefix|default:'DMF' }}";
   let NP_EDIT_INVOICE_ID = null;
   let npVid = 0;
 
@@ -636,6 +664,39 @@
   // The catalog picks and SKU previews below are keyed to one warehouse, so
   // switching depots starts the product list over rather than carrying a
   // stale selection into the wrong stock.
+  // Both answers are needed before a product row means anything, so the
+  // section stays shut until they are in. Editing an existing purchase is
+  // exempt: its warehouse and account are already settled and its fields
+  // are loaded for it.
+  window.npGateReady = function () {
+    if (GR_EDIT_ID) return true;
+    const wh = document.getElementById('npWarehouse');
+    const sup = document.getElementById('npSupplier');
+    return !!((wh && wh.value) && (sup && sup.value));
+  };
+  // Set while a saved order or an existing purchase is being rebuilt into
+  // the form. Both loaders empty #npProducts and then fill it from what
+  // they fetched, and they settle the account on the way — which reaches
+  // npUpdatePrefix, and would have the gate slip a blank card in ahead of
+  // the real ones.
+  let npLoading = false;
+
+  window.npGateUpdate = function () {
+    const ready = npGateReady();
+    const gate = document.getElementById('npGate');
+    const addBtn = document.getElementById('npAddProductBtn');
+    const wrap = document.getElementById('npProducts');
+    if (gate) gate.classList.toggle('show', !ready);
+    if (addBtn) addBtn.disabled = !ready;
+    if (wrap) wrap.style.display = ready ? '' : 'none';
+    // The first card appears the moment the section opens, so answering
+    // the two questions is the whole of getting started.
+    if (!npLoading && ready && wrap && !wrap.querySelector('.np-product-card')) {
+      npAddProduct();
+      npSummaryUpdate();
+    }
+  };
+
   window.npWarehouseChanged = function (sel) {
     const dirty = Array.prototype.some.call(
       document.querySelectorAll('#npProducts input'),
@@ -647,14 +708,14 @@
     }
     sel._npPrev = sel.value;
     document.getElementById('npProducts').innerHTML = '';
-    npAddProduct();
+    npGateUpdate();
     npSummaryUpdate();
   };
 
   function npCurPrefix() {
     const sel = document.getElementById('npSupplier');
     const opt = sel && sel.options[sel.selectedIndex];
-    return ((opt && opt.getAttribute('data-prefix')) || 'GEN') || 'GEN';
+    return ((opt && opt.getAttribute('data-prefix')) || GR_CODE_PREFIX) || GR_CODE_PREFIX;
   }
   // Fetch the next auto product SKU for ONE product card so the page shows
   // it (and roots that card's variant SKUs on it) up-front, not only after
@@ -866,10 +927,15 @@
     npSummaryUpdate();
   };
 
+  // Called by every path that settles the account — the picker, the clear
+  // button, an edit load, a plan load — which makes it the one place the
+  // gate has to be told the answer changed. A programmatic sel.value never
+  // fires the select's own onchange.
   window.npUpdatePrefix = function () {
     const p = npCurPrefix();
     const a = document.getElementById('npPrefix'); if (a) a.textContent = p;
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) { npFetchNextSku(card); });
+    if (window.npGateUpdate) npGateUpdate();
   };
 
   // ── Account picker ───────────────────────────────────────────────
@@ -1632,11 +1698,13 @@
   // with zero surviving original tops) instead of a blank intake.
   window.npLoadForEdit = function (invoiceId) {
     NP_EDIT_INVOICE_ID = invoiceId;
+    npLoading = true;
     fetch(npWhUrl(NP_EDIT_TPL).replace('/0/edit/', '/' + invoiceId + '/edit/'), {
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
     }).then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || !d.success) {
+          npLoading = false;
           alert((d && d.error) || '{% trans "Alım yüklenemedi." %}');
           return;
         }
@@ -1673,9 +1741,13 @@
         });
 
         npRelabelUnits();
+        npLoading = false;
         npSummaryUpdate();
         if (window.lucide) lucide.createIcons();
-      }).catch(function () { alert('{% trans "Ağ hatası." %}'); });
+      }).catch(function () {
+        npLoading = false;
+        alert('{% trans "Ağ hatası." %}');
+      });
   };
 
   function npCollectEditPayload() {
@@ -2010,6 +2082,7 @@
   // is just that in reverse. Everything comes back editable — an order that
   // hasn't been received has nothing behind it to protect.
   function npLoadFromPlan(plan) {
+    npLoading = true;
     const wrap = document.getElementById('npProducts');
     wrap.innerHTML = '';
 
@@ -2056,6 +2129,7 @@
     });
 
     npRelabelUnits();
+    npLoading = false;
     npSummaryUpdate();
   }
 
@@ -2096,7 +2170,7 @@
   } else if (GR_PLAN && (GR_PLAN.products || []).length) {
     npLoadFromPlan(GR_PLAN);
   } else {
-    npAddProduct();
+    npGateUpdate();
     npSummaryUpdate();
   }
 })();

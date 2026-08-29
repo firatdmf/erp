@@ -29,8 +29,15 @@ from django.views import View
 
 from .models import Invoice, InvoiceItem
 from .models_accounts import CariAccount, CariSettings
-from .services_accounts import _currency_by_code
+from .services_accounts import _currency_by_code, mark_as_supplier
 from marketing.models import SKU_MAX_LENGTH
+
+
+def _fallback_code_prefix():
+    """Imported lazily: operating already imports accounting."""
+    from operating.views_warehouse import _fallback_prefix
+    return _fallback_prefix()
+
 from operating.models import (
     StockMovement, Warehouse, WarehouseProduct, WarehouseProductRoll,
 )
@@ -243,6 +250,10 @@ class GoodsReceipt(View):
             "accounts": _account_choices(),
             "product_categories": _product_category_choices(),
             "sku_max_length": SKU_MAX_LENGTH,
+            # The house's own code, so the SKU the page previews for an
+            # account with no consonants to abbreviate is the one the save
+            # actually mints — see views_warehouse._fallback_prefix.
+            "code_prefix": _fallback_code_prefix(),
         })
 
 
@@ -386,6 +397,10 @@ class PurchaseOrderSave(View):
                 )
             invoice.recompute_totals(save=True)
             invoice.refresh_from_db()
+            # A draft order is already an intention to buy from them, and it
+            # is the account page's own answer to "who do we buy from" that
+            # goes stale otherwise.
+            mark_as_supplier(cari)
 
         return JsonResponse({
             "success": True,

@@ -1124,14 +1124,13 @@ class CariTransferEdit(View):
     has always said so — but it had nowhere to send the user, because a
     transfer could be made and never looked at again. This is that page.
 
-    Saving is unpost() then post(), not a field-by-field edit of the two
-    legs. The pair only cancels because both were stamped from one rate on
-    one date (see CariTransfer.post), and rewriting them individually is
-    how that invariant gets lost. Taking both rows back and writing them
-    again from the corrected transfer keeps the guarantee the model makes.
+    Saving hands the whole corrected transfer to repost(), which rewrites
+    both legs in place from ONE rate on ONE date — the invariant that makes
+    the pair cancel, and the reason neither leg is editable on its own. The
+    rows keep their ids, so a link to a leg survives a correction.
 
-    Both steps run in one transaction: a failure between them would leave
-    the transfer posted to nothing and two balances short.
+    The save and the rewrite run in one transaction, so a rejected edit
+    leaves the transfer posted exactly as it was.
     """
 
     template_name = "accounts/transfer_form.html"
@@ -1173,11 +1172,10 @@ class CariTransferEdit(View):
             return self._render(request, transfer, form=form)
         try:
             with transaction.atomic():
-                transfer.unpost()
                 transfer = form.save(commit=False)
                 transfer.book = form.cleaned_data.get("book") or transfer.book
                 transfer.save()
-                transfer.post(user=request.user)
+                transfer.repost(user=request.user)
         except ValidationError as exc:
             # The model guards the same rules the form does; this is the
             # belt to the form's braces rather than a path the UI reaches.

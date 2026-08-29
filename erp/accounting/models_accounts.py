@@ -1881,6 +1881,65 @@ class CariTransfer(models.Model):
         return Decimal(str(rate))
 
     @transaction.atomic
+    @transaction.atomic
+    def repost(self, user=None):
+        """Rewrite the two ledger rows this transfer already has, in place.
+
+        Correcting a transfer used to be unpost() then post() — delete both
+        rows, write two new ones. Arithmetically identical, and it renumbered
+        the ledger every time: a leg linked to as movement #1158 came back as
+        #1169, so every link into it died on a save that changed nothing but
+        the amount. Ledger rows are cited, from an invoice, a note, a
+        colleague's message; an id that moves under them is an id nobody can
+        use.
+
+        So the rows keep their identity and their fields are rewritten. The
+        invariant post() exists to protect is unchanged and for the same
+        reason: ONE rate resolved once here, stamped on both legs together
+        with one date, so the pair still converts at the same rate and nets
+        to zero in base currency as well as in the currency typed.
+
+        Rewriting rather than deleting is also why the accounts a leg moved
+        AWAY from have to be recomputed by name. CariMovement.save() refreshes
+        the account the row belongs to NOW; the one it just left keeps a
+        cached balance still counting a row that is no longer there.
+
+        An unposted transfer has nothing to rewrite, so it is simply posted.
+        """
+        if not (self.from_movement_id and self.to_movement_id):
+            self.post(user=user)
+            return
+
+        label = self.description or _("Account transfer")
+        rate = self.resolved_rate()
+        touched = []
+
+        def leg(mv, cari, signed, other):
+            # Where the row was, before it is pointed anywhere else.
+            touched.append(mv.cari)
+            mv.cari = cari
+            mv.book = self.book
+            mv.date = self.date
+            mv.amount = signed
+            mv.currency = self.currency
+            mv.description = f"{label} — {other.code} {other.name}"
+            mv.reference = f"TRANSFER {self.pk}"
+            # Stamped, not left to CariMovement.save() to derive: it only
+            # fills amount_base when falsy and would otherwise re-look-up a
+            # rate per leg, which is the pair drifting apart — see post().
+            mv.exchange_rate = rate
+            mv.amount_base = (signed * rate).quantize(Decimal("0.01"))
+            mv.save()
+            touched.append(cari)
+
+        # created_by is left alone on purpose: whoever entered the row still
+        # entered it. A correction is not a re-entry.
+        leg(self.from_movement, self.from_cari, -self.amount, self.to_cari)
+        leg(self.to_movement, self.to_cari, self.amount, self.from_cari)
+
+        for cari in {c.pk: c for c in touched if c}.values():
+            cari.recompute_balance(save=True)
+
     def unpost(self):
         """Delete both legs and re-derive the two balances.
 

@@ -84,8 +84,7 @@ class TransferEditPageTest(TransferTestBase):
         self.assertEqual(len({m.date for m in legs}), 1)
 
     def test_it_leaves_exactly_two_legs_behind(self):
-        """Saving is unpost-then-post, so the old rows go rather than
-        piling up beside the new ones."""
+        """One pair, however many times it is corrected."""
         self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-02-01",
             "from_cari": self.a.pk, "to_cari": self.b.pk,
@@ -151,6 +150,64 @@ class TransferEditPageTest(TransferTestBase):
         html = self.client.get(self.detail_url()).content.decode()
         self.assertIn(self.edit_url(), html)
         self.assertIn(self.undo_url(), html)
+
+    # --- a correction keeps the rows it corrects -------------------------
+
+    def test_correcting_a_transfer_keeps_its_ledger_row_ids(self):
+        """A ledger row gets cited — from an invoice, a note, a message. An
+        id that moves under a correction is an id nobody can use."""
+        before = (self.transfer.from_movement_id, self.transfer.to_movement_id)
+        self.client.post(self.edit_url(), {
+            "book": self.book.pk, "date": "2026-03-09",
+            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "amount": "250.00", "currency": self.usd.pk,
+        })
+        self.transfer.refresh_from_db()
+        self.assertEqual(
+            (self.transfer.from_movement_id, self.transfer.to_movement_id), before)
+        self.assertEqual(self.transfer.from_movement.amount, Decimal("-250.00"))
+        self.assertEqual(self.transfer.from_movement.date.isoformat(), "2026-03-09")
+
+    def test_a_legs_own_page_survives_the_correction(self):
+        """The point of keeping the ids, checked the way a reader meets it."""
+        leg_url = reverse("accounts:movement_detail",
+                          args=[self.a.pk, self.transfer.from_movement_id])
+        self.client.post(self.edit_url(), {
+            "book": self.book.pk, "date": "2026-02-01",
+            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "amount": "250.00", "currency": self.usd.pk,
+        })
+        self.assertEqual(self.client.get(leg_url).status_code, 200)
+
+    def test_a_leg_moved_to_another_account_leaves_no_balance_behind(self):
+        """CariMovement.save() refreshes the account the row belongs to NOW.
+        The one it just left would otherwise keep counting a row that is no
+        longer on it."""
+        c = self.b.__class__.objects.create(
+            book=self.book, code="01787", name="DÖRDÜNCÜ", default_currency=self.usd)
+        leg_id = self.transfer.to_movement_id
+        self.client.post(self.edit_url(), {
+            "book": self.book.pk, "date": "2026-02-01",
+            "from_cari": self.a.pk, "to_cari": c.pk,
+            "amount": "400.00", "currency": self.usd.pk,
+        })
+        self.b.refresh_from_db(); c.refresh_from_db()
+        self.assertEqual(self.b.cached_balance, Decimal("0.00"))
+        self.assertEqual(c.cached_balance, Decimal("400.00"))
+        # Moved, not replaced.
+        self.transfer.refresh_from_db()
+        self.assertEqual(self.transfer.to_movement_id, leg_id)
+        self.assertEqual(self.transfer.to_movement.cari_id, c.pk)
+
+    def test_an_unposted_transfer_is_simply_posted(self):
+        """repost() has nothing to rewrite when the legs are gone."""
+        self.transfer.unpost()
+        self.transfer.refresh_from_db()
+        self.assertIsNone(self.transfer.from_movement_id)
+        self.transfer.repost()
+        self.transfer.refresh_from_db()
+        self.assertIsNotNone(self.transfer.from_movement_id)
+        self.assertEqual(self.balances(), (Decimal("600.00"), Decimal("400.00")))
 
     def test_the_leg_links_to_the_edit_form_not_the_detail_page(self):
         """Same as an invoice or a payment: the ledger row's button is the

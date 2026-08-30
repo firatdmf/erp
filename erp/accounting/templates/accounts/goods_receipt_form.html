@@ -1589,6 +1589,41 @@
       .catch(function () { onDone(null); });
   }
 
+  // The row set is rebuilt only when the CURRENCIES change; the numbers in
+  // it are refreshed in place. Re-rendering the panel on every keystroke
+  // destroyed the very box being typed into — innerHTML replaces the node,
+  // and the caret goes with it.
+  let npFxKey = '';
+
+  function npFxRowHtml(code, target) {
+    return '<div class="np-fx-row" data-code="' + code + '">' +
+      '<span class="np-fx-pair">' + code + ' &rarr; ' + target + '</span>' +
+      '<input type="number" step="0.00000001" min="0" class="np-fx-rate" placeholder="0.00000000">' +
+      '<span class="np-fx-eq"></span>' +
+      '<span class="np-fx-out"></span>' +
+      '<button type="button" class="np-fx-pub">{% trans "Use published" %}</button>' +
+    '</div>';
+  }
+
+  function npFxWire(row, code) {
+    const rateIn = row.querySelector('.np-fx-rate');
+    // Both events, for the reason the transfer page gives: `input` alone
+    // misses autofill, the number spinner and a value restored on back.
+    ['input', 'change'].forEach(function (evt) {
+      rateIn.addEventListener(evt, function () {
+        const v = parseFloat(rateIn.value);
+        npFxRates[code] = (isFinite(v) && v > 0) ? v : undefined;
+        npSummaryUpdate();
+      });
+    });
+    row.querySelector('.np-fx-pub').addEventListener('click', function () {
+      npFxFetch(code, function (rate) {
+        npFxRates[code] = rate || undefined;
+        npSummaryUpdate();
+      });
+    });
+  }
+
   window.npFxUpdate = function (money) {
     const panel = document.getElementById('npFx');
     const rows = document.getElementById('npFxRows');
@@ -1599,53 +1634,49 @@
     }).sort();
 
     document.getElementById('npFxTarget').textContent = target;
-    if (!foreign.length) { panel.style.display = 'none'; rows.innerHTML = ''; return; }
+    if (!foreign.length) {
+      panel.style.display = 'none'; rows.innerHTML = ''; npFxKey = '';
+      return;
+    }
     panel.style.display = '';
 
-    // Rebuilt from scratch, but a rate already typed is carried across —
-    // adding a roll must not silently discard the rate someone entered.
-    rows.innerHTML = foreign.map(function (code) {
-      const rate = npFxRates[code];
-      const sub = money[code];
-      const out = (rate > 0) ? (sub * rate) : null;
-      return '<div class="np-fx-row" data-code="' + code + '">' +
-        '<span class="np-fx-pair">' + code + ' &rarr; ' + target + '</span>' +
-        '<input type="number" step="0.00000001" min="0" class="np-fx-rate" placeholder="0.00000000"' +
-          (rate > 0 ? ' value="' + rate + '"' : '') + '>' +
-        '<span class="np-fx-eq">&times; ' +
-          sub.toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' ' + code + ' =</span>' +
-        '<span class="np-fx-out">' + (out === null
-            ? '<span class="np-fx-note">{% trans "enter a rate" %}</span>'
-            : out.toLocaleString(undefined, { minimumFractionDigits: 2,
-                                              maximumFractionDigits: 2 }) + ' ' + target) + '</span>' +
-        '<button type="button" class="np-fx-pub">{% trans "Use published" %}</button>' +
-      '</div>';
-    }).join('');
+    const key = target + '|' + foreign.join(',');
+    if (npFxKey !== key) {
+      npFxKey = key;
+      rows.innerHTML = foreign.map(function (c) { return npFxRowHtml(c, target); }).join('');
+      rows.querySelectorAll('.np-fx-row').forEach(function (row) {
+        npFxWire(row, row.getAttribute('data-code'));
+      });
+    }
 
-    rows.querySelectorAll('.np-fx-row').forEach(function (row) {
-      const code = row.getAttribute('data-code');
-      const input = row.querySelector('.np-fx-rate');
-      // Both events, for the same reason the transfer page gives: `input`
-      // alone misses autofill, the number spinner and a restored value.
-      ['input', 'change'].forEach(function (evt) {
-        input.addEventListener(evt, function () {
-          const v = parseFloat(input.value);
-          npFxRates[code] = (isFinite(v) && v > 0) ? v : undefined;
-          npSummaryUpdate();
-        });
-      });
-      row.querySelector('.np-fx-pub').addEventListener('click', function () {
-        npFxFetch(code, function (rate) {
-          npFxRates[code] = rate || undefined;
-          npSummaryUpdate();
-        });
-      });
-      // Nothing typed yet and nothing fetched yet — ask once, so the row
+    foreign.forEach(function (code) {
+      const row = rows.querySelector('.np-fx-row[data-code="' + code + '"]');
+      if (!row) return;
+      const sub = money[code];
+      const rate = npFxRates[code];
+      const out = (rate > 0) ? (sub * rate) : null;
+
+      row.querySelector('.np-fx-eq').textContent =
+        '\u00d7 ' + sub.toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' ' + code + ' =';
+
+      // Never write into the box under the cursor: the operator is mid-way
+      // through a number, and a value pushed in behind them is the caret
+      // jumping and the digits reordering.
+      const rateIn = row.querySelector('.np-fx-rate');
+      if (document.activeElement !== rateIn) {
+        rateIn.value = (rate > 0) ? Number(rate).toFixed(8) : '';
+      }
+      row.querySelector('.np-fx-out').innerHTML = (out === null)
+        ? '<span class="np-fx-note">{% trans "enter a rate" %}</span>'
+        : out.toLocaleString(undefined, { minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2 }) + ' ' + target;
+
+      // Nothing typed and nothing fetched yet — ask once, so the row
       // arrives filled rather than empty.
       if (npFxRates[code] === undefined && !row._npAsked) {
         row._npAsked = true;
-        npFxFetch(code, function (rate) {
-          if (rate) { npFxRates[code] = rate; npSummaryUpdate(); }
+        npFxFetch(code, function (r) {
+          if (r) { npFxRates[code] = r; npSummaryUpdate(); }
         });
       }
     });

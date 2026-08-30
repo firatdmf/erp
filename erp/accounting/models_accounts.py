@@ -1004,7 +1004,16 @@ class InvoiceItem(models.Model):
     quantity    = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
     unit        = models.CharField(max_length=20, default="pcs")
 
-    unit_price    = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"),
+    # 6 decimals, for the reason WarehouseProduct.cost_usd already gives: a
+    # price that arrives through an FX division carries genuine sub-cent
+    # value, and rounding it AT REST costs real money once metres are
+    # multiplied back in. TRY 100.00/m at 0.02077833 is $2.077833 — held as
+    # $2.08 it billed $913.95 for a 439.40 m line whose true cost was
+    # $913.00. A hand-typed price is still entered in cents; only a
+    # converted one uses the room, and compute() still rounds the LINE to
+    # cents, which is where rounding belongs. max_digits widens in step so
+    # the integer range is unchanged.
+    unit_price    = models.DecimalField(max_digits=18, decimal_places=6, default=Decimal("0.00"),
                                         help_text="Unit price excluding VAT")
     discount_rate = models.DecimalField(max_digits=5,  decimal_places=2, default=Decimal("0.00"),
                                         help_text="Discount %")

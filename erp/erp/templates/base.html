@@ -5451,6 +5451,26 @@
         })();
       </script>
     {% endif %}
+
+    <script>
+      // A mouse wheel over a FOCUSED number input silently changes its
+      // value. That is the browser's default, and on a page of prices,
+      // quantities and rates it is a hazard: scrolling down to reach the
+      // save button retypes whatever figure the cursor passes over, and
+      // nothing says it happened.
+      //
+      // Blurring on wheel is the fix rather than preventDefault, which
+      // would stop the PAGE scrolling whenever the pointer crossed an
+      // input. Here the number holds still and the page scrolls normally.
+      // Global because it is a browser behaviour, not one form's problem —
+      // every quantity, price and rate box in the app has it.
+      document.addEventListener('wheel', function (e) {
+        var el = document.activeElement;
+        if (el && el === e.target && el.tagName === 'INPUT' && el.type === 'number') {
+          el.blur();
+        }
+      }, { passive: true });
+    </script>
 </body>
 
 </html>

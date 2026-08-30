@@ -553,7 +553,13 @@ def convert_lines_to_currency(lines, target_code, rates=None, *, on_date=None):
                 f"{code} → {target}: no rate for this receipt's date. "
                 f"Enter one on the form, or price the line in {target}."
             )
-        converted = (price * rate).quantize(_D("0.01"))
+        # NOT to cents. This is a UNIT price and the line multiplies it by
+        # metres, so a cent rounded off here comes back multiplied — TRY
+        # 100.00/m at 0.02077833 held as $2.08 billed $913.95 for a line
+        # whose true cost was $913.00. InvoiceItem.unit_price carries six
+        # decimals for exactly this, and InvoiceItem.compute() rounds the
+        # LINE to cents, which is where rounding belongs.
+        converted = (price * rate).quantize(_D("0.000001"))
         note = f" ({price} {code} @ {rate.normalize()})"
         out.append({
             **line,

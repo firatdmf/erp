@@ -54,8 +54,27 @@ class ConvertLinesTest(TestCase):
     def test_a_foreign_line_is_converted_at_the_rate_given(self):
         out = convert_lines_to_currency(
             [_line("100.00", "TRY")], "USD", {"TRY": "0.02077833"})
-        self.assertEqual(out[0]["unit_price"], Decimal("2.08"))
+        self.assertEqual(out[0]["unit_price"], Decimal("2.077833"))
         self.assertEqual(out[0]["currency"], "USD")
+
+    def test_the_unit_price_is_not_rounded_to_cents(self):
+        """A cent rounded off a UNIT price comes back multiplied by metres.
+        TRY 100.00/m at 0.02077833 held as $2.08 bills $913.95 for a 439.40 m
+        line whose true cost is $913.00."""
+        from accounting.models_accounts import InvoiceItem
+        line = convert_lines_to_currency(
+            [_line("100.00", "TRY")], "USD", {"TRY": "0.02077833"})[0]
+        item = InvoiceItem(quantity=Decimal("439.40"),
+                           unit_price=line["unit_price"],
+                           discount_rate=Decimal("0"), tax_rate=Decimal("0"))
+        item.compute()
+        self.assertEqual(item.subtotal, Decimal("913.00"))
+
+    def test_the_column_can_actually_hold_it(self):
+        """Six decimals in memory is worth nothing if the column rounds them
+        back on the way in — the whole bug was rounding AT REST."""
+        from accounting.models_accounts import InvoiceItem
+        self.assertEqual(InvoiceItem._meta.get_field("unit_price").decimal_places, 6)
 
     def test_the_original_price_stays_readable_on_the_line(self):
         """The converted figure has to be checkable against what was agreed."""
@@ -68,11 +87,12 @@ class ConvertLinesTest(TestCase):
         out = convert_lines_to_currency(
             [_line("4.00", "USD"), _line("100.00", "TRY")], "USD", {"TRY": "0.02"})
         self.assertEqual({l["currency"] for l in out}, {"USD"})
-        self.assertEqual([l["unit_price"] for l in out], [Decimal("4.00"), Decimal("2.00")])
+        self.assertEqual([l["unit_price"] for l in out],
+                         [Decimal("4.00"), Decimal("2.000000")])
 
     def test_case_does_not_matter(self):
         out = convert_lines_to_currency([_line("100.00", "try")], "usd", {"TrY": "0.02"})
-        self.assertEqual(out[0]["unit_price"], Decimal("2.00"))
+        self.assertEqual(out[0]["unit_price"], Decimal("2.000000"))
 
     def test_a_zero_price_needs_no_rate(self):
         out = convert_lines_to_currency([_line("0", "TRY")], "USD", {})
@@ -81,7 +101,7 @@ class ConvertLinesTest(TestCase):
     @patch("accounting.services.get_exchange_rate", return_value=Decimal("0.03"))
     def test_a_missing_rate_falls_back_to_the_published_one(self, _fx):
         out = convert_lines_to_currency([_line("100.00", "TRY")], "USD", {})
-        self.assertEqual(out[0]["unit_price"], Decimal("3.00"))
+        self.assertEqual(out[0]["unit_price"], Decimal("3.000000"))
 
     @patch("accounting.services.get_exchange_rate", return_value=None)
     def test_no_rate_anywhere_refuses_rather_than_billing_at_par(self, _fx):

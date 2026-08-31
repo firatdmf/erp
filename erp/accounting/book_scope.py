@@ -43,6 +43,47 @@ def book_scoped(view):
     return wrapper
 
 
+def book_guarded(view, model, book_path="book"):
+    """Refuse an OBJECT page whose row belongs to a book the viewer is
+    not assigned, and put that row's book on `request.book`.
+
+    Object routes do not name their book in the path, and should not:
+    /books/5/accounts/912/ where 912 belongs to book 2 is a mismatch
+    every view would then have to check for, so the row's own FK is the
+    single answer. But "the row knows its book" quietly became "nobody
+    checks the row's book". Collections were scoped and objects were
+    left open, so a member assigned only to Ergene could read a Laleli
+    customer's statement, and edit its orders, by walking sequential ids.
+
+    `book_path` is how to get from the row to its book — "book" for an
+    invoice, "cari.book" for an order (an Order carries no book of its
+    own), "accounting_book" for a warehouse.
+
+    404 rather than 403, for the same reason book_scoped does it: which
+    books exist is not something an unassigned member should be able to
+    probe by watching the status code change.
+
+    Applied in the URLconf beside `scoped`, per the note at the top of
+    this module: the rule stays in one readable place instead of being
+    repeated in twenty view bodies that are a mix of View, DetailView
+    and plain functions.
+    """
+    @wraps(view)
+    def wrapper(request, *args, pk=None, **kwargs):
+        obj = get_object_or_404(model, pk=pk)
+        book = obj
+        for step in book_path.split("."):
+            book = getattr(book, step, None)
+            if book is None:
+                break
+        member = getattr(request.user, "member", None)
+        if not member_can_use_book(member, book):
+            raise Http404("No such record.")
+        request.book = book
+        return view(request, *args, pk=pk, **kwargs)
+    return wrapper
+
+
 def current_book(request):
     """Context processor: the book the page is about.
 

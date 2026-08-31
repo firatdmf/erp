@@ -44,7 +44,9 @@ from . import (
     views_report,
 )
 from . import views_accounts as views
-from .book_scope import book_scoped
+from .book_scope import book_guarded, book_scoped
+from .models import CheckOrPromissoryNote, Invoice, Payment
+from .models_accounts import CariAccount, CariTransfer
 from .views_accounts import LegacyCollectionRedirect as _Legacy
 
 app_name = "accounts"
@@ -53,6 +55,15 @@ app_name = "accounts"
 def scoped(route, view, name):
     """A collection page, addressed by book."""
     return path(f"books/<int:book_id>/{route}", book_scoped(view), name=name)
+
+
+def owned(route, view, name, model, book_path="book"):
+    """An object page, refused when the row's book is not the viewer's.
+
+    The path still does not name the book — the row's FK does — but the
+    row's book is now checked before the view runs. See book_guarded.
+    """
+    return path(route, book_guarded(view, model, book_path), name=name)
 
 
 def legacy(route, name):
@@ -93,11 +104,11 @@ urlpatterns = [
     # ------------------------------------------------------------------
     # Objects — the row names its own book, so the path does not.
     # ------------------------------------------------------------------
-    path("accounts/<int:pk>/",                 views.CariDetail.as_view(),         name="detail"),
-    path("accounts/<int:pk>/statement/",       views.CariStatement.as_view(),      name="statement"),
-    path("accounts/<int:pk>/edit/",            views.CariEdit.as_view(),           name="edit"),
-    path("accounts/<int:pk>/delete/",          views.CariDelete.as_view(),         name="delete"),
-    path("accounts/<int:pk>/movements/new/",   views.CariMovementCreate.as_view(), name="movement_create"),
+    owned("accounts/<int:pk>/", views.CariDetail.as_view(), "detail", CariAccount),
+    owned("accounts/<int:pk>/statement/", views.CariStatement.as_view(), "statement", CariAccount),
+    owned("accounts/<int:pk>/edit/", views.CariEdit.as_view(), "edit", CariAccount),
+    owned("accounts/<int:pk>/delete/", views.CariDelete.as_view(), "delete", CariAccount),
+    owned("accounts/<int:pk>/movements/new/", views.CariMovementCreate.as_view(), "movement_create", CariAccount),
     path("accounts/<int:pk>/movements/<int:mv_pk>/",        views.CariMovementDetail.as_view(), name="movement_detail"),
     path("accounts/<int:pk>/movements/<int:mv_pk>/edit/",   views.CariMovementEdit.as_view(),   name="movement_edit"),
     path("accounts/<int:pk>/movements/<int:mv_pk>/delete/", views.CariMovementDelete.as_view(), name="movement_delete"),
@@ -107,9 +118,9 @@ urlpatterns = [
     path("accounts/transfers/<int:pk>/edit/", views.CariTransferEdit.as_view(),   name="transfer_edit"),
     path("accounts/transfers/<int:pk>/undo/", views.CariTransferUndo.as_view(),   name="transfer_undo"),
 
-    path("accounts/invoices/<int:pk>/",         views_invoice.InvoiceDetail.as_view(),  name="invoice_detail"),
+    owned("accounts/invoices/<int:pk>/", views_invoice.InvoiceDetail.as_view(), "invoice_detail", Invoice),
     path("accounts/invoices/<int:pk>/excel/",   invoice_excel.invoice_excel,            name="invoice_excel"),
-    path("accounts/invoices/<int:pk>/edit/",    views_invoice.InvoiceEdit.as_view(),    name="invoice_edit"),
+    owned("accounts/invoices/<int:pk>/edit/", views_invoice.InvoiceEdit.as_view(), "invoice_edit", Invoice),
     path("accounts/invoices/<int:pk>/issue/",   views_invoice.InvoiceIssue.as_view(),   name="invoice_issue"),
     path("accounts/invoices/<int:pk>/cancel/",  views_invoice.InvoiceCancel.as_view(),  name="invoice_cancel"),
     path("accounts/invoices/<int:pk>/restore/", views_invoice.InvoiceRestore.as_view(), name="invoice_restore"),
@@ -118,17 +129,17 @@ urlpatterns = [
     path("accounts/purchases/<int:pk>/order/",   views_purchase.PurchaseOrderSave.as_view(),    name="purchase_order_update"),
     path("accounts/purchases/<int:pk>/confirm/", views_purchase.PurchaseOrderConfirm.as_view(), name="purchase_order_confirm"),
     path("accounts/purchases/<int:pk>/print/",   views_purchase.PurchaseOrderPrint.as_view(),   name="purchase_order_print"),
-    path("accounts/purchases/<int:pk>/",         views_purchase.PurchaseOrderDetail.as_view(),  name="purchase_order_detail"),
-    path("accounts/purchases/<int:pk>/edit/",    views_purchase.GoodsReceipt.as_view(),         name="goods_receipt_edit"),
+    owned("accounts/purchases/<int:pk>/", views_purchase.PurchaseOrderDetail.as_view(), "purchase_order_detail", Invoice),
+    owned("accounts/purchases/<int:pk>/edit/", views_purchase.GoodsReceipt.as_view(), "goods_receipt_edit", Invoice),
     path("accounts/purchases/<int:pk>/cancel/",  views_purchase.PurchaseCancel.as_view(),       name="purchase_cancel"),
 
-    path("accounts/payments/<int:pk>/",         views_payment.PaymentDetail.as_view(),  name="payment_detail"),
-    path("accounts/payments/<int:pk>/edit/",    views_payment.PaymentEdit.as_view(),    name="payment_edit"),
+    owned("accounts/payments/<int:pk>/", views_payment.PaymentDetail.as_view(), "payment_detail", Payment),
+    owned("accounts/payments/<int:pk>/edit/", views_payment.PaymentEdit.as_view(), "payment_edit", Payment),
     path("accounts/payments/<int:pk>/confirm/", views_payment.PaymentConfirm.as_view(), name="payment_confirm"),
     path("accounts/payments/<int:pk>/cancel/",  views_payment.PaymentCancel.as_view(),  name="payment_cancel"),
     path("accounts/payments/<int:pk>/delete/",  views_payment.PaymentDelete.as_view(),  name="payment_delete"),
 
-    path("accounts/checks/<int:pk>/",         views_check.CheckDetail.as_view(),  name="check_detail"),
+    owned("accounts/checks/<int:pk>/", views_check.CheckDetail.as_view(), "check_detail", CheckOrPromissoryNote),
     path("accounts/checks/<int:pk>/endorse/", views_check.CheckEndorse.as_view(), name="check_endorse"),
     path("accounts/checks/<int:pk>/deposit/", views_check.CheckDeposit.as_view(), name="check_deposit"),
     path("accounts/checks/<int:pk>/clear/",   views_check.CheckClear.as_view(),   name="check_clear"),

@@ -35,6 +35,9 @@ class StatementBalanceInvariantTest(TestCase):
         self.usd = CurrencyCategory.objects.create(
             code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
+        # Object pages are refused unless the viewer is assigned the
+        # row's book (accounting.book_scope.book_guarded).
+        self.user.member.books.add(self.book)
         self.cari = CariAccount.objects.create(
             book=self.book, code="PERAKENDE", name="Perakende Satışları",
             default_currency=self.usd)

@@ -32,6 +32,9 @@ class CariDetailConversionTests(TestCase):
             code="TRY", name="Turkish Lira", symbol="₺"
         )
         self.book = Book.objects.create(name="Laleli Fabric", base_currency=self.usd)
+        # Object pages are refused unless the viewer is assigned the
+        # row's book (accounting.book_scope.book_guarded).
+        self.user.member.books.add(self.book)
         self.cari = CariAccount.objects.create(
             book=self.book, code="FIRAT", name="MUHAMMED FIRAT ÖZTÜRK",
             type="customer", default_currency=self.usd,

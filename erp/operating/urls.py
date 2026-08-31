@@ -4,7 +4,8 @@ from . import views_warehouse
 from . import order_excel
 from . import warehouse_label
 from . import warehouse_excel
-from accounting.book_scope import book_scoped
+from accounting.book_scope import book_guarded, book_scoped
+from .models import Order, Warehouse
 from django.views.generic import TemplateView, RedirectView
 
 
@@ -20,7 +21,7 @@ urlpatterns = [
     path("warehouses/create/partial/", views_warehouse.WarehouseCreatePartial.as_view(), name="create_warehouse_partial"),
     path("warehouses/account-create/", views_warehouse.warehouse_account_create, name="warehouse_account_create"),
     path("warehouses/barcode-available/", views_warehouse.warehouse_barcode_available, name="warehouse_barcode_available"),
-    path("warehouses/<int:pk>/", views_warehouse.WarehouseDetail.as_view(), name="warehouse_detail"),
+    path("warehouses/<int:pk>/", book_guarded(views_warehouse.WarehouseDetail.as_view(), Warehouse, "accounting_book"), name="warehouse_detail"),
     path("warehouses/<int:pk>/excel/", warehouse_excel.warehouse_excel, name="warehouse_excel"),
     path("warehouses/<int:pk>/group-variants/", views_warehouse.warehouse_group_variants, name="warehouse_group_variants"),
     path("warehouses/<int:pk>/catalog-search/", views_warehouse.catalog_base_search, name="catalog_base_search"),
@@ -51,9 +52,9 @@ urlpatterns = [
     path("warehouses/<int:warehouse_pk>/movements/", views_warehouse.WarehouseMovements.as_view(), name="warehouse_movements"),
     path("orders/create/", views.create_web_order, name="create_web_order"),
     path("orders/create", views.OrderCreate.as_view(), name="create_order"),
-    path("orders/edit/<int:pk>/", views.OrderEdit.as_view(), name="edit_order"),
+    path("orders/edit/<int:pk>/", book_guarded(views.OrderEdit.as_view(), Order, "cari.book"), name="edit_order"),
     path("orders/web/<int:pk>/status/", views.WebOrderStatusEdit.as_view(), name="web_order_status"),
-    path("orders/<int:pk>/", views.OrderDetail.as_view(), name="order_detail"),
+    path("orders/<int:pk>/", book_guarded(views.OrderDetail.as_view(), Order, "cari.book"), name="order_detail"),
     path("orders/<int:pk>/customer/", views.order_customer_card_view, name="order_customer_card"),
     path("orders/<int:pk>/print/", views.OrderPrint.as_view(), name="order_print"),
     path("orders/<int:pk>/print-header/", views.update_order_print_header, name="order_print_header"),

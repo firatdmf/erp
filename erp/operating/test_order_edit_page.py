@@ -15,6 +15,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from accounting.models import Book, CurrencyCategory
+from accounting.models_accounts import CariAccount
 from marketing.models import Product
 from .models import Order, OrderItem
 
@@ -23,7 +25,15 @@ class OrderEditIsAFullPage(TestCase):
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def setUp(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
-        self.order = Order.objects.create(order_number="DK0000284")
+        # The order needs its cari: an order page is refused unless the
+        # viewer is assigned the book the row belongs to, and an Order
+        # reaches its book through cari.book.
+        book = Book.objects.create(name="Laleli Fabric")
+        cari = CariAccount.objects.create(
+            book=book, code="C-284", name="Oleg", type="customer",
+            default_currency=CurrencyCategory.objects.create(
+                code="USD", name="US Dollar", symbol="$"))
+        self.order = Order.objects.create(order_number="DK0000284", cari=cari)
         product = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
         OrderItem.objects.create(order=self.order, product=product,
                                  quantity=Decimal("156.00"), price=Decimal("2.50"))

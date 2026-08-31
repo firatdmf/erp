@@ -704,7 +704,15 @@ class WarehouseList(View):
     template_name = "operating/warehouse_list.html"
 
     def get(self, request):
-        warehouses = list(Warehouse.objects.annotate(
+        # Only the books this member works in. A warehouse's stock is its
+        # book's asset, so someone assigned to Ergene has no business
+        # reading Laleli's shelves — and a warehouse with no book stated
+        # is shown to nobody rather than to everybody.
+        from accounting.services_accounts import member_books
+        member = getattr(request.user, "member", None)
+        warehouses = list(Warehouse.objects.filter(
+            accounting_book__in=member_books(member),
+        ).annotate(
             n_products=Count('products'),
         ).prefetch_related('combined_sources').order_by('name'))
         # Combined (ortak) warehouses own no products — their card shows
@@ -719,6 +727,7 @@ class WarehouseList(View):
         # warehouse, linking to the full filterable feed.
         recent = _decorate_movements(list(
             StockMovement.objects
+            .filter(product__warehouse__in=warehouses)
             .select_related("product", "product__warehouse", "created_by")
             .order_by("-created_at")[:6]
         ))

@@ -30,6 +30,9 @@ class CancelledStatementTests(TestCase):
             code="USD", name="US Dollar", symbol="$"
         )
         self.book = Book.objects.create(name="Laleli Fabric", base_currency=self.usd)
+        # Object pages are refused unless the viewer is assigned the
+        # row's book (accounting.book_scope.book_guarded).
+        self.user.member.books.add(self.book)
         self.kasa = CashAccount.objects.create(
             book=self.book, name="Kasa", currency=self.usd, balance=Decimal("1000.00"),
         )

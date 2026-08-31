@@ -16,7 +16,8 @@ from marketing.models import (Product, ProductCategory, ProductVariant,
                               ProductVariantAttributeValue)
 from .models import (Order, OrderItem, OrderRollReservation, Pack, Warehouse,
                      WarehouseProduct, WarehouseProductRoll)
-from .views import _long_date, _pack_roll_rows, _variant_label
+from .views import (_long_date, _pack_roll_rows, _product_type_label,
+                    _variant_label)
 
 
 class PackingListColumns(TestCase):
@@ -232,3 +233,124 @@ class BrandHeader(TestCase):
                     kwargs={"pk": self.order.pk}))
         ws = openpyxl.load_workbook(io.BytesIO(resp.content)).active
         self.assertEqual(ws["A1"].value, self.LOCKUP)
+
+
+class OrderPrintProductType(TestCase):
+    """The printed ORDER identifies its lines the way the packing list
+    does — kind of goods and variant NAME. It used to show neither: a
+    customer reading it could not tell that "MT-3016" was fabric, nor
+    that "MRK00061" was the beige-silver they ordered."""
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        self.order = Order.objects.create(order_number="DK0000289")
+        self.product = Product.objects.create(
+            title="MT-3016", sku="MT-3016", price=10,
+            category=ProductCategory.objects.create(name="fabric"))
+        self.variant = ProductVariant.objects.create(
+            product=self.product, variant_sku="MRK00061")
+        value, _ = ProductVariantAttributeValue.objects.get_or_create(
+            product_variant_attribute=ProductVariantAttribute.objects.create(
+                name="colour"),
+            product_variant_attribute_value="bej-gumus")
+        self.variant.product_variant_attribute_values.add(value)
+        OrderItem.objects.create(order=self.order, product=self.product,
+                                 quantity=Decimal("81.10"), price=10,
+                                 product_variant=self.variant)
+        self.client.force_login(
+            User.objects.create_superuser("p", "p@t.com", "pw"))
+
+    def _resp(self):
+        resp = self.client.get(
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}))
+        self.assertEqual(resp.status_code, 200)
+        return resp
+
+    def _items(self):
+        return self._resp().context["order_items"]
+
+    def _page(self):
+        return self._resp().content.decode()
+
+    def test_the_line_says_what_kind_of_goods_it_is(self):
+        self.assertEqual(self._items()[0].product_type_label, "Fabric")
+
+    def test_it_reads_the_same_word_the_packing_list_prints(self):
+        """Both documents go through _product_type_label, so a customer
+        holding the order and the packing list never sees two names for
+        one kind of goods."""
+        self.assertEqual(self._items()[0].product_type_label,
+                         _product_type_label(self.product))
+
+    def test_a_slugged_group_loses_its_underscore(self):
+        self.product.category = ProductCategory.objects.create(
+            name="ready-made_curtain")
+        self.product.save()
+        self.assertEqual(self._items()[0].product_type_label,
+                         "Ready-Made Curtain")
+
+    def test_an_unclassified_product_drops_the_line_instead_of_printing_a_dash(self):
+        """The packing list has a column to fill so it prints "-"; this
+        layout puts the kind under the product name, where a stray dash
+        would read as missing data."""
+        self.product.category = None
+        self.product.type = None
+        self.product.save()
+        self.assertIsNone(self._items()[0].product_type_label)
+
+    def test_the_line_names_the_variant_instead_of_its_sku(self):
+        """"MRK00061" is a warehouse code; the customer ordered a colour."""
+        item = self._items()[0]
+        self.assertEqual(item.variant_label, "Bej-Gumus")
+        self.assertNotIn("MRK00061", self._page())
+
+    def test_the_variant_reads_the_same_as_on_the_packing_list(self):
+        self.assertEqual(self._items()[0].variant_label,
+                         _variant_label(self.variant))
+
+    def test_a_line_with_no_variant_drops_the_chip(self):
+        OrderItem.objects.update(product_variant=None)
+        self.assertIsNone(self._items()[0].variant_label)
+
+    def test_a_mill_coded_product_does_not_print_its_code_twice(self):
+        """The title IS the SKU on 894 of 920 warehouse products, so
+        showing both read "MT-3016 MT-3016"."""
+        self.assertIsNone(self._items()[0].sku_label)
+
+    def test_a_sku_that_says_something_the_title_does_not_still_shows(self):
+        self.product.title = "Bergamo"
+        self.product.save()
+        self.assertEqual(self._items()[0].sku_label, "MT-3016")
+
+    def _query_count(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        with CaptureQueriesContext(connection) as cap:
+            self._items()
+        return len(cap)
+
+    def _add_lines(self, n, start=0):
+        for i in range(start, start + n):
+            p = Product.objects.create(title=f"P{i}", sku=f"S{i}", price=1,
+                                       category=self.product.category)
+            v = ProductVariant.objects.create(product=p, variant_sku=f"V{i}")
+            v.product_variant_attribute_values.add(
+                *self.variant.product_variant_attribute_values.all())
+            OrderItem.objects.create(order=self.order, product=p, quantity=1,
+                                     price=1, product_variant=v)
+
+    def test_extra_lines_do_not_each_cost_their_own_queries(self):
+        """Product group and variant attributes are pulled with the lines
+        (select_related + prefetch_related), so a six-line order costs
+        the same as an eleven-line one. Without them every line fetched
+        its own category and its own attribute M2M.
+
+        Both measurements are taken after the page has been rendered
+        once: the first render also pays one-off costs (session, content
+        types) that would otherwise swamp the comparison."""
+        self._add_lines(5)
+        self._items()                      # warm the one-off queries
+        before = self._query_count()
+        self._add_lines(5, start=5)
+        self.assertEqual(self._query_count(), before)

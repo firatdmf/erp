@@ -325,19 +325,19 @@ class PaymentCreate(View):
         cari_id = request.POST.get("account")
         if not cari_id:
             messages.error(request, _g("An account must be selected."))
-            return redirect("accounts:payment_create")
+            return redirect("accounts:payment_create", book_id=request.book.pk)
         cari = get_object_or_404(CariAccount, pk=int(cari_id))
 
         amount = _D(request.POST.get("amount"))
         if amount <= 0:
             messages.error(request, _g("Amount must be greater than zero."))
-            return redirect("accounts:payment_create")
+            return redirect("accounts:payment_create", book_id=request.book.pk)
 
         try:
             allocations = _parse_allocations(request.POST.get("allocations_json", ""))
         except ValueError as e:
             messages.error(request, str(e))
-            return redirect("accounts:payment_create")
+            return redirect("accounts:payment_create", book_id=request.book.pk)
 
         # Verify sum of allocations <= amount
         total_alloc = sum((a["amount"] for a in allocations), Decimal("0"))
@@ -345,7 +345,7 @@ class PaymentCreate(View):
             messages.error(request,
                            _g("Allocation total (%(total)s) cannot exceed payment amount (%(amount)s).")
                            % {"total": total_alloc, "amount": amount})
-            return redirect("accounts:payment_create")
+            return redirect("accounts:payment_create", book_id=request.book.pk)
 
         ptype = request.POST.get("type") or "collection"
         method = request.POST.get("method") or "bank_transfer"
@@ -661,6 +661,7 @@ class PaymentDelete(View):
             messages.error(request, _g("Only draft payments can be deleted. Cancel confirmed payments instead."))
             return redirect("accounts:payment_detail", pk=payment.pk)
         label = payment.number
+        book_id = payment.book_id       # read before the row goes
         payment.delete()
         messages.success(request, _g("Draft payment deleted: %(label)s") % {"label": label})
-        return redirect("accounts:payment_list")
+        return redirect("accounts:payment_list", book_id=book_id)

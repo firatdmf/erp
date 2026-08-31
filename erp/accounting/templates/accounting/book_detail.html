@@ -106,20 +106,6 @@
           {% endif %}
           <span class="book-brand-status" id="bookWorkStatus" hidden></span>
         </div>
-        <div class="book-ledger-row">
-          {% if book.is_default_cari_target %}
-          <span class="book-ledger-badge is-on">
-            <i class="fas fa-check-circle"></i> Default for new customer accounts
-          </span>
-          {% else %}
-          <button type="button" class="book-ledger-btn" id="bookLedgerBtn"
-                  data-url="{% url 'accounting:set_default_cari_target' book.pk %}"
-                  title="New customer accounts and invoices will land in this book when nothing else says which">
-            <i class="fas fa-arrow-right-arrow-left"></i> Make this the default for new customer accounts
-          </button>
-          {% endif %}
-          <span class="book-brand-status" id="bookLedgerStatus" hidden></span>
-        </div>
         <p>Manage your book entries, transactions, and stakeholders</p>
       </div>
     </div>
@@ -520,36 +506,6 @@
     const clear = document.getElementById('bookWorkClear');
     if (set) set.addEventListener('click', function () { post(set, false); });
     if (clear) clear.addEventListener('click', function () { post(clear, true); });
-  })();
-
-  // Move the default target to this book. Confirmed first: it decides
-  // where every new customer account and invoice lands while orders
-  // still carry no book of their own, and the damage from getting it
-  // wrong is invisible until someone reads a balance.
-  (function () {
-    const btn = document.getElementById('bookLedgerBtn');
-    const status = document.getElementById('bookLedgerStatus');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-      if (!confirm('Send NEW customer accounts and invoices to this book '
-                   + 'when nothing else says which?\n\n'
-                   + 'Existing records stay where they are.')) return;
-      fetch(btn.dataset.url, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': '{{ csrf_token }}',
-                   'X-Requested-With': 'XMLHttpRequest' },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (!data.success) throw new Error();
-          window.location.reload();
-        })
-        .catch(() => {
-          status.textContent = 'Could not save.';
-          status.classList.add('is-error');
-          status.hidden = false;
-        });
-    });
   })();
 
   // Rename the book by editing the printed title itself — the <h1> goes

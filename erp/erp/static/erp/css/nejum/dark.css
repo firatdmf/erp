@@ -1104,3 +1104,22 @@
   border: 2px solid #11161C;
 }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #3A4048; }
+
+/* ---------- Working book ---------- */
+[data-theme="dark"] .nj-book { border-bottom: 1px solid #262C34 !important; }
+[data-theme="dark"] .nj-book-btn {
+  background: rgba(0, 128, 128, 0.14) !important;
+  color: #DCE4E9 !important;
+}
+[data-theme="dark"] .nj-book-btn:not(.is-static):hover {
+  background: rgba(0, 128, 128, 0.22) !important;
+}
+[data-theme="dark"] .nj-book-btn svg { color: var(--nejum-teal-400, #33ADAD) !important; }
+[data-theme="dark"] .nj-book-menu {
+  background: #1B2128 !important;
+  border: 1px solid #2C333B !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+[data-theme="dark"] .nj-book-opt { color: #C5CDD3 !important; }
+[data-theme="dark"] .nj-book-opt:hover { background: rgba(0, 128, 128, 0.18) !important; }
+[data-theme="dark"] .nj-book-opt.is-current { color: #66C7C7 !important; }

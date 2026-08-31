@@ -421,6 +421,17 @@ class ContactDetail(generic.DetailView):
             Order.objects.filter(contact=contact)
             .order_by("-created_at")[:25]
         )
+
+        # ── Ledger accounts across every book ─────────────────
+        # One client can hold an account in more than one book — the
+        # factory and the wholesaler trade with the same people — so
+        # this is the only place their whole position is visible.
+        from accounting.models_accounts import CariAccount
+        context["cari_accounts"] = (
+            CariAccount.objects.filter(contact=contact)
+            .select_related("book", "default_currency")
+            .order_by("book__name")
+        )
         return context
 
     # Normally detail pages do not have post requests, but in here the client can add notes or tasks to the contact.
@@ -558,6 +569,18 @@ class CompanyDetail(generic.DetailView):
             Order.objects.filter(company=company)
             .order_by("-created_at")[:25]
         )
+
+        # ── Ledger accounts across every book ─────────────────
+        # One client can hold an account in more than one book — the
+        # factory and the wholesaler trade with the same people — so
+        # this is the only place their whole position is visible.
+        from accounting.models_accounts import CariAccount
+        context["cari_accounts"] = (
+            CariAccount.objects.filter(company=company)
+            .select_related("book", "default_currency")
+            .order_by("book__name")
+        )
+
 
         # print(context["tasks"])
         return context

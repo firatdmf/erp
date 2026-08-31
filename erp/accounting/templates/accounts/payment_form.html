@@ -176,7 +176,7 @@
     <i data-lucide="arrow-left"></i> {{ payment.number }}
   </a>
   {% else %}
-  <a class="pf-back" href="{% url 'accounts:payment_list' %}">
+  <a class="pf-back" href="{% url 'accounts:payment_list' current_book.pk %}">
     <i data-lucide="arrow-left"></i> {% trans "Payments" %}
   </a>
   {% endif %}
@@ -221,13 +221,13 @@
               <span class="code">{{ prefilled_cari.code }}</span>
               <span class="name">{{ prefilled_cari.name }}</span>
               <span class="balance">· {% trans "Balance:" %} {{ prefilled_cari.display_currency_symbol }}{{ prefilled_cari.absolute_balance|floatformat:2|intcomma }} ({{ prefilled_cari.balance_label }})</span>
-              {% if not payment %}<a href="{% url 'accounts:payment_create' %}" class="change">{% trans "change" %}</a>{% endif %}
+              {% if not payment %}<a href="{% url 'accounts:payment_create' current_book.pk %}" class="change">{% trans "change" %}</a>{% endif %}
             </div>
             {% else %}
             <div class="pf-row wide" style="margin-bottom: 14px;">
               <div class="pf-f">
                 <label>{% trans "Select Account" %}</label>
-                <select name="account" required onchange="if(this.value){ window.location.href = '{% url 'accounts:payment_create' %}?account=' + this.value; }">
+                <select name="account" required onchange="if(this.value){ window.location.href = '{% url 'accounts:payment_create' current_book.pk %}?account=' + this.value; }">
                   <option value="">{% trans "— Select account —" %}</option>
                   {% for c in cari_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
                 </select>
@@ -419,7 +419,7 @@
                 <i data-lucide="save"></i> {% trans "Save as Draft" %}
               </button>
               {% endif %}
-              <a href="{% if payment %}{% url 'accounts:payment_detail' payment.pk %}{% else %}{% url 'accounts:payment_list' %}{% endif %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
+              <a href="{% if payment %}{% url 'accounts:payment_detail' payment.pk %}{% else %}{% url 'accounts:payment_list' current_book.pk %}{% endif %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
             </div>
           </div>
         </div>

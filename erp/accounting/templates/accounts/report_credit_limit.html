@@ -101,7 +101,7 @@
 <div class="cl">
 
   <div class="cl-crumbs">
-    <a class="cl-back" href="{% url 'accounts:report_index' %}">
+    <a class="cl-back" href="{% url 'accounts:report_index' current_book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "Reports" %}
     </a>
     <span class="cl-sep">/</span>

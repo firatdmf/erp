@@ -131,13 +131,13 @@ class CheckCreate(View):
         cari_id = request.POST.get("account")
         if not cari_id:
             messages.error(request, _g("An account must be selected."))
-            return redirect("accounts:check_create")
+            return redirect("accounts:check_create", book_id=request.book.pk)
         cari = get_object_or_404(CariAccount, pk=int(cari_id))
 
         amount = _D(request.POST.get("amount"))
         if amount <= 0:
             messages.error(request, _g("Amount must be greater than zero."))
-            return redirect("accounts:check_create")
+            return redirect("accounts:check_create", book_id=request.book.pk)
 
         try:
             check = CheckOrPromissoryNote.objects.create(
@@ -159,7 +159,7 @@ class CheckCreate(View):
             )
         except ValidationError as ve:
             messages.error(request, _g("Invalid data: %(error)s") % {"error": ve})
-            return redirect("accounts:check_create")
+            return redirect("accounts:check_create", book_id=request.book.pk)
 
         messages.success(request, _g("%(instrument)s added to portfolio: #%(serial)s") % {"instrument": check.get_instrument_display(), "serial": check.serial_no})
         return redirect("accounts:check_detail", pk=check.pk)

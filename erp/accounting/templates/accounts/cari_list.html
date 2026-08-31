@@ -229,8 +229,8 @@
     </div>
     <div class="ca-head-r">
       <a href="{% url 'accounts:help' %}" class="ca-btn ghost"><i data-lucide="help-circle"></i>{% trans "Help" %}</a>
-      <a href="{% url 'accounts:statement_all' %}" class="ca-btn ghost"><i data-lucide="printer"></i>{% trans "Print statement" %}</a>
-      <a href="{% url 'accounts:create' %}" class="ca-btn primary"><i data-lucide="plus"></i>{% trans "New Account" %}</a>
+      <a href="{% url 'accounts:statement_all' current_book.pk %}" class="ca-btn ghost"><i data-lucide="printer"></i>{% trans "Print statement" %}</a>
+      <a href="{% url 'accounts:create' current_book.pk %}" class="ca-btn primary"><i data-lucide="plus"></i>{% trans "New Account" %}</a>
     </div>
   </div>
 
@@ -299,7 +299,7 @@
         </select>
       </label>
 
-      <a class="ca-reset" href="{% url 'accounts:list' %}">{% trans "Clear" %}</a>
+      <a class="ca-reset" href="{% url 'accounts:list' current_book.pk %}">{% trans "Clear" %}</a>
     </div>
   </form>
 

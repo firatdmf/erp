@@ -202,7 +202,7 @@
 
   <!-- CRUMBS -->
   <div class="cd-crumbs">
-    <a class="cd-back" href="{% url 'accounts:list' %}">
+    <a class="cd-back" href="{% url 'accounts:list' cari.book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "All Accounts" %}
     </a>
     <span class="cd-sep">/</span>
@@ -240,7 +240,7 @@
       <a class="cd-btn ghost" href="{% url 'accounts:statement' cari.pk %}"><i data-lucide="file-text"></i>{% trans "Statement" %}</a>
       <a class="cd-btn ghost" href="{% url 'accounts:edit' cari.pk %}"><i data-lucide="edit-3"></i>{% trans "Edit" %}</a>
       <a class="cd-btn ghost" href="{% url 'accounts:movement_create' cari.pk %}"><i data-lucide="plus-circle"></i>{% trans "Movement" %}</a>
-      <a class="cd-btn primary" href="{% url 'accounts:invoice_create' %}?account={{ cari.pk }}"><i data-lucide="file-plus"></i>{% trans "New Invoice" %}</a>
+      <a class="cd-btn primary" href="{% url 'accounts:invoice_create' cari.book.pk %}?account={{ cari.pk }}"><i data-lucide="file-plus"></i>{% trans "New Invoice" %}</a>
     </div>
   </div>
 
@@ -271,10 +271,10 @@
             <h3>{% trans "Quick Actions" %}</h3>
           </div>
           <div style="display:flex; gap:8px; flex-wrap: wrap;">
-            <a class="cd-btn primary" href="{% url 'accounts:invoice_create' %}?account={{ cari.pk }}"><i data-lucide="file-plus"></i>{% trans "Issue Invoice" %}</a>
-            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FFFAF0, #FFFFFF); border-color: #FED7AA; color: #B27500;" href="{% url 'accounts:payment_create' %}?account={{ cari.pk }}&type=collection"><i data-lucide="wallet"></i>{% trans "Take Payment" %}</a>
-            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FEF2F2, #FFFFFF); border-color: #FECACA; color: #B91C1C;" href="{% url 'accounts:payment_create' %}?account={{ cari.pk }}&type=payment"><i data-lucide="banknote"></i>{% trans "Make Payment" %}</a>
-            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #F5F3FF, #FFFFFF); border-color: #DDD6FE; color: #7E22CE;" href="{% url 'accounts:check_create' %}?account={{ cari.pk }}"><i data-lucide="scroll-text"></i>{% trans "Check / Note" %}</a>
+            <a class="cd-btn primary" href="{% url 'accounts:invoice_create' cari.book.pk %}?account={{ cari.pk }}"><i data-lucide="file-plus"></i>{% trans "Issue Invoice" %}</a>
+            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FFFAF0, #FFFFFF); border-color: #FED7AA; color: #B27500;" href="{% url 'accounts:payment_create' cari.book.pk %}?account={{ cari.pk }}&type=collection"><i data-lucide="wallet"></i>{% trans "Take Payment" %}</a>
+            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FEF2F2, #FFFFFF); border-color: #FECACA; color: #B91C1C;" href="{% url 'accounts:payment_create' cari.book.pk %}?account={{ cari.pk }}&type=payment"><i data-lucide="banknote"></i>{% trans "Make Payment" %}</a>
+            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #F5F3FF, #FFFFFF); border-color: #DDD6FE; color: #7E22CE;" href="{% url 'accounts:check_create' cari.book.pk %}?account={{ cari.pk }}"><i data-lucide="scroll-text"></i>{% trans "Check / Note" %}</a>
             <a class="cd-btn ghost" href="{% url 'accounts:movement_create' cari.pk %}"><i data-lucide="plus-circle"></i>{% trans "Add Movement" %}</a>
           </div>
         </div>
@@ -335,7 +335,7 @@
           <div class="cd-sect-h">
             <span class="ico"><i data-lucide="file-text"></i></span>
             <h3>{% trans "Recent Invoices" %}</h3>
-            <a href="{% url 'accounts:invoice_list' %}?account={{ cari.pk }}" class="all">{% trans "All" %} →</a>
+            <a href="{% url 'accounts:invoice_list' cari.book.pk %}?account={{ cari.pk }}" class="all">{% trans "All" %} →</a>
           </div>
         </div>
         <table class="cd-tbl">

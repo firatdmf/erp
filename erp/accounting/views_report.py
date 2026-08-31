@@ -77,7 +77,7 @@ class AgingReport(View):
     def get(self, request):
         today = timezone.now().date()
 
-        book_id = request.GET.get("book") or ""
+        book_id = str(request.book.pk)
         kind = request.GET.get("kind") or "receivable"   # receivable | payable
 
         # Open invoices with balance > 0, not draft/cancelled
@@ -157,7 +157,7 @@ class TrialBalance(View):
         today = timezone.now().date()
         date_from = request.GET.get("date_from") or ""
         date_to   = request.GET.get("date_to")   or today.isoformat()
-        book_id   = request.GET.get("book") or ""
+        book_id   = str(request.book.pk)
         zero_filter = request.GET.get("zero") or "hide"   # show | hide
 
         if not date_from:
@@ -225,7 +225,7 @@ class CreditLimitReport(View):
     template_name = "accounts/report_credit_limit.html"
 
     def get(self, request):
-        book_id = request.GET.get("book") or ""
+        book_id = str(request.book.pk)
         view = request.GET.get("view") or "over"  # over | near | all
 
         qs = (CariAccount.objects
@@ -277,7 +277,7 @@ class DueCalendar(View):
 
     def get(self, request):
         today = timezone.now().date()
-        book_id = request.GET.get("book") or ""
+        book_id = str(request.book.pk)
         kind = request.GET.get("kind") or "receivable"
 
         qs = (Invoice.objects

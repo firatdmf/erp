@@ -1526,7 +1526,7 @@
           <div style="display:flex; align-items:center; gap:8px;">
             {% if not has_active_invoice %}
               {% if order.order_status == "shipped" or order.order_status == "in_transit" or order.order_status == "out_for_delivery" or order.order_status == "delivered" %}
-              <a href="{% url 'accounts:invoice_create' %}?order={{ order.pk }}"
+              <a href="{% url 'accounts:legacy_invoice_create' %}?order={{ order.pk }}"
                  class="od-link"
                  style="font-size: 11.5px; padding:5px 10px; background:#147F74; color:#fff; border-radius:6px;"
                  title="{% trans 'Create invoice from this order' %}">

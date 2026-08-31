@@ -121,7 +121,7 @@
 <div class="ag">
 
   <div class="ag-crumbs no-print">
-    <a class="ag-back" href="{% url 'accounts:report_index' %}">
+    <a class="ag-back" href="{% url 'accounts:report_index' current_book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "Reports" %}
     </a>
     <span class="ag-sep">/</span>

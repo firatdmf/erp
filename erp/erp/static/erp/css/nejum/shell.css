@@ -857,3 +857,67 @@ button.primary:hover {
 h1 { font: 700 30px var(--font-sans, 'Plus Jakarta Sans'); letter-spacing: -0.015em; color: var(--gray-800, #1B2128); }
 h2 { font: 700 24px var(--font-sans, 'Plus Jakarta Sans'); letter-spacing: -0.01em; color: var(--gray-800, #1B2128); }
 h3 { font: 600 20px var(--font-sans, 'Plus Jakarta Sans'); color: var(--gray-800, #1B2128); }
+
+/* ---------- Working book ----------
+   Which business the reader is in, directly under the logo. The rail is
+   88px, so the name wraps like .nj-label rather than truncating — a book
+   called "Ergene Fabric" must not read as "Ergene F…" when the whole
+   point is to tell two businesses apart at a glance. */
+.nj-book {
+  position: relative;
+  flex-shrink: 0;
+  margin: 0 4px 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #EEF2F4;
+}
+.nj-book-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 5px 2px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 128, 128, 0.07);
+  color: #33474F;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+}
+.nj-book-btn.is-static { cursor: default; }
+.nj-book-btn:not(.is-static):hover { background: rgba(0, 128, 128, 0.14); }
+.nj-book-btn svg { width: 14px; height: 14px; color: var(--nejum-teal-500, #008080); }
+.nj-book-name {
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: normal;
+  word-break: keep-all;
+}
+.nj-book-caret { width: 10px !important; height: 10px !important; opacity: 0.55; }
+
+/* Fixed, like the nav flyouts, so the rail's overflow cannot clip it. */
+.nj-book-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 6px);
+  z-index: 60;
+  min-width: 172px;
+  padding: 5px;
+  border: 1px solid #E3E9EC;
+  border-radius: 10px;
+  background: #FFF;
+  box-shadow: 0 8px 24px rgba(15, 23, 31, 0.14);
+}
+.nj-book-opt {
+  display: block;
+  padding: 7px 10px;
+  border-radius: 7px;
+  color: #33474F;
+  font-size: 12.5px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.nj-book-opt:hover { background: rgba(0, 128, 128, 0.10); }
+.nj-book-opt.is-current { font-weight: 700; color: var(--nejum-teal-600, #006666); }

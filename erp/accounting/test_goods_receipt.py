@@ -26,12 +26,14 @@ class GoodsReceiptPageTest(TestCase):
 
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
+        self.user.member.books.add(self.book)
         self.cari = CariAccount.objects.create(
             book=self.book, code="CARI-001", name="Kızılırmak", type="supplier",
             default_currency=self.usd,
         )
 
-        self.depot = Warehouse.objects.create(name="Fabrika")
+        self.depot = Warehouse.objects.create(name="Fabrika",
+                                              accounting_book=self.book)
         self.store = Warehouse.objects.create(name="Laleli")
         # Combined ("ortak") warehouses hold no stock of their own — nothing
         # can be received into one, so the picker must not offer it.
@@ -61,7 +63,7 @@ class GoodsReceiptPageTest(TestCase):
 
     # ── New ──────────────────────────────────────────────────────────
     def test_new_page_renders_with_a_warehouse_picker(self):
-        r = self.client.get(reverse("accounts:goods_receipt"))
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         self.assertEqual(r.status_code, 200)
         self.assertTemplateUsed(r, "accounts/goods_receipt_form.html")
         self.assertContains(r, 'id="npWarehouse"')
@@ -69,16 +71,16 @@ class GoodsReceiptPageTest(TestCase):
         self.assertNotContains(r, "Hepsi")          # combined view isn't intake-able
 
     def test_new_page_preselects_the_warehouse_it_was_opened_from(self):
-        r = self.client.get(reverse("accounts:goods_receipt"), {"warehouse": self.store.pk})
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}), {"warehouse": self.store.pk})
         self.assertContains(r, f'<option value="{self.store.pk}" selected')
 
     def test_new_page_offers_no_default_when_several_warehouses_exist(self):
-        r = self.client.get(reverse("accounts:goods_receipt"))
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         self.assertIsNone(r.context["selected_warehouse_id"])
 
     def test_new_page_preselects_the_only_warehouse(self):
         self.store.delete()
-        r = self.client.get(reverse("accounts:goods_receipt"))
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         self.assertEqual(r.context["selected_warehouse_id"], self.depot.pk)
 
     # ── Edit ─────────────────────────────────────────────────────────
@@ -107,15 +109,15 @@ class GoodsReceiptPageTest(TestCase):
     # ── Entry points ────────────────────────────────────────────────
     def test_purchases_list_links_to_the_form(self):
         inv = self._purchase(self.store, number="PO-3")
-        r = self.client.get(reverse("accounts:purchase_order_list"))
-        self.assertContains(r, reverse("accounts:goods_receipt"))
+        r = self.client.get(reverse("accounts:purchase_order_list", kwargs={"book_id": self.book.pk}))
+        self.assertContains(r, reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         self.assertContains(r, reverse("accounts:goods_receipt_edit", args=[inv.pk]))
 
     def test_warehouse_page_sends_intake_to_the_form(self):
         r = self.client.get(reverse("operating:warehouse_detail", args=[self.depot.pk]))
         self.assertEqual(r.status_code, 200)
         self.assertContains(
-            r, f'{reverse("accounts:goods_receipt")}?warehouse={self.depot.pk}')
+            r, f'{reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk})}?warehouse={self.depot.pk}')
         # The sidebar it replaced is gone for good.
         self.assertNotContains(r, "newProductOverlay")
 

@@ -1918,7 +1918,13 @@ class OrderPrint(DetailView):
         items = []
         total = Decimal("0.00")
         total_qty = Decimal("0")
-        for it in order.items.all().select_related("product", "product_variant"):
+        # The variant's attributes are a M2M, so they are prefetched
+        # rather than joined — one extra query for the order, not one per
+        # line. Same shape _pack_roll_rows uses.
+        attr_values = "product_variant_attribute_values__product_variant_attribute"
+        for it in (order.items.all()
+                   .select_related("product", "product__category", "product_variant")
+                   .prefetch_related(f"product_variant__{attr_values}")):
             qty = it.quantity or Decimal("0")
             price = it.price or Decimal("0")
             # Half up, matching InvoiceItem.compute — an order line and
@@ -1927,6 +1933,27 @@ class OrderPrint(DetailView):
                 Decimal("0.01"), rounding=ROUND_HALF_UP)
             it.line_total_calc = line_total
             it.pack_count = len(packs_by_item.get(it.pk, ()))
+            # What KIND of goods the line is ("Fabric"). Same helper the
+            # packing list and the invoice print use, so a customer
+            # holding all three documents reads the same word. Its "-"
+            # for an unclassified product becomes None here: the packing
+            # list has a column to fill, this layout has a line it can
+            # simply leave out.
+            label = _product_type_label(it.product)
+            it.product_type_label = None if label == "-" else label
+            # Which variant, by NAME ("Bej-Gümüş") rather than by the
+            # SKU the row used to show: MRK00061 tells a customer
+            # nothing about the colour they ordered. Same helper, and so
+            # the same word, as the packing list's variant column.
+            variant = _variant_label(
+                it.product_variant if it.product_variant_id else None)
+            it.variant_label = None if variant == "-" else variant
+            # Mill-coded products are titled with their own code, so the
+            # name line would otherwise read "MT-3016 MT-3016". Same rule
+            # the intake picker applies to its result rows.
+            sku = (it.product.sku or "").strip()
+            title = (it.product.title or "").strip()
+            it.sku_label = None if sku.upper() == title.upper() else (sku or None)
             items.append(it)
             total += line_total
             total_qty += qty

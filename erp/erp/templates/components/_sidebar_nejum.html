@@ -17,6 +17,39 @@
   </a>
 
   {% comment %}
+    Which book the reader is in. Several businesses run on one install and
+    the ledger pages now name their book in the path, so the answer has to
+    be visible before you click — otherwise you find out which company's
+    money you were looking at only afterwards.
+
+    Members with one book see a label; those with several get a switcher.
+    `current_book` and `my_books` come from accounting.book_scope.
+  {% endcomment %}
+  {% if current_book %}
+  <div class="nj-book" data-book="{{ current_book.pk }}">
+    {% if my_books|length > 1 %}
+    <button type="button" class="nj-book-btn" aria-haspopup="true" aria-expanded="false">
+      <i data-lucide="book-open"></i>
+      <span class="nj-book-name">{{ current_book.name }}</span>
+      <i data-lucide="chevron-down" class="nj-book-caret"></i>
+    </button>
+    <div class="nj-book-menu" hidden>
+      {% for b in my_books %}
+      <a class="nj-book-opt{% if b.pk == current_book.pk %} is-current{% endif %}"
+         href="{% url 'accounts:list' b.pk %}"
+         data-work-url="{% url 'accounting:set_my_working_book' b.pk %}">{{ b.name }}</a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <span class="nj-book-btn is-static">
+      <i data-lucide="book-open"></i>
+      <span class="nj-book-name">{{ current_book.name }}</span>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% comment %}
     Every entry comes from erp/nav.py — the SAME list the mobile drawer
     renders, so the two menus cannot drift apart again. A section with
     `groups` is a hover flyout; one without is a plain tile. `key`
@@ -183,6 +216,49 @@
       // Keep arrow + position correct on resize
       window.addEventListener('resize', function() {
         if (openItem) position(openItem);
+      });
+    });
+  })();
+</script>
+
+<script>
+  // The book switcher. Picking a book both navigates to its ledger and
+  // records it as the member's working book, so every book-less entry
+  // point afterwards — the sidebar, a CRM record, a cron-less import —
+  // resolves to the same place the reader last chose.
+  (function () {
+    var root = document.querySelector('.nj-book');
+    if (!root) return;
+    var btn = root.querySelector('.nj-book-btn:not(.is-static)');
+    var menu = root.querySelector('.nj-book-menu');
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = !menu.hidden;
+      menu.hidden = open;
+      btn.setAttribute('aria-expanded', String(!open));
+    });
+    document.addEventListener('click', function () {
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    });
+
+    menu.querySelectorAll('.nj-book-opt').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+        fetch(a.dataset.workUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrf ? csrf.value : '',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        })
+          // Navigate either way: the page the reader asked for is the
+          // point, and a working book that failed to save is a
+          // preference lost, not a page they may not see.
+          .finally(function () { window.location.href = a.href; });
       });
     });
   })();

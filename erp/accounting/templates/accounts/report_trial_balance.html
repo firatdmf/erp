@@ -102,7 +102,7 @@
 <div class="tb">
 
   <div class="tb-crumbs no-print">
-    <a class="tb-back" href="{% url 'accounts:report_index' %}">
+    <a class="tb-back" href="{% url 'accounts:report_index' current_book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "Reports" %}
     </a>
     <span class="tb-sep">/</span>

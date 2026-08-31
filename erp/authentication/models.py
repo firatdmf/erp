@@ -57,9 +57,9 @@ class Member(models.Model):
     # entered it, not about the server. Staff at the Laleli branch enter
     # Laleli's orders whatever anybody else is doing at the same moment.
     #
-    # Null → fall back to Book.is_default_cari_target, so a member who
-    # has never picked one still books somewhere sensible rather than
-    # being blocked. See accounting.services_accounts.get_default_book.
+    # Null → fall back to their first assigned book, so a member who has
+    # never picked one still books somewhere sensible rather than being
+    # blocked. See accounting.services_accounts.get_default_book.
     default_book = models.ForeignKey(
         "accounting.Book",
         on_delete=models.SET_NULL,
@@ -67,6 +67,22 @@ class Member(models.Model):
         related_name="members",
         verbose_name="Working book",
         help_text="Orders this member creates are booked here.",
+    )
+
+    # Which books this member may work in at all. `default_book` is the one
+    # of them they are working in right now — most people have exactly one
+    # and never think about it; an admin holds several and switches.
+    #
+    # This is a permission boundary, not a convenience: the ledger views
+    # filter on it, so a book that is not assigned is not reachable by
+    # typing its id into the URL. Superusers are assigned every book
+    # implicitly — see accounting.services_accounts.member_books.
+    books = models.ManyToManyField(
+        "accounting.Book",
+        related_name="assigned_members",
+        blank=True,
+        verbose_name="Assigned books",
+        help_text="Books this member may work in.",
     )
 
     def __str__(self):

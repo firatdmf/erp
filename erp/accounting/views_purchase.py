@@ -59,8 +59,14 @@ class PurchaseOrderList(View):
     template_name = "accounts/purchase_order_list.html"
 
     def get(self, request):
+        # One book's purchases, not every book's. The route is
+        # books/<id>/purchases/, so book_scoped has already resolved
+        # request.book; without this filter the page listed all 10
+        # purchase invoices under whichever book you opened it in and
+        # summed their totals into that book's figure — Ergene showing
+        # Laleli's suppliers and Laleli's money.
         qs = (
-            Invoice.objects.filter(type="purchase")
+            Invoice.objects.filter(type="purchase", book=request.book)
             .select_related("cari", "currency")
             .order_by("-date", "-id")
         )
@@ -96,8 +102,10 @@ class PurchaseOrderList(View):
 
         totals = qs.aggregate(total_sum=Sum("total"))
 
+        # Scoped too: the filter dropdown must not offer a supplier
+        # whose invoices this page can never show.
         suppliers = (
-            Invoice.objects.filter(type="purchase")
+            Invoice.objects.filter(type="purchase", book=request.book)
             .values("cari_id", "cari__name")
             .distinct()
             .order_by("cari__name")
@@ -197,7 +205,12 @@ class GoodsReceipt(View):
         invoice = None          # an ISSUED purchase: rolls exist, identity locked
         order = None            # a DRAFT order: nothing received yet, fully editable
         selected_id = None
-        back_url = reverse("accounts:purchase_order_list")
+        # The scoped route (books/<id>/purchases/new/) names a book; the
+        # edit route addresses a document instead, and picks its book up
+        # from the document below.
+        back_url = (reverse("accounts:purchase_order_list",
+                            kwargs={"book_id": request.book.pk})
+                    if getattr(request, "book", None) else "")
 
         if pk is not None:
             doc = get_object_or_404(
@@ -207,6 +220,12 @@ class GoodsReceipt(View):
             if doc.status == "cancelled":
                 messages.warning(request, _("A cancelled purchase can no longer be edited."))
                 return redirect("accounts:purchase_order_detail", pk=doc.pk)
+            # Editing reaches this view through an object URL, which names
+            # no book — the document's own is the right one, and setting it
+            # here keeps every book-scoped link on the page pointing at the
+            # purchase's book rather than at whatever the editor happens to
+            # be working in.
+            request.book = doc.book
             back_url = reverse("accounts:purchase_order_detail", args=[doc.pk])
 
             if doc.status == "draft":

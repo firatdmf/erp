@@ -108,7 +108,7 @@ NAV_SECTIONS = [
                 {"label": _("View ledgers"),   "icon": "book",            "url": "accounting:index"},
                 {"label": _("Create ledger"),  "icon": "plus-circle",     "action": "openBookSidebar"},
                 # Turkish-only label, deliberately not translated.
-                {"label": "Perakende Satışları", "icon": "shopping-basket", "url": "accounts:retail"},
+                {"label": "Perakende Satışları", "icon": "shopping-basket", "url": "accounts:legacy_retail"},
             ]},
             {"title": _("ENTRIES"), "items": [
                 {"label": _("Add capital"),       "icon": "circle-plus",   "url": "accounting:go_add_capital"},
@@ -125,20 +125,20 @@ NAV_SECTIONS = [
                 {"label": _("Currency exchange"),  "icon": "refresh-cw", "url": "accounting:go_currency_exchange"},
             ]},
             {"title": _("CURRENT ACCOUNTS"), "items": [
-                {"label": _("All Accounts"), "icon": "id-card",   "url": "accounts:list"},
-                {"label": _("New Account"),  "icon": "user-plus", "url": "accounts:create"},
+                {"label": _("All Accounts"), "icon": "id-card",   "url": "accounts:legacy_list"},
+                {"label": _("New Account"),  "icon": "user-plus", "url": "accounts:legacy_create"},
             ]},
             {"title": _("INVOICES"), "items": [
-                {"label": _("All Invoices"), "icon": "file-text", "url": "accounts:invoice_list"},
-                {"label": _("New Invoice"),  "icon": "file-plus", "url": "accounts:invoice_create"},
+                {"label": _("All Invoices"), "icon": "file-text", "url": "accounts:legacy_invoice_list"},
+                {"label": _("New Invoice"),  "icon": "file-plus", "url": "accounts:legacy_invoice_create"},
             ]},
             {"title": _("COLLECTION / PAYMENT"), "items": [
-                {"label": _("All Payments"),              "icon": "wallet",     "url": "accounts:payment_list"},
-                {"label": _("New Collection / Payment"),  "icon": "hand-coins", "url": "accounts:payment_create"},
+                {"label": _("All Payments"),              "icon": "wallet",     "url": "accounts:legacy_payment_list"},
+                {"label": _("New Collection / Payment"),  "icon": "hand-coins", "url": "accounts:legacy_payment_create"},
             ]},
             {"title": _("CHECK / PROMISSORY NOTE"), "items": [
-                {"label": _("Portfolio"),          "icon": "scroll-text", "url": "accounts:check_list"},
-                {"label": _("New Check / Note"),   "icon": "plus-circle", "url": "accounts:check_create"},
+                {"label": _("Portfolio"),          "icon": "scroll-text", "url": "accounts:legacy_check_list"},
+                {"label": _("New Check / Note"),   "icon": "plus-circle", "url": "accounts:legacy_check_create"},
             ]},
             {"title": _("SHARES"), "items": [
                 {"label": _("Cap table"),        "icon": "pie-chart", "url": "accounting:go_cap_table"},
@@ -146,11 +146,11 @@ NAV_SECTIONS = [
             ]},
             {"title": _("REPORTS"), "items": [
                 {"label": _("Sales dashboard"), "icon": "bar-chart-3",    "url": "accounting:sales_dashboard"},
-                {"label": _("Report Center"), "icon": "pie-chart",      "url": "accounts:report_index"},
-                {"label": _("Aging"),         "icon": "clock",          "url": "accounts:report_aging"},
-                {"label": _("Trial Balance"), "icon": "layout-grid",    "url": "accounts:report_trial_balance"},
-                {"label": _("Due Calendar"),  "icon": "calendar-clock", "url": "accounts:report_due_calendar"},
-                {"label": _("Credit Limit"),  "icon": "shield-alert",   "url": "accounts:report_credit_limit"},
+                {"label": _("Report Center"), "icon": "pie-chart",      "url": "accounts:legacy_report_index"},
+                {"label": _("Aging"),         "icon": "clock",          "url": "accounts:legacy_report_aging"},
+                {"label": _("Trial Balance"), "icon": "layout-grid",    "url": "accounts:legacy_report_trial_balance"},
+                {"label": _("Due Calendar"),  "icon": "calendar-clock", "url": "accounts:legacy_report_due_calendar"},
+                {"label": _("Credit Limit"),  "icon": "shield-alert",   "url": "accounts:legacy_report_credit_limit"},
             ]},
             {"title": _("HELP"), "items": [
                 {"label": _("User Guide"), "emoji": "📘", "icon": "book-open", "url": "accounts:help"},
@@ -209,10 +209,10 @@ NAV_SECTIONS = [
         "icon": "shopping-basket",
         "groups": [
             {"title": _("PURCHASING"), "items": [
-                {"label": _("Purchases"),         "icon": "package-plus", "url": "accounts:invoice_list",
+                {"label": _("Purchases"),         "icon": "package-plus", "url": "accounts:legacy_invoice_list",
                  "query": "?type=purchase"},
                 {"label": _("Purchase requests"), "icon": "file-text",    "url": "procurement:request_list"},
-                {"label": _("Purchase orders"),   "icon": "receipt",      "url": "accounts:purchase_order_list"},
+                {"label": _("Purchase orders"),   "icon": "receipt",      "url": "accounts:legacy_purchase_order_list"},
             ]},
             {"title": _("SUPPLIERS"), "items": [
                 {"label": _("Supplier list"), "icon": "truck",       "url": "crm:supplier_list"},

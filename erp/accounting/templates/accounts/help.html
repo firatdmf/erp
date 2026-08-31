@@ -147,16 +147,16 @@
 
       <h3>{% trans "First 3 steps" %}</h3>
       <ol>
-        <li>{% url 'accounts:create' as cari_create_url %}{% blocktrans %}<strong>Open an account card:</strong> <a href="{{ cari_create_url }}">New Account</a> → select customer or supplier, enter the previous opening balance if any.{% endblocktrans %}</li>
+        <li>{% url 'accounts:legacy_create' as cari_create_url %}{% blocktrans %}<strong>Open an account card:</strong> <a href="{{ cari_create_url }}">New Account</a> → select customer or supplier, enter the previous opening balance if any.{% endblocktrans %}</li>
         <li>{% blocktrans %}<strong>Issue an invoice:</strong> On the account page, <strong>"Issue Invoice"</strong> purple button → add line items → <strong>"Save & Issue"</strong>.{% endblocktrans %}</li>
         <li>{% blocktrans %}<strong>Take a collection:</strong> On the account page, <strong>"Take Collection"</strong> green button → open invoices are listed automatically, match them.{% endblocktrans %}</li>
       </ol>
       <p>{% trans "That's all. Balance, statement, and status update automatically." %}</p>
 
       <div>
-        <a class="btn-cta" href="{% url 'accounts:list' %}"><i data-lucide="users" style="width:14px; height:14px;"></i> {% trans "Account List" %}</a>
-        <a class="btn-cta green" href="{% url 'accounts:invoice_create' %}"><i data-lucide="file-plus" style="width:14px; height:14px;"></i> {% trans "New Invoice" %}</a>
-        <a class="btn-cta purple" href="{% url 'accounts:check_list' %}"><i data-lucide="scroll-text" style="width:14px; height:14px;"></i> {% trans "Check Portfolio" %}</a>
+        <a class="btn-cta" href="{% url 'accounts:legacy_list' %}"><i data-lucide="users" style="width:14px; height:14px;"></i> {% trans "Account List" %}</a>
+        <a class="btn-cta green" href="{% url 'accounts:legacy_invoice_create' %}"><i data-lucide="file-plus" style="width:14px; height:14px;"></i> {% trans "New Invoice" %}</a>
+        <a class="btn-cta purple" href="{% url 'accounts:legacy_check_list' %}"><i data-lucide="scroll-text" style="width:14px; height:14px;"></i> {% trans "Check Portfolio" %}</a>
       </div>
 
       <hr>
@@ -222,19 +222,19 @@
 
       <div class="scenario" id="sen-e">
         <h4>{% trans 'E — "Who owes me, how much is overdue?"' %}</h4>
-        <p>{% url 'accounts:report_aging' as aging_url %}{% blocktrans %}<a href="{{ aging_url }}">Aging Report</a> → All open receivables are split into <code>0-30 / 30-60 / 60-90 / 90+ days</code> buckets.{% endblocktrans %}</p>
+        <p>{% url 'accounts:legacy_report_aging' as aging_url %}{% blocktrans %}<a href="{{ aging_url }}">Aging Report</a> → All open receivables are split into <code>0-30 / 30-60 / 60-90 / 90+ days</code> buckets.{% endblocktrans %}</p>
       </div>
 
       <div class="scenario" id="sen-f">
         <h4>{% trans 'F — "Which invoice is due soon?"' %}</h4>
-        <p>{% url 'accounts:report_due_calendar' as due_calendar_url %}{% blocktrans %}<a href="{{ due_calendar_url }}">Due Calendar</a> → Lists in groups: Overdue / This Week / Next Week / This Month / Later.{% endblocktrans %}</p>
+        <p>{% url 'accounts:legacy_report_due_calendar' as due_calendar_url %}{% blocktrans %}<a href="{{ due_calendar_url }}">Due Calendar</a> → Lists in groups: Overdue / This Week / Next Week / This Month / Later.{% endblocktrans %}</p>
       </div>
 
       <div class="scenario" id="sen-g">
         <h4>{% trans "G — Credit limit control for customers" %}</h4>
         <ol>
           <li>{% blocktrans %}Edit the account card → enter an amount in the <strong>Credit Limit</strong> field (e.g., 10,000){% endblocktrans %}</li>
-          <li>{% url 'accounts:report_credit_limit' as credit_limit_url %}{% blocktrans %}<a href="{{ credit_limit_url }}">Credit Limit Report</a> → all customers with a limit usage percentage{% endblocktrans %}</li>
+          <li>{% url 'accounts:legacy_report_credit_limit' as credit_limit_url %}{% blocktrans %}<a href="{{ credit_limit_url }}">Credit Limit Report</a> → all customers with a limit usage percentage{% endblocktrans %}</li>
           <li>{% blocktrans %}Customers above 80 percent usage receive a "Limit Exceeded" / "Approaching" badge{% endblocktrans %}</li>
         </ol>
       </div>
@@ -281,7 +281,7 @@
       <h2 id="kart">{% trans "📇 Account Card" %}</h2>
 
       <h3>{% trans "Opening" %}</h3>
-      <p>{% url 'accounts:create' as cari_create_url2 %}{% blocktrans %}Opened from the <a href="{{ cari_create_url2 }}">New Account</a> page.{% endblocktrans %}</p>
+      <p>{% url 'accounts:legacy_create' as cari_create_url2 %}{% blocktrans %}Opened from the <a href="{{ cari_create_url2 }}">New Account</a> page.{% endblocktrans %}</p>
       <p>{% blocktrans %}<strong>Required:</strong> Name, Type, Book, Currency.{% endblocktrans %}</p>
       <p>{% blocktrans %}<strong>Recommended (tax & risk):</strong>{% endblocktrans %}</p>
       <ul>
@@ -396,7 +396,7 @@
       <hr>
 
       <h2 id="rapor">{% trans "📊 Reports" %}</h2>
-      <p>{% url 'accounts:report_index' as report_index_url %}{% blocktrans %}<a href="{{ report_index_url }}">Report Center</a> → 4 major reports:{% endblocktrans %}</p>
+      <p>{% url 'accounts:legacy_report_index' as report_index_url %}{% blocktrans %}<a href="{{ report_index_url }}">Report Center</a> → 4 major reports:{% endblocktrans %}</p>
 
       <h3>{% trans "Aging" %}</h3>
       <ul>

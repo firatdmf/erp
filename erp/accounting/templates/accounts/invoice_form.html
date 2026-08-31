@@ -202,7 +202,7 @@
 
   <!-- CRUMBS -->
   <div class="if-crumbs">
-    <a class="if-back" href="{% url 'accounts:invoice_list' %}">
+    <a class="if-back" href="{% url 'accounts:invoice_list' current_book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "Invoices" %}
     </a>
     {% if invoice %}
@@ -245,7 +245,7 @@
                 <i data-lucide="user"></i>
                 <span class="code">{{ prefilled_cari.code }}</span>
                 <span class="name">{{ prefilled_cari.name }}</span>
-                {% if not invoice %}<a href="{% url 'accounts:invoice_create' %}" class="change">{% trans "change" %}</a>{% endif %}
+                {% if not invoice %}<a href="{% url 'accounts:invoice_create' current_book.pk %}" class="change">{% trans "change" %}</a>{% endif %}
               </div>
             </div>
             {% else %}
@@ -256,7 +256,7 @@
                   <option value="">{% trans "— Select account —" %}</option>
                   {% for c in cari_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
                 </select>
-                <span class="hint">{% trans "If no account exists, first" %} <a href="{% url 'accounts:create' %}">{% trans "open a new account" %}</a>.</span>
+                <span class="hint">{% trans "If no account exists, first" %} <a href="{% url 'accounts:create' current_book.pk %}">{% trans "open a new account" %}</a>.</span>
               </div>
             </div>
             {% endif %}
@@ -503,7 +503,7 @@
               </div>
 
               <div class="if-actions">
-                <a href="{% url 'accounts:invoice_list' %}" class="if-btn ghost">{% trans "Cancel" %}</a>
+                <a href="{% url 'accounts:invoice_list' current_book.pk %}" class="if-btn ghost">{% trans "Cancel" %}</a>
                 <button type="submit" class="if-btn primary" name="action" value="draft">{% trans "Save as Draft" %}</button>
                 <button type="submit" class="if-btn success" name="auto_issue" value="1">
                   <i data-lucide="check-circle"></i> {% trans "Save & Issue" %}

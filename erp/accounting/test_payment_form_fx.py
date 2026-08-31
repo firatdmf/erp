@@ -35,6 +35,7 @@ class PaymentFormFxTests(TestCase):
             code="TRY", name="Turkish Lira", symbol="₺"
         )
         self.book = Book.objects.create(name="Laleli Fabric", base_currency=self.usd)
+        self.user.member.books.add(self.book)
         self.lira = CashAccount.objects.create(
             book=self.book, name="Cash", currency=self.try_, balance=Decimal("0.00")
         )
@@ -83,14 +84,14 @@ class PaymentFormFxTests(TestCase):
     # -- the form ----------------------------------------------------------
     def test_the_form_tells_the_script_the_books_currency(self):
         response = self.client.get(
-            reverse("accounts:payment_create"), {"account": self.cari.pk}
+            reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}), {"account": self.cari.pk}
         )
         self.assertContains(response, 'id="fxRow"')
         self.assertContains(response, f'"code": "USD"')
 
     def test_the_form_says_null_before_an_account_is_picked(self):
         """No account means no book, so nothing is known to convert to."""
-        response = self.client.get(reverse("accounts:payment_create"))
+        response = self.client.get(reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}))
         self.assertContains(response, "var BASE = null;")
 
     # -- what gets saved ---------------------------------------------------
@@ -109,7 +110,7 @@ class PaymentFormFxTests(TestCase):
             "auto_confirm": "1",
         }
         data.update(overrides)
-        return self.client.post(reverse("accounts:payment_create"), data)
+        return self.client.post(reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}), data)
 
     def test_a_typed_rate_is_stored_and_used(self):
         with mock.patch("accounting.services.get_exchange_rate") as rate:

@@ -105,9 +105,7 @@ def _filter_invoices(request):
     if cari_id.isdigit():
         qs = qs.filter(cari_id=int(cari_id))
 
-    book_id = request.GET.get("book") or ""
-    if book_id.isdigit():
-        qs = qs.filter(book_id=int(book_id))
+    qs = qs.filter(book=request.book)
 
     type_ = request.GET.get("type") or ""
     if type_ in dict(Invoice.INVOICE_TYPES):
@@ -159,7 +157,7 @@ class InvoiceList(View):
             "type_choices":   Invoice.INVOICE_TYPES,
             "status_choices": Invoice.STATUS_CHOICES,
             "q":           request.GET.get("q", ""),
-            "filter_book": request.GET.get("book", ""),
+            "filter_book": str(request.book.pk),
             "filter_type": request.GET.get("type", ""),
             "filter_status": request.GET.get("status", ""),
             "filter_cari": request.GET.get("cari", ""),
@@ -199,7 +197,7 @@ class InvoiceSettingsUpdate(View):
         nxt = request.POST.get("next") or ""
         if nxt.startswith("/"):
             return redirect(nxt)
-        return redirect("accounts:invoice_list")
+        return redirect("accounts:invoice_list", book_id=request.book.pk)
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +297,7 @@ class InvoiceCreate(View):
         cari_id = request.POST.get("account")
         if not cari_id:
             messages.error(request, _g("An account must be selected."))
-            return redirect("accounts:invoice_create")
+            return redirect("accounts:invoice_create", book_id=request.book.pk)
 
         cari = get_object_or_404(CariAccount, pk=int(cari_id))
 
@@ -308,10 +306,10 @@ class InvoiceCreate(View):
             items_data = _parse_items(request.POST.get("items_json", ""))
         except ValueError as e:
             messages.error(request, str(e))
-            return redirect("accounts:invoice_create")
+            return redirect("accounts:invoice_create", book_id=request.book.pk)
         if not items_data:
             messages.error(request, _g("You must add at least one invoice item."))
-            return redirect("accounts:invoice_create")
+            return redirect("accounts:invoice_create", book_id=request.book.pk)
 
         invoice_type = request.POST.get("type") or "sales"
         series = request.POST.get("series") or "INV"
@@ -330,7 +328,7 @@ class InvoiceCreate(View):
                 due_date = (d + timedelta(days=cari.payment_term_days)).isoformat()
         except ValueError:
             messages.error(request, _g("Invalid date."))
-            return redirect("accounts:invoice_create")
+            return redirect("accounts:invoice_create", book_id=request.book.pk)
 
         # If invoice is being created from an operating Order, capture
         # the link so we can pre-fill from it next time and join the
@@ -733,6 +731,7 @@ class InvoiceDelete(View):
             messages.error(request, _g("Only draft invoices can be deleted. Cancel issued invoices instead."))
             return redirect("accounts:invoice_detail", pk=invoice.pk)
         label = invoice.display_number
+        book_id = invoice.book_id       # read before the row goes
         invoice.delete()
         messages.success(request, _g("Draft invoice deleted: %(label)s") % {"label": label})
-        return redirect("accounts:invoice_list")
+        return redirect("accounts:invoice_list", book_id=book_id)

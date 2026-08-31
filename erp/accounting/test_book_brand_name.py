@@ -12,7 +12,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book
-from accounting.services_accounts import brand_name_for
+from accounting.services_accounts import brand_name_for, get_default_book
 
 
 class BookBrandNameField(TestCase):
@@ -39,10 +39,17 @@ class BookBrandNameField(TestCase):
                          self.book.effective_brand_name)
         self.assertNotEqual(other.name, self.book.name)
 
-    def test_the_resolver_picks_the_flagged_book(self):
-        self.book.make_default_cari_target()
+    def test_the_resolver_picks_the_acting_members_book(self):
+        """A document signs with the name of the business that issued
+        it, and which business that is follows the person issuing it."""
         Book.objects.create(name="Side Book", brand_name="Wrong Name")
-        self.assertEqual(brand_name_for(), self.LOCKUP)
+        user = get_user_model().objects.create_user(
+            username="brand_tester", password="pw")
+        member = user.member
+        member.books.set([self.book])
+        member.default_book = self.book
+        member.save(update_fields=["default_book"])
+        self.assertEqual(brand_name_for(get_default_book(member)), self.LOCKUP)
 
     def test_the_resolver_survives_a_database_with_no_books(self):
         Book.objects.all().delete()
@@ -151,103 +158,80 @@ class InvoiceIssuer(TestCase):
 
 
 class CariLedgerBook(TestCase):
-    """Which book the ledger posts to is a flag on the row, so renaming
-    a book cannot move it."""
+    """Which book work lands in is a fact about the member doing it."""
 
     def setUp(self):
         self.user = get_user_model().objects.create_user(
             username="ledger_tester", password="pw")
         self.client.force_login(self.user)
         Book.objects.all().delete()
-        self.ledger = Book.objects.create(name="Laleli Fabric",
-                                          is_default_cari_target=True)
+        self.ledger = Book.objects.create(name="Laleli Fabric")
         self.other = Book.objects.create(name="Ergene Fabric")
+        self.member = self.user.member
+        self.member.books.set([self.ledger])
+        self.member.default_book = self.ledger
+        self.member.save(update_fields=["default_book"])
 
-    def test_the_flag_wins(self):
+    def test_the_working_book_wins(self):
         self.assertEqual(brand_name_for.__module__, "accounting.services_accounts")
         from accounting.services_accounts import get_default_book
-        self.assertEqual(get_default_book().pk, self.ledger.pk)
+        self.assertEqual(get_default_book(self.member).pk, self.ledger.pk)
 
     def test_renaming_the_book_does_not_move_the_ledger(self):
-        """The whole point: the old resolver matched
-        a book NAME held in settings against Book.name, so this rename
-        silently dropped it to guessing."""
+        """The original resolver matched a book NAME held in settings
+        against Book.name, so a rename silently dropped it to guessing."""
         from accounting.services_accounts import get_default_book
         self.ledger.name = "Something Else Entirely"
         self.ledger.save(update_fields=["name"])
-        self.assertEqual(get_default_book().pk, self.ledger.pk)
+        self.assertEqual(get_default_book(self.member).pk, self.ledger.pk)
 
-    def test_only_one_book_can_hold_it(self):
-        from django.db import IntegrityError, transaction
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                Book.objects.filter(pk=self.other.pk).update(is_default_cari_target=True)
+    def test_a_book_they_lost_access_to_is_not_used(self):
+        """Unassigning a book has to move their work off it too —
+        otherwise the stale FK keeps posting into a book they can no
+        longer open."""
+        from accounting.services_accounts import get_default_book
+        self.member.books.set([self.other])
+        self.assertEqual(get_default_book(self.member).pk, self.other.pk)
 
-    def test_promoting_a_book_demotes_the_old_one(self):
-        self.other.make_default_cari_target()
-        self.ledger.refresh_from_db()
-        self.other.refresh_from_db()
-        self.assertTrue(self.other.is_default_cari_target)
-        self.assertFalse(self.ledger.is_default_cari_target)
+    def test_a_member_who_never_picked_gets_their_assigned_book(self):
+        from accounting.services_accounts import get_default_book
+        self.member.default_book = None
+        self.member.save(update_fields=["default_book"])
+        self.member.books.set([self.other])
+        self.assertEqual(get_default_book(self.member).pk, self.other.pk)
 
-    def test_promoting_is_idempotent(self):
-        self.ledger.make_default_cari_target()
-        self.ledger.refresh_from_db()
-        self.assertTrue(self.ledger.is_default_cari_target)
-        self.assertEqual(Book.objects.filter(is_default_cari_target=True).count(), 1)
+    def test_a_superuser_may_use_any_book(self):
+        from accounting.services_accounts import member_books
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.member.books.clear()
+        self.assertEqual(member_books(self.member).count(), 2)
 
-    def test_the_endpoint_moves_it(self):
-        resp = self.client.post(reverse("accounting:set_default_cari_target",
+    def test_an_unassigned_book_is_refused(self):
+        from accounting.services_accounts import member_can_use_book
+        self.assertFalse(member_can_use_book(self.member, self.other))
+        self.assertTrue(member_can_use_book(self.member, self.ledger))
+
+    def test_the_endpoint_refuses_an_unassigned_book(self):
+        resp = self.client.post(reverse("accounting:set_my_working_book",
+                                        kwargs={"pk": self.other.pk}))
+        self.assertEqual(resp.status_code, 403)
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.default_book_id, self.ledger.pk)
+
+    def test_the_endpoint_moves_the_working_book(self):
+        self.member.books.add(self.other)
+        resp = self.client.post(reverse("accounting:set_my_working_book",
                                         kwargs={"pk": self.other.pk}))
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(json.loads(resp.content)["success"])
-        self.other.refresh_from_db()
-        self.ledger.refresh_from_db()
-        self.assertTrue(self.other.is_default_cari_target)
-        self.assertFalse(self.ledger.is_default_cari_target)
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.default_book_id, self.other.pk)
 
-    def test_an_explicit_id_still_overrides_the_flag(self):
+    def test_memberless_work_uses_the_pinned_id(self):
+        """Cron, imports and the shell have nobody at the keyboard, so
+        CARI_BOOK_ID is the only place left to say which business they
+        belong to."""
         from accounting.services_accounts import get_default_book
         with self.settings(CARI_BOOK_ID=str(self.other.pk)):
-            self.assertEqual(get_default_book().pk, self.other.pk)
-
-    def _give_a_cari_account(self, book):
-        from accounting.models import CurrencyCategory
-        from accounting.models_accounts import CariAccount
-        currency = (CurrencyCategory.objects.filter(code="USD").first()
-                    or CurrencyCategory.objects.create(code="USD", name="USD"))
-        return CariAccount.objects.create(book=book, name="Acme",
-                                          code="CARI-001",
-                                          default_currency=currency)
-
-    def test_no_flagged_book_falls_back_to_account_count(self):
-        from accounting.services_accounts import get_default_book
-        Book.objects.update(is_default_cari_target=False)
-        self._give_a_cari_account(self.other)
-        self.assertEqual(get_default_book().pk, self.other.pk)
-
-    def test_the_fallback_writes_its_answer_down(self):
-        """Step 3 adopts, so the guess is made once and then shows on
-        the book's page where somebody can correct it."""
-        from accounting.services_accounts import get_default_book
-        Book.objects.update(is_default_cari_target=False)
-        self._give_a_cari_account(self.other)
-
-        get_default_book()
-        self.other.refresh_from_db()
-        self.assertTrue(self.other.is_default_cari_target)
-        self.assertEqual(Book.objects.filter(is_default_cari_target=True).count(), 1)
-
-    def test_adopting_never_breaks_the_read(self):
-        """It runs inside order placement; a failed write must not
-        propagate."""
-        from unittest.mock import patch
-        from accounting.services_accounts import get_default_book
-        Book.objects.update(is_default_cari_target=False)
-        self._give_a_cari_account(self.other)
-
-        with patch("django.db.transaction.atomic",
-                   side_effect=RuntimeError("read-only replica")):
-            self.assertEqual(get_default_book().pk, self.other.pk)
-        self.other.refresh_from_db()
-        self.assertFalse(self.other.is_default_cari_target)
+            self.assertEqual(get_default_book(None).pk, self.other.pk)

@@ -127,7 +127,7 @@
 <div class="dc">
 
   <div class="dc-crumbs no-print">
-    <a class="dc-back" href="{% url 'accounts:report_index' %}">
+    <a class="dc-back" href="{% url 'accounts:report_index' current_book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "Reports" %}
     </a>
     <span class="dc-sep">/</span>

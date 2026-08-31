@@ -1021,8 +1021,13 @@
       {% if not warehouse.is_combined %}
       {% comment %}Intake lives on its own page now (accounts:goods_receipt) — a
       delivery is a document, and it's entered the same way from here or from
-      the purchases list. This warehouse is pre-selected there.{% endcomment %}
-      <a class="ord-btn" style="background:linear-gradient(180deg,#C9A75A,#A9852F);color:#fff;border:1px solid #8A6B22;box-shadow:0 1px 2px rgba(15,23,31,0.10),inset 0 1px 0 rgba(255,255,255,0.18);" href="{% url 'accounts:goods_receipt' %}?warehouse={{ warehouse.pk }}">
+      the purchases list. This warehouse is pre-selected there.
+
+      The receipt page belongs to a book. A warehouse that names one sends
+      the delivery there; one that does not falls back to the reader's
+      working book through the redirect.{% endcomment %}
+      {% if warehouse.accounting_book_id %}{% url 'accounts:goods_receipt' warehouse.accounting_book_id as intake_url %}{% else %}{% url 'accounts:legacy_goods_receipt' as intake_url %}{% endif %}
+      <a class="ord-btn" style="background:linear-gradient(180deg,#C9A75A,#A9852F);color:#fff;border:1px solid #8A6B22;box-shadow:0 1px 2px rgba(15,23,31,0.10),inset 0 1px 0 rgba(255,255,255,0.18);" href="{{ intake_url }}?warehouse={{ warehouse.pk }}">
         <i class="fa fa-plus"></i>{% trans "Goods receipt" %}
       </a>
       {% endif %}

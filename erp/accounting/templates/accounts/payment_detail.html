@@ -139,7 +139,7 @@
 
   <!-- CRUMBS -->
   <div class="pd-crumbs">
-    <a class="pd-back" href="{% url 'accounts:payment_list' %}">
+    <a class="pd-back" href="{% url 'accounts:payment_list' payment.book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "Payments" %}
     </a>
     <span class="pd-sep">/</span>

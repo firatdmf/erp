@@ -106,7 +106,7 @@
 {% block content %}
 <div class="cf">
 
-  <a class="cf-back" href="{% url 'accounts:list' %}">
+  <a class="cf-back" href="{% url 'accounts:list' current_book.pk %}">
     <i data-lucide="arrow-left"></i> {% trans "Back to All Accounts" %}
   </a>
 
@@ -311,7 +311,7 @@
           {% endif %}
         </div>
         <div class="cf-foot-r">
-          <a href="{% if cari %}{% url 'accounts:detail' cari.pk %}{% else %}{% url 'accounts:list' %}{% endif %}" class="cf-btn ghost">{% trans "Cancel" %}</a>
+          <a href="{% if cari %}{% url 'accounts:detail' cari.pk %}{% else %}{% url 'accounts:list' current_book.pk %}{% endif %}" class="cf-btn ghost">{% trans "Cancel" %}</a>
           <button type="submit" class="cf-btn primary">
             <i data-lucide="check"></i>
             {% if cari %}{% trans "Save Changes" %}{% else %}{% trans "Create Account" %}{% endif %}

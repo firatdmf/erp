@@ -90,7 +90,7 @@
       <h1 class="po-title">{% trans "Purchase orders" %}</h1>
       <div class="po-sub">{% trans "What was bought, from which supplier, and which physical rolls arrived — not a generic invoice view." %}</div>
     </div>
-    <a class="po-btn primary" href="{% url 'accounts:goods_receipt' %}">
+    <a class="po-btn primary" href="{% url 'accounts:goods_receipt' current_book.pk %}">
       <i data-lucide="package-plus"></i>{% trans "New purchase order" %}
     </a>
   </div>
@@ -164,7 +164,7 @@
     <div class="ico"><i data-lucide="package-search"></i></div>
     <h3>{% trans "No purchases yet" %}</h3>
     <p>{% trans "Write an order down now and receive it when it arrives — or receive a delivery that is already here." %}</p>
-    <a class="po-btn primary" style="margin-top:14px;" href="{% url 'accounts:goods_receipt' %}">
+    <a class="po-btn primary" style="margin-top:14px;" href="{% url 'accounts:goods_receipt' current_book.pk %}">
       <i data-lucide="package-plus"></i>{% trans "New purchase order" %}
     </a>
   </div>

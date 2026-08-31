@@ -35,6 +35,10 @@ class PurchaseOrderFlowTest(TestCase):
         # A Member row is created for every user by a signal.
         self.granted.member.permissions.add(perm)
         self.plain = get_user_model().objects.create_user(username="cuma_t", password="pw")
+        # The admin is a superuser and reaches every book implicitly; the
+        # other two have to be assigned this one.
+        self.granted.member.books.add(self.book)
+        self.plain.member.books.add(self.book)
 
         self.client.force_login(self.admin)
 
@@ -58,7 +62,7 @@ class PurchaseOrderFlowTest(TestCase):
 
     def _save_order(self, plan=None, pk=None):
         url = (reverse("accounts:purchase_order_update", args=[pk]) if pk
-               else reverse("accounts:purchase_order_save"))
+               else reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}))
         return self.client.post(url, data=json.dumps(plan or self._plan()),
                                 content_type="application/json")
 
@@ -173,7 +177,7 @@ class PurchaseOrderFlowTest(TestCase):
         self.assertEqual(c.status_code, 403)
         self.assertFalse(WarehouseProductRoll.objects.exists())
 
-        form = self.client.get(reverse("accounts:goods_receipt"))
+        form = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         self.assertFalse(form.context["can_confirm"])
 
     # ── The printed document ────────────────────────────────────────
@@ -212,7 +216,7 @@ class ReceivedPurchaseEditTest(TestCase):
         self.client.force_login(self.admin)
 
         r = self.client.post(
-            reverse("accounts:purchase_order_save"),
+            reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
             data=json.dumps({
                 "warehouse_id": self.wh.pk, "cari_id": self.cari.pk, "unit": "mt",
                 "date": "2026-08-21", "notes": "first note",
@@ -271,3 +275,69 @@ class ReceivedPurchaseEditTest(TestCase):
         self.assertRegex(body, r'id="npWarehouse"[^>]*disabled')
         self.assertRegex(body, r'id="npOrderDate"[^>]*disabled')
         self.assertNotRegex(body, r'id="npNotes"[^>]*disabled')
+
+
+class PurchaseListBookScopeTest(TestCase):
+    """The purchases list shows ONE book's purchases.
+
+    /accounting/books/5/purchases/ used to list every purchase invoice in
+    the database, whichever book was named in the URL, and sum their
+    totals into that book's figure — so Ergene's page showed Laleli's
+    suppliers and Laleli's money.
+    """
+
+    def setUp(self):
+        self.usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.laleli = Book.objects.create(name="Laleli Fabric")
+        self.ergene = Book.objects.create(name="Ergene Fabric")
+        self.admin = get_user_model().objects.create_superuser(
+            username="scope_admin", password="pw", email="s@b.c")
+        self.client.force_login(self.admin)
+        self.karven = self._purchase(self.laleli, "Karven", "600.00")
+
+    def _purchase(self, book, supplier, total):
+        cari = CariAccount.objects.create(
+            book=book, code=f"C-{supplier[:3].upper()}-{book.pk}", name=supplier,
+            type="supplier", default_currency=self.usd)
+        Invoice.objects.create(
+            book=book, cari=cari, type="purchase", status="draft",
+            date="2026-08-21", due_date="2026-09-21",
+            currency=self.usd, total=Decimal(total))
+        return cari
+
+    def _page(self, book):
+        resp = self.client.get(
+            reverse("accounts:purchase_order_list", kwargs={"book_id": book.pk}))
+        self.assertEqual(resp.status_code, 200)
+        return resp.context
+
+    def test_a_book_with_no_purchases_of_its_own_shows_none(self):
+        self.assertEqual(list(self._page(self.ergene)["invoices"]), [])
+
+    def test_another_books_money_is_not_totalled_into_this_one(self):
+        self.assertEqual(self._page(self.ergene)["total_sum"], 0)
+
+    def test_the_owning_book_still_shows_its_own(self):
+        ctx = self._page(self.laleli)
+        self.assertEqual(len(ctx["invoices"]), 1)
+        self.assertEqual(ctx["total_sum"], Decimal("600.00"))
+
+    def test_the_supplier_filter_offers_only_this_books_suppliers(self):
+        """A supplier the page can never show must not sit in its
+        dropdown: picking one would return an empty list with no
+        explanation."""
+        self.assertEqual(
+            [s["cari__name"] for s in self._page(self.ergene)["suppliers"]], [])
+        self.assertEqual(
+            [s["cari__name"] for s in self._page(self.laleli)["suppliers"]],
+            ["Karven"])
+
+    def test_each_book_sees_only_its_own_when_both_have_purchases(self):
+        self._purchase(self.ergene, "Bursa Tekstil", "150.00")
+        self.assertEqual(
+            [i.cari.name for i in self._page(self.ergene)["invoices"]],
+            ["Bursa Tekstil"])
+        self.assertEqual(self._page(self.ergene)["total_sum"], Decimal("150.00"))
+        self.assertEqual(
+            [i.cari.name for i in self._page(self.laleli)["invoices"]], ["Karven"])

@@ -106,7 +106,7 @@
 {% block content %}
 <div class="chk-f">
 
-  <a class="chk-f-back" href="{% url 'accounts:check_list' %}">
+  <a class="chk-f-back" href="{% url 'accounts:check_list' current_book.pk %}">
     <i data-lucide="arrow-left"></i> {% trans "Back to Check / Note Portfolio" %}
   </a>
 
@@ -136,7 +136,7 @@
             <i data-lucide="user"></i>
             <span class="code">{{ prefilled_cari.code }}</span>
             <span>{{ prefilled_cari.name }}</span>
-            <a href="{% url 'accounts:check_create' %}" class="change-link">{% trans "change" %}</a>
+            <a href="{% url 'accounts:check_create' current_book.pk %}" class="change-link">{% trans "change" %}</a>
           </div>
         </div>
         {% else %}
@@ -264,7 +264,7 @@
           {% trans "Instrument enters portfolio as 'In Portfolio' status." %}
         </div>
         <div class="chk-f-foot-r">
-          <a href="{% url 'accounts:check_list' %}" class="chk-f-btn ghost">{% trans "Cancel" %}</a>
+          <a href="{% url 'accounts:check_list' current_book.pk %}" class="chk-f-btn ghost">{% trans "Cancel" %}</a>
           <button type="submit" class="chk-f-btn primary">
             <i data-lucide="check"></i>{% trans "Add to Portfolio" %}
           </button>

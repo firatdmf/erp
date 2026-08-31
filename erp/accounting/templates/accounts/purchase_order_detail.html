@@ -67,7 +67,7 @@
 {% block content %}
 <div class="po">
   <div class="po-crumbs">
-    <a class="po-back" href="{% url 'accounts:purchase_order_list' %}">
+    <a class="po-back" href="{% url 'accounts:purchase_order_list' invoice.book.pk %}">
       <i class="fa fa-arrow-left"></i> {% trans "Back to purchases" %}
     </a>
   </div>

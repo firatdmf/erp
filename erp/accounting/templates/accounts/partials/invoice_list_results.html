@@ -82,6 +82,6 @@ in place instead of reloading the whole page.
   <div class="ico"><i data-lucide="file-text"></i></div>
   <h3>{% trans "No invoices" %}</h3>
   <p>{% trans "Adjust filters or create a new invoice." %}</p>
-  <a href="{% url 'accounts:invoice_create' %}" class="iv-btn primary"><i data-lucide="plus"></i>{% trans "New Invoice" %}</a>
+  <a href="{% url 'accounts:invoice_create' current_book.pk %}" class="iv-btn primary"><i data-lucide="plus"></i>{% trans "New Invoice" %}</a>
 </div>
 {% endif %}

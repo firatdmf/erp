@@ -377,7 +377,7 @@
 <div class="gr">
 
   <div class="gr-crumbs">
-    <a href="{% url 'accounts:purchase_order_list' %}">{% trans "Purchase orders" %}</a>
+    <a href="{% url 'accounts:purchase_order_list' current_book.pk %}">{% trans "Purchase orders" %}</a>
     <span class="sep">/</span>
     {% if edit_invoice %}
       <a href="{% url 'accounts:purchase_order_detail' edit_invoice.pk %}">{{ edit_invoice.number }}</a>
@@ -643,7 +643,7 @@
   const NP_MATCH_TPL = "{% url 'operating:catalog_variant_match' 0 0 %}";
   const NP_EDIT_TPL = "{% url 'operating:warehouse_purchase_edit' 0 0 %}";
   const NP_PURCHASE_DETAIL_TPL = "{% url 'accounts:purchase_order_detail' 0 %}";
-  const NP_LIST_URL = "{% url 'accounts:purchase_order_list' %}";
+  const NP_LIST_URL = "{% url 'accounts:purchase_order_list' current_book.pk %}";
   const NP_CSRF = "{{ csrf_token }}";
   const NP_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
   const NP_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="lock-ico"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
@@ -669,7 +669,7 @@
   const GR_SKU_MAX = {{ sku_max_length }};   // marketing.models.SKU_MAX_LENGTH
   const GR_EDIT_ID = {% if edit_invoice %}{{ edit_invoice.pk }}{% else %}null{% endif %};
   const GR_ORDER_ID = {% if order_invoice %}{{ order_invoice.pk }}{% else %}null{% endif %};
-  const GR_ORDER_URL = "{% url 'accounts:purchase_order_save' %}";
+  const GR_ORDER_URL = "{% url 'accounts:purchase_order_save' current_book.pk %}";
   const GR_ORDER_UPDATE_TPL = "{% url 'accounts:purchase_order_update' 0 %}";
   const GR_CONFIRM_TPL = "{% url 'accounts:purchase_order_confirm' 0 %}";
   const GR_PLAN = JSON.parse((document.getElementById('gr-plan-data') || {}).textContent || 'null');

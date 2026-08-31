@@ -622,6 +622,36 @@
           </div>
         </section>
 
+        <!-- LEDGER ACCOUNTS (all books) -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-book card-ico"></i>
+            <h3>{% trans "Ledger accounts" %}</h3>
+            <span class="od-card-sub">{{ cari_accounts|length }} {% blocktrans count counter=cari_accounts|length %}book{% plural %}books{% endblocktrans %}</span>
+          </div>
+          <div class="od-order-list">
+            {% for a in cari_accounts %}
+              <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
+                <div class="od-order-id">
+                  <div class="od-order-num">{{ a.book.name }}</div>
+                  <div class="od-order-date">{{ a.code }}</div>
+                </div>
+                <span class="ord-status {% if a.cached_balance > 0 %}pending{% elif a.cached_balance < 0 %}cancelled{% else %}completed{% endif %}">
+                  <span class="ord-status-dot"></span>{{ a.balance_label }}
+                </span>
+                <div class="od-order-total">
+                  {{ a.cached_balance|floatformat:2 }} <span>{{ a.display_currency_symbol }}</span>
+                </div>
+                <i class="fa fa-chevron-right od-order-chev"></i>
+              </a>
+            {% empty %}
+              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
+                {% trans "No ledger account in any book yet." %}
+              </p>
+            {% endfor %}
+          </div>
+        </section>
+
         <!-- ATTACH AN ITEM -->
         <section class="od-card attach-card">
           <div class="od-card-h">

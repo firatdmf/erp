@@ -90,36 +90,40 @@ def get_default_book(member=None) -> Book:
     Resolution order:
 
       1. Member.default_book — the member passed in, else whoever is making
-         the request. The most specific signal there is: this person works
-         for that business.
-      2. settings.CARI_BOOK_ID — pins the FALLBACK from a deploy, for a
-         member who has not picked a book (and for work with no member at
-         all: cron, imports, the shell).
-      3. Book.is_default_cari_target — the app-wide fallback, unique by
-         constraint. Set from the book's own page.
-      4. The book already holding the most cari accounts, WHICH IS THEN
-         WRITTEN TO THE FLAG. This step is the old guess, kept only to answer
-         the question once on a database where nobody has set the flag; by
-         recording its answer it stops being a guess made fresh on every
-         call, and the result becomes visible on the book's page where
-         somebody can correct it. A brand-new second book has no accounts,
-         so adding one never moves the target.
-      5. Lowest id, then create — only reachable on a database with no cari
-         accounts at all, i.e. a fresh install.
+         the request — provided they are still assigned that book. The most
+         specific signal there is: this person works for that business.
+      2. Their first assigned book, for a member who has never picked one.
+         With a single assignment there is nothing to pick, which is the
+         common case.
+      3. settings.CARI_BOOK_ID — pins the answer from a deploy, for work
+         with no member at all: cron, imports, the shell.
+      4. Lowest id, then create — only reachable on a fresh install, or on
+         a deployment that has left CARI_BOOK_ID unset while running
+         memberless work.
 
-    Every step falls through rather than raising: a stale id or a book nobody
-    has flagged must not stop an order being placed.
+    Every step falls through rather than raising: a stale id must not stop
+    an order being placed.
 
-    (Step 4 adopts rather than a data migration doing it, because a migration
-    would have to reach `cari_accounts` through a HISTORICAL Book, and at that
-    point in the graph CariAccount still answers to its pre-move
-    `current_account_*` table — which no longer exists.)
+    There used to be a Book.is_default_cari_target flag between steps 2 and
+    3, plus a step that guessed the book holding the most cari accounts and
+    wrote its guess back to that flag. Both are gone. An app-wide "default
+    book" is a second answer to a question the working book already answers,
+    and the two disagree the moment somebody's work moves; the guess was
+    worse still, because it silently changed which business a record landed
+    in as soon as the account counts crossed over. Which business a record
+    belongs to is a fact about the person entering it. When there is no such
+    person, CARI_BOOK_ID is the place to say so.
     """
     if member is None:
         member = acting_member()
-    book = getattr(member, "default_book", None) if member is not None else None
-    if book is not None:
-        return book
+    if member is not None:
+        allowed = member_books(member)
+        book = getattr(member, "default_book", None)
+        if book is not None and allowed.filter(pk=book.pk).exists():
+            return book
+        book = allowed.first()
+        if book is not None:
+            return book
 
     pinned = getattr(settings, "CARI_BOOK_ID", "") or ""
     if str(pinned).strip().isdigit():
@@ -127,41 +131,34 @@ def get_default_book(member=None) -> Book:
         if book:
             return book
 
-    book = Book.objects.filter(is_default_cari_target=True).first()
-    if book:
-        return book
-
-    book = (Book.objects
-            .annotate(n=Count("cari_accounts"))
-            .filter(n__gt=0)
-            .order_by("-n", "id")
-            .first())
-    if book:
-        _adopt_as_default_cari_target(book)
-        return book
-
     return Book.objects.order_by("id").first() or Book.objects.create(name="Main Book")
 
 
-def _adopt_as_default_cari_target(book) -> None:
-    """Record the book step 3 picked, so the choice is made once.
+def member_books(member):
+    """The books this member may work in, as a queryset.
 
-    Best-effort on purpose. This runs inside reads — placing an order,
-    printing a packing list — and none of them may fail because the flag
-    could not be written (a read-only replica, a concurrent adopter
-    losing the unique-constraint race). Losing the write just means the
-    next call works it out again, exactly as before.
+    A superuser is assigned every book implicitly — an install's owner
+    should not be able to lock themselves out of a ledger by forgetting a
+    row — and everybody else gets exactly what has been assigned to them.
+
+    Returns an empty queryset for no member, which is the honest answer:
+    work nobody is doing belongs to nobody's book. Callers that need one
+    anyway (cron, imports) go through get_default_book and land on
+    CARI_BOOK_ID.
     """
-    from django.db import transaction
-    try:
-        with transaction.atomic():
-            updated = (Book.objects
-                       .filter(pk=book.pk, is_default_cari_target=False)
-                       .update(is_default_cari_target=True))
-        if updated:
-            book.is_default_cari_target = True
-    except Exception:
-        pass
+    if member is None:
+        return Book.objects.none()
+    user = getattr(member, "user", None)
+    if user is not None and user.is_superuser:
+        return Book.objects.all().order_by("name")
+    return member.books.all().order_by("name")
+
+
+def member_can_use_book(member, book) -> bool:
+    """Whether this member may see and act on this book."""
+    if book is None:
+        return False
+    return member_books(member).filter(pk=book.pk).exists()
 
 
 def brand_name_for(book=None) -> str:
@@ -234,11 +231,15 @@ def get_or_create_cari_for_order(order, *, member=None) -> CariAccount | None:
     return None
 
 
-def get_or_create_cari_for_contact(contact, *, member=None) -> CariAccount:
+def get_or_create_cari_for_contact(contact, *, member=None, book=None) -> CariAccount:
     """Find (or create) the contact's cari — every B2B contact gets one
     so orders/invoices can post against it. Idempotent via the
-    uniq_cari_book_contact constraint (one cari per book+contact)."""
-    book = get_default_book(member)
+    uniq_cari_book_contact constraint (one cari per book+contact).
+
+    Pass `book` when the caller already knows which one — a book-scoped
+    page does, and must not silently create the account somewhere else
+    because that happens to be the member's working book."""
+    book = book or get_default_book(member)
     cari = CariAccount.objects.filter(book=book, contact=contact).first()
     if cari:
         return cari
@@ -251,11 +252,13 @@ def get_or_create_cari_for_contact(contact, *, member=None) -> CariAccount:
     )
 
 
-def get_or_create_cari_for_company(company, *, member=None) -> CariAccount:
+def get_or_create_cari_for_company(company, *, member=None, book=None) -> CariAccount:
     """Find (or create) the company's cari — every B2B company gets one
     so orders/invoices can post against it. Idempotent via the
-    uniq_cari_book_company constraint (one cari per book+company)."""
-    book = get_default_book(member)
+    uniq_cari_book_company constraint (one cari per book+company).
+
+    Pass `book` when the caller already knows which one."""
+    book = book or get_default_book(member)
     cari = CariAccount.objects.filter(book=book, company=company).first()
     if cari:
         return cari
@@ -268,11 +271,13 @@ def get_or_create_cari_for_company(company, *, member=None) -> CariAccount:
     )
 
 
-def get_or_create_cari_for_supplier(supplier, *, member=None) -> CariAccount:
+def get_or_create_cari_for_supplier(supplier, *, member=None, book=None) -> CariAccount:
     """Find (or create) the supplier's cari — every supplier gets one so
     purchases (stock intake) can post debt against it. Idempotent via
-    the uniq_cari_book_supplier constraint (one cari per book+supplier)."""
-    book = get_default_book(member)
+    the uniq_cari_book_supplier constraint (one cari per book+supplier).
+
+    Pass `book` when the caller already knows which one."""
+    book = book or get_default_book(member)
     cari = CariAccount.objects.filter(book=book, supplier=supplier).first()
     if cari:
         return cari

@@ -288,9 +288,10 @@ DB_SCHEMA = config("DB_SCHEMA", default=_brand_cfg["DB_SCHEMA"]).strip()
 # else says. An id, never a name: a book's name is edited from the UI
 # and a constant here cannot follow, so name-matching silently stopped
 # matching the first time a book was renamed. Normally left empty — the
-# answer lives on the row as Book.is_default_cari_target, editable from
-# the book's own page. This is the escape hatch for pinning it from a
-# deploy. See accounting.services_accounts.get_default_book().
+# answer is the acting member's working book. This pins the fallback for
+# work with NO member at all — cron, imports, the shell — which would
+# otherwise land on the lowest-id book.
+# See accounting.services_accounts.get_default_book().
 CARI_BOOK_ID = config("CARI_BOOK_ID", default="").strip()
 BRAND_NAME = config("BRAND_NAME", default=_brand_cfg["BRAND_NAME"]).strip()
 BRAND_DISPLAY_NAME = config(
@@ -333,6 +334,9 @@ TEMPLATES = [
                 "erp.context_processors.client_groups",
                 "erp.context_processors.all_members",
                 "erp.context_processors.ui_theme",
+                # Which book the reader is in — the sidebar prints it and
+                # every book-scoped link is built from it.
+                "accounting.book_scope.current_book",
                 # Removed: product_categories and suppliers - not used in base.html
                 # "erp.context_processors.product_categories",
                 # "erp.context_processors.suppliers",

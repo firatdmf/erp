@@ -132,7 +132,7 @@
       <div class="ck-sub">{% trans "Tracks the status of checks and promissory notes received from customers and given to suppliers" %}</div>
     </div>
     <div class="ck-head-r">
-      <a href="{% url 'accounts:check_create' %}" class="ck-btn primary"><i data-lucide="plus"></i>{% trans "New Check / Note" %}</a>
+      <a href="{% url 'accounts:check_create' current_book.pk %}" class="ck-btn primary"><i data-lucide="plus"></i>{% trans "New Check / Note" %}</a>
     </div>
   </div>
 
@@ -197,7 +197,7 @@
         {% for v,l in status_choices %}<option value="{{ v }}" {% if filter_status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
       </select>
 
-      <a class="ck-reset" href="{% url 'accounts:check_list' %}">{% trans "Clear" %}</a>
+      <a class="ck-reset" href="{% url 'accounts:check_list' current_book.pk %}">{% trans "Clear" %}</a>
     </div>
   </form>
 
@@ -260,7 +260,7 @@
     <div class="ico"><i data-lucide="scroll-text"></i></div>
     <h3>{% trans "No checks / notes" %}</h3>
     <p>{% trans "No instruments in the portfolio." %}</p>
-    <a href="{% url 'accounts:check_create' %}" class="ck-btn primary"><i data-lucide="plus"></i>{% trans "New Check / Note" %}</a>
+    <a href="{% url 'accounts:check_create' current_book.pk %}" class="ck-btn primary"><i data-lucide="plus"></i>{% trans "New Check / Note" %}</a>
   </div>
   {% endif %}
 </div>

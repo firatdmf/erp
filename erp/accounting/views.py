@@ -395,38 +395,16 @@ class SetBookBrandName(generic.edit.UpdateView):
         )
 
 
-class SetDefaultCariTarget(generic.detail.SingleObjectMixin, generic.View):
-    """Make this book the one the current-account ledger posts to.
-
-    POST-only and JSON-only, like the other header editors. Not a
-    ModelForm: the flag is unique across books, so setting it here has
-    to clear it there, which is Book.make_default_cari_target's job rather than
-    a per-row form's.
-
-    Turning the flag OFF is deliberately not offered. "No book is the
-    ledger" sends get_default_book() back to guessing by account count,
-    which is the failure this replaced — you move the ledger to another
-    book, you do not unset it.
-    """
-
-    model = Book
-    http_method_names = ["post"]
-
-    def post(self, request, *args, **kwargs):
-        book = self.get_object()
-        book.make_default_cari_target()
-        return JsonResponse({"success": True, "book": book.pk, "name": book.name})
-
-
 @method_decorator(login_required, name="dispatch")
 class SetMyWorkingBook(generic.detail.SingleObjectMixin, generic.View):
     """Make this the book the logged-in member's work is booked into.
 
     Per member, not per app: several businesses run on one install and
-    which one a record belongs to follows the person entering it. Unlike
-    the app-level default, this one CAN be cleared — a member who works
-    across businesses falls back to the app default, which is a
-    legitimate way to work rather than a broken state.
+    which one a record belongs to follows the person entering it.
+
+    Only a book the member is actually assigned may be picked — this is
+    the same boundary the ledger views enforce, and refusing here keeps a
+    stale bookmark from parking somebody in a book they cannot open.
     """
 
     model = Book
@@ -439,6 +417,12 @@ class SetMyWorkingBook(generic.detail.SingleObjectMixin, generic.View):
             return JsonResponse(
                 {"success": False, "error": "No member profile."}, status=400)
         clearing = request.POST.get("clear") == "1"
+        if not clearing:
+            from accounting.services_accounts import member_can_use_book
+            if not member_can_use_book(member, book):
+                return JsonResponse(
+                    {"success": False,
+                     "error": f"You are not assigned to {book.name}."}, status=403)
         member.default_book = None if clearing else book
         member.save(update_fields=["default_book"])
         return JsonResponse({

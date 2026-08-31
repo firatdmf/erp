@@ -495,7 +495,7 @@
 
   <!-- TOOLBAR (no-print) -->
   <div class="iv-toolbar no-print">
-    <a class="iv-back" href="{% url 'accounts:invoice_list' %}">
+    <a class="iv-back" href="{% url 'accounts:invoice_list' invoice.book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "Invoices" %}
     </a>
     <div class="iv-tools">
@@ -751,7 +751,7 @@
     <p style="margin:0 0 14px; font:400 12.5px var(--font-sans); color:var(--gray-600);">
       {% trans "Language of the printable invoice document. English is the default; choose Türkçe to print invoices with Turkish labels." %}
     </p>
-    <form method="post" action="{% url 'accounts:invoice_settings' %}">
+    <form method="post" action="{% url 'accounts:invoice_settings' invoice.book.pk %}">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       <label style="display:block; font:600 12px var(--font-sans); color:var(--gray-700); margin-bottom:6px;">{% trans "Invoice language" %}</label>

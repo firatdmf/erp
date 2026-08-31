@@ -165,3 +165,6 @@ reply_check.log
 # against what is actually deployed. Sources live in each app's own
 # static/ directory; STATICFILES_DIRS is empty.
 /erp/static/
+
+# Opening-balance maps carry real customer names; this repo is public.
+erp/accounting/data/

@@ -25,6 +25,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.views import generic
 from django.utils.translation import gettext_lazy as _, gettext as _g
 from django.views import View
 
@@ -40,6 +41,16 @@ from .forms import CariTransferForm
 # ---------------------------------------------------------------------------
 def _books():
     return Book.objects.all().order_by("name")
+
+
+def _member_books(request):
+    """The books this reader may switch to — never the full list.
+
+    A book they cannot open has no business appearing in a picker that
+    would only 404 them.
+    """
+    from .services_accounts import member_books
+    return member_books(getattr(request.user, "member", None))
 
 
 def _currencies():
@@ -112,9 +123,10 @@ def _filter_caris(request, apply_type=True):
             )
         qs = qs.filter(cond)
 
-    book_id = request.GET.get("book") or ""
-    if book_id.isdigit():
-        qs = qs.filter(book_id=int(book_id))
+    # The book is not a filter the reader can drop — it is which business
+    # the page is about, and it comes from the path. Summing two books'
+    # balances into one total was the bug this replaced.
+    qs = qs.filter(book=request.book)
 
     type_filter = request.GET.get("type") or ""
     if apply_type and type_filter in dict(CariAccount.TYPE_CHOICES):
@@ -158,6 +170,30 @@ def _filter_caris(request, apply_type=True):
     # another never appears at all.
     qs = qs.order_by(sort_map.get(sort, "name"), "id")
     return qs
+
+
+@method_decorator(login_required, name="dispatch")
+class LegacyCollectionRedirect(generic.RedirectView):
+    """Send a pre-split ledger URL to the same page in the working book.
+
+    /accounting/accounts/ used to list every book at once. It now names a
+    book, so the old address has to choose one — and the right choice is
+    the same one every other book-less entry point makes: the viewer's
+    working book.
+
+    Kept rather than deleted because these URLs are in people's
+    bookmarks, in old emails, and in any template not yet moved over.
+    """
+    permanent = False
+    target = None
+
+    def get_redirect_url(self, *args, **kwargs):
+        from .services_accounts import get_default_book
+        member = getattr(self.request.user, "member", None)
+        book = get_default_book(member)
+        url = reverse(self.target, kwargs={"book_id": book.pk})
+        query = self.request.META.get("QUERY_STRING", "")
+        return f"{url}?{query}" if query else url
 
 
 # ---------------------------------------------------------------------------
@@ -216,13 +252,13 @@ class CariList(View):
             "owes_us":        totals["owes_us"] or Decimal("0.00"),
             "we_owe":         abs(totals["we_owe"] or Decimal("0.00")),
             "net":            (totals["owes_us"] or Decimal("0.00")) + (totals["we_owe"] or Decimal("0.00")),
-            "books":          _books(),
+            "books":          _member_books(request),
             "type_choices":   CariAccount.TYPE_CHOICES,
             "all_count":      all_count,
             "type_tabs":      type_tabs,
             "tab_counts_json": json.dumps(tab_counts),
             "q":              request.GET.get("q", ""),
-            "filter_book":    request.GET.get("book", ""),
+            "filter_book":    str(request.book.pk),
             "filter_type":    request.GET.get("type", ""),
             "filter_balance": request.GET.get("balance", ""),
             "filter_active":  request.GET.get("active", "1"),
@@ -247,7 +283,7 @@ class CariCreate(View):
     def get(self, request):
         return render(request, self.template_name, {
             "cari": None,
-            "books": _books(),
+            "books": _member_books(request),
             "currencies": _currencies(),
             "type_choices": CariAccount.TYPE_CHOICES,
             "entity_types": self.ENTITY_TYPES,
@@ -271,12 +307,12 @@ class CariCreate(View):
         name = request.POST.get("name", "").strip()
         if not name:
             messages.error(request, _g("Name is required."))
-            return redirect("accounts:create")
+            return redirect("accounts:create", book_id=request.book.pk)
 
         currency_id = request.POST.get("default_currency")
         if not currency_id:
             messages.error(request, _g("Currency is required."))
-            return redirect("accounts:create")
+            return redirect("accounts:create", book_id=request.book.pk)
 
         email = request.POST.get("email", "").strip()
         phone = request.POST.get("phone", "").strip()
@@ -288,7 +324,7 @@ class CariCreate(View):
             if entity_type == "company":
                 if Company.objects.filter(name__iexact=name).exists():
                     messages.error(request, _g("A company with this name already exists."))
-                    return redirect("accounts:create")
+                    return redirect("accounts:create", book_id=request.book.pk)
                 entity = Company.objects.create(
                     name=name,
                     email=[email] if email else [],
@@ -296,7 +332,8 @@ class CariCreate(View):
                     address=address,
                     country=country,
                 )
-                cari = get_or_create_cari_for_company(entity, member=member)
+                cari = get_or_create_cari_for_company(
+                    entity, member=member, book=request.book)
             elif entity_type == "contact":
                 entity = Contact.objects.create(
                     name=name,
@@ -305,7 +342,8 @@ class CariCreate(View):
                     address=address,
                     country=country,
                 )
-                cari = get_or_create_cari_for_contact(entity, member=member)
+                cari = get_or_create_cari_for_contact(
+                    entity, member=member, book=request.book)
             else:
                 entity = Supplier.objects.create(
                     company_name=name,
@@ -315,10 +353,11 @@ class CariCreate(View):
                 # The post_save signal on Supplier already creates the
                 # cari unconditionally — this call is idempotent and
                 # just fetches that same row.
-                cari = get_or_create_cari_for_supplier(entity, member=member)
+                cari = get_or_create_cari_for_supplier(
+                    entity, member=member, book=request.book)
         except Exception as exc:
             messages.error(request, _g("Could not create record: %(error)s") % {"error": exc})
-            return redirect("accounts:create")
+            return redirect("accounts:create", book_id=request.book.pk)
 
         # Layer the cari-specific commercial/tax fields on top of the
         # row the service function just created.
@@ -343,7 +382,7 @@ class CariCreate(View):
             cari.full_clean(exclude=["code"])
         except Exception as exc:
             messages.error(request, _g("Invalid data: %(error)s") % {"error": exc})
-            return redirect("accounts:create")
+            return redirect("accounts:create", book_id=request.book.pk)
         cari.save()
 
         # If opening balance non-zero, drop a single opening movement
@@ -371,7 +410,7 @@ class CariEdit(View):
         cari = get_object_or_404(CariAccount, pk=pk)
         return render(request, self.template_name, {
             "cari": cari,
-            "books": _books(),
+            "books": _member_books(request),
             "currencies": _currencies(),
             "type_choices": CariAccount.TYPE_CHOICES,
         })
@@ -1212,6 +1251,7 @@ class CariTransferUndo(View):
 class CariDelete(View):
     def post(self, request, pk):
         cari = get_object_or_404(CariAccount, pk=pk)
+        book_id = cari.book_id          # read before the row may go
         if cari.movements.exists():
             cari.is_active = False
             cari.save(update_fields=["is_active"])
@@ -1220,4 +1260,4 @@ class CariDelete(View):
             code = cari.code
             cari.delete()
             messages.success(request, _g("Account %(code)s deleted.") % {"code": code})
-        return redirect("accounts:list")
+        return redirect("accounts:list", book_id=book_id)

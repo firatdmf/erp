@@ -83,7 +83,7 @@
   </div>
 
   <div class="rx-grid">
-    <a class="rx-card" href="{% url 'accounts:report_aging' %}">
+    <a class="rx-card" href="{% url 'accounts:report_aging' current_book.pk %}">
       <div class="rx-ico"><i data-lucide="clock"></i></div>
       <h3>{% trans "Aging Report" %}</h3>
       <p>{% trans "Aging analysis of open receivables and payables: 0-30, 30-60, 60-90, 90+ days" %}</p>
@@ -96,7 +96,7 @@
       </div>
     </a>
 
-    <a class="rx-card" href="{% url 'accounts:report_trial_balance' %}">
+    <a class="rx-card" href="{% url 'accounts:report_trial_balance' current_book.pk %}">
       <div class="rx-ico"><i data-lucide="layout-grid"></i></div>
       <h3>{% trans "Trial Balance" %}</h3>
       <p>{% trans "Opening, debit, credit and closing balances of all accounts by book" %}</p>
@@ -105,7 +105,7 @@
       </div>
     </a>
 
-    <a class="rx-card" href="{% url 'accounts:report_credit_limit' %}">
+    <a class="rx-card" href="{% url 'accounts:report_credit_limit' current_book.pk %}">
       <div class="rx-ico"><i data-lucide="shield-alert"></i></div>
       <h3>{% trans "Credit Limit Report" %}</h3>
       <p>{% trans "Customers reaching or exceeding their credit limit — accounts at risk" %}</p>
@@ -118,7 +118,7 @@
       </div>
     </a>
 
-    <a class="rx-card" href="{% url 'accounts:report_due_calendar' %}">
+    <a class="rx-card" href="{% url 'accounts:report_due_calendar' current_book.pk %}">
       <div class="rx-ico"><i data-lucide="calendar-clock"></i></div>
       <h3>{% trans "Due Date Calendar" %}</h3>
       <p>{% trans "Upcoming due dates — this week, next week, month-end and overdue" %}</p>

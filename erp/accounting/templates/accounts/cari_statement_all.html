@@ -96,7 +96,7 @@
 <div class="sa">
 
   <div class="sa-crumbs no-print">
-    <a class="sa-back" href="{% url 'accounts:list' %}">
+    <a class="sa-back" href="{% url 'accounts:list' current_book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "All Accounts" %}
     </a>
   </div>

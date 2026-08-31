@@ -23,6 +23,7 @@ class PaymentFormDefaultsTest(TestCase):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.try_ = CurrencyCategory.objects.create(code="TRY", name="Turkish Lira", symbol="₺")
         self.book = Book.objects.create(name="Laleli Fabric")
+        self.user.member.books.add(self.book)
 
         self.cash_usd = CashAccount.objects.create(
             book=self.book, name="Cash", currency=self.usd
@@ -36,7 +37,7 @@ class PaymentFormDefaultsTest(TestCase):
         )
 
     def url(self):
-        return reverse("accounts:payment_create") + "?account=%d" % self.cari.pk
+        return reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}) + "?account=%d" % self.cari.pk
 
     def method_options(self, html):
         block = re.search(r'<select name="method">(.*?)</select>', html, re.S).group(1)

@@ -255,7 +255,7 @@
       <h1 class="pl-title">{% trans "Collections / Payments" %}</h1>
     </div>
     <div class="pl-head-r">
-      <a href="{% url 'accounts:payment_create' %}" class="pl-btn primary"><i data-lucide="plus"></i>{% trans "New Collection / Payment" %}</a>
+      <a href="{% url 'accounts:payment_create' current_book.pk %}" class="pl-btn primary"><i data-lucide="plus"></i>{% trans "New Collection / Payment" %}</a>
     </div>
   </div>
 
@@ -308,7 +308,7 @@
         <input type="date" name="date_to" value="{{ date_to }}">
       </label>
 
-      <a class="pl-reset" href="{% url 'accounts:payment_list' %}" id="pl-clear">{% trans "Clear" %}</a>
+      <a class="pl-reset" href="{% url 'accounts:payment_list' current_book.pk %}" id="pl-clear">{% trans "Clear" %}</a>
     </div>
   </form>
 

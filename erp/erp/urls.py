@@ -33,9 +33,10 @@ urlpatterns = [
     path("i18n/", include("django.conf.urls.i18n")),
     path("admin/", admin.site.urls),
     path('authentication/',include('authentication.urls')),
-    # Must precede the generic accounting/ include so the accounts subtree is
-    # matched here directly rather than falling through accounting.urls first.
-    path('accounting/accounts/', include('accounting.urls_accounts')),
+    # Both are mounted at accounting/. The ledger goes first so its
+    # books/<id>/accounts/ collections are matched here rather than being
+    # shadowed by accounting.urls' own books/<pk>/ routes.
+    path('accounting/', include('accounting.urls_accounts')),
     path('accounting/',include('accounting.urls')),
     path("todo/", include("todo.urls")),
     path("crm/", include("crm.urls")),

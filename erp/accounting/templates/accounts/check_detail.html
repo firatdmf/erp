@@ -154,7 +154,7 @@
 
   <!-- CRUMBS -->
   <div class="chk-d-crumbs no-print">
-    <a class="chk-d-back" href="{% url 'accounts:check_list' %}">
+    <a class="chk-d-back" href="{% url 'accounts:check_list' check.book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "Check / Promissory Note Portfolio" %}
     </a>
     <span class="chk-d-sep">/</span>

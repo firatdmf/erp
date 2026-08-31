@@ -17,22 +17,23 @@ class MemberWorkingBook(TestCase):
     it, not the server."""
 
     def setUp(self):
-        self.laleli = Book.objects.create(name="Laleli Fabric",
-                                          is_default_cari_target=True)
+        self.laleli = Book.objects.create(name="Laleli Fabric")
         self.ergene = Book.objects.create(name="Ergene Fabric")
         # A Member is created for every User by signal, so fetch rather
         # than create.
         self.user = get_user_model().objects.create_user(
             username="ergene_staff", password="pw")
         self.member = Member.objects.get(user=self.user)
+        self.member.books.set([self.laleli, self.ergene])
 
-    def test_the_members_book_wins_over_the_app_default(self):
+    def test_the_book_they_picked_wins(self):
         self.member.default_book = self.ergene
         self.member.save(update_fields=["default_book"])
         self.assertEqual(get_default_book(self.member).pk, self.ergene.pk)
 
-    def test_a_member_with_no_book_falls_back_to_the_app_default(self):
-        self.assertEqual(get_default_book(self.member).pk, self.laleli.pk)
+    def test_a_member_with_no_pick_gets_their_first_assigned_book(self):
+        """Assigned books are ordered by name, so Ergene comes first."""
+        self.assertEqual(get_default_book(self.member).pk, self.ergene.pk)
 
     def test_two_members_book_into_different_places(self):
         other = Member.objects.get(
@@ -40,6 +41,7 @@ class MemberWorkingBook(TestCase):
                                                       password="pw"))
         self.member.default_book = self.ergene
         self.member.save(update_fields=["default_book"])
+        other.books.set([self.laleli])
         other.default_book = self.laleli
         other.save(update_fields=["default_book"])
         self.assertEqual(get_default_book(self.member).pk, self.ergene.pk)
@@ -47,7 +49,8 @@ class MemberWorkingBook(TestCase):
 
     def test_no_member_at_all_still_resolves(self):
         """Cron jobs, imports and the shell have no member."""
-        self.assertEqual(get_default_book(None).pk, self.laleli.pk)
+        with self.settings(CARI_BOOK_ID=str(self.laleli.pk)):
+            self.assertEqual(get_default_book(None).pk, self.laleli.pk)
 
     def test_it_is_read_from_the_request_when_not_passed(self):
         """~15 call sites have no member in scope, so the acting member
@@ -99,6 +102,7 @@ class WorkingBookEndpoint(TestCase):
         self.user = get_user_model().objects.create_user(
             username="staff", password="pw")
         self.member = Member.objects.get(user=self.user)
+        self.member.books.set([self.book, self.other])
         self.member.default_book = self.other
         self.member.save(update_fields=["default_book"])
         self.client.force_login(self.user)
@@ -114,7 +118,7 @@ class WorkingBookEndpoint(TestCase):
         self.member.refresh_from_db()
         self.assertEqual(self.member.default_book_id, self.book.pk)
 
-    def test_clearing_falls_back_to_the_app_default(self):
+    def test_clearing_leaves_them_with_no_pick(self):
         resp = self.client.post(self.url(), {"clear": "1"})
         self.assertEqual(resp.status_code, 200)
         self.member.refresh_from_db()
@@ -124,6 +128,7 @@ class WorkingBookEndpoint(TestCase):
         stranger = Member.objects.get(
             user=get_user_model().objects.create_user(username="other",
                                                       password="pw"))
+        stranger.books.set([self.other])
         stranger.default_book = self.other
         stranger.save(update_fields=["default_book"])
         self.client.post(self.url())

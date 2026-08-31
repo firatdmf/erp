@@ -203,6 +203,15 @@ class CatalogSearchLabelTest(TestCase):
         self.assertNotIn("PETROL", row["title"])
         self.assertEqual(row["variants"], 3)
 
+    def test_the_count_ignores_variants_the_warehouse_does_not_have(self):
+        """The dropdown's "N variants" must match the chip row the picker
+        draws next, which lists only warehouse-backed variants. MT-3016
+        advertised 11 and drew 5: the other six were old sync slugs, test
+        rows and a variant whose warehouse product was gone."""
+        p = self._product("MT-3016", "MT-3016", ["MT-3016 GÜMÜŞ", "MT-3016 ALTIN"])
+        self.ProductVariant.objects.create(product=p, variant_sku="MT-3016_silver")
+        self.assertEqual(self._search("MT-3016")[0]["variants"], 2)
+
     def test_the_title_rides_along_untouched(self):
         """A title that says something the SKU doesn't is still returned —
         the page shows it beside the SKU rather than instead of it."""

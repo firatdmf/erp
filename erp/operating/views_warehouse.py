@@ -1586,8 +1586,15 @@ def catalog_base_search(request, pk):
             # lowest-id row of N1464T ("PETROL+MARLETTO") ended up labelling
             # the whole product "PETROL" — and it cost one query per result
             # on every keystroke to get there.
+            # Counted the same way catalog_product_variants LISTS them —
+            # only variants with a real WarehouseProduct behind them. A raw
+            # .variants.count() reads the catalog's leftovers too (old sync
+            # slugs, test rows, variants whose warehouse row is gone), so
+            # MT-3016 advertised "11 variants" and then drew 5 chips.
             results.append({"id": p.id, "title": p.title or "", "sku": p.sku or "",
-                            "variants": p.variants.count()})
+                            "variants": (p.variants
+                                         .filter(warehouse_products__isnull=False)
+                                         .distinct().count())})
     return JsonResponse({"results": results})
 
 

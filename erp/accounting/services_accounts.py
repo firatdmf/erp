@@ -752,7 +752,9 @@ def create_invoice_for_order(order, *, user=None):
         return None
 
     cari = order.cari
-    book = cari.book or get_default_book()
+    # CariAccount.book is null=False, so the account always states its
+    # book and there is nothing to fall back to.
+    book = cari.book
     settings_obj = CariSettings.for_book(book)
     member = getattr(user, "member", None) if user else None
     today = date.today()
@@ -996,9 +998,13 @@ def reverse_retail_order_financials(order, user=None):
 
     reverse_order_movement(order)
 
-    cari = CariAccount.objects.filter(book=get_default_book(),
-                                      code=RETAIL_CARI_CODE).first()
-    if cari:
+    # The order already carries the retail cari that
+    # post_retail_order_financials attached; ask it rather than guessing
+    # which book to look in. A wrong guess found no account and silently
+    # reversed nothing, leaving the collections standing on an un-shipped
+    # order.
+    cari = order.cari if order.cari_id else None
+    if cari and cari.code == RETAIL_CARI_CODE:
         for pay in Payment.objects.filter(
                 cari=cari, type="collection", status="confirmed",
                 notes=f"ORD-{order.pk}",

@@ -140,3 +140,49 @@ class RetailUnshipTest(RetailPostingBase):
         self.assertEqual(self.collections().count(), 0)
         cari.refresh_from_db()
         self.assertEqual(cari.cached_balance, Decimal("0.00"))
+
+
+class RetailReversalFindsTheOrdersOwnAccount(RetailPostingBase):
+    """Un-shipping reverses against the account the order actually posted
+    to, not against whichever book the acting member happens to work in.
+
+    It used to look the retail cari up with
+    `filter(book=get_default_book(), code=PERAKENDE)`. That is a guess,
+    and when it guessed a book the account was not in it found nothing,
+    reversed nothing, and left confirmed collections standing on an
+    un-shipped order — silently, because "no account found" and "no
+    collections to cancel" look identical from the outside.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # A second book, and a member whose working book is that one —
+        # the shape that made the guess wrong.
+        self.other = Book.objects.create(name="Ergene Fabric")
+        self.user.member.books.add(self.other)
+        self.user.member.default_book = self.other
+        self.user.member.save()
+
+    def test_a_collection_is_reversed_from_another_book(self):
+        post_retail_order_financials(self.order, user=self.user)
+        cari = self.order.cari
+        self.assertIsNotNone(cari)
+        pay = Payment.objects.create(
+            cari=cari, book=cari.book, number="TAH-TEST-1",
+            type="collection", method="cash", status="draft",
+            date=self.order.order_date or __import__("datetime").date.today(),
+            amount=Decimal("10.00"), currency=self.usd,
+            description="Perakende otomatik tahsilat",
+            notes=f"ORD-{self.order.pk}")
+        pay.confirm(user=self.user)
+        self.assertEqual(self.collections().count(), 1)
+
+        reverse_retail_order_financials(self.order, user=self.user)
+        self.assertEqual(self.collections().count(), 0)
+
+    def test_the_sale_movement_is_reversed_too(self):
+        post_retail_order_financials(self.order, user=self.user)
+        cari = self.order.cari
+        self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 1)
+        reverse_retail_order_financials(self.order, user=self.user)
+        self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 0)

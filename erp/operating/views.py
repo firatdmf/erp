@@ -2244,9 +2244,15 @@ class OrderCreate(View):
                         from datetime import date
                         from accounting.models import Payment
                         from accounting.views_payment import _next_payment_number
-                        from accounting.services_accounts import get_default_book, _resolve_currency
+                        from accounting.services_accounts import _resolve_currency
 
-                        book = get_default_book()
+                        # The deposit belongs in the SAME book as the
+                        # account it is collected against — never a
+                        # guessed one. Guessing here meant a deposit
+                        # taken by an Ergene member on a Laleli order
+                        # created a Payment in Ergene whose cari lived
+                        # in Laleli.
+                        book = order.cari.book
                         currency = _resolve_currency(order)
                         pay = Payment.objects.create(
                             cari=order.cari, book=book,

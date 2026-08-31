@@ -928,9 +928,9 @@
         </a>
       {% endif %}
       {% if not shipped and not is_terminal %}
-        <button type="button" class="ord-btn ghost" onclick="openEditOrderSidebar({{ order.pk }})">
+        <a href="{% url 'operating:edit_order' order.pk %}" class="ord-btn ghost">
           <i class="fa fa-pen"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Düzenle{% else %}Edit{% endif %}
-        </button>
+        </a>
         <a href="{% url 'operating:order_pack_scan' order.pk %}" class="ord-btn primary">
           <i class="fa fa-barcode"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketle (Top Okut){% else %}Pack (Scan rolls){% endif %}
         </a>
@@ -1089,10 +1089,9 @@
           </div>
           {% if not shipped and not is_terminal %}
           <div style="display:flex; gap:6px;">
-            <button type="button" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;"
-                    onclick="openEditOrderSidebar({{ order.pk }})">
+            <a href="{% url 'operating:edit_order' order.pk %}" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
               <i class="fa fa-pen"></i> <span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Düzenle{% else %}Edit{% endif %}</span>
-            </button>
+            </a>
             <a href="{% url 'operating:order_pack_scan' order.pk %}" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
               <i class="fa fa-barcode"></i> <span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketle{% else %}Pack{% endif %}</span>
             </a>

@@ -4067,13 +4067,6 @@
         margin-top: 18px !important;
       }
     }
-    @media (min-width: 769px) {
-      #editOrderSidebarOverlay .sidebar-modal {
-        width: 50vw !important;
-        max-width: 50vw !important;
-        min-width: 520px !important;
-      }
-    }
   </style>
   <div id="orderSidebarOverlay" class="sidebar-overlay" onclick="closeOrderSidebar()">
     <div class="sidebar-modal" onclick="event.stopPropagation();">
@@ -4088,24 +4081,6 @@
       </div>
       <div class="sidebar-content" id="orderSidebarContent">
         <!-- HTMX loading target -->
-      </div>
-    </div>
-  </div>
-
-  <!-- Edit Order Sidebar -->
-  <div id="editOrderSidebarOverlay" class="sidebar-overlay" onclick="closeEditOrderSidebar()">
-    <div class="sidebar-modal" onclick="event.stopPropagation();">
-      <div class="sidebar-header">
-        <button class="sidebar-close" onclick="closeEditOrderSidebar()">
-          <i class="fas fa-times"></i> {% trans "Close" %}
-        </button>
-        <div class="sidebar-title">
-          <i class="fas fa-pen-to-square"></i>
-          <h2>{% trans "Edit Order" %}</h2>
-        </div>
-      </div>
-      <div class="sidebar-content" id="editOrderSidebarContent">
-        <!-- AJAX loading target -->
       </div>
     </div>
   </div>
@@ -4742,60 +4717,6 @@
           if (c && !document.getElementById('orderSidebarOverlay').classList.contains('active')) c.innerHTML = '';
         }, 300);
       }
-
-      // Edit Order Sidebar — uses htmx.ajax (same as the Create
-      // sidebar) so HTMX automatically processes the injected form's
-      // hx-* attributes and re-runs <script> tags. Plain fetch +
-      // innerHTML didn't, which made the product autocomplete dead.
-      function openEditOrderSidebar(orderId) {
-        const overlay = document.getElementById('editOrderSidebarOverlay');
-        const content = document.getElementById('editOrderSidebarContent');
-        if (!overlay || !content) return;
-        overlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        content.innerHTML = '<div style="text-align:center; padding: 40px; color: #6b7280;"><i class="fas fa-spinner fa-spin fa-2x"></i><div style="margin-top:12px;">Loading…</div></div>';
-        var editUrl = '{% url "operating:edit_order" 0 %}'.replace('/0/', '/' + orderId + '/');
-        if (window.htmx) {
-          htmx.ajax('GET', editUrl, {
-            target: '#editOrderSidebarContent',
-            swap: 'innerHTML',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-          });
-        } else {
-          // Fallback: plain fetch with manual script re-execution.
-          fetch(editUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function (r) { return r.text(); })
-            .then(function (html) {
-              content.innerHTML = html;
-              content.querySelectorAll('script').forEach(function (oldScript) {
-                const s = document.createElement('script');
-                if (oldScript.src) s.src = oldScript.src;
-                else s.textContent = oldScript.textContent;
-                document.body.appendChild(s).parentNode.removeChild(s);
-              });
-            })
-            .catch(function () {
-              content.innerHTML = '<div style="padding:40px;color:#ef4444;text-align:center;">Failed to load edit form.</div>';
-            });
-        }
-      }
-      function closeEditOrderSidebar() {
-        const overlay = document.getElementById('editOrderSidebarOverlay');
-        if (overlay) overlay.classList.remove('active');
-        document.body.style.overflow = '';
-        // Empty the container once the slide-out finishes — leaving the
-        // edit form (and its #existing-order-items hydration payload) in
-        // the DOM made a subsequently opened CREATE sidebar hydrate with
-        // the edited order's items.
-        setTimeout(function () {
-          var c = document.getElementById('editOrderSidebarContent');
-          var ov = document.getElementById('editOrderSidebarOverlay');
-          if (c && ov && !ov.classList.contains('active')) c.innerHTML = '';
-        }, 300);
-      }
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeEditOrderSidebar();
-      });
 
       // Book Sidebar Functions
       function openBookSidebar() {

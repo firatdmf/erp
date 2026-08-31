@@ -4,6 +4,7 @@ from . import views_warehouse
 from . import order_excel
 from . import warehouse_label
 from . import warehouse_excel
+from accounting.book_scope import book_scoped
 from django.views.generic import TemplateView, RedirectView
 
 
@@ -69,7 +70,14 @@ urlpatterns = [
     path("orders/create/barcode_resolve/", views.order_create_barcode_resolve, name="order_create_barcode_resolve"),
     path("orders/create/roll_list/", views.order_create_roll_list, name="order_create_roll_list"),
     path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
-    path("orders/", views.OrderList.as_view(), name="order_list"),
+    # An order's money lands in one book (through its cari), so the list
+    # names the book the same way the ledger's collections do. The old
+    # unscoped address stays as a redirect to the viewer's working book:
+    # it is linked from the nav, the mobile drawer, the top bar and a
+    # cari's detail page, and those links carry no book of their own.
+    path("books/<int:book_id>/orders/", book_scoped(views.OrderList.as_view()),
+         name="order_list_scoped"),
+    path("orders/", views.OrderListRedirect.as_view(), name="order_list"),
     path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),
     path("orders/delete/<int:pk>/", views.delete_order, name="delete_order"),
     path("orders/bulk-delete/", views.bulk_delete_orders, name="bulk_delete_orders"),

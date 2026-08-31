@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% comment %}
+  Full-page order edit.
+
+  The same form partial the create/edit SIDEBARS load, rendered as a page
+  of its own instead. Editing an order means reading a customer, a dozen
+  product lines and their prices at once, which a 50vw drawer cannot show
+  without scrolling — and the drawer closed on any click landing outside
+  it, losing everything typed. A page has nothing to click outside of.
+
+  The partial is deliberately reused rather than reviving the old
+  edit_order.html form: create and edit stay one thing to maintain, and
+  the partial already degrades out of a sidebar (its scope root falls
+  back to `document` when there is no .sidebar-content around it).
+{% endcomment %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  .eop {
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --ink: #0F1419;
+    padding: 22px 28px 120px;
+    font: 400 13.5px var(--font-sans);
+    color: var(--ink);
+  }
+  /* The form's fields were laid out for a ~50vw drawer; stretched across
+     a wide monitor the rows read as disconnected columns. Cap it and
+     centre it so the measure stays the one the fields were designed at. */
+  .eop-body { max-width: 940px; margin: 0 auto; }
+
+  .eop-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .eop-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; background: #fff; border: 1px solid #E0E6EE;
+    border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: #4B5563; text-decoration: none;
+  }
+  .eop-back:hover { border-color: #147F74; color: #147F74; }
+
+  .eop-head {
+    max-width: 940px; margin: 0 auto 18px;
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  .eop-head h1 { margin: 0; font: 800 22px var(--font-sans); color: var(--ink); }
+  .eop-head .eop-sub { font: 500 13px var(--font-sans); color: #6B7280; }
+
+  .eop-card {
+    background: #fff; border: 1px solid #E2E8EE; border-radius: 12px;
+    padding: 20px 22px;
+  }
+
+  /* The partial ends in a .sidebar-footer holding the submit button. In a
+     drawer that sat against the bottom edge; here it is just the last row
+     of the card, so give it a rule above instead of a floating look. */
+  .eop-card .sidebar-footer {
+    border-top: 1px solid #EEF1F5 !important;
+    padding-top: 16px !important;
+    margin-top: 20px !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="eop">
+  <div class="eop-crumbs">
+    <a class="eop-back" href="{% url 'operating:order_detail' order.pk %}">
+      <i class="fa fa-arrow-left"></i>
+      {% trans "Back to order" %}
+    </a>
+  </div>
+
+  <div class="eop-head">
+    <h1>{% trans "Edit Order" %} #{{ order.pk }}</h1>
+    {% if order.order_number %}
+      <span class="eop-sub">{{ order.order_number }}</span>
+    {% endif %}
+  </div>
+
+  <div class="eop-body">
+    <div class="eop-card">
+      {% include "operating/partials/create_order_form.html" %}
+    </div>
+  </div>
+</div>
+{% endblock %}

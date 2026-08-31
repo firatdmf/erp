@@ -20,7 +20,7 @@ from .forms import (
 )
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.detail import DetailView
-from django.views.generic import ListView
+from django.views.generic import ListView, RedirectView
 from django.db import transaction
 from django.forms import ValidationError, formset_factory
 from django.views.decorators.http import require_POST
@@ -1153,8 +1153,7 @@ def order_pack_scan(request, pk):
     get the package (Pack) drag-and-drop grouping — scanned tops sorted
     into named packages so it's visible which sack/box holds what;
     retail orders keep the plain flat list. PACKING ONLY — editing the
-    order's lines/prices happens in the pre-filled create-order sidebar
-    (openEditOrderSidebar → OrderEdit)."""
+    order's lines/prices happens on its own full page (OrderEdit)."""
     order = get_object_or_404(Order, pk=pk)
     # Cancelled/returned is terminal — never render the packing UI (which
     # would also auto-create Pack #1 as a GET side effect) for a dead order.
@@ -2284,7 +2283,7 @@ class OrderCreate(View):
 class OrderEdit(UpdateView):
     model = Order
     form_class = OrderForm
-    template_name = "operating/edit_order.html"
+    template_name = "operating/edit_order_page.html"
 
     def _is_ajax(self):
         return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -2296,7 +2295,10 @@ class OrderEdit(UpdateView):
         # submit label, and to hydrate existing items / customer.
         if self._is_ajax():
             return ["operating/partials/create_order_form.html"]
-        return [self.template_name]
+        # Full page: the same partial again, wrapped in a page instead of
+        # a drawer. Not the old edit_order.html, which is the unstyled
+        # pre-sidebar form and has drifted from what the partial does.
+        return ["operating/edit_order_page.html"]
 
     # prevent editing completed orders.
     def dispatch(self, request, *args, **kwargs):
@@ -2671,12 +2673,29 @@ class OrderEdit(UpdateView):
         return reverse_lazy("operating:order_detail", kwargs={"pk": self.object.pk})
 
 
+class OrderListRedirect(RedirectView):
+    """Send the pre-split /operating/orders/ to the working book.
+
+    Kept rather than deleted because the address is linked from the nav,
+    the mobile drawer, the top bar and every cari detail page, none of
+    which know which book the reader is in.
+    """
+    permanent = False
+
+    def get_redirect_url(self, *args, **kwargs):
+        from accounting.services_accounts import get_default_book
+        book = get_default_book(getattr(self.request.user, "member", None))
+        url = reverse("operating:order_list_scoped", kwargs={"book_id": book.pk})
+        query = self.request.META.get("QUERY_STRING", "")
+        return f"{url}?{query}" if query else url
+
+
 class OrderList(ListView):
     model = Order
     template_name = "operating/order_list.html"
     context_object_name = "orders"
     ordering = ["-created_at"]
-    
+
     def get_queryset(self):
         # Optimize with select_related and prefetch_related to avoid N+1 queries.
         # `items__product` and `items__product_variant` are needed because
@@ -2684,13 +2703,17 @@ class OrderList(ListView):
         # prefetching, each order row would fire two extra queries per
         # line item. `cari` joins for the same reason: the customer cell
         # names the account a retail order posts to.
-        return (
+        qs = (
             Order.objects
             .select_related('contact', 'company', 'web_client', 'cari')
             .prefetch_related('items__product', 'items__product_variant')
             .order_by("-created_at")
         )
-    
+        # One book's orders. An Order carries no book of its own; the
+        # link is its cari, which is where the sale actually posts, so
+        # the book of the account is the book of the order.
+        return qs.filter(cari__book=self.request.book)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         

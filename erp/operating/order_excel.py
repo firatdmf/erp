@@ -87,6 +87,26 @@ def _money_format(code):
     return f'"{sym}"#,##0.00'
 
 
+def _break_words(text, every=4):
+    """Hard-wrap a name every `every` words.
+
+    Excel wraps on its own, but only where the column happens to run
+    out: the same name breaks in a different place on every sheet, and
+    one that fits by a character does not break at all — it just runs
+    on across the page. A break the reader can predict beats one the
+    column width decides.
+
+    Four words, because that is what halves the names this is for.
+    "GREK TAŞLI VE İNCİ EKRU İNCİ BEYAZ ZEMİN" is eight of them and
+    comes out square.
+    """
+    words = str(text or "").split()
+    if len(words) <= every:
+        return str(text or "").strip()
+    return "\n".join(" ".join(words[i:i + every])
+                     for i in range(0, len(words), every))
+
+
 def _wrapped_lines(text, width_chars):
     """How many lines a value takes in a column that wide.
 
@@ -252,7 +272,8 @@ def build_order_workbook(order):
         price = it.price or Decimal("0")
         line = (qty * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         total += line
-        title = getattr(it.product, "title", None) or str(it.product or "—")
+        title = _break_words(getattr(it.product, "title", None)
+                             or str(it.product or "—"))
         if getattr(it, "description", ""):
             title = f"{title}\n{it.description}"
         vsku = it.product_variant.variant_sku if (it.product_variant_id and it.product_variant) else "—"
@@ -328,12 +349,12 @@ def build_combined_workbook(orders):
     ws = wb.active
     ws.title = "Orders"
     ws.sheet_view.showGridLines = False
-    # 137 character-widths across, which is 10.0in — inside the 10.4in a
+    # 133 character-widths across, which is 9.7in — inside the 10.4in a
     # landscape Letter page leaves between its margins, so the fit-to-
     # width scaling set up at the foot of this function has nothing to
     # shrink and the sheet prints at full size. Widen a column here and
     # it still prints, just smaller.
-    widths = (28, 15, 21, 17, 12, 11, 8, 11, 14)
+    widths = (24, 15, 21, 17, 12, 11, 8, 11, 14)
     for col, w in zip("ABCDEFGHI", widths):
         ws.column_dimensions[col].width = w
 
@@ -411,7 +432,8 @@ def build_combined_workbook(orders):
         line = it.line_total_calc
         total += line
         total_qty += qty
-        title = getattr(it.product, "title", None) or str(it.product or "—")
+        title = _break_words(getattr(it.product, "title", None)
+                             or str(it.product or "—"))
         if getattr(it, "description", ""):
             title = f"{title}\n{it.description}"
         vsku = (it.product_variant.variant_sku

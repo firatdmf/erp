@@ -229,11 +229,25 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         ws = self._book(self.laleli_a)
         row = next(r for r in range(11, ws.max_row + 1)
                    if str(ws.cell(r, 1).value or "").startswith("GREK"))
+        # Broken where the rule says, not where the column happens to
+        # run out: four words a line, so eight words come out square.
+        self.assertEqual(ws.cell(row, 1).value,
+                         "GREK TAŞLI VE İNCİ\nEKRU İNCİ BEYAZ ZEMİN")
+        self.assertTrue(ws.cell(row, 1).alignment.wrap_text)
         self.assertGreaterEqual(ws.row_dimensions[row].height or 0, 27)
         # A short name is left alone rather than padded to match.
         short = next(r for r in range(11, ws.max_row + 1)
                      if ws.cell(r, 1).value == "Crepe")
         self.assertIsNone(ws.row_dimensions[short].height)
+
+    def test_a_name_of_four_words_or_fewer_is_left_whole(self):
+        four = Product.objects.create(title="Ekru Grek Taşlı İnci",
+                                      sku="PIL01", price=1)
+        OrderItem.objects.create(order=self.laleli_a, product=four,
+                                 quantity=Decimal("1"), price=Decimal("1"))
+        titles = [self._book(self.laleli_a).cell(r, 1).value
+                  for r in range(11, 40)]
+        self.assertIn("Ekru Grek Taşlı İnci", titles)
 
     def test_the_total_row_stands_out_from_the_lines_it_totals(self):
         """At the foot of thirty half-bold rows, bold alone is not a

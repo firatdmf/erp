@@ -178,9 +178,11 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         self.assertEqual(resp.status_code, 200)
         return openpyxl.load_workbook(BytesIO(resp.content)).active
 
+    AMOUNT = 9  # the last column — see COMBINED_HEADS
+
     def test_it_comes_to_what_the_printed_sheet_comes_to(self):
         ws = self._book(self.laleli_a, self.laleli_b, self.ergene_a)
-        self.assertEqual(ws.cell(ws.max_row, 11).value, 654.15)
+        self.assertEqual(ws.cell(ws.max_row, self.AMOUNT).value, 654.15)
 
     def test_money_is_a_number_a_spreadsheet_can_add(self):
         """The point of exporting is to do arithmetic on it, so the
@@ -189,17 +191,26 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         ws = self._book(self.laleli_a)
         # int or float — openpyxl reads a whole number back as an int.
         # What matters is that it is not a string that looks like money.
-        self.assertIsInstance(ws.cell(ws.max_row, 11).value, (int, float))
-        self.assertIn("#,##0.00", ws.cell(ws.max_row, 11).number_format)
+        cell = ws.cell(ws.max_row, self.AMOUNT)
+        self.assertIsInstance(cell.value, (int, float))
+        self.assertEqual(cell.number_format, "#,##0.00")
 
-    def test_every_line_names_the_order_it_came_from(self):
-        """A column, where the printed sheet uses a heading row: a
-        spreadsheet sorts and pivots on a column and cannot on a
-        heading."""
-        ws = self._book(self.laleli_a, self.ergene_a)
-        col = [ws.cell(r, 1).value for r in range(1, ws.max_row + 1)]
-        self.assertIn("DK-284", col)
-        self.assertIn("DK-291", col)
+    def test_the_currency_is_named_in_the_heading_not_in_the_cells(self):
+        """A figure carrying its own currency has to be stripped before
+        it can be summed, which is the one thing a spreadsheet is for."""
+        ws = self._book(self.laleli_a)
+        heads = [c.value for c in ws[ws.max_row - 2]]
+        self.assertIn("Price (USD)", heads)
+        self.assertIn("Amount (USD)", heads)
+        for row in ws.iter_rows(min_row=1, values_only=True):
+            for v in row:
+                if isinstance(v, str):
+                    self.assertNotIn("0.00 USD", v)
+
+    def test_the_wordmark_gets_a_row_tall_enough_to_hold_it(self):
+        """20pt type in a row sized for 11pt loses its descenders under
+        the row beneath."""
+        self.assertGreaterEqual(self._book(self.laleli_a).row_dimensions[1].height, 26)
 
     def test_it_is_delivered_as_a_spreadsheet(self):
         resp = self._get(self.laleli_a)
@@ -225,8 +236,9 @@ class CombinedOrderExcel(OlegOrders, TestCase):
     def test_it_carries_the_variant_name_and_both_codes(self):
         ws = self._book(self.laleli_a)
         heads = [ws.cell(r, c).value
-                 for r in range(1, ws.max_row + 1) for c in (3, 4, 5, 6, 7)]
-        for h in ("Product", "SKU", "Variant", "Variant SKU", "Type"):
+                 for r in range(1, ws.max_row + 1) for c in range(1, 10)]
+        for h in ("Product", "SKU", "Variant", "Variant SKU", "Type",
+                  "Quantity", "Packs"):
             self.assertIn(h, heads)
 
 

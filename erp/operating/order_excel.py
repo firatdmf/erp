@@ -3,10 +3,13 @@ mirrors the printable order PDF and carries the full order record.
 
 Two of them: one order, and several of one customer's orders together
 (the sheet OrderPrintCombined prints). The combined workbook is the one
-people take away to work on, so it is a table before it is a document —
-every line carries the order it came from in a column of its own, which
-is what lets a spreadsheet sort, filter and pivot by it where the
-printed sheet uses a heading row.
+people take away to work on, so it is a table before it is a document:
+one row per line item, the rows filtered and the header frozen, and
+every figure a number rather than something that only looks like one.
+
+It does NOT carry the order each line came from. The printed sheet says
+that in a heading above each group, and this deliberately does not
+repeat it — asked for as a list of goods, not a reconciliation.
 """
 from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
@@ -72,6 +75,9 @@ def build_order_workbook(order):
     merge(ws, r, 1, 3)
     cell(ws, r, 4, f"ORDER {num}", font=F_DOCNO, align=RIGHT)
     merge(ws, r, 4, 6)
+    # 20pt type in a row sized for 11pt: the wordmark's descenders were
+    # cut off by the row beneath it. Row heights are in points.
+    ws.row_dimensions[r].height = 28
     r += 1
     cell(ws, r, 1, "Order Confirmation", font=F_SUB)
     merge(ws, r, 1, 3)
@@ -219,13 +225,15 @@ def build_order_workbook(order):
 
 
 # ── Combined: several of one customer's orders ───────────────────────
-# Columns, and why these: the printed sheet's six, plus the two the
-# print folds under a name (each SKU) and the two only a spreadsheet has
-# room for (the order, its date). Someone who exports this is about to
-# sort or pivot it, and neither works on a value tucked under another.
-COMBINED_HEADS = ["Order", "Order Date", "Product", "SKU", "Variant",
-                  "Variant SKU", "Type", "Qty", "Packs", "Unit", "Amount"]
+# The printed sheet's columns, with each SKU given one of its own rather
+# than folded under the name it belongs to: someone who exports this is
+# about to sort or pivot, and neither works on a value tucked under
+# another. The money columns name the currency in the HEADING and hold
+# bare numbers — see the note on `money` below.
+COMBINED_HEADS = ["Product", "SKU", "Variant", "Variant SKU", "Type",
+                  "Quantity", "Packs", "Price", "Amount"]
 CNCOLS = len(COMBINED_HEADS)
+C_QTY, C_PACKS, C_PRICE, C_AMOUNT = 6, 7, 8, 9
 
 
 def build_combined_workbook(orders):
@@ -235,7 +243,8 @@ def build_combined_workbook(orders):
     printed sheet uses — so the two documents cannot disagree about what
     a line says or what it comes to. Quantities and money are written as
     NUMBERS with a display format, not as text: the point of taking this
-    into a spreadsheet is to do arithmetic on it.
+    into a spreadsheet is to do arithmetic on it, and a figure carrying
+    its own currency is a figure you have to strip before you can.
     """
     from openpyxl import Workbook
     from accounting.services_accounts import brand_name_for
@@ -244,14 +253,19 @@ def build_combined_workbook(orders):
     primary = orders[-1]
     brand = (primary.print_header or "").strip() or brand_name_for()
     ccode = (primary.original_currency or primary.paid_currency or "USD")
-    money = f'#,##0.00" {ccode}"'
+    # No currency in the cell — not even as a display suffix. A column
+    # headed "Price (USD)" holding plain numbers is one a spreadsheet
+    # can sum, chart and multiply without the reader wondering whether
+    # what they see is a number or a label. The currency is said once,
+    # in the heading, where it cannot get into the arithmetic.
+    money = "#,##0.00"
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Orders"
     ws.sheet_view.showGridLines = False
-    for col, w in zip("ABCDEFGHIJK",
-                      (14, 13, 30, 16, 22, 18, 12, 10, 8, 12, 14)):
+    for col, w in zip("ABCDEFGHI",
+                      (30, 16, 22, 18, 12, 11, 8, 12, 14)):
         ws.column_dimensions[col].width = w
 
     dates = [o.order_date for o in orders if o.order_date]
@@ -264,15 +278,18 @@ def build_combined_workbook(orders):
     # ── Header ──
     r = 1
     cell(ws, r, 1, brand, font=F_TITLE)
-    merge(ws, r, 1, 6)
-    cell(ws, r, 7, f"{len(orders)} ORDERS" if len(orders) != 1 else "ORDER",
+    merge(ws, r, 1, 5)
+    cell(ws, r, 6, f"{len(orders)} ORDERS" if len(orders) != 1 else "ORDER",
          font=F_DOCNO, align=RIGHT)
-    merge(ws, r, 7, CNCOLS)
+    merge(ws, r, 6, CNCOLS)
+    # The wordmark is 20pt in a row sized for 11pt text, so its descenders
+    # were being cut off by the row below it. Row heights are in points.
+    ws.row_dimensions[r].height = 28
     r += 1
     cell(ws, r, 1, "Order Confirmation", font=F_SUB)
-    merge(ws, r, 1, 6)
-    cell(ws, r, 7, span, font=F_SUB, align=RIGHT)
-    merge(ws, r, 7, CNCOLS)
+    merge(ws, r, 1, 5)
+    cell(ws, r, 6, span, font=F_SUB, align=RIGHT)
+    merge(ws, r, 6, CNCOLS)
     for c in range(1, CNCOLS + 1):
         ws.cell(r, c).border = RULE
     r += 2
@@ -307,8 +324,10 @@ def build_combined_workbook(orders):
         packs |= o_packs
     r = section(ws, r, f"PRODUCTS ({len(rows)})", CNCOLS)
     for i, h in enumerate(COMBINED_HEADS, 1):
+        if i in (C_PRICE, C_AMOUNT):
+            h = f"{h} ({ccode})"
         cell(ws, r, i, h, font=F_HEAD, fill=FILL_HEAD, border=GRID,
-             align=(RIGHT if i >= 8 else LEFT))
+             align=(RIGHT if i >= C_QTY else LEFT))
     r += 1
     head_row = r
 
@@ -324,33 +343,31 @@ def build_combined_workbook(orders):
             title = f"{title}\n{it.description}"
         vsku = (it.product_variant.variant_sku
                 if (it.product_variant_id and it.product_variant) else None)
-        cell(ws, r, 1, o.order_number or f"#{o.pk}", font=F_VAL, border=GRID)
-        cell(ws, r, 2, _dt(o.order_date, "%d %b %Y") if o.order_date else "—",
-             font=F_VAL, border=GRID)
-        cell(ws, r, 3, title, font=F_VAL, border=GRID, align=TOP)
-        cell(ws, r, 4, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID)
-        cell(ws, r, 5, it.variant_label or "—", font=F_VAL, border=GRID)
-        cell(ws, r, 6, vsku or "—", font=F_VAL, border=GRID)
-        cell(ws, r, 7, it.product_type_label or "—", font=F_VAL, border=GRID)
-        cell(ws, r, 8, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00")
-        cell(ws, r, 9, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0")
-        cell(ws, r, 10, _dec(it.price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
-        cell(ws, r, 11, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
+        cell(ws, r, 1, title, font=F_VAL, border=GRID, align=TOP)
+        cell(ws, r, 2, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID)
+        cell(ws, r, 3, it.variant_label or "—", font=F_VAL, border=GRID)
+        cell(ws, r, 4, vsku or "—", font=F_VAL, border=GRID)
+        cell(ws, r, 5, it.product_type_label or "—", font=F_VAL, border=GRID)
+        cell(ws, r, C_QTY, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00")
+        cell(ws, r, C_PACKS, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0")
+        cell(ws, r, C_PRICE, _dec(it.price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
+        cell(ws, r, C_AMOUNT, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         r += 1
 
     # ── Total ──
     cell(ws, r, 1, "Total", font=F_TOTAL, border=GRID)
-    merge(ws, r, 1, 7)
-    merge_border(ws, r, 1, 7, GRID)
-    cell(ws, r, 8, _dec(total_qty), font=F_TOTAL, border=GRID, align=RIGHT, fmt="#,##0.00")
-    cell(ws, r, 9, len(packs), font=F_TOTAL, border=GRID, align=RIGHT, fmt="#,##0")
-    cell(ws, r, 10, "", font=F_TOTAL, border=GRID)
-    cell(ws, r, 11, _dec(total), font=F_TOTAL, border=GRID, align=RIGHT, fmt=money)
+    merge(ws, r, 1, C_QTY - 1)
+    merge_border(ws, r, 1, C_QTY - 1, GRID)
+    cell(ws, r, C_QTY, _dec(total_qty), font=F_TOTAL, border=GRID, align=RIGHT, fmt="#,##0.00")
+    cell(ws, r, C_PACKS, len(packs), font=F_TOTAL, border=GRID, align=RIGHT, fmt="#,##0")
+    cell(ws, r, C_PRICE, "", font=F_TOTAL, border=GRID)
+    cell(ws, r, C_AMOUNT, _dec(total), font=F_TOTAL, border=GRID, align=RIGHT, fmt=money)
 
     # The item rows get a filter, which is the first thing anyone who
     # exported this will want — by order, by product, by colour.
     if rows:
-        ws.auto_filter.ref = f"A{head_row - 1}:{'K'}{head_row + len(rows) - 1}"
+        last_col = chr(ord("A") + CNCOLS - 1)
+        ws.auto_filter.ref = f"A{head_row - 1}:{last_col}{head_row + len(rows) - 1}"
     ws.freeze_panes = ws.cell(head_row, 1)
 
     return wb

@@ -61,6 +61,7 @@ urlpatterns = [
     # customer's orders, which may sit in two books. The view checks the
     # viewer against each order's book itself.
     path("orders/print/combined/", views.OrderPrintCombined.as_view(), name="order_print_combined"),
+    path("orders/print/combined/excel/", order_excel.combined_order_excel, name="order_excel_combined"),
     path("orders/<int:pk>/print-header/", views.update_order_print_header, name="order_print_header"),
     path("orders/<int:pk>/changes/", views.order_changes, name="order_changes"),
     # Packing-scan flow (reserve warehouse rolls before shipping)

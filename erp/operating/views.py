@@ -2047,6 +2047,57 @@ class OrderPrint(DetailView):
         return HttpResponse(html)
 
 
+def select_combined_orders(request):
+    """The orders a combined document is being asked for, or a refusal.
+
+    Returns (orders, None) or (None, response). Shared by the printable
+    sheet and its Excel — the two are one document in two formats, and a
+    rule enforced in only one of them is not a rule. The refusals:
+
+      * nothing picked, or nothing that parses as an id;
+      * an id that matches no order — printing two of the three asked
+        for would put a wrong total on a document handed to a customer;
+      * more than one customer, or an order with nobody attached: one
+        sheet is addressed to one customer, and the orders are named by
+        id in a URL anyone can retype;
+      * a book the viewer is not assigned to. This is the rule
+        book_guarded applies to an order page, asked here per order
+        because a combined sheet may legitimately span books.
+    """
+    from django.utils.translation import gettext as _
+    from accounting.services_accounts import member_can_use_book
+
+    ids, seen = [], set()
+    for part in (request.GET.get("ids") or "").split(","):
+        part = part.strip()
+        if part.isdigit() and int(part) not in seen:
+            seen.add(int(part))
+            ids.append(int(part))
+    if not ids:
+        return None, HttpResponseBadRequest(_("Pick at least one order."))
+
+    orders = list(
+        Order.objects.filter(pk__in=ids)
+        .select_related("contact", "company", "web_client", "cari", "cari__book")
+        .order_by("order_date", "pk")
+    )
+    if len(orders) != len(ids):
+        raise Http404("No such order.")
+
+    who = {(o.contact_id, o.company_id, o.web_client_id) for o in orders}
+    if len(who) > 1 or who == {(None, None, None)}:
+        return None, HttpResponseBadRequest(
+            _("A combined sheet covers one customer's orders."))
+
+    member = getattr(request.user, "member", None)
+    for o in orders:
+        book = o.cari.book if o.cari_id else None
+        if book is not None and not member_can_use_book(member, book):
+            raise Http404("No such order.")
+
+    return orders, None
+
+
 class OrderPrintCombined(LoginRequiredMixin, View):
     """Several of one customer's orders on a single printable sheet.
 
@@ -2069,44 +2120,12 @@ class OrderPrintCombined(LoginRequiredMixin, View):
     """
 
     def get(self, request):
-        from django.utils.translation import gettext as _
         from decimal import Decimal
-        from accounting.services_accounts import brand_name_for, member_can_use_book
+        from accounting.services_accounts import brand_name_for
 
-        ids, seen = [], set()
-        for part in (request.GET.get("ids") or "").split(","):
-            part = part.strip()
-            if part.isdigit() and int(part) not in seen:
-                seen.add(int(part))
-                ids.append(int(part))
-        if not ids:
-            return HttpResponseBadRequest(_("Pick at least one order to print."))
-
-        orders = list(
-            Order.objects.filter(pk__in=ids)
-            .select_related("contact", "company", "web_client", "cari", "cari__book")
-            .order_by("order_date", "pk")
-        )
-        if len(orders) != len(ids):
-            raise Http404("No such order.")
-
-        # One sheet is addressed to one customer. The orders are named by
-        # id in a URL anyone can retype, so this is what keeps two
-        # customers' lines off one page — and an order with nobody
-        # attached has no customer for the sheet to be addressed to.
-        who = {(o.contact_id, o.company_id, o.web_client_id) for o in orders}
-        if len(who) > 1 or who == {(None, None, None)}:
-            return HttpResponseBadRequest(
-                _("A combined sheet covers one customer's orders."))
-
-        # Every order's book must be one the viewer is assigned to — the
-        # rule book_guarded applies to an order page, asked here per
-        # order because this sheet may legitimately span books.
-        member = getattr(request.user, "member", None)
-        for o in orders:
-            book = o.cari.book if o.cari_id else None
-            if book is not None and not member_can_use_book(member, book):
-                raise Http404("No such order.")
+        orders, refusal = select_combined_orders(request)
+        if refusal is not None:
+            return refusal
 
         groups, items = [], []
         total, total_qty, pack_ids = Decimal("0.00"), Decimal("0"), set()

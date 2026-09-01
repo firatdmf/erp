@@ -518,6 +518,12 @@
               <i class="fa fa-print"></i>
               <span id="printOrdersLabel">{% trans "Print selected" %}</span>
             </button>
+            <button type="button" id="excelOrdersBtn" class="od-print-orders" disabled
+                    onclick="excelSelectedOrders()"
+                    title="{% trans 'Download the selected orders as a spreadsheet' %}">
+              <i class="fa fa-file-excel"></i>
+              <span>{% trans "Excel" %}</span>
+            </button>
             {% endif %}
           </div>
           <div class="od-order-list">
@@ -1288,6 +1294,8 @@
     if (!btn) return;
     const n = document.querySelectorAll('.od-order-check:checked').length;
     btn.disabled = n === 0;
+    const xls = document.getElementById('excelOrdersBtn');
+    if (xls) xls.disabled = n === 0;
     // Labels come off data- attributes rather than being written into
     // this script: they are translated, and a Turkish label carrying an
     // apostrophe would otherwise close the JS string it sits in.
@@ -1295,12 +1303,25 @@
       n ? btn.dataset.labelPicked + ' (' + n + ')' : btn.dataset.labelIdle;
   }
 
+  function pickedOrderIds() {
+    return Array.from(document.querySelectorAll('.od-order-check:checked'))
+                .map(function (cb) { return cb.value; });
+  }
+
   function printSelectedOrders() {
-    const ids = Array.from(document.querySelectorAll('.od-order-check:checked'))
-                     .map(function (cb) { return cb.value; });
+    const ids = pickedOrderIds();
     if (!ids.length) return;
     window.open('{% url "operating:order_print_combined" %}?ids=' + ids.join(','),
                 '_blank');
+  }
+
+  // The same sheet as a spreadsheet. Navigates rather than opening a
+  // tab: the response is an attachment, so a new tab would open, take
+  // the download and sit there blank.
+  function excelSelectedOrders() {
+    const ids = pickedOrderIds();
+    if (!ids.length) return;
+    window.location = '{% url "operating:order_excel_combined" %}?ids=' + ids.join(',');
   }
 </script>
 

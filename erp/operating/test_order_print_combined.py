@@ -31,7 +31,11 @@ from .models import Order, OrderItem
 User = get_user_model()
 
 
-class CombinedOrderSheet(TestCase):
+class OlegOrders:
+    """Three orders for one customer across two books — the split that
+    sent this customer three documents. Shared by the printed sheet and
+    the Excel of it, which are one document in two formats."""
+
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def setUp(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
@@ -56,7 +60,7 @@ class CombinedOrderSheet(TestCase):
 
         self.boss = User.objects.create_superuser("boss", "b@t.com", "pw")
         self.client.force_login(self.boss)
-        self.url = reverse("operating:order_print_combined")
+        self.url = reverse(self.url_name)
 
     def _order(self, book, contact, number, qty, price):
         cari, _ = CariAccount.objects.get_or_create(
@@ -72,6 +76,10 @@ class CombinedOrderSheet(TestCase):
     def _get(self, *orders):
         ids = ",".join(str(o.pk) for o in orders)
         return self.client.get(self.url, {"ids": ids})
+
+
+class CombinedOrderSheet(OlegOrders, TestCase):
+    url_name = "operating:order_print_combined"
 
     # ── what it prints ────────────────────────────────────────────────
     def test_it_totals_every_order_on_the_sheet(self):
@@ -156,6 +164,70 @@ class CombinedOrderSheet(TestCase):
 
         self.assertEqual(self._get(self.laleli_a, self.laleli_b).status_code, 200)
         self.assertEqual(self._get(self.laleli_a, self.ergene_a).status_code, 404)
+
+
+class CombinedOrderExcel(OlegOrders, TestCase):
+    """The same sheet as a spreadsheet."""
+
+    url_name = "operating:order_excel_combined"
+
+    def _book(self, *orders):
+        import openpyxl
+        from io import BytesIO
+        resp = self._get(*orders)
+        self.assertEqual(resp.status_code, 200)
+        return openpyxl.load_workbook(BytesIO(resp.content)).active
+
+    def test_it_comes_to_what_the_printed_sheet_comes_to(self):
+        ws = self._book(self.laleli_a, self.laleli_b, self.ergene_a)
+        self.assertEqual(ws.cell(ws.max_row, 11).value, 654.15)
+
+    def test_money_is_a_number_a_spreadsheet_can_add(self):
+        """The point of exporting is to do arithmetic on it, so the
+        figures are numbers with a display format — not text that only
+        looks like money."""
+        ws = self._book(self.laleli_a)
+        # int or float — openpyxl reads a whole number back as an int.
+        # What matters is that it is not a string that looks like money.
+        self.assertIsInstance(ws.cell(ws.max_row, 11).value, (int, float))
+        self.assertIn("#,##0.00", ws.cell(ws.max_row, 11).number_format)
+
+    def test_every_line_names_the_order_it_came_from(self):
+        """A column, where the printed sheet uses a heading row: a
+        spreadsheet sorts and pivots on a column and cannot on a
+        heading."""
+        ws = self._book(self.laleli_a, self.ergene_a)
+        col = [ws.cell(r, 1).value for r in range(1, ws.max_row + 1)]
+        self.assertIn("DK-284", col)
+        self.assertIn("DK-291", col)
+
+    def test_it_is_delivered_as_a_spreadsheet(self):
+        resp = self._get(self.laleli_a)
+        self.assertIn("spreadsheetml.sheet", resp["Content-Type"])
+        self.assertIn("attachment;", resp["Content-Disposition"])
+        self.assertIn("OLEG MOTUZENKO", resp["Content-Disposition"])
+
+    def test_it_refuses_what_the_printed_sheet_refuses(self):
+        """Both go through select_combined_orders — a rule enforced in
+        only one of two formats is not a rule."""
+        theirs = self._order(self.laleli, self.someone_else, "DK-999",
+                             Decimal("10"), Decimal("1"))
+        self.assertEqual(self._get(self.laleli_a, theirs).status_code, 400)
+        self.assertEqual(self.client.get(self.url).status_code, 400)
+        self.assertEqual(
+            self.client.get(self.url,
+                            {"ids": f"{self.laleli_a.pk},9999999"}).status_code, 404)
+
+    def test_a_signed_out_visitor_gets_nothing(self):
+        self.client.logout()
+        self.assertEqual(self._get(self.laleli_a).status_code, 302)
+
+    def test_it_carries_the_variant_name_and_both_codes(self):
+        ws = self._book(self.laleli_a)
+        heads = [ws.cell(r, c).value
+                 for r in range(1, ws.max_row + 1) for c in (3, 4, 5, 6, 7)]
+        for h in ("Product", "SKU", "Variant", "Variant SKU", "Type"):
+            self.assertIn(h, heads)
 
 
 class SingleOrderPrintUnchanged(TestCase):

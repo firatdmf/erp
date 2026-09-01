@@ -276,6 +276,42 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         # The column headings repeat, so page two can be read at all.
         self.assertTrue(ws.print_title_rows)
 
+    def test_every_column_is_as_wide_as_its_content_and_no_wider(self):
+        """Fixed widths were guesses, generous where they should have
+        been tight and tight where a heading needed room."""
+        from openpyxl.utils import get_column_letter
+        long_name = Product.objects.create(
+            title="GREK TAŞLI VE İNCİ EKRU İNCİ BEYAZ ZEMİN",
+            sku="HKN00011", price=10)
+        OrderItem.objects.create(order=self.laleli_a, product=long_name,
+                                 quantity=Decimal("150"), price=Decimal("4.50"))
+        ws = self._book(self.laleli_a)
+        head = 10
+
+        for c in range(1, 10):
+            width = ws.column_dimensions[get_column_letter(c)].width
+            widest = max(
+                len(max(str(ws.cell(r, c).value or "").split("\n"), key=len))
+                for r in range(head, ws.max_row + 1))
+            # Wide enough for what is in it...
+            self.assertGreaterEqual(width, widest)
+            # ...and not wide enough to be holding room for anything
+            # else. The heading gets three characters more than its
+            # label for the filter's dropdown, which sits in the cell.
+            self.assertLessEqual(width, widest + 5)
+
+        # "Type" holds "Fabric"; "Product" holds four words of a name.
+        self.assertLess(ws.column_dimensions["E"].width,
+                        ws.column_dimensions["A"].width)
+
+    def test_a_heading_is_not_hidden_behind_its_own_filter_arrow(self):
+        """"Price (USD)" is eleven characters in a column whose figures
+        are seven, so the column is sized by the heading — and the
+        dropdown sits on top of the last of it."""
+        ws = self._book(self.laleli_a)
+        self.assertGreaterEqual(ws.column_dimensions["H"].width,
+                                len("Price (USD)") + 3)
+
     def test_the_wordmark_gets_a_row_tall_enough_to_hold_it(self):
         """20pt type in a row sized for 11pt loses its descenders under
         the row beneath."""

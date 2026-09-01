@@ -107,6 +107,76 @@ def _break_words(text, every=4):
                      for i in range(0, len(words), every))
 
 
+def _display_len(cl):
+    """How wide a cell READS, which is not how wide its value is.
+
+    A number carries a format: 243.53 in a currency column shows as
+    "$243.53", two characters more than the value has. And a value
+    broken over lines is only as wide as its longest line, not the sum
+    of them.
+    """
+    v = cl.value
+    if v is None:
+        return 0
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        fmt = cl.number_format or ""
+        # Whatever the format sets in quotes is printed literally beside
+        # the figure — the currency sign, in practice.
+        literal = sum(len(part) for part in fmt.split('"')[1::2])
+        return len(f"{v:,.2f}") + literal
+    return max((len(line) for line in str(v).split("\n")), default=0)
+
+
+def fit_columns(ws, first_row, last_row, ncols, header_row=None,
+                min_w=6, max_w=34, pad=1, arrow=3):
+    """Size each column to the widest thing actually in it.
+
+    Fixed widths were guesswork, and guessed generously: columns holding
+    "Fabric" and a pack count were as wide as the room a long name might
+    one day need. Measured against the rows themselves there is no such
+    slack, and a narrower sheet is one the fit-to-width scaling has less
+    to shrink.
+
+    `pad` is one character, which is all a cell needs: Excel already
+    insets its text a couple of pixels from the border. `arrow` is the
+    three the header row gets on top — the filter's dropdown sits
+    INSIDE the cell and covers the end of the label otherwise, which is
+    what several of these columns were doing before they were measured.
+    """
+    from openpyxl.utils import get_column_letter
+
+    for c in range(1, ncols + 1):
+        widest = 0
+        for r in range(first_row, last_row + 1):
+            n = _display_len(ws.cell(r, c))
+            if r == header_row and n:
+                n += arrow
+            widest = max(widest, n)
+        ws.column_dimensions[get_column_letter(c)].width = \
+            min(max(widest + pad, min_w), max_w)
+
+
+def fit_rows(ws, first_row, last_row, ncols, cap=4):
+    """Give each row the height its longest cell needs.
+
+    Runs AFTER fit_columns, because how many lines a value takes is a
+    question about the column it ended up in. openpyxl writes no row
+    heights at all, and Excel then leaves every row one line tall
+    whatever its cells say about wrapping.
+    """
+    from openpyxl.utils import get_column_letter
+
+    for r in range(first_row, last_row + 1):
+        lines = 1
+        for c in range(1, ncols + 1):
+            v = ws.cell(r, c).value
+            if isinstance(v, str):
+                w = ws.column_dimensions[get_column_letter(c)].width or 10
+                lines = max(lines, _wrapped_lines(v, w))
+        if lines > 1:
+            ws.row_dimensions[r].height = 13.5 * min(lines, cap)
+
+
 def _wrapped_lines(text, width_chars):
     """How many lines a value takes in a column that wide.
 
@@ -349,14 +419,6 @@ def build_combined_workbook(orders):
     ws = wb.active
     ws.title = "Orders"
     ws.sheet_view.showGridLines = False
-    # 133 character-widths across, which is 9.7in — inside the 10.4in a
-    # landscape Letter page leaves between its margins, so the fit-to-
-    # width scaling set up at the foot of this function has nothing to
-    # shrink and the sheet prints at full size. Widen a column here and
-    # it still prints, just smaller.
-    widths = (24, 15, 21, 17, 12, 11, 8, 11, 14)
-    for col, w in zip("ABCDEFGHI", widths):
-        ws.column_dimensions[col].width = w
 
     dates = [o.order_date for o in orders if o.order_date]
     span = "—"
@@ -447,21 +509,6 @@ def build_combined_workbook(orders):
         cell(ws, r, C_PACKS, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0")
         cell(ws, r, C_PRICE, _dec(it.price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         cell(ws, r, C_AMOUNT, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
-
-        # Give the row the height its longest text needs. The cells wrap
-        # already, but openpyxl writes no row heights and Excel then
-        # leaves the row one line tall, so "GREK TAŞLI VE İNCİ EKRU İNCİ
-        # BEYAZ ZEMİN" ran off the side of its column rather than
-        # breaking in half inside it. Four lines is the ceiling: past
-        # that a product has a description, not a name, and the row
-        # would push everything below it onto another page.
-        lines = max(_wrapped_lines(v, widths[i])
-                    for i, v in enumerate([title,
-                                           getattr(it.product, "sku", ""),
-                                           it.variant_label, vsku,
-                                           it.product_type_label]))
-        if lines > 1:
-            ws.row_dimensions[r].height = 13.5 * min(lines, 4)
         r += 1
 
     # ── Total ──
@@ -485,6 +532,15 @@ def build_combined_workbook(orders):
 
     # The item rows get a filter, which is the first thing anyone who
     # exported this will want — by order, by product, by colour.
+    # ── Fit the table to what is in it ───────────────────────────────
+    # Both after the fact, and in this order: a column is sized to its
+    # widest cell, and only then can a row be asked how many lines its
+    # cells take. Measured over the item table alone — the header block
+    # above it is merged across the sheet, and a merged value would size
+    # every column to the whole of itself.
+    fit_columns(ws, head_row - 1, r, CNCOLS, header_row=head_row - 1)
+    fit_rows(ws, head_row, r, CNCOLS)
+
     last_col = chr(ord("A") + CNCOLS - 1)
     if rows:
         ws.auto_filter.ref = f"A{head_row - 1}:{last_col}{head_row + len(rows) - 1}"

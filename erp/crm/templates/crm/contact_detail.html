@@ -216,6 +216,27 @@
   /* TASKS LIST */
   /* Order history — compact clickable rows linking to operating:order_detail */
   .od-order-list { display: flex; flex-direction: column; gap: 8px; }
+  /* Each row carries a tick box: several of one customer's orders print
+     onto a single sheet (operating:order_print_combined). The box sits
+     OUTSIDE the row's anchor — inside it, ticking an order would
+     navigate away to that order instead. */
+  .od-order-pick { display: flex; align-items: center; gap: 10px; }
+  .od-order-pick > .od-order-row { flex: 1; min-width: 0; }
+  .od-order-check {
+    flex: none; width: 15px; height: 15px; cursor: pointer;
+    accent-color: var(--nejum-teal-600);
+  }
+  .od-print-orders {
+    display: inline-flex; align-items: center; gap: 6px; margin-left: 10px;
+    padding: 5px 11px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--nejum-teal-500); background: white;
+    color: var(--nejum-teal-700); font: 600 11.5px var(--font-sans);
+    transition: all 140ms;
+  }
+  .od-print-orders:hover:not(:disabled) { background: #E6F4F1; }
+  .od-print-orders:disabled {
+    opacity: 0.45; cursor: default; border-color: #E2E8EE; color: var(--gray-500);
+  }
   .od-order-row {
     display: grid;
     grid-template-columns: 1.4fr 130px 1fr 18px;
@@ -489,10 +510,23 @@
             <i class="fa fa-shopping-bag card-ico"></i>
             <h3>{% trans "Order history" %}</h3>
             <span class="od-card-sub">{{ orders|length }} {% blocktrans count counter=orders|length %}order{% plural %}orders{% endblocktrans %}</span>
+            {% if orders %}
+            <button type="button" id="printOrdersBtn" class="od-print-orders" disabled
+                    onclick="printSelectedOrders()"
+                    data-label-idle="{% trans 'Print selected' %}"
+                    data-label-picked="{% trans 'Print' %}">
+              <i class="fa fa-print"></i>
+              <span id="printOrdersLabel">{% trans "Print selected" %}</span>
+            </button>
+            {% endif %}
           </div>
           <div class="od-order-list">
             {% for o in orders %}
-              <a class="od-order-row" href="{% url 'operating:order_detail' o.pk %}">
+              <div class="od-order-pick">
+                <input type="checkbox" class="od-order-check" value="{{ o.pk }}"
+                       onchange="syncPrintSelection()"
+                       aria-label="{% trans 'Print this order' %} {{ o.order_number|default:o.pk }}">
+                <a class="od-order-row" href="{% url 'operating:order_detail' o.pk %}">
                 <div class="od-order-id">
                   <div class="od-order-num">{{ o.order_number|default:o.pk }}</div>
                   <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
@@ -521,7 +555,8 @@
                   {% endif %}
                 </div>
                 <i class="fa fa-chevron-right od-order-chev"></i>
-              </a>
+                </a>
+              </div>
             {% empty %}
               <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
                 {% trans "No orders yet for this contact." %}
@@ -1242,6 +1277,31 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeEditContactSidebar();
   });
+
+  // ── Combined order sheet ───────────────────────────────────────────
+  // Tick several of this contact's orders and print them onto one page
+  // (operating:order_print_combined). It is a document and nothing else
+  // — no invoice, no ledger row — so the only state there is to keep is
+  // what happens to be ticked right now.
+  function syncPrintSelection() {
+    const btn = document.getElementById('printOrdersBtn');
+    if (!btn) return;
+    const n = document.querySelectorAll('.od-order-check:checked').length;
+    btn.disabled = n === 0;
+    // Labels come off data- attributes rather than being written into
+    // this script: they are translated, and a Turkish label carrying an
+    // apostrophe would otherwise close the JS string it sits in.
+    document.getElementById('printOrdersLabel').textContent =
+      n ? btn.dataset.labelPicked + ' (' + n + ')' : btn.dataset.labelIdle;
+  }
+
+  function printSelectedOrders() {
+    const ids = Array.from(document.querySelectorAll('.od-order-check:checked'))
+                     .map(function (cb) { return cb.value; });
+    if (!ids.length) return;
+    window.open('{% url "operating:order_print_combined" %}?ids=' + ids.join(','),
+                '_blank');
+  }
 </script>
 
 <!-- Edit Contact Sidebar -->

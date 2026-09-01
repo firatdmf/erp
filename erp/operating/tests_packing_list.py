@@ -292,20 +292,24 @@ class OrderPrintProductType(TestCase):
         self.assertEqual(self._items()[0].product_type_label,
                          "Ready-Made Curtain")
 
-    def test_an_unclassified_product_drops_the_line_instead_of_printing_a_dash(self):
-        """The packing list has a column to fill so it prints "-"; this
-        layout puts the kind under the product name, where a stray dash
-        would read as missing data."""
+    def test_an_unclassified_product_leaves_its_column_empty(self):
+        """Both documents have a Type column to fill now. The helper
+        still hands back None rather than "-" — the template is what
+        decides how an empty cell reads."""
         self.product.category = None
         self.product.type = None
         self.product.save()
         self.assertIsNone(self._items()[0].product_type_label)
 
-    def test_the_line_names_the_variant_instead_of_its_sku(self):
-        """"MRK00061" is a warehouse code; the customer ordered a colour."""
-        item = self._items()[0]
-        self.assertEqual(item.variant_label, "Bej-Gumus")
-        self.assertNotIn("MRK00061", self._page())
+    def test_the_line_names_the_variant_AND_gives_its_code(self):
+        """The name is what the customer ordered ("Bej-Gumus"); the code
+        is what they quote back to order it again. The name once
+        replaced the code, which left them nothing to check the colour
+        against — both print now, in columns of their own."""
+        page = self._page()
+        self.assertEqual(self._items()[0].variant_label, "Bej-Gumus")
+        self.assertIn("Bej-Gumus", page)
+        self.assertIn("MRK00061", page)
 
     def test_the_variant_reads_the_same_as_on_the_packing_list(self):
         self.assertEqual(self._items()[0].variant_label,
@@ -315,15 +319,19 @@ class OrderPrintProductType(TestCase):
         OrderItem.objects.update(product_variant=None)
         self.assertIsNone(self._items()[0].variant_label)
 
-    def test_a_mill_coded_product_does_not_print_its_code_twice(self):
-        """The title IS the SKU on 894 of 920 warehouse products, so
-        showing both read "MT-3016 MT-3016"."""
-        self.assertIsNone(self._items()[0].sku_label)
+    def test_the_product_and_its_sku_each_hold_a_column(self):
+        """The title IS the SKU on 894 of 920 warehouse products. Folded
+        onto one line that read "MT-3016 MT-3016", so the SKU was
+        suppressed; under a column headed SKU it is the column doing its
+        job, and suppressing it would leave a hole in the table."""
+        self.assertIn("MT-3016", self._page())
 
     def test_a_sku_that_says_something_the_title_does_not_still_shows(self):
         self.product.title = "Bergamo"
         self.product.save()
-        self.assertEqual(self._items()[0].sku_label, "MT-3016")
+        page = self._page()
+        self.assertIn("Bergamo", page)
+        self.assertIn("MT-3016", page)
 
     def _query_count(self):
         from django.db import connection

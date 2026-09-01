@@ -39,12 +39,13 @@ from marketing.utils.bunny_storage import upload_to_bunny
 # make the qr codes jso
 
 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.html import escape
 from .models import (
     OrderItem,
     OrderRollReservation,
 )  # if it's not already in __init__.py
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.contrib import messages
 from django.urls import reverse, reverse_lazy
 from django.contrib.auth.decorators import login_required
@@ -1909,6 +1910,93 @@ def update_order_print_header(request, pk):
     return JsonResponse({"success": True, "print_header": order.print_header or ""})
 
 
+def build_order_print_rows(order):
+    """The decorated line rows an order prints, and what they come to.
+
+    Pulled out of OrderPrint so the combined sheet (several orders on one
+    page — OrderPrintCombined) builds its lines through this same rule:
+    the half-up rounding InvoiceItem.compute uses, the variant and
+    goods-type wording the packing list uses, the same pack counting. A
+    line has to read identically whether it is printed alone or beneath
+    two other orders'.
+
+    Returns (rows, total, total_quantity, pack_ids). The packs come back
+    as the SET of roll ids rather than a count, so a caller merging
+    orders unions them: one physical pack scanned onto two lines is one
+    pack, and adding counts would call it two.
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+
+    # Physical packs scanned for this order (a "top"/roll for fabric,
+    # but the goods aren't only fabric — the printed document calls
+    # them packs), per line and in total. Consumed reservations count
+    # too: on a shipped order those ARE the packs that went out. The
+    # same pack scanned twice on one line is still one physical
+    # pack, hence the sets.
+    packs_by_item, all_pack_ids = {}, set()
+    for r in order.roll_reservations.values("order_item_id", "roll_id"):
+        all_pack_ids.add(r["roll_id"])
+        if r["order_item_id"]:
+            packs_by_item.setdefault(r["order_item_id"], set()).add(r["roll_id"])
+
+    items = []
+    total = Decimal("0.00")
+    total_qty = Decimal("0")
+    # The variant's attributes are a M2M, so they are prefetched
+    # rather than joined — one extra query for the order, not one per
+    # line. Same shape _pack_roll_rows uses.
+    attr_values = "product_variant_attribute_values__product_variant_attribute"
+    for it in (order.items.all()
+               .select_related("product", "product__category", "product_variant")
+               .prefetch_related(f"product_variant__{attr_values}")):
+        qty = it.quantity or Decimal("0")
+        price = it.price or Decimal("0")
+        # Half up, matching InvoiceItem.compute — an order line and
+        # the invoice raised from it must not differ by a cent.
+        line_total = (qty * price).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP)
+        it.line_total_calc = line_total
+        it.pack_count = len(packs_by_item.get(it.pk, ()))
+        # What KIND of goods the line is ("Fabric"). Same helper the
+        # packing list and the invoice print use, so a customer
+        # holding all three documents reads the same word. Its "-"
+        # for an unclassified product becomes None here: the packing
+        # list has a column to fill, this layout has a line it can
+        # simply leave out.
+        label = _product_type_label(it.product)
+        it.product_type_label = None if label == "-" else label
+        # Which variant, by NAME ("Bej-Gümüş") rather than by the
+        # SKU the row used to show: MRK00061 tells a customer
+        # nothing about the colour they ordered. Same helper, and so
+        # the same word, as the packing list's variant column.
+        variant = _variant_label(
+            it.product_variant if it.product_variant_id else None)
+        it.variant_label = None if variant == "-" else variant
+        # The product's own SKU and the variant's are read straight off
+        # the row in the template — each has a column of its own, so a
+        # mill-coded product printing "MT-3016" under both Product and
+        # SKU is the column doing its job, not the repetition it was
+        # when the two sat on one line.
+        items.append(it)
+        total += line_total
+        total_qty += qty
+    return items, total, total_qty, all_pack_ids
+
+
+def order_has_delivery_info(order):
+    """Whether this order carries an address worth printing.
+
+    Drives the Customer/Delivery card layout: show only the side(s)
+    that have real data instead of a "No customer attached" /
+    "No delivery address" placeholder on a printed document.
+    """
+    return bool(
+        (order.delivery_address or "").strip()
+        or (order.delivery_city or "").strip()
+        or (order.billing_address or "").strip()
+    )
+
+
 class OrderPrint(DetailView):
     """Printable order view.
 
@@ -1923,7 +2011,6 @@ class OrderPrint(DetailView):
     context_object_name = "order"
 
     def get_context_data(self, **kwargs):
-        from decimal import Decimal, ROUND_HALF_UP
         from accounting.services_accounts import brand_name_for
         ctx = super().get_context_data(**kwargs)
         order = self.object
@@ -1932,74 +2019,18 @@ class OrderPrint(DetailView):
         # template so the printed order, its Excel and the invoice
         # raised from it all go through one rule.
         ctx["brand_line"] = (order.print_header or "").strip() or brand_name_for()
-        # Physical packs scanned for this order (a "top"/roll for fabric,
-        # but the goods aren't only fabric — the printed document calls
-        # them packs), per line and in total. Consumed reservations count
-        # too: on a shipped order those ARE the packs that went out. The
-        # same pack scanned twice on one line is still one physical
-        # pack, hence the sets.
-        packs_by_item, all_pack_ids = {}, set()
-        for r in order.roll_reservations.values("order_item_id", "roll_id"):
-            all_pack_ids.add(r["roll_id"])
-            if r["order_item_id"]:
-                packs_by_item.setdefault(r["order_item_id"], set()).add(r["roll_id"])
-
-        items = []
-        total = Decimal("0.00")
-        total_qty = Decimal("0")
-        # The variant's attributes are a M2M, so they are prefetched
-        # rather than joined — one extra query for the order, not one per
-        # line. Same shape _pack_roll_rows uses.
-        attr_values = "product_variant_attribute_values__product_variant_attribute"
-        for it in (order.items.all()
-                   .select_related("product", "product__category", "product_variant")
-                   .prefetch_related(f"product_variant__{attr_values}")):
-            qty = it.quantity or Decimal("0")
-            price = it.price or Decimal("0")
-            # Half up, matching InvoiceItem.compute — an order line and
-            # the invoice raised from it must not differ by a cent.
-            line_total = (qty * price).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP)
-            it.line_total_calc = line_total
-            it.pack_count = len(packs_by_item.get(it.pk, ()))
-            # What KIND of goods the line is ("Fabric"). Same helper the
-            # packing list and the invoice print use, so a customer
-            # holding all three documents reads the same word. Its "-"
-            # for an unclassified product becomes None here: the packing
-            # list has a column to fill, this layout has a line it can
-            # simply leave out.
-            label = _product_type_label(it.product)
-            it.product_type_label = None if label == "-" else label
-            # Which variant, by NAME ("Bej-Gümüş") rather than by the
-            # SKU the row used to show: MRK00061 tells a customer
-            # nothing about the colour they ordered. Same helper, and so
-            # the same word, as the packing list's variant column.
-            variant = _variant_label(
-                it.product_variant if it.product_variant_id else None)
-            it.variant_label = None if variant == "-" else variant
-            # Mill-coded products are titled with their own code, so the
-            # name line would otherwise read "MT-3016 MT-3016". Same rule
-            # the intake picker applies to its result rows.
-            sku = (it.product.sku or "").strip()
-            title = (it.product.title or "").strip()
-            it.sku_label = None if sku.upper() == title.upper() else (sku or None)
-            items.append(it)
-            total += line_total
-            total_qty += qty
+        items, total, total_qty, pack_ids = build_order_print_rows(order)
+        # A single group, so the template walks the same loop the
+        # combined sheet walks — see OrderPrintCombined. `combined` is
+        # what puts a heading above each group; one order needs none.
+        ctx["order_groups"] = [{"order": order, "items": items}]
         ctx["order_items"] = items
         ctx["order_total"] = total
         ctx["order_total_quantity"] = total_qty
-        ctx["order_total_packs"] = len(all_pack_ids)
+        ctx["order_total_packs"] = len(pack_ids)
         ctx["is_pdf"] = True   # template can strip JS auto-print when rendering for PDF
-        # Drives the Customer/Delivery card layout: show only the side(s)
-        # that have real data instead of a "No customer attached" /
-        # "No delivery address" placeholder on a printed document.
         ctx["has_customer_info"] = bool(order.contact_id or order.company_id or order.web_client_id)
-        ctx["has_delivery_info"] = bool(
-            (order.delivery_address or "").strip()
-            or (order.delivery_city or "").strip()
-            or (order.billing_address or "").strip()
-        )
+        ctx["has_delivery_info"] = order_has_delivery_info(order)
         return ctx
 
     def render_to_response(self, context, **response_kwargs):
@@ -2014,6 +2045,118 @@ class OrderPrint(DetailView):
         ctx["is_pdf"] = False
         html = render_to_string(self.template_name, ctx, request=self.request)
         return HttpResponse(html)
+
+
+class OrderPrintCombined(LoginRequiredMixin, View):
+    """Several of one customer's orders on a single printable sheet.
+
+    The same document OrderPrint produces — same header, same customer
+    block, same four columns — with the chosen orders' lines run under
+    one another beneath a heading each, and ONE grand total at the foot.
+    Picked from the contact page, which is where a customer's whole
+    order history is listed.
+
+    It records NOTHING. No invoice is raised and no ledger row written:
+    the receivable already sits on each order (post_order_movement puts
+    it there the moment the order is saved), so a document that posted
+    again would claim the same money twice. This is a sheet to hand the
+    customer, not a second claim on them.
+
+    That is also what lets it cross books. An Invoice belongs to exactly
+    one book because its money does; this belongs to none, so Ergene's
+    order and Laleli's can be read on one page while their receivables
+    stay in the two ledgers they belong to.
+    """
+
+    def get(self, request):
+        from django.utils.translation import gettext as _
+        from decimal import Decimal
+        from accounting.services_accounts import brand_name_for, member_can_use_book
+
+        ids, seen = [], set()
+        for part in (request.GET.get("ids") or "").split(","):
+            part = part.strip()
+            if part.isdigit() and int(part) not in seen:
+                seen.add(int(part))
+                ids.append(int(part))
+        if not ids:
+            return HttpResponseBadRequest(_("Pick at least one order to print."))
+
+        orders = list(
+            Order.objects.filter(pk__in=ids)
+            .select_related("contact", "company", "web_client", "cari", "cari__book")
+            .order_by("order_date", "pk")
+        )
+        if len(orders) != len(ids):
+            raise Http404("No such order.")
+
+        # One sheet is addressed to one customer. The orders are named by
+        # id in a URL anyone can retype, so this is what keeps two
+        # customers' lines off one page — and an order with nobody
+        # attached has no customer for the sheet to be addressed to.
+        who = {(o.contact_id, o.company_id, o.web_client_id) for o in orders}
+        if len(who) > 1 or who == {(None, None, None)}:
+            return HttpResponseBadRequest(
+                _("A combined sheet covers one customer's orders."))
+
+        # Every order's book must be one the viewer is assigned to — the
+        # rule book_guarded applies to an order page, asked here per
+        # order because this sheet may legitimately span books.
+        member = getattr(request.user, "member", None)
+        for o in orders:
+            book = o.cari.book if o.cari_id else None
+            if book is not None and not member_can_use_book(member, book):
+                raise Http404("No such order.")
+
+        groups, items = [], []
+        total, total_qty, pack_ids = Decimal("0.00"), Decimal("0"), set()
+        for o in orders:
+            rows, o_total, o_qty, o_packs = build_order_print_rows(o)
+            groups.append({"order": o, "items": rows})
+            items.extend(rows)
+            total += o_total
+            total_qty += o_qty
+            # Union, not a sum: an order's pack set may overlap another's
+            # only if the same roll went out twice, which it cannot — but
+            # unioning is what makes the total a count of PACKS rather
+            # than a count of scans, the same way it does within an order.
+            pack_ids |= o_packs
+
+        # The customer block is one block for the whole sheet. Which
+        # order fills it matters only for the address: the customer is
+        # the same on all of them (checked above), but an older order's
+        # address is where a past delivery went, not where these goods
+        # are going. So: the most recent order carrying an address, and
+        # the most recent order at all when none of them do.
+        primary = next((o for o in reversed(orders) if order_has_delivery_info(o)),
+                       orders[-1])
+
+        # The span the header prints. Undated orders are left out of it
+        # rather than emptying it: Postgres sorts NULLs last, so one
+        # order saved without a date would otherwise become the range's
+        # end and print nothing at all.
+        dates = [o.order_date for o in orders if o.order_date]
+
+        return render(request, "operating/order_print.html", {
+            "order": primary,
+            "combined": True,
+            "combined_orders": orders,
+            "combined_from": dates[0] if dates else None,
+            "combined_to": dates[-1] if dates else None,
+            "order_groups": groups,
+            "order_items": items,
+            "order_total": total,
+            "order_total_quantity": total_qty,
+            "order_total_packs": len(pack_ids),
+            "brand_line": (primary.print_header or "").strip() or brand_name_for(),
+            "has_customer_info": bool(primary.contact_id or primary.company_id
+                                      or primary.web_client_id),
+            "has_delivery_info": order_has_delivery_info(primary),
+            # False, so the template keeps the script that opens the
+            # browser's print dialog — same as OrderPrint, which flips it
+            # in render_to_response for exactly that reason.
+            "is_pdf": False,
+        })
 
 
 class OrderCreate(View):

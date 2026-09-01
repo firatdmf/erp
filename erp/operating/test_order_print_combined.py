@@ -207,6 +207,33 @@ class CombinedOrderExcel(OlegOrders, TestCase):
                 if isinstance(v, str):
                     self.assertNotIn("0.00 USD", v)
 
+    def test_the_total_row_stands_out_from_the_lines_it_totals(self):
+        """At the foot of thirty half-bold rows, bold alone is not a
+        difference anyone sees."""
+        ws = self._book(self.laleli_a, self.laleli_b, self.ergene_a)
+        last, line = ws.max_row, ws.max_row - 1
+        for c in range(1, 10):
+            total, item = ws.cell(last, c), ws.cell(line, c)
+            self.assertEqual(total.fill.fgColor.rgb, "FFF3F6F8")
+            self.assertEqual(total.border.top.style, "medium")
+            self.assertEqual(total.border.bottom.style, "double")
+            self.assertNotEqual(total.fill.fgColor.rgb, item.fill.fgColor.rgb)
+        self.assertGreater(ws.cell(last, 9).font.size, ws.cell(line, 9).font.size)
+
+    def test_it_prints_onto_a_page(self):
+        """Nine columns do not fit a portrait page, and a sheet that
+        spills its last two columns onto pages of their own is not a
+        document anyone can hand over."""
+        ws = self._book(self.laleli_a, self.laleli_b, self.ergene_a)
+        self.assertEqual(ws.page_setup.orientation, "landscape")
+        self.assertTrue(ws.sheet_properties.pageSetUpPr.fitToPage)
+        self.assertEqual(ws.page_setup.fitToWidth, 1)
+        # 0 means "as many pages tall as it takes" — only the WIDTH is
+        # being forced onto one page.
+        self.assertEqual(ws.page_setup.fitToHeight, 0)
+        # The column headings repeat, so page two can be read at all.
+        self.assertTrue(ws.print_title_rows)
+
     def test_the_wordmark_gets_a_row_tall_enough_to_hold_it(self):
         """20pt type in a row sized for 11pt loses its descenders under
         the row beneath."""

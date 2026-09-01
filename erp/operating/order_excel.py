@@ -19,12 +19,26 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 
+from openpyxl.styles import Border, Font, PatternFill, Side
+from openpyxl.worksheet.properties import PageSetupProperties
+
 from erp.xlsx_utils import (
     cell, merge, merge_border, section, kv_full, kv_pair,
-    GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP,
+    GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP, INK,
     F_TITLE, F_SUB, F_DOCNO, F_HEAD, F_VAL, F_VALB, F_TOTAL,
 )
 from .models import Order
+
+# The totals row, dressed so the eye lands on it from across the sheet:
+# the accountant's rule above and double rule below, a tinted ground, and
+# type a size up from the lines it totals. It used to differ from a line
+# item by its font weight alone, which is not enough at the foot of
+# thirty rows that are themselves half bold.
+_rule = Side(style="medium", color=INK)
+_double = Side(style="double", color=INK)
+BORDER_TOTAL = Border(top=_rule, bottom=_double)
+FILL_TOTAL = PatternFill("solid", fgColor="FFF3F6F8")
+F_GRAND = Font(size=12, bold=True, color=INK)
 
 NCOLS = 6  # A..F
 
@@ -264,8 +278,13 @@ def build_combined_workbook(orders):
     ws = wb.active
     ws.title = "Orders"
     ws.sheet_view.showGridLines = False
+    # 137 character-widths across, which is 10.0in — inside the 10.4in a
+    # landscape Letter page leaves between its margins, so the fit-to-
+    # width scaling set up at the foot of this function has nothing to
+    # shrink and the sheet prints at full size. Widen a column here and
+    # it still prints, just smaller.
     for col, w in zip("ABCDEFGHI",
-                      (30, 16, 22, 18, 12, 11, 8, 12, 14)):
+                      (28, 15, 21, 17, 12, 11, 8, 11, 14)):
         ws.column_dimensions[col].width = w
 
     dates = [o.order_date for o in orders if o.order_date]
@@ -355,20 +374,50 @@ def build_combined_workbook(orders):
         r += 1
 
     # ── Total ──
-    cell(ws, r, 1, "Total", font=F_TOTAL, border=GRID)
-    merge(ws, r, 1, C_QTY - 1)
-    merge_border(ws, r, 1, C_QTY - 1, GRID)
-    cell(ws, r, C_QTY, _dec(total_qty), font=F_TOTAL, border=GRID, align=RIGHT, fmt="#,##0.00")
-    cell(ws, r, C_PACKS, len(packs), font=F_TOTAL, border=GRID, align=RIGHT, fmt="#,##0")
-    cell(ws, r, C_PRICE, "", font=F_TOTAL, border=GRID)
-    cell(ws, r, C_AMOUNT, _dec(total), font=F_TOTAL, border=GRID, align=RIGHT, fmt=money)
+    # The label's span is NOT merged. A fill does not survive being
+    # assigned to a merged-over cell, so the tint stopped at column A
+    # and the row read as half-shaded — and a merge across a table
+    # people are going to sort and filter is worth avoiding anyway. The
+    # word sits in A and the cells beside it are simply dressed to
+    # match, which looks the same and behaves better.
+    for c in range(1, C_QTY):
+        cell(ws, r, c, "TOTAL" if c == 1 else "", font=F_GRAND,
+             fill=FILL_TOTAL, border=BORDER_TOTAL)
+    cell(ws, r, C_QTY, _dec(total_qty), font=F_GRAND, fill=FILL_TOTAL,
+         border=BORDER_TOTAL, align=RIGHT, fmt="#,##0.00")
+    cell(ws, r, C_PACKS, len(packs), font=F_GRAND, fill=FILL_TOTAL,
+         border=BORDER_TOTAL, align=RIGHT, fmt="#,##0")
+    cell(ws, r, C_PRICE, "", font=F_GRAND, fill=FILL_TOTAL, border=BORDER_TOTAL)
+    cell(ws, r, C_AMOUNT, _dec(total), font=F_GRAND, fill=FILL_TOTAL,
+         border=BORDER_TOTAL, align=RIGHT, fmt=money)
+    ws.row_dimensions[r].height = 22
 
     # The item rows get a filter, which is the first thing anyone who
     # exported this will want — by order, by product, by colour.
+    last_col = chr(ord("A") + CNCOLS - 1)
     if rows:
-        last_col = chr(ord("A") + CNCOLS - 1)
         ws.auto_filter.ref = f"A{head_row - 1}:{last_col}{head_row + len(rows) - 1}"
     ws.freeze_panes = ws.cell(head_row, 1)
+
+    # ── How it prints ────────────────────────────────────────────────
+    # Nine columns of a customer's goods do not fit the width of a
+    # portrait page, and a spreadsheet that spills its last two columns
+    # onto sheets of their own is not a document anyone can hand over.
+    # Landscape, scaled to exactly one page WIDE and as many pages long
+    # as it takes (fitToHeight=0 means "don't limit the height"), with
+    # the column headings repeated at the top of every page so page two
+    # can be read at all.
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.paperSize = ws.PAPERSIZE_LETTER
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.print_options.horizontalCentered = True
+    ws.page_margins.left = ws.page_margins.right = 0.3
+    ws.page_margins.top = ws.page_margins.bottom = 0.4
+    if rows:
+        ws.print_title_rows = f"{head_row - 1}:{head_row - 1}"
+    ws.print_area = f"A1:{last_col}{r}"
 
     return wb
 

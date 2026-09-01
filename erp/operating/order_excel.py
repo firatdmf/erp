@@ -57,6 +57,53 @@ def _dt(v, fmt="%d %b %Y · %H:%M"):
         return "—"
 
 
+def _currency_symbol(code):
+    """The sign a figure in this currency wears — "$", "₺", "€".
+
+    Asked of CurrencyCategory, which is where the ledger keeps it, so a
+    workbook and an invoice cannot disagree about what a lira looks
+    like. Falls back to the ISO code itself: a column reading "USD 2.45"
+    is worse than "$2.45" but better than a blank sign, and it must
+    never raise — a spreadsheet has to build on a database that has no
+    currency rows at all.
+    """
+    try:
+        from accounting.models import CurrencyCategory
+        sym = (CurrencyCategory.objects.filter(code=code)
+               .values_list("symbol", flat=True).first() or "").strip()
+        if sym:
+            return sym
+    except Exception:
+        pass
+    return {"USD": "$", "EUR": "€", "GBP": "£", "TRY": "₺"}.get(code, code)
+
+
+def _money_format(code):
+    """An Excel CURRENCY format: the sign is worn by the number, not
+    typed beside it. The cell still holds 2.45 and still sums; only its
+    display carries the sign, which is the difference between a figure
+    and a label that looks like one."""
+    sym = _currency_symbol(code).replace('"', "")
+    return f'"{sym}"#,##0.00'
+
+
+def _wrapped_lines(text, width_chars):
+    """How many lines a value takes in a column that wide.
+
+    Rough — it counts characters, not the words they fall into — but it
+    only ever has to answer "more than one?", and openpyxl writes no row
+    heights, so without an answer Excel leaves the row one line tall and
+    a 40-character product name runs off the side of its column instead
+    of wrapping inside it.
+    """
+    if not text:
+        return 1
+    lines = 0
+    for para in str(text).split("\n"):
+        lines += max(1, -(-len(para) // max(1, int(width_chars) - 1)))
+    return lines
+
+
 def _firstv(v):
     if isinstance(v, (list, tuple)):
         return (v[0] if v else "") or ""
@@ -72,7 +119,11 @@ def build_order_workbook(order):
     from accounting.services_accounts import brand_name_for
     brand = (order.print_header or "").strip() or brand_name_for()
     ccode = (order.original_currency or order.paid_currency or "USD")
-    money = f'#,##0.00" {ccode}"'
+    # The same currency FORMAT the combined sheet uses — "$2.45", the
+    # sign worn by the number. This carried the ISO code as a suffix
+    # ("2.45 USD"), which is still a number underneath but reads as a
+    # label and cannot be told apart from one at a glance.
+    money = _money_format(ccode)
 
     wb = Workbook()
     ws = wb.active
@@ -267,12 +318,11 @@ def build_combined_workbook(orders):
     primary = orders[-1]
     brand = (primary.print_header or "").strip() or brand_name_for()
     ccode = (primary.original_currency or primary.paid_currency or "USD")
-    # No currency in the cell — not even as a display suffix. A column
-    # headed "Price (USD)" holding plain numbers is one a spreadsheet
-    # can sum, chart and multiply without the reader wondering whether
-    # what they see is a number or a label. The currency is said once,
-    # in the heading, where it cannot get into the arithmetic.
-    money = "#,##0.00"
+    # A currency FORMAT, not a currency written into the cell: the cell
+    # holds 2.45 and shows $2.45, so it sums, charts and multiplies like
+    # the number it is. What it must never be is the string "2.45 USD",
+    # which has to be stripped before any of that works.
+    money = _money_format(ccode)
 
     wb = Workbook()
     ws = wb.active
@@ -283,8 +333,8 @@ def build_combined_workbook(orders):
     # width scaling set up at the foot of this function has nothing to
     # shrink and the sheet prints at full size. Widen a column here and
     # it still prints, just smaller.
-    for col, w in zip("ABCDEFGHI",
-                      (28, 15, 21, 17, 12, 11, 8, 11, 14)):
+    widths = (28, 15, 21, 17, 12, 11, 8, 11, 14)
+    for col, w in zip("ABCDEFGHI", widths):
         ws.column_dimensions[col].width = w
 
     dates = [o.order_date for o in orders if o.order_date]
@@ -344,7 +394,11 @@ def build_combined_workbook(orders):
     r = section(ws, r, f"PRODUCTS ({len(rows)})", CNCOLS)
     for i, h in enumerate(COMBINED_HEADS, 1):
         if i in (C_PRICE, C_AMOUNT):
-            h = f"{h} ({ccode})"
+            # The sign is in the cells now, so the heading names the
+            # currency only where a sign is ambiguous — "$" is worn by
+            # more than one dollar, "₺" by exactly one lira.
+            if _currency_symbol(ccode) in ("$", "kr", ccode):
+                h = f"{h} ({ccode})"
         cell(ws, r, i, h, font=F_HEAD, fill=FILL_HEAD, border=GRID,
              align=(RIGHT if i >= C_QTY else LEFT))
     r += 1
@@ -371,6 +425,21 @@ def build_combined_workbook(orders):
         cell(ws, r, C_PACKS, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0")
         cell(ws, r, C_PRICE, _dec(it.price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         cell(ws, r, C_AMOUNT, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
+
+        # Give the row the height its longest text needs. The cells wrap
+        # already, but openpyxl writes no row heights and Excel then
+        # leaves the row one line tall, so "GREK TAŞLI VE İNCİ EKRU İNCİ
+        # BEYAZ ZEMİN" ran off the side of its column rather than
+        # breaking in half inside it. Four lines is the ceiling: past
+        # that a product has a description, not a name, and the row
+        # would push everything below it onto another page.
+        lines = max(_wrapped_lines(v, widths[i])
+                    for i, v in enumerate([title,
+                                           getattr(it.product, "sku", ""),
+                                           it.variant_label, vsku,
+                                           it.product_type_label]))
+        if lines > 1:
+            ws.row_dimensions[r].height = 13.5 * min(lines, 4)
         r += 1
 
     # ── Total ──

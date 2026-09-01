@@ -193,19 +193,47 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         # What matters is that it is not a string that looks like money.
         cell = ws.cell(ws.max_row, self.AMOUNT)
         self.assertIsInstance(cell.value, (int, float))
-        self.assertEqual(cell.number_format, "#,##0.00")
+        # A number FORMAT — the sign and separators are display, and
+        # what the cell holds is a figure arithmetic can reach.
+        self.assertIn("#,##0.00", cell.number_format)
 
-    def test_the_currency_is_named_in_the_heading_not_in_the_cells(self):
-        """A figure carrying its own currency has to be stripped before
-        it can be summed, which is the one thing a spreadsheet is for."""
+    def test_money_wears_its_sign_as_a_format_not_as_text(self):
+        """"$2.45" the cell SHOWS, 2.45 the cell HOLDS. A figure
+        carrying its currency as text has to be stripped before it can
+        be summed, which is the one thing a spreadsheet is for."""
         ws = self._book(self.laleli_a)
-        heads = [c.value for c in ws[ws.max_row - 2]]
-        self.assertIn("Price (USD)", heads)
-        self.assertIn("Amount (USD)", heads)
+        cell = ws.cell(ws.max_row, self.AMOUNT)
+        self.assertEqual(cell.number_format, '"$"#,##0.00')
+        self.assertIsInstance(cell.value, (int, float))
         for row in ws.iter_rows(min_row=1, values_only=True):
             for v in row:
                 if isinstance(v, str):
                     self.assertNotIn("0.00 USD", v)
+
+    def test_the_heading_still_names_the_currency(self):
+        """More than one currency signs itself "$"."""
+        heads = [c.value for c in self._book(self.laleli_a)[10]]
+        self.assertIn("Price (USD)", heads)
+        self.assertIn("Amount (USD)", heads)
+
+    def test_a_long_product_name_breaks_across_lines_in_its_column(self):
+        """The cells wrap already, but openpyxl writes no row heights
+        and Excel then leaves the row one line tall, so a 40-character
+        name ran off the side of its column instead of breaking inside
+        it."""
+        long_name = Product.objects.create(
+            title="GREK TAŞLI VE İNCİ EKRU İNCİ BEYAZ ZEMİN",
+            sku="HKN00011", price=10)
+        OrderItem.objects.create(order=self.laleli_a, product=long_name,
+                                 quantity=Decimal("150"), price=Decimal("4.50"))
+        ws = self._book(self.laleli_a)
+        row = next(r for r in range(11, ws.max_row + 1)
+                   if str(ws.cell(r, 1).value or "").startswith("GREK"))
+        self.assertGreaterEqual(ws.row_dimensions[row].height or 0, 27)
+        # A short name is left alone rather than padded to match.
+        short = next(r for r in range(11, ws.max_row + 1)
+                     if ws.cell(r, 1).value == "Crepe")
+        self.assertIsNone(ws.row_dimensions[short].height)
 
     def test_the_total_row_stands_out_from_the_lines_it_totals(self):
         """At the foot of thirty half-bold rows, bold alone is not a

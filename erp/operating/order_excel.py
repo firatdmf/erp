@@ -564,7 +564,13 @@ def build_combined_workbook(orders):
     ws.page_margins.top = ws.page_margins.bottom = 0.4
     if rows:
         ws.print_title_rows = f"{head_row - 1}:{head_row - 1}"
-    ws.print_area = f"A1:{last_col}{r}"
+    # NO print area. One was set here, ending at the totals row, and it
+    # meant that anything added to the sheet afterwards did not print:
+    # somebody put "Previous Balance" and a grand total under ours and
+    # Excel dropped both without a word. A workbook is handed over to be
+    # worked in, so what prints has to be what the sheet holds, not what
+    # it held the day it was generated. Left unset, Excel prints the
+    # used range, and the used range grows with the work.
 
     return wb
 

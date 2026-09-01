@@ -276,6 +276,16 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         # The column headings repeat, so page two can be read at all.
         self.assertTrue(ws.print_title_rows)
 
+    def test_rows_added_after_the_total_still_print(self):
+        """A print area was set here once, ending at the totals row, so
+        a "Previous Balance" line typed underneath it printed as
+        nothing at all. The sheet is handed over to be worked in: what
+        prints must be what it holds, not what it held when it was
+        made."""
+        ws = self._book(self.laleli_a, self.ergene_a)
+        # openpyxl reads an unset area back as "", not None.
+        self.assertFalse(ws.print_area)
+
     def test_every_column_is_as_wide_as_its_content_and_no_wider(self):
         """Fixed widths were guesses, generous where they should have
         been tight and tight where a heading needed room."""

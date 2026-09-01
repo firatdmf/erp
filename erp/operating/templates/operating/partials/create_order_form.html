@@ -617,7 +617,7 @@
   const CO_ORDER_ID = {% if order %}{{ order.pk }}{% else %}null{% endif %};
   function coOrderParam() { return CO_ORDER_ID ? ('&order=' + CO_ORDER_ID) : ''; }
 
-  window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
+  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
     // Stock is informational only — out-of-stock / low-stock products
     // can still be added (back-order). Catalog stock is deducted only
@@ -659,7 +659,29 @@
       listEl.firstElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     fetchAvailableRolls(stableIndex, sku);
-  };
+  }
+
+  // Claim the global slot the autocomplete's inline onclick calls.
+  //
+  // base.html loads operating/js/create_edit_order.js at the very bottom,
+  // and that legacy script assigns its own window.selectProduct — one that
+  // builds rows for an order_items_table this form does not have. Loaded as
+  // a SIDEBAR the partial is injected after that script has already run, so
+  // the assignment above won a race it did not know it was in. Rendered as a
+  // PAGE (edit_order_page.html) the inline script runs during parse, the
+  // legacy file loads after it, and clicking a suggestion threw
+  // "Cannot read properties of undefined (reading 'insertAdjacentHTML')"
+  // — the click appeared to do nothing at all.
+  //
+  // Same readyState guard order_detail.html already uses for its own
+  // override, and it covers both entry points: defer to DOMContentLoaded
+  // while the document is still parsing (page), assign immediately when it
+  // has finished (htmx-injected sidebar).
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { window.selectProduct = coSelectProduct; });
+  } else {
+    window.selectProduct = coSelectProduct;
+  }
 
   // Fetch the browsable "available tops" list for a product once (by its
   // stable index, not array position — items can shift/be removed while
@@ -905,7 +927,7 @@
         var skuL = (d.sku || '').toLowerCase();
         var idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         if (idx === -1) {
-          selectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost);
+          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost);
           idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         }
         if (idx === -1) { showToast('Ürün eklenemedi', 'error'); return; }

@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from accounting.models import Book
 from marketing.models import Product, ProductVariant
 from operating.models import Warehouse, WarehouseProduct
 
@@ -24,7 +25,11 @@ class ProductAutocompleteBreadthTest(TestCase):
         self.user = get_user_model().objects.create_superuser(
             username="ac_tester", password="pw", email="a@c.t")
         self.client.force_login(self.user)
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        # A warehouse states which book owns its stock; the picker
+        # only searches the shelves of books the viewer works in.
+        self.warehouse = Warehouse.objects.create(
+            name="Fabrika",
+            accounting_book=Book.objects.create(name="Laleli Fabric"))
         self.product = Product.objects.create(
             title="PETEK FONLUK KUMAŞ", sku="PETEK FONLUK", featured=False)
 
@@ -71,7 +76,11 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
         self.user = get_user_model().objects.create_superuser(
             username="free_stock", password="pw", email="f@s.t")
         self.client.force_login(self.user)
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        # A warehouse states which book owns its stock; the picker
+        # only searches the shelves of books the viewer works in.
+        self.warehouse = Warehouse.objects.create(
+            name="Fabrika",
+            accounting_book=Book.objects.create(name="Laleli Fabric"))
         product = Product.objects.create(title="PETEK", sku="PETEK-T", featured=False)
         self.variant = ProductVariant.objects.create(
             product=product, variant_sku="PETEK.94.310", variant_quantity=Decimal("30"))

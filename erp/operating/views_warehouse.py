@@ -737,22 +737,57 @@ class WarehouseList(View):
         })
 
 
-def _get_book_choices():
-    """Return list of accounting Book objects for dropdown (lazy import)."""
+def _get_book_choices(request=None):
+    """The books a warehouse may be created in, for the form dropdown.
+
+    Scoped to the member's own assignments: a warehouse's book decides
+    who may read its shelves and which orders may draw on them, so
+    offering somebody a book they do not work in is offering them a way
+    to put stock somewhere they cannot see it. Unscoped when no request
+    is passed, for the callers that have none.
+    """
     try:
         from accounting.models import Book
+        from accounting.services_accounts import member_books
+        if request is not None:
+            member = getattr(request.user, "member", None)
+            return member_books(member).order_by('name')
         return Book.objects.all().order_by('name')
     except Exception:
         return []
 
 
-def _combined_form_ctx(warehouse=None):
+def _resolve_warehouse_book(request):
+    """The Book a new warehouse is being created in, or (None, error).
+
+    Required — a warehouse states which book owns its stock — and
+    checked against the member's assignments, because the id comes from
+    a form the browser controls.
+    """
+    book_id = (request.POST.get('accounting_book') or '').strip()
+    if not book_id.isdigit():
+        return None, "Bir defter seçin — deponun stoğu bir defterin varlığıdır."
+    from accounting.services_accounts import member_books
+    member = getattr(request.user, "member", None)
+    book = member_books(member).filter(pk=int(book_id)).first()
+    if book is None:
+        return None, "Bu defterde depo açamazsınız."
+    return book, None
+
+
+def _combined_form_ctx(warehouse=None, request=None):
     """Shared context for the warehouse form: books + the normal warehouses
     offered as members of a combined (ortak) warehouse."""
     ctx = {
         'warehouse': warehouse,
-        'books': _get_book_choices(),
-        'member_choices': Warehouse.objects.filter(kind='normal').order_by('name'),
+        'books': _get_book_choices(request),
+        # Only warehouses from books this member works in: a combined
+        # warehouse merges its members' stock, so offering another
+        # book's warehouse here is offering a way to read it.
+        'member_choices': Warehouse.objects.filter(
+            kind='normal',
+            accounting_book__in=_get_book_choices(request),
+        ).order_by('name'),
         'combined_selected': set(),
     }
     if warehouse is not None and warehouse.is_combined:
@@ -785,33 +820,29 @@ class WarehouseCreate(View):
     template_name = "operating/warehouse_form.html"
 
     def get(self, request):
-        return render(request, self.template_name, _combined_form_ctx())
+        return render(request, self.template_name, _combined_form_ctx(request=request))
 
     def post(self, request):
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
         description = (request.POST.get('description') or '').strip()
-        book_id = (request.POST.get('accounting_book') or '').strip()
 
         if not name:
             messages.error(request, "Name is required")
-            return render(request, self.template_name, _combined_form_ctx())
+            return render(request, self.template_name, _combined_form_ctx(request=request))
         if Warehouse.objects.filter(name__iexact=name).exists():
             messages.error(request, "A warehouse with this name already exists")
-            return render(request, self.template_name, _combined_form_ctx())
+            return render(request, self.template_name, _combined_form_ctx(request=request))
 
         kind, sources, kind_err = _parse_combined_fields(request)
         if kind_err:
             messages.error(request, kind_err)
-            return render(request, self.template_name, _combined_form_ctx())
+            return render(request, self.template_name, _combined_form_ctx(request=request))
 
-        book = None
-        if book_id:
-            try:
-                from accounting.models import Book
-                book = Book.objects.filter(pk=int(book_id)).first()
-            except (ValueError, TypeError):
-                pass
+        book, book_err = _resolve_warehouse_book(request)
+        if book_err:
+            messages.error(request, book_err)
+            return render(request, self.template_name, _combined_form_ctx(request=request))
 
         wh = Warehouse.objects.create(
             name=name,
@@ -840,14 +871,13 @@ class WarehouseCreatePartial(View):
 
     def get(self, request):
         return render(request, self.template_name, {
-            'books': _get_book_choices(),
+            'books': _get_book_choices(request),
         })
 
     def post(self, request):
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
         description = (request.POST.get('description') or '').strip()
-        book_id = (request.POST.get('accounting_book') or '').strip()
 
         if not name:
             return JsonResponse({"success": False, "errors": {"name": "Name is required"}}, status=400)
@@ -857,13 +887,11 @@ class WarehouseCreatePartial(View):
                 "errors": {"name": "A warehouse with this name already exists"},
             }, status=400)
 
-        book = None
-        if book_id:
-            try:
-                from accounting.models import Book
-                book = Book.objects.filter(pk=int(book_id)).first()
-            except (ValueError, TypeError):
-                pass
+        book, book_err = _resolve_warehouse_book(request)
+        if book_err:
+            return JsonResponse(
+                {"success": False, "errors": {"accounting_book": book_err}},
+                status=400)
 
         wh = Warehouse.objects.create(
             name=name,
@@ -885,47 +913,43 @@ class WarehouseEdit(View):
 
     def get(self, request, pk):
         warehouse = get_object_or_404(Warehouse, pk=pk)
-        return render(request, self.template_name, _combined_form_ctx(warehouse))
+        return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
 
     def post(self, request, pk):
         warehouse = get_object_or_404(Warehouse, pk=pk)
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
         description = (request.POST.get('description') or '').strip()
-        book_id = (request.POST.get('accounting_book') or '').strip()
 
         if not name:
             messages.error(request, "Name is required")
-            return render(request, self.template_name, _combined_form_ctx(warehouse))
+            return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
 
         # Allow same name as own, but block conflict with others
         if Warehouse.objects.filter(name__iexact=name).exclude(pk=warehouse.pk).exists():
             messages.error(request, "Another warehouse with this name already exists")
-            return render(request, self.template_name, _combined_form_ctx(warehouse))
+            return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
 
         kind, sources, kind_err = _parse_combined_fields(request, exclude_pk=warehouse.pk)
         if kind_err:
             messages.error(request, kind_err)
-            return render(request, self.template_name, _combined_form_ctx(warehouse))
+            return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
         # A normal warehouse that already HOLDS stock can't become a
         # virtual one — its own products would silently disappear from view.
         if kind == 'combined' and warehouse.kind == 'normal' and warehouse.products.exists():
             messages.error(request, "İçinde ürün olan bir depo ortak depoya çevrilemez.")
-            return render(request, self.template_name, _combined_form_ctx(warehouse))
+            return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
 
         warehouse.name = name
         warehouse.location = location or None
         warehouse.description = description or None
         warehouse.kind = kind
 
-        if book_id:
-            try:
-                from accounting.models import Book
-                warehouse.accounting_book = Book.objects.filter(pk=int(book_id)).first()
-            except (ValueError, TypeError):
-                warehouse.accounting_book = None
-        else:
-            warehouse.accounting_book = None
+        book, book_err = _resolve_warehouse_book(request)
+        if book_err:
+            messages.error(request, book_err)
+            return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
+        warehouse.accounting_book = book
 
         warehouse.save()
         warehouse.combined_sources.set(sources if kind == 'combined' else [])

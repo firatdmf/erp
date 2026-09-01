@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from accounting.models import Book
 from operating.models import Warehouse, WarehouseProduct, WarehouseProductRoll
 
 
@@ -22,7 +23,8 @@ class LabelShowsRemainingMetersTest(TestCase):
         self.user = get_user_model().objects.create_superuser(
             username="label_tester", password="pw", email="l@a.b")
         self.client.force_login(self.user)
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="KARDELEN", sku="KAR0001468",
             quantity=Decimal("12.90"))

@@ -1195,14 +1195,20 @@ class Warehouse(models.Model):
         "self", symmetrical=False, blank=True, related_name="combined_views",
         help_text="Member warehouses this combined (ortak) warehouse merges",
     )
-    # Optional link to an accounting Book — warehouse net worth contributes to this book
+    # Which book owns this warehouse's stock. Required: the shelves are
+    # a business's asset, and who may read them, which orders may draw
+    # on them and whose net worth they count toward all follow from it.
+    # It was optional, and a warehouse that answered "no book" was shown
+    # to everyone and searchable from every order.
+    #
+    # PROTECT rather than SET_NULL: a book holding stock cannot be
+    # deleted out from under it, and there is no longer a null to fall
+    # back to.
     accounting_book = models.ForeignKey(
         'accounting.Book',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        on_delete=models.PROTECT,
         related_name='warehouses',
-        help_text="Optional: accounting book this warehouse's value is tied to"
+        help_text="Accounting book this warehouse's stock belongs to"
     )
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)

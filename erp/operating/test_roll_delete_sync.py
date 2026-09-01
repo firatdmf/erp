@@ -28,7 +28,8 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
         self.user = get_user_model().objects.create_superuser(
             username="roll_tester", password="pw", email="r@o.l")
         self.client.force_login(self.user)
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         product = Product.objects.create(title="N1464T", sku="N1464T", featured=False)
         self.variant = ProductVariant.objects.create(
             product=product, variant_sku="N1464T.G54", variant_quantity=Decimal("33.66"))
@@ -94,7 +95,8 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
         self.user = get_user_model().objects.create_superuser(
             username="bc_tester", password="pw", email="b@c.t")
         self.client.force_login(self.user)
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
         self.cari = CariAccount.objects.create(

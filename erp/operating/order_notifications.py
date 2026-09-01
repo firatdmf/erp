@@ -259,7 +259,7 @@ def _render_order_pdf(order):
         # ---- Meta row ----
         meta = Table([[
             [par(_("Status"), 8, color=MUT, upper=True),
-             par(order.get_status_display() or order.status, 10, bold=True)],
+             par(order.get_order_status_display() or order.order_status, 10, bold=True)],
             [par(_("Order Date"), 8, color=MUT, upper=True, align=1),
              par(datef(order.order_date or order.created_at, "d M Y"), 10, bold=True, align=1)],
             [par(_("Last Update"), 8, color=MUT, upper=True, align=2),

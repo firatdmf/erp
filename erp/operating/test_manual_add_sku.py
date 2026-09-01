@@ -35,7 +35,8 @@ class ManualAddMainProductSkuTest(TestCase):
             book=self.book, code="CARI-KRV", name="Karven", type="supplier",
             default_currency=self.usd,
         )
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
 
     def _post(self, main_sku, name="K24644", variant_sku="K24644.G07"):
         return self.client.post(
@@ -129,7 +130,8 @@ class ManualAddPermissionTest(TestCase):
         self.cari = CariAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
 
     def _post(self):
         return self.client.post(
@@ -173,7 +175,8 @@ class CatalogSearchLabelTest(TestCase):
 
     def setUp(self):
         from marketing.models import Product, ProductVariant
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.user = get_user_model().objects.create_superuser(
             username="search_tester", password="pw", email="s@e.a")
         self.client.force_login(self.user)
@@ -234,7 +237,8 @@ class VariantMatchBySkuTest(TestCase):
 
     def setUp(self):
         from marketing.models import Product, ProductVariant
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.user = get_user_model().objects.create_superuser(
             username="match_tester", password="pw", email="m@a.t")
         self.client.force_login(self.user)
@@ -354,7 +358,8 @@ class FallbackCodePrefixTest(TestCase):
     """
 
     def setUp(self):
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.user = get_user_model().objects.create_superuser(
             username="prefix_tester", password="pw", email="p@r.t")
         self.client.force_login(self.user)
@@ -406,7 +411,8 @@ class LongVariantSkuTest(TestCase):
         self.cari = CariAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
-        self.warehouse = Warehouse.objects.create(name="Fabrika")
+        self.warehouse = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
 
     def _post(self, variants):
         return self.client.post(

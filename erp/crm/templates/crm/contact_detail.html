@@ -497,14 +497,18 @@
                   <div class="od-order-num">{{ o.order_number|default:o.pk }}</div>
                   <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
                 </div>
-                {% with disp_status=o.order_status|default:o.status %}
+                {% with disp_status=o.order_status %}
                 <span class="ord-status {{ disp_status }}">
                   <span class="ord-status-dot"></span>
-                  {% comment %} Prefer the production STATUS_CHOICES label (English
-                     and translatable). The customer-facing
-                     ORDER_STATUS_CHOICES labels are hardcoded Turkish
-                     in the model, so they'd leak into English mode. {% endcomment %}
-                  {% if o.get_status_display %}{{ o.get_status_display }}{% else %}{{ disp_status|capfirst }}{% endif %}
+                  {% comment %} The customer-facing order_status, matching
+                     order_list and order_detail — including their relabel of
+                     "shipped" as Completed. This used to render the production
+                     STATUS_CHOICES label instead, because ORDER_STATUS_CHOICES
+                     was once hardcoded Turkish; it goes through gettext_lazy
+                     now, so the .po file supplies the translation. Reading
+                     `status` here meant an order set to Shipped still showed
+                     "Pending" whenever its items had not been moved on. {% endcomment %}
+                  {% if disp_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ o.get_order_status_display }}{% endif %}
                 </span>
                 {% endwith %}
                 <div class="od-order-total">

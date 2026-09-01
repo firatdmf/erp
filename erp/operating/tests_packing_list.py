@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from accounting.models import Book
 from marketing.models import (Product, ProductCategory, ProductVariant,
                               ProductVariantAttribute,
                               ProductVariantAttributeValue)
@@ -28,7 +29,8 @@ class PackingListColumns(TestCase):
         self.colour = ProductVariantAttribute.objects.create(name="colour")
         # Group names are stored slugged; the printed column un-slugs them.
         linen = ProductCategory.objects.create(name="bed_linen")
-        wh = Warehouse.objects.create(name="Test WH")
+        wh = Warehouse.objects.create(name="Test WH",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.order = Order.objects.create(order_number="DK0000270")
 
         # Two packages of two rolls each — enough to prove the item

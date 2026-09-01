@@ -963,21 +963,29 @@ def _outsourced_qty(item_data):
     return val if val > 0 else _PDecimal("0")
 
 
-def _lookup_roll_by_barcode_for_sku(code, target_sku):
+def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
     """Find a WarehouseProductRoll by barcode whose product matches
     target_sku (variant SKU or plain warehouse SKU) directly. Used when
     the caller already knows exactly which product/variant a barcode
     should belong to (e.g. a not-yet-saved order-create line) — unlike
     _match_roll_to_order, which guesses across a whole order's items.
     Returns (roll_or_None, error_code_or_None); error_code is one of
-    'not_found' / 'wrong_product' / 'no_target'."""
+    'not_found' / 'wrong_product' / 'no_target'.
+
+    Pass `books` to restrict the search to the shelves those books own —
+    a scan from an order in one book must not reach another book's
+    stock. Left None for the internal callers that are already working
+    within a known order's own rolls."""
     from .models import WarehouseProductRoll
     target = (target_sku or "").strip().lower()
     if not target:
         return None, "no_target"
-    rolls = list(WarehouseProductRoll.objects
-                 .select_related("product", "product__catalog_variant", "product__warehouse")
-                 .filter(barcode__iexact=code))
+    qs = (WarehouseProductRoll.objects
+          .select_related("product", "product__catalog_variant", "product__warehouse")
+          .filter(barcode__iexact=code))
+    if books is not None:
+        qs = qs.filter(product__warehouse__accounting_book__in=books)
+    rolls = list(qs)
     if not rolls:
         return None, "not_found"
     for roll in rolls:
@@ -1425,7 +1433,8 @@ def order_create_barcode_check(request):
     sku = (request.GET.get("sku") or "").strip()
     if not code or not sku:
         return JsonResponse({"ok": False, "error": "Barkod veya ürün bilgisi eksik."}, status=400)
-    roll, err = _lookup_roll_by_barcode_for_sku(code, sku)
+    roll, err = _lookup_roll_by_barcode_for_sku(
+        code, sku, books=_books_in_scope(request))
     if err == "not_found":
         return JsonResponse({"ok": False, "kind": "not_found", "error": "Bu barkodla bir top bulunamadı."}, status=404)
     if err == "wrong_product":
@@ -1440,6 +1449,26 @@ def order_create_barcode_check(request):
         "available": float(avail),
         "warehouse": (roll.product.warehouse.name if (roll.product and roll.product.warehouse_id) else ""),
     })
+
+
+def _books_in_scope(request):
+    """The books whose shelves this request may draw stock from.
+
+    The member's assignments, narrowed to one book when the form says
+    which it is working in. The `book` parameter arrives from the
+    browser, so it can only ever narrow — never widen past what the
+    member is assigned.
+
+    Stock belongs to the book that owns its warehouse. Offering a line
+    from another book's shelf promises a different business's asset and
+    bills it to this book's cari.
+    """
+    from accounting.services_accounts import member_books
+    allowed = member_books(getattr(request.user, "member", None))
+    asked = (request.GET.get("book") or "").strip()
+    if asked.isdigit():
+        allowed = allowed.filter(pk=int(asked))
+    return allowed
 
 
 @login_required
@@ -1459,6 +1488,7 @@ def order_create_barcode_resolve(request):
             .select_related("product__warehouse",
                             "product__catalog_variant__product")
             .filter(barcode__iexact=code, status__in=["in_stock", "partial"])
+            .filter(product__warehouse__accounting_book__in=_books_in_scope(request))
             .first())
     if roll is None:
         return JsonResponse({"ok": False, "error": "Bu barkodla bir top bulunamadı."}, status=404)
@@ -3348,9 +3378,17 @@ def product_autocomplete(request):
         return reduce(_op.or_, (Q(**{f"{field}__icontains": v}) for v in q_variants))
 
     # ── 1) Warehouse hits, grouped by their catalog variant ──────────
+    # Only the working book's shelves. Offering a line from a warehouse
+    # the book does not own means promising stock that is another
+    # business's asset, and the order would bill it to this book's cari.
+    # `book` is what the form is working in; it is still checked against
+    # the member's assignments, because it arrives from the browser.
+    allowed = _books_in_scope(request)
+
     wh_rows = (
         WarehouseProduct.objects
         .filter(catalog_variant__isnull=False)
+        .filter(warehouse__accounting_book__in=allowed)
         .filter(_fq("name") | _fq("sku")
                 | _fq("catalog_variant__variant_sku")
                 | _fq("catalog_variant__product__title"))
@@ -4188,7 +4226,7 @@ def get_order_status(request, order_id):
         return JsonResponse(
             {
                 "id": order.pk,
-                "status": order.get_status_display(),
+                "status": order.get_order_status_display(),
                 "created_at": order.created_at.isoformat(),
                 "updated_at": order.updated_at.isoformat(),
                 "items": [
@@ -4268,7 +4306,14 @@ def get_order_detail_api(request, user_id, order_id):
         order_data = {
             'id': order.pk,
             'order_number': f'ORD-{order.pk}',
+            # `status` is the legacy production rollup, kept so existing
+            # clients keep parsing. `order_status` is the real, customer-
+            # facing state — the one the rest of the API already returns.
             'status': order.status,
+            'order_status': order.order_status,
+            'order_status_display': dict(
+                order._meta.get_field('order_status').choices
+            ).get(order.order_status) if order.order_status else None,
             'created_at': order.created_at.isoformat(),
             'updated_at': order.updated_at.isoformat(),
             'ettn': order.ettn,

@@ -26,7 +26,8 @@ class PurchaseOrderFlowTest(TestCase):
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd,
         )
-        self.wh = Warehouse.objects.create(name="Fabrika")
+        self.wh = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
 
         self.admin = get_user_model().objects.create_superuser(
             username="firat_t", password="pw", email="a@b.c")
@@ -210,7 +211,8 @@ class ReceivedPurchaseEditTest(TestCase):
         self.cari = CariAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
-        self.wh = Warehouse.objects.create(name="Fabrika")
+        self.wh = Warehouse.objects.create(name="Fabrika",
+            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.admin = get_user_model().objects.create_superuser(
             username="edit_admin", password="pw", email="e@d.t")
         self.client.force_login(self.admin)

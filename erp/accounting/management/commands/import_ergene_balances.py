@@ -64,6 +64,18 @@ class _DryRun(Exception):
     """Raised at the end of a dry run to roll the transaction back."""
 
 
+def nfc(value):
+    """Compose a string the way the rest of the world writes it.
+
+    macOS hands back DECOMPOSED filenames — "HACİM" arrives as H A C I
+    plus a combining dot — and a name written to the database that way is
+    unsearchable, because every browser sends the composed form and
+    Postgres compares the bytes. Everything read from a filename or from
+    the map CSV goes through this before it is stored.
+    """
+    return unicodedata.normalize("NFC", value or "")
+
+
 def fold(value):
     """Case- and diacritic-insensitive key.
 
@@ -140,6 +152,12 @@ class Command(BaseCommand):
                             help="Cutover date, YYYY-MM-DD (default: today)")
         parser.add_argument("--prefix", default="ACC",
                             help="Account code prefix for newly minted codes")
+        parser.add_argument("--only", nargs="+", default=None, metavar="KEY",
+                            help="Restrict the run to these map keys. Balances are "
+                                 "re-read from the workbooks every time, so without "
+                                 "this a later run also trues up any sheet that has "
+                                 "moved since — useful, but rarely what you meant "
+                                 "when posting one account.")
         parser.add_argument("--apply", action="store_true",
                             help="Commit. Without it the run is rolled back.")
 
@@ -169,7 +187,14 @@ class Command(BaseCommand):
         # Index the workbooks by folded name so NFD filenames still match.
         workbooks = {fold(p.stem): p for p in source.glob("*.xlsx")
                      if not p.name.startswith("~$")}
-        rows = list(csv.DictReader(map_path.open(encoding="utf-8")))
+        rows = [{k: nfc(v) for k, v in r.items()}
+                for r in csv.DictReader(map_path.open(encoding="utf-8"))]
+        if options["only"]:
+            wanted = {fold(k) for k in options["only"]}
+            rows = [r for r in rows if fold(r["key"]) in wanted]
+            missing = wanted - {fold(r["key"]) for r in rows}
+            if missing:
+                raise CommandError("No map row for: " + ", ".join(sorted(missing)))
 
         self.stdout.write(
             f"book={book.name} (id {book.pk})  cutover={cutover}  ref={batch_ref}  "
@@ -227,16 +252,20 @@ class Command(BaseCommand):
                 continue
             field, target = link
 
-            account = CariAccount.objects.filter(book=book, **{field: target}).first()
+            lookup = {field: target} if field else {"name": row["account_name"]}
+            account = CariAccount.objects.filter(book=book, **lookup).first()
             if account is None and action == "movement_only":
                 problems.append(f"{key}: map says movement_only but no account is linked")
                 continue
 
             if account is None:
                 account = CariAccount(
-                    book=book, name=row["account_name"], type="customer",
+                    book=book, name=row["account_name"],
+                    type=row.get("account_type") or "customer",
                     default_currency=usd, opening_balance=balance,
-                    opening_balance_date=cutover, **{field: target},
+                    opening_balance_date=cutover,
+                    notes=row.get("note") or "",
+                    **({field: target} if field else {}),
                 )
                 account.save()          # blank code -> minted by pre_save signal
                 created += 1
@@ -266,9 +295,10 @@ class Command(BaseCommand):
             ).save()                    # never bulk_create: save() fills amount_base
             posted += 1
             total += delta
+            where = f"[{field} #{target.pk}]" if field else "[no CRM link]"
             self.stdout.write(
                 f"  + {row['account_name'][:28]:29} {delta:>12,.2f}  {verb} -> "
-                f"{account.code} [{field} #{target.pk}]"
+                f"{account.code} {where}"
             )
 
         self.stdout.write("")
@@ -283,7 +313,15 @@ class Command(BaseCommand):
             raise CommandError("Refusing to continue with unresolved rows.")
 
     def _resolve_link(self, row, problems):
-        """Return (field_name, crm_object) for the map row, or None."""
+        """Return (field_name, crm_object) for the map row, or None.
+
+        link_type "none" returns (None, None): an inter-company position is
+        not a client relationship, and inventing a CRM record for the other
+        half of your own business would put a company in the customer list
+        that nobody is allowed to sell to.
+        """
+        if (row.get("link_type") or "").strip() == "none":
+            return None, None
         model, field = (
             (Company, "company") if row["link_type"] == "company" else (Contact, "contact")
         )

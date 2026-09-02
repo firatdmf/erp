@@ -126,22 +126,25 @@ def _filter_payments(request):
           .select_related("cari", "book", "currency", "cash_account")
           .all())
 
-    # Turkish-aware case folding (ı↔I, i↔İ) for both free-text filters —
-    # cari names are stored uppercase Turkish and SQL ILIKE only folds
-    # ASCII, so a lowercase search would otherwise never match them.
-    from .views_accounts import _tr_case_variants
+    # Both free-text filters fold each side to plain uppercase ASCII —
+    # cari names are stored in uppercase Turkish, ILIKE folds only ASCII
+    # case, and "gurhan" has to find GÜRHAN whatever keyboard produced it.
+    from .views_accounts import tr_fold, tr_fold_expr
+
+    qs = qs.annotate(
+        _f_name=tr_fold_expr("cari__name"),
+        _f_code=tr_fold_expr("cari__code"),
+    )
 
     q = (request.GET.get("q") or "").strip()
     if q:
-        cond = Q()
-        for v in _tr_case_variants(q):
-            cond |= (
-                Q(number__icontains=v)
-                | Q(cari__name__icontains=v)
-                | Q(cari__code__icontains=v)
-                | Q(description__icontains=v)
-            )
-        qs = qs.filter(cond)
+        needle = tr_fold(q)
+        qs = qs.filter(
+            Q(_f_name__contains=needle)
+            | Q(_f_code__contains=needle)
+            | Q(number__icontains=q)
+            | Q(description__icontains=q)
+        )
 
     cari_id = request.GET.get("account") or ""
     if cari_id.isdigit():
@@ -152,10 +155,8 @@ def _filter_payments(request):
     # filter bar's "Account" input.
     cari_q = (request.GET.get("cari_q") or "").strip()
     if cari_q:
-        cond = Q()
-        for v in _tr_case_variants(cari_q):
-            cond |= Q(cari__name__icontains=v) | Q(cari__code__icontains=v)
-        qs = qs.filter(cond)
+        needle = tr_fold(cari_q)
+        qs = qs.filter(Q(_f_name__contains=needle) | Q(_f_code__contains=needle))
 
     type_ = request.GET.get("type") or ""
     if type_ in dict(Payment.PAYMENT_TYPES):

@@ -87,13 +87,47 @@ def _movement_choices_including(current):
     return choices
 
 
+# Turkish letters and the ASCII letter each one folds to.
+_TR_FROM = "ıİşŞğĞüÜöÖçÇâÂîÎûÛ"
+_TR_TO   = "iIsSgGuUoOcCaAiIuU"
+
+
+def tr_fold(value):
+    """An ASCII, upper-cased form of a string, for comparing names.
+
+    Search has to survive two separate problems at once. SQL's ILIKE
+    folds only ASCII case, so 'ı'/'I' and 'i'/'İ' never meet — typing
+    'kızılırmak' misses the stored 'KIZILIRMAK'. And people type on
+    whatever keyboard they have: 'gurhan' has to find 'GÜRHAN', because
+    requiring the reader to produce a Ü before they can look anything up
+    is not a search box, it is a quiz.
+
+    Folding both sides to plain uppercase ASCII settles both. The DB side
+    is folded in SQL by tr_fold_expr() so no extension or extra column is
+    needed.
+    """
+    return (value or "").translate(str.maketrans(_TR_FROM, _TR_TO)).upper()
+
+
+def tr_fold_expr(field):
+    """The same fold as tr_fold(), applied to a column by Postgres.
+
+    translate() is standard SQL and needs no extension. There is no index
+    behind it, which is fine at this size — a book holds low thousands of
+    accounts, and the alternative is a denormalised column to keep in
+    sync forever.
+    """
+    from django.db.models import Func, Value
+    from django.db.models.functions import Upper
+    return Upper(Func(field, Value(_TR_FROM), Value(_TR_TO), function="translate"))
+
+
 def _tr_case_variants(q):
-    """Query variants that make search genuinely case-insensitive for
-    TURKISH text. SQL ILIKE only folds ASCII (i↔I): typing lowercase
-    'kızılırmak' never matches the stored uppercase 'KIZILIRMAK'
-    because dotless 'ı' ↔ 'I' (and dotted 'i' ↔ 'İ') aren't in the
-    fold. We OR the original with Turkish-aware upper/lower versions
-    so any casing the user types finds any casing in the DB."""
+    """Deprecated — kept so older call sites keep working.
+
+    Superseded by tr_fold()/tr_fold_expr(), which fold both sides once
+    instead of guessing at the casings the user might have typed.
+    """
     tr_upper = q.replace("i", "İ").replace("ı", "I").upper()
     tr_lower = q.replace("İ", "i").replace("I", "ı").lower()
     return {q, tr_upper, tr_lower}
@@ -112,16 +146,17 @@ def _filter_caris(request, apply_type=True):
 
     q = (request.GET.get("q") or "").strip()
     if q:
-        cond = Q()
-        for v in _tr_case_variants(q):
-            cond |= (
-                Q(code__icontains=v)
-                | Q(name__icontains=v)
-                | Q(tax_number__icontains=v)
-                | Q(email__icontains=v)
-                | Q(phone__icontains=v)
-            )
-        qs = qs.filter(cond)
+        needle = tr_fold(q)
+        qs = qs.annotate(
+            _f_code=tr_fold_expr("code"),
+            _f_name=tr_fold_expr("name"),
+        ).filter(
+            Q(_f_code__contains=needle)
+            | Q(_f_name__contains=needle)
+            | Q(tax_number__icontains=q)
+            | Q(email__icontains=q)
+            | Q(phone__icontains=q)
+        )
 
     # The book is not a filter the reader can drop — it is which business
     # the page is about, and it comes from the path. Summing two books'

@@ -88,18 +88,21 @@ def _filter_invoices(request):
 
     q = (request.GET.get("q") or "").strip()
     if q:
-        # Turkish-aware case folding (ı↔I, i↔İ) — SQL ILIKE only folds
-        # ASCII, so OR a few cased variants like the cari list does.
-        from .views_accounts import _tr_case_variants
-        cond = Q()
-        for v in _tr_case_variants(q):
-            cond |= (
-                Q(number__icontains=v)
-                | Q(cari__name__icontains=v)
-                | Q(cari__code__icontains=v)
-                | Q(notes__icontains=v)
-            )
-        qs = qs.filter(cond)
+        # Fold both sides to plain uppercase ASCII, like the cari list:
+        # ILIKE folds only ASCII case, and a reader on a UK keyboard still
+        # has to be able to find GÜRHAN by typing "gurhan".
+        from .views_accounts import tr_fold, tr_fold_expr
+        needle = tr_fold(q)
+        qs = qs.annotate(
+            _f_name=tr_fold_expr("cari__name"),
+            _f_code=tr_fold_expr("cari__code"),
+        )
+        qs = qs.filter(
+            Q(_f_name__contains=needle)
+            | Q(_f_code__contains=needle)
+            | Q(number__icontains=q)
+            | Q(notes__icontains=q)
+        )
 
     cari_id = request.GET.get("account") or ""
     if cari_id.isdigit():

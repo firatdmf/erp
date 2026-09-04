@@ -20,6 +20,18 @@ deletes the duplicate.
     python manage.py dedupe_cari_accounts --include-names  # + name matches
     python manage.py dedupe_cari_accounts --apply          # merge them
     python manage.py dedupe_cari_accounts --apply --deactivate  # keep the row
+
+Some duplicates the rules cannot see, because the names differ by exactly
+the thing that makes them separate rows — a customer the legacy ledger
+split per year ("ÖZCAN ŞAHSİ 2024/2025/2026") or per shipment. Name those
+groups yourself; the merge, the blockers and the dry run are the same:
+
+    python manage.py dedupe_cari_accounts --book 2 \\
+        --merge 88888,2025Ö --into 99999 --merge-cross-entity
+
+NB: after a cross-entity merge the losing CRM records have no account
+left, and any call to get_or_create_cari_for_* will mint them a fresh
+one. Delete or merge those records too, or the duplicates grow back.
 """
 from collections import defaultdict
 from decimal import Decimal
@@ -123,6 +135,20 @@ class Command(BaseCommand):
             "--limit", type=int, default=None,
             help="Process at most N duplicate groups.",
         )
+        parser.add_argument(
+            "--merge", default=None,
+            help="Merge these account CODES (comma-separated) regardless of "
+                 "what the detection rules think. For duplicates the rules "
+                 "cannot see — a customer the legacy ledger split by year or "
+                 "by shipment, where the names differ by exactly the thing "
+                 "that makes them separate rows.",
+        )
+        parser.add_argument(
+            "--into", default=None,
+            help="The account CODE that survives a --merge. Required with it: "
+                 "when a human names the group, a human names the keeper, "
+                 "rather than the ranking picking one of three plausible rows.",
+        )
 
     # ------------------------------------------------------------------
     def handle(self, *args, **opts):
@@ -143,7 +169,10 @@ class Command(BaseCommand):
             self.stdout.write("No current accounts found.")
             return
 
-        groups = self._find_groups(accounts, opts["include_names"])
+        if opts["merge"] or opts["into"]:
+            groups = [self._explicit_group(accounts, opts)]
+        else:
+            groups = self._find_groups(accounts, opts["include_names"])
         if opts["limit"]:
             groups = groups[: opts["limit"]]
 
@@ -248,6 +277,52 @@ class Command(BaseCommand):
         return out
 
     # ------------------------------------------------------------------
+    def _explicit_group(self, accounts, opts):
+        """Build the one group the operator named on the command line.
+
+        Codes are per-book, so an ambiguous one is an error rather than a
+        guess — merging the wrong book's account is not something to
+        discover afterwards.
+        """
+        if not (opts["merge"] and opts["into"]):
+            raise CommandError("--merge and --into are used together.")
+
+        wanted = [c.strip() for c in opts["merge"].split(",") if c.strip()]
+        keeper = opts["into"].strip()
+        by_code = defaultdict(list)
+        for a in accounts:
+            by_code[a.code].append(a)
+
+        def one(code):
+            found = by_code.get(code) or []
+            if not found:
+                raise CommandError(
+                    f"No account with code {code!r}"
+                    + (f" in book {opts['book']}" if opts["book"] else "")
+                )
+            if len(found) > 1:
+                books = ", ".join(f"{a.book_id}:{a.book.name}" for a in found)
+                raise CommandError(
+                    f"Code {code!r} exists in several books ({books}) — "
+                    "pass --book to say which."
+                )
+            return found[0]
+
+        survivor = one(keeper)
+        losers = [one(c) for c in wanted if c != keeper]
+        if not losers:
+            raise CommandError("--merge named nothing that --into does not.")
+        books = {a.book_id for a in [survivor] + losers}
+        if len(books) > 1:
+            raise CommandError(
+                "These accounts are in different books. A book is a separate "
+                "business and its balances are its own — merging across one "
+                "would move money between them."
+            )
+        self._forced_survivor = survivor
+        return ([survivor] + losers, ["named on the command line"])
+
+    # ------------------------------------------------------------------
     def _rank(self, cari):
         """Higher is more likely to be the keeper."""
         return (
@@ -269,8 +344,13 @@ class Command(BaseCommand):
 
     def _handle_group(self, group):
         members, why = group
-        members = sorted(members, key=self._rank, reverse=True)
-        survivor, losers = members[0], members[1:]
+        forced = getattr(self, "_forced_survivor", None)
+        if forced is not None:
+            survivor = forced
+            losers = [m for m in members if m.pk != forced.pk]
+        else:
+            members = sorted(members, key=self._rank, reverse=True)
+            survivor, losers = members[0], members[1:]
 
         self.stdout.write(f"  book #{survivor.book_id} — matched by {', '.join(why)}")
         self.stdout.write(self._describe(survivor, "KEEP"))

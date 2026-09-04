@@ -287,6 +287,19 @@
         </select>
       </label>
 
+      {% comment %}Not a tab: it cuts across every type, and the set it
+      names is a backlog to work through rather than a kind of account.
+      Most of this book came in from the legacy ledger with no CRM record
+      behind it — this is how you see what is still unidentified.{% endcomment %}
+      <label class="ca-ctl" title="{% trans 'CRM' %}">
+        <span class="ca-ctl-lbl">{% trans "CRM" %}</span>
+        <select name="crm">
+          <option value="">{% trans "All" %}</option>
+          <option value="none"   {% if filter_crm == 'none' %}selected{% endif %}>{% trans "No CRM link" %}</option>
+          <option value="linked" {% if filter_crm == 'linked' %}selected{% endif %}>{% trans "Linked" %}</option>
+        </select>
+      </label>
+
       <label class="ca-ctl" title="{% trans 'Sort' %}">
         <span class="ca-ctl-lbl">{% trans "Sort" %}</span>
         <select name="sort">

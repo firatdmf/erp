@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load accounting_tags %}
+
+{% comment %}
+  One expense, in full, with nothing on it to submit.
+
+  This is where a save lands. It says what was recorded and then shows the
+  other half of the entry — the cash the account gave up, or the debt the
+  book took on — read back off the ledger rather than restated from the
+  figures above it. That is the whole point of the page: the numbers are
+  the ones a person typed, the row underneath them is the one the ledger
+  actually holds, and seeing both agree is the confirmation.
+{% endcomment %}
+
+{% block css %}
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .xd { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 880px; margin: 0 auto; }
+  .xd, .xd * { box-sizing: border-box; }
+
+  .xd-back { display:inline-flex; align-items:center; gap:6px; color: var(--gray-600); font: 500 12.5px var(--font-sans); text-decoration: none; margin-bottom: 14px; }
+  .xd-back:hover { color: var(--nejum-teal-700); }
+
+  .xd-head { display:flex; align-items:flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .xd-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .xd-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0; font-variant-numeric: tabular-nums; }
+  .xd-id { color: var(--gray-400); font-weight: 700; margin-left: 8px; }
+  .xd-actions { margin-left: auto; display:flex; gap: 8px; flex-wrap: wrap; }
+
+  .xd-btn { display:inline-flex; align-items:center; gap:7px; padding: 9px 16px; border-radius: 10px; font: 600 13px var(--font-sans); cursor: pointer; text-decoration: none; border: none; transition: all 140ms; }
+  .xd-btn i { width: 14px; height: 14px; }
+  .xd-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; }
+  .xd-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .xd-btn.danger { background: white; border:1px solid #F0C9C2; color: #B23B12; }
+  .xd-btn.danger:hover { background: #FDF3F2; }
+
+  .xd-card { background: white; border:1px solid #E2E8EE; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); overflow: hidden; margin-bottom: 14px; }
+  .xd-sect { padding: 18px 22px; }
+  .xd-sect-h { display:flex; align-items:center; gap: 10px; margin-bottom: 14px; }
+  .xd-sect-h .ico { display:inline-flex; align-items:center; justify-content:center; width: 28px; height: 28px; border-radius: 8px; background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+  .xd-sect-h h3 { font: 700 14px var(--font-sans); margin: 0; }
+
+  .xd-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  @media (max-width: 720px) { .xd-facts { grid-template-columns: 1fr; } }
+  .xd-fact { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px dashed #E7ECF2; }
+  .xd-fact .k { color: var(--gray-600); font: 500 12.5px var(--font-sans); }
+  .xd-fact .v { font: 600 13px var(--font-sans); text-align: right; font-variant-numeric: tabular-nums; }
+  .xd-fact .v.mono { font-family: var(--font-mono); font-size: 12.5px; }
+  .xd-fact .v .eq { color: var(--gray-500); font-weight: 500; margin-left: 6px; }
+
+  /* The posted row: what the ledger holds, not what the form said. */
+  .xd-posted { border: 1px solid #E7ECF2; border-radius: 10px; padding: 13px 15px; background: #FCFDFE; }
+  .xd-posted .who { display:flex; align-items:center; gap: 8px; flex-wrap: wrap; }
+  .xd-posted .code { font: 600 11.5px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 7px; background: var(--nejum-teal-50); border-radius: 6px; }
+  .xd-posted .name { font: 700 14px var(--font-sans); color: var(--ink); text-decoration: none; }
+  .xd-posted .name:hover { color: var(--nejum-teal-700); text-decoration: underline; }
+  .xd-posted .n { font: 500 12.5px var(--font-sans); color: var(--gray-500); margin-top: 7px; font-variant-numeric: tabular-nums; }
+  .xd-posted .amt { font: 700 16px var(--font-sans); color: #B23B12; font-variant-numeric: tabular-nums; margin-top: 8px; display:block; }
+  .xd-posted .gone { font: 500 12.5px var(--font-sans); color: #B23B12; }
+
+  .xd-note { display:flex; gap: 10px; align-items:flex-start; border-radius: 10px; padding: 12px 14px; font: 500 12.5px var(--font-sans); line-height: 1.55; margin-bottom: 14px; }
+  .xd-note.info { background: #F1F6FB; border: 1px solid #CFE0F0; color: #24486B; }
+  .xd-note i { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+
+  .xd-desc { font: 500 13px var(--font-sans); color: var(--ink); line-height: 1.6; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="xd">
+  <a href="{% url 'accounting:equity_expense_list' pk=book.pk %}" class="xd-back">
+    &larr; {% trans "Expenses" %}
+  </a>
+
+  <div class="xd-head">
+    <div>
+      <div class="xd-eyebrow">{% trans "Expense" %}</div>
+      <h1 class="xd-title">
+        {{ expense.currency.symbol }}{{ expense.amount|format_money }} {{ expense.currency.code }}<span class="xd-id">#{{ expense.pk }}</span>
+      </h1>
+    </div>
+    <div class="xd-actions">
+      <a href="{% url 'accounting:edit_equity_expense' pk=book.pk expense_pk=expense.pk %}" class="xd-btn primary">
+        <i data-lucide="pencil"></i> {% trans "Edit" %}
+      </a>
+      {% comment %}
+        POST, and its own form. A delete a crawler or a prefetch could
+        follow would unwind a ledger entry on its own.
+      {% endcomment %}
+      <form method="post" action="{% url 'accounting:delete_equity_expense' pk=book.pk expense_pk=expense.pk %}"
+            onsubmit="return confirm('{% trans "Delete this expense? Whatever it posted — the cash it took or the debt it created — is undone with it." %}');">
+        {% csrf_token %}
+        <button type="submit" class="xd-btn danger">
+          <i data-lucide="trash-2"></i> {% trans "Delete" %}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="xd-card">
+    <div class="xd-sect">
+      <div class="xd-sect-h">
+        <span class="ico"><i data-lucide="receipt"></i></span>
+        <h3>{% trans "The expense" %}</h3>
+      </div>
+      <div class="xd-facts">
+        <div class="xd-fact"><span class="k">{% trans "Date" %}</span><span class="v">{{ expense.date|date:"d.m.Y" }}</span></div>
+        <div class="xd-fact"><span class="k">{% trans "Category" %}</span><span class="v">{{ expense.category|default:"—" }}</span></div>
+        <div class="xd-fact">
+          <span class="k">{% trans "Amount" %}</span>
+          <span class="v">{{ expense.amount|format_money }} {{ expense.currency.code }}</span>
+        </div>
+        {% if conversion %}
+        {% comment %}
+          The rate and what it came to, in one row. A rate on its own asks
+          the reader to multiply; the figure on its own hides what it was
+          arrived at. An expense already in the book's own currency has
+          neither — see EquityExpenseDetail.conversion.
+        {% endcomment %}
+        <div class="xd-fact">
+          <span class="k">{% trans "Exchange rate" %}</span>
+          <span class="v mono">
+            {{ conversion.rate|format_rate }}
+            <span class="eq">= {{ conversion.base_currency.symbol }}{{ conversion.amount|format_money }}</span>
+          </span>
+        </div>
+        {% endif %}
+        <div class="xd-fact"><span class="k">{% trans "Book" %}</span><span class="v">{{ book.name }}</span></div>
+        <div class="xd-fact"><span class="k">{% trans "Recorded" %}</span><span class="v">{{ expense.created_at|date:"d.m.Y H:i" }}</span></div>
+      </div>
+
+      {% if expense.description %}
+      <div style="margin-top:14px;">
+        <div class="xd-fact" style="border-bottom:none;">
+          <span class="k">{% trans "Description" %}</span>
+        </div>
+        <div class="xd-desc">{{ expense.description }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="xd-card">
+    <div class="xd-sect">
+      <div class="xd-sect-h">
+        <span class="ico"><i data-lucide="wallet"></i></span>
+        <h3>{% trans "What funded it" %}</h3>
+      </div>
+
+      {% if expense.paid_by_cari %}
+        <div class="xd-note info">
+          <i data-lucide="info"></i>
+          <div>{% trans "Somebody settled this for the book. No cash moved — the book owes them instead." %}</div>
+        </div>
+        <div class="xd-posted">
+          <div class="who">
+            <span class="code">{{ expense.paid_by_cari.code }}</span>
+            <a class="name" href="{% url 'accounts:detail' pk=expense.paid_by_cari_id %}">{{ expense.paid_by_cari.name }}</a>
+          </div>
+          {% if ledger_movement %}
+            {# The base equivalent is stated once, up in the rate row. #}
+            <span class="amt">
+              {{ ledger_movement.amount|format_money }} {{ ledger_movement.currency.code }}
+            </span>
+            <div class="n">
+              {{ ledger_movement.date|date:"d.m.Y" }} ·
+              <a href="{% url 'accounts:movement_detail' expense.paid_by_cari_id ledger_movement.pk %}">{% trans "See this ledger row" %} &rarr;</a>
+            </div>
+          {% else %}
+            {# Every funded expense posts one. Saying so is better than showing nothing. #}
+            <div class="n"><span class="gone">{% trans "No ledger row is posted for this expense." %}</span></div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="xd-posted">
+          <div class="who">
+            <a class="name" href="{% url 'accounting:cash_transaction_entry_list' pk=book.pk %}">{{ expense.cash_account.name }}</a>
+            <span class="code">{{ expense.cash_account.currency.code }}</span>
+          </div>
+          {% if cash_entry %}
+            <span class="amt">
+              &minus;{{ cash_entry.amount|format_money }} {{ cash_entry.currency.code }}
+            </span>
+            <div class="n">
+              {{ cash_entry.date|date:"d.m.Y" }} · {% trans "Taken out of this account" %}
+            </div>
+          {% else %}
+            <div class="n"><span class="gone">{% trans "No cash entry is posted for this expense." %}</span></div>
+          {% endif %}
+          <div class="n">
+            {% blocktrans with balance=expense.cash_account.balance|format_money code=expense.cash_account.currency.code %}The account now holds {{ balance }} {{ code }}.{% endblocktrans %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>if (window.lucide) lucide.createIcons();</script>
+{% endblock %}

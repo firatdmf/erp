@@ -224,6 +224,32 @@ class CariAccount(models.Model):
                 "An account can be linked to only one of Contact, Company or Supplier."
             )
 
+    # ── CRM link ──────────────────────────────────────────────────────
+    # Three nullable FKs hold one relationship, and clean() guarantees at
+    # most one is set. The two properties below are that guarantee spelled
+    # as a single answer, so a page asking "who is this account?" doesn't
+    # have to re-derive it from three fields every time.
+    #
+    # Unlinked is an ORDINARY state, not a broken one: the accounts
+    # carried in from the legacy Laleli ledger have no CRM record behind
+    # them, and the links are SET_NULL besides — deleting a company
+    # orphans its account rather than taking the ledger down with it.
+    CRM_FIELDS = ("contact", "company", "supplier")
+
+    @property
+    def crm_link_field(self):
+        """"contact", "company" or "supplier" — "" when nothing is linked."""
+        for field in self.CRM_FIELDS:
+            if getattr(self, f"{field}_id"):
+                return field
+        return ""
+
+    @property
+    def crm_link(self):
+        """The CRM record this account stands for, or None."""
+        field = self.crm_link_field
+        return getattr(self, field) if field else None
+
     def recompute_balance(self, save=True):
         """Recalculate cached_balance from movements. Safe to call any time.
 

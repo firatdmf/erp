@@ -20,7 +20,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Prefetch, Sum
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -173,6 +173,43 @@ def purchase_warehouse_id(invoice_pk):
         .values_list("product__warehouse_id", flat=True)
         .first()
     )
+
+
+@method_decorator(login_required, name="dispatch")
+class PurchaseItemLabels(View):
+    """Every roll sticker for ONE purchase line, as a single inline PDF.
+
+    The stickers are made where the goods are: the delivery is entered,
+    the rolls are on the bench and the printer is next to it. Sending the
+    warehouseman to each product's own page to print its rolls one product
+    at a time is the long way round to the same labels, and it loses the
+    one grouping that matters at that moment — what arrived on this line.
+
+    Consumed rolls print too, unlike the product page's button: a purchase
+    line is a record of what physically arrived, and reprinting the sheet
+    for a delivery should give back the sheet that delivery produced.
+    """
+
+    def get(self, request, pk, item_pk):
+        item = get_object_or_404(
+            InvoiceItem.objects.select_related("invoice"),
+            pk=item_pk, invoice_id=pk, invoice__type="purchase",
+        )
+        rolls = list(
+            item.warehouse_rolls
+            .select_related("product", "product__warehouse")
+            .order_by("id")
+        )
+        if not rolls:
+            raise Http404("This purchase line has no rolls to label.")
+
+        from operating.warehouse_label import inline_pdf_response, labels_pdf_bytes
+
+        invoice = item.invoice
+        line = (item.description or "").strip()
+        title = f"{_('Roll labels')} — {invoice.display_number}{f' — {line}' if line else ''}"
+        pdf = labels_pdf_bytes([(r.product, r) for r in rolls], title=title)
+        return inline_pdf_response(pdf, f"rolls-{invoice.display_number}-{item.line_no}")
 
 
 @method_decorator(login_required, name="dispatch")

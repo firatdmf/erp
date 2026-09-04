@@ -36,6 +36,20 @@ def warehouse_product_info(request, warehouse_pk, product_pk):
 
 
 def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
+    """One product's labels: a page per roll, or a single product-level
+    page when it has none."""
+    return labels_pdf_bytes([(product, r) for r in rolls] or [(product, None)],
+                            detail_url=detail_url, title=title)
+
+
+def labels_pdf_bytes(pairs, detail_url=None, title=None):
+    """A label sheet for (product, roll) pairs — one page each, in order.
+
+    Pairs rather than one product plus its rolls, because a caller like the
+    purchase-order page prints the rolls of a whole delivery line, and those
+    can sit on more than one warehouse product; every page has to carry its
+    own roll's product name and SKU.
+    """
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import mm
     from reportlab.graphics.barcode import code128
@@ -48,12 +62,7 @@ def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "DejaVuSans-Bold" if reg == "DejaVuSans" else "Helvetica-Bold"
-
-    cat = derive_catalog(product.sku, product.name)
-    base = cat["base_name"] or product.name or "—"
-    token = cat["original_token"] or ""
     brand = (getattr(settings, "BRAND_NAME", "") or "Nejum").upper()
-    sku = product.sku or ""
 
     W, H = 76 * mm, 58 * mm
     buf = BytesIO()
@@ -63,9 +72,11 @@ def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
         c.setTitle(title)
         c.setSubject(title)
 
-    # One label per roll; if there are no rolls, one product-level label.
-    items = list(rolls) if rolls else [None]
-    for roll in items:
+    for product, roll in pairs:
+        cat = derive_catalog(product.sku, product.name)
+        base = cat["base_name"] or product.name or "—"
+        token = cat["original_token"] or ""
+        sku = product.sku or ""
         bc_val = (roll.barcode if (roll and roll.barcode) else (product.barcode or sku or ""))
         # What is physically on the roll NOW, not the length it arrived
         # at: a cut roll carries meters_remaining, and the reprinted label
@@ -219,7 +230,6 @@ def warehouse_product_label(request, warehouse_pk, product_pk):
         kwargs={"warehouse_pk": warehouse_pk, "product_pk": product_pk}))
 
     # Build a meaningful title (browser tab) and safe filename (download).
-    import re
     product_name = (product.name or product.sku or f"Product {product.pk}").strip()
     if len(rolls) == 1 and rolls[0].barcode:
         title = f"Label — {product_name} — {rolls[0].barcode}"
@@ -227,18 +237,25 @@ def warehouse_product_label(request, warehouse_pk, product_pk):
     else:
         title = f"Label — {product_name}"
         stem = f"label-{product.sku or product.pk}"
-    # Filename: RFC 5987 filename* carries the full Unicode (Turkish
-    # chars preserved in modern browsers), plus an ASCII-transliterated
-    # filename= fallback for older clients. Turkish İ → I via NFKD so
-    # the fallback stays readable instead of dropping the letter.
+    pdf = _label_pdf_bytes(product, rolls, detail_url=detail_url, title=title)
+    return inline_pdf_response(pdf, stem)
+
+
+def inline_pdf_response(pdf, stem):
+    """A label PDF the browser opens in a tab, named so it can be saved.
+
+    RFC 5987 filename* carries the full Unicode (Turkish chars preserved
+    in modern browsers), plus an ASCII-transliterated filename= fallback
+    for older clients. Turkish İ → I via NFKD so the fallback stays
+    readable instead of dropping the letter.
+    """
+    import re
     import unicodedata
     from urllib.parse import quote
     ascii_stem = (
         unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode("ascii")
     )
     ascii_stem = re.sub(r"[^A-Za-z0-9._-]+", "-", ascii_stem).strip("-") or "label"
-
-    pdf = _label_pdf_bytes(product, rolls, detail_url=detail_url, title=title)
     resp = HttpResponse(pdf, content_type="application/pdf")
     resp["Content-Disposition"] = (
         f'inline; filename="{ascii_stem}.pdf"; '

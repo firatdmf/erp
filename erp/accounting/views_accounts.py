@@ -21,6 +21,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -179,6 +180,18 @@ def _filter_caris(request, apply_type=True):
             where=["cached_balance > credit_limit AND credit_limit > 0"]
         )
 
+    # Whether the account stands for a CRM record. Not a tab: it cuts
+    # across every type, and the set it names is a backlog to work
+    # through rather than a kind of account. Most of the Laleli book came
+    # in from the legacy ledger with nothing behind it, so this is the
+    # only way to see what is still waiting to be identified.
+    crm_filter = request.GET.get("crm") or ""
+    unlinked = Q(contact__isnull=True, company__isnull=True, supplier__isnull=True)
+    if crm_filter == "none":
+        qs = qs.filter(unlinked)
+    elif crm_filter == "linked":
+        qs = qs.exclude(unlinked)
+
     # Default (no param) = active only; "0" = inactive only; "all" = both.
     # "all" is an explicit value on purpose — an empty one is stripped from
     # the fetch URL client-side and would silently fall back to the default.
@@ -296,6 +309,7 @@ class CariList(View):
             "filter_book":    str(request.book.pk),
             "filter_type":    request.GET.get("type", ""),
             "filter_balance": request.GET.get("balance", ""),
+            "filter_crm":     request.GET.get("crm", ""),
             "filter_active":  request.GET.get("active", "1"),
             "sort":           request.GET.get("sort", "name"),
         }
@@ -478,6 +492,262 @@ class CariEdit(View):
         return redirect("accounts:detail", pk=cari.pk)
 
 
+# ---------------------------------------------------------------------------
+# CRM link
+#
+# An account is meant to stand for someone the CRM already knows, and
+# creating one here always mints the matching record. Nothing did that for
+# the accounts carried in from the legacy Laleli ledger, and until now
+# nothing could: CariEdit never touched the three link fields, so 1,148
+# accounts had no CRM record and no way to be given one short of a shell.
+# Downstream code had begun working around the hole rather than closing it
+# (warehouse intake reads through cari.supplier, which is empty for every
+# imported account).
+#
+# So: a picker on the account page. Attach an existing record, mint one
+# from what the account already knows about itself, or detach a wrong
+# guess. One account at a time, by someone who recognises the name —
+# there is no fuzzy match to be had here, the imported names ("AHMET
+# ABİ", "İNNA GALA KOTOBSK 63 KARGO KOD 3325") overlap the CRM's 224
+# companies in exactly zero places.
+# ---------------------------------------------------------------------------
+# One list, defined on the model beside the fields themselves — this used
+# to be spelled out again here, and two copies of "which three FKs" is how
+# a fourth would end up honoured in one place and not the other.
+_CRM_KINDS = CariAccount.CRM_FIELDS
+
+
+def _crm_subtitle(obj):
+    """A second line for a picker row.
+
+    Enough to tell two records with the same name apart without opening
+    either — which is the whole job of this list.
+    """
+    bits = []
+    country = (getattr(obj, "country", "") or "").strip()
+    if country:
+        bits.append(country)
+    email = getattr(obj, "email", None)
+    if isinstance(email, list):          # Contact/Company hold an array
+        email = email[0] if email else ""
+    if email:
+        bits.append(email)
+    return " · ".join(bits)
+
+
+def _crm_model(kind):
+    from crm.models import Company, Contact, Supplier
+    return {"contact": Contact, "company": Company, "supplier": Supplier}[kind]
+
+
+@method_decorator(login_required, name="dispatch")
+class CariCrmSearch(View):
+    """Candidate CRM records for the account page's link picker (JSON).
+
+    Matched with the same Turkish fold the account list searches by, so
+    "gurhan" finds "GÜRHAN" from a keyboard that cannot type Ü.
+
+    Every candidate says whether it is already spoken for IN THIS BOOK.
+    A CRM record holds at most one account per book (the uniq_cari_book_*
+    constraints), so offering a taken one could only end in an
+    IntegrityError at save time. Naming the account that holds it is more
+    useful than hiding it anyway: that account is usually the duplicate
+    the reader was about to create by hand.
+    """
+    LIMIT = 8
+
+    def get(self, request, pk):
+        from crm.models import Company, Contact, Supplier
+
+        cari = get_object_or_404(CariAccount, pk=pk)
+        q = (request.GET.get("q") or "").strip()
+        if not q:
+            return JsonResponse({"results": []})
+        needle = tr_fold(q)
+
+        found = {
+            "contact": list(
+                Contact.objects.annotate(_f=tr_fold_expr("name"))
+                .filter(_f__contains=needle).order_by("name")[:self.LIMIT]
+            ),
+            "company": list(
+                Company.objects.annotate(_f=tr_fold_expr("name"))
+                .filter(_f__contains=needle).order_by("name")[:self.LIMIT]
+            ),
+            # A supplier is named by whichever of the two columns is
+            # filled — __str__ prefers company_name — so both are searched.
+            "supplier": list(
+                Supplier.objects.annotate(_fc=tr_fold_expr("company_name"),
+                                          _fn=tr_fold_expr("contact_name"))
+                .filter(Q(_fc__contains=needle) | Q(_fn__contains=needle))
+                .order_by("company_name", "contact_name")[:self.LIMIT]
+            ),
+        }
+
+        results = []
+        for kind in _CRM_KINDS:
+            rows = found[kind]
+            if not rows:
+                continue
+            # One query per kind, not one per row.
+            holders = {
+                getattr(c, f"{kind}_id"): c
+                for c in CariAccount.objects
+                .filter(book=cari.book, **{f"{kind}__in": rows})
+                .exclude(pk=cari.pk)
+            }
+            for obj in rows:
+                held = holders.get(obj.pk)
+                results.append({
+                    "kind": kind,
+                    "id": obj.pk,
+                    "label": str(obj),
+                    "sub": _crm_subtitle(obj),
+                    "taken": None if held is None else {
+                        "code": held.code,
+                        "name": held.name,
+                        "url": reverse("accounts:detail", args=[held.pk]),
+                    },
+                })
+        return JsonResponse({"results": results})
+
+
+@method_decorator(login_required, name="dispatch")
+class CariCrmLink(View):
+    """Attach the account to a CRM record, mint one for it, or detach it.
+
+    Three actions on one route because they are one decision — who is
+    this account? — and splitting them across three URLs would only make
+    the redirect and the error handling three times over.
+    """
+
+    def post(self, request, pk):
+        cari = get_object_or_404(CariAccount, pk=pk)
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "detach":
+            if not cari.crm_link_field:
+                messages.info(request, _g("This account has no CRM link."))
+                return redirect("accounts:detail", pk=cari.pk)
+            was = str(cari.crm_link)
+            cari.contact = cari.company = cari.supplier = None
+            cari.save(update_fields=["contact", "company", "supplier", "updated_at"])
+            messages.success(
+                request,
+                _g("CRM link removed (%(name)s). The account and its ledger are untouched.")
+                % {"name": was},
+            )
+            return redirect("accounts:detail", pk=cari.pk)
+
+        kind = (request.POST.get("kind") or "").strip()
+        if kind not in _CRM_KINDS:
+            messages.error(request, _g("Pick a contact, company or supplier."))
+            return redirect("accounts:detail", pk=cari.pk)
+
+        if action == "create":
+            obj = self._create(request, cari, kind)
+            if obj is None:
+                return redirect("accounts:detail", pk=cari.pk)
+        elif action == "attach":
+            obj = _crm_model(kind).objects.filter(pk=request.POST.get("id")).first()
+            if obj is None:
+                messages.error(request, _g("That CRM record no longer exists."))
+                return redirect("accounts:detail", pk=cari.pk)
+        else:
+            messages.error(request, _g("Unknown action."))
+            return redirect("accounts:detail", pk=cari.pk)
+
+        # Checked before saving rather than caught afterwards: a
+        # constraint violation would say "duplicate key value violates
+        # uniq_cari_book_company", and the reader needs the account's
+        # code, which is the thing they were actually looking for.
+        holder = (CariAccount.objects
+                  .filter(book=cari.book, **{kind: obj})
+                  .exclude(pk=cari.pk).first())
+        if holder is not None:
+            messages.error(
+                request,
+                _g("%(name)s is already linked to account %(code)s (%(account)s) "
+                   "in this book. An account and a CRM record go together one "
+                   "to one — if these two are the same customer, the balances "
+                   "belong on one of them.")
+                % {"name": str(obj), "code": holder.code, "account": holder.name},
+            )
+            return redirect("accounts:detail", pk=cari.pk)
+
+        # Exactly one of the three, always — clean() refuses two, and
+        # re-pointing a link has to clear the old one to obey that.
+        for field in _CRM_KINDS:
+            setattr(cari, field, obj if field == kind else None)
+        cari.save(update_fields=[*_CRM_KINDS, "updated_at"])
+        messages.success(request, _g("Linked to %(name)s.") % {"name": str(obj)})
+        return redirect("accounts:detail", pk=cari.pk)
+
+    def _create(self, request, cari, kind):
+        """Mint the CRM record this account has been standing in for.
+
+        Seeded from the account's own fields — the name, address and
+        phone on an imported account are the only record of that customer
+        anyone has, and retyping them into a CRM form is how they get
+        retyped differently.
+
+        Returns the object, or None after reporting why not.
+        """
+        from crm.models import Company, Contact, Supplier
+
+        name = (request.POST.get("name") or cari.name or "").strip()
+        if not name:
+            messages.error(request, _g("Name is required."))
+            return None
+
+        email = (cari.email or "").strip()
+        phone = (cari.phone or "").strip()
+        address = (cari.billing_address or "").strip()
+        country = (cari.billing_country or "").strip()
+
+        if kind == "company":
+            # Company.name is unique, and CariCreate refuses a duplicate
+            # rather than quietly reusing the existing row. Same here:
+            # attaching to someone else's company because the names match
+            # is a judgement only the reader can make, and the search box
+            # above this button is how they make it.
+            if Company.objects.filter(name__iexact=name).exists():
+                messages.error(
+                    request,
+                    _g("A company named %(name)s already exists — search for it "
+                       "above and link to it instead.") % {"name": name},
+                )
+                return None
+            obj = Company(name=name, email=[email] if email else [],
+                          phone=[phone] if phone else [],
+                          address=address, country=country)
+        elif kind == "contact":
+            obj = Contact(name=name, email=[email] if email else [],
+                          phone=[phone] if phone else [],
+                          address=address, country=country)
+        else:
+            obj = Supplier(company_name=name, email=email, phone=phone,
+                           address=address, country=country)
+
+        try:
+            # full_clean rather than a silent truncation: Contact.name
+            # holds 50 characters and a phone 20, and half the imported
+            # account names are longer than that. A name the CRM cannot
+            # hold is worth saying out loud — cutting it in half here is
+            # how a record becomes unfindable later.
+            obj.full_clean()
+            obj.save()
+        except ValidationError as exc:
+            messages.error(
+                request,
+                _g("Could not create the CRM record: %(error)s")
+                % {"error": "; ".join(
+                    f"{f}: {' '.join(m)}" for f, m in exc.message_dict.items())},
+            )
+            return None
+        return obj
+
+
 def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=False):
     """Which document OWNS this ledger row, and where it is edited.
 
@@ -511,9 +781,11 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
             # An expense somebody settled on the book's behalf. The expense
             # is what posts this row and what reposts it on every edit, so
             # it is corrected there — and now there is a page to send the
-            # user to, which is why this is no longer a dead end.
+            # user to, which is why this is no longer a dead end. The
+            # expense's own page, not its edit form: following a link from
+            # a ledger row is asking what this is, not asking to change it.
             return (_("Expense"),
-                    reverse("accounting:edit_equity_expense",
+                    reverse("accounting:equity_expense_detail",
                             kwargs={"pk": mv.book_id, "expense_pk": mv.source_id}),
                     False)
         if model is not None and model.__name__ == "CariTransfer":
@@ -725,6 +997,14 @@ class CariDetail(View):
             "recent_orders": recent_orders,
             "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
+            # Buttons on the CRM picker, in the order the CRM itself
+            # thinks about people: a person, the firm they work for, then
+            # someone we buy from.
+            "crm_new_kinds": [
+                ("contact",  _("New contact")),
+                ("company",  _("New company")),
+                ("supplier", _("New supplier")),
+            ],
         }
         return render(request, self.template_name, ctx)
 

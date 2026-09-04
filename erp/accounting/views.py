@@ -1257,17 +1257,20 @@ class EquityExpensePage:
         }
 
     def get_success_url(self) -> str:
-        """The expense's own page.
+        """The expense's own page — the read-only one.
 
-        Not the book, which reports a position that one expense moves by an
-        amount too small to see, and not the list, which says an entry
+        Not the book, which reports a position that one expense moves by
+        an amount too small to see, and not the list, which says an entry
         exists without showing what it did. Its own page shows the figures
-        back, the ledger row it posted and the account that carries it —
-        and is where a correction is made, so the answer to "is that
-        right?" and the way to fix it are the same screen.
+        back and the row it posted, which is the answer to "is that
+        right?".
+
+        Not back to this form, either. Landing on the form the entry was
+        just submitted from reads as though nothing was saved — the same
+        fields, still editable, waiting to be submitted again.
         """
         return reverse(
-            "accounting:edit_equity_expense",
+            "accounting:equity_expense_detail",
             kwargs={"pk": self.kwargs.get("pk"), "expense_pk": self.object.pk},
         )
 
@@ -1296,6 +1299,92 @@ class EquityExpensePage:
                 'redirect_url': self.get_success_url()
             })
         return HttpResponseRedirect(self.get_success_url())
+
+
+@method_decorator(login_required, name="dispatch")
+class EquityExpenseDetail(generic.DetailView):
+    """One expense, in full, and nothing to submit.
+
+    Where a save lands. The form the entry was made on cannot be that
+    place: it comes back with the same fields still editable and a save
+    button under them, which says nothing about whether the entry was
+    written and invites it to be written again. This states what was
+    recorded and shows the other half of it — the cash the account gave
+    up, or the debt the book took on — read back off the ledger rather
+    than recomputed from the figures above it. Correcting it is a click
+    away, and deliberate.
+    """
+
+    model = EquityExpense
+    template_name = "accounting/equity_expense_detail.html"
+    pk_url_kwarg = "expense_pk"
+    context_object_name = "expense"
+
+    def get_queryset(self):
+        # Book-scoped for the same reason the edit page is: an expense
+        # reached through the wrong book's URL is a 404, not somebody
+        # else's entry to read.
+        return (
+            EquityExpense.objects
+            .filter(book_id=self.kwargs.get("pk"))
+            .select_related("book", "category", "currency",
+                            "cash_account", "cash_account__currency",
+                            "paid_by_cari", "paid_by_cari__default_currency")
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        expense = self.object
+        context["book"] = expense.book
+        content_type = ContentType.objects.get_for_model(EquityExpense)
+        # Exactly one of these exists, decided by which funding source the
+        # expense named — see EquityExpense's check constraint and
+        # post_expense. Both are looked up rather than derived, because
+        # what the page is for is showing that the entry really posted.
+        context["ledger_movement"] = (
+            CariMovement.objects
+            .filter(source_type=content_type, source_id=expense.pk)
+            .select_related("currency", "cari")
+            .first()
+        ) if expense.paid_by_cari_id else None
+        context["cash_entry"] = (
+            CashTransactionEntry.objects
+            .filter(content_type=content_type, content_pk=expense.pk)
+            .select_related("currency", "cash_account")
+            .first()
+        ) if expense.cash_account_id else None
+        context["conversion"] = self.conversion(
+            context["cash_entry"] or context["ledger_movement"]
+        )
+        return context
+
+    def conversion(self, posted):
+        """The rate the posted row converted at, and what it came to.
+
+        Both figures are read off that row and nothing here converts
+        anything. The row is what moved a balance; a figure worked out
+        here from the amount and a rate would be this page's arithmetic
+        rather than the ledger's, and the two are free to disagree — an
+        expense edited without resyncing, a rate corrected after posting.
+        A page that quietly recomputes is how it comes to contradict the
+        statement it is describing.
+
+        None when there is nothing the ledger says: the expense is already
+        in the book's own currency, or it posted no row to ask.
+        """
+        base = self.object.book.effective_base_currency
+        if self.object.currency_id == base.pk:
+            return None
+
+        rate = getattr(posted, "exchange_rate", None)
+        # CashTransactionEntry keeps the converted figure under one name,
+        # CariMovement under another; only one of the two ever posted.
+        amount = getattr(posted, "amount_in_base_currency", None)
+        if amount is None:
+            amount = getattr(posted, "amount_base", None)
+        if not rate or amount is None:
+            return None
+        return {"rate": rate, "amount": amount, "base_currency": base}
 
 
 @method_decorator(login_required, name="dispatch")

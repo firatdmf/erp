@@ -117,6 +117,40 @@
   .cd-crm-link i, .cd-crm-link svg { width: 12px; height: 12px; stroke-width: 2; opacity: 0.5; transition: opacity 140ms; flex-shrink: 0; }
   .cd-crm-link:hover i, .cd-crm-link:hover svg { opacity: 1; }
 
+  /* CRM link picker — shown on an account that stands for nobody yet. */
+  .cd-crm-none { display:flex; align-items:flex-start; gap: 8px; margin: 0 0 14px; padding: 10px 12px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 9px; font: 500 12.5px var(--font-sans); color: #92400E; }
+  .cd-crm-none i, .cd-crm-none svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }
+  .cd-crm-standalone { display:flex; align-items:flex-start; gap: 8px; margin: 0 0 14px; padding: 10px 12px; background: #F4F7FB; border: 1px solid #E2E8EE; border-radius: 9px; font: 500 12.5px var(--font-sans); color: var(--gray-600); }
+  .cd-crm-standalone i, .cd-crm-standalone svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: var(--gray-500); }
+  .cd-crm-search { position: relative; }
+  .cd-crm-search i, .cd-crm-search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--gray-400); pointer-events: none; }
+  .cd-crm-search input { width: 100%; padding: 9px 12px 9px 33px; border: 1px solid #E0E6EE; border-radius: 9px; font: 500 13px var(--font-sans); color: var(--ink); background: white; outline: none; transition: border-color 140ms, box-shadow 140ms; }
+  .cd-crm-search input:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .cd-crm-results { margin-top: 8px; border: 1px solid #E2E8EE; border-radius: 9px; overflow: hidden; max-height: 260px; overflow-y: auto; }
+  .cd-crm-res { display:flex; align-items:center; gap: 9px; width: 100%; padding: 9px 11px; background: white; border: none; border-bottom: 1px solid #EEF1F5; text-align: left; cursor: pointer; font: 500 12.5px var(--font-sans); color: var(--ink); }
+  .cd-crm-res:last-child { border-bottom: none; }
+  .cd-crm-res:hover { background: #F4FAFA; }
+  .cd-crm-res i, .cd-crm-res svg { width: 13px; height: 13px; flex-shrink: 0; color: var(--gray-500); }
+  .cd-crm-res .t { min-width: 0; flex: 1; }
+  .cd-crm-res .t b { display:block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cd-crm-res .t small { display:block; font: 500 11px var(--font-sans); color: var(--gray-500); }
+  .cd-crm-res .k { font: 700 9.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #EEF1F5; color: var(--gray-600); flex-shrink: 0; }
+  /* Already spoken for in this book: not offered, but shown — it is
+     usually the duplicate the reader was about to create by hand. */
+  .cd-crm-res.taken { cursor: default; background: #FAFBFD; }
+  .cd-crm-res.taken:hover { background: #FAFBFD; }
+  .cd-crm-res.taken .t b { color: var(--gray-500); }
+  .cd-crm-res .held { font: 600 11px var(--font-mono); color: var(--nejum-teal-700); text-decoration: none; flex-shrink: 0; }
+  .cd-crm-res .held:hover { text-decoration: underline; }
+  .cd-crm-empty { padding: 12px; text-align: center; font: 500 12px var(--font-sans); color: var(--gray-500); }
+  .cd-crm-new { margin-top: 16px; padding-top: 14px; border-top: 1px dashed #E2E8EE; }
+  .cd-crm-new .lbl { font: 600 10.5px var(--font-sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 9px; }
+  .cd-crm-new-btns { display:grid; gap: 7px; }
+  .cd-crm-detach { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #EEF1F5; }
+  .cd-crm-detach-btn { display:inline-flex; align-items:center; gap: 6px; padding: 5px 10px; background: none; border: none; cursor: pointer; font: 600 11.5px var(--font-sans); color: var(--gray-500); border-radius: 7px; }
+  .cd-crm-detach-btn:hover { background: #FEF2F2; color: #B23B12; }
+  .cd-crm-detach-btn i, .cd-crm-detach-btn svg { width: 12px; height: 12px; }
+
   /* Tables in detail cards */
   .cd-tbl { width: 100%; border-collapse: collapse; font: 400 13px var(--font-sans); }
   .cd-tbl thead th { background: #FAFBFD; border-bottom: 1px solid #E2E8EE; font: 600 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); padding: 10px 14px; text-align: left; }
@@ -514,13 +548,20 @@
       </div>
 
       <!-- CRM link -->
-      {% if cari.contact or cari.company or cari.supplier %}
+      {% comment %}
+        Always drawn, linked or not. This card used to render only when
+        one of the three FKs was set, which meant the accounts that most
+        need attention — the ones carried in from the legacy ledger, with
+        no CRM record behind them — were the ones showing nothing at all.
+      {% endcomment %}
       <div class="cd-card">
         <div class="cd-sect">
           <div class="cd-sect-h">
             <span class="ico"><i data-lucide="link"></i></span>
             <h3>{% trans "CRM Link" %}</h3>
           </div>
+
+          {% if cari.crm_link %}
           <div class="cd-info">
             {% comment %}
               Each row opens its CRM record in a NEW TAB: this card is
@@ -561,9 +602,84 @@
             </div>
             {% endif %}
           </div>
+          <form method="post" action="{% url 'accounts:crm_link' cari.pk %}"
+                class="cd-crm-detach"
+                onsubmit="return confirm('{% trans "Remove the CRM link? The account, its balance and its ledger are untouched." %}');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="detach">
+            <button type="submit" class="cd-crm-detach-btn">
+              <i data-lucide="unlink"></i>{% trans "Remove link" %}
+            </button>
+          </form>
+
+          {% else %}
+          {% comment %}
+            The picker. Search first, create second — deliberately in that
+            order: a second CRM record for a customer who already has one
+            is how the account list filled up with duplicates in the first
+            place, and the search box is what stops the reader making one.
+          {% endcomment %}
+          {% comment %}
+            An "other" account stands alone by design — the walk-in
+            counter, an inter-company position. It will never have a CRM
+            record, so warning about the missing one would be an alarm
+            that can never be cleared. The picker stays available below,
+            since the type can be wrong; only the alarm goes.
+          {% endcomment %}
+          {% if cari.type == "other" %}
+          <p class="cd-crm-standalone">
+            <i data-lucide="info"></i>
+            {% trans "This account stands alone — no CRM record is expected." %}
+          </p>
+          {% else %}
+          <p class="cd-crm-none">
+            <i data-lucide="alert-circle"></i>
+            {% trans "This account doesn't stand for anyone in the CRM yet." %}
+          </p>
+          {% endif %}
+
+          <div class="cd-crm-pick" data-search-url="{% url 'accounts:crm_search' cari.pk %}">
+            <div class="cd-crm-search">
+              <i data-lucide="search"></i>
+              <input type="text" id="cd-crm-q" autocomplete="off"
+                     placeholder="{% trans 'Search contacts, companies, suppliers…' %}"
+                     value="{{ cari.name }}">
+            </div>
+            <div id="cd-crm-results" class="cd-crm-results" hidden></div>
+
+            <form method="post" action="{% url 'accounts:crm_link' cari.pk %}" id="cd-crm-attach">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="attach">
+              <input type="hidden" name="kind" id="cd-crm-kind">
+              <input type="hidden" name="id" id="cd-crm-id">
+            </form>
+
+            <div class="cd-crm-new">
+              <div class="lbl">{% trans "Or create one from this account" %}</div>
+              {% comment %}
+                Seeded from the account's own name, address and phone —
+                on an imported account those are the only record of that
+                customer anybody has, and retyping them into a CRM form
+                is how they come out different.
+              {% endcomment %}
+              <div class="cd-crm-new-btns">
+                {% for kind, label in crm_new_kinds %}
+                <form method="post" action="{% url 'accounts:crm_link' cari.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="create">
+                  <input type="hidden" name="kind" value="{{ kind }}">
+                  <input type="hidden" name="name" value="{{ cari.name }}">
+                  <button type="submit" class="cd-btn ghost" style="width: 100%; justify-content: center;">
+                    <i data-lucide="plus"></i>{{ label }}
+                  </button>
+                </form>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
-      {% endif %}
 
       <!-- Notes -->
       {% if cari.notes %}
@@ -607,5 +723,86 @@
       window.location.href = tr.dataset.href;
     });
   });
+
+  // ── CRM link picker. Only present on an account that stands for
+  //    nobody yet; the search runs server-side so the Turkish fold is
+  //    the same one the account list uses.
+  (function () {
+    const pick = document.querySelector('.cd-crm-pick');
+    if (!pick) return;
+    const input = document.getElementById('cd-crm-q');
+    const box = document.getElementById('cd-crm-results');
+    const form = document.getElementById('cd-crm-attach');
+    const url = pick.dataset.searchUrl;
+    const KIND = {
+      contact: {icon: 'user', label: '{% trans "Contact" %}'},
+      company: {icon: 'building-2', label: '{% trans "Company" %}'},
+      supplier: {icon: 'truck', label: '{% trans "Supplier" %}'}
+    };
+    let timer = null, token = 0;
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, c => (
+        {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+    }
+
+    function render(results) {
+      if (!results.length) {
+        box.innerHTML = '<div class="cd-crm-empty">{% trans "Nothing found — create a record below." %}</div>';
+        box.hidden = false;
+        return;
+      }
+      box.innerHTML = results.map(function (r) {
+        const k = KIND[r.kind] || {icon: 'circle', label: r.kind};
+        const sub = r.sub ? '<small>' + esc(r.sub) + '</small>' : '';
+        if (r.taken) {
+          // Not selectable — one CRM record holds one account per book.
+          return '<div class="cd-crm-res taken" title="' +
+            esc('{% trans "Already linked to another account in this book" %}') + '">' +
+            '<i data-lucide="' + k.icon + '"></i>' +
+            '<span class="t"><b>' + esc(r.label) + '</b>' + sub + '</span>' +
+            '<a class="held" href="' + esc(r.taken.url) + '" title="' + esc(r.taken.name) + '">' +
+            esc(r.taken.code) + '</a></div>';
+        }
+        return '<button type="button" class="cd-crm-res" data-kind="' + esc(r.kind) +
+          '" data-id="' + esc(r.id) + '">' +
+          '<i data-lucide="' + k.icon + '"></i>' +
+          '<span class="t"><b>' + esc(r.label) + '</b>' + sub + '</span>' +
+          '<span class="k">' + esc(k.label) + '</span></button>';
+      }).join('');
+      box.hidden = false;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function search() {
+      const q = input.value.trim();
+      if (!q) { box.hidden = true; box.innerHTML = ''; return; }
+      const mine = ++token;
+      fetch(url + '?q=' + encodeURIComponent(q),
+            {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        .then(r => r.json())
+        .then(d => { if (mine === token) render(d.results || []); })
+        .catch(() => {});
+    }
+
+    input.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(search, 250);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); search(); }
+    });
+    // Delegated: the rows are replaced on every keystroke.
+    box.addEventListener('click', function (e) {
+      const btn = e.target.closest('.cd-crm-res[data-kind]');
+      if (!btn) return;
+      document.getElementById('cd-crm-kind').value = btn.dataset.kind;
+      document.getElementById('cd-crm-id').value = btn.dataset.id;
+      form.submit();
+    });
+    // The box opens pre-filled with the account's name, which is the
+    // search everyone would type first anyway.
+    search();
+  })();
 </script>
 {% endblock %}

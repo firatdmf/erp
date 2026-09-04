@@ -147,7 +147,7 @@ class MovementDetailTests(TestCase):
         self.assertFalse(response.context["row"]["editable"])
         self.assertContains(
             response,
-            reverse("accounting:edit_equity_expense",
+            reverse("accounting:equity_expense_detail",
                     kwargs={"pk": self.book.pk, "expense_pk": expense.pk}),
         )
 

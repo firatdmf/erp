@@ -55,6 +55,10 @@
   .po-item-meta b { color: var(--gray-700); }
 
   .po-rolls-h { font: 700 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); margin: 10px 0 6px; display:flex; align-items:center; gap: 6px; }
+  /* Print button sits in the rolls header, right-aligned: it belongs to
+     the rolls of THIS line, and the header is the only line-level row. */
+  .po-rolls-print { margin-left: auto; display:inline-flex; align-items:center; gap: 6px; padding: 5px 10px; background:white; border:1px solid #E0E6EE; border-radius: 8px; font: 700 11px var(--font-sans); letter-spacing: 0.02em; text-transform: none; color: var(--nejum-teal-700); text-decoration:none; transition: all 140ms; }
+  .po-rolls-print:hover { border-color: var(--nejum-teal-600); background:#F0FBF9; }
   .po-rolls { display:flex; flex-wrap: wrap; gap: 8px; }
   .po-roll { display:flex; align-items:center; gap: 8px; padding: 7px 10px; background:#F8FAFC; border:1px solid #E2E8EE; border-radius: 8px; font-size: 12px; }
   .po-roll code { font-family: var(--font-mono); background: white; border:1px solid #E2E8EE; border-radius: 5px; padding: 1px 6px; }
@@ -156,7 +160,16 @@
       {% if it.variant %} · <span style="font-family:var(--font-mono);">{{ it.variant.variant_sku }}</span>{% endif %}
     </div>
 
-    <div class="po-rolls-h"><i data-lucide="layers"></i> {% trans "Physical rolls received" %}</div>
+    <div class="po-rolls-h">
+      <i data-lucide="layers"></i> {% trans "Physical rolls received" %}
+      {% if it.warehouse_rolls.all %}
+      <a class="po-rolls-print" target="_blank" rel="noopener"
+         href="{% url 'accounts:purchase_item_labels' invoice.pk it.pk %}"
+         title="{% trans 'One label per roll on this line, as one PDF' %}">
+        <i class="fa fa-qrcode"></i> {% trans "Print roll barcodes" %}
+      </a>
+      {% endif %}
+    </div>
     {% if it.warehouse_rolls.all %}
     <div class="po-rolls">
       {% for r in it.warehouse_rolls.all %}

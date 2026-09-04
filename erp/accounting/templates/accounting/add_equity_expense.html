@@ -189,8 +189,8 @@
 
 {% block content %}
 <div class="pf">
-  <a href="{% if object.pk %}{% url 'accounting:equity_expense_list' pk=book.pk %}{% else %}{% url 'accounting:book_detail' pk=book.pk %}{% endif %}"
-     class="pf-back">&larr; {% if object.pk %}{% trans "Expenses" %}{% else %}{{ book.name }}{% endif %}</a>
+  <a href="{% if object.pk %}{% url 'accounting:equity_expense_detail' pk=book.pk expense_pk=object.pk %}{% else %}{% url 'accounting:book_detail' pk=book.pk %}{% endif %}"
+     class="pf-back">&larr; {% if object.pk %}{% trans "The expense" %}{% else %}{{ book.name }}{% endif %}</a>
 
   <div class="pf-head">
     <div>
@@ -430,7 +430,13 @@
               <button type="submit" class="pf-btn primary">
                 {% if object.pk %}{% trans "Save changes" %}{% else %}{% trans "Save expense" %}{% endif %}
               </button>
-              <a href="{% url 'accounting:equity_expense_list' pk=book.pk %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
+              {% comment %}
+                Cancelling an edit goes back to the entry it was opened
+                from, not to the list — leaving without saving should put
+                the user where they were, and the entry is still there to
+                look at.
+              {% endcomment %}
+              <a href="{% if object.pk %}{% url 'accounting:equity_expense_detail' pk=book.pk expense_pk=object.pk %}{% else %}{% url 'accounting:equity_expense_list' pk=book.pk %}{% endif %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
 
               {% if object.pk %}
               {% comment %}

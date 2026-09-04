@@ -52,7 +52,12 @@ urlpatterns = [
     path('books/<int:pk>/add_equity_expense/', AddEquityExpense.as_view(),name="add_equity_expense"),
     path('books/<int:pk>/add_equity_divident/', AddEquityDivident.as_view(),name="add_equity_divident"),
     path('books/<int:pk>/equity_expense_list/', EquityExpenseList.as_view(),name="equity_expense_list"),
-    path('books/<int:pk>/expenses/<int:expense_pk>/', EditEquityExpense.as_view(),name="edit_equity_expense"),
+    # The entry itself at expenses/<pk>/, the form to change it one level
+    # deeper — the shape every other document here already has
+    # (invoices/<pk>/ and invoices/<pk>/edit/). A saved expense lands on
+    # the first of these; the second is only reached by asking to edit.
+    path('books/<int:pk>/expenses/<int:expense_pk>/', EquityExpenseDetail.as_view(),name="equity_expense_detail"),
+    path('books/<int:pk>/expenses/<int:expense_pk>/edit/', EditEquityExpense.as_view(),name="edit_equity_expense"),
     path('books/<int:pk>/expenses/<int:expense_pk>/delete/', DeleteEquityExpense.as_view(),name="delete_equity_expense"),
     # path('books/<int:pk>/create_invoice/', InvoiceCreateView.as_view(),name="create_invoice"),
     path('books/<int:pk>/make_in_transfer/', MakeInTransfer.as_view(),name="make_in_transfer"),

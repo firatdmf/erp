@@ -280,7 +280,7 @@ class ExpensePaidOnAccountTests(TestCase):
         expense = EquityExpense.objects.get()
         self.assertRedirects(
             response,
-            reverse("accounting:edit_equity_expense",
+            reverse("accounting:equity_expense_detail",
                     kwargs={"pk": self.book.pk, "expense_pk": expense.pk}),
             fetch_redirect_response=False,
         )

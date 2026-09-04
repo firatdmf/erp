@@ -945,7 +945,14 @@ def get_or_create_retail_cari(member=None) -> CariAccount:
         return cari
     return CariAccount.objects.create(
         book=book, code=RETAIL_CARI_CODE, name="Perakende Satışları",
-        type="customer", default_currency=_resolve_currency(),
+        # "other", not "customer": the counter is not a customer, it is
+        # where anonymous walk-in sales land. Typing it as a customer put
+        # it in the customer tab and made the account page ask which CRM
+        # record it stands for — a question it will never have an answer
+        # to. "other" is the ledger's word for an account that stands
+        # alone by design; ACC-061, the inter-company position on Ergene,
+        # is the same kind of thing.
+        type="other", default_currency=_resolve_currency(),
         notes="Sistem carisi — anonim perakende satışlar otomatik buraya işlenir.",
         created_by=member,
     )

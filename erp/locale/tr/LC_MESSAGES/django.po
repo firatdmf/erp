@@ -8914,3 +8914,106 @@ msgstr "Bu gider silinsin mi? Neyi işlediyse — aldığı nakit ya da yarattı
 
 msgid "%(amount)s expense deleted."
 msgstr "%(amount)s tutarındaki gider silindi."
+
+msgid "CRM"
+msgstr "CRM"
+
+msgid "No CRM link"
+msgstr "CRM bağlantısı yok"
+
+msgid "Linked"
+msgstr "Bağlı"
+
+msgid "This account doesn't stand for anyone in the CRM yet."
+msgstr "Bu hesap henüz CRM'deki kimseyi temsil etmiyor."
+
+msgid "Search contacts, companies, suppliers…"
+msgstr "Kişi, firma, tedarikçi ara…"
+
+msgid "Nothing found — create a record below."
+msgstr "Sonuç yok — aşağıdan yeni bir kayıt oluşturun."
+
+msgid "Or create one from this account"
+msgstr "Ya da bu hesaptan yeni bir kayıt oluşturun"
+
+msgid "New contact"
+msgstr "Yeni kişi"
+
+msgid "New company"
+msgstr "Yeni firma"
+
+msgid "Remove link"
+msgstr "Bağlantıyı kaldır"
+
+msgid "Remove the CRM link? The account, its balance and its ledger are untouched."
+msgstr "CRM bağlantısı kaldırılsın mı? Hesap, bakiyesi ve ekstresi olduğu gibi kalır."
+
+msgid "This account has no CRM link."
+msgstr "Bu hesabın CRM bağlantısı yok."
+
+msgid "CRM link removed (%(name)s). The account and its ledger are untouched."
+msgstr "CRM bağlantısı kaldırıldı (%(name)s). Hesap ve ekstresi olduğu gibi kaldı."
+
+msgid "Pick a contact, company or supplier."
+msgstr "Bir kişi, firma ya da tedarikçi seçin."
+
+msgid "That CRM record no longer exists."
+msgstr "O CRM kaydı artık mevcut değil."
+
+msgid "Unknown action."
+msgstr "Bilinmeyen işlem."
+
+msgid "%(name)s is already linked to account %(code)s (%(account)s) in this book. An account and a CRM record go together one to one — if these two are the same customer, the balances belong on one of them."
+msgstr "%(name)s bu defterde zaten %(code)s (%(account)s) hesabına bağlı. Bir hesap ile bir CRM kaydı birebir eşleşir — bu ikisi aynı müşteriyse, bakiyeler tek bir hesapta toplanmalı."
+
+msgid "Linked to %(name)s."
+msgstr "%(name)s kaydına bağlandı."
+
+msgid "A company named %(name)s already exists — search for it above and link to it instead."
+msgstr "%(name)s adında bir firma zaten var — yukarıdan arayıp ona bağlanın."
+
+msgid "Could not create the CRM record: %(error)s"
+msgstr "CRM kaydı oluşturulamadı: %(error)s"
+
+msgid "Already linked to another account in this book"
+msgstr "Bu defterde başka bir hesaba bağlı"
+
+msgid "This account stands alone — no CRM record is expected."
+msgstr "Bu hesap kendi başına durur — bir CRM kaydı beklenmiyor."
+
+msgid "Recorded"
+msgstr "Kaydedildiği an"
+
+msgid "What funded it"
+msgstr "Bunu ne karşıladı"
+
+msgid "Somebody settled this for the book. No cash moved — the book owes them instead."
+msgstr "Bunu defter adına biri ödemiş. Kasadan para çıkmadı — defter ona borçlandı."
+
+msgid "See this ledger row"
+msgstr "Bu cari hareketi gör"
+
+msgid "No ledger row is posted for this expense."
+msgstr "Bu gider için cari hesaba satır işlenmemiş."
+
+msgid "Taken out of this account"
+msgstr "Bu hesaptan çıktı"
+
+msgid "No cash entry is posted for this expense."
+msgstr "Bu gider için kasa hareketi işlenmemiş."
+
+msgid "The account now holds %(balance)s %(code)s."
+msgstr "Hesapta şimdi %(balance)s %(code)s var."
+
+msgid "Print roll barcodes"
+msgstr "Top barkodlarını yazdır"
+
+msgid "One label per roll on this line, as one PDF"
+msgstr "Bu satırdaki her top için bir etiket, tek PDF"
+
+msgid "Roll labels"
+msgstr "Top etiketleri"
+
+#: operating/templates/operating/partials/create_order_form.html
+msgid "At most %(m)s m can be entered"
+msgstr "En fazla %(m)s m girilebilir"

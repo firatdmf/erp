@@ -1278,6 +1278,7 @@
           delete skuI.dataset.matchLocked;
           npSuggestVariantSku(vEl);
         }
+        npSyncVariantChips(card);
       }).catch(function () {
         if (vEl._npMatchToken !== reqToken) return;
         badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = '';
@@ -1301,7 +1302,7 @@
     }
     // Typing an existing variant's SKU is the most direct way to say "add to
     // that one" — so re-classify on the SKU, not only on the name.
-    if (vEl) npQueueVariantMatch(vEl);
+    if (vEl) { npQueueVariantMatch(vEl); npSyncVariantChips(vEl.closest('.np-product-card')); }
   };
 
   window.npAddVariant = function (cardEl) {
@@ -1343,23 +1344,31 @@
     npRenumberVariants(cardEl);
     npSummaryUpdate();
   };
-  // Renumber the variant labels AND hide the remove icon on the FIRST variant
-  // (there must always be at least one in "Has variants" mode).
+  // Renumber the variant labels. EVERY variant carries a remove icon, the
+  // first one included — it is the row a mis-clicked chip lands in, and a row
+  // that cannot be taken back off is a dead end.
   window.npRenumberVariants = function (cardEl) {
     const vs = cardEl.querySelectorAll('.np-variants .np-variant');
     vs.forEach(function (v, i) {
       const no = v.querySelector('.np-variant-no');
       if (no) no.textContent = '{% trans "Variant" %} ' + (i + 1);
       const rm = v.querySelector('.np-variant-rm');
-      if (rm) rm.style.display = (i === 0) ? 'none' : '';
+      if (rm) rm.style.display = '';
     });
   };
   window.npRemoveVariant = function (btn) {
-    const v = btn.closest('.np-variant');
-    const card = btn.closest('.np-product-card');
-    if (v) v.remove();
-    npRenumberVariants(card);
-    npSummaryUpdate();
+    npDropVariant(btn.closest('.np-variant'));
+  };
+  // "Has variants" mode must still offer somewhere to type, so removing the
+  // only row leaves a fresh empty one behind rather than an empty card.
+  window.npDropVariant = function (vEl) {
+    if (!vEl) return;
+    const card = vEl.closest('.np-product-card');
+    const wasLast = card.querySelectorAll('.np-variants .np-variant').length === 1;
+    vEl.remove();
+    if (wasLast) npAddVariant(card);
+    else { npRenumberVariants(card); npSummaryUpdate(); }
+    npSyncVariantChips(card);
   };
 
   window.npAddTop = function (vEl) {
@@ -1719,10 +1728,11 @@
             // warehouse name, which is how staff recognise the colour.
             const label = (v.label && v.label !== v.variant_sku)
               ? ' <span class="np-ev-name">' + npEsc(v.label) + '</span>' : '';
-            return '<button type="button" class="np-ev-chip" data-sku="' + npEsc(v.variant_sku) + '" onclick="npPickExistingVariant(this.closest(\'.np-product-card\'), \'' + npEsc(v.variant_sku).replace(/'/g, "\\'") + '\', this)" title="{% trans "Click to fill a variant row with this" %}">' +
+            return '<button type="button" class="np-ev-chip" data-sku="' + npEsc(v.variant_sku) + '" onclick="npPickExistingVariant(this.closest(\'.np-product-card\'), \'' + npEsc(v.variant_sku).replace(/'/g, "\\'") + '\', this)" title="{% trans "Click to fill a variant row with this — click again to remove that row" %}">' +
               '<b class="np-ev-sku">' + npEsc(v.variant_sku) + '</b>' + label + ' (' +
               (Math.round((v.variant_quantity || 0) * 100) / 100) + ')</button>';
           }).join('');
+        npSyncVariantChips(cardEl);
       }).catch(function () { npResetExistingVariants(cardEl); });
   };
 
@@ -1739,6 +1749,11 @@
   window.npPickExistingVariant = function (cardEl, sku, chipEl) {
     const v = (cardEl._npExistingVariants || []).find(function (x) { return x.variant_sku === sku; });
     if (!v) return;
+    // A chip already sitting on a row comes back off when clicked again —
+    // without this every further click on the same chip piles up another
+    // duplicate row for the same variant.
+    const taken = npVariantRowWithSku(cardEl, sku);
+    if (taken) { npDropVariant(taken); return; }
     let target = Array.prototype.find.call(
       cardEl.querySelectorAll('.np-variants .np-variant'),
       function (vEl) { return !(vEl.querySelector('.np-v-name') || {}).value; }
@@ -1761,8 +1776,35 @@
         '{% trans "will add stock to this variant" %} (' +
         (Math.round((v.variant_quantity || 0) * 100) / 100) + ')';
     }
-    if (chipEl) chipEl.classList.add('picked');
+    npSyncVariantChips(cardEl);
     target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  function npSkuKey(s) { return (s == null ? '' : String(s)).trim().toUpperCase(); }
+  window.npVariantRowWithSku = function (cardEl, sku) {
+    const want = npSkuKey(sku);
+    if (!want) return null;
+    return Array.prototype.find.call(
+      cardEl.querySelectorAll('.np-variants .np-variant'),
+      function (vEl) {
+        const s = vEl.querySelector('.np-v-sku');
+        return s && npSkuKey(s.value) === want;
+      }
+    ) || null;
+  };
+  // The chips are a picker, not a record of what was picked: their highlight
+  // has to follow the variant rows that actually exist right now, so a removed
+  // (or re-typed) row leaves its chip unhighlighted again.
+  window.npSyncVariantChips = function (cardEl) {
+    const box = cardEl.querySelector('.np-existing-variants');
+    if (!box) return;
+    const used = Array.prototype.map.call(
+      cardEl.querySelectorAll('.np-variants .np-v-sku'),
+      function (s) { return npSkuKey(s.value); }
+    );
+    box.querySelectorAll('.np-ev-chip').forEach(function (chip) {
+      chip.classList.toggle('picked', used.indexOf(npSkuKey(chip.dataset.sku)) !== -1);
+    });
   };
 
   window.npSearchMain = function (inputEl) {

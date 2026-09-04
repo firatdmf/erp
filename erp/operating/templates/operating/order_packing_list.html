@@ -111,11 +111,6 @@
     <a href="{% url 'operating:export_packing_list_excel' order.pk %}" class="pk-btn ghost">
       <i class="fa fa-file-excel-o"></i> {% trans "Download Excel (editable)" %}
     </a>
-    {% if not shipped %}
-    <button type="button" class="pk-btn ghost" onclick="pkAddPack()">
-      <i class="fa fa-plus"></i> {% trans "New package" %}
-    </button>
-    {% endif %}
     <span class="spacer"></span>
   </div>
 
@@ -173,13 +168,6 @@
       headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
       body,
     }).then(r => r.json());
-  }
-
-  function pkAddPack() {
-    pkFetch({ action: 'add_pack' }).then(data => {
-      if (!data.ok) { alert(data.error || 'Failed'); return; }
-      window.location.reload();
-    });
   }
 
   function pkDeletePack(packId) {

@@ -1155,6 +1155,38 @@ def _reservation_payload(r):
     }
 
 
+def _annotate_pack_contents(packs, reservations, untracked_items):
+    """What each package physically holds: tops, metres, and extra lines.
+
+    The package header used to say only how many tops were in it, and only
+    after the JS had run. A packer closing a sack wants the metres too —
+    that is the quantity on the packing list and on the pack label — so it
+    is counted here, server-side, from the rows already loaded for the
+    page (no per-pack query), and the JS keeps both figures live as tops
+    are dragged in and out.
+
+    Untracked lines (trade goods with no roll to scan) are counted apart
+    rather than folded in: they are physically in the sack, but their
+    quantity is pieces, not metres, and adding the two would produce a
+    number that means nothing.
+    """
+    from collections import defaultdict
+    from decimal import Decimal
+
+    rolls, meters, extras = defaultdict(int), defaultdict(Decimal), defaultdict(int)
+    for r in reservations:
+        if r.pack_id:
+            rolls[r.pack_id] += 1
+            meters[r.pack_id] += r.meters or Decimal("0")
+    for it in untracked_items:
+        if it.pack_id:
+            extras[it.pack_id] += 1
+    for p in packs:
+        p.roll_count = rolls[p.pk]
+        p.total_meters = meters[p.pk]
+        p.item_count = extras[p.pk]
+
+
 @login_required
 def order_pack_scan(request, pk):
     """The packing page for an order — item checklist + roll scanner +
@@ -1203,6 +1235,11 @@ def order_pack_scan(request, pk):
     # instead of them silently sitting invisible.
     unassigned_reservations = [r for r in reservations if not r.order_item_id and not r.pack_id]
 
+    # What is in each sack, ready for the header — after untracked_items,
+    # since those are the lines that get dropped into a package alongside
+    # the scanned tops.
+    _annotate_pack_contents(packs, reservations, untracked_items)
+
     return render(request, "operating/order_pack_scan.html", {
         "order": order,
         "items": items,
@@ -1220,7 +1257,22 @@ def order_pack_scan(request, pk):
 @require_POST
 def order_pack_reserve_add(request, pk):
     """Scan/enter a roll barcode → reserve it for this order. Rejects
-    rolls whose product is not part of the order."""
+    rolls whose product is not part of the order.
+
+    An optional pack_id puts the roll straight into that package, so a
+    packer with a sack open can scan into it instead of scanning first
+    and dragging afterwards. Re-scanning a roll that is already reserved
+    MOVES it into the named package — the roll is physically in the
+    packer's hand going into that sack, so that is the only reading that
+    matches what is happening.
+
+    place_only=1 turns the scan into a PLACEMENT rather than an addition:
+    the roll must already be reserved for this order, and the scan only
+    decides which package it goes in. The packing screen sends it,
+    because which rolls an order takes — and therefore what it bills
+    (see Order.billable_value) — is settled on the order form. A roll
+    the order does not hold is refused there instead of quietly joining
+    the order from the packing bench."""
     from .models import WarehouseProductRoll, OrderRollReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
@@ -1261,12 +1313,76 @@ def order_pack_reserve_add(request, pk):
             "product_name": (rolls[0].product.name if rolls[0].product else ""),
         }, status=409)
 
-    # Already reserved for this order? Re-scan is a no-op (no duplicate).
+    # The package this scan puts the roll into.
+    target_pack = None
+    pack_id = (request.POST.get("pack_id") or "").strip()
+    if pack_id:
+        target_pack = Pack.objects.filter(pk=pack_id, order=order).first()
+        if target_pack is None:
+            return JsonResponse({"ok": False, "error": "Paket bulunamadı."}, status=404)
+    place_only = (request.POST.get("place_only") or "").strip() == "1"
+
+    # preview=1 resolves and validates a barcode exactly like a real
+    # scan and then STOPS, so the screen can show what it found and wait
+    # for a confirm. It returns before every write below, which is the
+    # whole point: a preview must never be able to change anything.
+    if (request.POST.get("preview") or "").strip() == "1":
+        for roll, _mi in matched:
+            existing = OrderRollReservation.objects.filter(
+                order=order, roll=roll, consumed=False).first()
+            if existing:
+                return JsonResponse({
+                    "ok": True, "preview": True, "held": True,
+                    "reservation": _reservation_payload(existing),
+                    "pack_number": (existing.pack.pack_number if existing.pack_id else None),
+                    "in_target": bool(target_pack is not None
+                                      and existing.pack_id == target_pack.pk),
+                })
+        if place_only:
+            return JsonResponse({
+                "ok": False, "kind": "not_in_order",
+                "error": "Bu top bu siparişe ait değil — pakete eklenemez.",
+            }, status=409)
+        pick = next(((roll, mi) for (roll, mi) in matched
+                     if _roll_available_meters(roll) > 0), None)
+        if pick is None:
+            return _roll_unavailable_response(matched[0][0])
+        roll_pick, _mi = pick
+        wp = roll_pick.product
+        return JsonResponse({
+            "ok": True, "preview": True, "held": False,
+            "roll": {
+                "barcode": roll_pick.barcode,
+                "product_name": (wp.name if wp else ""),
+                "sku": (wp.sku if wp else ""),
+                "warehouse": (wp.warehouse.name if (wp and wp.warehouse_id) else ""),
+                "available": float(_roll_available_meters(roll_pick)),
+            },
+        })
+
+    # Already reserved for this order? Re-scan is a no-op — unless a
+    # package is named and the roll is not in it yet, in which case the
+    # scan moves it there.
     for roll, _mi in matched:
         existing = OrderRollReservation.objects.filter(order=order, roll=roll, consumed=False).first()
         if existing:
-            return JsonResponse({"ok": True, "duplicate": True,
+            moved = False
+            if target_pack is not None and existing.pack_id != target_pack.pk:
+                existing.pack = target_pack
+                existing.save(update_fields=["pack"])
+                moved = True
+            return JsonResponse({"ok": True, "duplicate": True, "moved": moved,
+                                 "placed": place_only,
                                  "reservation": _reservation_payload(existing)})
+
+    # Nothing held for this roll, and the caller may only place what the
+    # order already has. The product matching is not enough: the order
+    # has to hold THIS roll.
+    if place_only:
+        return JsonResponse({
+            "ok": False, "kind": "not_in_order",
+            "error": "Bu top bu siparişe ait değil — pakete eklenemez.",
+        }, status=409)
 
     # Prefer the first matching roll that still has reservable metres.
     pick = next(((roll, mi) for (roll, mi) in matched if _roll_available_meters(roll) > 0), None)
@@ -1290,6 +1406,9 @@ def order_pack_reserve_add(request, pk):
         # Raced: another request took the last metres between the check
         # above and the lock — report the (possibly reserved) state.
         return _roll_unavailable_response(roll_pick)
+    if target_pack is not None:
+        r.pack = target_pack
+        r.save(update_fields=["pack"])
     # The cari receivable is sourced from scanned metres (see
     # Order.billable_value) — a fresh scan changes it, so re-post now
     # rather than waiting for some unrelated OrderItem save.

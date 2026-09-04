@@ -75,3 +75,83 @@ class OrderEditIsAFullPage(TestCase):
         # what must be gone is any button wired to call it.
         self.assertNotIn('onclick="openEditOrderSidebar', body)
         self.assertIn(self.url, body)
+
+
+class SavingAnEditLandsOnTheOrder(TestCase):
+    """Saving used to leave you sitting on the form you had just saved.
+
+    The form posts over XHR, and OrderEdit answers that with 200 JSON
+    carrying redirect_url rather than a 302. The page only looked for
+    `order_id`, so it fell through to a plain reload — of the edit page.
+    """
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        book = Book.objects.create(name="Laleli Fabric")
+        cari = CariAccount.objects.create(
+            book=book, code="C-294", name="Oleg", type="customer",
+            default_currency=CurrencyCategory.objects.create(
+                code="USD", name="US Dollar", symbol="$"))
+        self.order = Order.objects.create(order_number="DK0000294", cari=cari)
+        product = Product.objects.create(title="Crepe", sku="KZL000316", price=10)
+        OrderItem.objects.create(order=self.order, product=product,
+                                 quantity=Decimal("10.00"), price=Decimal("2.50"))
+        self.client.force_login(User.objects.create_superuser("ed2", "e2@t.com", "pw"))
+        self.url = reverse("operating:edit_order", kwargs={"pk": self.order.pk})
+
+    def test_an_xhr_save_names_the_order_page_to_go_to(self):
+        resp = self.client.post(self.url, {"order_number": self.order.order_number},
+                                headers={"x-requested-with": "XMLHttpRequest"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["redirect_url"],
+                         reverse("operating:order_detail", kwargs={"pk": self.order.pk}))
+
+    def test_the_form_follows_that_redirect_instead_of_reloading(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("data.redirect_url", html)
+        self.assertIn("window.location.href = data.redirect_url", html)
+
+
+class AnOrderCanBeEmptied(TestCase):
+    """Every line can be deleted and the order still saved.
+
+    The form used to refuse with "Add at least one product". Both views
+    skip item processing when the payload is empty, so an emptied order
+    was always a saveable state — the block was the form protecting the
+    server from something it handles fine.
+    """
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        book = Book.objects.create(name="Laleli Fabric")
+        cari = CariAccount.objects.create(
+            book=book, code="C-295", name="Oleg", type="customer",
+            default_currency=CurrencyCategory.objects.create(
+                code="USD", name="US Dollar", symbol="$"))
+        self.order = Order.objects.create(order_number="DK0000295", cari=cari)
+        product = Product.objects.create(title="Crepe", sku="KZL000317", price=10)
+        self.item = OrderItem.objects.create(
+            order=self.order, product=product,
+            quantity=Decimal("12.00"), price=Decimal("2.50"))
+        self.client.force_login(User.objects.create_superuser("ed3", "e3@t.com", "pw"))
+        self.url = reverse("operating:edit_order", kwargs={"pk": self.order.pk})
+
+    def test_deleting_every_line_saves(self):
+        import json
+        resp = self.client.post(
+            self.url,
+            {"order_number": self.order.order_number,
+             "deleted_items": json.dumps([self.item.pk]),
+             "product_json_input": ""},
+            headers={"x-requested-with": "XMLHttpRequest"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["success"])
+        self.assertEqual(self.order.items.count(), 0)
+
+    def test_the_form_no_longer_blocks_an_empty_order(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertNotIn("Add at least one product", html)

@@ -469,7 +469,7 @@
           // scissors for a partial cut. Nothing hits the server until
           // "save changes"; the backend then reconciles the submitted
           // list against the saved reservations (kept / re-cut /
-          // released). A small KAYITLI tag marks the already-saved ones.
+          // released).
           existingRolls: [],
           rolls: rolls,
           // barcode → the hold this order already has on that top. These
@@ -796,22 +796,20 @@
     } else if (locked) {
       meterHtml = '<span style="font-weight:700;color:#64748B;white-space:nowrap;">' + (+meters).toFixed(2) + ' m</span>';
     } else {
-      meterHtml = '<span style="font-weight:600;color:#0F766E;white-space:nowrap;">' + r.available + ' m {% trans "mevcut" %}</span>';
+      meterHtml = '<span style="font-weight:600;color:#0F766E;white-space:nowrap;">' + (+r.available).toFixed(2) + ' m</span>';
     }
     var scissorsBtn = picked
       ? '<button type="button" onclick="event.stopPropagation(); coToggleRollCut(' + i + ',' + ri + ')" title="{% trans "Kısmi kes" %}" style="background:none;border:0;color:#B45309;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"><i class="fas fa-scissors"></i></button>'
       : '';
-    // Already-saved (hydrated) rolls carry reservation_id — tag them so
-    // staff can tell saved apart from freshly picked. They untick and
-    // re-cut exactly like fresh picks; the backend reconciles on save.
-    var tag = (locked || (picked && r.reservation_id))
-      ? '<span style="font-size:9.5px;font-weight:700;color:#64748B;background:#E2E8F0;padding:2px 6px;border-radius:5px;white-space:nowrap;flex-shrink:0;">{% trans "KAYITLI" %}</span>'
-      : '';
+    // No "saved" tag: an already-saved roll unticks and re-cuts exactly
+    // like a freshly picked one, so the distinction never changes what
+    // the row can do. A locked row does behave differently, and already
+    // says so with its padlock and grey ground.
     return '<div class="co-roll-row"' + toggleAttrs + ' style="display:flex;align-items:center;gap:8px;padding:8px 9px;margin-top:6px;font-size:12px;background:' + bg + ';border:1px solid ' + border + ';border-radius:7px;' + (locked ? '' : 'cursor:pointer;') + '">' +
       tickHtml +
       '<code style="background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;">' + esc(r.barcode || '—') + '</code>' +
       '<span style="color:#6b7280;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.warehouse || '') + '</span>' +
-      meterHtml + scissorsBtn + tag +
+      meterHtml + scissorsBtn +
     '</div>';
   }
 
@@ -1006,7 +1004,10 @@
     if (!item || !item.rolls || !item.rolls[ri]) return;
     var m = parseFloat(v) || 0;
     var cap = item.rolls[ri].available;
-    if (m > cap) { m = cap; showToast('En fazla ' + cap + ' m girilebilir', 'warning'); }
+    // One translatable sentence with the metres as a placeholder — the
+    // number sits mid-sentence in Turkish, so it can't be concatenated
+    // onto a translated fragment and still read right in both.
+    if (m > cap) { m = cap; showToast('{% trans "At most %(m)s m can be entered" %}'.replace('%(m)s', cap), 'warning'); }
     item.rolls[ri].meters = m;
     syncQtyFromRolls(i, true);
     renderProducts();
@@ -1363,7 +1364,10 @@
       if (custSearch) custSearch.focus();
       return;
     }
-    if (!orderItems.length) { showToast('Add at least one product','error'); return; }
+    // An order with no lines is allowed to save. Both the create and the
+    // edit view skip item processing when the payload is empty, so an
+    // emptied order is a real, saveable state rather than something the
+    // form has to protect the server from.
     // A fabric/home-textile line's quantity comes entirely from the
     // tops picked for it — zero tops means zero quantity, which is
     // never a valid line to submit.
@@ -1449,7 +1453,15 @@
           if (submitBtn) submitBtn.disabled = false;
           return;
         }
-        // success path — server may also return JSON with order_id
+        // Success. The server names where to go next — an edit answers
+        // an XHR with 200 JSON carrying redirect_url (see
+        // OrderEdit.form_valid), so without honouring it the code fell
+        // through to the reload below and put the user straight back on
+        // the form they had just saved.
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+          return;
+        }
         if (data.order_id) {
           window.location.href = '/operating/orders/' + data.order_id + '/';
           return;

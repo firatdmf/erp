@@ -328,3 +328,44 @@ class DueCalendar(View):
             "filter_book": book_id,
             "books": Book.objects.all().order_by("name"),
         })
+
+
+@method_decorator(login_required, name="dispatch")
+class BalanceSheet(View):
+    """Assets = Liabilities + Equity, twice over.
+
+    The left column is the general ledger, where the equation is true by
+    construction because an unbalanced entry cannot be written. The right
+    column is the same equation computed from the subsidiary ledgers, the
+    way it has always had to be computed — and there it does not balance,
+    by $353,865.03 on Laleli and $1,319,947.21 on Ergene.
+
+    Both are shown because the ledger starts empty and fills up as the
+    posting paths are wired and history is backfilled. Watching the two
+    columns converge IS the migration; when they agree, it is finished.
+    Showing only the ledger would report a tidy zero while the money sat
+    somewhere else entirely.
+    """
+    template_name = "accounts/report_balance_sheet.html"
+
+    def get(self, request):
+        from .services_ledger import balance_sheet, subsidiary_equation
+
+        date_to = request.GET.get("date_to") or None
+        gl = balance_sheet(request.book, date_to=date_to)
+        subs = subsidiary_equation(request.book)
+
+        # How far the ledger has come. Zero when nothing is posted yet; 100
+        # when the two agree on total assets.
+        coverage = None
+        if subs["assets"]:
+            coverage = (gl["assets"] / subs["assets"] * 100).quantize(
+                Decimal("0.1"))
+
+        return render(request, self.template_name, {
+            "gl": gl,
+            "subs": subs,
+            "coverage": coverage,
+            "date_to": date_to or "",
+            "identity_holds": subs["causes_total"] == subs["residual"],
+        })

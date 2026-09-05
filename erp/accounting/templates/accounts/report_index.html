@@ -96,6 +96,15 @@
       </div>
     </a>
 
+    <a class="rx-card" href="{% url 'accounts:report_balance_sheet' current_book.pk %}">
+      <div class="rx-ico"><i data-lucide="scale"></i></div>
+      <h3>{% trans "Balance Sheet" %}</h3>
+      <p>{% trans "Assets = Liabilities + Equity, from the general ledger and from the subsidiary ledgers side by side" %}</p>
+      <div class="rx-card-foot">
+        <span class="rx-badge">{% trans "Accounting equation" %}</span>
+      </div>
+    </a>
+
     <a class="rx-card" href="{% url 'accounts:report_trial_balance' current_book.pk %}">
       <div class="rx-ico"><i data-lucide="layout-grid"></i></div>
       <h3>{% trans "Trial Balance" %}</h3>

@@ -94,6 +94,7 @@ urlpatterns = [
 
     scoped("reports/",                   views_report.ReportIndex.as_view(),       "report_index"),
     scoped("reports/aging/",             views_report.AgingReport.as_view(),       "report_aging"),
+    scoped("reports/balance-sheet/",     views_report.BalanceSheet.as_view(),      "report_balance_sheet"),
     scoped("reports/trial-balance/",     views_report.TrialBalance.as_view(),      "report_trial_balance"),
     scoped("reports/credit-limit/",      views_report.CreditLimitReport.as_view(), "report_credit_limit"),
     scoped("reports/due-calendar/",      views_report.DueCalendar.as_view(),       "report_due_calendar"),

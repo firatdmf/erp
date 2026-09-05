@@ -1168,3 +1168,7 @@ class Metric(models.Model):
 # accounting.* models exactly as if they were declared inline.
 # ---------------------------------------------------------------------------
 from .models_accounts import *  # noqa: E402,F401,F403
+
+# The general ledger, same arrangement and for the same reason. It sits
+# after models_accounts because a JournalLine points at a CariAccount.
+from .models_ledger import *  # noqa: E402,F401,F403

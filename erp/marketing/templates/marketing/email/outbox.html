@@ -4,19 +4,19 @@
 
 {% block css %}
 <style>
-.inbox-container {
+.outbox-container {
   max-width: 1400px;
   margin: 0 auto;
 }
 
-.inbox-header {
+.outbox-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
 }
 
-.inbox-header h1 {
+.outbox-header h1 {
   font-size: 2rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -25,7 +25,7 @@
   gap: 0.75rem;
 }
 
-.inbox-actions {
+.outbox-actions {
   display: flex;
   gap: 1rem;
 }
@@ -58,17 +58,18 @@
   margin-bottom: 1rem;
 }
 
-.email-sender {
+.email-recipient {
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex: 1;
 }
 
-.sender-avatar {
+.recipient-avatar {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: var(--accent-primary);
+  background: #10b981;
   color: white;
   display: flex;
   align-items: center;
@@ -78,27 +79,54 @@
   flex-shrink: 0;
 }
 
-.sender-info {
+.recipient-info {
   flex: 1;
   min-width: 0;
 }
 
-.sender-name {
+.recipient-name {
   font-weight: 600;
   font-size: 1rem;
   color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
-.sender-email {
+.recipient-company {
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+.email-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
 }
 
 .email-date {
   font-size: 0.875rem;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.status-badge {
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.status-sent {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-replied {
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .email-subject {
@@ -108,14 +136,37 @@
   margin-bottom: 0.75rem;
 }
 
-.email-snippet {
-  font-size: 0.9375rem;
+.email-footer {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.8125rem;
   color: var(--text-secondary);
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+}
+
+.email-footer i {
+  color: var(--accent-primary);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-state i {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
 }
 
 /* Modal */
@@ -199,37 +250,18 @@
   color: var(--text-primary);
   white-space: pre-wrap;
 }
-
-.empty-state {
-  text-align: center;
-  padding: 4rem 2rem;
-  color: var(--text-secondary);
-}
-
-.empty-state i {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
-.empty-state h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="inbox-container">
-  <div class="inbox-header">
+<div class="outbox-container">
+  <div class="outbox-header">
     <h1>
-      <i class="fa fa-inbox"></i>
-      Inbox - Email Replies
+      <i class="fa fa-paper-plane"></i>
+      Sent Emails
     </h1>
-    <div class="inbox-actions">
-      <a href="{% url 'email_automation:dashboard' %}" class="btn btn-secondary">
+    <div class="outbox-actions">
+      <a href="{% url 'marketing:dashboard' %}" class="btn btn-secondary">
         <i class="fa fa-arrow-left"></i> Back
       </a>
       <button class="btn btn-primary" onclick="location.reload()">
@@ -241,28 +273,55 @@
   <div class="emails-grid">
     {% if emails %}
       {% for email in emails %}
-      <div class="email-card" onclick="showEmailDetail({{ forloop.counter0 }})">
+      <div class="email-card" onclick="showEmailDetail({{ email.id }})">
         <div class="email-card-header">
-          <div class="email-sender">
-            <div class="sender-avatar">
-              {{ email.sender|slice:":1"|upper }}
+          <div class="email-recipient">
+            <div class="recipient-avatar">
+              {{ email.recipient_email|slice:":1"|upper }}
             </div>
-            <div class="sender-info">
-              <div class="sender-name">{{ email.sender|truncatewords:5 }}</div>
-              <div class="sender-email">Reply from campaign</div>
+            <div class="recipient-info">
+              <div class="recipient-name">To: {{ email.recipient_email }}</div>
+              <div class="recipient-company">
+                {% if email.campaign.company %}
+                  <i class="fa fa-building"></i> {{ email.campaign.company.name }}
+                {% else %}
+                  Campaign Email
+                {% endif %}
+              </div>
             </div>
           </div>
-          <div class="email-date">{{ email.received_at|date:"M d, Y H:i" }}</div>
+          <div class="email-meta">
+            <div class="email-date">{{ email.sent_at|date:"M d, Y H:i" }}</div>
+            <span class="status-badge {% if email.replied %}status-replied{% else %}status-sent{% endif %}">
+              <i class="fa {% if email.replied %}fa-reply{% else %}fa-check{% endif %}"></i>
+              {% if email.replied %}Replied{% else %}Sent{% endif %}
+            </span>
+          </div>
         </div>
         <div class="email-subject">{{ email.subject }}</div>
-        <div class="email-snippet">{{ email.snippet|truncatewords:30 }}</div>
+        <div class="email-footer">
+          {% if email.template %}
+          <span>
+            <i class="fa fa-hashtag"></i>
+            Email {{ email.template.sequence_number }}
+          </span>
+          <span>
+            <i class="fa fa-file-text"></i>
+            {{ email.template.name }}
+          </span>
+          {% endif %}
+          <span>
+            <i class="fa fa-rocket"></i>
+            Campaign
+          </span>
+        </div>
       </div>
       {% endfor %}
     {% else %}
       <div class="empty-state">
-        <i class="fa fa-inbox"></i>
-        <h3>{% trans "No replies yet" %}</h3>
-        <p>Replies to your campaign emails will appear here</p>
+        <i class="fa fa-paper-plane"></i>
+        <h3>{% trans "No sent emails yet" %}</h3>
+        <p>Emails sent through campaigns will appear here</p>
       </div>
     {% endif %}
   </div>
@@ -279,10 +338,10 @@
     </div>
     <div class="modal-body">
       <div class="email-detail-meta">
-        <div class="sender-avatar" id="modalAvatar">S</div>
+        <div class="recipient-avatar" id="modalAvatar">R</div>
         <div style="flex: 1;">
-          <div class="sender-name" id="modalSender">Sender Name</div>
-          <div class="sender-email" id="modalDate">Date</div>
+          <div class="recipient-name" id="modalRecipient">Recipient</div>
+          <div class="recipient-company" id="modalDate">Date</div>
         </div>
       </div>
       <div class="email-detail-body" id="modalBody">
@@ -293,19 +352,19 @@
 </div>
 
 <script>
-const emails = {{ emails_json|safe }};
-
-function showEmailDetail(index) {
-  const email = emails[index];
-  if (!email) return;
-  
-  document.getElementById('modalSubject').textContent = email.subject;
-  document.getElementById('modalAvatar').textContent = email.sender.charAt(0).toUpperCase();
-  document.getElementById('modalSender').textContent = email.sender;
-  document.getElementById('modalDate').textContent = new Date(email.received_at).toLocaleString();
-  document.getElementById('modalBody').textContent = email.body || email.snippet;
-  
-  document.getElementById('emailModal').classList.add('active');
+function showEmailDetail(emailId) {
+  fetch(`/email/sent/${emailId}/`)
+    .then(response => response.json())
+    .then(email => {
+      document.getElementById('modalSubject').textContent = email.subject;
+      document.getElementById('modalAvatar').textContent = email.recipient_email.charAt(0).toUpperCase();
+      document.getElementById('modalRecipient').textContent = 'To: ' + email.recipient_email;
+      document.getElementById('modalDate').textContent = email.sent_at;
+      document.getElementById('modalBody').textContent = email.body;
+      
+      document.getElementById('emailModal').classList.add('active');
+    })
+    .catch(error => console.error('Error loading email:', error));
 }
 
 function closeModal() {

@@ -206,3 +206,5 @@ class NewsletterSubscriptionAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
     ordering = ('-created_at',)
 
+# Mail admin, moved in from the old `email_automation` app.
+from . import admin_email  # noqa: E402,F401

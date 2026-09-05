@@ -230,8 +230,8 @@ NAV_SECTIONS = [
         "groups": [
             # No group title on this one — a single unlabelled group.
             {"items": [
-                {"label": _("Email automation"), "icon": "gauge", "url": "email_automation:dashboard"},
-                {"label": _("My emails"),        "icon": "inbox", "url": "email_automation:my_emails"},
+                {"label": _("Email automation"), "icon": "gauge", "url": "marketing:dashboard"},
+                {"label": _("My emails"),        "icon": "inbox", "url": "marketing:my_emails"},
             ]},
         ],
     },

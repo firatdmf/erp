@@ -15,7 +15,7 @@
     </div>
     <div class="mb-list-h-r">
       <button type="button" class="mb-icbtn" title="{% trans 'Refresh' %}"
-              hx-get="{% url 'email_automation:my_emails' %}?folder={{ current_folder }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
+              hx-get="{% url 'marketing:my_emails' %}?folder={{ current_folder }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
               hx-target="#mb-main-host" hx-swap="innerHTML">
         <i class="fas fa-rotate"></i>
       </button>
@@ -28,7 +28,7 @@
       {% with display_name=email.from_name|default:email.from_email %}
       <div class="mb-row {% if not email.is_read and current_folder == 'inbox' %}unread{% endif %}"
            data-email-id="{{ email.pk }}"
-           hx-get="{% url 'email_automation:email_detail' email.pk %}"
+           hx-get="{% url 'marketing:email_detail' email.pk %}"
            hx-target="#mb-main-host" hx-swap="innerHTML">
         <button type="button" class="mb-row-star {% if email.is_starred %}starred{% endif %}"
                 data-mb-toggle-star="{{ email.pk }}" title="{% trans 'Star' %}">
@@ -92,7 +92,7 @@
     <div class="mb-pager-btns">
       {% if page_obj.has_previous %}
       <button type="button" class="mb-icbtn"
-              hx-get="{% url 'email_automation:my_emails' %}?folder={{ current_folder }}&page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
+              hx-get="{% url 'marketing:my_emails' %}?folder={{ current_folder }}&page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
               hx-target="#mb-main-host" hx-swap="innerHTML">
         <i class="fas fa-chevron-left"></i>
       </button>
@@ -101,7 +101,7 @@
       {% endif %}
       {% if page_obj.has_next %}
       <button type="button" class="mb-icbtn"
-              hx-get="{% url 'email_automation:my_emails' %}?folder={{ current_folder }}&page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
+              hx-get="{% url 'marketing:my_emails' %}?folder={{ current_folder }}&page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
               hx-target="#mb-main-host" hx-swap="innerHTML">
         <i class="fas fa-chevron-right"></i>
       </button>

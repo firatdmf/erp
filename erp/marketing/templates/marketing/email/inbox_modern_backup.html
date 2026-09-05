@@ -417,20 +417,20 @@
     <!-- Sidebar Navigation -->
     <div class="email-sidebar">
       <nav class="sidebar-nav">
-        <a href="{% url 'email_automation:inbox' %}" class="nav-item active">
+        <a href="{% url 'marketing:inbox' %}" class="nav-item active">
           <i class="fa fa-inbox"></i>
           <span>Inbox</span>
           <span class="badge">{{ emails|length }}</span>
         </a>
-        <a href="{% url 'email_automation:outbox' %}" class="nav-item">
+        <a href="{% url 'marketing:outbox' %}" class="nav-item">
           <i class="fa fa-paper-plane"></i>
           <span>Sent</span>
         </a>
-        <a href="{% url 'email_automation:campaign_list' %}" class="nav-item">
+        <a href="{% url 'marketing:campaign_list' %}" class="nav-item">
           <i class="fa fa-rocket"></i>
           <span>Campaigns</span>
         </a>
-        <a href="{% url 'email_automation:template_list' %}" class="nav-item">
+        <a href="{% url 'marketing:template_list' %}" class="nav-item">
           <i class="fa fa-file-text"></i>
           <span>Templates</span>
         </a>

@@ -129,22 +129,22 @@
   <!-- Toolbar -->
   <div class="mb-d-top">
     <button type="button" class="mb-icbtn mb-back-btn" title="{% trans 'Back to list' %}"
-            hx-get="{% url 'email_automation:my_emails' %}?folder={{ email.folder }}"
+            hx-get="{% url 'marketing:my_emails' %}?folder={{ email.folder }}"
             hx-target="#mb-main-host" hx-swap="innerHTML">
       <i class="fas fa-arrow-left"></i> <span style="font: 600 12.5px var(--font-sans); margin-left: 4px;">{% trans "Back" %}</span>
     </button>
     <button type="button" class="mb-icbtn" title="{% trans 'Archive' %}"
-            hx-post="{% url 'email_automation:move_email' email.pk %}"
+            hx-post="{% url 'marketing:move_email' email.pk %}"
             hx-vals='{"folder":"archive"}'
             hx-target="#mb-main-host" hx-swap="innerHTML"
-            hx-on::after-request="if(event.detail.successful) htmx.ajax('GET', '{% url 'email_automation:my_emails' %}?folder={{ email.folder }}', '#mb-main-host')">
+            hx-on::after-request="if(event.detail.successful) htmx.ajax('GET', '{% url 'marketing:my_emails' %}?folder={{ email.folder }}', '#mb-main-host')">
       <i class="fas fa-box-archive"></i>
     </button>
     <button type="button" class="mb-icbtn" title="{% trans 'Move to Trash' %}"
-            hx-post="{% url 'email_automation:move_email' email.pk %}"
+            hx-post="{% url 'marketing:move_email' email.pk %}"
             hx-vals='{"folder":"trash"}'
             hx-target="#mb-main-host" hx-swap="innerHTML"
-            hx-on::after-request="if(event.detail.successful) htmx.ajax('GET', '{% url 'email_automation:my_emails' %}?folder={{ email.folder }}', '#mb-main-host')"
+            hx-on::after-request="if(event.detail.successful) htmx.ajax('GET', '{% url 'marketing:my_emails' %}?folder={{ email.folder }}', '#mb-main-host')"
             hx-confirm="{% trans 'Move this email to Trash?' %}">
       <i class="fas fa-trash"></i>
     </button>
@@ -154,12 +154,12 @@
     </button>
     <div class="mb-d-right">
       <button type="button" class="mb-btn primary"
-              hx-get="{% url 'email_automation:compose_email' %}?to={{ email.from_email|urlencode }}&name={{ email.from_name|urlencode }}&subject=Re: {{ email.subject|urlencode }}{% if email.company %}&company={{ email.company.pk }}{% endif %}{% if email.contact %}&contact={{ email.contact.pk }}{% endif %}"
+              hx-get="{% url 'marketing:compose_email' %}?to={{ email.from_email|urlencode }}&name={{ email.from_name|urlencode }}&subject=Re: {{ email.subject|urlencode }}{% if email.company %}&company={{ email.company.pk }}{% endif %}{% if email.contact %}&contact={{ email.contact.pk }}{% endif %}"
               hx-target="#mb-compose-host" hx-swap="innerHTML">
         <i class="fas fa-reply"></i> {% trans "Reply" %}
       </button>
       <button type="button" class="mb-btn"
-              hx-get="{% url 'email_automation:compose_email' %}?subject=Fwd: {{ email.subject|urlencode }}"
+              hx-get="{% url 'marketing:compose_email' %}?subject=Fwd: {{ email.subject|urlencode }}"
               hx-target="#mb-compose-host" hx-swap="innerHTML">
         <i class="fas fa-share"></i> {% trans "Forward" %}
       </button>
@@ -229,7 +229,7 @@
     </div>
     <div class="mb-d-att-grid">
       {% for att in attachments %}
-      <a class="mb-att-card" href="{% url 'email_automation:download_attachment' att.pk %}" target="_blank">
+      <a class="mb-att-card" href="{% url 'marketing:download_attachment' att.pk %}" target="_blank">
         <div class="mb-att-icon">
           {% with name=att.filename|lower %}
           {% if '.pdf' in name %}<i class="fas fa-file-pdf"></i>

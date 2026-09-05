@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from email_automation.email_service import process_scheduled_campaigns
+from marketing.email_service import process_scheduled_campaigns
 
 
 class Command(BaseCommand):

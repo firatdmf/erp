@@ -325,6 +325,18 @@ CARRIER_CHOICES = [
 
 # Create your models here.
 class Order(models.Model):
+    # Who raised this record. Stamped automatically on first save by
+    # erp.ownership.stamp_creator, from the request-scoped user. NULL on
+    # rows that predate this column (and on anything created outside a
+    # request); erp.ownership.can_edit treats those as admin-only.
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="created_%(class)ss",
+        editable=False,
+    )
+
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1440,8 +1452,12 @@ class WarehouseProductRoll(models.Model):
         help_text="Length still on the roll (drops as stock-outs happen)",
     )
     # The barcode printed on the label — each roll has a UNIQUE barcode
-    # so we can scan it later for stock-out / order picking.
-    barcode = models.CharField(max_length=64, blank=True, null=True, db_index=True)
+    # so we can scan it later for stock-out / order picking. Unique across
+    # every warehouse, not just within one: a scanner reads the label with
+    # no idea where it is standing, so the same code in two locations means
+    # the same physical roll counted twice. NULL is still allowed (Postgres
+    # lets NULLs repeat) for a roll whose label was never captured.
+    barcode = models.CharField(max_length=64, blank=True, null=True, unique=True)
     lot_number = models.CharField(max_length=64, blank=True, null=True)
     status = models.CharField(
         max_length=16, choices=STATUS_CHOICES, default="in_stock", db_index=True,
@@ -1460,9 +1476,23 @@ class WarehouseProductRoll(models.Model):
         blank=True,
         related_name="scanned_rolls",
     )
+    # The captured label photo, on the CDN. Bunny rather than the local disk
+    # because the app runs on a container with no mounted volume: every
+    # deploy wiped MEDIA_ROOT, and 3,611 rolls were left pointing at photos
+    # that no longer existed. Nothing noticed, because nothing ever
+    # displayed them.
+    image_url = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="CDN URL of the captured label image (kept for audit)",
+    )
+    # The same photo on local disk — how it was stored before the CDN. Kept
+    # for the rolls scanned that way, and still written as a fallback when
+    # Bunny is switched off or an upload fails, so a scan never loses its
+    # photo just because the CDN is unreachable. Read `label_image_url()`
+    # rather than either field.
     source_image = models.ImageField(
         upload_to="roll_scans/%Y/%m/", blank=True, null=True,
-        help_text="The captured label image (kept for audit)",
+        help_text="The captured label image, stored locally (legacy)",
     )
     ocr_raw = models.TextField(
         blank=True, null=True,
@@ -1483,11 +1513,34 @@ class WarehouseProductRoll(models.Model):
         ordering = ["-scanned_at"]
         indexes = [
             models.Index(fields=["product", "-scanned_at"]),
-            models.Index(fields=["barcode"]),
         ]
 
     def __str__(self):
         return f"Roll #{self.pk} · {self.meters}m · {self.product.sku or self.product.name}"
+
+    def label_image_url(self):
+        """Where this roll's label photo can actually be fetched, or None.
+
+        The CDN copy wins; a locally-stored one answers for rolls scanned
+        before the move to Bunny. Templates ask `has_label_image` and link
+        to the `warehouse_roll_photo` view rather than reading either field,
+        so a photo that moves storage doesn't move in the markup too.
+
+        A local path is NOT proof the file is there — the disk it was
+        written to is wiped on every deploy. The view handles the miss.
+        """
+        if self.image_url:
+            return self.image_url
+        if self.source_image:
+            try:
+                return self.source_image.url
+            except ValueError:
+                return None
+        return None
+
+    @property
+    def has_label_image(self):
+        return bool(self.image_url or self.source_image)
 
 
 class StockMovement(models.Model):

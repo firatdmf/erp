@@ -1,9 +1,9 @@
 """
 Manual script to test Gmail connection and create EmailAccount
-Run this with: python manage.py shell < email_automation/test_gmail_connection.py
+Run this with: python manage.py shell < marketing/tests/test_gmail_connection.py
 """
 from django.contrib.auth import get_user_model
-from email_automation.models import EmailAccount
+from marketing.models import EmailAccount
 
 User = get_user_model()
 

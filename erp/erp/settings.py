@@ -166,11 +166,14 @@ INSTALLED_APPS = [
     "authentication",
     "operating",
     "marketing",
-    "email_automation",  # Email automation system
     "notifications",  # Notification system
     "team",  # Team management system
     "notes", # My Notes system
     "procurement", # Procurement system
+    # Migrations-only stub. The mail system now lives in `marketing`; this
+    # app stays registered so its own migration history and marketing's
+    # adoption migration keep resolving. See its apps.py.
+    "email_automation",
     # Migrations-only stub. The cari ledger now lives in `accounting`; this
     # app stays registered so migration dependencies on ('current_account', …)
     # in operating/ and its own history keep resolving. See its apps.py.
@@ -229,6 +232,10 @@ MIDDLEWARE = [
     # Request-scoped current user for the order audit trail (must come
     # after AuthenticationMiddleware so request.user is resolved).
     "operating.audit.CurrentUserMiddleware",
+    # Holds read-only roles (sales rep) to stock + sales. Must come after
+    # AuthenticationMiddleware — it needs request.user — and before the
+    # view runs, so a blocked write never reaches a model.
+    "erp.middleware.ReadOnlyRoleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -334,6 +341,7 @@ TEMPLATES = [
                 "erp.context_processors.client_groups",
                 "erp.context_processors.all_members",
                 "erp.context_processors.ui_theme",
+                "erp.context_processors.role_flags",
                 # Which book the reader is in — the sidebar prints it and
                 # every book-scoped link is built from it.
                 "accounting.book_scope.current_book",

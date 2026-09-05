@@ -203,11 +203,11 @@
       Email Templates
     </h1>
     <div class="page-actions">
-      <a href="{% url 'email_automation:dashboard' %}" class="btn btn-secondary">
+      <a href="{% url 'marketing:dashboard' %}" class="btn btn-secondary">
         <i class="fa fa-arrow-left"></i>
         Back
       </a>
-      <a href="{% url 'email_automation:template_create' %}" class="btn btn-primary">
+      <a href="{% url 'marketing:template_create' %}" class="btn btn-primary">
         <i class="fa fa-plus"></i>
         Create Template
       </a>
@@ -221,7 +221,7 @@
       <div class="template-header">
         <div class="template-sequence">{{ template.sequence_number }}</div>
         <div class="template-actions">
-          <a href="{% url 'email_automation:template_edit' template.pk %}" class="icon-btn" title="Edit">
+          <a href="{% url 'marketing:template_edit' template.pk %}" class="icon-btn" title="Edit">
             <i class="fa fa-edit"></i>
           </a>
         </div>
@@ -237,7 +237,7 @@
     <i class="fa fa-file-text"></i>
     <h3>{% trans "No email templates yet" %}</h3>
     <p>Create email templates for your automated campaigns. You can create up to 6 sequential emails.</p>
-    <a href="{% url 'email_automation:template_create' %}" class="btn btn-primary">
+    <a href="{% url 'marketing:template_create' %}" class="btn btn-primary">
       <i class="fa fa-plus"></i>
       Create Your First Template
     </a>

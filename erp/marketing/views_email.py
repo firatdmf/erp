@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.conf import settings
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from django.http import HttpResponseRedirect, JsonResponse
 from django.utils import timezone
 from django.db import models
@@ -72,7 +73,7 @@ def dashboard(request):
         'recent_campaigns': recent_campaigns,
     }
     
-    return render(request, 'email_automation/dashboard.html', context)
+    return render(request, 'marketing/email/dashboard.html', context)
 
 
 @login_required
@@ -83,12 +84,12 @@ def connect_gmail(request):
     # Check if already connected
     if EmailAccount.objects.filter(user=request.user).exists():
         messages.info(request, 'You already have a connected Gmail account.')
-        return redirect('email_automation:dashboard')
+        return redirect('marketing:dashboard')
     
     # Check if OAuth credentials are configured
     if not settings.GMAIL_CLIENT_ID or not settings.GMAIL_CLIENT_SECRET:
         messages.error(request, 'Gmail OAuth is not configured. Please add GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET to your .env file.')
-        return redirect('email_automation:dashboard')
+        return redirect('marketing:dashboard')
     
     try:
         # Generate OAuth URL and redirect user
@@ -96,7 +97,7 @@ def connect_gmail(request):
         return HttpResponseRedirect(authorization_url)
     except Exception as e:
         messages.error(request, f'Error starting OAuth flow: {str(e)}')
-        return redirect('email_automation:dashboard')
+        return redirect('marketing:dashboard')
 
 
 @login_required
@@ -112,11 +113,11 @@ def oauth2callback(request):
     # Check for errors
     if error:
         messages.error(request, f'OAuth error: {error}')
-        return redirect('email_automation:dashboard')
+        return redirect('marketing:dashboard')
     
     if not code:
         messages.error(request, 'No authorization code received')
-        return redirect('email_automation:dashboard')
+        return redirect('marketing:dashboard')
     
     try:
         print(f"DEBUG: OAuth callback - code received: {code[:20]}...")
@@ -153,7 +154,7 @@ def oauth2callback(request):
         if not email_address:
             messages.error(request, 'Could not retrieve email address from Gmail')
             print("ERROR: Could not retrieve email address")
-            return redirect('email_automation:dashboard')
+            return redirect('marketing:dashboard')
         
         # Save email account
         print(f"DEBUG: Saving EmailAccount for user {request.user.username}...")
@@ -184,10 +185,11 @@ def oauth2callback(request):
         traceback.print_exc()
         messages.error(request, f'Error connecting Gmail: {str(e)}')
     
-    return redirect('email_automation:dashboard')
+    return redirect('marketing:dashboard')
 
 
 @login_required
+@require_POST
 def disconnect_gmail(request):
     """Disconnect Gmail account"""
     try:
@@ -198,7 +200,7 @@ def disconnect_gmail(request):
     except EmailAccount.DoesNotExist:
         messages.error(request, 'No Gmail account connected')
     
-    return redirect('email_automation:dashboard')
+    return redirect('marketing:dashboard')
 
 
 @login_required
@@ -273,7 +275,7 @@ def inbox_view(request):
         'page_title': 'Inbox',
     }
     
-    return render(request, 'email_automation/inbox.html', context)
+    return render(request, 'marketing/email/inbox.html', context)
 
 
 @login_required
@@ -288,7 +290,7 @@ def outbox_view(request):
         'page_title': 'Outbox',
     }
     
-    return render(request, 'email_automation/outbox.html', context)
+    return render(request, 'marketing/email/outbox.html', context)
 
 
 @login_required
@@ -300,20 +302,20 @@ def template_list(request):
         'templates': templates,
     }
     
-    return render(request, 'email_automation/template_list.html', context)
+    return render(request, 'marketing/email/template_list.html', context)
 
 
 @login_required
 def template_create(request):
     """Create new email template"""
-    from .forms import EmailTemplateForm
+    from .forms_email import EmailTemplateForm
     
     if request.method == 'POST':
         form = EmailTemplateForm(request.POST, user=request.user)
         if form.is_valid():
             template = form.save()
             messages.success(request, f'Template "{template.name}" created successfully!')
-            return redirect('email_automation:template_list')
+            return redirect('marketing:template_list')
     else:
         form = EmailTemplateForm(user=request.user)
     
@@ -323,13 +325,13 @@ def template_create(request):
         'button_text': 'Create Template',
     }
     
-    return render(request, 'email_automation/template_form.html', context)
+    return render(request, 'marketing/email/template_form.html', context)
 
 
 @login_required
 def template_edit(request, pk):
     """Edit email template"""
-    from .forms import EmailTemplateForm
+    from .forms_email import EmailTemplateForm
     
     template = get_object_or_404(EmailTemplate, pk=pk, user=request.user)
     
@@ -338,7 +340,7 @@ def template_edit(request, pk):
         if form.is_valid():
             template = form.save()
             messages.success(request, f'Template "{template.name}" updated successfully!')
-            return redirect('email_automation:template_list')
+            return redirect('marketing:template_list')
     else:
         form = EmailTemplateForm(instance=template, user=request.user)
     
@@ -349,7 +351,7 @@ def template_edit(request, pk):
         'button_text': 'Update Template',
     }
     
-    return render(request, 'email_automation/template_form.html', context)
+    return render(request, 'marketing/email/template_form.html', context)
 
 
 @login_required
@@ -363,7 +365,7 @@ def campaign_list(request):
         'campaigns': campaigns,
     }
     
-    return render(request, 'email_automation/campaign_list.html', context)
+    return render(request, 'marketing/email/campaign_list.html', context)
 
 
 @login_required
@@ -377,7 +379,7 @@ def campaign_detail(request, pk):
         'sent_emails': sent_emails,
     }
     
-    return render(request, 'email_automation/campaign_detail.html', context)
+    return render(request, 'marketing/email/campaign_detail.html', context)
 
 
 @login_required
@@ -560,6 +562,7 @@ def sent_email_detail_api(request, pk):
 
 
 @login_required
+@require_POST
 def campaign_pause(request, pk):
     """Pause an active campaign"""
     campaign = get_object_or_404(EmailCampaign, pk=pk, user=request.user)
@@ -571,10 +574,11 @@ def campaign_pause(request, pk):
     else:
         messages.info(request, f'Campaign is already {campaign.status}.')
     
-    return redirect('email_automation:campaign_detail', pk=campaign.pk)
+    return redirect('marketing:campaign_detail', pk=campaign.pk)
 
 
 @login_required
+@require_POST
 def campaign_resume(request, pk):
     """Resume a paused campaign"""
     campaign = get_object_or_404(EmailCampaign, pk=pk, user=request.user)
@@ -601,7 +605,7 @@ def campaign_resume(request, pk):
     else:
         messages.info(request, f'Campaign is currently {campaign.status}.')
     
-    return redirect('email_automation:campaign_detail', pk=campaign.pk)
+    return redirect('marketing:campaign_detail', pk=campaign.pk)
 
 
 @login_required
@@ -613,10 +617,10 @@ def campaign_delete(request, pk):
     if request.method == 'POST':
         campaign.delete()
         messages.success(request, f'Campaign for {company_name} has been deleted.')
-        return redirect('email_automation:campaign_list')
+        return redirect('marketing:campaign_list')
     
     # If GET request, redirect back
-    return redirect('email_automation:campaign_detail', pk=campaign.pk)
+    return redirect('marketing:campaign_detail', pk=campaign.pk)
 
 
 # ============================================================
@@ -766,9 +770,9 @@ def my_emails(request):
     
     # Return partial for HTMX requests (sidebar navigation)
     if is_htmx:
-        return render(request, 'email_automation/partials/my_emails_list.html', context)
+        return render(request, 'marketing/email/partials/my_emails_list.html', context)
     
-    return render(request, 'email_automation/my_emails.html', context)
+    return render(request, 'marketing/email/my_emails.html', context)
 
 
 @login_required
@@ -874,9 +878,9 @@ def my_emails_folder(request, folder):
     
     # Return partial for HTMX requests
     if is_htmx:
-        return render(request, 'email_automation/partials/my_emails_list.html', context)
+        return render(request, 'marketing/email/partials/my_emails_list.html', context)
     
-    return render(request, 'email_automation/my_emails.html', context)
+    return render(request, 'marketing/email/my_emails.html', context)
 
 
 @login_required
@@ -911,9 +915,9 @@ def compose_email(request):
     
     # Return modal partial for HTMX requests
     if request.headers.get('HX-Request'):
-        return render(request, 'email_automation/partials/compose_modal.html', context)
+        return render(request, 'marketing/email/partials/compose_modal.html', context)
     
-    return render(request, 'email_automation/compose.html', context)
+    return render(request, 'marketing/email/compose.html', context)
 
 
 @login_required
@@ -1083,8 +1087,8 @@ def email_detail(request, pk):
         email_account = EmailAccount.objects.get(user=request.user)
     except EmailAccount.DoesNotExist:
         if request.headers.get('HX-Request'):
-            return render(request, 'email_automation/partials/email_detail.html', {'error': 'Not connected'})
-        return redirect('email_automation:my_emails')
+            return render(request, 'marketing/email/partials/email_detail.html', {'error': 'Not connected'})
+        return redirect('marketing:my_emails')
     
     email = get_object_or_404(
         Email.objects.select_related('company', 'contact').prefetch_related('companies', 'contacts', 'attachments'), 
@@ -1103,9 +1107,9 @@ def email_detail(request, pk):
     }
     
     if request.headers.get('HX-Request'):
-        return render(request, 'email_automation/partials/email_detail.html', context)
+        return render(request, 'marketing/email/partials/email_detail.html', context)
     
-    return render(request, 'email_automation/email_detail.html', context)
+    return render(request, 'marketing/email/email_detail.html', context)
 
 
 @login_required
@@ -1252,7 +1256,7 @@ def company_emails(request, company_id):
     }
     
     if request.headers.get('HX-Request'):
-        return render(request, 'email_automation/partials/company_emails.html', context)
+        return render(request, 'marketing/email/partials/company_emails.html', context)
     
     return JsonResponse({
         'emails': [{
@@ -1290,7 +1294,7 @@ def company_shared_files(request, company_id):
     }
     
     if request.headers.get('HX-Request'):
-        return render(request, 'email_automation/partials/company_files.html', context)
+        return render(request, 'marketing/email/partials/company_files.html', context)
     
     return JsonResponse({
         'files': [{
@@ -1325,7 +1329,7 @@ def contact_emails(request, contact_id):
     }
     
     if request.headers.get('HX-Request'):
-        return render(request, 'email_automation/partials/contact_emails.html', context)
+        return render(request, 'marketing/email/partials/contact_emails.html', context)
     
     return JsonResponse({
         'emails': [{
@@ -1362,7 +1366,7 @@ def contact_shared_files(request, contact_id):
     }
     
     if request.headers.get('HX-Request'):
-        return render(request, 'email_automation/partials/company_files.html', context)
+        return render(request, 'marketing/email/partials/company_files.html', context)
     
     return JsonResponse({
         'files': [{

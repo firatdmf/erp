@@ -519,10 +519,11 @@
         <i class="fas fa-warehouse"></i>
         <span class="top-bar-btn-label">{% trans "My Warehouses" %}</span>
       </a>
-      <a href="{% url 'accounts:legacy_purchase_order_list' %}" class="top-bar-btn" id="topBarPurchasesBtn" title="{% trans 'Purchases' %}">
+{% if not is_sales_rep %}      <a href="{% url 'accounts:legacy_purchase_order_list' %}" class="top-bar-btn" id="topBarPurchasesBtn" title="{% trans 'Purchases' %}">
         <i class="fas fa-truck"></i>
         <span class="top-bar-btn-label">{% trans "Purchases" %}</span>
       </a>
+{% endif %}
       <a href="{% url 'operating:order_list' %}" class="top-bar-btn" id="topBarSalesBtn" title="{% trans 'Sales' %}">
         <i class="fas fa-cart-shopping"></i>
         <span class="top-bar-btn-label">{% trans "Sales" %}</span>
@@ -541,6 +542,7 @@
               <span class="favorites-item-icon"><i class="fas fa-list"></i></span>
               <span class="favorites-item-label">{% trans "Order list" %}</span>
             </a>
+{% if not is_sales_rep %}
             <a href="#" class="favorites-item" onclick="openOrderSidebar(); return false;">
               <span class="favorites-item-icon"><i class="fas fa-cart-plus"></i></span>
               <span class="favorites-item-label">{% trans "Create order" %}</span>
@@ -549,6 +551,7 @@
               <span class="favorites-item-icon"><i class="fas fa-id-card"></i></span>
               <span class="favorites-item-label">{% trans "All Accounts" %}</span>
             </a>
+{% endif %}
           </div>
         </div>
       </div>
@@ -1125,7 +1128,7 @@
           <div class="add-menu-section" style="padding: 1.5rem;">
             <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.1rem;">
               <li>
-                <a href="{% url 'email_automation:dashboard' %}"
+                <a href="{% url 'marketing:dashboard' %}"
                   style="display: flex; align-items: center; gap: 0.875rem; padding: 0.35rem 1rem; border-radius: var(--border-radius-sm); transition: all 0.2s ease; font-size: 0.9375rem; color: var(--text-primary); font-weight: 500;">
                   <i class="fas fa-tachometer-alt"
                     style="width: 20px; text-align: center; color: var(--text-secondary);"></i>
@@ -1133,7 +1136,7 @@
                 </a>
               </li>
               <li>
-                <a href="{% url 'email_automation:my_emails' %}"
+                <a href="{% url 'marketing:my_emails' %}"
                   style="display: flex; align-items: center; gap: 0.875rem; padding: 0.35rem 1rem; border-radius: var(--border-radius-sm); transition: all 0.2s ease; font-size: 0.9375rem; color: var(--text-primary); font-weight: 500;">
                   <i class="fas fa-inbox" style="width: 20px; text-align: center; color: var(--text-secondary);"></i>
                   <span>My Emails</span>
@@ -3452,6 +3455,39 @@
       document.getElementById('id_contact').value = pk;
       document.getElementById('taskContactResults').innerHTML = '';
     }
+
+    // ── Backdrop dismiss: only for a click that BEGAN on the backdrop ──
+    // Every .sidebar-overlay closes on an inline onclick. But a drag that
+    // starts inside the panel and releases outside it — selecting the text in
+    // a field and drifting a few pixels past the border — fires a click whose
+    // target is the OVERLAY: the browser reports the nearest common ancestor
+    // of where the press and the release landed. So selecting text read as
+    // "clicked outside" and threw a half-filled form away.
+    //
+    // stopPropagation on the panel cannot help; the event never travelled
+    // through the panel. This watches the whole gesture instead and cancels
+    // the click in the CAPTURE phase — before it reaches the overlay's own
+    // handler — unless the press AND the release both landed on the backdrop.
+    (function () {
+      const isBackdrop = function (t) {
+        return !!(t && t.classList && t.classList.contains('sidebar-overlay'));
+      };
+      let pressedBackdrop = false;
+      let releasedBackdrop = false;
+      // Pointer events cover mouse, touch and pen in one pair.
+      document.addEventListener('pointerdown', function (e) {
+        pressedBackdrop = isBackdrop(e.target);
+      }, true);
+      document.addEventListener('pointerup', function (e) {
+        releasedBackdrop = isBackdrop(e.target);
+      }, true);
+      document.addEventListener('click', function (e) {
+        if (!isBackdrop(e.target)) return;                 // landed inside the panel
+        if (pressedBackdrop && releasedBackdrop) return;   // a real outside click
+        e.stopPropagation();
+        e.preventDefault();
+      }, true);
+    })();
 
     // Close on Escape key
     document.addEventListener('keydown', function (e) {

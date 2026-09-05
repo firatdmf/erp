@@ -395,7 +395,7 @@
     <div class="ico"><i class="fab fa-google"></i></div>
     <h2>{% trans "Connect your Google account" %}</h2>
     <p>{% trans "Connect Gmail to send, read, archive, and manage your emails — fully integrated with your CRM contacts and companies." %}</p>
-    <a href="{% url 'email_automation:connect_gmail' %}" class="mb-btn primary">
+    <a href="{% url 'marketing:connect_gmail' %}" class="mb-btn primary">
       <i class="fab fa-google"></i> {% trans "Connect Gmail" %}
     </a>
   </div>
@@ -411,13 +411,13 @@
     </div>
     <div class="mb-head-r">
       <button type="button" class="mb-btn"
-              hx-post="{% url 'email_automation:sync_emails' %}"
+              hx-post="{% url 'marketing:sync_emails' %}"
               hx-target="#mb-main-host" hx-swap="innerHTML"
-              hx-on::after-request="if(event.detail.successful) htmx.ajax('GET', '{% url 'email_automation:my_emails' %}?folder={{ current_folder }}', '#mb-main-host')">
+              hx-on::after-request="if(event.detail.successful) htmx.ajax('GET', '{% url 'marketing:my_emails' %}?folder={{ current_folder }}', '#mb-main-host')">
         <i class="fas fa-rotate"></i> {% trans "Sync" %}
       </button>
       <button type="button" class="mb-btn primary"
-              hx-get="{% url 'email_automation:compose_email' %}"
+              hx-get="{% url 'marketing:compose_email' %}"
               hx-target="#mb-compose-host"
               hx-swap="innerHTML">
         <i class="fas fa-pen-to-square"></i> {% trans "Compose" %}
@@ -427,7 +427,7 @@
 
   <!-- Search hero -->
   <form class="mb-search-card" id="mb-search-form"
-        hx-get="{% url 'email_automation:my_emails' %}"
+        hx-get="{% url 'marketing:my_emails' %}"
         hx-trigger="submit, input[name='q'] from:closest form delay:350ms"
         hx-target="#mb-main-host" hx-swap="innerHTML"
         hx-push-url="true">
@@ -440,7 +440,7 @@
     </div>
     {% if search_query %}
     <button type="button" class="mb-search-clear" title="{% trans 'Clear search' %}"
-            hx-get="{% url 'email_automation:my_emails' %}?folder={{ current_folder }}"
+            hx-get="{% url 'marketing:my_emails' %}?folder={{ current_folder }}"
             hx-target="#mb-main-host" hx-swap="innerHTML" hx-push-url="true"
             onclick="document.querySelector('input[name=q]').value='';">
       <i class="fas fa-times"></i>
@@ -455,9 +455,9 @@
     <aside class="mb-card">
       <div class="mb-folders">
         <a class="mb-folder {% if current_folder == 'inbox' %}active{% endif %}"
-           hx-get="{% url 'email_automation:my_emails' %}?folder=inbox"
+           hx-get="{% url 'marketing:my_emails' %}?folder=inbox"
            hx-target="#mb-main-host" hx-swap="innerHTML"
-           hx-push-url="{% url 'email_automation:my_emails' %}?folder=inbox">
+           hx-push-url="{% url 'marketing:my_emails' %}?folder=inbox">
           <i class="fas fa-inbox"></i> <span>{% trans "Inbox" %}</span>
           {% if folder_counts.unread %}
             <span class="mb-folder-count unread">{{ folder_counts.unread }}</span>
@@ -466,23 +466,23 @@
           {% endif %}
         </a>
         <a class="mb-folder {% if current_folder == 'sent' %}active{% endif %}"
-           hx-get="{% url 'email_automation:my_emails' %}?folder=sent"
+           hx-get="{% url 'marketing:my_emails' %}?folder=sent"
            hx-target="#mb-main-host" hx-swap="innerHTML"
-           hx-push-url="{% url 'email_automation:my_emails' %}?folder=sent">
+           hx-push-url="{% url 'marketing:my_emails' %}?folder=sent">
           <i class="fas fa-paper-plane"></i> <span>{% trans "Sent" %}</span>
           {% if folder_counts.sent %}<span class="mb-folder-count">{{ folder_counts.sent }}</span>{% endif %}
         </a>
         <a class="mb-folder {% if current_folder == 'archive' %}active{% endif %}"
-           hx-get="{% url 'email_automation:my_emails' %}?folder=archive"
+           hx-get="{% url 'marketing:my_emails' %}?folder=archive"
            hx-target="#mb-main-host" hx-swap="innerHTML"
-           hx-push-url="{% url 'email_automation:my_emails' %}?folder=archive">
+           hx-push-url="{% url 'marketing:my_emails' %}?folder=archive">
           <i class="fas fa-box-archive"></i> <span>{% trans "Archive" %}</span>
           {% if folder_counts.archive %}<span class="mb-folder-count">{{ folder_counts.archive }}</span>{% endif %}
         </a>
         <a class="mb-folder {% if current_folder == 'trash' %}active{% endif %}"
-           hx-get="{% url 'email_automation:my_emails' %}?folder=trash"
+           hx-get="{% url 'marketing:my_emails' %}?folder=trash"
            hx-target="#mb-main-host" hx-swap="innerHTML"
-           hx-push-url="{% url 'email_automation:my_emails' %}?folder=trash">
+           hx-push-url="{% url 'marketing:my_emails' %}?folder=trash">
           <i class="fas fa-trash"></i> <span>{% trans "Trash" %}</span>
           {% if folder_counts.trash %}<span class="mb-folder-count">{{ folder_counts.trash }}</span>{% endif %}
         </a>
@@ -490,10 +490,10 @@
 
       <div class="mb-side-section">{% trans "Tools" %}</div>
       <div class="mb-folders">
-        <a class="mb-folder" href="{% url 'email_automation:template_list' %}">
+        <a class="mb-folder" href="{% url 'marketing:template_list' %}">
           <i class="fas fa-file-lines"></i> <span>{% trans "Templates" %}</span>
         </a>
-        <a class="mb-folder" href="{% url 'email_automation:campaign_list' %}">
+        <a class="mb-folder" href="{% url 'marketing:campaign_list' %}">
           <i class="fas fa-bullhorn"></i> <span>{% trans "Campaigns" %}</span>
         </a>
       </div>
@@ -511,7 +511,7 @@
 
     <!-- Single content area: list by default, detail swaps in -->
     <div id="mb-main-host">
-      {% include 'email_automation/partials/my_emails_list.html' %}
+      {% include 'marketing/email/partials/my_emails_list.html' %}
     </div>
 
   </div>
@@ -523,7 +523,7 @@
 
 <script>
   // Star toggle (delegated)
-  const MB_STAR_BASE = '{% url "email_automation:toggle_star" 0 %}'.replace(/\/0\/$/, '/');
+  const MB_STAR_BASE = '{% url "marketing:toggle_star" 0 %}'.replace(/\/0\/$/, '/');
   document.addEventListener('click', function (e) {
     const star = e.target.closest('[data-mb-toggle-star]');
     if (!star) return;

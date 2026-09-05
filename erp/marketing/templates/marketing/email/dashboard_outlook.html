@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'email_automation/css/mail_dashboard.css' %}?v=1.0" />
+<link rel="stylesheet" href="{% static 'marketing/email/css/mail_dashboard.css' %}?v=1.0" />
 {% endblock %}
 
 {% block content %}
@@ -44,11 +44,15 @@
       {% if email_account %}
         <i class="fa fa-check-circle" style="color: #10b981;"></i>
         <span>{{ email_account.email_address }}</span>
-        <a href="{% url 'email_automation:disconnect_gmail' %}" class="btn-icon" title="Disconnect">
-          <i class="fa fa-times"></i>
-        </a>
+        <form method="post" action="{% url 'marketing:disconnect_gmail' %}" style="display: inline;"
+          onsubmit="return confirm('Disconnect this Gmail account?')">
+          {% csrf_token %}
+          <button type="submit" class="btn-icon" title="Disconnect">
+            <i class="fa fa-times"></i>
+          </button>
+        </form>
       {% else %}
-        <a href="{% url 'email_automation:connect_gmail' %}" class="btn btn-primary btn-sm">
+        <a href="{% url 'marketing:connect_gmail' %}" class="btn btn-primary btn-sm">
           <i class="fa fa-link"></i> Connect Gmail
         </a>
       {% endif %}
@@ -98,7 +102,7 @@
           <div class="empty-state">
             <i class="fa fa-envelope-open"></i>
             <p>Connect your Gmail account to view replies</p>
-            <a href="{% url 'email_automation:connect_gmail' %}" class="btn btn-primary">Connect Gmail</a>
+            <a href="{% url 'marketing:connect_gmail' %}" class="btn btn-primary">Connect Gmail</a>
           </div>
           {% else %}
           <div class="loading-state">
@@ -135,7 +139,7 @@
         <div class="view-header">
           <h2><i class="fa fa-file-text"></i> Email Templates</h2>
           <div class="view-actions">
-            <a href="{% url 'email_automation:template_create' %}" class="btn btn-primary btn-sm">
+            <a href="{% url 'marketing:template_create' %}" class="btn btn-primary btn-sm">
               <i class="fa fa-plus"></i> New Template
             </a>
           </div>
@@ -173,18 +177,22 @@
         <i class="fa fa-cog"></i> Manage Actions
       </h3>
       <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <a href="{% url 'email_automation:template_list' %}" class="btn btn-secondary">
+        <a href="{% url 'marketing:template_list' %}" class="btn btn-secondary">
           <i class="fa fa-file-text"></i> Manage Templates
         </a>
-        <a href="{% url 'email_automation:campaign_list' %}" class="btn btn-secondary">
+        <a href="{% url 'marketing:campaign_list' %}" class="btn btn-secondary">
           <i class="fa fa-list"></i> View All Campaigns
         </a>
         {% if email_account %}
-        <a href="{% url 'email_automation:disconnect_gmail' %}" class="btn btn-danger">
-          <i class="fa fa-unlink"></i> Disconnect Gmail
-        </a>
+        <form method="post" action="{% url 'marketing:disconnect_gmail' %}" style="display: inline;"
+          onsubmit="return confirm('Disconnect this Gmail account?')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">
+            <i class="fa fa-unlink"></i> Disconnect Gmail
+          </button>
+        </form>
         {% else %}
-        <a href="{% url 'email_automation:connect_gmail' %}" class="btn btn-primary">
+        <a href="{% url 'marketing:connect_gmail' %}" class="btn btn-primary">
           <i class="fa fa-link"></i> Connect Gmail
         </a>
         {% endif %}
@@ -217,5 +225,5 @@
   </div>
 </div>
 
-<script src="{% static 'email_automation/js/mail_dashboard.js' %}?v=1.0"></script>
+<script src="{% static 'marketing/email/js/mail_dashboard.js' %}?v=1.0"></script>
 {% endblock %}

@@ -1174,3 +1174,19 @@ class ProductCampaignTier(models.Model):
         cap = self.max_qty if self.max_qty else '+'
         return f'{self.min_qty}–{cap} → %{self.discount_percent}'
 
+
+# ---------------------------------------------------------------------------
+# Mail system — moved here from the old `email_automation` app. The models
+# live in models_email.py to keep this module readable; they are re-exported
+# so `marketing.models.Email` and friends resolve the way every other
+# marketing model does.
+# ---------------------------------------------------------------------------
+from .models_email import (  # noqa: E402,F401
+    EmailAccount,
+    EmailTemplate,
+    EmailCampaign,
+    SentEmail,
+    ReceivedEmail,
+    Email,
+    EmailAttachment,
+)

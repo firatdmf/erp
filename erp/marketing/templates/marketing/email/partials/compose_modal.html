@@ -367,8 +367,8 @@
 
 <script>
 (function(){
-  const RECIPIENTS_URL = '{% url "email_automation:api_recipients" %}';
-  const SEND_URL       = '{% url "email_automation:send_email" %}';
+  const RECIPIENTS_URL = '{% url "marketing:api_recipients" %}';
+  const SEND_URL       = '{% url "marketing:send_email" %}';
   const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
   let attachedFiles = [];
 
@@ -575,7 +575,7 @@
         if (typeof htmx !== 'undefined') {
           const mainHost = document.getElementById('mb-main-host');
           if (mainHost) {
-            htmx.ajax('GET', '{% url 'email_automation:my_emails' %}?folder=sent', '#mb-main-host');
+            htmx.ajax('GET', '{% url 'marketing:my_emails' %}?folder=sent', '#mb-main-host');
           }
         }
       }, 700);

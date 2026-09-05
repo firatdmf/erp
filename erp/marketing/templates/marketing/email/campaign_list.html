@@ -261,7 +261,7 @@
       <i class="fa fa-rocket"></i>
       Email Campaigns
     </h1>
-    <a href="{% url 'email_automation:dashboard' %}" class="btn btn-secondary">
+    <a href="{% url 'marketing:dashboard' %}" class="btn btn-secondary">
       <i class="fa fa-arrow-left"></i>
       Back to Dashboard
     </a>
@@ -287,21 +287,27 @@
             </span>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
               {% if campaign.status == 'active' %}
-              <a href="{% url 'email_automation:campaign_pause' campaign.pk %}" class="action-btn pause-btn" title="Pause campaign">
-                <i class="fa fa-pause"></i>
-              </a>
+              <form method="post" action="{% url 'marketing:campaign_pause' campaign.pk %}" style="display: inline;" onsubmit="return confirm('Pause this campaign?')">
+                {% csrf_token %}
+                <button type="submit" class="action-btn pause-btn" title="Pause campaign">
+                  <i class="fa fa-pause"></i>
+                </button>
+              </form>
               {% elif campaign.status == 'paused' %}
-              <a href="{% url 'email_automation:campaign_resume' campaign.pk %}" class="action-btn resume-btn" title="Resume campaign">
-                <i class="fa fa-play"></i>
-              </a>
+              <form method="post" action="{% url 'marketing:campaign_resume' campaign.pk %}" style="display: inline;" onsubmit="return confirm('Resume this campaign?')">
+                {% csrf_token %}
+                <button type="submit" class="action-btn resume-btn" title="Resume campaign">
+                  <i class="fa fa-play"></i>
+                </button>
+              </form>
               {% endif %}
-              <form method="post" action="{% url 'email_automation:campaign_delete' campaign.pk %}" style="display: inline;" onsubmit="return confirm('Delete this campaign?')">
+              <form method="post" action="{% url 'marketing:campaign_delete' campaign.pk %}" style="display: inline;" onsubmit="return confirm('Delete this campaign?')">
                 {% csrf_token %}
                 <button type="submit" class="action-btn delete-btn" title="Delete campaign">
                   <i class="fa fa-trash"></i>
                 </button>
               </form>
-              <a href="{% url 'email_automation:campaign_detail' campaign.pk %}" class="view-link">
+              <a href="{% url 'marketing:campaign_detail' campaign.pk %}" class="view-link">
                 View Details <i class="fa fa-arrow-right"></i>
               </a>
             </div>

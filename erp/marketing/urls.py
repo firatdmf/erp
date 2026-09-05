@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 from . import api_stock_update
 from . import views_csv_stock
@@ -8,6 +8,10 @@ app_name = "marketing"
 
 
 urlpatterns = [
+    # Mail system, moved in from the old `email_automation` app. Mounted here
+    # so its names resolve as `marketing:dashboard`, `marketing:my_emails`, ...
+    path("email/", include("marketing.urls_email")),
+
     path("",views.Index.as_view(),name="index"),
     path("product_list/",views.ProductList.as_view(),name="product_list"),
     path("product_detail/<int:pk>/",views.ProductDetail.as_view(),name="product_detail"),

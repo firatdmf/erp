@@ -359,12 +359,13 @@
 
     <div class="connection-actions">
       {% if email_account %}
-      <a href="{% url 'email_automation:disconnect_gmail' %}" class="btn-modern btn-danger-modern"
-        onclick="return confirm('Are you sure you want to disconnect your Gmail account?')">
-        Disconnect
-      </a>
+      <form method="post" action="{% url 'marketing:disconnect_gmail' %}" style="display: inline;"
+        onsubmit="return confirm('Are you sure you want to disconnect your Gmail account?')">
+        {% csrf_token %}
+        <button type="submit" class="btn-modern btn-danger-modern">Disconnect</button>
+      </form>
       {% else %}
-      <a href="{% url 'email_automation:connect_gmail' %}" class="btn-modern btn-primary-modern">
+      <a href="{% url 'marketing:connect_gmail' %}" class="btn-modern btn-primary-modern">
         <i class="fa-brands fa-google"></i>
         Connect Account
       </a>
@@ -390,7 +391,7 @@
       <div class="stat-value">{{ total_sent }}</div>
     </div>
 
-    <a href="{% url 'email_automation:inbox' %}" class="stat-card-modern">
+    <a href="{% url 'marketing:inbox' %}" class="stat-card-modern">
       <div class="stat-header">
         <span class="stat-label">Replies Received</span>
         <div class="stat-icon" style="color: #ea580c; background: #fff7ed;"><i class="fa-solid fa-reply"></i></div>
@@ -412,7 +413,7 @@
   <div class="quick-actions-section">
     <h2><i class="fa-solid fa-bolt" style="color: #f59e0b; font-size: 1rem;"></i> Quick Actions</h2>
     <div class="actions-grid">
-      <a href="{% url 'email_automation:template_list' %}" class="action-card">
+      <a href="{% url 'marketing:template_list' %}" class="action-card">
         <div class="action-icon-box">
           <i class="fa-solid fa-file-lines"></i>
         </div>
@@ -422,7 +423,7 @@
         </div>
       </a>
 
-      <a href="{% url 'email_automation:campaign_list' %}" class="action-card">
+      <a href="{% url 'marketing:campaign_list' %}" class="action-card">
         <div class="action-icon-box">
           <i class="fa-solid fa-list-check"></i>
         </div>
@@ -432,7 +433,7 @@
         </div>
       </a>
 
-      <a href="{% url 'email_automation:inbox' %}" class="action-card">
+      <a href="{% url 'marketing:inbox' %}" class="action-card">
         <div class="action-icon-box">
           <i class="fa-solid fa-inbox"></i>
         </div>
@@ -442,7 +443,7 @@
         </div>
       </a>
 
-      <a href="{% url 'email_automation:my_emails' %}" class="action-card">
+      <a href="{% url 'marketing:my_emails' %}" class="action-card">
         <div class="action-icon-box">
           <i class="fa-solid fa-envelope"></i>
         </div>

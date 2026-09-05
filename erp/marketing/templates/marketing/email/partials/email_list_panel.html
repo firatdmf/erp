@@ -40,7 +40,7 @@
     {% for email in emails %}
     <a href="javascript:void(0)"
         class="email-item {% if not email.is_read %}unread{% endif %} {% if selected_email.id == email.id %}active{% endif %}"
-        hx-get="{% url 'email_automation:email_detail' email.id %}" hx-target="#emailDetailContent" hx-swap="innerHTML">
+        hx-get="{% url 'marketing:email_detail' email.id %}" hx-target="#emailDetailContent" hx-swap="innerHTML">
 
         <!-- Avatar -->
         <div class="email-avatar"

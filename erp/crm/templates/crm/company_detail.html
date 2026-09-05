@@ -932,7 +932,7 @@
         </button>
       </div>
 
-      <div id="comm-content" class="comm-content" hx-get="{% url 'email_automation:company_emails' company.id %}"
+      <div id="comm-content" class="comm-content" hx-get="{% url 'marketing:company_emails' company.id %}"
         hx-trigger="load">
         <div style="text-align: center; padding: 40px; color: var(--gray-400);">
           <i class="fas fa-spinner fa-spin fa-2x"></i>
@@ -1356,16 +1356,16 @@
 
     if (type === 'emails') {
       btns[0].classList.add('active');
-      htmx.ajax('GET', "{% url 'email_automation:company_emails' company.id %}", { target: '#comm-content' });
+      htmx.ajax('GET', "{% url 'marketing:company_emails' company.id %}", { target: '#comm-content' });
     } else {
       btns[1].classList.add('active');
-      htmx.ajax('GET', "{% url 'email_automation:company_shared_files' company.id %}", { target: '#comm-content' });
+      htmx.ajax('GET', "{% url 'marketing:company_shared_files' company.id %}", { target: '#comm-content' });
     }
   }
 
   // Open Compose Modal
   function openComposeModal(toEmail, toName, subject, companyId) {
-    let url = "{% url 'email_automation:compose_email' %}?";
+    let url = "{% url 'marketing:compose_email' %}?";
     if (toEmail) url += `to=${encodeURIComponent(toEmail)}&`;
     if (toName) url += `name=${encodeURIComponent(toName)}&`;
     if (subject) url += `subject=${encodeURIComponent(subject)}&`;

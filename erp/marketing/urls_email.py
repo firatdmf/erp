@@ -1,8 +1,8 @@
 from django.urls import path
-from . import views
+from . import views_email as views
 
-app_name = 'email_automation'
-
+# No namespace declared here: these patterns are included into marketing/urls.py,
+# so the names live in the `marketing:` namespace with the rest of the app.
 urlpatterns = [
     # Dashboard - main email page
     path('', views.dashboard, name='dashboard'),

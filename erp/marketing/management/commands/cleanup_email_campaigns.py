@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from email_automation.models import EmailCampaign
+from marketing.models import EmailCampaign
 from crm.models import Company
 import logging
 

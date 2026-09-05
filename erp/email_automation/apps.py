@@ -2,16 +2,19 @@ from django.apps import AppConfig
 
 
 class EmailAutomationConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'email_automation'
-    verbose_name = 'Email Automation'
-    
-    def ready(self):
-        import email_automation.signals
-        
-        # Start background scheduler for automatic email sending
-        # Only in main process, not in reloader
-        import os
-        if os.environ.get('RUN_MAIN') == 'true':
-            from .scheduler import start_scheduler
-            start_scheduler()
+    """Migrations-only stub.
+
+    The mail system (models, views, urls, services, signals, templates and
+    static files) moved into the `marketing` app. Nothing is defined here any
+    more — but the app must stay registered, because this package's own
+    migration history and marketing's adoption migration declare dependencies
+    on ('email_automation', ...). Dropping the app would make the migration
+    graph unresolvable on every database that has already applied them.
+
+    The models were re-pointed at marketing via a SeparateDatabaseAndState
+    move, so this app owns no tables.
+    """
+
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "email_automation"
+    verbose_name = "Email Automation (migrations only)"

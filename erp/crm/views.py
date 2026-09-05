@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.contrib import messages
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
@@ -203,6 +204,26 @@ class ContactUpdate(generic.edit.UpdateView):
     def _is_ajax(self):
         return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
+    def get_denied_url(self, obj):
+        return reverse("crm:contact_detail", kwargs={"pk": obj.pk})
+
+    def dispatch(self, request, *args, **kwargs):
+        """Admins edit anything; everyone else edits what they created.
+
+        Records made before created_by existed are NULL and so are
+        admin-only — see erp.ownership.can_edit.
+        """
+        from erp.ownership import can_edit
+
+        obj = self.get_object()
+        if not can_edit(request.user, obj):
+            message = "You can only edit records you created."
+            if self._is_ajax():
+                return JsonResponse({"success": False, "error": message}, status=403)
+            messages.error(request, message)
+            return redirect(self.get_denied_url(obj))
+        return super().dispatch(request, *args, **kwargs)
+
     def get_template_names(self):
         # When loaded into the edit sidebar, return just the form partial
         # (no base.html chrome) so the sidebar wraps it.
@@ -256,8 +277,8 @@ class CompanyCreate(generic.edit.CreateView):
             # Save the form data to create the Company instance but do not commit yet
             self.object = form.save(commit=False)
             
-            # Set flag for email_automation signal
-            # This tells the email_automation module whether to create a campaign
+            # Set flag for the mail signal
+            # This tells marketing's mail signals whether to create a campaign
             self.object._enable_email_campaign = send_emails
             
             # Now save (signal will check _enable_email_campaign flag)
@@ -300,13 +321,13 @@ class CompanyCreate(generic.edit.CreateView):
                     member=task_member,
                 )
 
-            # NOTE: Email campaign creation is now handled by email_automation module's signal
+            # NOTE: Email campaign creation is now handled by marketing's mail signal
             # The _enable_email_campaign flag (set above before save) controls whether
-            # the email_automation signal creates a campaign
+            # the mail signal creates a campaign
 
             # Log for debugging
             if send_emails:
-                logger.info(f"✓ Email automation ENABLED for {self.object.name} (email_automation module will handle)")
+                logger.info(f"✓ Email automation ENABLED for {self.object.name} (marketing's mail signals will handle)")
             else:
                 logger.info(f"⊘ Email automation DISABLED for {self.object.name} - Checkbox not checked")
 
@@ -355,6 +376,26 @@ class EditCompanyView(generic.edit.UpdateView):
 
     def _is_ajax(self):
         return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def get_denied_url(self, obj):
+        return reverse("crm:company_detail", kwargs={"pk": obj.pk})
+
+    def dispatch(self, request, *args, **kwargs):
+        """Admins edit anything; everyone else edits what they created.
+
+        Records made before created_by existed are NULL and so are
+        admin-only — see erp.ownership.can_edit.
+        """
+        from erp.ownership import can_edit
+
+        obj = self.get_object()
+        if not can_edit(request.user, obj):
+            message = "You can only edit records you created."
+            if self._is_ajax():
+                return JsonResponse({"success": False, "error": message}, status=403)
+            messages.error(request, message)
+            return redirect(self.get_denied_url(obj))
+        return super().dispatch(request, *args, **kwargs)
 
     def get_template_names(self):
         if self._is_ajax():
@@ -555,7 +596,7 @@ class CompanyDetail(generic.DetailView):
         
         # Add email campaign info if exists
         try:
-            from email_automation.models import EmailCampaign
+            from marketing.models import EmailCampaign
             campaign = company.email_campaign
             context["email_campaign"] = campaign
             context["has_campaign"] = True
@@ -1186,7 +1227,16 @@ def quick_create_customer(request):
     name/phone/email/address only. Tax info and currency live on the
     CariAccount, which is auto-created behind the scenes once the order
     is saved (get_or_create_cari_for_order), so there's no need to ask
-    for them here."""
+    for them here.
+
+    An order can be raised against a Contact or a Company (Order has a
+    FK to each), so this makes either. `kind` picks: "company" builds a
+    Company, anything else a Contact — defaulting to contact keeps every
+    existing caller that sends no kind at all working unchanged.
+
+    created_by is stamped by erp.ownership on save, so whoever adds a
+    customer here owns the record and can edit it afterwards.
+    """
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "POST required"}, status=405)
     name = (request.POST.get("name") or "").strip()
@@ -1195,13 +1245,25 @@ def quick_create_customer(request):
     phone = (request.POST.get("phone") or "").strip()
     email = (request.POST.get("email") or "").strip()
     address = (request.POST.get("address") or "").strip()
-    contact = Contact.objects.create(
+
+    kind = (request.POST.get("kind") or "contact").strip().lower()
+    model = Company if kind == "company" else Contact
+
+    # Both models keep phone/email as ArrayFields, so a blank one has to
+    # be an empty list rather than [""] — an array holding one empty
+    # string reads as "has a phone number" everywhere downstream.
+    obj = model.objects.create(
         name=name,
         phone=[phone] if phone else [],
         email=[email] if email else [],
         address=address,
     )
-    return JsonResponse({"ok": True, "id": contact.pk, "name": contact.name, "type": "contact"})
+    return JsonResponse({
+        "ok": True,
+        "id": obj.pk,
+        "name": obj.name,
+        "type": "company" if model is Company else "contact",
+    })
 
 
 @login_required
@@ -1219,7 +1281,7 @@ def toggle_email_campaign(request, pk):
             # Check if company has email
             if company.email and len(company.email) > 0 and company.email[0].strip():
                 # Check if campaign already exists
-                from email_automation.models import EmailCampaign, EmailTemplate
+                from marketing.models import EmailCampaign, EmailTemplate
                 from django.contrib.auth.models import User
                 
                 try:
@@ -1251,7 +1313,7 @@ def toggle_email_campaign(request, pk):
                         logger.info(f"✓ Campaign created for {company.name}")
                         
                         # Send Email 1 immediately
-                        from email_automation.email_service import send_campaign_email
+                        from marketing.email_service import send_campaign_email
                         try:
                             if send_campaign_email(campaign, sequence_number=1):
                                 logger.info(f"✓ Email 1 sent immediately to {company.name}")
@@ -1263,7 +1325,7 @@ def toggle_email_campaign(request, pk):
         elif not enable:
             # Disable/Pause campaign if exists
             try:
-                from email_automation.models import EmailCampaign
+                from marketing.models import EmailCampaign
                 campaign = company.email_campaign
                 if campaign.status == 'active':
                     campaign.status = 'paused'
@@ -1275,7 +1337,7 @@ def toggle_email_campaign(request, pk):
         # Re-enable if campaign is paused
         if enable:
             try:
-                from email_automation.models import EmailCampaign
+                from marketing.models import EmailCampaign
                 campaign = company.email_campaign
                 if campaign.status == 'paused':
                     campaign.status = 'active'
@@ -1286,7 +1348,7 @@ def toggle_email_campaign(request, pk):
     
     # Return updated campaign card HTML
     try:
-        from email_automation.models import EmailCampaign
+        from marketing.models import EmailCampaign
         campaign = company.email_campaign
         has_campaign = True
     except EmailCampaign.DoesNotExist:

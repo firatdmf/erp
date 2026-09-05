@@ -852,7 +852,7 @@
     <!-- Top Bar -->
     <div class="ed-topbar">
         <div class="ed-back-section">
-            <a href="{% url 'email_automation:my_emails' %}" class="ed-back-btn" title="Back to Inbox">
+            <a href="{% url 'marketing:my_emails' %}" class="ed-back-btn" title="Back to Inbox">
                 <i class="fas fa-arrow-left"></i>
             </a>
             <div class="ed-breadcrumb">
@@ -961,7 +961,7 @@
                 </div>
                 <div class="ed-attachment-grid">
                     {% for attachment in attachments %}
-                    <a href="{% url 'email_automation:download_attachment' attachment.id %}" target="_blank"
+                    <a href="{% url 'marketing:download_attachment' attachment.id %}" target="_blank"
                         class="ed-attachment-card" title="Download {{ attachment.filename }}">
                         <div class="ed-att-icon">
                             {% if 'pdf' in attachment.filename|lower %}
@@ -1121,7 +1121,7 @@
 <script>
     // Compose Modal
     function openComposeModal(event, recipientEmail, subject) {
-        let url = '{% url "email_automation:compose_email" %}';
+        let url = '{% url "marketing:compose_email" %}';
         if (recipientEmail) url += '?to=' + encodeURIComponent(recipientEmail);
         if (subject) url += (url.includes('?') ? '&' : '?') + 'subject=' + encodeURIComponent(subject);
 
@@ -1164,7 +1164,7 @@
             .then(d => {
                 if (d.success) {
                     showToast(d.message || 'Done');
-                    setTimeout(() => window.location.href = '{% url "email_automation:my_emails" %}', 800);
+                    setTimeout(() => window.location.href = '{% url "marketing:my_emails" %}', 800);
                 }
             });
     }
@@ -1195,7 +1195,7 @@
         formData.append('subject', 'Re: {{ email.subject|escapejs }}');
         formData.append('body', body);
 
-        fetch('{% url "email_automation:send_email" %}', {
+        fetch('{% url "marketing:send_email" %}', {
             method: 'POST',
             headers: { 'X-CSRFToken': '{{ csrf_token }}' },
             body: formData

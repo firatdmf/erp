@@ -1,0 +1,89 @@
+{% load i18n %}
+{% get_current_language as LANGUAGE_CODE %}
+{% comment %}The rolls ("top" in Turkish) inside one product, injected as ONE row under
+that product's line when it is expanded. A single full-width cell rather
+than cells aligned to the parent columns: a roll's fields (barcode, length
+left, status, who scanned it) don't line up with a product's, and forcing
+them into the same grid squeezed both.{% endcomment %}
+<tr class="wh-rollrow">
+  <td colspan="6" class="wh-rolls-cell">
+    {% if rolls %}
+    <div class="wh-rolls-head">
+      <span class="wh-rolls-count">
+        <i class="fa fa-layer-group"></i>
+        {{ shown }}{% if truncated %} / {{ total }}{% endif %}
+        {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=shown %}roll{% plural %}rolls{% endblocktrans %}{% endif %}
+      </span>
+      <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}"
+         class="wh-rolls-open">
+        {% trans "Open product" %} <i class="fa fa-arrow-right"></i>
+      </a>
+    </div>
+
+    <div class="wh-rolls-list">
+      {% for r in rolls %}
+      <div class="wh-roll">
+        <div class="wh-roll-code">
+          {% if r.barcode %}<span class="roll-barcode">{{ r.barcode }}</span>
+          {% else %}<span style="color:#C5CCD3;">#{{ r.pk }}</span>{% endif %}
+          {% if r.is_second %}<span class="wh-roll-2nd" title="{% trans 'Factory second — imperfect roll, not first quality.' %}">2nd</span>{% endif %}
+          {% if r.lot_number %}<span class="wh-roll-lot">Lot: {{ r.lot_number }}</span>{% endif %}
+        </div>
+
+        <div class="wh-roll-len">
+          <span class="wh-roll-m">{% if r.meters_remaining is not None %}{{ r.meters_remaining|floatformat:2 }}{% else %}{{ r.meters|floatformat:2 }}{% endif %} m</span>
+          {% if r.meters and r.meters_remaining is not None and r.meters_remaining < r.meters %}
+            <span class="wh-roll-of">{% trans "of" %} {{ r.meters|floatformat:2 }} m</span>
+            <span class="wh-roll-bar"><span style="width:{% widthratio r.meters_remaining r.meters 100 %}%;"></span></span>
+          {% endif %}
+        </div>
+
+        <div class="wh-roll-state">
+          <span class="roll-status {{ r.status }}">
+            {% if r.status == 'in_stock' %}<i class="fa fa-circle-check"></i> {% trans "In stock" %}
+            {% elif r.status == 'partial' %}<i class="fa fa-circle-half-stroke"></i> {% trans "Partial" %}
+            {% else %}<i class="fa fa-circle-xmark"></i> {% trans "Consumed" %}{% endif %}
+          </span>
+          {% if r.reserved_m %}
+            <span class="wh-roll-resv">
+              <i class="fa fa-lock"></i>
+              {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ r.reserved_m|floatformat:2 }} m
+            </span>
+            {% for resv in r.reservation_list %}
+              <a href="{% url 'operating:order_detail' resv.order_id %}" target="_blank" rel="noopener" class="wh-roll-order">
+                {{ resv.order.order_number|default:resv.order_id }} ({{ resv.meters|floatformat:2 }} m)
+              </a>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <div class="wh-roll-when">
+          {{ r.scanned_at|date:"d.m.Y" }}{% if r.scanned_by %} · {{ r.scanned_by.username }}{% endif %}
+        </div>
+
+        <div class="wh-roll-act">
+          <a href="{% url 'operating:warehouse_product_label' product.warehouse_id product.pk %}?roll={{ r.pk }}"
+             target="_blank" rel="noopener" title="{% trans 'Print label' %}">
+            <i class="fa fa-qrcode"></i>
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if truncated %}
+    <div class="wh-rolls-more">
+      {% blocktrans %}Showing the newest {{ shown }} of {{ total }} rolls.{% endblocktrans %}
+      <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}">{% trans "See all" %}</a>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="wh-rolls-empty">
+      <i class="fa fa-barcode"></i>
+      {% trans "No rolls scanned for this product." %}
+      <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}">{% trans "Open product" %}</a>
+    </div>
+    {% endif %}
+  </td>
+</tr>

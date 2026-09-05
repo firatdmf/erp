@@ -1260,26 +1260,19 @@ class Warehouse(models.Model):
                             output_field=_dec)
         return unit_usd, unit_try
 
-    def total_values(self):
-        """(usd, try) rollups in a single aggregate query. A combined
-        (ortak) warehouse rolls up its MEMBERS' stock — it owns none."""
+    def total_value_usd(self):
+        """Net worth in the base currency (settings.BASE_CURRENCY_CODE), as
+        ONE aggregate query. A combined (ortak) warehouse rolls up its
+        MEMBERS' stock — it owns none."""
         from decimal import Decimal
         from django.db.models import Sum, F, DecimalField
         from django.db.models.functions import Coalesce
-        unit_usd, unit_try = self._total_value_annotations()
+        unit_usd, _unit_try = self._total_value_annotations()
         _dec = DecimalField(max_digits=20, decimal_places=4)
         qs = WarehouseProduct.objects.filter(warehouse_id__in=self.scope_ids())
-        agg = qs.aggregate(
+        return qs.aggregate(
             usd=Coalesce(Sum(F("quantity") * unit_usd, output_field=_dec), Decimal("0"), output_field=_dec),
-            trl=Coalesce(Sum(F("quantity") * unit_try, output_field=_dec), Decimal("0"), output_field=_dec),
-        )
-        return agg["usd"], agg["trl"]
-
-    def total_value_usd(self):
-        return self.total_values()[0]
-
-    def total_value_try(self):
-        return self.total_values()[1]
+        )["usd"]
 
     def product_count(self):
         return self.products.count()

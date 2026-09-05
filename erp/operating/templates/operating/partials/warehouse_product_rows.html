@@ -4,14 +4,21 @@
 {% comment %}Row links use the product's OWN warehouse id — on a combined
 (ortak) warehouse page the rows come from MEMBER warehouses, and linking
 them under the combined pk would 404.{% endcomment %}
-<tr class="wh-vrow" style="cursor:pointer;">
+{% comment %}A plain click EXPANDS the row's rolls (fetched on demand);
+the SKU pill still navigates to the product, and ctrl/cmd/middle/right-click
+anywhere on the row opens it in a tab — the cell anchors below stay real
+links so that keeps working.{% endcomment %}
+<tr class="wh-vrow" style="cursor:pointer;" data-roll-count="{{ p.roll_count|default:0 }}"
+    onclick="toggleWhRolls(event, this, '{% url 'operating:warehouse_product_rolls' p.warehouse_id p.pk %}')">
   {% comment %}Every cell wraps its content in an anchor to the product
   detail page, so right-click / middle-click / Cmd+click work anywhere
   on the row (not just SKU or Name). Nested anchors are invalid HTML —
   the SKU cell's external "Open linked product" link stays a sibling
   outside the row-link wrapper.{% endcomment %}
-  <td data-label="SKU">
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit;">
+  <td class="wh-chev-cell" data-label="SKU">
+    <i class="fa fa-chevron-right wh-vrow-chev{% if not p.roll_count %} is-empty{% endif %}"
+       title="{% trans 'Show the rolls in this product' %}"></i>
+    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link wh-cell-nav" style="text-decoration:none; color:inherit;">
       {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
       {% if warehouse.is_combined %}
         <span style="margin-left:6px; font:700 10px var(--font-sans,sans-serif); color:#5B21B6; background:#EDE9FE; border-radius:5px; padding:1px 6px; vertical-align:middle; white-space:nowrap;">{{ p.warehouse.name }}</span>
@@ -39,7 +46,7 @@ them under the combined pk would 404.{% endcomment %}
   <td class="num" data-label="{% trans 'Stock' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
       <div class="qty">{{ p.quantity|floatformat:2 }} m</div>
-      {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each top has its own barcode' %}">{{ p.roll_count }} top</div>{% endif %}
+      {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each roll has its own barcode' %}">{{ p.roll_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=p.roll_count %}roll{% plural %}rolls{% endblocktrans %}{% endif %}</div>{% endif %}
       {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} m</div>{% endif %}
     </a>
   </td>
@@ -53,15 +60,10 @@ them under the combined pk would 404.{% endcomment %}
       {% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
-  <td class="num" data-label="{% trans 'Total (TRY)' %}">
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
-      {% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
-    </a>
-  </td>
 </tr>
 {% empty %}
 <tr>
-  <td colspan="7">
+  <td colspan="6">
     <div class="od-empty">
       <i class="fa fa-box-open empty-ico"></i>
       <h4>{% trans "No variants in this warehouse" %}</h4>
@@ -91,19 +93,18 @@ them under the combined pk would 404.{% endcomment %}
   <td class="od-m-hide"><span style="color:#C5CCD3;">—</span></td>
   <td class="num" data-label="{% trans 'Total' %}">
     <div class="qty">{{ g.total_qty|floatformat:2 }} m</div>
-    {% if g.roll_total %}<div class="tops-sub">{{ g.roll_total }} top</div>{% endif %}
+    {% if g.roll_total %}<div class="tops-sub">{{ g.roll_total }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=g.roll_total %}roll{% plural %}rolls{% endblocktrans %}{% endif %}</div>{% endif %}
     {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ g.reserved_total|floatformat:2 }} m</div>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Unit cost' %}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Varyantların ortalama birim maliyeti{% else %}Average unit cost across variants{% endif %}">
     {% if g.avg_cost_usd %}<span class="mono">~{{ g.avg_cost_usd|floatformat:2 }}</span><span class="curr-pill">USD</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Total (USD)' %}">{% if g.total_usd %}<span class="cost-usd">${{ g.total_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
-  <td class="num" data-label="{% trans 'Total (TRY)' %}">{% if g.total_try %}<span class="cost-try">₺{{ g.total_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
 </tr>
 {% endwith %}
 {% empty %}
 <tr>
-  <td colspan="7">
+  <td colspan="6">
     <div class="od-empty">
       <i class="fa fa-box-open empty-ico"></i>
       <h4>{% trans "No products in this warehouse" %}</h4>

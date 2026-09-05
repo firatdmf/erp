@@ -1032,6 +1032,50 @@ def _tr_ci_variants(term):
     return out
 
 
+WAREHOUSE_SEARCH_MODES = ("text", "barcode")
+
+
+def warehouse_search_mode(request):
+    """The search box's mode, chosen in the UI. Anything unrecognised (or
+    absent) falls back to the default text search."""
+    mode = (request.GET.get("search_by") or "").strip().lower()
+    return mode if mode in WAREHOUSE_SEARCH_MODES else "text"
+
+
+def warehouse_search_q(search, scope_ids, search_by="text"):
+    """Build the WarehouseProduct filter behind the warehouse list's search
+    box, shared by the page and its Excel export so both narrow the same way.
+
+    The DEFAULT mode matches what a person actually reads on the row: the
+    product name, its SKU, and the linked catalog variant's SKU. Barcodes are
+    long digit strings that a typed name or SKU fragment hits by accident, so
+    they moved into their own mode the user picks in the UI.
+
+    Roll (top) barcodes are matched with a SUBQUERY rather than a join — a
+    join would multiply the grouped view's Sum() aggregates."""
+    from functools import reduce
+    import operator
+    variants = _tr_ci_variants(search)
+    if not variants:
+        return Q()
+
+    def _field_q(field):
+        return reduce(operator.or_,
+                      (Q(**{f"{field}__icontains": v}) for v in variants))
+
+    if search_by == "barcode":
+        roll_match = (WarehouseProductRoll.objects
+                      .filter(product__warehouse_id__in=scope_ids)
+                      .filter(_field_q("barcode"))
+                      .values("product_id"))
+        return (_field_q("barcode")
+                | _field_q("catalog_variant__variant_barcode")
+                | Q(id__in=roll_match))
+
+    return (_field_q("name") | _field_q("sku")
+            | _field_q("catalog_variant__variant_sku"))
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseDetail(View):
     template_name = "operating/warehouse_detail.html"
@@ -1039,6 +1083,9 @@ class WarehouseDetail(View):
     def get(self, request, pk):
         warehouse = get_object_or_404(Warehouse, pk=pk)
         search = (request.GET.get('search') or '').strip()
+        # Name/SKU by default; barcode matching is its own mode (see
+        # warehouse_search_q) the user turns on from the toolbar.
+        search_by = warehouse_search_mode(request)
         sort = (request.GET.get('sort') or 'name_asc').strip()
         page_num = request.GET.get('page', '1')
         # Hide zero-quantity WPs by default (empty variants clutter the list
@@ -1061,27 +1108,8 @@ class WarehouseDetail(View):
         if not show_empty:
             base_qs = base_qs.exclude(quantity=0)
         if search:
-            # Case-insensitive across name / SKU / product-barcode AND each
-            # roll's (top's) own barcode. We OR a few Turkish-aware cased
-            # variants of the term so dotted/dotless İ/ı match no matter how
-            # the data was typed. Rolls are matched via a SUBQUERY (not a
-            # join) so the grouped-view Sum() aggregates aren't multiplied.
-            from functools import reduce
-            import operator
-            variants = _tr_ci_variants(search)
-
-            def _field_q(field):
-                return reduce(operator.or_,
-                              (Q(**{f"{field}__icontains": v}) for v in variants))
-
-            roll_match = (WarehouseProductRoll.objects
-                          .filter(product__warehouse_id__in=scope_ids)
-                          .filter(_field_q("barcode"))
-                          .values('product_id'))
             base_qs = base_qs.filter(
-                _field_q("name") | _field_q("sku") | _field_q("barcode")
-                | Q(id__in=roll_match)
-            )
+                warehouse_search_q(search, scope_ids, search_by))
 
         # Keep only products holding at least one ACTIVE (packed-but-not-
         # shipped) reservation. Same consumed=False definition the reserved
@@ -1111,7 +1139,6 @@ class WarehouseDetail(View):
                     .annotate(base=base_expr,
                               roll_count=Count('rolls', filter=~Q(rolls__status='consumed')),
                               line_usd=F('quantity') * F('cost_usd'),
-                              line_try=F('quantity') * F('cost_try'),
                               reserved=reserved_meters_subquery()))
             # A → Z by product NAME, top quantity, unit price, or recent.
             _flat_sort = {
@@ -1147,11 +1174,8 @@ class WarehouseDetail(View):
                                    output_field=DecimalField(max_digits=18, decimal_places=2)),
                 total_usd=Coalesce(Sum(F("quantity") * F("cost_usd")), Decimal("0"),
                                    output_field=DecimalField(max_digits=20, decimal_places=4)),
-                total_try=Coalesce(Sum(F("quantity") * F("cost_try")), Decimal("0"),
-                                   output_field=DecimalField(max_digits=20, decimal_places=4)),
                 updated=Max("updated_at"),
                 avg_cost=Avg("cost_usd"),
-                avg_cost_try=Avg("cost_try"),
             ))
             _sort_map = {
                 "name_asc": "base", "name_desc": "-base",
@@ -1208,9 +1232,7 @@ class WarehouseDetail(View):
                 "total_qty": g["total_qty"],
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
-                "total_try": g["total_try"],
                 "avg_cost_usd": g["avg_cost"],
-                "avg_cost_try": g["avg_cost_try"],
                 "is_catalog": (g.get("linked") or 0) > 0,
             } for g in page.object_list]
 
@@ -1224,6 +1246,7 @@ class WarehouseDetail(View):
             'page': page,
             'paginator': paginator,
             'search': search,
+            'search_by': search_by,
             'sort': sort,
             'sort_options': [(k, v[1]) for k, v in SORT_OPTIONS.items()],
             'filtered_count': paginator.count,
@@ -1256,7 +1279,7 @@ class WarehouseDetail(View):
         roll_count = (WarehouseProductRoll.objects
                       .filter(product__warehouse_id__in=scope_ids)
                       .exclude(status='consumed').count())
-        total_value_usd, total_value_try = warehouse.total_values()
+        total_value_usd = warehouse.total_value_usd()
 
         # "Son Hareketler" preview — the latest activity in THIS warehouse
         # (all products; members' products for a combined view), linking to
@@ -1271,7 +1294,6 @@ class WarehouseDetail(View):
         ctx.update({
             'recent_movements': recent_movements,
             'total_value_usd': total_value_usd,
-            'total_value_try': total_value_try,
             'product_count': counts['n'],     # variants
             'variant_count': counts['n'],     # alias — variants
             'group_count': group_count,       # main products (packages)
@@ -1303,9 +1325,9 @@ def warehouse_group_variants(request, pk):
     CAP = 400
     qs = (WarehouseProduct.objects.filter(warehouse_id__in=warehouse.scope_ids())
           .select_related("catalog_variant__product", "warehouse")
-          .annotate(base=base_expr, roll_count=Count("rolls"),
+          .annotate(base=base_expr,
+                    roll_count=Count("rolls", filter=~Q(rolls__status="consumed")),
                     line_usd=F("quantity") * F("cost_usd"),
-                    line_try=F("quantity") * F("cost_try"),
                     reserved=reserved_meters_subquery())
           .filter(base=base).order_by("name", "id"))
     total = qs.count()
@@ -1317,6 +1339,66 @@ def warehouse_group_variants(request, pk):
         "shown": len(variants),
         "total": total,
         "base": base,
+    })
+
+
+@login_required
+def warehouse_product_rolls(request, warehouse_pk, product_pk):
+    """The rolls ("top" in Turkish) held by ONE product, as rows injected
+    under its line when that line is expanded in the warehouse list.
+
+    Lazy, like the grouped view's variant rows: a single product can hold
+    hundreds of rolls and a page lists dozens of products, so rendering them
+    all up front would make the list crawl.
+    """
+    from decimal import Decimal as _Dec
+    from .models import OrderRollReservation
+
+    warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+    # A combined (ortak) warehouse expands rows belonging to its MEMBERS.
+    product = get_object_or_404(WarehouseProduct, pk=product_pk,
+                                warehouse_id__in=warehouse.scope_ids())
+
+    CAP = 200
+    # Consumed rolls are gone from the floor — the row's roll count and the
+    # product page's list both leave them out, so this agrees with both.
+    qs = (product.rolls.exclude(status="consumed")
+          .select_related("scanned_by")
+          .order_by("-scanned_at"))
+    # One row past the cap tells us whether there are more WITHOUT a second
+    # COUNT query — almost every product is well under it, and this endpoint
+    # fires on every row a user opens.
+    rolls = list(qs[:CAP + 1])
+    truncated = len(rolls) > CAP
+    if truncated:
+        rolls = rolls[:CAP]
+        total = qs.count()
+    else:
+        total = len(rolls)
+
+    # Active (packed-but-not-shipped) reservations per roll, with the order
+    # holding each — the same decoration the product detail page applies, so
+    # "Reserved: 40 m" traces to an order here too instead of dead-ending.
+    reserved_by_roll, reservations_by_roll = {}, {}
+    if rolls:
+        for resv in (OrderRollReservation.objects
+                     .filter(roll_id__in=[r.id for r in rolls], consumed=False)
+                     .select_related("order")
+                     .order_by("-created_at")):
+            reserved_by_roll[resv.roll_id] = (reserved_by_roll.get(resv.roll_id, _Dec("0"))
+                                              + (resv.meters or _Dec("0")))
+            reservations_by_roll.setdefault(resv.roll_id, []).append(resv)
+    for r in rolls:
+        r.reserved_m = reserved_by_roll.get(r.id, _Dec("0"))
+        r.reservation_list = reservations_by_roll.get(r.id, [])
+
+    return render(request, "operating/partials/warehouse_product_roll_rows.html", {
+        "warehouse": warehouse,
+        "product": product,
+        "rolls": rolls,
+        "shown": len(rolls),
+        "total": total,
+        "truncated": truncated,
     })
 
 

@@ -15,10 +15,11 @@ from erp.xlsx_utils import (
     F_TITLE, F_SUB, F_DOCNO, F_HEAD, F_VAL, F_VALB,
 )
 
-from .models import Warehouse, WarehouseProduct, WarehouseProductRoll
-from .views_warehouse import _tr_ci_variants, reserved_meters_subquery
+from .models import Warehouse, WarehouseProduct
+from .views_warehouse import (reserved_meters_subquery,
+                              warehouse_search_mode, warehouse_search_q)
 
-NCOLS = 10  # A..J
+NCOLS = 9  # A..I
 
 
 def _dec(v):
@@ -35,34 +36,21 @@ def _dt(v):
         return "—"
 
 
-def _filtered_products(warehouse, search, sort):
+def _filtered_products(warehouse, search, sort, search_by="text"):
     # Combined (ortak) warehouses export their MEMBERS' stock.
     scope_ids = warehouse.scope_ids()
     qs = WarehouseProduct.objects.filter(warehouse_id__in=scope_ids)
     if search:
-        from functools import reduce
-        import operator
-        variants = _tr_ci_variants(search)
-
-        def _field_q(field):
-            return reduce(operator.or_,
-                          (Q(**{f"{field}__icontains": v}) for v in variants))
-
-        roll_match = (WarehouseProductRoll.objects
-                      .filter(product__warehouse_id__in=scope_ids)
-                      .filter(_field_q("barcode"))
-                      .values('product_id'))
-        qs = qs.filter(
-            _field_q("name") | _field_q("sku") | _field_q("barcode")
-            | Q(id__in=roll_match)
-        )
+        # Same filter the page's search box builds, so the export holds
+        # exactly the rows that were on screen.
+        qs = qs.filter(warehouse_search_q(search, scope_ids, search_by))
 
     # Unit cost comes from the SAME expression the warehouse page's
     # valuation uses (Warehouse._total_value_annotations) — it falls back to
-    # purchase_price, converting from purchase_currency, when cost_usd/try is
+    # purchase_price, converting from purchase_currency, when cost_usd is
     # NULL. Multiplying raw cost_usd here instead silently valued those rows
     # at 0 and left the export's TOPLAM short of the on-screen total.
-    unit_usd, unit_try = warehouse._total_value_annotations()
+    unit_usd, _unit_try = warehouse._total_value_annotations()
     _money = DecimalField(max_digits=20, decimal_places=4)
     # Count LIVE tops only — the warehouse list page counts the same way
     # (~Q(rolls__status='consumed')), so counting all of them here made the
@@ -70,8 +58,6 @@ def _filtered_products(warehouse, search, sort):
     qs = qs.annotate(roll_count=Count('rolls',
                                       filter=~Q(rolls__status='consumed')),
                       line_usd=ExpressionWrapper(F('quantity') * unit_usd,
-                                                 output_field=_money),
-                      line_try=ExpressionWrapper(F('quantity') * unit_try,
                                                  output_field=_money),
                       reserved=reserved_meters_subquery())
 
@@ -89,17 +75,18 @@ def _filtered_products(warehouse, search, sort):
     return qs
 
 
-def build_warehouse_workbook(warehouse, search="", sort="name_asc"):
+def build_warehouse_workbook(warehouse, search="", sort="name_asc",
+                             search_by="text"):
     from openpyxl import Workbook
 
     brand = (getattr(settings, "BRAND_NAME", "") or "Nejum")
-    products = list(_filtered_products(warehouse, search, sort))
+    products = list(_filtered_products(warehouse, search, sort, search_by))
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Depo"
     ws.sheet_view.showGridLines = False
-    for col, w in zip("ABCDEFGHIJ", (16, 34, 16, 18, 12, 8, 12, 14, 14, 16)):
+    for col, w in zip("ABCDEFGHI", (16, 34, 16, 18, 12, 8, 12, 14, 14)):
         ws.column_dimensions[col].width = w
 
     # ── Header ──
@@ -122,13 +109,13 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc"):
 
     # ── Table header ──
     heads = ["SKU", "Ürün Adı", "Model", "Barkod", "Stok (m)", "Kupon",
-             "Rezerve (m)", "Br. Maliyet", "Toplam (USD)", "Toplam (TRY)"]
+             "Rezerve (m)", "Br. Maliyet", "Toplam (USD)"]
     for i, h in enumerate(heads, 1):
         cell(ws, r, i, h, font=F_HEAD, fill=FILL_HEAD, border=GRID,
              align=(RIGHT if i >= 5 else LEFT))
     r += 1
 
-    total_qty = total_usd = total_try = 0.0
+    total_qty = total_usd = 0.0
     for p in products:
         unit_cost = ""
         if p.purchase_price is not None:
@@ -142,10 +129,8 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc"):
         cell(ws, r, 7, _dec(p.reserved), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00")
         cell(ws, r, 8, unit_cost or "—", font=F_VAL, border=GRID, align=RIGHT)
         cell(ws, r, 9, _dec(p.line_usd), font=F_VAL, border=GRID, align=RIGHT, fmt='#,##0.00" USD"')
-        cell(ws, r, 10, _dec(p.line_try), font=F_VAL, border=GRID, align=RIGHT, fmt='#,##0.00" TRY"')
         total_qty += _dec(p.quantity)
         total_usd += _dec(p.line_usd)
-        total_try += _dec(p.line_try)
         r += 1
 
     # ── Totals ──
@@ -154,7 +139,6 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc"):
     cell(ws, r, 4, "TOPLAM", font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT)
     cell(ws, r, 5, total_qty, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt="#,##0.00")
     cell(ws, r, 9, total_usd, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt='#,##0.00" USD"')
-    cell(ws, r, 10, total_try, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt='#,##0.00" TRY"')
 
     return wb
 
@@ -162,11 +146,13 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc"):
 @login_required
 def warehouse_excel(request, pk):
     """Download this warehouse's product list as an .xlsx file, honoring the
-    same ?search= / ?sort= the on-screen list is currently filtered by."""
+    same ?search= / ?search_by= / ?sort= the on-screen list is currently
+    filtered by."""
     warehouse = get_object_or_404(Warehouse, pk=pk)
     search = (request.GET.get('search') or '').strip()
     sort = (request.GET.get('sort') or 'name_asc').strip()
-    wb = build_warehouse_workbook(warehouse, search=search, sort=sort)
+    wb = build_warehouse_workbook(warehouse, search=search, sort=sort,
+                                  search_by=warehouse_search_mode(request))
     buf = BytesIO()
     wb.save(buf)
     label = f"depo-{warehouse.pk}-{warehouse.name}".replace("/", "-")

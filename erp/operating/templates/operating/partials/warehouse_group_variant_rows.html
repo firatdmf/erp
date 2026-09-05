@@ -2,10 +2,16 @@
 {% for p in variants %}
 {% comment %}Product's OWN warehouse id in the link — a combined (ortak)
 warehouse page lists member warehouses' rows.{% endcomment %}
-<tr class="wh-vrow wh-vrow-nested" style="cursor:pointer;"
-    onclick="window.location='{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}'">
-  <td class="wh-vrow-sku" data-label="SKU" style="padding-left:34px;">
-    {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+{% comment %}Same behaviour as the flat rows: a plain click expands this
+variant's rolls, the SKU pill opens the product.{% endcomment %}
+<tr class="wh-vrow wh-vrow-nested" style="cursor:pointer;" data-roll-count="{{ p.roll_count|default:0 }}"
+    onclick="toggleWhRolls(event, this, '{% url 'operating:warehouse_product_rolls' p.warehouse_id p.pk %}')">
+  <td class="wh-vrow-sku wh-chev-cell" data-label="SKU">
+    <i class="fa fa-chevron-right wh-vrow-chev{% if not p.roll_count %} is-empty{% endif %}"
+       title="{% trans 'Show the rolls in this product' %}"></i>
+    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link wh-cell-nav" style="text-decoration:none; color:inherit;">
+      {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    </a>
     {% if warehouse.is_combined %}
       <span style="margin-left:6px; font:700 10px var(--font-sans,sans-serif); color:#5B21B6; background:#EDE9FE; border-radius:5px; padding:1px 6px; vertical-align:middle; white-space:nowrap;">{{ p.warehouse.name }}</span>
     {% endif %}
@@ -24,7 +30,7 @@ warehouse page lists member warehouses' rows.{% endcomment %}
   </td>
   <td class="num" data-label="{% trans 'Stock' %}">
     <div class="qty">{{ p.quantity|floatformat:2 }} m</div>
-    {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each top has its own barcode' %}">{{ p.roll_count }} top</div>{% endif %}
+    {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each roll has its own barcode' %}">{{ p.roll_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=p.roll_count %}roll{% plural %}rolls{% endblocktrans %}{% endif %}</div>{% endif %}
     {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} m</div>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Unit cost' %}">
@@ -33,7 +39,6 @@ warehouse page lists member warehouses' rows.{% endcomment %}
     {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Total (USD)' %}">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
-  <td class="num" data-label="{% trans 'Total (TRY)' %}">{% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
 </tr>
 {% empty %}
 <tr><td colspan="6" style="padding:12px 34px; color:#94A3B8;">{% trans "No variants." %}</td></tr>

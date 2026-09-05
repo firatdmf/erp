@@ -4593,7 +4593,8 @@ class WarehouseProductDetail(View):
         # Hide fully-consumed rolls — their stock is 0 and they only clutter
         # the list. Movement history below still preserves them.
         rolls = list(product.rolls.exclude(status="consumed").order_by("-scanned_at"))
-        movements = product.movements.all().select_related("roll", "created_by")[:200]
+        movements = _decorate_movements(list(
+            product.movements.all().select_related("roll", "created_by", "order")[:200]))
 
         # Aggregate quick stats — in/out totals in a single query.
         from django.db.models import Sum, Q as _Q
@@ -4756,13 +4757,36 @@ def _decorate_movements(movements):
             if m.reference and _re.match(_ORDER_REF_RE, m.reference)}
     order_map = dict(Order.objects.filter(order_number__in=refs)
                      .values_list("order_number", "pk")) if refs else {}
+
+    def _ref_pk(ref):
+        """The pk a bare "Order #265" reference names, if it names one."""
+        tail = ref[7:].strip() if ref.startswith("Order #") else ""
+        return int(tail) if tail.isdigit() else None
+
+    # Those pks resolved in one query. An order can be deleted while the
+    # ledger row recording the metres it moved stays — SET_NULL on the FK
+    # says so outright — and a link to an order that is gone is worse than
+    # the plain text it replaced.
+    _cand = {pk for pk in (_ref_pk(m.reference or "") for m in movements) if pk}
+    live = set(Order.objects.filter(pk__in=_cand)
+               .values_list("pk", flat=True)) if _cand else set()
+
     for m in movements:
         m.kind = "order" if _movement_is_order(m) else m.movement_type
         m.reason_display = _reason_display(m.reason) if is_tr else m.reason
         ref = m.reference or ""
-        m.order_pk = order_map.get(ref)
-        if m.order_pk is None and ref.startswith("Order #") and ref[7:].strip().isdigit():
-            m.order_pk = int(ref[7:].strip())
+        # The FK first: it is the recorded fact, and an order reached
+        # through it is known to still exist. The reference is free text
+        # and only answers for rows written before the FK, or by a path
+        # that never set it.
+        m.order_pk = m.order_id or order_map.get(ref)
+        if m.order_pk is None:
+            _pk = _ref_pk(ref)
+            m.order_pk = _pk if _pk in live else None
+        # Every order row writes the reference into the reason too —
+        # "Order ship Order #265" alongside "Order #265" — so a view that
+        # prints both says the number twice for no reason.
+        m.ref_redundant = bool(ref) and ref in (m.reason or "")
     return movements
 
 

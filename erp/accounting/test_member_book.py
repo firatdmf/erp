@@ -118,11 +118,14 @@ class WorkingBookEndpoint(TestCase):
         self.member.refresh_from_db()
         self.assertEqual(self.member.default_book_id, self.book.pk)
 
-    def test_clearing_leaves_them_with_no_pick(self):
+    def test_it_refuses_to_leave_them_with_no_book(self):
+        """There is no unsetting a working book. "Cleared" never meant
+        booking nowhere — get_default_book just picked the first book they
+        were assigned, which is the guess this field replaces."""
         resp = self.client.post(self.url(), {"clear": "1"})
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 400)
         self.member.refresh_from_db()
-        self.assertIsNone(self.member.default_book)
+        self.assertEqual(self.member.default_book_id, self.other.pk)
 
     def test_it_only_touches_the_acting_member(self):
         stranger = Member.objects.get(
@@ -143,3 +146,46 @@ class WorkingBookEndpoint(TestCase):
         other = self.client.get(
             reverse("accounting:book_detail", kwargs={"pk": self.other.pk})).context
         self.assertFalse(other["is_my_working_book"])
+
+    def test_picking_a_book_says_so_on_the_next_page(self):
+        """The switcher navigates straight after this POST, so the
+        confirmation has to survive into the page it lands on — the app's
+        own flash, not a toast the JSON response would have to raise."""
+        from django.contrib.messages import get_messages
+        resp = self.client.post(self.url())
+        said = [str(m) for m in get_messages(resp.wsgi_request)]
+        self.assertEqual(said, ['Working book set to "Ergene Fabric".'])
+
+    def test_a_refused_clear_says_nothing(self):
+        from django.contrib.messages import get_messages
+        resp = self.client.post(self.url(), {"clear": "1"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual([str(m) for m in get_messages(resp.wsgi_request)], [])
+
+    def test_a_refused_book_says_nothing(self):
+        """A member who may not use the book gets 403 and no flash — a
+        confirmation for something that did not happen is worse than none."""
+        from django.contrib.messages import get_messages
+        self.member.books.set([self.other])
+        resp = self.client.post(self.url())
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual([str(m) for m in get_messages(resp.wsgi_request)], [])
+
+
+class RetailCariIsNamedInEnglish(TestCase):
+    """The shared walk-in account is written by code, never typed, so its
+    name is ours to state — and the database states things in English."""
+
+    def setUp(self):
+        from accounting.models import CurrencyCategory
+        # get_or_create_retail_cari resolves a currency for the new row,
+        # and default_currency is NOT NULL.
+        CurrencyCategory.objects.create(code="USD", name="US Dollar",
+                                        symbol="$")
+
+    def test_a_fresh_install_creates_it_in_english(self):
+        from accounting.services_accounts import get_or_create_retail_cari
+        cari = get_or_create_retail_cari()
+        self.assertEqual(cari.code, "PERAKENDE")
+        self.assertEqual(cari.name, "Retail Sales")
+        self.assertNotIn("Perakende", cari.notes)

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% load accounts_tags %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -132,7 +133,7 @@
     </div>
     <div class="po-card">
       <div class="po-card-l">{% trans "Total" %}</div>
-      <div class="po-card-v total">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|floatformat:2|intcomma }}</div>
+      <div class="po-card-v total">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|money }}</div>
     </div>
     <div class="po-card">
       <div class="po-card-l">{% trans "Accounting record" %}</div>
@@ -153,7 +154,7 @@
   <div class="po-item">
     <div class="po-item-h">
       <span class="po-item-name">{{ it.description }}</span>
-      <span class="po-item-total">{{ invoice.currency.symbol|default:"$" }}{{ it.total|floatformat:2|intcomma }}</span>
+      <span class="po-item-total">{{ invoice.currency.symbol|default:"$" }}{{ it.total|money }}</span>
     </div>
     <div class="po-item-meta">
       <b>{{ it.quantity|floatformat:2 }} {{ it.unit }}</b> × {{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }}

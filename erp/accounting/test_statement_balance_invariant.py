@@ -39,7 +39,7 @@ class StatementBalanceInvariantTest(TestCase):
         # row's book (accounting.book_scope.book_guarded).
         self.user.member.books.add(self.book)
         self.cari = CariAccount.objects.create(
-            book=self.book, code="PERAKENDE", name="Perakende Satışları",
+            book=self.book, code="PERAKENDE", name="Retail Sales",
             default_currency=self.usd)
 
     # -- helpers ---------------------------------------------------------

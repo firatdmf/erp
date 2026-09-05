@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% load accounts_tags %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -170,7 +171,7 @@
           {{ grp.label }}
           <span class="count">{% blocktrans with count=grp.items|length %}({{ count }} invoices){% endblocktrans %}</span>
         </h3>
-        <div class="total">{{ grp.total|floatformat:2|intcomma }}</div>
+        <div class="total">{{ grp.total|money }}</div>
       </div>
       {% for x in grp.items %}
       <div class="dc-row">
@@ -191,7 +192,7 @@
             {% else %}{% blocktrans with d=x.days_diff %}{{ d }} days from now{% endblocktrans %}{% endif %}
           </span>
         </div>
-        <div class="dc-amt">{{ x.inv.currency.symbol }}{{ x.inv.balance|floatformat:2|intcomma }}</div>
+        <div class="dc-amt">{{ x.inv.currency.symbol }}{{ x.inv.balance|money }}</div>
       </div>
       {% endfor %}
     </div>

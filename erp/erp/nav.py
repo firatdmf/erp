@@ -5,8 +5,7 @@ drawer (`components/_mobile_shell.html`) render the SAME sections and
 items from this list — they differ only in markup and CSS. Each used to
 carry its own hand-written copy, and they drifted: the drawer spent a
 long time with no way to create a task, contact or company at all, and
-was missing "Add warehouse" and both product-group entries, while the
-sidebar was missing Perakende Satışları.
+was missing "Add warehouse" and both product-group entries.
 
 Adding a menu entry means editing this file and nothing else.
 
@@ -107,8 +106,6 @@ NAV_SECTIONS = [
             {"title": _("LEDGERS"), "items": [
                 {"label": _("View ledgers"),   "icon": "book",            "url": "accounting:index"},
                 {"label": _("Create ledger"),  "icon": "plus-circle",     "action": "openBookSidebar"},
-                # Turkish-only label, deliberately not translated.
-                {"label": "Perakende Satışları", "icon": "shopping-basket", "url": "accounts:legacy_retail"},
             ]},
             {"title": _("ENTRIES"), "items": [
                 {"label": _("Add capital"),       "icon": "circle-plus",   "url": "accounting:go_add_capital"},

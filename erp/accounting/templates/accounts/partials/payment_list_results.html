@@ -1,4 +1,4 @@
-{% load i18n %}{% load humanize %}{% comment %}
+{% load i18n %}{% load humanize %}{% load accounts_tags %}{% comment %}
 Results block for the payment (tahsilat) list — stats + count + table.
 Rendered inside #pl-results on full page load AND returned alone for the
 page's dynamic search/filter fetches (PaymentList returns just this when
@@ -15,12 +15,12 @@ place instead of reloading the whole page.
   </div>
   <div class="pl-stat">
     <div class="pl-stat-l">{% trans "Total Collected" %}</div>
-    <div class="pl-stat-v pos">{{ collection_sum|floatformat:2|intcomma }}</div>
+    <div class="pl-stat-v pos">{{ collection_sum|money }}</div>
     <div class="pl-stat-s">{% trans "From customers" %}</div>
   </div>
   <div class="pl-stat">
     <div class="pl-stat-l">{% trans "Total Paid" %}</div>
-    <div class="pl-stat-v neg">{{ payment_sum|floatformat:2|intcomma }}</div>
+    <div class="pl-stat-v neg">{{ payment_sum|money }}</div>
     <div class="pl-stat-s">{% trans "To suppliers" %}</div>
   </div>
 </div>
@@ -69,7 +69,7 @@ place instead of reloading the whole page.
             <span class="pl-badge-dot"></span>{{ p.get_status_display }}
           </span>
         </td>
-        <td class="num">{{ p.currency.symbol }}{{ p.amount|floatformat:2|intcomma }}</td>
+        <td class="num">{{ p.currency.symbol }}{{ p.amount|money }}</td>
         <td class="pl-row-actions">
           <a class="pl-go" href="{% url 'accounts:detail' p.cari.pk %}"
              title="{% trans 'Open current account' %}">

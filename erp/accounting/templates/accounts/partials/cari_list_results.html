@@ -1,4 +1,4 @@
-{% load i18n %}{% load humanize %}{% comment %}
+{% load i18n %}{% load humanize %}{% load accounts_tags %}{% comment %}
 Results block for the cari list — stats + count + rows. Rendered inside
 #ca-results on full page load AND returned alone for the page's dynamic
 search/filter fetches (CariList returns just this when the request
@@ -16,17 +16,17 @@ in place instead of reloading the whole page.
   </div>
   <div class="ca-stat">
     <div class="ca-stat-l">{% trans "Owes Us" %}</div>
-    <div class="ca-stat-v pos">${{ owes_us|floatformat:2|intcomma }}</div>
+    <div class="ca-stat-v pos">${{ owes_us|money }}</div>
     <div class="ca-stat-s">{% trans "USD-based total" %}</div>
   </div>
   <div class="ca-stat">
     <div class="ca-stat-l">{% trans "We Owe" %}</div>
-    <div class="ca-stat-v neg">${{ we_owe|floatformat:2|intcomma }}</div>
+    <div class="ca-stat-v neg">${{ we_owe|money }}</div>
     <div class="ca-stat-s">{% trans "USD-based total" %}</div>
   </div>
   <div class="ca-stat">
     <div class="ca-stat-l">{% trans "Net" %}</div>
-    <div class="ca-stat-v {% if net > 0 %}pos{% elif net < 0 %}neg{% endif %}">${{ net|floatformat:2|intcomma }}</div>
+    <div class="ca-stat-v {% if net > 0 %}pos{% elif net < 0 %}neg{% endif %}">${{ net|money }}</div>
     <div class="ca-stat-s">+ {% trans "in our favor" %} / − {% trans "against us" %}</div>
   </div>
 </div>
@@ -69,7 +69,7 @@ in place instead of reloading the whole page.
     <div><span class="ca-book" title="{% trans "Book" %}: {{ c.book.name }}">{{ c.book.name }}</span></div>
     <div class="num">
       <div class="ca-bal {% if c.cached_balance > 0 %}pos{% elif c.cached_balance < 0 %}neg{% else %}zero{% endif %}">
-        {{ c.display_currency_symbol }}{{ c.absolute_balance|floatformat:2|intcomma }}
+        {{ c.display_currency_symbol }}{{ c.absolute_balance|money }}
       </div>
       <div class="ca-bal-label">{{ c.balance_label }}</div>
     </div>

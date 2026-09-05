@@ -88,14 +88,12 @@
         decides where your own work lands.{% endcomment %}
         <div class="book-ledger-row">
           {% if is_my_working_book %}
+          {% comment %}No way to unset it: work always lands in some book,
+          and "cleared" only meant get_default_book picked one for you. The
+          way out of a book is to pick another.{% endcomment %}
           <span class="book-ledger-badge is-mine">
             <i class="fas fa-user-check"></i> You work in this book
           </span>
-          <button type="button" class="book-ledger-btn subtle" id="bookWorkClear"
-                  data-url="{% url 'accounting:set_my_working_book' book.pk %}"
-                  title="Stop booking your work here">
-            <i class="fas fa-xmark"></i> Clear
-          </button>
           {% else %}
           <button type="button" class="book-ledger-btn" id="bookWorkBtn"
                   data-url="{% url 'accounting:set_my_working_book' book.pk %}"
@@ -477,19 +475,17 @@
     });
   })();
 
-  // Pick this book as the logged-in member's working book, or clear it.
-  // No confirm: it changes only where THIS person's future work lands,
-  // and it is one click to undo.
+  // Pick this book as the logged-in member's working book. No confirm:
+  // it changes only where THIS person's future work lands, and picking
+  // another book is one click away.
   (function () {
     const status = document.getElementById('bookWorkStatus');
-    function post(btn, clearing) {
-      const body = new FormData();
-      if (clearing) body.append('clear', '1');
+    function post(btn) {
       fetch(btn.dataset.url, {
         method: 'POST',
         headers: { 'X-CSRFToken': '{{ csrf_token }}',
                    'X-Requested-With': 'XMLHttpRequest' },
-        body,
+        body: new FormData(),
       })
         .then(function (r) { return r.json(); })
         .then(function (data) {
@@ -503,9 +499,7 @@
         });
     }
     const set = document.getElementById('bookWorkBtn');
-    const clear = document.getElementById('bookWorkClear');
-    if (set) set.addEventListener('click', function () { post(set, false); });
-    if (clear) clear.addEventListener('click', function () { post(clear, true); });
+    if (set) set.addEventListener('click', function () { post(set); });
   })();
 
   // Rename the book by editing the printed title itself — the <h1> goes

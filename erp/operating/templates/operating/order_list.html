@@ -406,7 +406,7 @@
     </button>
     <button type="button" class="ord-tab" data-tab="retail">
       <i class="fa fa-cash-register"></i>
-      <span>{% trans "Perakende" %}</span>
+      <span>{% trans "Retail" %}</span>
       <span class="ord-tab-count">{{ retail_count }}</span>
     </button>
     <div class="ord-tabs-r">
@@ -446,7 +446,7 @@
         {% if order.web_client %}
           <span class="ord-kind b2c">B2C</span>
         {% elif order.is_retail_order %}
-          <span class="ord-kind retail">{% trans "Perakende" %}</span>
+          <span class="ord-kind retail">{% trans "Retail" %}</span>
         {% elif order.contact or order.company %}
           <span class="ord-kind b2b">B2B</span>
         {% else %}
@@ -498,7 +498,7 @@
             <div>
               {# default_if_none, not a bare render: "Tamer Bulgaristan None". #}
               <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name|default_if_none:"" }} {{ order.guest_last_name|default_if_none:"" }}{% elif order.cari %}{{ order.cari.name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
-              <div class="ord-cust-c">{% trans "Perakende" %}{% if order.cari %} · {{ order.cari.code }}{% endif %}</div>
+              <div class="ord-cust-c">{% trans "Retail" %}{% if order.cari %} · {{ order.cari.code }}{% endif %}</div>
             </div>
           {% else %}
             <div class="ord-cust-avatar" style="background: #9CA3AF;">—</div>
@@ -700,7 +700,7 @@
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
-        <span class="ord-kind retail">{% trans "Perakende" %}</span>
+        <span class="ord-kind retail">{% trans "Retail" %}</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
@@ -711,7 +711,7 @@
           </div>
           <div>
             <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name }} {{ order.guest_last_name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
-            <div class="ord-cust-c">{% trans "Perakende" %}</div>
+            <div class="ord-cust-c">{% trans "Retail" %}</div>
           </div>
         </div>
         <div>
@@ -738,7 +738,7 @@
     <div class="ord-empty">
       <div class="ico"><i class="fa fa-cash-register"></i></div>
       <h3>{% trans "No retail orders" %}</h3>
-      <p>{% trans "Orders created via the Perakende toggle will appear here" %}</p>
+      <p>{% trans "Orders created via the Retail toggle will appear here" %}</p>
     </div>
     {% endif %}
   </div>

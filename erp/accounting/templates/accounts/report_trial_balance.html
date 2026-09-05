@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% load accounts_tags %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -138,19 +139,19 @@
   <div class="tb-summary">
     <div class="tb-stat">
       <div class="lbl">{% trans "Total Opening" %}</div>
-      <div class="val {% if g_opening > 0 %}pos{% elif g_opening < 0 %}neg{% endif %}">{{ g_opening|floatformat:2|intcomma }}</div>
+      <div class="val {% if g_opening > 0 %}pos{% elif g_opening < 0 %}neg{% endif %}">{{ g_opening|money }}</div>
     </div>
     <div class="tb-stat">
       <div class="lbl">{% trans "Period Debit" %}</div>
-      <div class="val pos">{{ g_debits|floatformat:2|intcomma }}</div>
+      <div class="val pos">{{ g_debits|money }}</div>
     </div>
     <div class="tb-stat">
       <div class="lbl">{% trans "Period Credit" %}</div>
-      <div class="val neg">{{ g_credits|floatformat:2|intcomma }}</div>
+      <div class="val neg">{{ g_credits|money }}</div>
     </div>
     <div class="tb-stat dark">
       <div class="lbl">{% trans "Total Closing" %}</div>
-      <div class="val">{{ g_closing|floatformat:2|intcomma }}</div>
+      <div class="val">{{ g_closing|money }}</div>
     </div>
   </div>
 
@@ -174,20 +175,20 @@
           <td><span class="tb-code">{{ r.cari.code }}</span></td>
           <td><a class="tb-name" href="{% url 'accounts:detail' r.cari.pk %}">{{ r.cari.name }}</a></td>
           <td><span class="tb-book">{{ r.cari.book.name }}</span></td>
-          <td class="num {% if r.opening > 0 %}pos{% elif r.opening < 0 %}neg{% else %}muted{% endif %}">{{ r.opening|floatformat:2|intcomma }}</td>
-          <td class="num {% if r.debits %}pos{% else %}muted{% endif %}">{% if r.debits %}{{ r.debits|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
-          <td class="num {% if r.credits %}neg{% else %}muted{% endif %}">{% if r.credits %}{{ r.credits|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
-          <td class="num closing {% if r.closing > 0 %}pos{% elif r.closing < 0 %}neg{% else %}muted{% endif %}">{{ r.closing|floatformat:2|intcomma }}</td>
+          <td class="num {% if r.opening > 0 %}pos{% elif r.opening < 0 %}neg{% else %}muted{% endif %}">{{ r.opening|money }}</td>
+          <td class="num {% if r.debits %}pos{% else %}muted{% endif %}">{% if r.debits %}{{ r.debits|money }}{% else %}—{% endif %}</td>
+          <td class="num {% if r.credits %}neg{% else %}muted{% endif %}">{% if r.credits %}{{ r.credits|money }}{% else %}—{% endif %}</td>
+          <td class="num closing {% if r.closing > 0 %}pos{% elif r.closing < 0 %}neg{% else %}muted{% endif %}">{{ r.closing|money }}</td>
         </tr>
         {% endfor %}
       </tbody>
       <tfoot>
         <tr>
           <td colspan="3">{% blocktrans with count=rows|length %}Total ({{ count }} accounts){% endblocktrans %}</td>
-          <td class="num">{{ g_opening|floatformat:2|intcomma }}</td>
-          <td class="num pos">{{ g_debits|floatformat:2|intcomma }}</td>
-          <td class="num neg">{{ g_credits|floatformat:2|intcomma }}</td>
-          <td class="num">{{ g_closing|floatformat:2|intcomma }}</td>
+          <td class="num">{{ g_opening|money }}</td>
+          <td class="num pos">{{ g_debits|money }}</td>
+          <td class="num neg">{{ g_credits|money }}</td>
+          <td class="num">{{ g_closing|money }}</td>
         </tr>
       </tfoot>
     </table>

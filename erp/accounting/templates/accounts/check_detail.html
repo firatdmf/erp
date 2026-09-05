@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load humanize %}
 
+{% load accounts_tags %}
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -192,7 +193,7 @@
       <div class="chk-d-card">
         <div class="chk-d-amount">
           <div class="lbl">{% trans "Amount" %}</div>
-          <div class="amt">{{ check.currency.symbol }}{{ check.amount|floatformat:2|intcomma }}</div>
+          <div class="amt">{{ check.currency.symbol }}{{ check.amount|money }}</div>
           <div class="due {% if check.due_date < today and check.status == 'portfolio' %}overdue{% endif %}">
             {% trans "Due:" %} <strong>{{ check.due_date|date:"d.m.Y" }}</strong>
           </div>
@@ -364,7 +365,7 @@
           <div class="chk-d-side-name">{{ check.cari.name }}</div>
           <div class="chk-d-side-code">{{ check.cari.code }}</div>
           <div class="chk-d-side-bal">
-            {% trans "Current balance:" %} <strong>{{ check.cari.display_currency_symbol }}{{ check.cari.absolute_balance|floatformat:2|intcomma }}</strong>
+            {% trans "Current balance:" %} <strong>{{ check.cari.display_currency_symbol }}{{ check.cari.absolute_balance|money }}</strong>
           </div>
           <a href="{% url 'accounts:detail' check.cari.pk %}" class="chk-d-side-link">{% trans "Go to account" %} <i data-lucide="arrow-right"></i></a>
         </div>

@@ -682,16 +682,16 @@
             </div>
             {% endif %}
           </td>
-          <td class="num">{{ it.quantity|floatformat:2|intcomma }} {{ it.unit|unit_loc }}</td>
-          <td class="num">{{ invoice.currency.symbol }}{{ it.unit_price|floatformat:2|intcomma }}</td>
-          <td class="num"><b>{{ invoice.currency.symbol }}{{ it.total|floatformat:2|intcomma }}</b></td>
+          <td class="num">{{ it.quantity|money }} {{ it.unit|unit_loc }}</td>
+          <td class="num">{{ invoice.currency.symbol }}{{ it.unit_price|money }}</td>
+          <td class="num"><b>{{ invoice.currency.symbol }}{{ it.total|money }}</b></td>
         </tr>
         {% endfor %}
       </tbody>
       <tfoot>
         <tr>
           <td colspan="6" class="label">{% trans "Amount to be Paid" %} ({{ invoice.currency.code }})</td>
-          <td class="value">{{ invoice.currency.symbol }}{{ invoice.total|floatformat:2|intcomma }}</td>
+          <td class="value">{{ invoice.currency.symbol }}{{ invoice.total|money }}</td>
         </tr>
       </tfoot>
     </table>
@@ -717,8 +717,8 @@
         {% for rate, agg in tax_breakdown %}
         <tr>
           <td style="border:1px solid var(--hair); padding:5px 10px;">%{{ rate }}</td>
-          <td style="border:1px solid var(--hair); padding:5px 10px; text-align:right; font-variant-numeric:tabular-nums;">{{ agg.base|default:"0"|floatformat:2|intcomma }}</td>
-          <td style="border:1px solid var(--hair); padding:5px 10px; text-align:right; font-variant-numeric:tabular-nums;">{{ agg.tax|floatformat:2|intcomma }}</td>
+          <td style="border:1px solid var(--hair); padding:5px 10px; text-align:right; font-variant-numeric:tabular-nums;">{{ agg.base|default:"0"|money }}</td>
+          <td style="border:1px solid var(--hair); padding:5px 10px; text-align:right; font-variant-numeric:tabular-nums;">{{ agg.tax|money }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -733,12 +733,12 @@
     <div class="iv-side-h">
       <h3>{% trans "Payment Status" %}</h3>
     </div>
-    <div class="row"><span>{% trans "Grand Total" %}</span><b>{{ invoice.currency.symbol }}{{ invoice.total|floatformat:2|intcomma }}</b></div>
-    <div class="row"><span>{% trans "Paid" %}</span><b>{{ invoice.currency.symbol }}{{ invoice.paid_amount|floatformat:2|intcomma }}</b></div>
+    <div class="row"><span>{% trans "Grand Total" %}</span><b>{{ invoice.currency.symbol }}{{ invoice.total|money }}</b></div>
+    <div class="row"><span>{% trans "Paid" %}</span><b>{{ invoice.currency.symbol }}{{ invoice.paid_amount|money }}</b></div>
     <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #EEF1F5; text-align: center;">
       <div style="font: 700 10px var(--font-sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 4px;">{% trans "Outstanding Balance" %}</div>
       <div class="iv-bal {% if invoice.balance > 0 %}pos{% elif invoice.balance < 0 %}neg{% else %}zero{% endif %}">
-        {{ invoice.currency.symbol }}{{ invoice.balance|floatformat:2|intcomma }}
+        {{ invoice.currency.symbol }}{{ invoice.balance|money }}
       </div>
     </div>
   </div>

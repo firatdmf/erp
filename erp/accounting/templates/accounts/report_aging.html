@@ -154,12 +154,12 @@
     {% for key, label, _, _ in buckets %}
       <div class="ag-bucket b{{ forloop.counter0 }}">
         <div class="lbl">{{ label }}</div>
-        <div class="val">{{ grand_buckets|dictlookup:key|floatformat:2|intcomma }}</div>
+        <div class="val">{{ grand_buckets|dictlookup:key|money }}</div>
       </div>
     {% endfor %}
     <div class="ag-bucket total">
       <div class="lbl">{% trans "Total" %}</div>
-      <div class="val">{{ grand_total|floatformat:2|intcomma }}</div>
+      <div class="val">{{ grand_total|money }}</div>
     </div>
   </div>
 
@@ -201,10 +201,10 @@
           </td>
           {% for key, label, _, _ in buckets %}
             <td class="num {% if forloop.counter == 5 %}danger{% endif %}">
-              {% with val=r.buckets|dictlookup:key %}{% if val %}{{ val|floatformat:2|intcomma }}{% else %}<span class="muted">—</span>{% endif %}{% endwith %}
+              {% with val=r.buckets|dictlookup:key %}{% if val %}{{ val|money }}{% else %}<span class="muted">—</span>{% endif %}{% endwith %}
             </td>
           {% endfor %}
-          <td class="num total">{{ r.total|floatformat:2|intcomma }}</td>
+          <td class="num total">{{ r.total|money }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -212,9 +212,9 @@
         <tr>
           <td colspan="3">{% trans "Total" %}</td>
           {% for key, label, _, _ in buckets %}
-            <td class="num">{{ grand_buckets|dictlookup:key|floatformat:2|intcomma }}</td>
+            <td class="num">{{ grand_buckets|dictlookup:key|money }}</td>
           {% endfor %}
-          <td class="num">{{ grand_total|floatformat:2|intcomma }}</td>
+          <td class="num">{{ grand_total|money }}</td>
         </tr>
       </tfoot>
     </table>

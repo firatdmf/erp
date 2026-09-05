@@ -68,6 +68,11 @@
   .md-leg { border: 1px solid #E7ECF2; border-radius: 10px; padding: 13px 15px; background: #FCFDFE; }
   .md-leg .code { font: 600 11.5px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 7px; background: var(--nejum-teal-50); border-radius: 6px; }
   .md-leg .name { display:block; font: 700 14px var(--font-sans); color: var(--ink); margin: 6px 0 8px; }
+  /* A transfer names two accounts and neither was reachable from here —
+     the statement link at the top only ever answers for the from side. */
+  .md-leg .acct { display:block; text-decoration: none; color: inherit; }
+  .md-leg .acct:hover .name { color: var(--nejum-teal-700); text-decoration: underline; }
+  .md-leg .acct:focus-visible { outline: 2px solid var(--nejum-teal-700); outline-offset: 3px; border-radius: 8px; }
   .md-leg .amt { font: 700 16px var(--font-sans); font-variant-numeric: tabular-nums; }
   .md-leg .amt.pos { color: #B23B12; }
   .md-leg .amt.neg { color: #0E6E4A; }
@@ -93,7 +98,7 @@
     <div>
       <div class="md-eyebrow">{% trans "Account transfer" %}</div>
       <h1 class="md-title">
-        {{ transfer.amount|floatformat:2|intcomma }} {{ transfer.currency.code }}<span class="md-id">#{{ transfer.pk }}</span>
+        {{ transfer.amount|money }} {{ transfer.currency.code }}<span class="md-id">#{{ transfer.pk }}</span>
       </h1>
     </div>
     <div class="md-actions">
@@ -127,11 +132,13 @@
             <span class="arrow"><i data-lucide="arrow-right"></i></span>
           {% endif %}
           <div class="md-leg">
-            <span class="code">{{ cari.code }}</span>
-            <span class="name">{{ cari.name }}</span>
+            <a class="acct" href="{% url 'accounts:detail' cari.pk %}">
+              <span class="code">{{ cari.code }}</span>
+              <span class="name">{{ cari.name }}</span>
+            </a>
             {% if mv %}
               <span class="amt {% if mv.amount > 0 %}pos{% else %}neg{% endif %}">
-                {% if mv.amount > 0 %}+{% endif %}{{ mv.amount|floatformat:2|intcomma }} {{ mv.currency.code }}
+                {% if mv.amount > 0 %}+{% endif %}{{ mv.amount|money }} {{ mv.currency.code }}
               </span>
               <a class="row-link" href="{% url 'accounts:movement_detail' cari.pk mv.pk %}">
                 {% trans "See this ledger row" %} &rarr;
@@ -157,7 +164,7 @@
         <div class="md-fact"><span class="k">{% trans "Date" %}</span><span class="v">{{ transfer.date|date:"d.m.Y" }}</span></div>
         <div class="md-fact">
           <span class="k">{% trans "Amount" %}</span>
-          <span class="v">{{ transfer.amount|floatformat:2|intcomma }} {{ transfer.currency.code }}</span>
+          <span class="v">{{ transfer.amount|money }} {{ transfer.currency.code }}</span>
         </div>
         {% if fx %}
         <div class="md-fact">

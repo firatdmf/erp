@@ -131,7 +131,7 @@ class RetailUnshipTest(RetailPostingBase):
             cari=cari, book=cari.book, number="COL-AUTO-1",
             type="collection", method="cash", status="draft",
             date="2026-08-27", amount=Decimal("57.01"), currency=self.usd,
-            description="Perakende otomatik tahsilat — Sipariş #%d" % self.order.pk,
+            description="Retail automatic collection — Order #%d" % self.order.pk,
             notes="ORD-%d" % self.order.pk,
         ).confirm()
 
@@ -172,7 +172,7 @@ class RetailReversalFindsTheOrdersOwnAccount(RetailPostingBase):
             type="collection", method="cash", status="draft",
             date=self.order.order_date or __import__("datetime").date.today(),
             amount=Decimal("10.00"), currency=self.usd,
-            description="Perakende otomatik tahsilat",
+            description="Retail automatic collection",
             notes=f"ORD-{self.order.pk}")
         pay.confirm(user=self.user)
         self.assertEqual(self.collections().count(), 1)
@@ -186,3 +186,41 @@ class RetailReversalFindsTheOrdersOwnAccount(RetailPostingBase):
         self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 1)
         reverse_retail_order_financials(self.order, user=self.user)
         self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 0)
+
+
+class TheAutoCollectionPrefixMatchesWhatIsStored(RetailPostingBase):
+    """The constant and the column have to say the same thing.
+
+    reverse_retail_order_financials finds historical auto-collections by
+    description prefix, so translating _RETAIL_AUTO_DESC without restating
+    the rows would silently stop matching them — an un-shipped order would
+    keep its confirmed collection and nobody would be told. Migration 0097
+    moves the rows; this pins the two together.
+    """
+
+    def test_the_migration_and_the_constant_agree(self):
+        import importlib
+        mig = importlib.import_module(
+            "accounting.migrations.0097_retail_auto_collection_desc_in_english")
+        from accounting.services_accounts import _RETAIL_AUTO_DESC
+        self.assertEqual(mig.EN_PREFIX, _RETAIL_AUTO_DESC)
+
+    def test_a_restated_row_is_still_reversed(self):
+        """The English description the migration leaves behind is the one
+        the reversal has to find."""
+        from accounting.services_accounts import _RETAIL_AUTO_DESC
+        post_retail_order_financials(self.order, user=self.user)
+        cari = self.retail_cari()
+        Payment.objects.create(
+            cari=cari, book=cari.book, number="COL-AUTO-EN",
+            type="collection", method="cash", status="draft",
+            date="2026-08-27", amount=Decimal("57.01"), currency=self.usd,
+            description=f"{_RETAIL_AUTO_DESC} — Order #{self.order.pk}",
+            notes="ORD-%d" % self.order.pk,
+        ).confirm()
+
+        reverse_retail_order_financials(self.order, user=self.user)
+
+        self.assertEqual(self.collections().count(), 0)
+        cari.refresh_from_db()
+        self.assertEqual(cari.cached_balance, Decimal("0.00"))

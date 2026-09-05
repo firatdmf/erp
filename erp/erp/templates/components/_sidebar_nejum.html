@@ -36,7 +36,7 @@
     <div class="nj-book-menu" hidden>
       {% for b in my_books %}
       <a class="nj-book-opt{% if b.pk == current_book.pk %} is-current{% endif %}"
-         href="{% url 'accounts:list' b.pk %}"
+         href="{% url 'accounting:book_detail' b.pk %}"
          data-work-url="{% url 'accounting:set_my_working_book' b.pk %}">{{ b.name }}</a>
       {% endfor %}
     </div>
@@ -222,10 +222,12 @@
 </script>
 
 <script>
-  // The book switcher. Picking a book both navigates to its ledger and
-  // records it as the member's working book, so every book-less entry
-  // point afterwards — the sidebar, a CRM record, a cron-less import —
-  // resolves to the same place the reader last chose.
+  // The book switcher. Picking a book both opens that book — its own
+  // detail page, which is what the reader asked to see, rather than one
+  // of the ledgers inside it — and records it as the member's working
+  // book, so every book-less entry point afterwards — the sidebar, a CRM
+  // record, a cron-less import — resolves to the same place the reader
+  // last chose.
   (function () {
     var root = document.querySelector('.nj-book');
     if (!root) return;

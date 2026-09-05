@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% load accounts_tags %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -102,7 +103,7 @@
     </div>
     <div class="po-stat">
       <div class="po-stat-l">{% trans "Total (listed)" %}</div>
-      <div class="po-stat-v">${{ total_sum|floatformat:2|intcomma }}</div>
+      <div class="po-stat-v">${{ total_sum|money }}</div>
     </div>
   </div>
 
@@ -147,7 +148,7 @@
           <td>
             <span class="po-badge {{ inv.status }}">{{ inv.get_status_display }}</span>
           </td>
-          <td class="num po-total">{{ inv.currency.symbol|default:"$" }}{{ inv.total|floatformat:2|intcomma }}</td>
+          <td class="num po-total">{{ inv.currency.symbol|default:"$" }}{{ inv.total|money }}</td>
           <td class="po-row-actions">
             {% if inv.status != 'cancelled' and inv.warehouse_id_for_edit %}
               <a class="po-edit-ic" href="{% url 'accounts:goods_receipt_edit' inv.pk %}"

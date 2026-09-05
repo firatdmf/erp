@@ -1,4 +1,4 @@
-{% load i18n %}{% load humanize %}<!doctype html>
+{% load i18n %}{% load humanize %}{% load accounts_tags %}<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -133,7 +133,7 @@
       <td class="num">{{ it.roll_count }}</td>
       <td class="num">{{ it.quantity|floatformat:2 }} {{ it.unit }}</td>
       <td class="num">{{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }}</td>
-      <td class="num">{{ invoice.currency.symbol|default:"$" }}{{ it.total|floatformat:2|intcomma }}</td>
+      <td class="num">{{ invoice.currency.symbol|default:"$" }}{{ it.total|money }}</td>
     </tr>
     {% endfor %}
   </tbody>
@@ -142,7 +142,7 @@
 <table class="totals">
   <tr class="grand">
     <td class="lbl">{% trans "Total" %}</td>
-    <td class="val">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|floatformat:2|intcomma }}</td>
+    <td class="val">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|money }}</td>
   </tr>
 </table>
 

@@ -4,19 +4,19 @@
 <div class="st-summary">
   <div class="st-stat">
     <div class="lbl">{% trans "Opening Balance" %}</div>
-    <div class="val {% if opening > 0 %}pos{% elif opening < 0 %}neg{% endif %}">{{ opening|floatformat:2|intcomma }}</div>
+    <div class="val {% if opening > 0 %}pos{% elif opening < 0 %}neg{% endif %}">{{ opening|money }}</div>
   </div>
   <div class="st-stat">
     <div class="lbl">{% trans "Total Debit" %}</div>
-    <div class="val pos">+{{ debit_total|floatformat:2|intcomma }}</div>
+    <div class="val pos">+{{ debit_total|money }}</div>
   </div>
   <div class="st-stat">
     <div class="lbl">{% trans "Total Credit" %}</div>
-    <div class="val neg">−{{ credit_total|floatformat:2|intcomma }}</div>
+    <div class="val neg">−{{ credit_total|money }}</div>
   </div>
   <div class="st-stat">
     <div class="lbl">{% trans "Closing Balance" %}</div>
-    <div class="val {% if closing > 0 %}pos{% elif closing < 0 %}neg{% endif %}">{{ closing|floatformat:2|intcomma }}</div>
+    <div class="val {% if closing > 0 %}pos{% elif closing < 0 %}neg{% endif %}">{{ closing|money }}</div>
   </div>
 </div>
 
@@ -45,7 +45,7 @@
       {% if sort != 'desc' %}
       <tr class="opening">
         <td colspan="7">{% trans "Opening Balance" %}</td>
-        <td class="num">{{ opening|floatformat:2|intcomma }}</td>
+        <td class="num">{{ opening|money }}</td>
         <td class="no-print"></td>
       </tr>
       {% endif %}
@@ -100,17 +100,17 @@
         {% conversion_facts r.mv as fx %}
         <td class="num {% if r.mv.amount > 0 %}pos{% else %}muted{% endif %}">
           {% if r.mv.amount > 0 %}
-            {{ r.mv.amount|floatformat:2|intcomma }}
+            {{ r.mv.amount|money }}
             {% if fx %}<span class="st-fx">{{ fx.currency.code }} · {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
           {% else %}—{% endif %}
         </td>
         <td class="num {% if r.mv.amount < 0 %}neg{% else %}muted{% endif %}">
           {% if r.mv.amount < 0 %}
-            {{ r.mv.amount|floatformat:2|intcomma|cut:'-' }}
+            {{ r.mv.amount|money|cut:'-' }}
             {% if fx %}<span class="st-fx">{{ fx.currency.code }} · {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
           {% else %}—{% endif %}
         </td>
-        <td class="num">{{ r.balance_after|floatformat:2|intcomma }}</td>
+        <td class="num">{{ r.balance_after|money }}</td>
         <td class="st-actions no-print">
           {% if r.editable %}
             <span class="st-act-group">
@@ -150,7 +150,7 @@
       {% if sort == 'desc' %}
       <tr class="opening">
         <td colspan="7">{% trans "Opening Balance" %}</td>
-        <td class="num">{{ opening|floatformat:2|intcomma }}</td>
+        <td class="num">{{ opening|money }}</td>
         <td class="no-print"></td>
       </tr>
       {% endif %}
@@ -158,9 +158,9 @@
     <tfoot>
       <tr>
         <td colspan="5">{% trans "Total" %}</td>
-        <td class="num pos">+{{ debit_total|floatformat:2|intcomma }}</td>
-        <td class="num neg">−{{ credit_total|floatformat:2|intcomma }}</td>
-        <td class="num">{{ closing|floatformat:2|intcomma }}</td>
+        <td class="num pos">+{{ debit_total|money }}</td>
+        <td class="num neg">−{{ credit_total|money }}</td>
+        <td class="num">{{ closing|money }}</td>
         <td class="no-print"></td>
       </tr>
     </tfoot>
@@ -210,7 +210,7 @@
         <td>{{ d.date }}</td>
         <td>{{ d.kind }}</td>
         <td><a href="{{ d.url }}">{{ d.label }}</a></td>
-        <td class="num">{{ d.amount|floatformat:2|intcomma }} {{ d.currency.code }}</td>
+        <td class="num">{{ d.amount|money }} {{ d.currency.code }}</td>
         <td class="no-print"></td>
       </tr>
       {% endfor %}

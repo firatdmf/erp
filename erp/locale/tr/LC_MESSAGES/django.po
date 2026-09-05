@@ -9017,3 +9017,18 @@ msgstr "Top etiketleri"
 #: operating/templates/operating/partials/create_order_form.html
 msgid "At most %(m)s m can be entered"
 msgstr "En fazla %(m)s m girilebilir"
+
+msgid "Custom curtain"
+msgstr "Özel perde"
+
+msgid "No items."
+msgstr "Ürün yok."
+
+msgid "Web Customer"
+msgstr "Web Müşterisi"
+
+msgid "Working book set to \"%(name)s\"."
+msgstr "Çalışma defteri \"%(name)s\" olarak ayarlandı."
+
+msgid "Orders created via the Retail toggle will appear here"
+msgstr "Perakende seçeneğiyle oluşturulan siparişler burada görünecek"

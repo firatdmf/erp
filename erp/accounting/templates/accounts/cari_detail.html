@@ -266,7 +266,7 @@
         <span><i data-lucide="clock"></i>{% trans "Term" %}: {{ cari.payment_term_days }} {% trans "days" %}</span>
         {% if cari.credit_limit %}
           <span class="cd-dot"></span>
-          <span><i data-lucide="shield"></i>{% trans "Limit" %}: {{ cari.display_currency_symbol }}{{ cari.credit_limit|floatformat:2|intcomma }}</span>
+          <span><i data-lucide="shield"></i>{% trans "Limit" %}: {{ cari.display_currency_symbol }}{{ cari.credit_limit|money }}</span>
         {% endif %}
       </div>
     </div>
@@ -288,7 +288,7 @@
         <div class="cd-balance">
           <div class="lbl">{% trans "Current Balance" %}</div>
           <div class="amount {% if cari.cached_balance > 0 %}pos{% elif cari.cached_balance < 0 %}neg{% endif %}">
-            {{ cari.display_currency_symbol }}{{ cari.absolute_balance|floatformat:2|intcomma }}
+            {{ cari.display_currency_symbol }}{{ cari.absolute_balance|money }}
           </div>
           <div class="sub">{{ cari.balance_label }}</div>
           {% if cari.is_over_credit_limit %}
@@ -354,7 +354,7 @@
                 {% endif %}
               </td>
               <td class="num">{{ o.items.count }}</td>
-              <td class="num">${{ o.total_value|floatformat:2|intcomma }}</td>
+              <td class="num">${{ o.total_value|money }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -383,8 +383,8 @@
               <td style="color: var(--gray-600); font-size: 12.5px;">{{ inv.date|date:"d.m.Y" }}</td>
               <td><span class="mv-type">{{ inv.get_type_display }}</span></td>
               <td style="color: var(--gray-600); font-size: 12px;">{{ inv.get_status_display }}</td>
-              <td class="num">{{ inv.currency.symbol }}{{ inv.total|floatformat:2|intcomma }}</td>
-              <td class="num {% if inv.balance > 0 %}pos{% elif inv.balance < 0 %}neg{% endif %}">{{ inv.currency.symbol }}{{ inv.balance|floatformat:2|intcomma }}</td>
+              <td class="num">{{ inv.currency.symbol }}{{ inv.total|money }}</td>
+              <td class="num {% if inv.balance > 0 %}pos{% elif inv.balance < 0 %}neg{% endif %}">{{ inv.currency.symbol }}{{ inv.balance|money }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -471,10 +471,10 @@
               {% endcomment %}
               {% conversion_facts m.mv as fx %}
               <td class="num {% if m.mv.amount > 0 %}pos{% elif m.mv.amount < 0 %}neg{% endif %}">
-                {% if m.mv.amount > 0 %}+{% endif %}{{ m.mv.amount|floatformat:2|intcomma }} {{ m.mv.currency.code }}
-                {% if fx %}<span class="cd-fx">{{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
+                {% if m.mv.amount > 0 %}+{% endif %}{{ m.mv.amount|money }} {{ m.mv.currency.code }}
+                {% if fx %}<span class="cd-fx">{{ fx.base_symbol }}{{ fx.base_amount|absval|money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
               </td>
-              <td class="num">{{ m.balance_after|floatformat:2|intcomma }}</td>
+              <td class="num">{{ m.balance_after|money }}</td>
             </tr>
             {% endwith %}
             {% endfor %}
@@ -500,7 +500,7 @@
           <div class="cd-info">
             <div class="row"><div class="lbl">{% trans "Currency" %}</div><div class="val">{{ cari.default_currency.code }}</div></div>
             <div class="row"><div class="lbl">{% trans "Payment Term" %}</div><div class="val">{{ cari.payment_term_days }} {% trans "days" %}</div></div>
-            <div class="row"><div class="lbl">{% trans "Credit Limit" %}</div><div class="val">{{ cari.display_currency_symbol }}{{ cari.credit_limit|floatformat:2|intcomma }}</div></div>
+            <div class="row"><div class="lbl">{% trans "Credit Limit" %}</div><div class="val">{{ cari.display_currency_symbol }}{{ cari.credit_limit|money }}</div></div>
             <div class="row"><div class="lbl">{% trans "Discount" %}</div><div class="val">%{{ cari.discount_rate }}</div></div>
           </div>
         </div>

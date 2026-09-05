@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% load accounts_tags %}
 {% load l10n %}
 
 {% block css %}
@@ -132,7 +133,7 @@
         </div>
         <div class="mf-chip-r">
           <span class="lbl">{% trans "Current Balance" %}</span>
-          <span class="val">{{ cari.display_currency_symbol }}{{ cari.absolute_balance|floatformat:2|intcomma }}</span>
+          <span class="val">{{ cari.display_currency_symbol }}{{ cari.absolute_balance|money }}</span>
           <span class="sub">{{ cari.balance_label }}</span>
         </div>
       </div>

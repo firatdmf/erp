@@ -405,6 +405,12 @@ class SetMyWorkingBook(generic.detail.SingleObjectMixin, generic.View):
     Only a book the member is actually assigned may be picked — this is
     the same boundary the ledger views enforce, and refusing here keeps a
     stale bookmark from parking somebody in a book they cannot open.
+
+    There is no unsetting it. Work always lands in some book, so a member
+    with no pick did not stop booking anywhere — get_default_book simply
+    chose the first book they happen to be assigned, which is the same
+    silent guess this field exists to replace. The way out of a book is to
+    pick another one.
     """
 
     model = Book
@@ -416,19 +422,30 @@ class SetMyWorkingBook(generic.detail.SingleObjectMixin, generic.View):
         if member is None:
             return JsonResponse(
                 {"success": False, "error": "No member profile."}, status=400)
-        clearing = request.POST.get("clear") == "1"
-        if not clearing:
-            from accounting.services_accounts import member_can_use_book
-            if not member_can_use_book(member, book):
-                return JsonResponse(
-                    {"success": False,
-                     "error": f"You are not assigned to {book.name}."}, status=403)
-        member.default_book = None if clearing else book
+        if request.POST.get("clear") == "1":
+            return JsonResponse(
+                {"success": False,
+                 "error": "You must work in a book. Pick another instead."},
+                status=400)
+        from accounting.services_accounts import member_can_use_book
+        if not member_can_use_book(member, book):
+            return JsonResponse(
+                {"success": False,
+                 "error": f"You are not assigned to {book.name}."}, status=403)
+        member.default_book = book
         member.save(update_fields=["default_book"])
+        # Say so on the page the caller lands on next. Both callers move
+        # immediately — the sidebar switcher navigates to the book it just
+        # picked, the book page reloads itself — so the app's own flash
+        # carries this, rather than a second toast the JSON would have to
+        # raise on its own.
+        messages.success(
+            request,
+            _g('Working book set to "%(name)s".') % {"name": book.name})
         return JsonResponse({
             "success": True,
-            "book": None if clearing else book.pk,
-            "name": None if clearing else book.name,
+            "book": book.pk,
+            "name": book.name,
         })
 
 

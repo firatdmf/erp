@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load humanize %}
 
+{% load accounts_tags %}
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -124,7 +125,7 @@
     </div>
     <div class="sa-stat">
       <div class="lbl">{% trans "Total receivable" %}</div>
-      <div class="val pos">{{ debtors_total|floatformat:2|intcomma }}</div>
+      <div class="val pos">{{ debtors_total|money }}</div>
     </div>
     <div class="sa-stat">
       <div class="lbl">{% trans "Creditors (we owe)" %}</div>
@@ -132,7 +133,7 @@
     </div>
     <div class="sa-stat">
       <div class="lbl">{% trans "Total payable" %}</div>
-      <div class="val neg">{{ creditors_total|floatformat:2|intcomma }}</div>
+      <div class="val neg">{{ creditors_total|money }}</div>
     </div>
   </div>
 
@@ -158,14 +159,14 @@
             <td><span class="sa-code">{{ cari.code }}</span></td>
             <td><a class="sa-name" href="{% url 'accounts:detail' cari.pk %}">{{ cari.name }}</a></td>
             <td><span class="sa-book">{{ cari.book.name }}</span></td>
-            <td class="num pos">{{ cari.display_currency_symbol }}{{ cari.cached_balance|floatformat:2|intcomma }}</td>
+            <td class="num pos">{{ cari.display_currency_symbol }}{{ cari.cached_balance|money }}</td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr>
             <td colspan="3">{% blocktrans with count=debtors|length %}Total ({{ count }} accounts){% endblocktrans %}</td>
-            <td class="num pos">{{ debtors_total|floatformat:2|intcomma }}</td>
+            <td class="num pos">{{ debtors_total|money }}</td>
           </tr>
         </tfoot>
       </table>
@@ -197,14 +198,14 @@
             <td><span class="sa-code">{{ cari.code }}</span></td>
             <td><a class="sa-name" href="{% url 'accounts:detail' cari.pk %}">{{ cari.name }}</a></td>
             <td><span class="sa-book">{{ cari.book.name }}</span></td>
-            <td class="num neg">{{ cari.display_currency_symbol }}{{ cari.absolute_balance|floatformat:2|intcomma }}</td>
+            <td class="num neg">{{ cari.display_currency_symbol }}{{ cari.absolute_balance|money }}</td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr>
             <td colspan="3">{% blocktrans with count=creditors|length %}Total ({{ count }} accounts){% endblocktrans %}</td>
-            <td class="num neg">{{ creditors_total|floatformat:2|intcomma }}</td>
+            <td class="num neg">{{ creditors_total|money }}</td>
           </tr>
         </tfoot>
       </table>

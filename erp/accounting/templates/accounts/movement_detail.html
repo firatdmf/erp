@@ -132,7 +132,7 @@
         <div class="md-fact">
           <span class="k">{% trans "Amount" %}</span>
           <span class="v {% if mv.amount > 0 %}pos{% elif mv.amount < 0 %}neg{% endif %}">
-            {% if mv.amount > 0 %}+{% endif %}{{ mv.amount|floatformat:2|intcomma }} {{ mv.currency.code }}
+            {% if mv.amount > 0 %}+{% endif %}{{ mv.amount|money }} {{ mv.currency.code }}
           </span>
         </div>
         <div class="md-fact">
@@ -151,7 +151,7 @@
         {% endif %}
         <div class="md-fact">
           <span class="k">{% trans "Balance after" %}</span>
-          <span class="v">{{ balance_after|floatformat:2|intcomma }}</span>
+          <span class="v">{{ balance_after|money }}</span>
         </div>
         <div class="md-fact"><span class="k">{% trans "Type" %}</span><span class="v">{{ mv.get_movement_type_display }}</span></div>
         <div class="md-fact"><span class="k">{% trans "Reference" %}</span><span class="v">{{ mv.reference|default:"—" }}</span></div>

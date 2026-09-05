@@ -934,7 +934,11 @@ def reverse_order_movement(order):
 # PERAKENDE cari and its statement.
 # ---------------------------------------------------------------------------
 RETAIL_CARI_CODE = "PERAKENDE"
-_RETAIL_AUTO_DESC = "Perakende otomatik tahsilat"
+# The description those historical auto-collections carry. They were
+# written in Turkish and migration 0097 restated them in English;
+# this prefix has to keep matching whatever is in the column, so the
+# two move together and neither is edited alone.
+_RETAIL_AUTO_DESC = "Retail automatic collection"
 
 
 def get_or_create_retail_cari(member=None) -> CariAccount:
@@ -944,7 +948,7 @@ def get_or_create_retail_cari(member=None) -> CariAccount:
     if cari:
         return cari
     return CariAccount.objects.create(
-        book=book, code=RETAIL_CARI_CODE, name="Perakende Satışları",
+        book=book, code=RETAIL_CARI_CODE, name="Retail Sales",
         # "other", not "customer": the counter is not a customer, it is
         # where anonymous walk-in sales land. Typing it as a customer put
         # it in the customer tab and made the account page ask which CRM
@@ -953,7 +957,10 @@ def get_or_create_retail_cari(member=None) -> CariAccount:
         # alone by design; ACC-061, the inter-company position on Ergene,
         # is the same kind of thing.
         type="other", default_currency=_resolve_currency(),
-        notes="Sistem carisi — anonim perakende satışlar otomatik buraya işlenir.",
+        # English, like every other row this code writes: the database
+        # records what happened, the interface translates it. See
+        # migration 0096, which renamed the row already out there.
+        notes="System account — anonymous retail sales are posted here automatically.",
         created_by=member,
     )
 
@@ -1016,7 +1023,7 @@ def reverse_retail_order_financials(order, user=None):
                 cari=cari, type="collection", status="confirmed",
                 notes=f"ORD-{order.pk}",
                 description__startswith=_RETAIL_AUTO_DESC):
-            pay.cancel(user=user, reason="Sipariş sevk iptali")
+            pay.cancel(user=user, reason="Order shipment cancelled")
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,7 @@
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
 from django import template
+from django.utils.formats import number_format
 from django.utils.translation import gettext as _
 
 register = template.Library()
@@ -87,3 +90,27 @@ def conversion_facts_tag(obj):
     """
     from accounting.services_accounts import conversion_facts
     return conversion_facts(obj)
+
+
+@register.filter(name="money")
+def money(value, decimals=2):
+    """Group a money amount the way the *active locale* groups numbers.
+
+    The old `floatformat:2|intcomma` pipeline is right in English and
+    wrong in Turkish: floatformat localises first, so intcomma is handed
+    the string "1234567,50", cannot read it as a number, and falls back
+    to its English-only regex — printing "1,234,567,50" where Turkish
+    wants "1.234.567,50". number_format does the grouping and the
+    decimal separator together, in one locale-aware pass.
+    """
+    if value is None or value == "":
+        return value
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return value
+    decimals = int(decimals)
+    # number_format truncates the tail; floatformat, which this filter
+    # replaces, rounds it. Quantise first so the digits do not change.
+    amount = amount.quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP)
+    return number_format(amount, decimal_pos=decimals, force_grouping=True)

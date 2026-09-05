@@ -205,7 +205,7 @@
           </div>
           <div class="pd-info">
             <div class="row"><div class="lbl">{% trans "Date" %}</div><div class="val">{{ payment.date|date:"d.m.Y" }}</div></div>
-            <div class="row"><div class="lbl">{% trans "Amount" %}</div><div class="val amt">{{ payment.currency.symbol }}{{ payment.amount|floatformat:2|intcomma }} {{ payment.currency.code }}</div></div>
+            <div class="row"><div class="lbl">{% trans "Amount" %}</div><div class="val amt">{{ payment.currency.symbol }}{{ payment.amount|money }} {{ payment.currency.code }}</div></div>
             {# Only for a payment that is not already in the book's own currency. #}
             {% conversion_facts payment as fx %}
             {% include "accounts/partials/fx_conversion.html" with fx=fx %}
@@ -253,8 +253,8 @@
               </td>
               <td><span class="date">{% if a.invoice %}{{ a.invoice.date|date:"d.m.Y" }}{% else %}—{% endif %}</span></td>
               <td><span class="date">{% if a.invoice %}{{ a.invoice.due_date|date:"d.m.Y" }}{% else %}—{% endif %}</span></td>
-              <td class="num">{% if a.invoice %}{{ a.invoice.total|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
-              <td class="num applied">{{ a.amount|floatformat:2|intcomma }}</td>
+              <td class="num">{% if a.invoice %}{{ a.invoice.total|money }}{% else %}—{% endif %}</td>
+              <td class="num applied">{{ a.amount|money }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -288,9 +288,9 @@
             <h3>{% trans "Amount Distribution" %}</h3>
           </div>
           <div>
-            <div class="pd-stat-row"><span class="l">{% trans "Payment" %}</span><span class="v">{{ payment.amount|floatformat:2|intcomma }}</span></div>
-            <div class="pd-stat-row"><span class="l">{% trans "Allocated" %}</span><span class="v">{{ payment.allocated_amount|floatformat:2|intcomma }}</span></div>
-            <div class="pd-stat-row grand"><span class="l">{% trans "Advance" %}</span><span class="v">{{ payment.unallocated_amount|floatformat:2|intcomma }}</span></div>
+            <div class="pd-stat-row"><span class="l">{% trans "Payment" %}</span><span class="v">{{ payment.amount|money }}</span></div>
+            <div class="pd-stat-row"><span class="l">{% trans "Allocated" %}</span><span class="v">{{ payment.allocated_amount|money }}</span></div>
+            <div class="pd-stat-row grand"><span class="l">{% trans "Advance" %}</span><span class="v">{{ payment.unallocated_amount|money }}</span></div>
           </div>
         </div>
       </div>
@@ -305,7 +305,7 @@
           <div class="pd-mini-name">{{ payment.cari.name }}</div>
           <span class="pd-mini-code">{{ payment.cari.code }}</span>
           <div class="pd-mini-sub">
-            {% trans "Current balance:" %} <strong>{{ payment.cari.display_currency_symbol }}{{ payment.cari.absolute_balance|floatformat:2|intcomma }}</strong>
+            {% trans "Current balance:" %} <strong>{{ payment.cari.display_currency_symbol }}{{ payment.cari.absolute_balance|money }}</strong>
             <br>{{ payment.cari.balance_label }}
           </div>
           <a href="{% url 'accounts:detail' payment.cari.pk %}" class="pd-mini-link">
@@ -325,10 +325,10 @@
           <div class="pd-mini-name">{{ payment.cash_account.name }}</div>
           <div class="pd-mini-sub">
             {{ payment.cash_account.currency.code }}
-            <br>{% trans "Current balance:" %} <strong>{{ payment.cash_account.currency.symbol }}{{ payment.cash_account.balance|floatformat:2|intcomma }}</strong>
+            <br>{% trans "Current balance:" %} <strong>{{ payment.cash_account.currency.symbol }}{{ payment.cash_account.balance|money }}</strong>
           </div>
           <div class="pd-applied-note">
-            {% if payment.cash_sign == 1 %}+{% else %}−{% endif %}{{ payment.amount|floatformat:2|intcomma }} {% trans "applied" %}
+            {% if payment.cash_sign == 1 %}+{% else %}−{% endif %}{{ payment.amount|money }} {% trans "applied" %}
           </div>
         </div>
       </div>

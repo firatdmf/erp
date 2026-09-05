@@ -278,6 +278,18 @@
     font: 500 12px var(--font-sans); color: var(--gray-600);
     margin-top: 2px;
   }
+  /* The reason line, when it is the link to its order — in the blue chip
+     the movements list already uses for one. Set in the reason's own sans
+     face rather than the list's mono: this wraps a whole phrase, not a
+     bare number, and it is allowed to wrap with the line. */
+  .mv-order {
+    display: inline; padding: 1px 7px; border-radius: 4px;
+    background: #DBEAFE; color: #1D4ED8;
+    font: 600 12px var(--font-sans);
+    text-decoration: none;
+  }
+  .mv-order:hover { background: #BFDBFE; }
+  .mv-order i { font-size: 9px; margin-right: 4px; opacity: .75; }
   .mv-qty {
     font: 800 13px var(--font-sans); color: #0F1419;
     font-variant-numeric: tabular-nums;
@@ -791,9 +803,14 @@
                 {% else %}<i class="fa fa-pen"></i>{% trans "ADJ" %}{% endif %}
               </span>
               <div class="mv-reason">
-                {{ m.reason|default:"" }}
+                {% comment %} The reason already names the order — "Order ship Order
+                   #265" — so it becomes the link itself rather than being followed
+                   by the same number again as a separate one. {% endcomment %}
+                {% if m.order_pk %}<a class="mv-order" href="{% url 'operating:order_detail' m.order_pk %}"
+                     title="{% trans 'Open order' %}"
+                  ><i class="fa fa-up-right-from-square"></i>{{ m.reason }}</a>{% else %}{{ m.reason|default:"" }}{% endif %}
                 {% if m.roll %}<span style="color:var(--gray-400);"> · roll #{{ m.roll.pk }}</span>{% endif %}
-                {% if m.reference %}<span style="color:var(--gray-400);"> · {{ m.reference }}</span>{% endif %}
+                {% if m.reference and not m.ref_redundant %}<span style="color:var(--gray-400);"> · {{ m.reference }}</span>{% endif %}
                 {% if m.created_by %}<span style="color:var(--gray-400);"> · {{ m.created_by.username }}</span>{% endif %}
               </div>
             </div>

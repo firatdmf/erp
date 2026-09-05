@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load humanize %}
 
+{% load accounts_tags %}
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -144,12 +145,12 @@
     </div>
     <div class="ck-stat">
       <div class="ck-stat-l">{% trans "Received in Portfolio" %}</div>
-      <div class="ck-stat-v pos">{{ portfolio_received|floatformat:2|intcomma }}</div>
+      <div class="ck-stat-v pos">{{ portfolio_received|money }}</div>
       <div class="ck-stat-s">{% trans "From customers" %}</div>
     </div>
     <div class="ck-stat">
       <div class="ck-stat-l">{% trans "Given in Portfolio" %}</div>
-      <div class="ck-stat-v neg">{{ portfolio_given|floatformat:2|intcomma }}</div>
+      <div class="ck-stat-v neg">{{ portfolio_given|money }}</div>
       <div class="ck-stat-s">{% trans "To suppliers" %}</div>
     </div>
     <div class="ck-stat">
@@ -249,7 +250,7 @@
               <span class="ck-badge-dot"></span>{{ c.get_status_display }}
             </span>
           </td>
-          <td class="num">{{ c.currency.symbol }}{{ c.amount|floatformat:2|intcomma }}</td>
+          <td class="num">{{ c.currency.symbol }}{{ c.amount|money }}</td>
         </tr>
         {% endfor %}
       </tbody>

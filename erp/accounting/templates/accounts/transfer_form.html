@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% load accounts_tags %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -145,7 +146,7 @@
         </div>
         <div class="mf-amt">
           <span class="lbl">{% trans "Currently" %}</span>
-          <span class="val">{{ transfer.amount|floatformat:2|intcomma }} {{ transfer.currency.code }}</span>
+          <span class="val">{{ transfer.amount|money }} {{ transfer.currency.code }}</span>
           <span class="sub">{{ transfer.date }}</span>
         </div>
       </div>

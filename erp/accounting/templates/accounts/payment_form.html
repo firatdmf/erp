@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load humanize %}
 {% load l10n %}
+{% load accounts_tags %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -220,7 +221,7 @@
               <i data-lucide="user"></i>
               <span class="code">{{ prefilled_cari.code }}</span>
               <span class="name">{{ prefilled_cari.name }}</span>
-              <span class="balance">· {% trans "Balance:" %} {{ prefilled_cari.display_currency_symbol }}{{ prefilled_cari.absolute_balance|floatformat:2|intcomma }} ({{ prefilled_cari.balance_label }})</span>
+              <span class="balance">· {% trans "Balance:" %} {{ prefilled_cari.display_currency_symbol }}{{ prefilled_cari.absolute_balance|money }} ({{ prefilled_cari.balance_label }})</span>
               {% if not payment %}<a href="{% url 'accounts:payment_create' current_book.pk %}" class="change">{% trans "change" %}</a>{% endif %}
             </div>
             {% else %}

@@ -1,4 +1,4 @@
-{% load i18n %}{% load humanize %}{% comment %}
+{% load i18n %}{% load humanize %}{% load accounts_tags %}{% comment %}
 Results block for the invoice list — stats + count + table. Rendered inside
 #iv-results on full page load AND returned alone for the page's dynamic
 search/filter fetches (InvoiceList returns just this when the request
@@ -15,12 +15,12 @@ in place instead of reloading the whole page.
   </div>
   <div class="iv-stat">
     <div class="iv-stat-l">{% trans "Total Amount" %}</div>
-    <div class="iv-stat-v">{{ total_sum|floatformat:2|intcomma }}</div>
+    <div class="iv-stat-v">{{ total_sum|money }}</div>
     <div class="iv-stat-s">{% trans "Sum of invoice totals" %}</div>
   </div>
   <div class="iv-stat">
     <div class="iv-stat-l">{% trans "Open Balance" %}</div>
-    <div class="iv-stat-v pos">{{ unpaid_sum|floatformat:2|intcomma }}</div>
+    <div class="iv-stat-v pos">{{ unpaid_sum|money }}</div>
     <div class="iv-stat-s">{% trans "Unpaid balance" %}</div>
   </div>
 </div>
@@ -68,9 +68,9 @@ in place instead of reloading the whole page.
             <span class="iv-badge-dot"></span>{{ inv.get_status_display }}
           </span>
         </td>
-        <td class="num">{{ inv.currency.symbol }}{{ inv.total|floatformat:2|intcomma }}</td>
+        <td class="num">{{ inv.currency.symbol }}{{ inv.total|money }}</td>
         <td class="num {% if inv.balance > 0 %}pos{% elif inv.balance < 0 %}neg{% else %}zero{% endif %}">
-          {{ inv.currency.symbol }}{{ inv.balance|floatformat:2|intcomma }}
+          {{ inv.currency.symbol }}{{ inv.balance|money }}
         </td>
       </tr>
       {% endfor %}

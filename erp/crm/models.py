@@ -25,6 +25,18 @@ class ClientGroup(models.Model):
 
 
 class Company(models.Model):
+    # Who raised this record. Stamped automatically on first save by
+    # erp.ownership.stamp_creator, from the request-scoped user. NULL on
+    # rows that predate this column (and on anything created outside a
+    # request); erp.ownership.can_edit treats those as admin-only.
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="created_%(class)ss",
+        editable=False,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     name = models.CharField(
         max_length=100, verbose_name="Company Name (required)", unique=True
@@ -69,6 +81,18 @@ class Company(models.Model):
 
 
 class Contact(models.Model):
+    # Who raised this record. Stamped automatically on first save by
+    # erp.ownership.stamp_creator, from the request-scoped user. NULL on
+    # rows that predate this column (and on anything created outside a
+    # request); erp.ownership.can_edit treats those as admin-only.
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="created_%(class)ss",
+        editable=False,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=50, verbose_name="Contact Name (required)")
     company = models.ForeignKey(

@@ -125,7 +125,8 @@
         var navRect = item.getBoundingClientRect();
         // Topbar is 64px tall and fixed at top:0 — flyout must start
         // BELOW it so the header (icon+title) is always visible.
-        // No scrolling: tall menus simply overflow the viewport bottom.
+        // The body caps itself at calc(100vh - 140px) and scrolls, so
+        // offsetHeight below is already bounded by the viewport.
         var topMargin = 76;
         var bottomMargin = 12;
         var flyHeight = fly.offsetHeight || 320;

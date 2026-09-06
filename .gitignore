@@ -168,3 +168,7 @@ reply_check.log
 
 # Opening-balance maps carry real customer names; this repo is public.
 erp/accounting/data/
+
+# Railway deploy key — private, never commit
+ssh-railway
+ssh-railway.pub

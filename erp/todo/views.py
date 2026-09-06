@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect
+from django.contrib import messages
 from django.http import HttpResponse,HttpResponseRedirect, JsonResponse
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from django import forms
 from .models import Task
 from erp.search_utils import unaccent_icontains
@@ -23,114 +25,27 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 
 
-class task_list(generic.ListView):
-    # Model to list out
-    model = Task
-    # Where to list out
-    template_name = "todo/task_list.html"
-    # Variable to use in the template for listing out
-    context_object_name = "tasks"
-    # ordering = '-created_at'
-
-    # def get_queryset(self):
-    #     # Get the current date
-    #     current_date = date.today()
-
-    #     # Calculate the days since due for each task
-    #     queryset = super().get_queryset()
-    #     for task in queryset:
-    #         task.days_since_due = (current_date - task.due_date).days
-
-    #     return queryset
-
-    # def get_ordering(self):
-    #     ordering = self.request.GET.get('ordering','-created_at')
-    #     return ordering
-
-    # def get_context_data(self, **kwargs):
-    #     # get the current context data
-    #     context = super().get_context_data(**kwargs)
-    #     # add to it
-    #     context["current_date"] = date.today()  # Add the current date to the context
-    #     return context
-
-
-# just a simple template view
-@method_decorator(login_required, name="dispatch")
-class index(View):
-    def get(self, request):
-        # Get the data from the task_list view
-        task_list_view = task_list.as_view()
-        task_list_data = task_list_view(request)
-        task_list_context = task_list_data.context_data
-
-        # Get the data from the CreateTask view
-        create_task_view = CreateTask.as_view()
-        create_task_data = create_task_view(request)
-        create_task_context = create_task_data.context_data
-
-        # Merge the context data from both views
-        context = {**task_list_context, **create_task_context}
-
-        # # Render the template with the combined context
-        return render(request, "todo/index.html", context)
-
-    def post(self, request):
-        # Your code for handling POST requests
-        # This part should process the submitted form data and save it
-
-        # Bind the form with the POST data and FILES
-        form = TaskForm(request.POST, request.FILES)
-
-        if form.is_valid():
-            # Form is valid, save the task
-            task = form.save()
-            
-            # Handle Attachments
-            if request.FILES.getlist('attachments'):
-                from erp.google_drive import upload_file_to_drive
-                from .models import TaskAttachment
-                
-                for file_item in request.FILES.getlist('attachments'):
-                    upload_result = upload_file_to_drive(request.user, file_item, folder_name="ERP Personal Tasks")
-                    
-                    if upload_result.get('success'):
-                        TaskAttachment.objects.create(
-                            task=task,
-                            file_name=upload_result.get('name'),
-                            drive_file_id=upload_result.get('file_id'),
-                            drive_link=upload_result.get('drive_link'),
-                            uploaded_by=request.user.member
-                        )
-                    else:
-                        print(f"Failed to upload attachment {file_item.name}: {upload_result.get('error')}")
-
-            # You can also add a success message if needed
-            # messages.success(request, 'Task created successfully.')
-
-            # Redirect to a different URL (e.g., task list)
-            return redirect("/todo")  # Adjust the URL name if needed
-
-        # Form is not valid, re-render the page with form errors
-        tasks = Task.objects.all()  # Fetch all tasks (adjust the queryset as needed)
-
-        context = {
-            "form": form,
-            "tasks": tasks,
-        }
-
-        return render(request, "todo/index.html", context)
-
-
 # -------------------------------------------------
 
 
 @method_decorator(login_required, name="dispatch")
 class CreateTask(generic.edit.CreateView):
+    """The task sidebar's POST endpoint. There is no page behind it.
+
+    Tasks are created from the sidebar in base.html, which posts here
+    over fetch() with X-Requested-With and reads JSON back. The
+    standalone create_task.html page it replaced is gone, so this view
+    renders no template at all: POST only, and both outcomes answer in
+    JSON. A GET gets 405 rather than a 500 from a missing template.
+
+    Redirect on success is handled in form_valid (task detail page) for
+    a non-AJAX post, which nothing sends today but which still works.
+    """
+
     model = Task
     form_class = TaskForm
-    template_name = "todo/create_task.html"
-    # Redirect will be handled in form_valid to go to task detail page
+    # POST-only: no template_name, because there is no template.
+    http_method_names = ["post"]
 
     def post(self, request, *args, **kwargs):
         # Handle empty member field (common when creating personal tasks via sidebar)
@@ -224,231 +139,32 @@ class CreateTask(generic.edit.CreateView):
         return response
 
     def form_invalid(self, form):
-        print("Form Invalid!")
-        print(form.errors)
+        """Report the errors without a template, because there isn't one.
+
+        The sidebar posts over fetch() and reads the JSON. A native
+        browser post (only possible if the onsubmit binding in base.html
+        never ran) used to land on create_task.html re-rendered with the
+        errors; that page is gone, so falling back to it would raise
+        TemplateDoesNotExist — a 500 at exactly the moment the person
+        needs to be told which field is wrong. Send them back where they
+        came from with the errors in a message instead.
+        """
+        from django.http import JsonResponse
+
         if self.is_ajax():
-            from django.http import JsonResponse
             return JsonResponse(
-                {"success": False, "errors": form.errors},
-                status=400,
+                {"success": False, "errors": form.errors}, status=400
             )
-        return super().form_invalid(form)
+
+        for field, errors in form.errors.items():
+            label = form.fields[field].label if field in form.fields else field
+            for error in errors:
+                messages.error(self.request, f"{label}: {error}")
+        return redirect(self.request.META.get("HTTP_REFERER") or "/")
 
     def get_success_url(self):
         # Redirect to task detail page after creation
         return reverse('todo:task_detail', kwargs={'task_id': self.object.pk})
-
-
-@method_decorator(login_required, name="dispatch")
-class TaskReport(View):
-    template_name = "todo/task_report.html"
-    
-    def get(self, request):
-        from django.core.paginator import Paginator
-        from django.db.models import Q
-        
-        current_member = request.user.member if hasattr(request.user, 'member') else None
-        tab = request.GET.get('tab', 'myTasks')
-        search_query = request.GET.get('search', '').strip()
-        page_number = request.GET.get('page', 1)
-        
-        print(f"\n=== TaskReport Debug ===")
-        print(f"Current member: {current_member} (ID: {current_member.id if current_member else None})")
-        print(f"Tab: {tab}")
-        print(f"Search: {search_query}")
-        print(f"Page: {page_number}")
-        
-        # My Tasks - tasks assigned to me (OPTIMIZED)
-        my_tasks_query = Task.objects.filter(
-            member=current_member,
-            completed=False
-        ).select_related(
-            'contact', 
-            'company', 
-            'member__user',  # ✅ Optimized: member.user already loaded
-            'created_by__user'
-        ).order_by('-priority', 'due_date')
-        
-        # Apply search filter for My Tasks. unaccent_icontains folds
-        # Turkish letters on both sides (ş/s, ı/i/İ/I, ö/o, ç/c, ğ/g).
-        if search_query:
-            my_tasks_query = my_tasks_query.filter(
-                unaccent_icontains(
-                    search_query,
-                    'name', 'description', 'contact__name', 'company__name',
-                )
-            )
-        
-        print(f"My tasks count: {my_tasks_query.count()}")
-        
-        # Paginate My Tasks
-        my_tasks_paginator = Paginator(my_tasks_query, 10)  # 10 tasks per page
-        my_tasks_page = my_tasks_paginator.get_page(page_number if tab == 'myTasks' else 1)
-        
-        # Assigned Tasks - tasks I created/assigned to others (OPTIMIZED)
-        assigned_tasks_query = Task.objects.filter(
-            created_by=current_member,
-            completed=False
-        ).exclude(
-            member=current_member
-        ).select_related(
-            'contact', 
-            'company', 
-            'member__user',  # ✅ Already optimized
-            'created_by__user'
-        ).order_by('-priority', 'due_date')
-        
-        # Apply search filter for Assigned Tasks
-        if search_query:
-            assigned_tasks_query = assigned_tasks_query.filter(
-                unaccent_icontains(
-                    search_query,
-                    'name', 'description', 'contact__name', 'company__name',
-                    'member__user__first_name', 'member__user__last_name',
-                )
-            )
-        
-        print(f"Assigned tasks count: {assigned_tasks_query.count()}")
-        
-        # Future Tasks - tasks in the future (due_date > today, completed = False) (OPTIMIZED)
-        today = timezone.localdate()
-        future_tasks_query = Task.objects.filter(
-            completed=False,
-            due_date__gt=today
-        ).select_related(
-            'contact', 
-            'company', 
-            'member__user',
-            'created_by__user'
-        ).order_by('due_date', '-priority')
-        
-        # Apply search filter for Future Tasks
-        if search_query:
-            future_tasks_query = future_tasks_query.filter(
-                unaccent_icontains(
-                    search_query,
-                    'name', 'description', 'contact__name', 'company__name',
-                    'member__user__first_name', 'member__user__last_name',
-                )
-            )
-        
-        print(f"Future tasks count: {future_tasks_query.count()}")
-        
-        # Calculate statistics BEFORE applying search (for display purposes)
-        # These should NOT change when user searches
-        my_total_count = Task.objects.filter(member=current_member, completed=False).count()
-        assigned_total_count = Task.objects.filter(
-            created_by=current_member,
-            completed=False
-        ).exclude(member=current_member).count()
-        future_total_count = Task.objects.filter(completed=False, due_date__gt=today).count()
-        
-        # Paginate My Tasks
-        my_tasks_paginator = Paginator(my_tasks_query, 10)  # 10 tasks per page
-        my_tasks_page = my_tasks_paginator.get_page(page_number if tab == 'myTasks' else 1)
-        
-        # Paginate Assigned Tasks
-        assigned_tasks_paginator = Paginator(assigned_tasks_query, 10)  # 10 tasks per page
-        assigned_tasks_page = assigned_tasks_paginator.get_page(page_number if tab == 'assignedTasks' else 1)
-
-        # Paginate Future Tasks
-        future_tasks_paginator = Paginator(future_tasks_query, 10)  # 10 tasks per page
-        future_tasks_page = future_tasks_paginator.get_page(page_number if tab == 'futureTasks' else 1)
-        
-        # Annotate each task with deletion permission so the template can
-        # show/hide the trash icon per row without recomputing.
-        _user = request.user
-        for _t in my_tasks_page.object_list:
-            _t.can_be_deleted_by_user = _t.can_be_deleted_by(_user)
-        for _t in assigned_tasks_page.object_list:
-            _t.can_be_deleted_by_user = _t.can_be_deleted_by(_user)
-        for _t in future_tasks_page.object_list:
-            _t.can_be_deleted_by_user = _t.can_be_deleted_by(_user)
-
-        # AJAX için direkt döndür - statistics'i hesaplama (ÇOOK DAHA HIZLI)
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            if tab == 'myTasks':
-                html = render_to_string('todo/components/task_table.html', {
-                    'tasks': my_tasks_page,
-                    'today': today,
-                    'total_count': my_total_count,  # Use pre-calculated total, not filtered count
-                    'completed_count': 0,  # Skip expensive query
-                    'ongoing_count': my_total_count,  # Use pre-calculated total
-                    'is_assigned_view': False,
-                    'search_query': search_query,
-                    'tab': tab,
-                }, request=request)
-            elif tab == 'assignedTasks':
-                html = render_to_string('todo/components/task_table.html', {
-                    'tasks': assigned_tasks_page,
-                    'today': today,
-                    'total_count': assigned_total_count,  # Use pre-calculated total, not filtered count
-                    'completed_count': 0,  # Skip expensive query
-                    'ongoing_count': assigned_total_count,  # Use pre-calculated total
-                    'is_assigned_view': True,
-                    'search_query': search_query,
-                    'tab': tab,
-                }, request=request)
-            elif tab == 'futureTasks':
-                html = render_to_string('todo/components/task_table.html', {
-                    'tasks': future_tasks_page,
-                    'today': today,
-                    'total_count': future_total_count,
-                    'completed_count': 0,
-                    'ongoing_count': future_total_count,
-                    'is_future_view': True,
-                    'search_query': search_query,
-                    'tab': tab,
-                }, request=request)
-            return HttpResponse(html)
-        
-        # Full page load için statistics hesapla
-        from datetime import timedelta
-        week_start = today - timedelta(days=today.weekday())  # Monday
-        week_end = week_start + timedelta(days=6)  # Sunday
-        
-        # My Tasks - all tasks assigned to me (including completed)
-        all_my_tasks = Task.objects.filter(member=current_member)
-        my_total = all_my_tasks.count()
-        my_ongoing = all_my_tasks.filter(completed=False).count()
-        my_completed_this_week = all_my_tasks.filter(
-            completed=True,
-            completed_at__gte=week_start,
-            completed_at__lte=week_end + timedelta(days=1)  # Include end of Sunday
-        ).count()
-        
-        # Assigned Tasks - all tasks I created for others (including completed)
-        all_assigned_tasks = Task.objects.filter(
-            created_by=current_member
-        ).exclude(member=current_member)
-        assigned_total = all_assigned_tasks.count()
-        assigned_ongoing = all_assigned_tasks.filter(completed=False).count()
-        assigned_completed_this_week = all_assigned_tasks.filter(
-            completed=True,
-            completed_at__gte=week_start,
-            completed_at__lte=week_end + timedelta(days=1)
-        ).count()
-        
-        context = {
-            'my_tasks': my_tasks_page,
-            'assigned_tasks': assigned_tasks_page,
-            'future_tasks': future_tasks_page,
-            'current_member': current_member,
-            'today': today,
-            'search_query': search_query,
-            # My Tasks stats
-            'my_total_count': my_total,
-            'my_completed_count': my_completed_this_week,
-            'my_ongoing_count': my_ongoing,
-            # Assigned Tasks stats
-            'assigned_total_count': assigned_total,
-            'assigned_completed_count': assigned_completed_this_week,
-            'assigned_ongoing_count': assigned_ongoing,
-            # Future Tasks stats
-            'future_total_count': future_total_count,
-        }
-        
-        return render(request, self.template_name, context)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -586,6 +302,7 @@ def search_contacts_and_companies(request):
     return JsonResponse({"suggestions": suggestions})
 
 # @method_decorator(login_required, name="dispatch")
+@require_POST
 def complete_task(request, task_id):
     """Update task status - supports todo, in_progress, review, done"""
     task = get_object_or_404(Task, pk=task_id)

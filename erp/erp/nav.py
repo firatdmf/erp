@@ -173,11 +173,15 @@ NAV_SECTIONS = [
                 {"label": _("Create blog post"), "icon": "plus-circle", "url": "marketing:blog_create"},
                 {"label": _("Blog list"),        "icon": "book-open",   "url": "marketing:blog_list"},
             ]},
+            {"title": _("MAIL"), "items": [
+                {"label": _("Email automation"), "icon": "gauge", "url": "marketing:dashboard"},
+                {"label": _("My emails"),        "icon": "inbox", "url": "marketing:my_emails"},
+            ]},
         ],
     },
     {
         "key": "operations",
-        "label": _("Operations"),
+        "label": _("Operating"),
         "icon": "settings-2",
         "groups": [
             {"title": _("QR ACTIONS"), "items": [
@@ -198,17 +202,10 @@ NAV_SECTIONS = [
                 {"label": _("My warehouses"), "icon": "warehouse",   "url": "operating:warehouse_list"},
                 {"label": _("Add warehouse"), "icon": "plus-circle", "url": "operating:create_warehouse"},
             ]},
-        ],
-    },
-    {
-        "key": "procurement",
-        "label": _("Procurement"),
-        "icon": "shopping-basket",
-        "groups": [
             {"title": _("PURCHASING"), "items": [
                 {"label": _("Purchases"),         "icon": "package-plus", "url": "accounts:legacy_invoice_list",
                  "query": "?type=purchase"},
-                {"label": _("Purchase requests"), "icon": "file-text",    "url": "procurement:request_list"},
+                {"label": _("Purchase requests"), "icon": "file-text",    "url": "operating:purchase_request_list"},
                 {"label": _("Purchase orders"),   "icon": "receipt",      "url": "accounts:legacy_purchase_order_list"},
             ]},
             {"title": _("SUPPLIERS"), "items": [
@@ -222,18 +219,6 @@ NAV_SECTIONS = [
         "label": _("Analytics"),
         "icon": "line-chart",
         "url": "operating:order_analytics",
-    },
-    {
-        "key": "mail",
-        "label": _("Mail"),
-        "icon": "mail",
-        "groups": [
-            # No group title on this one — a single unlabelled group.
-            {"items": [
-                {"label": _("Email automation"), "icon": "gauge", "url": "marketing:dashboard"},
-                {"label": _("My emails"),        "icon": "inbox", "url": "marketing:my_emails"},
-            ]},
-        ],
     },
     {
         "key": "notes",

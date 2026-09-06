@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load operating_tags %}
 {% if view_mode == 'variants' %}
 {% for p in variants %}
 {% comment %}Row links use the product's OWN warehouse id — on a combined
@@ -52,7 +53,7 @@ links so that keeps working.{% endcomment %}
   </td>
   <td class="num" data-label="{% trans 'Unit cost' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
-      {% if p.purchase_price %}<span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+      {% if p.purchase_price %}<span class="mono">{{ p.purchase_currency|currency_sign }}{{ p.purchase_price|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
   <td class="num" data-label="{% trans 'Total (USD)' %}">
@@ -97,7 +98,7 @@ links so that keeps working.{% endcomment %}
     {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ g.reserved_total|floatformat:2 }} m</div>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Unit cost' %}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Varyantların ortalama birim maliyeti{% else %}Average unit cost across variants{% endif %}">
-    {% if g.avg_cost_usd %}<span class="mono">~{{ g.avg_cost_usd|floatformat:2 }}</span><span class="curr-pill">USD</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% if g.avg_cost_usd %}<span class="mono">~${{ g.avg_cost_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Total (USD)' %}">{% if g.total_usd %}<span class="cost-usd">${{ g.total_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
 </tr>

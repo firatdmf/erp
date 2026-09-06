@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load operating_tags %}
 {% for p in variants %}
 {% comment %}Product's OWN warehouse id in the link — a combined (ortak)
 warehouse page lists member warehouses' rows.{% endcomment %}
@@ -35,7 +36,7 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
   </td>
   <td class="num" data-label="{% trans 'Unit cost' %}">
     {% if p.purchase_price %}
-      <span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>
+      <span class="mono">{{ p.purchase_currency|currency_sign }}{{ p.purchase_price|floatformat:2 }}</span>
     {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Total (USD)' %}">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>

@@ -7,3 +7,10 @@ class CrmConfig(AppConfig):
 
     def ready(self):
         import crm.signals
+
+        # Stamp created_by on every new Company/Contact, whichever path
+        # made it (list screens, detail sidebars, the order form's
+        # inline quick-create).
+        from erp.ownership import register
+        from .models import Company, Contact
+        register(Company, Contact)

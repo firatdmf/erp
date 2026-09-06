@@ -107,6 +107,7 @@ def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
 
 
 # This is for reading the QR code on mobile for order_item_unit status updates.
+@require_POST
 def process_qr_payload(request):
     try:
         data = json.loads(request.body)
@@ -136,6 +137,7 @@ def process_qr_payload(request):
         return JsonResponse({"success": False, "error": str(e)}, status=400)
 
 
+@require_POST
 def process_qr_payload_pack(request):
     try:
         with transaction.atomic():
@@ -2620,6 +2622,15 @@ class OrderEdit(UpdateView):
     # prevent editing completed orders.
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
+        # Who may touch someone else's order: admins, and the person who
+        # raised it. Checked before the status rules below so a sales rep
+        # poking at another rep's order is refused for the honest reason
+        # rather than being told the order is the wrong status.
+        from erp.ownership import can_edit
+
+        if not can_edit(request.user, self.object):
+            messages.error(request, "You can only edit orders you created.")
+            return redirect("operating:order_detail", pk=self.object.pk)
         if self.object.status == "completed":
             messages.error(request, "Completed orders cannot be edited.")
             return HttpResponseForbidden("You cannot edit a completed order.")
@@ -3533,6 +3544,7 @@ def _order_delete_allowed(request):
                    "silme şifresini girin." if not supplied else "Silme şifresi hatalı.")
 
 
+@require_POST
 def delete_order(request, pk):
     try:
         order = Order.objects.get(pk=pk)

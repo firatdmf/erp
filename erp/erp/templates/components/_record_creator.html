@@ -1,0 +1,33 @@
+{% load i18n %}
+{% comment %}
+Who raised this record, and when.
+
+One partial for orders, contacts and companies because all three carry
+the same `created_by` / `created_at` pair (see erp/ownership.py) and
+should read identically wherever they appear.
+
+Usage:  {% include "components/_record_creator.html" with obj=order %}
+
+`created_by` is NULL on everything that predates the column, so the
+absent case says so plainly rather than printing a bare dash that reads
+like a missing value — those records are also the ones erp.ownership
+treats as admin-only, and it helps to see why.
+{% endcomment %}
+<style>
+  /* Sits inside the .od-meta row on every detail page, so it inherits
+     that row's size and colour; these only handle its own two bits. */
+  .rec-creator strong { font-weight: 600; }
+  .rec-creator-unknown { font-style: italic; opacity: .75; }
+</style>
+<span class="rec-creator" title="{% if obj.created_by %}{% blocktrans with who=obj.created_by.get_username %}Created by {{ who }}{% endblocktrans %}{% else %}{% trans "Created before this was recorded" %}{% endif %}">
+  <i class="fa fa-user-pen"></i>
+  {% if obj.created_by %}
+    {% trans "Created by" %}
+    <strong>{{ obj.created_by.get_full_name|default:obj.created_by.get_username }}</strong>
+  {% else %}
+    <span class="rec-creator-unknown">{% trans "Creator not recorded" %}</span>
+  {% endif %}
+  {% if obj.created_at %}
+    · {{ obj.created_at|date:"d M Y" }}
+  {% endif %}
+</span>

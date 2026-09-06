@@ -20,9 +20,6 @@
 <p>It is nice to see you again.</p>
 {% else %}
 <button type="submit">
-  <a href="{% url 'authentication:signup' %}">SignUp</a>
-</button>
-<button type="submit">
   <a href="{% url 'authentication:signin' %}">SignIn</a>
 </button>
 {% endif %} 

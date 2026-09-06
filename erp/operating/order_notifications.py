@@ -561,7 +561,7 @@ def _send_via_gmail_oauth(to_email, subject, html_body, pdf_name, pdf_bytes,
     SMTP. Never raises."""
     try:
         from authentication.models import GoogleChatCredentials
-        from email_automation.gmail_utils import send_email as gmail_send
+        from marketing.gmail_utils import send_email as gmail_send
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
         from googleapiclient.discovery import build

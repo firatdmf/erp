@@ -6,7 +6,7 @@ from django.urls import reverse_lazy, reverse
 from django.db import transaction
 from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import PurchaseRequest, PurchaseOrder
-from .forms import PurchaseRequestForm, PurchaseRequestItemFormSet, PurchaseOrderForm, PurchaseOrderItemFormSet
+from .forms_procurement import PurchaseRequestForm, PurchaseRequestItemFormSet, PurchaseOrderForm, PurchaseOrderItemFormSet
 
 from django.db.models import Q
 
@@ -25,7 +25,7 @@ def create_request_partial(request):
             return JsonResponse({
                 'success': True,
                 'message': f'Purchase Request {purchase_request.pk} created successfully.',
-                'redirect_url': reverse('procurement:request_list')
+                'redirect_url': reverse('operating:purchase_request_list')
             })
         else:
              return JsonResponse({
@@ -35,7 +35,7 @@ def create_request_partial(request):
     else:
         form = PurchaseRequestForm()
         items = PurchaseRequestItemFormSet()
-    return render(request, 'procurement/request_form_partial.html', {'form': form, 'items': items})
+    return render(request, 'operating/procurement/request_form_partial.html', {'form': form, 'items': items})
 
 
 def create_order_partial(request):
@@ -53,7 +53,7 @@ def create_order_partial(request):
             return JsonResponse({
                 'success': True,
                 'message': f'Purchase Order {purchase_order.pk} created successfully.',
-                'redirect_url': reverse('procurement:order_list')
+                'redirect_url': reverse('operating:purchase_order_list')
             })
         else:
              return JsonResponse({
@@ -64,12 +64,12 @@ def create_order_partial(request):
         form = PurchaseOrderForm()
         items = PurchaseOrderItemFormSet()
     
-    return render(request, 'procurement/order_form_partial.html', {'form': form, 'items': items})
+    return render(request, 'operating/procurement/order_form_partial.html', {'form': form, 'items': items})
 
 
 class PurchaseRequestListView(LoginRequiredMixin, ListView):
     model = PurchaseRequest
-    template_name = 'procurement/request_list.html'
+    template_name = 'operating/procurement/request_list.html'
     context_object_name = 'requests'
     ordering = ['-created_at']
     paginate_by = 25
@@ -95,8 +95,8 @@ class PurchaseRequestListView(LoginRequiredMixin, ListView):
 class PurchaseRequestCreateView(LoginRequiredMixin, CreateView):
     model = PurchaseRequest
     form_class = PurchaseRequestForm
-    template_name = 'procurement/request_form.html'
-    success_url = reverse_lazy('procurement:request_list')
+    template_name = 'operating/procurement/request_form.html'
+    success_url = reverse_lazy('operating:purchase_request_list')
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -119,12 +119,12 @@ class PurchaseRequestCreateView(LoginRequiredMixin, CreateView):
 
 class PurchaseRequestDetailView(LoginRequiredMixin, DetailView):
     model = PurchaseRequest
-    template_name = 'procurement/request_detail.html'
+    template_name = 'operating/procurement/request_detail.html'
     context_object_name = 'purchase_request'
 
 class PurchaseOrderListView(LoginRequiredMixin, ListView):
     model = PurchaseOrder
-    template_name = 'procurement/order_list.html'
+    template_name = 'operating/procurement/order_list.html'
     context_object_name = 'orders'
     ordering = ['-created_at']
     paginate_by = 25
@@ -149,8 +149,8 @@ class PurchaseOrderListView(LoginRequiredMixin, ListView):
 class PurchaseOrderCreateView(LoginRequiredMixin, CreateView):
     model = PurchaseOrder
     form_class = PurchaseOrderForm
-    template_name = 'procurement/order_form.html'
-    success_url = reverse_lazy('procurement:order_list')
+    template_name = 'operating/procurement/order_form.html'
+    success_url = reverse_lazy('operating:purchase_order_list')
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -173,5 +173,5 @@ class PurchaseOrderCreateView(LoginRequiredMixin, CreateView):
 
 class PurchaseOrderDetailView(LoginRequiredMixin, DetailView):
     model = PurchaseOrder
-    template_name = 'procurement/order_detail.html'
+    template_name = 'operating/procurement/order_detail.html'
     context_object_name = 'order'

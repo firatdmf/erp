@@ -1845,3 +1845,19 @@ class PackedOrderItem(models.Model):
 # class RawMaterialUnit(models.Model):
 #     raw_material = models.ForeignKey(
 #         AssetInventoryRawMaterial, on_delete=models.RESTRICT, related_name="units")
+
+
+# ---------------------------------------------------------------------------
+# Purchasing — moved here from the old `procurement` app. The models live in
+# models_procurement.py to keep this module readable; they are re-exported so
+# `operating.models.PurchaseOrder` and friends resolve the way every other
+# operating model does. Imported last because they reference RawMaterialGood
+# by name, which has to be defined by the time this runs.
+# ---------------------------------------------------------------------------
+from .models_procurement import (  # noqa: E402,F401
+    PurchaseRequest,
+    PurchaseRequestItem,
+    RequestForQuotation,
+    PurchaseOrder,
+    PurchaseOrderItem,
+)

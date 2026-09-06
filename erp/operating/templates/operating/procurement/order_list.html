@@ -345,7 +345,7 @@
       <span></span>
     </div>
     {% for order in orders %}
-    <a href="{% url 'procurement:order_detail' order.pk %}" class="po-row">
+    <a href="{% url 'operating:purchase_order_detail' order.pk %}" class="po-row">
       <span class="po-id">PO-{{ order.pk }}</span>
 
       <div class="po-supp">
@@ -434,14 +434,14 @@
       searchClear.classList.toggle('show', !!query);
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
-        const base = '{% url "procurement:order_list" %}';
+        const base = '{% url "operating:purchase_order_list" %}';
         window.location.href = query ? base + '?search=' + encodeURIComponent(query) : base;
       }, 500);
     });
     window.clearSearch = function () {
       searchInput.value = '';
       searchClear.classList.remove('show');
-      window.location.href = '{% url "procurement:order_list" %}';
+      window.location.href = '{% url "operating:purchase_order_list" %}';
     };
   })();
 </script>

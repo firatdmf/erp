@@ -98,3 +98,6 @@ admin.site.register(RawMaterialGoodReceipt)
 admin.site.register(RawMaterialGoodItem)
 admin.site.register(StockMovement, StockMovementAdmin)
 admin.site.register(OrderRollReservation, OrderRollReservationAdmin)
+
+# Purchasing admin, moved in from the old `procurement` app.
+from . import admin_procurement  # noqa: E402,F401

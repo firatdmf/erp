@@ -123,3 +123,15 @@ def all_members(request):
         except Exception:
             members = []
     return {'all_members': members}
+
+
+def role_flags(request):
+    """`is_sales_rep` for the templates.
+
+    Only used to hide chrome a read-only member cannot use (the top
+    bar's Purchases button, the "Create order" favorite). The refusal
+    itself is ReadOnlyRoleMiddleware's job — see erp/roles.py.
+    """
+    from erp.roles import is_sales_rep
+
+    return {"is_sales_rep": is_sales_rep(getattr(request, "user", None))}

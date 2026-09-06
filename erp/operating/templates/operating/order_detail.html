@@ -902,6 +902,8 @@
         </span>
         <span class="od-dot"></span>
         <span><i class="fa fa-clock"></i>{% trans "Updated" %} {{ order.updated_at|date:"d M Y · H:i" }}</span>
+        <span class="od-dot"></span>
+        {% include "components/_record_creator.html" with obj=order %}
       </div>
     </div>
     <div class="od-head-r">

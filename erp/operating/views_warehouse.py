@@ -4639,6 +4639,15 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     write path (order detail page, JSON API, web-order edit) must go
     through here so the lifecycle rules can't diverge:
 
+      * a sales rep may raise an order but never move it on. Because
+        every transition lands here, this one check covers packaging,
+        shipping, delivery and cancellation across all six call sites —
+        including the auto-advance to "packaging" that OrderCreate does
+        when rolls are picked on the create form, which is why the
+        order she raises stays "Açık". `user` arrives here as a Member
+        from that call site and as a User from the rest; is_sales_rep
+        accepts either;
+
       * cargo info (carrier + tracking) is OPTIONAL — completing an
         order without it is allowed for every order type; whatever the
         caller supplies is stored. (require_cargo_for_ship is kept in
@@ -4668,6 +4677,13 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
 
     Returns (ok: bool, code: str|None). code is a machine-readable
     reason on failure: 'order_cancelled_terminal' | 'error:<detail>'."""
+    from erp.roles import is_sales_rep
+
+    # Read the role before anything else: a refusal must leave the order
+    # exactly as it was found.
+    if is_sales_rep(user):
+        return False, "forbidden_sales_rep"
+
     from django.db import transaction as _tx
     from django.utils import timezone as _tz
     from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES

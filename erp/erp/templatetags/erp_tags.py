@@ -142,22 +142,23 @@ def dashboard_component(csrf_token,path,member):
     
     tasks_calendar_data = json.dumps(dict(tasks_by_date))
     
-    # Per-brand theme: Nejum profile uses dashboard_nejum.html which
-    # mirrors the design kit's ScreenHome 1:1. Other tenants (e.g.
-    # demfirat) keep dashboard_new.html — original layout untouched.
+    # There is one dashboard now: dashboard_nejum.html, which mirrors
+    # the design kit's ScreenHome 1:1. The old dashboard_new.html
+    # fallback was deleted — no brand had selected it since demfirat
+    # moved to the nejum theme, so it had stopped rendering anywhere.
     from django.conf import settings as _dj_settings
     _theme = getattr(_dj_settings, 'UI_THEME', '')
 
     # ALL of this user's OPEN tasks for the Nejum dashboard. Completed
     # tasks are filtered out at the DB query so they never show up on
     # the calendar list view. Hand the full set to the client and let
-    # JS slice by selected day. Demfirat path skips this work.
+    # JS slice by selected day.
     all_tasks_by_date = {}
     today_tasks_data = []
     future_tasks_data = []
     delegated_tasks_data = []
     completed_tasks_data = []
-    if _theme == 'nejum' and member:
+    if member:
         # Preview of the task's description for the card. Paragraph
         # breaks the author typed are kept — the card renders with
         # `white-space: pre-line` — but runs of spaces and blank lines
@@ -551,11 +552,7 @@ def dashboard_component(csrf_token,path,member):
             all_tasks_by_date = {}
             delegated_tasks_data = []
 
-    template = (
-        'components/dashboard_nejum.html' if _theme == 'nejum'
-        else 'components/dashboard_new.html'
-    )
-    return render_to_string(template, {
+    return render_to_string('components/dashboard_nejum.html', {
         'csrf_token':csrf_token,
         'number_of_leads_added':number_of_leads_added,
         'pending_tasks_count':pending_tasks_count,
@@ -591,14 +588,55 @@ def search_component(csrf_token):
     return render_to_string('components/search_component.html',{'context':"This is the test page context","csrf_token":csrf_token})
 
 
-@register.simple_tag
-def nav_sections(surface="desktop"):
+@register.simple_tag(takes_context=True)
+def nav_sections(context, surface="desktop"):
     """The shared main-navigation definition (see erp/nav.py).
 
     `surface="mobile"` returns the drawer's arrangement of the same
     sections — reordered for the phone's daily flow, with the link-only
     sections gathered under one heading. The items are identical either
     way; only the markup around them differs.
+
+    A sales rep sees only the entries her role can actually open. Which
+    those are is not listed anywhere: each item is checked against the
+    same gate the middleware enforces (erp.roles.may_use_nav_item), so
+    the menu tracks the rules instead of copying them. Hiding an entry
+    is courtesy, not security — ReadOnlyRoleMiddleware refuses the
+    request either way.
     """
     from erp.nav import NAV_SECTIONS, mobile_sections
-    return mobile_sections() if surface == "mobile" else NAV_SECTIONS
+    from erp.roles import is_sales_rep
+
+    sections = mobile_sections() if surface == "mobile" else NAV_SECTIONS
+    if is_sales_rep(context.get("user")):
+        sections = _readable_sections(sections)
+    return sections
+
+
+def _readable_sections(sections):
+    """`sections` with everything a sales rep cannot use removed.
+
+    Each item is judged by its own route through erp.roles — links by
+    may_read, sidebar actions by may_write on the endpoint they post to.
+    Nothing here lists which entries are allowed; the gate answers that,
+    so the menu follows the rules automatically when they change.
+
+    A menu left with no items, and a link section whose own url is not
+    allowed, drop out too rather than rendering an empty flyout.
+    """
+    from erp.roles import may_use_nav_item
+
+    kept = []
+    for section in sections:
+        if not section.get("groups"):
+            if may_use_nav_item(section):
+                kept.append(section)
+            continue
+        groups = []
+        for group in section["groups"]:
+            items = [i for i in group["items"] if may_use_nav_item(i)]
+            if items:
+                groups.append({**group, "items": items})
+        if groups:
+            kept.append({**section, "groups": groups})
+    return kept

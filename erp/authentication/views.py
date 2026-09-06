@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.contrib.auth import update_session_auth_hash
 
 # Create your views here.
@@ -36,6 +36,13 @@ def home(request):
 
 
 def signup(request):
+    # Accounts are not self-serve. The page stays reachable so a superuser
+    # can still create one from the browser, but everyone else — signed in
+    # or not — gets a 404 so the route is not discoverable. Day to day,
+    # accounts are made in the Django admin.
+    if not request.user.is_superuser:
+        raise Http404()
+
     if request.method == "POST":
         print("hello")
         # this is based on name, not id

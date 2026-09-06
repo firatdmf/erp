@@ -169,7 +169,10 @@ INSTALLED_APPS = [
     "notifications",  # Notification system
     "team",  # Team management system
     "notes", # My Notes system
-    "procurement", # Procurement system
+    # Migrations-only stub. Purchasing now lives in `operating`; this app stays
+    # registered so its own migration history and operating's adoption
+    # migration keep resolving. See its apps.py.
+    "procurement",
     # Migrations-only stub. The mail system now lives in `marketing`; this
     # app stays registered so its own migration history and marketing's
     # adoption migration keep resolving. See its apps.py.

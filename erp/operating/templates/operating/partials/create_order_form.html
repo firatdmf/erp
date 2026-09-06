@@ -164,6 +164,13 @@
                auto-created behind the scenes once the order is saved). -->
           <div id="co-new-customer-panel" style="display:none; margin-top:10px; padding:12px; background:#F8FAFC; border:1px solid #E2E8EE; border-radius:8px;">
             <div class="form-group">
+              <label>{% trans "Customer type" %}</label>
+              <select id="co-nc-kind" class="form-input" onchange="coNewCustomerKindChanged()">
+                <option value="contact">{% trans "Contact (person)" %}</option>
+                <option value="company">{% trans "Company" %}</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label>{% trans "Name" %}</label>
               <input type="text" id="co-nc-name" class="form-input" placeholder="{% trans 'Full name' %}">
             </div>
@@ -578,14 +585,23 @@
     document.getElementById('co-retail-fields').style.display = checked ? 'block' : 'none';
   };
 
+  // Placeholder follows the picker: "Full name" is wrong for a company.
+  window.coNewCustomerKindChanged = function () {
+    var isCompany = document.getElementById('co-nc-kind').value === 'company';
+    document.getElementById('co-nc-name').placeholder =
+      isCompany ? '{% trans "Company name" %}' : '{% trans "Full name" %}';
+  };
+
   window.coCreateCustomer = function () {
     var nameEl = document.getElementById('co-nc-name');
     var name = (nameEl.value || '').trim();
     if (!name) { showToast('İsim gerekli', 'error'); return; }
+    var kind = document.getElementById('co-nc-kind').value || 'contact';
     var phone = document.getElementById('co-nc-phone').value || '';
     var email = document.getElementById('co-nc-email').value || '';
     var address = document.getElementById('co-nc-address').value || '';
     var fd = new FormData();
+    fd.append('kind', kind);
     fd.append('name', name);
     fd.append('phone', phone);
     fd.append('email', email);
@@ -603,6 +619,8 @@
 
   window.coCancelCreateCustomer = function () {
     document.getElementById('co-new-customer-panel').style.display = 'none';
+    document.getElementById('co-nc-kind').value = 'contact';
+    coNewCustomerKindChanged();
     document.getElementById('co-nc-name').value = '';
     document.getElementById('co-nc-phone').value = '';
     document.getElementById('co-nc-email').value = '';

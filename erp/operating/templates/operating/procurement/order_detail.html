@@ -60,7 +60,7 @@
         </div>
 
         <div class="px-4 py-5 sm:px-6 bg-gray-50 flex justify-end gap-2">
-            <a href="{% url 'procurement:order_list' %}" class="bg-gray-500 text-white px-4 py-2 rounded">Back</a>
+            <a href="{% url 'operating:purchase_order_list' %}" class="bg-gray-500 text-white px-4 py-2 rounded">Back</a>
             {% if order.status == 'draft' %}
             <button class="bg-blue-600 text-white px-4 py-2 rounded">{% trans "Send to Supplier" %}</button>
             {% endif %}

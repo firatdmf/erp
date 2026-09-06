@@ -8,7 +8,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'erp.settings')
 django.setup()
 
 from django.contrib.auth import get_user_model
-from email_automation.models import Email, EmailAccount
+from marketing.models import Email, EmailAccount
 
 User = get_user_model()
 print(f"Total Users: {User.objects.count()}")

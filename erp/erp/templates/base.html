@@ -39,7 +39,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=20" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=42" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=43" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=11" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=31" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard-mobile.css' %}?v=7" />
@@ -285,8 +285,7 @@
       #marketingExpanded,
       #operatingExpanded,
       #accountingExpanded,
-      #cariExpanded,
-      #emailExpanded {
+      #cariExpanded {
         position: fixed !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
@@ -304,8 +303,7 @@
       #marketingButton::after,
       #operatingButton::after,
       #accountingButton::after,
-      #cariButton::after,
-      #emailButton::after {
+      #cariButton::after {
         display: none !important;
       }
 
@@ -381,57 +379,7 @@
       }
     }
 
-    /* CRITICAL SIDEBAR FIXES FOR MAIL MENU */
-    #emailButton {
-      position: relative !important;
-    }
-
-    #emailExpanded {
-      display: none !important;
-      position: fixed !important;
-      left: 6rem !important;
-      background-color: #ffffff !important;
-      width: 340px !important;
-      z-index: 99999 !important;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
-      border: 1px solid #e2e8f0 !important;
-      border-radius: 12px !important;
-      overflow: hidden !important;
-    }
-
-    #emailButton:hover #emailExpanded,
-    #emailExpanded:hover {
-      display: block !important;
-    }
-
-    /* Hover bridge */
-    #emailButton::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 100%;
-      width: 20px;
-      height: 100%;
-      background: transparent;
-      z-index: 99998;
-    }
-
-    #emailButton:hover::after {
-      display: block !important;
-    }
   </style>
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      var emailBtn = document.getElementById('emailButton');
-      var emailPanel = document.getElementById('emailExpanded');
-      if (emailBtn && emailPanel) {
-        emailBtn.addEventListener('mouseenter', function () {
-          var rect = emailBtn.getBoundingClientRect();
-          emailPanel.style.top = rect.top + 'px';
-        });
-      }
-    });
-  </script>
 </head>
 
 <body>
@@ -971,6 +919,23 @@
               </li>
             </ul>
           </div>
+          <div class="add-menu-section">
+            <h3>{% trans "Mail" %}</h3>
+            <ul>
+              <li>
+                <a href="{% url 'marketing:dashboard' %}">
+                  <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
+                  <span>{% trans "Automatic Mail System" %}</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'marketing:my_emails' %}">
+                  <i class="fas fa-inbox" aria-hidden="true"></i>
+                  <span>{% trans "My Emails" %}</span>
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
       </li>
       <li class="nav-item" id="operatingButton">
@@ -1064,30 +1029,17 @@
               </li>
             </ul>
           </div>
-        </div>
-      </li>
-      <li class="nav-item" id="procurementButton">
-        <a href="#procurement" class="nav-link">
-          <i class="fas fa-shopping-basket fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Procurement</span>
-        </a>
-        <div id="procurementExpanded"
-          style="top: 375px !important; max-height: 90vh !important; overflow-y: auto !important;">
-          <div class="add-menu-header">
-            <i class="fas fa-shopping-basket" aria-hidden="true"></i>
-            <h2>{% trans "Procurement" %}</h2>
-          </div>
           <div class="add-menu-section">
             <h3>{% trans "Purchasing" %}</h3>
             <ul>
               <li>
-                <a href="{% url 'procurement:request_list' %}">
+                <a href="{% url 'operating:purchase_request_list' %}">
                   <i class="fas fa-file-alt" aria-hidden="true"></i>
                   <span>Purchase Requests</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'procurement:order_list' %}">
+                <a href="{% url 'operating:purchase_order_list' %}">
                   <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
                   <span>Purchase Orders</span>
                 </a>
@@ -1118,33 +1070,6 @@
           <i class="fas fa-chart-line fa-2x" aria-hidden="true"></i>
           <span class="link-text">Analytics</span>
         </a>
-      </li>
-      <li class="nav-item" id="emailButton">
-        <a href="#email" class="nav-link">
-          <i class="fas fa-envelope fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Mail</span>
-        </a>
-        <div id="emailExpanded">
-          <div class="add-menu-section" style="padding: 1.5rem;">
-            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.1rem;">
-              <li>
-                <a href="{% url 'marketing:dashboard' %}"
-                  style="display: flex; align-items: center; gap: 0.875rem; padding: 0.35rem 1rem; border-radius: var(--border-radius-sm); transition: all 0.2s ease; font-size: 0.9375rem; color: var(--text-primary); font-weight: 500;">
-                  <i class="fas fa-tachometer-alt"
-                    style="width: 20px; text-align: center; color: var(--text-secondary);"></i>
-                  <span>Automatic Mail System</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'marketing:my_emails' %}"
-                  style="display: flex; align-items: center; gap: 0.875rem; padding: 0.35rem 1rem; border-radius: var(--border-radius-sm); transition: all 0.2s ease; font-size: 0.9375rem; color: var(--text-primary); font-weight: 500;">
-                  <i class="fas fa-inbox" style="width: 20px; text-align: center; color: var(--text-secondary);"></i>
-                  <span>My Emails</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
       </li>
       <li class="nav-item">
         <a href="{% url 'notes:index' %}" class="nav-link">
@@ -1862,7 +1787,7 @@
       overlay.classList.add('active');
       document.body.style.overflow = 'hidden';
       content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
-      htmx.ajax('GET', '{% url "procurement:request_create_partial" %}', { target: '#purchaseRequestSidebarContent', swap: 'innerHTML' });
+      htmx.ajax('GET', '{% url "operating:purchase_request_create_partial" %}', { target: '#purchaseRequestSidebarContent', swap: 'innerHTML' });
     }
 
     function closePurchaseRequestSidebar() {
@@ -1883,7 +1808,7 @@
 
       const formData = new FormData(form);
 
-      fetch('{% url "procurement:request_create_partial" %}', {
+      fetch('{% url "operating:purchase_request_create_partial" %}', {
         method: 'POST',
         body: formData,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -1920,7 +1845,7 @@
       overlay.classList.add('active');
       document.body.style.overflow = 'hidden';
       content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
-      htmx.ajax('GET', '{% url "procurement:order_create_partial" %}', { target: '#purchaseOrderSidebarContent', swap: 'innerHTML' });
+      htmx.ajax('GET', '{% url "operating:purchase_order_create_partial" %}', { target: '#purchaseOrderSidebarContent', swap: 'innerHTML' });
     }
 
     function closePurchaseOrderSidebar() {
@@ -1941,7 +1866,7 @@
 
       const formData = new FormData(form);
 
-      fetch('{% url "procurement:order_create_partial" %}', {
+      fetch('{% url "operating:purchase_order_create_partial" %}', {
         method: 'POST',
         body: formData,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }

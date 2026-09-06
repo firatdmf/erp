@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 from . import views_warehouse
 from . import order_excel
@@ -11,6 +11,11 @@ from django.views.generic import TemplateView, RedirectView
 
 app_name = "operating"
 urlpatterns = [
+    # Purchasing, moved in from the old `procurement` app. Mounted here so its
+    # names resolve as `operating:purchase_request_list`, and so the sales-rep
+    # path gate keeps seeing it as a prefix it does not allow.
+    path("procurement/", include("operating.urls_procurement")),
+
     path("", views.index.as_view(), name="index"),
     # Warehouse
     path("warehouses/", views_warehouse.WarehouseList.as_view(), name="warehouse_list"),

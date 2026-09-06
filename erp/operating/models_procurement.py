@@ -2,7 +2,9 @@ from django.db import models
 from django.conf import settings
 from crm.models import Supplier
 from marketing.models import Product, ProductVariant
-from operating.models import RawMaterialGood
+# RawMaterialGood lives in this same app now, so it is referenced by name:
+# importing operating.models from a module operating.models itself imports
+# would be circular.
 
 class PurchaseRequest(models.Model):
     STATUS_CHOICES = [
@@ -41,7 +43,7 @@ class PurchaseRequest(models.Model):
 class PurchaseRequestItem(models.Model):
     request = models.ForeignKey(PurchaseRequest, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, help_text="Select if buying a finished product")
-    raw_material = models.ForeignKey(RawMaterialGood, on_delete=models.SET_NULL, null=True, blank=True, help_text="Select if buying raw material")
+    raw_material = models.ForeignKey("RawMaterialGood", on_delete=models.SET_NULL, null=True, blank=True, help_text="Select if buying raw material")
     description = models.CharField(max_length=255, blank=True, help_text="Description if item not in system")
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
     unit = models.CharField(max_length=20, default='unit')

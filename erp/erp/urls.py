@@ -59,7 +59,10 @@ urlpatterns = [
     path("notifications/", include("notifications.urls")),
     path("team/", include("team.urls")),
     path("notes/", include("notes.urls")),
-    path("procurement/", include("procurement.urls")),
+    # Procurement moved into `operating` and now lives at
+    # /operating/procurement/... . Old links redirect rather than 404; the
+    # role gate still runs first, so this opens nothing it did not open before.
+    re_path(r"^procurement/(?P<rest>.*)$", RedirectView.as_view(url="/operating/procurement/%(rest)s", permanent=False)),
     path('accounts/', include('django.contrib.auth.urls')),
     path("testpage/",views.test_page.as_view(),name="test_page"),
     path("testpage2/",views.test_page2.as_view(),name="test_page2"),

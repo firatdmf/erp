@@ -7,7 +7,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 
-from erp.nav import NAV_SECTIONS, mobile_sections
+from erp.nav import MOBILE_FIRST, NAV_SECTIONS, mobile_sections
 
 # Surfaces the drawer owns that the desktop sidebar has no equivalent
 # for: Settings/Sign out live in the desktop TOP BAR, and the favourites
@@ -63,7 +63,19 @@ class NavDefinitionTest(TestCase):
         self.assertEqual(desktop, mobile)
 
     def test_daily_flow_sections_come_first_on_mobile(self):
-        self.assertEqual([s["key"] for s in mobile_sections()][:2], ["operations", "cari"])
+        # Checked against MOBILE_FIRST rather than a hardcoded pair. Sections
+        # keep absorbing each other — cari went into accounting, procurement
+        # into operating — and a literal list here goes stale silently every
+        # time one does, which is how this test came to expect a "cari"
+        # section that no longer existed.
+        for key in MOBILE_FIRST:
+            section = next((s for s in NAV_SECTIONS if s["key"] == key), None)
+            self.assertIsNotNone(section, f"MOBILE_FIRST names {key!r}, which is not a section")
+            self.assertTrue(section.get("groups"), f"{key!r} has no groups, so the drawer cannot lead with it")
+        self.assertEqual(
+            [s["key"] for s in mobile_sections()][:len(MOBILE_FIRST)],
+            list(MOBILE_FIRST),
+        )
 
 
 class RenderedMenusMatchTest(TestCase):

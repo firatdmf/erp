@@ -24,13 +24,6 @@ class index(TemplateView):
     template_name = "index.html"
 
 
-class reports(View):
-    template_name = "reports.html"
-
-    def get(self, request):
-        return render(request, self.template_name)
-
-
 from authentication.models import GoogleChatCredentials
 
 class user_settings(View):
@@ -46,21 +39,6 @@ class user_settings(View):
             "is_google_connected": google_creds is not None,
             "user": request.user
         })
-
-
-class task_report(View):
-    template_name = "task_report.html"
-    tasks = Task.objects
-
-    def get_context_data(self, **kwargs):
-        context = {}
-        context["my_variable"] = 123
-        context["tasks"] = Task.objects.all()
-        return context
-
-    def get(self, request, *args, **kwargs):
-        context = self.get_context_data()
-        return render(request, self.template_name, context)
 
 
 class test_page(TemplateView):

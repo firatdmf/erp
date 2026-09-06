@@ -420,6 +420,8 @@
             <a href="mailto:{{ contact.email.0 }}">{{ contact.email.0 }}</a>
           </span>
         {% endif %}
+        <span class="od-dot"></span>
+        {% include "components/_record_creator.html" with obj=contact %}
       </div>
     </div>
     <div class="od-head-r">

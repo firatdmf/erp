@@ -6,7 +6,7 @@ sys.path.append('c:\\Users\\enes3\\erp')
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'erp.settings')
 django.setup()
 
-from email_automation.models import Email, EmailAccount
+from marketing.models import Email, EmailAccount
 
 print(f"Total Accounts: {EmailAccount.objects.count()}")
 

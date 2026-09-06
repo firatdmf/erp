@@ -18,6 +18,14 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "Confirm purchases",
         "Can confirm a purchase order into warehouse stock (goods receipt).",
     ),
+    # Read-only, and narrower than "guest": a sales rep sees the two
+    # things she quotes from — stock (quantity and price) and sales —
+    # and cannot write anything anywhere. Enforced in one place, by
+    # erp.middleware.ReadOnlyRoleMiddleware; see erp/roles.py.
+    "sales_rep": (
+        "Sales rep (read-only)",
+        "Can view stock quantities, prices and sales. Cannot change anything.",
+    ),
 }
 
 # Convert dictionary to list of tuples for name choices

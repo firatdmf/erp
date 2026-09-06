@@ -462,6 +462,8 @@
         {% if not company.website and not company.email and not company.phone and not company.address and not company.country %}
           <span class="od-empty-mute">{% trans "No contact details yet" %}</span>
         {% endif %}
+        <span class="od-dot"></span>
+        {% include "components/_record_creator.html" with obj=company %}
       </div>
     </div>
     <div class="od-head-r">

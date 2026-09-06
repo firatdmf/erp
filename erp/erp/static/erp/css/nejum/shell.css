@@ -207,10 +207,10 @@ body > main {
 /* ------------------------------------------------------------------------
    Compact mode for the Accounting flyout. It absorbed the old top-level
    Cari (Current Account) menu, so it now carries ten groups where that one
-   carried six — spacing is tightened globally inside this flyout, and the
-   body scrolls rather than running off the screen on a short viewport.
-   The compact rules were written for [data-flyout="cari"]; that section no
-   longer exists, so they moved here with it.
+   carried six — spacing is tightened globally inside this flyout so more of
+   it fits before the body has to scroll. The compact rules were written for
+   [data-flyout="cari"]; that section no longer exists, so they moved here
+   with it.
    ------------------------------------------------------------------------ */
 [data-flyout="accounting"] > .nj-flyout {
   padding: 8px 0 6px;
@@ -229,9 +229,6 @@ body > main {
 }
 [data-flyout="accounting"] > .nj-flyout .nj-fly-body {
   padding: 0 6px 4px;
-  max-height: calc(100vh - 140px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 [data-flyout="accounting"] > .nj-flyout .nj-fly-group + .nj-fly-group {
   margin-top: 2px;
@@ -325,7 +322,19 @@ body > main {
 }
 
 /* Body */
-.nj-fly-body { padding: 0 8px 6px; }
+/* Every flyout body scrolls once it outgrows the viewport. Sections keep
+   absorbing each other — Accounting took in Cari, Operations took in
+   Procurement, Marketing took in Mail — and a menu that runs off the bottom
+   of the screen hides its own last entries with no way to reach them.
+   140px leaves room for the 64px topbar, the flyout header and a bottom
+   margin. overscroll-behavior stops the page scrolling underneath once the
+   list hits its end. */
+.nj-fly-body {
+  padding: 0 8px 6px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .nj-fly-group + .nj-fly-group {
   margin-top: 6px;
   padding-top: 4px;

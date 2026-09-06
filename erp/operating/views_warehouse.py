@@ -1637,9 +1637,19 @@ def warehouse_barcode_lookup(request, pk):
                 # No move offer for a top that has already been used up —
                 # there is nothing physical left to carry over, and the row
                 # is history of where the stock went out from.
-                "move_url": (None if other_roll.status == "consumed" else
+                #
+                # Nor across BOOKS. The move view refuses those (stock
+                # changing owner is a purchase, not a shelf change), so
+                # offering the button here would only produce an error after
+                # the click. The panel still shows where the top is, which is
+                # what the scan was asking.
+                "move_url": (None if (other_roll.status == "consumed"
+                                      or op.warehouse.accounting_book_id
+                                      != warehouse.accounting_book_id) else
                              reverse("operating:warehouse_roll_move_here",
                                      args=[warehouse.pk, other_roll.pk])),
+                "cross_book": (op.warehouse.accounting_book_id
+                               != warehouse.accounting_book_id),
             })
         # No roll anywhere — fall back to a product-level barcode/SKU
         # match within THIS warehouse (members, for a combined view).
@@ -1730,6 +1740,33 @@ def warehouse_roll_move_here(request, pk, roll_pk):
         return JsonResponse(
             {"success": False,
              "error": "Bu top tükenmiş — taşınacak metre yok."}, status=400)
+
+    # Stock may not cross between BOOKS on a warehouse move. A book is a
+    # business: Warehouse.accounting_book is required and PROTECTed because
+    # the shelves are that business's asset, and its net worth is the sum of
+    # them. Carrying a top from one book's depot to another's hands over an
+    # asset — 857m of K24593.G07 is about $2,058 — and this view records only
+    # a pair of StockMovement rows, so both balance sheets would move with
+    # nothing in either ledger to say why.
+    #
+    # Between depots of the SAME book it is what it looks like: goods
+    # changing shelves, no change of owner, and it stays allowed.
+    #
+    # Selling between the two businesses is a real transaction and belongs in
+    # a purchase invoice, where it gets a price, a currency, a counterparty
+    # and an entry on both sides.
+    source_book_id = source_wp.warehouse.accounting_book_id
+    if source_book_id != target_warehouse.accounting_book_id:
+        return JsonResponse({
+            "success": False,
+            "error": (
+                "Bu top başka bir defterin deposunda (%s → %s). Defterler "
+                "arasında mal geçişi satın alma faturası ile yapılmalı — "
+                "taşıma işlemi sadece aynı defterin depoları arasında "
+                "çalışır." % (source_wp.warehouse.name, target_warehouse.name)
+            ),
+            "cross_book": True,
+        }, status=400)
 
     user = request.user if request.user.is_authenticated else None
 

@@ -3596,6 +3596,12 @@
             // No move offer for a used-up top: there are no metres to carry,
             // and its row records where the stock went out from. The server
             // refuses it too, so a stale screen can't sneak one through.
+            (d.cross_book
+              ? '<div class="bl-note" style="margin-top:6px; font-size:11px; color:var(--gray-600); line-height:1.5;">' +
+                  '<i class="fa fa-circle-info"></i> ' +
+                  '{% trans "This top belongs to another book. Stock moves between books through a purchase invoice, not a warehouse transfer." %}' +
+                '</div>'
+              : '') +
             (d.move_url
               ? '<button type="button" class="bl-btn primary" id="blMoveBtn" onclick="moveRollToThisWarehouse(' + er.id + ', this)">' +
                   '<i class="fa fa-truck-fast"></i> {% trans "Move to this warehouse" %}</button>'

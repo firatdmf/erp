@@ -737,6 +737,14 @@
               </td>
               <td>
                 <div style="display:flex; gap:4px; align-items:center;">
+                  {% if r.has_label_image %}
+                  <a class="roll-delete-btn" style="color:var(--gray-600);"
+                     href="{% url 'operating:warehouse_roll_photo' warehouse.pk r.pk %}"
+                     target="_blank" rel="noopener"
+                     title="{% trans 'Label photo taken when this roll was scanned' %}">
+                    <i class="fa fa-camera"></i>
+                  </a>
+                  {% endif %}
                   <a class="roll-delete-btn" style="color:var(--gray-600);"
                      href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}?roll={{ r.pk }}"
                      target="_blank" rel="noopener" title="{% trans 'Print label' %}">

@@ -233,6 +233,108 @@ def _roll_usage_info(roll):
     }
 
 
+# Where roll label photos live in the Bunny zone. A top-level folder named
+# for the Django app that owns them, alongside the zone's existing `media`,
+# `reviews` and `website-videos`. The YYYY/MM below mirrors the old local
+# `upload_to="roll_scans/%Y/%m/"`, so recovered legacy files would drop
+# straight into the same shape.
+ROLL_SCAN_CDN_FOLDER = "Operating/roll_scans"
+
+
+def _roll_photo_filename(product, barcode, original_name):
+    """Name a label photo `<product sku>_<variant sku>_<barcode>`, so someone
+    browsing the CDN can tell which top a photo shows without the database.
+
+    Each part may be missing, and an absent one is dropped rather than
+    leaving an empty gap: only 1,232 of 2,072 warehouse products carry a
+    catalog link at all (2 of 841 in Ergene), so the parent product SKU is
+    often unknown, and tops arrive from the factory with no barcode. A
+    repeated part is dropped too — the warehouse SKU and the variant SKU are
+    the same string on every row that has both.
+
+    With a barcode the name ends there: `barcode` is UNIQUE across every
+    warehouse, the scan view turns a re-scan away, and a Bunny PUT would
+    otherwise overwrite in silence — so the constraint that keeps two rolls
+    from sharing a code is exactly what keeps two photos from sharing a
+    path. Nothing further is needed to make it safe.
+
+    WITHOUT one, a short random suffix is added. Postgres lets NULLs repeat
+    under a unique constraint and the scan form does not require a barcode,
+    so two unlabelled tops of the same product would otherwise land on one
+    object and the first photo would be destroyed with nothing raised.
+    """
+    import os
+    import re
+    from django.utils.crypto import get_random_string
+
+    variant = getattr(product, "catalog_variant", None)
+    parent = getattr(variant, "product", None)
+    parts = [getattr(parent, "sku", None),                       # e.g. 1016
+             getattr(variant, "variant_sku", None) or getattr(product, "sku", None),
+             barcode]                                            # e.g. 2000047424300
+
+    # Hand-typed SKUs and barcodes hold spaces, slashes and Turkish letters;
+    # anything outside this set would change the object's path or break its URL.
+    clean, seen = [], set()
+    for part in parts:
+        safe = re.sub(r"[^A-Za-z0-9._-]", "-",
+                      str(part or "").strip())[:40].strip("-._")
+        if safe and safe.casefold() not in seen:
+            seen.add(safe.casefold())
+            clean.append(safe)
+
+    _, ext = os.path.splitext(os.path.basename(original_name or "capture.jpg"))
+    stem = "_".join(clean) or "unidentified"
+    # The barcode after cleaning, not the raw one — a code of only punctuation
+    # survives the `if barcode` test but contributes nothing to the name.
+    identified = bool(barcode) and clean and clean[-1].casefold() == re.sub(
+        r"[^A-Za-z0-9._-]", "-", str(barcode).strip())[:40].strip("-._").casefold()
+    if identified:
+        return f"{stem}{ext or '.jpg'}"
+    return f"{stem}_{get_random_string(8)}{ext or '.jpg'}"
+
+
+def _store_roll_label_image(image, product=None, barcode=None):
+    """Put a scanned label photo somewhere it will survive, and say where.
+
+    Returns `(cdn_url, local_file)`, at most one of which is set — they map
+    straight onto WarehouseProductRoll.image_url / .source_image.
+
+    Bunny first, because MEDIA_ROOT is a container path with no volume
+    mounted: photos written there vanish on the next deploy, which is how
+    3,611 rolls ended up pointing at files that no longer exist.
+
+    A failed upload falls back to the local disk rather than raising. A
+    label photo is worth less than the stock count it accompanies, and
+    losing the whole scan because the CDN blinked would be the wrong
+    trade — a local copy at least survives until the next deploy, and the
+    intake itself always completes.
+    """
+    from django.utils import timezone as _tz
+
+    if not image:
+        return None, None
+    if not getattr(_dj_settings, "USE_BUNNY_CDN", False):
+        return None, image
+    try:
+        from marketing.utils.bunny_storage import upload_to_bunny
+        stamp = _tz.now()
+        name = _roll_photo_filename(product, barcode, getattr(image, "name", ""))
+        path = f"{ROLL_SCAN_CDN_FOLDER}/{stamp:%Y}/{stamp:%m}/{name}"
+        url = upload_to_bunny(
+            image, path, content_type=getattr(image, "content_type", None))
+        return url, None
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "Bunny upload failed for a roll label photo; storing it locally")
+        try:
+            image.seek(0)   # the failed read left the file part-consumed
+        except Exception:
+            pass
+        return None, image
+
+
 def _barcode_taken(code, *, exclude_roll_ids=()):
     """True if `code` is already carried by a roll or a product, anywhere.
 
@@ -1340,6 +1442,45 @@ def warehouse_group_variants(request, pk):
         "total": total,
         "base": base,
     })
+
+
+@login_required
+def warehouse_roll_photo(request, warehouse_pk, roll_pk):
+    """Show the label photo taken when this roll was scanned.
+
+    The photos were captured "for audit" from the start, but nothing ever
+    displayed one, so nobody noticed when the container's disk stopped
+    keeping them. This is the missing half.
+
+    One address for both storage eras: a CDN-hosted photo redirects (Bunny
+    serves it far better than we can), a locally-stored one streams from
+    disk. A path whose file is gone answers 410 rather than 500 — the row
+    genuinely did have a photo once, and saying so is more useful than a
+    stack trace.
+    """
+    import os
+    from django.http import FileResponse, Http404, HttpResponse
+
+    warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+    roll = get_object_or_404(
+        WarehouseProductRoll,
+        pk=roll_pk, product__warehouse_id__in=warehouse.scope_ids(),
+    )
+    if roll.image_url:
+        return redirect(roll.image_url)
+    if not roll.source_image:
+        raise Http404("This roll has no label photo.")
+
+    path = os.path.join(str(_dj_settings.MEDIA_ROOT),
+                        roll.source_image.name.replace("/", os.sep))
+    if not os.path.exists(path):
+        return HttpResponse(
+            "The label photo for this roll is no longer stored. It was "
+            "written to the server's local disk, which does not survive a "
+            "deploy; photos taken from now on go to the CDN instead.",
+            status=410, content_type="text/plain; charset=utf-8",
+        )
+    return FileResponse(open(path, "rb"), content_type="image/jpeg")
 
 
 @login_required
@@ -5475,12 +5616,20 @@ class WarehouseRollEdit(View):
         changes = []
         roll_fields = []
 
-        # ── Barcode (unique per roll within the warehouse) ──
+        # ── Barcode (required, and unique across EVERY warehouse) ──
         barcode = (request.POST.get("barcode") or "").strip()
         if (barcode or "") != (roll.barcode or ""):
-            if barcode and (WarehouseProductRoll.objects
-                            .filter(product__warehouse=warehouse, barcode=barcode)
-                            .exclude(pk=roll.pk).exists()):
+            # A top must keep a barcode. Editing one away used to be allowed
+            # and left stock that picking cannot scan — the same state the
+            # scan form now refuses to create.
+            if not barcode and roll.barcode:
+                return JsonResponse({"success": False,
+                                     "error": "Barkod zorunlu — bir topun barkodu silinemez."},
+                                    status=400)
+            # Scoped to the whole system, matching the DB's unique constraint.
+            # Checking only this warehouse passed codes that the database then
+            # rejected, turning a correctable mistake into a 500.
+            if barcode and _barcode_taken(barcode, exclude_roll_ids=(roll.pk,)):
                 return JsonResponse({"success": False,
                                      "error": "Bu barkod zaten başka bir topta kullanılıyor."},
                                     status=400)
@@ -5871,8 +6020,18 @@ class WarehouseRollScan(View):
                 quantity=Decimal("0"),
             )
 
-        # Optional manual fields: barcode (per-roll) + price (per-product).
+        # Barcode (per-roll) is REQUIRED. It is what picking and stock-out
+        # scan, what keeps a re-scan from counting the same top twice, and —
+        # being unique across every warehouse — what names the top's label
+        # photo on the CDN. A top saved without one is stock nobody can find
+        # by scanning it, so refuse rather than store it that way.
         barcode = (request.POST.get("barcode") or "").strip() or None
+        if not barcode:
+            return JsonResponse({
+                "success": False,
+                "error": "Barkod zorunlu — bu top olmadan kaydedilemez.",
+            }, status=400)
+        # Price is optional. Barcode is not.
         purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
         purchase_currency = (request.POST.get("purchase_currency") or "").strip().upper() or product.purchase_currency or "USD"
         if purchase_price_raw:
@@ -5906,6 +6065,7 @@ class WarehouseRollScan(View):
             product.barcode = barcode[:64]
 
         # Save the roll.
+        cdn_url, local_image = _store_roll_label_image(image, product, barcode)
         roll = WarehouseProductRoll.objects.create(
             product=product,
             meters=meters,
@@ -5913,7 +6073,8 @@ class WarehouseRollScan(View):
             barcode=barcode[:64] if barcode else None,
             lot_number=(request.POST.get("lot_number") or "").strip() or None,
             scanned_by=request.user if request.user.is_authenticated else None,
-            source_image=image if image else None,
+            image_url=cdn_url,
+            source_image=local_image,
             ocr_raw=(request.POST.get("ocr_raw") or "")[:5000] or None,
         )
 

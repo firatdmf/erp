@@ -2023,8 +2023,9 @@
               <span style="font-weight:500; font-size:11px; color:var(--gray-500); margin-left:4px;">
                 {% trans "(per-roll — same product, different bar code)" %}
               </span>
+              <span style="color:var(--danger, #C0392B); margin-left:2px;" aria-hidden="true">*</span>
             </label>
-            <input id="rsBarcode" type="text" class="rs-input"
+            <input id="rsBarcode" type="text" class="rs-input" required
                    placeholder="{% trans 'Scanned or typed barcode' %}"
                    autocomplete="off">
           </div>
@@ -3004,6 +3005,17 @@
     const currency = (document.getElementById('rsCurrency')?.value || '').trim() || 'TRY';
     if (!meters || parseFloat(meters) <= 0) {
       alert('{% trans "Please enter a positive meters value" %}');
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = origLabel;
+      return;
+    }
+    // Barcode is required — it is what picking scans, what stops the same
+    // top being counted twice, and what names its label photo. Caught here
+    // so the camera stays open on the roll instead of the save failing
+    // after the fact; the server refuses a blank one regardless.
+    if (!barcode) {
+      alert('{% trans "Barcode is required — scan or type the roll barcode." %}');
+      document.getElementById('rsBarcode')?.focus();
       saveBtn.disabled = false;
       saveBtn.innerHTML = origLabel;
       return;

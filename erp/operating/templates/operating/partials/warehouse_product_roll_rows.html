@@ -62,6 +62,12 @@ them into the same grid squeezed both.{% endcomment %}
         </div>
 
         <div class="wh-roll-act">
+          {% if r.has_label_image %}
+          <a href="{% url 'operating:warehouse_roll_photo' product.warehouse_id r.pk %}"
+             target="_blank" rel="noopener" title="{% trans 'Label photo taken when this roll was scanned' %}">
+            <i class="fa fa-camera"></i>
+          </a>
+          {% endif %}
           <a href="{% url 'operating:warehouse_product_label' product.warehouse_id product.pk %}?roll={{ r.pk }}"
              target="_blank" rel="noopener" title="{% trans 'Print label' %}">
             <i class="fa fa-qrcode"></i>

@@ -30,6 +30,7 @@ urlpatterns = [
     path("warehouses/<int:pk>/barcode-lookup/", views_warehouse.warehouse_barcode_lookup, name="warehouse_barcode_lookup"),
     path("warehouses/<int:pk>/rolls/<int:roll_pk>/move-here/", views_warehouse.warehouse_roll_move_here, name="warehouse_roll_move_here"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/", views_warehouse.warehouse_product_rolls, name="warehouse_product_rolls"),
+    path("warehouses/<int:warehouse_pk>/rolls/<int:roll_pk>/photo/", views_warehouse.warehouse_roll_photo, name="warehouse_roll_photo"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/", warehouse_label.warehouse_product_label, name="warehouse_product_label"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/code/", warehouse_label.warehouse_product_code, name="warehouse_product_code"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/info/", warehouse_label.warehouse_product_info, name="warehouse_product_info"),

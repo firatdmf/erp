@@ -73,8 +73,8 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
     """
 
     def setUp(self):
-        from operating.models import Order, OrderRollReservation, WarehouseProductRoll
-        self.OrderRollReservation = OrderRollReservation
+        from operating.models import Order, OrderStockReservation, WarehouseProductItem
+        self.OrderStockReservation = OrderStockReservation
         self.user = get_user_model().objects.create_superuser(
             username="free_stock", password="pw", email="f@s.t")
         self.client.force_login(self.user)
@@ -89,7 +89,7 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="PETEK FONLUK KUMAŞ 94",
             sku="PETEK.94.310", quantity=Decimal("30"), catalog_variant=self.variant)
-        self.roll = WarehouseProductRoll.objects.create(
+        self.stock_item = WarehouseProductItem.objects.create(
             product=self.wp, meters=Decimal("30"), barcode="PTK-1")
         self.order = Order.objects.create()
 
@@ -103,15 +103,15 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
         self.assertIn("30", self._stock_shown())
 
     def test_reserved_metres_are_not_offered(self):
-        self.OrderRollReservation.objects.create(
-            order=self.order, roll=self.roll, warehouse_product=self.wp,
+        self.OrderStockReservation.objects.create(
+            order=self.order, stock_item=self.stock_item, warehouse_product=self.wp,
             meters=Decimal("30"), consumed=False)
         self.assertIn("0", self._stock_shown())
         self.assertNotIn("30", self._stock_shown())
 
     def test_a_partial_reservation_leaves_the_remainder(self):
-        self.OrderRollReservation.objects.create(
-            order=self.order, roll=self.roll, warehouse_product=self.wp,
+        self.OrderStockReservation.objects.create(
+            order=self.order, stock_item=self.stock_item, warehouse_product=self.wp,
             meters=Decimal("12"), consumed=False)
         self.assertIn("18", self._stock_shown())
 

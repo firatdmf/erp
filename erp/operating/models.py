@@ -701,7 +701,7 @@ class Order(models.Model):
     def compute_billable_line_quantities(self, as_of=None):
         """Per-order-item quantity that should actually be BILLED (cari +
         invoice) — the metres physically scanned into this order's
-        packing (OrderRollReservation, whether still a pending hold or
+        packing (OrderStockReservation, whether still a pending hold or
         already consumed at ship time), NOT the ordered quantity. A line
         with nothing scanned yet contributes 0 here even though it has
         an ordered quantity — the unscanned portion of an order must
@@ -740,7 +740,7 @@ class Order(models.Model):
         # were actually scanned.
         scanned = {
             r["order_item_id"]: (r["s"] or Decimal("0"))
-            for r in (self.roll_reservations
+            for r in (self.stock_reservations
                       .filter(order_item__isnull=False)
                       .values("order_item_id").annotate(s=Sum("meters")))
         }
@@ -807,7 +807,7 @@ class Order(models.Model):
         items = []
         for it in (self.items.all()
                    .select_related("product", "product_variant")
-                   .prefetch_related("roll_reservations__roll")):
+                   .prefetch_related("stock_reservations__stock_item")):
             items.append({
                 "product_title": it.product.title if it.product_id else None,
                 "sku": (it.product_variant.variant_sku if it.product_variant_id
@@ -822,8 +822,8 @@ class Order(models.Model):
                 "custom_height": _f(it.custom_height),
                 "custom_fabric_used_meters": _f(it.custom_fabric_used_meters),
                 "rolls": [
-                    {"barcode": (r.roll.barcode if r.roll_id else None), "meters": _f(r.meters)}
-                    for r in it.roll_reservations.all()
+                    {"barcode": (r.stock_item.barcode if r.stock_item_id else None), "meters": _f(r.meters)}
+                    for r in it.stock_reservations.all()
                 ],
             })
 
@@ -984,7 +984,7 @@ class OrderItem(models.Model):
     )
     # Which physical package this line was packed into — ONLY used for
     # warehouse-untracked (catalog-only) lines, which have no roll to
-    # scan/reserve so OrderRollReservation.pack doesn't apply to them.
+    # scan/reserve so OrderStockReservation.pack doesn't apply to them.
     # Tracked lines are packed via their roll reservations instead; this
     # stays null for them.
     pack = models.ForeignKey(
@@ -1273,17 +1273,37 @@ class Warehouse(models.Model):
         return unit_usd, unit_try
 
     def total_value_usd(self):
-        """Net worth in the base currency (settings.BASE_CURRENCY_CODE), as
-        ONE aggregate query. A combined (ortak) warehouse rolls up its
-        MEMBERS' stock — it owns none."""
+        """Net worth in the base currency, as ONE aggregate query. A
+        combined (ortak) warehouse rolls up its MEMBERS' stock — it owns
+        none.
+
+        Summed over the stock itself, at what each item cost. It used to
+        be quantity x the SKU's cost_usd, which is a last-purchase price:
+        a dearer delivery silently revalued everything already on the
+        shelf, and the headline moved without a metre going anywhere. This
+        is the same expression accounting.services_ledger._inventory_value
+        counts, so the warehouse page and the balance sheet cannot drift.
+
+        Items with no cost are left out rather than valued through the
+        product's purchase_price, which is what the old expression did —
+        that made 21 items across the install carry a value the ledger
+        would not recognise. They are counted as unvalued on the balance
+        sheet instead, where a missing cost is visible rather than
+        guessed at.
+        """
         from decimal import Decimal
         from django.db.models import Sum, F, DecimalField
         from django.db.models.functions import Coalesce
-        unit_usd, _unit_try = self._total_value_annotations()
         _dec = DecimalField(max_digits=20, decimal_places=4)
-        qs = WarehouseProduct.objects.filter(warehouse_id__in=self.scope_ids())
-        return qs.aggregate(
-            usd=Coalesce(Sum(F("quantity") * unit_usd, output_field=_dec), Decimal("0"), output_field=_dec),
+        return WarehouseProductItem.objects.filter(
+            product__warehouse_id__in=self.scope_ids(),
+            status__in=("in_stock", "partial"),
+            unit_cost_base__isnull=False,
+            meters_remaining__isnull=False,
+        ).aggregate(
+            usd=Coalesce(
+                Sum(F("meters_remaining") * F("unit_cost_base"), output_field=_dec),
+                Decimal("0"), output_field=_dec),
         )["usd"]
 
     def product_count(self):
@@ -1376,6 +1396,62 @@ class WarehouseProduct(models.Model):
             pass
         return None
 
+    @staticmethod
+    def _stock_cost_exprs():
+        """(value, quantity) over the stock standing on this product's floor.
+
+        Correlated subqueries rather than a stored column. The weighted
+        average has to follow every metre that arrives, ships, is cut or
+        is deleted, and more than ten code paths move those metres —
+        several of them by an incremental delta rather than a recompute.
+        A stored average would fall out of step with the shelf at the
+        first one anybody forgot, which is the failure this whole
+        exercise exists to end. Derived, it cannot.
+
+        Only priced items count, in both halves: quantity with no cost
+        in the denominator would report stock cheaper than anything
+        actually on the floor.
+        """
+        from django.db.models import DecimalField, F, OuterRef, Subquery, Sum
+        _dec = DecimalField(max_digits=20, decimal_places=4)
+        priced = (WarehouseProductItem.objects
+                  .filter(product=OuterRef("pk"),
+                          status__in=("in_stock", "partial"),
+                          unit_cost_base__isnull=False,
+                          meters_remaining__isnull=False)
+                  .values("product"))
+        value = Subquery(
+            priced.annotate(v=Sum(F("meters_remaining") * F("unit_cost_base"),
+                                  output_field=_dec)).values("v")[:1],
+            output_field=_dec)
+        metres = Subquery(
+            priced.annotate(m=Sum("meters_remaining", output_field=_dec))
+                  .values("m")[:1],
+            output_field=_dec)
+        return value, metres
+
+    @classmethod
+    def with_stock_costs(cls, qs=None):
+        """Annotate `stock_value`, `stock_quantity` and `avg_cost`.
+
+        `avg_cost` is what one unit of this SKU actually cost, weighted
+        by quantity — NOT the plain mean of the items, which would let a
+        5 m remnant count for as much as a 400 m bolt. `stock_value` is the
+        exact figure the balance sheet counts, so a list total and the
+        books agree by construction rather than by coincidence.
+        """
+        from django.db.models import Case, DecimalField, F, When
+        _dec = DecimalField(max_digits=20, decimal_places=4)
+        value, metres = cls._stock_cost_exprs()
+        return (
+            (cls.objects.all() if qs is None else qs)
+            .annotate(stock_value=value, stock_quantity=metres)
+            .annotate(avg_cost=Case(
+                When(stock_quantity__gt=0,
+                     then=F("stock_value") / F("stock_quantity")),
+                default=None, output_field=_dec))
+        )
+
     def unit_cost_usd(self):
         """Best-effort unit cost in USD. Prefers the stored cost_usd
         field; falls back to purchase_price converted from the
@@ -1426,7 +1502,7 @@ class WarehouseProduct(models.Model):
         return (self.quantity or 0) * unit
 
 
-class WarehouseProductRoll(models.Model):
+class WarehouseProductItem(models.Model):
     """A single physical roll/bale of a WarehouseProduct. Each scan
     via the warehouse camera adds one of these. The parent
     WarehouseProduct.quantity is the rolled-up sum of all roll
@@ -1440,7 +1516,7 @@ class WarehouseProductRoll(models.Model):
 
     product = models.ForeignKey(
         WarehouseProduct,
-        related_name="rolls",
+        related_name="stock_items",
         on_delete=models.CASCADE,
     )
     meters = models.DecimalField(
@@ -1474,7 +1550,7 @@ class WarehouseProductRoll(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="scanned_rolls",
+        related_name="scanned_stock_items",
     )
     # The captured label photo, on the CDN. Bunny rather than the local disk
     # because the app runs on a container with no mounted volume: every
@@ -1498,15 +1574,33 @@ class WarehouseProductRoll(models.Model):
         blank=True, null=True,
         help_text="Raw OCR text — useful for debugging misreads",
     )
-    # The purchase-invoice LINE this physical top was received against —
+    # The purchase-invoice LINE this physical stock item was received against —
     # lets the purchase-order detail page drill all the way down from
-    # "we bought 115m of seta grey from deneme" to the exact tops that
+    # "we bought 115m of seta grey from deneme" to the exact stock items that
     # arrived. Set at intake time (WarehouseManualAdd); SET_NULL so
     # deleting/cancelling an invoice never deletes real warehouse stock.
     purchase_invoice_item = models.ForeignKey(
         "accounting.InvoiceItem",
         on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="warehouse_rolls",
+        related_name="warehouse_stock_items",
+    )
+    # What THIS item cost, stamped once when it was received and never
+    # rewritten. WarehouseProduct.cost_usd is a last-purchase price: the
+    # intake path overwrites it every time a batch arrives at a new price,
+    # which retroactively revalues fabric bought months ago. That is fine
+    # for "what would this cost to replace" and wrong for the ledger,
+    # where account 1300 is built from what was actually paid. Crediting
+    # stock out at a price nobody paid makes 1300 drift from the shelf
+    # with no entry that could ever explain the difference.
+    #
+    # Base currency, meaning the base currency of the book that owns this
+    # item's warehouse (product.warehouse.accounting_book). Every book is
+    # USD today, so intake stamps this straight from cost_usd; a book
+    # based on anything else has to convert at intake, which is the one
+    # place that knows the rate on the day the goods arrived.
+    unit_cost_base = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True,
+        help_text="Unit cost when received, in the owning book's base currency",
     )
 
     class Meta:
@@ -1560,12 +1654,12 @@ class StockMovement(models.Model):
         related_name="movements",
         on_delete=models.CASCADE,
     )
-    roll = models.ForeignKey(
-        WarehouseProductRoll,
+    stock_item = models.ForeignKey(
+        WarehouseProductItem,
         related_name="movements",
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        help_text="The specific roll affected, when applicable",
+        help_text="The specific stock item affected, when applicable",
     )
     movement_type = models.CharField(
         max_length=16, choices=TYPE_CHOICES, db_index=True,
@@ -1581,7 +1675,7 @@ class StockMovement(models.Model):
     #
     # `reason`/`reference` are free text ("Order ship Order #241"), which
     # is fine to read and useless to join on. Shipping writes BOTH a
-    # consumed OrderRollReservation and this ledger row for the same
+    # consumed OrderStockReservation and this ledger row for the same
     # metres, and with nothing linking them, code reporting where a roll
     # went had to guess which pairs were the same event — by amount, since
     # timestamps can straddle midnight. These two FKs make the pairing a
@@ -1599,7 +1693,7 @@ class StockMovement(models.Model):
         help_text="The order this movement was made for, when applicable.",
     )
     reservation = models.ForeignKey(
-        "OrderRollReservation",
+        "OrderStockReservation",
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name="stock_movements",
@@ -1624,7 +1718,7 @@ class StockMovement(models.Model):
         return f"{sign}{self.quantity}m · {self.product.sku or self.product.name} · {self.created_at:%Y-%m-%d}"
 
 
-class OrderRollReservation(models.Model):
+class OrderStockReservation(models.Model):
     """A soft hold on a specific physical roll for an order, created the
     moment that roll is picked for it — by scanning a barcode into a line
     on the order create/edit form, by the packing scan, or by the retail
@@ -1643,15 +1737,15 @@ class OrderRollReservation(models.Model):
     Applies to BOTH manual and retail (Perakende) orders."""
 
     order = models.ForeignKey(
-        Order, related_name="roll_reservations", on_delete=models.CASCADE,
+        Order, related_name="stock_reservations", on_delete=models.CASCADE,
     )
     order_item = models.ForeignKey(
-        OrderItem, related_name="roll_reservations",
+        OrderItem, related_name="stock_reservations",
         on_delete=models.SET_NULL, null=True, blank=True,
         help_text="The order line this roll helps fulfil (best-effort).",
     )
-    roll = models.ForeignKey(
-        WarehouseProductRoll, related_name="reservations",
+    stock_item = models.ForeignKey(
+        WarehouseProductItem, related_name="reservations",
         on_delete=models.CASCADE,
     )
     # Denormalised so the warehouse list + detail pages can roll up
@@ -1671,15 +1765,15 @@ class OrderRollReservation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="roll_reservations",
+        related_name="stock_reservations",
     )
-    # Which physical package (Pack) this scanned top was dragged into on
+    # Which physical package (Pack) this scanned stock item was dragged into on
     # the packing screen — non-retail orders only (retail keeps the flat
     # list). Null = not yet assigned to a package. SET_NULL on pack
-    # delete so its tops fall back to "unassigned" instead of vanishing.
+    # delete so its stock items fall back to "unassigned" instead of vanishing.
     pack = models.ForeignKey(
         "Pack", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="roll_reservations",
+        related_name="stock_reservations",
     )
 
     class Meta:
@@ -1687,11 +1781,11 @@ class OrderRollReservation(models.Model):
         indexes = [
             models.Index(fields=["order", "consumed"]),
             models.Index(fields=["warehouse_product", "consumed"]),
-            models.Index(fields=["roll", "consumed"]),
+            models.Index(fields=["stock_item", "consumed"]),
         ]
 
     def __str__(self):
-        return f"Reserve {self.meters}m · roll #{self.roll_id} · order #{self.order_id}"
+        return f"Reserve {self.meters}m · item #{self.stock_item_id} · order #{self.order_id}"
 
 
 class OrderChange(models.Model):

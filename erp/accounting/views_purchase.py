@@ -5,7 +5,7 @@ by operating.WarehouseManualAdd on stock intake), deliberately NOT the
 generic invoice list/detail. Where the invoice pages show accounting
 fields (VAT, e-Arşiv, payment allocations…), these show what a buyer
 actually wants to see: which supplier, which products, which physical
-tops (rolls) arrived, and how much it cost.
+stock items (rolls) arrived, and how much it cost.
 
     /accounting/accounts/purchases/           → PurchaseOrderList
     /accounting/accounts/purchases/<id>/      → PurchaseOrderDetail
@@ -42,7 +42,7 @@ def _fallback_code_prefix():
     return _fallback_prefix()
 
 from operating.models import (
-    StockMovement, Warehouse, WarehouseProduct, WarehouseProductRoll,
+    StockMovement, Warehouse, WarehouseProduct, WarehouseProductItem,
 )
 
 
@@ -92,7 +92,7 @@ class PurchaseOrderList(View):
         # Edit icon doesn't cost an extra query per row.
         warehouse_by_invoice = {}
         for inv_id, wh_id in (
-            WarehouseProductRoll.objects
+            WarehouseProductItem.objects
             .filter(purchase_invoice_item__invoice_id__in=[i.pk for i in invoices])
             .values_list("purchase_invoice_item__invoice_id", "product__warehouse_id")
         ):
@@ -137,8 +137,8 @@ class PurchaseOrderDetail(View):
             .select_related("product", "variant")
             .prefetch_related(
                 Prefetch(
-                    "warehouse_rolls",
-                    queryset=WarehouseProductRoll.objects.select_related("product", "product__warehouse"),
+                    "warehouse_stock_items",
+                    queryset=WarehouseProductItem.objects.select_related("product", "product__warehouse"),
                 )
             )
             .order_by("line_no")
@@ -168,7 +168,7 @@ def purchase_warehouse_id(invoice_pk):
     can no longer be edited, only viewed or cancelled.
     """
     return (
-        WarehouseProductRoll.objects
+        WarehouseProductItem.objects
         .filter(purchase_invoice_item__invoice_id=invoice_pk)
         .values_list("product__warehouse_id", flat=True)
         .first()
@@ -196,7 +196,7 @@ class PurchaseItemLabels(View):
             pk=item_pk, invoice_id=pk, invoice__type="purchase",
         )
         rolls = list(
-            item.warehouse_rolls
+            item.warehouse_stock_items
             .select_related("product", "product__warehouse")
             .order_by("id")
         )
@@ -215,13 +215,13 @@ class PurchaseItemLabels(View):
 @method_decorator(login_required, name="dispatch")
 class GoodsReceipt(View):
     """"Mal kabul" — the full-page form that receives a delivery into a
-    warehouse: it creates the stock (products, variants, physical tops)
+    warehouse: it creates the stock (products, variants, physical stock_items)
     AND the supplier purchase invoice in one atomic submit.
 
     A page rather than the warehouse sidebar it grew out of, because a
     delivery is a document of its own: it is entered from the purchases
     list, it is what a purchase record is made of, and it is long enough
-    (several products, each with variants and tops) to deserve the room.
+    (several products, each with variants and stock_items) to deserve the room.
 
     Both modes render the SAME template; the form itself talks to the
     warehouse endpoints that own the write side:
@@ -486,7 +486,7 @@ class PurchaseOrderConfirm(View):
     """Confirm an order: receive it into the warehouse.
 
     This is the moment the document stops being a plan — the products,
-    variants and physical tops it describes are created, and the order is
+    variants and physical stock items it describes are created, and the order is
     issued so the supplier is owed for them. All of it in ONE transaction,
     so a failure leaves the order exactly as it was, still a draft, still
     confirmable.
@@ -553,7 +553,7 @@ class PurchaseOrderPrint(View):
         items = list(invoice.items.order_by("line_no"))
         plan = invoice.intake_plan or {}
         # Roll counts come from the plan while the order is still an order,
-        # and from the real tops once it has been received — the document
+        # and from the real stock items once it has been received — the document
         # says the same thing either side of confirmation.
         rolls_by_line = {}
         if invoice.status == "draft":
@@ -561,15 +561,15 @@ class PurchaseOrderPrint(View):
             line_no = 0
             for p_in in (plan.get("products") or []):
                 for v_in in (p_in.get("variants") or []):
-                    tops = [t for t in (v_in.get("tops") or [])
+                    stock_items = [t for t in (v_in.get("tops") or [])
                             if str(t.get("qty") or "0").strip() not in ("", "0")]
-                    if not tops:
+                    if not stock_items:
                         continue
                     line_no += 1
-                    rolls_by_line[line_no] = len(tops)
+                    rolls_by_line[line_no] = len(stock_items)
         else:
             for it in items:
-                rolls_by_line[it.line_no] = it.warehouse_rolls.count()
+                rolls_by_line[it.line_no] = it.warehouse_stock_items.count()
         for it in items:
             it.roll_count = rolls_by_line.get(it.line_no, 0)
 
@@ -584,7 +584,7 @@ class PurchaseOrderPrint(View):
 
 class PurchaseCancelBlocked(Exception):
     """Raised by cancel_purchase_invoice() when the cancel can't proceed
-    because one or more tops are already reserved into a customer order.
+    because one or more stock items are already reserved into a customer order.
     Carries `.blockers` — [{"barcode": ..., "order_ids": [...]}, ...]."""
     def __init__(self, message, blockers=None):
         super().__init__(message)
@@ -592,14 +592,14 @@ class PurchaseCancelBlocked(Exception):
 
 
 def cancel_purchase_invoice(invoice_pk, user):
-    """Cancel a purchase invoice: hard-deletes every physical top it
+    """Cancel a purchase invoice: hard-deletes every physical stock item it
     brought in (after confirming NONE has ever been reserved into a
     customer order — checked and acted on under a row lock in the SAME
     transaction, so a concurrent scan can't slip past the check), then
     cancels the invoice/cari via Invoice.cancel() (which deletes the
     posted supplier-debt movement and recomputes the balance).
 
-    Raises PurchaseCancelBlocked (nothing mutated) if any top is reserved,
+    Raises PurchaseCancelBlocked (nothing mutated) if any stock item is reserved,
     or Invoice.DoesNotExist / ValueError if the invoice can't be cancelled.
     Returns the now-cancelled Invoice.
 
@@ -616,7 +616,7 @@ def cancel_purchase_invoice(invoice_pk, user):
             raise ValueError("Bu alım zaten iptal edilmiş.")
 
         rolls = list(
-            WarehouseProductRoll.objects
+            WarehouseProductItem.objects
             .filter(purchase_invoice_item__invoice=invoice)
             .select_for_update()
             .select_related("product")
@@ -639,7 +639,7 @@ def cancel_purchase_invoice(invoice_pk, user):
             wp = roll.product
             touched_wp_ids.add(wp.pk)
             StockMovement.objects.create(
-                product=wp, roll=None, movement_type="adjustment",
+                product=wp, stock_item=None, movement_type="adjustment",
                 quantity=-(roll.meters_remaining if roll.meters_remaining is not None else roll.meters),
                 reason="Purchase cancelled",
                 reference=roll.barcode, created_by=user,
@@ -651,7 +651,7 @@ def cancel_purchase_invoice(invoice_pk, user):
             if wp is None:
                 continue
             total = Decimal("0")
-            for r in wp.rolls.all():
+            for r in wp.stock_items.all():
                 rem = r.meters_remaining if r.meters_remaining is not None else (r.meters or Decimal("0"))
                 total += rem or Decimal("0")
             wp.quantity = total
@@ -664,9 +664,9 @@ def cancel_purchase_invoice(invoice_pk, user):
 
 @method_decorator(login_required, name="dispatch")
 class PurchaseCancel(View):
-    """Cancel a purchase — irreversible: hard-deletes every physical top
+    """Cancel a purchase — irreversible: hard-deletes every physical stock item
     it brought in, then cancels the invoice/cari. Blocked entirely (no
-    partial cancel) if ANY of its tops has ever been reserved into a
+    partial cancel) if ANY of its stock items has ever been reserved into a
     customer order.
 
     Admin-gated like other destructive warehouse actions — the stock is

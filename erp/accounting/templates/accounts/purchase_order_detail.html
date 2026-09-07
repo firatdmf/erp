@@ -163,7 +163,7 @@
 
     <div class="po-rolls-h">
       <i data-lucide="layers"></i> {% trans "Physical rolls received" %}
-      {% if it.warehouse_rolls.all %}
+      {% if it.warehouse_stock_items.all %}
       <a class="po-rolls-print" target="_blank" rel="noopener"
          href="{% url 'accounts:purchase_item_labels' invoice.pk it.pk %}"
          title="{% trans 'One label per roll on this line, as one PDF' %}">
@@ -171,9 +171,9 @@
       </a>
       {% endif %}
     </div>
-    {% if it.warehouse_rolls.all %}
+    {% if it.warehouse_stock_items.all %}
     <div class="po-rolls">
-      {% for r in it.warehouse_rolls.all %}
+      {% for r in it.warehouse_stock_items.all %}
       <div class="po-roll">
         <code>{{ r.barcode|default:"—" }}</code>
         <span class="m">{{ r.meters|floatformat:2 }} m</span>

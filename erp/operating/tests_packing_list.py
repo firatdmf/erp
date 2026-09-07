@@ -15,8 +15,8 @@ from accounting.models import Book
 from marketing.models import (Product, ProductCategory, ProductVariant,
                               ProductVariantAttribute,
                               ProductVariantAttributeValue)
-from .models import (Order, OrderItem, OrderRollReservation, Pack, Warehouse,
-                     WarehouseProduct, WarehouseProductRoll)
+from .models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
+                     WarehouseProduct, WarehouseProductItem)
 from .views import (_long_date, _pack_roll_rows, _product_type_label,
                     _variant_label)
 
@@ -56,11 +56,11 @@ class PackingListColumns(TestCase):
                     product_variant=variant)
                 wp = WarehouseProduct.objects.create(
                     warehouse=wh, name=product.title, sku=product.sku, quantity=50)
-                roll = WarehouseProductRoll.objects.create(
+                roll = WarehouseProductItem.objects.create(
                     product=wp, meters=Decimal("50.00"),
                     meters_remaining=Decimal("50.00"), barcode=f"BC{pack_no}{i}")
-                OrderRollReservation.objects.create(
-                    order=self.order, order_item=item, roll=roll,
+                OrderStockReservation.objects.create(
+                    order=self.order, order_item=item, stock_item=roll,
                     warehouse_product=wp, meters=Decimal("32.45"), pack=pack)
 
     def test_rows_carry_the_product_type(self):

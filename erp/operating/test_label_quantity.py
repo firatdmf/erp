@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book
-from operating.models import Warehouse, WarehouseProduct, WarehouseProductRoll
+from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
 class LabelShowsRemainingMetersTest(TestCase):
@@ -45,7 +45,7 @@ class LabelShowsRemainingMetersTest(TestCase):
         return [s.decode("latin-1") for s in re.findall(rb"\((.*?)\)\s*Tj", resp.content)]
 
     def test_cut_roll_prints_what_is_left(self):
-        roll = WarehouseProductRoll.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=self.wp, meters=Decimal("18.50"),
             meters_remaining=Decimal("12.90"), status="partial",
             barcode="KAR0001468")
@@ -56,14 +56,14 @@ class LabelShowsRemainingMetersTest(TestCase):
     def test_uncut_roll_still_prints_its_full_length(self):
         # meters_remaining is null until the first cut — the label has to
         # fall back to meters there rather than printing 0.00.
-        roll = WarehouseProductRoll.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=self.wp, meters=Decimal("18.50"), barcode="KAR0001469")
         self.assertIn("18.50", self._drawn_strings(roll))
 
     def test_fully_consumed_roll_prints_zero(self):
         # A consumed roll only prints when asked for by pk; it should say
         # it's empty rather than advertise the length it once had.
-        roll = WarehouseProductRoll.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=self.wp, meters=Decimal("18.50"),
             meters_remaining=Decimal("0.00"), status="consumed",
             barcode="KAR0001470")

@@ -1,7 +1,7 @@
 # to run this test, use the command:
 # python manage.py test operating.test_pack_scan_totals
 
-"""The packing screen's package headers: how many tops are in a sack and
+"""The packing screen's package headers: how many stock items are in a sack and
 how many metres they carry."""
 from decimal import Decimal
 from unittest.mock import patch
@@ -12,8 +12,8 @@ from django.urls import reverse
 
 from accounting.models import Book
 from marketing.models import Product, ProductCategory
-from .models import (Order, OrderItem, OrderRollReservation, Pack, Warehouse,
-                     WarehouseProduct, WarehouseProductRoll)
+from .models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
+                     WarehouseProduct, WarehouseProductItem)
 
 
 class PackHeaderTotals(TestCase):
@@ -27,10 +27,10 @@ class PackHeaderTotals(TestCase):
         self.pack2 = Pack.objects.create(order=self.order, pack_number=2)
 
         self.item = self._tracked_item("Bergamo", "BRG-01")
-        # Two tops in package 1, one of them cut down to 12.50 of its 40 m.
+        # Two stock items in package 1, one of them cut down to 12.50 of its 40 m.
         self._reserve("BC1", Decimal("40.00"), Decimal("40.00"), self.pack1)
         self._reserve("BC2", Decimal("40.00"), Decimal("12.50"), self.pack1)
-        # One top in package 2, and one scanned but not yet in any package.
+        # One stock item in package 2, and one scanned but not yet in any package.
         self._reserve("BC3", Decimal("25.00"), Decimal("25.00"), self.pack2)
         self._reserve("BC4", Decimal("18.00"), Decimal("18.00"), None)
 
@@ -48,11 +48,11 @@ class PackHeaderTotals(TestCase):
                                         quantity=Decimal("100.00"), price=10)
 
     def _reserve(self, barcode, roll_meters, reserved, pack):
-        roll = WarehouseProductRoll.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=self.wp, meters=roll_meters, meters_remaining=roll_meters,
             barcode=barcode)
-        return OrderRollReservation.objects.create(
-            order=self.order, order_item=self.item, roll=roll,
+        return OrderStockReservation.objects.create(
+            order=self.order, order_item=self.item, stock_item=roll,
             warehouse_product=self.wp, meters=reserved, pack=pack)
 
     def _packs(self):
@@ -61,20 +61,20 @@ class PackHeaderTotals(TestCase):
         self.assertEqual(resp.status_code, 200)
         return resp, {p.pack_number: p for p in resp.context["packs"]}
 
-    def test_each_package_carries_its_own_tops_and_metres(self):
+    def test_each_package_carries_its_own_stock_and_metres(self):
         _, packs = self._packs()
         self.assertEqual(packs[1].roll_count, 2)
         self.assertEqual(packs[1].total_meters, Decimal("52.50"))
         self.assertEqual(packs[2].roll_count, 1)
         self.assertEqual(packs[2].total_meters, Decimal("25.00"))
 
-    def test_a_cut_top_counts_what_was_reserved_not_the_whole_roll(self):
+    def test_a_cut_stock_item_counts_what_was_reserved_not_the_whole_roll(self):
         # BC2 is a 40 m roll cut to 12.50 for this order; the sack holds
         # 12.50, so that is what the header has to say.
         _, packs = self._packs()
         self.assertEqual(packs[1].total_meters, Decimal("52.50"))
 
-    def test_an_unassigned_top_belongs_to_no_package(self):
+    def test_an_unassigned_stock_item_belongs_to_no_package(self):
         _, packs = self._packs()
         self.assertEqual(sum(p.roll_count for p in packs.values()), 3)
         self.assertEqual(sum(p.total_meters for p in packs.values()),
@@ -197,7 +197,7 @@ class ScanningStraightIntoAPackage(TestCase):
             warehouse=self.wh, name="Bergamo", sku="BRG-01", quantity=Decimal("100.00"))
         self.item = OrderItem.objects.create(order=self.order, product=product,
                                              quantity=Decimal("100.00"), price=10)
-        self.roll = WarehouseProductRoll.objects.create(
+        self.stock_item = WarehouseProductItem.objects.create(
             product=self.wp, meters=Decimal("40.00"),
             meters_remaining=Decimal("40.00"), barcode="SCAN-1")
         self.client.force_login(User.objects.create_superuser("p3", "p3@a.b", "pw"))
@@ -211,7 +211,7 @@ class ScanningStraightIntoAPackage(TestCase):
         data = self._scan(pack_id=self.pack2.pk).json()
         self.assertTrue(data["ok"])
         self.assertEqual(data["reservation"]["pack_id"], self.pack2.pk)
-        self.assertEqual(OrderRollReservation.objects.get(roll=self.roll).pack_id, self.pack2.pk)
+        self.assertEqual(OrderStockReservation.objects.get(stock_item=self.stock_item).pack_id, self.pack2.pk)
 
     def test_a_scan_with_no_package_still_lands_loose(self):
         data = self._scan().json()
@@ -225,8 +225,8 @@ class ScanningStraightIntoAPackage(TestCase):
         data = self._scan(pack_id=self.pack2.pk).json()
         self.assertTrue(data["duplicate"])
         self.assertTrue(data["moved"])
-        self.assertEqual(OrderRollReservation.objects.get(roll=self.roll).pack_id, self.pack2.pk)
-        self.assertEqual(OrderRollReservation.objects.filter(roll=self.roll).count(), 1)
+        self.assertEqual(OrderStockReservation.objects.get(stock_item=self.stock_item).pack_id, self.pack2.pk)
+        self.assertEqual(OrderStockReservation.objects.filter(stock_item=self.stock_item).count(), 1)
 
     def test_rescanning_into_the_same_package_changes_nothing(self):
         self._scan(pack_id=self.pack1.pk)
@@ -241,7 +241,7 @@ class ScanningStraightIntoAPackage(TestCase):
         resp = self._scan(pack_id=self.pack1.pk, place_only="1")
         self.assertEqual(resp.status_code, 409)
         self.assertEqual(resp.json()["kind"], "not_in_order")
-        self.assertFalse(OrderRollReservation.objects.filter(roll=self.roll).exists())
+        self.assertFalse(OrderStockReservation.objects.filter(stock_item=self.stock_item).exists())
 
     def test_place_only_puts_a_held_roll_into_the_scanned_package(self):
         self._scan()                                    # the order takes it
@@ -249,14 +249,14 @@ class ScanningStraightIntoAPackage(TestCase):
         self.assertTrue(data["ok"])
         self.assertTrue(data["placed"])
         self.assertTrue(data["moved"])
-        self.assertEqual(OrderRollReservation.objects.get(roll=self.roll).pack_id, self.pack2.pk)
+        self.assertEqual(OrderStockReservation.objects.get(stock_item=self.stock_item).pack_id, self.pack2.pk)
 
     def test_place_only_leaves_a_roll_already_in_that_package_alone(self):
         self._scan(pack_id=self.pack2.pk)
         data = self._scan(pack_id=self.pack2.pk, place_only="1").json()
         self.assertTrue(data["placed"])
         self.assertFalse(data["moved"])
-        self.assertEqual(OrderRollReservation.objects.filter(roll=self.roll).count(), 1)
+        self.assertEqual(OrderStockReservation.objects.filter(stock_item=self.stock_item).count(), 1)
 
     def test_a_preview_reports_the_roll_without_writing_anything(self):
         """The screen shows what it found and waits for a confirm, so the
@@ -269,8 +269,8 @@ class ScanningStraightIntoAPackage(TestCase):
         self.assertEqual(data["pack_number"], self.pack1.pack_number)
         self.assertEqual(data["reservation"]["barcode"], "SCAN-1")
         # Untouched: still in package 1, still exactly one reservation.
-        self.assertEqual(OrderRollReservation.objects.get(roll=self.roll).pack_id, self.pack1.pk)
-        self.assertEqual(OrderRollReservation.objects.count(), 1)
+        self.assertEqual(OrderStockReservation.objects.get(stock_item=self.stock_item).pack_id, self.pack1.pk)
+        self.assertEqual(OrderStockReservation.objects.count(), 1)
 
     def test_a_preview_knows_when_the_roll_is_already_in_that_package(self):
         self._scan(pack_id=self.pack2.pk)
@@ -281,11 +281,11 @@ class ScanningStraightIntoAPackage(TestCase):
         resp = self._scan(pack_id=self.pack1.pk, place_only="1", preview="1")
         self.assertEqual(resp.status_code, 409)
         self.assertEqual(resp.json()["kind"], "not_in_order")
-        self.assertFalse(OrderRollReservation.objects.exists())
+        self.assertFalse(OrderStockReservation.objects.exists())
 
     def test_a_package_from_another_order_is_refused(self):
         other = Pack.objects.create(order=Order.objects.create(order_number="DK0000295"),
                                     pack_number=1)
         resp = self._scan(pack_id=other.pk)
         self.assertEqual(resp.status_code, 404)
-        self.assertFalse(OrderRollReservation.objects.filter(roll=self.roll).exists())
+        self.assertFalse(OrderStockReservation.objects.filter(stock_item=self.stock_item).exists())

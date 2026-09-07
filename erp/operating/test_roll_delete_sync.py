@@ -13,7 +13,7 @@ from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CariAccount
 from marketing.models import Product, ProductVariant
 from operating.models import (
-    StockMovement, Warehouse, WarehouseProduct, WarehouseProductRoll,
+    StockMovement, Warehouse, WarehouseProduct, WarehouseProductItem,
 )
 
 
@@ -36,7 +36,7 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="MARLETTOO", sku="N1464T.G54",
             quantity=Decimal("33.66"), catalog_variant=self.variant)
-        self.roll = WarehouseProductRoll.objects.create(
+        self.stock_item = WarehouseProductItem.objects.create(
             product=self.wp, meters=Decimal("33.66"), barcode="2000043130007")
 
     def _delete(self, roll):
@@ -47,7 +47,7 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
             headers={"x-requested-with": "XMLHttpRequest"})
 
     def test_both_sides_come_down_together(self):
-        r = self._delete(self.roll)
+        r = self._delete(self.stock_item)
         self.assertEqual(r.status_code, 200, r.content)
         self.wp.refresh_from_db()
         self.variant.refresh_from_db()
@@ -57,7 +57,7 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
     def test_it_is_still_a_correction_not_a_sale(self):
         """The distinction is deliberate: real stock-out happens when an
         order ships, so a deleted roll must never inflate Stock out."""
-        self._delete(self.roll)
+        self._delete(self.stock_item)
         kinds = list(StockMovement.objects.filter(product=self.wp)
                      .values_list("movement_type", flat=True))
         self.assertIn("adjustment", kinds)
@@ -69,7 +69,7 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
         StockMovement.objects.create(
             product=self.wp, movement_type="in", quantity=Decimal("33.66"),
             reason="Roll scanned")
-        self._delete(self.roll)
+        self._delete(self.stock_item)
         r = self.client.get(reverse("operating:warehouse_product_detail",
                                     args=[self.warehouse.pk, self.wp.pk]))
         ctx = r.context
@@ -82,13 +82,13 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
 
 
 class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
-    """A barcode identifies one physical top, so it never lands on the parent.
+    """A barcode identifies one physical stock item, so it never lands on the parent.
 
     Intake used to copy the first roll's code onto WarehouseProduct.barcode.
     That made the product advertise a code belonging to a single roll, and
     _barcode_taken() checks products as well as rolls — so once the roll was
     deleted the code stayed reserved against something that no longer
-    existed, and re-entering the same top was refused as a duplicate.
+    existed, and re-entering the same stock item was refused as a duplicate.
     """
 
     def setUp(self):
@@ -121,13 +121,13 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
         self.assertEqual(self._receive("2000043130007").status_code, 200)
         wp = WarehouseProduct.objects.get(sku="K24644.G07")
         self.assertIsNone(wp.barcode)
-        self.assertEqual(wp.rolls.get().barcode, "2000043130007")
+        self.assertEqual(wp.stock_items.get().barcode, "2000043130007")
 
     def test_the_code_is_reusable_once_its_roll_is_deleted(self):
         from operating.views_warehouse import _barcode_taken
         self._receive("2000043130007")
         wp = WarehouseProduct.objects.get(sku="K24644.G07")
-        roll = wp.rolls.get()
+        roll = wp.stock_items.get()
         self.assertTrue(_barcode_taken("2000043130007"))   # the roll holds it
 
         r = self.client.post(
@@ -137,7 +137,7 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertFalse(_barcode_taken("2000043130007"))
 
-        # ...and the same top can be entered again, which is the whole point.
+        # ...and the same stock item can be entered again, which is the whole point.
         # (Against the EXISTING product — its main SKU is taken now, as it
         # should be; only the barcode had to be released.)
         existing = Product.objects.get(sku="K24644")
@@ -145,7 +145,7 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
                               main={"mode": "existing", "id": existing.pk})
         self.assertEqual(again.status_code, 200, again.content)
         self.assertEqual(
-            WarehouseProductRoll.objects.filter(barcode="2000043130007").count(), 1)
+            WarehouseProductItem.objects.filter(barcode="2000043130007").count(), 1)
 
     def test_a_hand_entered_product_barcode_survives_roll_changes(self):
         """The field is now only ever set deliberately, so nothing may wipe
@@ -155,7 +155,7 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
         wp.barcode = "ARTICLE-8690000"
         wp.save(update_fields=["barcode"])
 
-        roll = wp.rolls.get()
+        roll = wp.stock_items.get()
         self.client.post(
             reverse("operating:warehouse_roll_delete",
                     args=[self.warehouse.pk, wp.pk, roll.pk]),

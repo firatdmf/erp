@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views import View
 
-from .models import Warehouse, WarehouseProduct, WarehouseProductRoll, StockMovement
+from .models import Warehouse, WarehouseProduct, WarehouseProductItem, StockMovement
 from marketing.models import SKU_MAX_LENGTH
 
 
@@ -111,12 +111,12 @@ def _roll_reservation_info(roll):
 
     Returns None when the roll is free."""
     from django.utils.timezone import localtime
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
 
     held = []
     total = Decimal("0")
-    for res in (OrderRollReservation.objects
-                .filter(roll=roll, consumed=False)
+    for res in (OrderStockReservation.objects
+                .filter(stock_item=roll, consumed=False)
                 .select_related("order", "order_item__product",
                                 "order_item__product_variant")
                 .order_by("-created_at", "-id")):
@@ -175,7 +175,7 @@ def _roll_usage_info(roll):
 
     entries = []
     for mv in (StockMovement.objects
-               .filter(roll=roll, movement_type="out")
+               .filter(stock_item=roll, movement_type="out")
                .select_related("created_by", "order",
                                "reservation__order_item__product",
                                "reservation__order_item__product_variant")
@@ -243,12 +243,12 @@ ROLL_SCAN_CDN_FOLDER = "Operating/roll_scans"
 
 def _roll_photo_filename(product, barcode, original_name):
     """Name a label photo `<product sku>_<variant sku>_<barcode>`, so someone
-    browsing the CDN can tell which top a photo shows without the database.
+    browsing the CDN can tell which stock item a photo shows without the database.
 
     Each part may be missing, and an absent one is dropped rather than
     leaving an empty gap: only 1,232 of 2,072 warehouse products carry a
     catalog link at all (2 of 841 in Ergene), so the parent product SKU is
-    often unknown, and tops arrive from the factory with no barcode. A
+    often unknown, and stock items arrive from the factory with no barcode. A
     repeated part is dropped too — the warehouse SKU and the variant SKU are
     the same string on every row that has both.
 
@@ -260,7 +260,7 @@ def _roll_photo_filename(product, barcode, original_name):
 
     WITHOUT one, a short random suffix is added. Postgres lets NULLs repeat
     under a unique constraint and the scan form does not require a barcode,
-    so two unlabelled tops of the same product would otherwise land on one
+    so two unlabelled stock items of the same product would otherwise land on one
     object and the first photo would be destroyed with nothing raised.
     """
     import os
@@ -298,7 +298,7 @@ def _store_roll_label_image(image, product=None, barcode=None):
     """Put a scanned label photo somewhere it will survive, and say where.
 
     Returns `(cdn_url, local_file)`, at most one of which is set — they map
-    straight onto WarehouseProductRoll.image_url / .source_image.
+    straight onto WarehouseProductItem.image_url / .source_image.
 
     Bunny first, because MEDIA_ROOT is a container path with no volume
     mounted: photos written there vanish on the next deploy, which is how
@@ -344,7 +344,7 @@ def _barcode_taken(code, *, exclude_roll_ids=()):
     code = (code or "").strip()
     if not code:
         return False
-    roll_q = WarehouseProductRoll.objects.filter(barcode__iexact=code)
+    roll_q = WarehouseProductItem.objects.filter(barcode__iexact=code)
     if exclude_roll_ids:
         roll_q = roll_q.exclude(pk__in=list(exclude_roll_ids))
     return (roll_q.exists()
@@ -355,17 +355,17 @@ def _barcode_minter(prefix, reserved=()):
     """Return a closure that mints fresh, GLOBALLY-UNIQUE barcodes of the form
     PREFIX + 6 digits (e.g. KZL000123). Uniqueness is checked against every
     existing roll AND product barcode, plus the ones minted in this batch, so
-    each top across the whole system gets a one-of-a-kind code.
+    each stock item across the whole system gets a one-of-a-kind code.
 
     `reserved` blocks codes that aren't in the database yet — the barcodes
     typed by hand elsewhere in the SAME submit. Without it an auto-minted
-    top could be handed a code a manual top in the same batch is about to
+    stock item could be handed a code a manual stock item in the same batch is about to
     claim, and the two would collide only at write time."""
     import re as _re
     prefix = (prefix or "").upper()[:6] or _fallback_prefix()
     existing = set(str(r).strip() for r in (reserved or ()) if str(r).strip())
     for qs in (
-        WarehouseProductRoll.objects.filter(barcode__startswith=prefix)
+        WarehouseProductItem.objects.filter(barcode__startswith=prefix)
         .values_list("barcode", flat=True),
         WarehouseProduct.objects.filter(barcode__startswith=prefix)
         .values_list("barcode", flat=True),
@@ -455,7 +455,7 @@ def warehouse_barcode_available(request):
     if not code:
         return JsonResponse({"available": False, "reason": "empty"})
 
-    roll = (WarehouseProductRoll.objects
+    roll = (WarehouseProductItem.objects
             .select_related("product", "product__warehouse")
             .filter(barcode__iexact=code).first())
     if roll:
@@ -624,36 +624,45 @@ def _variant_sku_exists(sku):
         return False
 
 
-def _add_tops_to_variant(wp, tops, mint, user, *, notes_supplier=None):
-    """Create a WarehouseProductRoll + StockMovement(in) for each top with a
+def _add_stock_to_variant(wp, stock_items, mint, user, *, notes_supplier=None,
+                         unit_cost=None):
+    """Create a WarehouseProductItem + StockMovement(in) for each stock item with a
     positive qty, recompute wp.quantity from ALL its rolls, and return
     (added_qty, new_roll_ids). Shared by WarehouseManualAdd (create) and
     WarehousePurchaseEdit (edit) so intake and edit never drift into two
     subtly different copies of the same "receive stock" logic. Does NOT sync
     the catalog — call _resync_wp_catalog(wp) separately once all of a
-    request's tops have been applied."""
+    request's stock items have been applied.
+
+    Each item is stamped with what it cost, which is the whole reason
+    the ledger can credit stock out at a price somebody actually paid.
+    The default reads wp.cost_usd, which every caller has just set to the
+    price on the batch being received; `unit_cost` overrides it for a
+    caller that knows better. Stamped once here and never rewritten —
+    wp.cost_usd moves on to the next batch, this does not."""
     first_barcode = None
     added_qty = Decimal("0")
     new_roll_ids = []
-    for t in tops:
+    for t in stock_items:
         qty = _safe_decimal(t.get("qty"))
         if qty is None or qty <= 0:
             continue
-        # A top that arrived already labelled keeps ITS barcode — scanning
+        # A stock item that arrived already labelled keeps ITS barcode — scanning
         # the supplier's own label is the whole point, and re-labelling it
         # would leave the physical roll and our record disagreeing. Callers
         # validate the code for uniqueness BEFORE any writing starts.
         code = (t.get("barcode") or "").strip() or mint()
         if first_barcode is None:
             first_barcode = code
-        roll = WarehouseProductRoll.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=wp, meters=qty, meters_remaining=qty,
             barcode=code,
             notes=(f"Supplier: {notes_supplier}" if notes_supplier else None),
             scanned_by=user,
+            unit_cost_base=(unit_cost if unit_cost is not None else wp.cost_usd),
         )
         StockMovement.objects.create(
-            product=wp, roll=roll, movement_type="in",
+            product=wp, stock_item=roll, movement_type="in",
             quantity=qty, reason="Manual add",
             reference=code, created_by=user,
         )
@@ -661,17 +670,17 @@ def _add_tops_to_variant(wp, tops, mint, user, *, notes_supplier=None):
         new_roll_ids.append(roll.pk)
 
     # Quantity = sum of remaining metres across ALL rolls (covers reusing an
-    # existing same-SKU product, not just the tops just added here).
+    # existing same-SKU product, not just the stock items just added here).
     total = Decimal("0")
-    for rr in wp.rolls.all():
+    for rr in wp.stock_items.all():
         rem = rr.meters_remaining if rr.meters_remaining is not None else (rr.meters or Decimal("0"))
         total += rem or Decimal("0")
     wp.quantity = total
     # WarehouseProduct.barcode is NOT set from a roll. A barcode identifies
-    # one physical top; a product is many of them, so stamping the first
+    # one physical stock item; a product is many of them, so stamping the first
     # one's code onto the parent made it advertise a code that belonged to a
     # single roll — and kept that code reserved after the roll was gone, so
-    # re-entering the same top was refused as a duplicate. The field stays
+    # re-entering the same stock item was refused as a duplicate. The field stays
     # for a product's own article barcode, entered by hand.
     wp.save(update_fields=["quantity", "updated_at"])
     return added_qty, new_roll_ids
@@ -711,7 +720,7 @@ def _resync_wp_catalog(wp):
 
 
 def _barcode_prefix_from_existing(wp, fallback_prefix):
-    """Derive a new top's barcode prefix from an existing roll already on
+    """Derive a new stock item's barcode prefix from an existing roll already on
     this WarehouseProduct, so adding stock to an EXISTING purchase line
     during an edit keeps the same barcode family even if the supplier's
     name has since changed (which would make _consonant_prefix(supplier.name)
@@ -719,7 +728,7 @@ def _barcode_prefix_from_existing(wp, fallback_prefix):
     (the normal supplier-derived prefix) when there's no existing barcode
     to read, e.g. a brand-new line."""
     import re as _re
-    roll = (wp.rolls.exclude(barcode__isnull=True).exclude(barcode="")
+    roll = (wp.stock_items.exclude(barcode__isnull=True).exclude(barcode="")
             .order_by("id").first())
     if roll and roll.barcode:
         m = _re.match(r"^([A-Za-z]+)\d+$", roll.barcode)
@@ -731,13 +740,13 @@ def _barcode_prefix_from_existing(wp, fallback_prefix):
 def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
     """Consolidate every WarehouseProduct in `warehouse` that shares `sku`
     (case-insensitive) into ONE record — the same SKU is the same variant and
-    must never show as two rows. Moves the duplicates' rolls (tops) + stock
+    must never show as two rows. Moves the duplicates' rolls (stock_items) + stock
     movements onto the survivor, recomputes its quantity from all its rolls,
     keeps a single catalog variant (deleting any now-orphaned hidden ones +
     their emptied parent), and deletes the emptied duplicates. Survivor = `keep`
     when given, else the lowest-id match. Returns (survivor, merged_count)."""
     from django.db import transaction as _tx
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     sku = (sku or "").strip()
     if not sku:
         return keep, 0
@@ -752,13 +761,13 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
         for dup in dupes:
             if dup.pk == survivor.pk:
                 continue
-            WarehouseProductRoll.objects.filter(product=dup).update(product=survivor)
+            WarehouseProductItem.objects.filter(product=dup).update(product=survivor)
             StockMovement.objects.filter(product=dup).update(product=survivor)
             # Reservations cascade on warehouse_product, so they have to be
             # re-pointed BEFORE dup.delete() below — otherwise merging two
             # rows of the same SKU silently drops live holds while their
-            # tops survive on the survivor.
-            OrderRollReservation.objects.filter(warehouse_product=dup).update(
+            # stock items survive on the survivor.
+            OrderStockReservation.objects.filter(warehouse_product=dup).update(
                 warehouse_product=survivor)
             if not survivor.catalog_variant_id and dup.catalog_variant_id:
                 survivor.catalog_variant_id = dup.catalog_variant_id
@@ -768,7 +777,7 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
             merged += 1
         # Survivor quantity = sum of remaining metres across ALL its rolls.
         total = Decimal("0")
-        for r in survivor.rolls.all():
+        for r in survivor.stock_items.all():
             rem = r.meters_remaining if r.meters_remaining is not None else (r.meters or Decimal("0"))
             total += rem or Decimal("0")
         survivor.quantity = total
@@ -1061,13 +1070,13 @@ class WarehouseEdit(View):
 
 from django.utils.translation import gettext_lazy as _lz
 # The sort options offered on the warehouse product list. Kept simple:
-# alphabetical by name, by top (roll) quantity, and most-recently-updated.
+# alphabetical by name, by stock item (roll) quantity, and most-recently-updated.
 SORT_OPTIONS = {
     'name_asc':   ('name', _lz('A → Z')),
     'name_desc':  ('-name', _lz('Z → A')),
-    'qty_desc':   ('-quantity', _lz('Top quantity')),
-    'price_desc': ('-cost_usd', _lz('Most expensive')),
-    'price_asc':  ('cost_usd', _lz('Cheapest')),
+    'qty_desc':   ('-quantity', _lz('Stock item quantity')),
+    'price_desc': ('-avg_cost', _lz('Most expensive')),
+    'price_asc':  ('avg_cost', _lz('Cheapest')),
     'recent':     ('-updated_at', _lz('Recently updated')),
 }
 
@@ -1153,7 +1162,7 @@ def warehouse_search_q(search, scope_ids, search_by="text"):
     long digit strings that a typed name or SKU fragment hits by accident, so
     they moved into their own mode the user picks in the UI.
 
-    Roll (top) barcodes are matched with a SUBQUERY rather than a join — a
+    Roll (stock item) barcodes are matched with a SUBQUERY rather than a join — a
     join would multiply the grouped view's Sum() aggregates."""
     from functools import reduce
     import operator
@@ -1166,7 +1175,7 @@ def warehouse_search_q(search, scope_ids, search_by="text"):
                       (Q(**{f"{field}__icontains": v}) for v in variants))
 
     if search_by == "barcode":
-        roll_match = (WarehouseProductRoll.objects
+        roll_match = (WarehouseProductItem.objects
                       .filter(product__warehouse_id__in=scope_ids)
                       .filter(_field_q("barcode"))
                       .values("product_id"))
@@ -1206,7 +1215,7 @@ class WarehouseDetail(View):
 
         base_qs = (WarehouseProduct.objects
                    .filter(warehouse_id__in=scope_ids)
-                   .select_related('warehouse'))
+                   .select_related('warehouse__accounting_book__base_currency'))
         if not show_empty:
             base_qs = base_qs.exclude(quantity=0)
         if search:
@@ -1218,9 +1227,9 @@ class WarehouseDetail(View):
         # metres column uses, so the filter and the number always agree.
         # Applied to base_qs — the flat and grouped modes both build on it.
         if reserved_only:
-            from .models import OrderRollReservation
+            from .models import OrderStockReservation
             base_qs = base_qs.filter(
-                id__in=(OrderRollReservation.objects
+                id__in=(OrderStockReservation.objects
                         .filter(consumed=False)
                         .values("warehouse_product_id"))
             )
@@ -1236,24 +1245,24 @@ class WarehouseDetail(View):
 
         if view_mode == 'variants':
             # ── FLAT: list EVERY variant (WarehouseProduct) individually. ──
-            flat = (base_qs
+            flat = (WarehouseProduct.with_stock_costs(base_qs)
                     .select_related('catalog_variant__product')
                     .annotate(base=base_expr,
-                              roll_count=Count('rolls', filter=~Q(rolls__status='consumed')),
-                              line_usd=F('quantity') * F('cost_usd'),
+                              roll_count=Count('stock_items', filter=~Q(stock_items__status='consumed')),
+                              line_usd=F('stock_value'),
                               reserved=reserved_meters_subquery()))
-            # A → Z by product NAME, top quantity, unit price, or recent.
+            # A → Z by product NAME, stock item quantity, unit price, or recent.
             _flat_sort = {
                 "name_asc": "name", "name_desc": "-name",
                 "qty_desc": "-quantity", "qty_asc": "quantity",
                 "recent": "-updated_at",
             }
             # Price sorts use the normalized USD unit cost with NULLs last
-            # so uncosted products never top the "most expensive" list.
+            # so uncosted products never stock item the "most expensive" list.
             if sort == "price_desc":
-                flat = flat.order_by(F("cost_usd").desc(nulls_last=True), "name", "id")
+                flat = flat.order_by(F("avg_cost").desc(nulls_last=True), "name", "id")
             elif sort == "price_asc":
-                flat = flat.order_by(F("cost_usd").asc(nulls_last=True), "name", "id")
+                flat = flat.order_by(F("avg_cost").asc(nulls_last=True), "name", "id")
             else:
                 flat = flat.order_by(_flat_sort.get(sort, "name"), "sku", "id")
             paginator = Paginator(flat, PAGE_SIZE)
@@ -1267,17 +1276,30 @@ class WarehouseDetail(View):
         else:
             # ── Group in SQL by main product (base name). One row per group →
             #    cheap to paginate even with thousands of variants. Each group
-            #    expands to its variants (stock / SKU / rolls=tops/coupons). ──
-            from django.db.models import Max, Avg
-            grouped = (base_qs.annotate(base=base_expr).values("base").annotate(
+            #    expands to its variants (stock / SKU / stock_items=stock items/coupons). ──
+            from django.db.models import Case, Max, When
+            _tv, _tm = WarehouseProduct._stock_cost_exprs()
+            grouped = (base_qs.annotate(base=base_expr,
+                                        stock_value=_tv, stock_quantity=_tm)
+                       .values("base").annotate(
                 variant_count=Count("id"),
                 linked=Count("catalog_variant"),
                 total_qty=Coalesce(Sum("quantity"), Decimal("0"),
                                    output_field=DecimalField(max_digits=18, decimal_places=2)),
-                total_usd=Coalesce(Sum(F("quantity") * F("cost_usd")), Decimal("0"),
+                total_usd=Coalesce(Sum("stock_value"), Decimal("0"),
                                    output_field=DecimalField(max_digits=20, decimal_places=4)),
                 updated=Max("updated_at"),
-                avg_cost=Avg("cost_usd"),
+                # Weighted across the group's quantity, not
+                # Avg("cost_usd") — a plain mean let a 5 m remnant count
+                # for as much as a 400 m bolt, and averaged a
+                # last-purchase price at that.
+                total_quantity=Sum("stock_quantity"),
+            ).annotate(
+                avg_cost=Case(
+                    When(total_quantity__gt=0,
+                         then=F("total_usd") / F("total_quantity")),
+                    default=None,
+                    output_field=DecimalField(max_digits=20, decimal_places=4)),
             ))
             _sort_map = {
                 "name_asc": "base", "name_desc": "-base",
@@ -1301,16 +1323,17 @@ class WarehouseDetail(View):
             except EmptyPage:
                 page = paginator.page(paginator.num_pages or 1)
 
-            # Total tops (rolls) per group on THIS page — computed in a
+            # Total stock items (rolls) per group on THIS page — computed in a
             # SEPARATE query (Count only) so it doesn't multiply the Sum()s
             # above via the rolls join.
             _bases = [g["base"] for g in page.object_list]
             _roll_counts = {}
             _reserved_by_base = {}
+            _locations_by_base = {}
             if _bases:
                 _rc = (base_qs.annotate(base=base_expr)
                        .filter(base__in=_bases).values("base")
-                       .annotate(rc=Count("rolls", filter=~Q(rolls__status='consumed'))))
+                       .annotate(rc=Count("stock_items", filter=~Q(stock_items__status='consumed'))))
                 _roll_counts = {r["base"]: r["rc"] for r in _rc}
 
                 # Active reserved metres per group — computed separately
@@ -1322,6 +1345,19 @@ class WarehouseDetail(View):
                 for _pid, _m in _res_by_pid.items():
                     _b = _pid_to_base.get(_pid)
                     _reserved_by_base[_b] = _reserved_by_base.get(_b, Decimal("0")) + _m
+
+                # Which member warehouses hold this group — the Location
+                # column on a combined (ortak) page. One group can straddle
+                # several members, so it is a list, not a name. Its own
+                # cheap DISTINCT query, for the same reason as the counts
+                # above: joining it into the aggregate would multiply them.
+                if warehouse.is_combined:
+                    for _row in (base_qs.annotate(base=base_expr)
+                                 .filter(base__in=_bases)
+                                 .values("base", "warehouse__name")
+                                 .distinct().order_by("warehouse__name")):
+                        _locations_by_base.setdefault(
+                            _row["base"], []).append(_row["warehouse__name"])
 
             # Only the group HEADERS render up-front — variants load lazily on
             # expand (a single base can hold thousands of variants, so rendering
@@ -1335,6 +1371,7 @@ class WarehouseDetail(View):
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "avg_cost_usd": g["avg_cost"],
+                "locations": _locations_by_base.get(g["base"], []),
                 "is_catalog": (g.get("linked") or 0) > 0,
             } for g in page.object_list]
 
@@ -1354,6 +1391,11 @@ class WarehouseDetail(View):
             'filtered_count': paginator.count,
             'show_empty': show_empty,
             'reserved_only': reserved_only,
+            'cost_sign': _cost_sign(warehouse),
+            # Full-width cells (pagination, empty states, expanded rolls)
+            # span the table — which grows a Location column on a combined
+            # (ortak) page, so the number cannot be hard-coded.
+            'col_count': _warehouse_col_count(warehouse),
         }
 
         # HTMX partial refresh for search/sort/page — re-renders ONLY the
@@ -1375,10 +1417,10 @@ class WarehouseDetail(View):
             n=Count('id'),
             qty=Coalesce(Sum('quantity'), Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2)),
         )
-        # Header counts: main products (packages), variants, and rolls (tops).
+        # Header counts: main products (packages), variants, and rolls (stock_items).
         group_count = (all_products.annotate(base=base_expr)
                        .values('base').distinct().count())
-        roll_count = (WarehouseProductRoll.objects
+        roll_count = (WarehouseProductItem.objects
                       .filter(product__warehouse_id__in=scope_ids)
                       .exclude(status='consumed').count())
         total_value_usd = warehouse.total_value_usd()
@@ -1399,7 +1441,7 @@ class WarehouseDetail(View):
             'product_count': counts['n'],     # variants
             'variant_count': counts['n'],     # alias — variants
             'group_count': group_count,       # main products (packages)
-            'roll_count': roll_count,         # rolls (tops)
+            'roll_count': roll_count,         # rolls (stock_items)
             'is_admin': _is_admin(request.user),
             # Dup scan is a MERGE tool — merging across two real warehouses
             # from a virtual view would move stock; disabled there.
@@ -1425,11 +1467,13 @@ def warehouse_group_variants(request, pk):
 
     base_expr = _warehouse_base_expr()
     CAP = 400
-    qs = (WarehouseProduct.objects.filter(warehouse_id__in=warehouse.scope_ids())
-          .select_related("catalog_variant__product", "warehouse")
+    qs = (WarehouseProduct.with_stock_costs(
+              WarehouseProduct.objects.filter(warehouse_id__in=warehouse.scope_ids()))
+          .select_related("catalog_variant__product",
+                          "warehouse__accounting_book__base_currency")
           .annotate(base=base_expr,
-                    roll_count=Count("rolls", filter=~Q(rolls__status="consumed")),
-                    line_usd=F("quantity") * F("cost_usd"),
+                    roll_count=Count("stock_items", filter=~Q(stock_items__status="consumed")),
+                    line_usd=F("stock_value"),
                     reserved=reserved_meters_subquery())
           .filter(base=base).order_by("name", "id"))
     total = qs.count()
@@ -1441,6 +1485,7 @@ def warehouse_group_variants(request, pk):
         "shown": len(variants),
         "total": total,
         "base": base,
+        "col_count": _warehouse_col_count(warehouse),
     })
 
 
@@ -1463,7 +1508,7 @@ def warehouse_roll_photo(request, warehouse_pk, roll_pk):
 
     warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
     roll = get_object_or_404(
-        WarehouseProductRoll,
+        WarehouseProductItem,
         pk=roll_pk, product__warehouse_id__in=warehouse.scope_ids(),
     )
     if roll.image_url:
@@ -1483,6 +1528,26 @@ def warehouse_roll_photo(request, warehouse_pk, roll_pk):
     return FileResponse(open(path, "rb"), content_type="image/jpeg")
 
 
+def _warehouse_col_count(warehouse):
+    """Columns in the warehouse product table — 6, plus the Location
+    column a combined (ortak) warehouse adds to say which member holds
+    each row. Full-width cells span this."""
+    return 7 if warehouse.is_combined else 6
+
+
+def _cost_sign(warehouse):
+    """The currency sign stock in this warehouse is costed in.
+
+    unit_cost_base is held in the base currency of the book that owns
+    the warehouse, so that book decides the sign. A book with no base
+    currency set yields "" — the amount then prints bare rather than
+    wearing somebody else's currency.
+    """
+    from .templatetags.operating_tags import book_sign
+
+    return book_sign(warehouse)
+
+
 @login_required
 def warehouse_product_rolls(request, warehouse_pk, product_pk):
     """The rolls ("top" in Turkish) held by ONE product, as rows injected
@@ -1493,7 +1558,7 @@ def warehouse_product_rolls(request, warehouse_pk, product_pk):
     all up front would make the list crawl.
     """
     from decimal import Decimal as _Dec
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
 
     warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
     # A combined (ortak) warehouse expands rows belonging to its MEMBERS.
@@ -1503,7 +1568,7 @@ def warehouse_product_rolls(request, warehouse_pk, product_pk):
     CAP = 200
     # Consumed rolls are gone from the floor — the row's roll count and the
     # product page's list both leave them out, so this agrees with both.
-    qs = (product.rolls.exclude(status="consumed")
+    qs = (product.stock_items.exclude(status="consumed")
           .select_related("scanned_by")
           .order_by("-scanned_at"))
     # One row past the cap tells us whether there are more WITHOUT a second
@@ -1522,13 +1587,13 @@ def warehouse_product_rolls(request, warehouse_pk, product_pk):
     # "Reserved: 40 m" traces to an order here too instead of dead-ending.
     reserved_by_roll, reservations_by_roll = {}, {}
     if rolls:
-        for resv in (OrderRollReservation.objects
-                     .filter(roll_id__in=[r.id for r in rolls], consumed=False)
+        for resv in (OrderStockReservation.objects
+                     .filter(stock_item_id__in=[r.id for r in rolls], consumed=False)
                      .select_related("order")
                      .order_by("-created_at")):
-            reserved_by_roll[resv.roll_id] = (reserved_by_roll.get(resv.roll_id, _Dec("0"))
+            reserved_by_roll[resv.stock_item_id] = (reserved_by_roll.get(resv.stock_item_id, _Dec("0"))
                                               + (resv.meters or _Dec("0")))
-            reservations_by_roll.setdefault(resv.roll_id, []).append(resv)
+            reservations_by_roll.setdefault(resv.stock_item_id, []).append(resv)
     for r in rolls:
         r.reserved_m = reserved_by_roll.get(r.id, _Dec("0"))
         r.reservation_list = reservations_by_roll.get(r.id, [])
@@ -1536,23 +1601,25 @@ def warehouse_product_rolls(request, warehouse_pk, product_pk):
     return render(request, "operating/partials/warehouse_product_roll_rows.html", {
         "warehouse": warehouse,
         "product": product,
+        "cost_sign": _cost_sign(product.warehouse),
         "rolls": rolls,
         "shown": len(rolls),
         "total": total,
         "truncated": truncated,
+        "col_count": _warehouse_col_count(warehouse),
     })
 
 
 @login_required
 def warehouse_barcode_lookup(request, pk):
     """Barcode-only LOOKUP (separate from scanning to ADD). Given a scanned
-    barcode, says whether that top/product is already in this warehouse.
+    barcode, says whether that stock item/product is already in this warehouse.
 
     Match precedence — a ROLL barcode identifies one specific physical
-    top, so roll matches (in ANY warehouse) always outrank the product-
+    stock item, so roll matches (in ANY warehouse) always outrank the product-
     level barcode/SKU fallback. Previously the current warehouse's
     product fallback fired before the cross-warehouse roll check, so
-    scanning a top that physically lives in warehouse B while standing
+    scanning a stock item that physically lives in warehouse B while standing
     in warehouse A wrongly reported "already in this warehouse" whenever
     the same PRODUCT also existed in A — hiding the "move it here" flow.
       1. roll with this barcode in THIS warehouse   → found (roll)
@@ -1571,7 +1638,7 @@ def warehouse_barcode_lookup(request, pk):
 
     matched = None
     product = None
-    roll = (WarehouseProductRoll.objects
+    roll = (WarehouseProductItem.objects
             .select_related("product", "product__catalog_variant__product")
             .filter(product__warehouse_id__in=scope_ids, barcode__iexact=code)
             .first())
@@ -1579,12 +1646,12 @@ def warehouse_barcode_lookup(request, pk):
         product = roll.product
         matched = "roll"
     else:
-        # The barcode may be a real top received into a DIFFERENT
+        # The barcode may be a real stock item received into a DIFFERENT
         # warehouse — that wins over any same-product fallback here, and
         # offers a one-click move so staff don't re-add it as brand-new
         # stock (a silent duplicate). No move INTO a combined warehouse —
         # it's virtual; goods must land in one of its members.
-        other_roll = (WarehouseProductRoll.objects
+        other_roll = (WarehouseProductItem.objects
                       .select_related("product", "product__warehouse")
                       .exclude(product__warehouse_id__in=scope_ids)
                       .filter(barcode__iexact=code)
@@ -1634,14 +1701,14 @@ def warehouse_barcode_lookup(request, pk):
                     "usage": _roll_usage_info(other_roll),
                     "reserved": _roll_reservation_info(other_roll),
                 },
-                # No move offer for a top that has already been used up —
+                # No move offer for a stock item that has already been used up —
                 # there is nothing physical left to carry over, and the row
                 # is history of where the stock went out from.
                 #
                 # Nor across BOOKS. The move view refuses those (stock
                 # changing owner is a purchase, not a shelf change), so
                 # offering the button here would only produce an error after
-                # the click. The panel still shows where the top is, which is
+                # the click. The panel still shows where the stock item is, which is
                 # what the scan was asking.
                 "move_url": (None if (other_roll.status == "consumed"
                                       or op.warehouse.accounting_book_id
@@ -1674,9 +1741,9 @@ def warehouse_barcode_lookup(request, pk):
             "sku": product.sku,
             "name": product.name,
             "quantity": float(product.quantity or 0),
-            # Live tops, matching what the product page lists and what the
+            # Live stock_items, matching what the product page lists and what the
             # Excel export counts — a used-up roll is not stock on hand.
-            "rolls_count": product.rolls.exclude(status="consumed").count(),
+            "rolls_count": product.stock_items.exclude(status="consumed").count(),
             # Always the product's OWN warehouse — from a combined view the
             # match lives in a member, and the detail route 404s otherwise.
             "detail_url": reverse("operating:warehouse_product_detail",
@@ -1700,7 +1767,7 @@ def warehouse_barcode_lookup(request, pk):
 
 @login_required
 def warehouse_roll_move_here(request, pk, roll_pk):
-    """Move ONE physical top (roll) that currently belongs to a DIFFERENT
+    """Move ONE physical stock item (roll) that currently belongs to a DIFFERENT
     warehouse into THIS one — reached from the barcode-lookup "found
     elsewhere" result. Only the scanned roll moves; any other rolls of the
     same product stay put in the source warehouse.
@@ -1712,7 +1779,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     quantity + re-syncs the catalog for both the source and target product.
     """
     from django.db import transaction
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
 
     if request.method != "POST":
         return JsonResponse({"success": False, "error": "POST required."}, status=405)
@@ -1721,17 +1788,17 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     if target_warehouse.is_combined:
         # Virtual warehouse — physical goods must land in a member.
         return JsonResponse({"success": False,
-                             "error": "Ortak depo sanaldır — top ancak üye depolardan birine taşınabilir."}, status=400)
+                             "error": "Ortak depo sanaldır — stock item ancak üye depolardan birine taşınabilir."}, status=400)
     roll = get_object_or_404(
-        WarehouseProductRoll.objects.select_related("product", "product__warehouse"),
+        WarehouseProductItem.objects.select_related("product", "product__warehouse"),
         pk=roll_pk,
     )
     source_wp = roll.product
 
     if source_wp.warehouse_id == target_warehouse.pk:
-        return JsonResponse({"success": False, "error": "Bu top zaten bu depoda."}, status=400)
+        return JsonResponse({"success": False, "error": "Bu stock item zaten bu depoda."}, status=400)
 
-    # A used-up top has no metres left to carry anywhere. Its row is the
+    # A used-up stock item has no metres left to carry anywhere. Its row is the
     # record of where that stock went OUT from, so moving it would relocate
     # history and credit the receiving warehouse with a transfer of nothing.
     # The scanner already withholds the offer; this is the same rule where
@@ -1739,12 +1806,12 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     if roll.status == "consumed":
         return JsonResponse(
             {"success": False,
-             "error": "Bu top tükenmiş — taşınacak metre yok."}, status=400)
+             "error": "Bu stock item tükenmiş — taşınacak metre yok."}, status=400)
 
     # Stock may not cross between BOOKS on a warehouse move. A book is a
     # business: Warehouse.accounting_book is required and PROTECTed because
     # the shelves are that business's asset, and its net worth is the sum of
-    # them. Carrying a top from one book's depot to another's hands over an
+    # them. Carrying a stock item from one book's depot to another's hands over an
     # asset — 857m of K24593.G07 is about $2,058 — and this view records only
     # a pair of StockMovement rows, so both balance sheets would move with
     # nothing in either ledger to say why.
@@ -1760,7 +1827,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
         return JsonResponse({
             "success": False,
             "error": (
-                "Bu top başka bir defterin deposunda (%s → %s). Defterler "
+                "Bu stock item başka bir defterin deposunda (%s → %s). Defterler "
                 "arasında mal geçişi satın alma faturası ile yapılmalı — "
                 "taşıma işlemi sadece aynı defterin depoları arasında "
                 "çalışır." % (source_wp.warehouse.name, target_warehouse.name)
@@ -1788,7 +1855,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
         meters = meters or Decimal("0")
 
         StockMovement.objects.create(
-            product=source_wp, roll=None, movement_type="adjustment",
+            product=source_wp, stock_item=None, movement_type="adjustment",
             quantity=-meters,
             reason=f"Transferred to {target_warehouse.name}",
             reference=roll.barcode, created_by=user,
@@ -1796,17 +1863,17 @@ def warehouse_roll_move_here(request, pk, roll_pk):
         source_warehouse_name = source_wp.warehouse.name
         roll.product = target_wp
         roll.save(update_fields=["product"])
-        # Any live hold on this top travels WITH it. OrderRollReservation
+        # Any live hold on this stock item travels WITH it. OrderStockReservation
         # denormalises the warehouse product purely so the list/detail pages
         # can roll up reserved metres, so leaving it pointed at the source
-        # would strand the reservation in the warehouse the top just left —
+        # would strand the reservation in the warehouse the stock item just left —
         # and would later cut the metres out of that warehouse's quantity
         # when the order ships. Consumed rows stay put: they record where the
         # stock actually went out from, which is history and did not move.
-        OrderRollReservation.objects.filter(roll=roll, consumed=False).update(
+        OrderStockReservation.objects.filter(stock_item=roll, consumed=False).update(
             warehouse_product=target_wp)
         StockMovement.objects.create(
-            product=target_wp, roll=roll, movement_type="adjustment",
+            product=target_wp, stock_item=roll, movement_type="adjustment",
             quantity=meters,
             reason=f"Transferred from {source_warehouse_name}",
             reference=roll.barcode, created_by=user,
@@ -1814,7 +1881,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
 
         for wp in (source_wp, target_wp):
             total = Decimal("0")
-            for r in wp.rolls.all():
+            for r in wp.stock_items.all():
                 rem = r.meters_remaining if r.meters_remaining is not None else (r.meters or Decimal("0"))
                 total += rem or Decimal("0")
             wp.quantity = total
@@ -2079,7 +2146,7 @@ def _warehouse_dup_sku_count(warehouse):
 @method_decorator(login_required, name='dispatch')
 class WarehouseMergeDuplicates(View):
     """Merge every same-SKU duplicate variant in the warehouse into one record.
-    GET = dry-run PREVIEW (which products/tops would merge, which survives) so
+    GET = dry-run PREVIEW (which products/stock items would merge, which survives) so
     the user can approve; POST = actually merge (see _merge_warehouse_dupes_by_sku)."""
 
     def get(self, request, pk):
@@ -2098,10 +2165,10 @@ class WarehouseMergeDuplicates(View):
                          .select_related("catalog_variant__product").order_by("id"))
             if len(prods) <= 1:
                 continue
-            items, total_tops, total_qty, main = [], 0, Decimal("0"), ""
+            items, total_stock, total_qty, main = [], 0, Decimal("0"), ""
             for i, p in enumerate(prods):
-                tc = p.rolls.count()
-                total_tops += tc
+                tc = p.stock_items.count()
+                total_stock += tc
                 total_qty += (p.quantity or Decimal("0"))
                 if not main and p.catalog_variant_id and p.catalog_variant and p.catalog_variant.product_id:
                     main = p.catalog_variant.product.title or ""
@@ -2113,7 +2180,7 @@ class WarehouseMergeDuplicates(View):
             groups.append({
                 "sku": prods[0].sku, "main_product": main,
                 "variant_name": prods[0].name, "count": len(prods),
-                "total_tops": total_tops, "total_quantity": float(total_qty),
+                "total_stock": total_stock, "total_quantity": float(total_qty),
                 "products": items,
             })
         return JsonResponse({"success": True, "groups": groups})
@@ -2154,7 +2221,7 @@ class IntakeError(Exception):
 
 def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     """Receive a delivery into `warehouse`: create the products, variants and
-    physical tops described by `data`, then post the purchase invoice.
+    physical stock items described by `data`, then post the purchase invoice.
 
     `data` is the goods-receipt payload (see WarehouseManualAdd for its
     shape). Raises IntakeError on any validation failure, having written
@@ -2404,8 +2471,8 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                     v_name = (v.get("name") or "").strip()
                     typed_sku = (v.get("sku") or "").strip()[:SKU_MAX_LENGTH]
                     v_sku = typed_sku
-                    tops = v.get("tops") or []
-                    if not v_name and not v_sku and not tops:
+                    stock_items = v.get("tops") or []
+                    if not v_name and not v_sku and not stock_items:
                         continue
                     if not v_sku:
                         # AUTO variant SKU rooted on the (minted) main product SKU.
@@ -2476,13 +2543,13 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                         wp.save(update_fields=["purchase_price", "purchase_currency",
                                                "cost_usd", "cost_try", "updated_at"])
 
-                    added_qty, new_roll_ids = _add_tops_to_variant(
-                        wp, tops, mint, user, notes_supplier=account_name,
+                    added_qty, new_roll_ids = _add_stock_to_variant(
+                        wp, stock_items, mint, user, notes_supplier=account_name,
                     )
                     first_barcode = None
                     if new_roll_ids:
                         new_barcodes = list(
-                            WarehouseProductRoll.objects
+                            WarehouseProductItem.objects
                             .filter(pk__in=new_roll_ids)
                             .order_by("id")
                             .values_list("barcode", flat=True)
@@ -2523,7 +2590,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                             "currency": currency,
                             "product": main_product,
                             "variant": cat_variant_obj,
-                            "roll_ids": new_roll_ids,
+                            "stock_item_ids": new_roll_ids,
                         })
 
                 created_list.append(created)
@@ -2564,16 +2631,16 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                 "total": float(inv.total or 0),
                 "currency": inv.currency.code,
             }
-            # Link each physical top back to the invoice line it was
+            # Link each physical stock item back to the invoice line it was
             # received against — items are created in the same order
             # as purchase_lines, so zipping by line_no is exact.
             inv_items = list(inv.items.order_by("line_no"))
             # purchase_lines, not billed_lines: same order and count, and
-            # roll_ids is carried through the conversion untouched either way.
+            # stock_item_ids is carried through the conversion untouched either way.
             for line, item in zip(purchase_lines, inv_items):
-                roll_ids = line.get("roll_ids") or []
-                if roll_ids:
-                    WarehouseProductRoll.objects.filter(pk__in=roll_ids).update(
+                stock_item_ids = line.get("stock_item_ids") or []
+                if stock_item_ids:
+                    WarehouseProductItem.objects.filter(pk__in=stock_item_ids).update(
                         purchase_invoice_item=item
                     )
             if not any(l["unit_price"] > 0 for l in purchase_lines):
@@ -2609,7 +2676,7 @@ class WarehouseManualAdd(View):
     is invalid, nothing in the batch is saved.
 
     Each product = ONE main product (group) → its VARIANTS → each variant's
-    TOPS (rolls), every top getting an auto-generated, globally-unique
+    TOPS (rolls), every stock item getting an auto-generated, globally-unique
     barcode whose prefix is the supplier's consonants ("Kızılırmak" →
     KZL000001). Unit-agnostic so it fits fabric (m), bedding (pcs), etc.
 
@@ -2745,15 +2812,15 @@ def _resolve_variant_wp(warehouse, main_product, base_name, v_in, prefix, seen_s
 class WarehousePurchaseEdit(View):
     """Edit an existing purchase (Invoice(type="purchase")) from the SAME
     goods-receipt form used to receive stock (accounts:goods_receipt_edit),
-    pre-filled with its existing lines/tops. Tops (WarehouseProductRoll) that are already
-    reserved into a customer order (OrderRollReservation, however
+    pre-filled with its existing lines/stock items. Stock items (WarehouseProductItem) that are already
+    reserved into a customer order (OrderStockReservation, however
     unconsumed) can never be removed here — that's a hard, permanent
     invariant used elsewhere in the app too.
 
-    GET  → JSON describing the purchase's current products/variants/tops
+    GET  → JSON describing the purchase's current products/variants/stock items
            for the goods-receipt page to render (see `get`).
-    POST → applies the diff: removes unreserved tops the client dropped,
-           adds any new tops/lines, and syncs the purchase invoice + the
+    POST → applies the diff: removes unreserved stock items the client dropped,
+           adds any new stock items/lines, and syncs the purchase invoice + the
            supplier's cari balance to match. All-or-nothing: if ANY
            targeted-for-removal roll turns out to be reserved, the WHOLE
            request is rejected before anything is written.
@@ -2762,7 +2829,7 @@ class WarehousePurchaseEdit(View):
     def get(self, request, pk, invoice_id):
         from django.db.models import Exists, OuterRef, Prefetch
         from accounting.models import Invoice
-        from .models import OrderRollReservation
+        from .models import OrderStockReservation
 
         get_object_or_404(Warehouse, pk=pk)
         invoice = get_object_or_404(
@@ -2772,21 +2839,21 @@ class WarehousePurchaseEdit(View):
         if invoice.status == "cancelled":
             return JsonResponse({"success": False, "error": "İptal edilmiş alım düzenlenemez."}, status=400)
 
-        rolls_qs = (WarehouseProductRoll.objects
+        rolls_qs = (WarehouseProductItem.objects
                     .select_related("product")
                     .annotate(is_locked=Exists(
-                        OrderRollReservation.objects.filter(roll=OuterRef("pk"))))
+                        OrderStockReservation.objects.filter(stock_item=OuterRef("pk"))))
                     .order_by("id"))
         items = list(
             invoice.items.select_related("product", "variant")
-            .prefetch_related(Prefetch("warehouse_rolls", queryset=rolls_qs))
+            .prefetch_related(Prefetch("warehouse_stock_items", queryset=rolls_qs))
             .order_by("line_no")
         )
 
         groups = {}
         order = []
         for it in items:
-            rolls = list(it.warehouse_rolls.all())
+            rolls = list(it.warehouse_stock_items.all())
             wp = rolls[0].product if rolls else None
             title = it.product.title if it.product_id else it.description
             key = it.product_id or f"item{it.pk}"
@@ -2808,7 +2875,7 @@ class WarehousePurchaseEdit(View):
                 "currency": invoice.currency.code,
                 "quantity": str(it.quantity),
                 "tops": [
-                    {"roll_id": r.pk, "barcode": r.barcode,
+                    {"stock_item_id": r.pk, "barcode": r.barcode,
                      "meters": str(r.meters), "locked": bool(r.is_locked)}
                     for r in rolls
                 ],
@@ -2832,10 +2899,10 @@ class WarehousePurchaseEdit(View):
         from accounting.models import Invoice
         from accounting.services_accounts import sync_purchase_invoice_items
         from accounting.views_purchase import can_confirm_purchase
-        from .models import OrderRollReservation
+        from .models import OrderStockReservation
         from marketing.models import Product as _Prod
 
-        # Editing a received purchase adds and removes real tops and moves
+        # Editing a received purchase adds and removes real stock items and moves
         # what we owe — same permission as receiving one.
         if not can_confirm_purchase(request.user):
             return JsonResponse(
@@ -2879,23 +2946,23 @@ class WarehousePurchaseEdit(View):
                     invoice.notes = notes
                     invoice.save(update_fields=["notes", "updated_at"])
 
-            # Name the tops' notes/prefix after the ACCOUNT the alım sits
+            # Name the stock items' notes/prefix after the ACCOUNT the alım sits
             # on — cari.supplier is empty for every imported account, which
-            # made added tops fall back to a generic prefix mid-edit.
+            # made added stock items fall back to a generic prefix mid-edit.
             supplier_name = invoice.cari.name
             fallback_prefix = _consonant_prefix(supplier_name)
 
-            # ── Hand-typed barcodes on tops being ADDED to this alım. Same
+            # ── Hand-typed barcodes on stock items being ADDED to this alım. Same
             # hard refusal as intake, checked before anything is written.
             # Rolls already on this invoice are excluded from the clash
-            # test only where they're being kept — a code freed by a top
+            # test only where they're being kept — a code freed by a stock item
             # this same edit removes is still treated as taken, which is
             # the safe direction to be wrong in.
             edit_seen = {}
             edit_manual = []
             for p in products_in:
                 for v in (p.get("variants") or []):
-                    for t in (v.get("new_tops") or []):
+                    for t in (v.get("new_stock") or []):
                         code = (t.get("barcode") or "").strip()
                         if not code:
                             continue
@@ -2915,7 +2982,7 @@ class WarehousePurchaseEdit(View):
                         edit_seen[key] = True
                         edit_manual.append(code)
 
-            # ── Every existing top not re-submitted as "kept" is being
+            # ── Every existing stock item not re-submitted as "kept" is being
             # removed. Lock + re-check each one for a live reservation
             # INSIDE this same transaction — never validate in a separate
             # pass — so a packer's concurrent scan can't slip a fresh
@@ -2927,7 +2994,7 @@ class WarehousePurchaseEdit(View):
                         kept_ids.update(int(x) for x in (v.get("kept_roll_ids") or []))
 
             existing_roll_ids = set(
-                WarehouseProductRoll.objects
+                WarehouseProductItem.objects
                 .filter(purchase_invoice_item__invoice=invoice)
                 .values_list("pk", flat=True)
             )
@@ -2936,7 +3003,7 @@ class WarehousePurchaseEdit(View):
             blockers = []
             removable_rolls = []
             for rid in removal_candidates:
-                roll = (WarehouseProductRoll.objects.select_for_update()
+                roll = (WarehouseProductItem.objects.select_for_update()
                         .filter(pk=rid).select_related("product").first())
                 if roll is None:
                     continue
@@ -2957,20 +3024,20 @@ class WarehousePurchaseEdit(View):
                     "blocked": blockers,
                 }, status=422)
 
-            # ── Apply: remove the (now confirmed safe) dropped tops. ──
+            # ── Apply: remove the (now confirmed safe) dropped stock items. ──
             touched_wp_ids = set()
             for roll in removable_rolls:
                 wp = roll.product
                 touched_wp_ids.add(wp.pk)
                 StockMovement.objects.create(
-                    product=wp, roll=None, movement_type="adjustment",
+                    product=wp, stock_item=None, movement_type="adjustment",
                     quantity=-(roll.meters_remaining if roll.meters_remaining is not None else roll.meters),
-                    reason="Purchase edit — top removed",
+                    reason="Purchase edit — stock item removed",
                     reference=roll.barcode, created_by=user,
                 )
                 roll.delete()
 
-            # ── Add new tops (existing lines) / new lines (brand-new
+            # ── Add new stock items (existing lines) / new lines (brand-new
             # variants), building the diff sync_purchase_invoice_items needs.
             line_updates = []
             for p in products_in:
@@ -2986,31 +3053,31 @@ class WarehousePurchaseEdit(View):
                     item_id = v.get("invoice_item_id")
                     if item_id:
                         # EXISTING line — product/variant identity is locked;
-                        # only its tops (and, only if it has zero surviving
-                        # tops, its price) can change here.
+                        # only its stock items (and, only if it has zero surviving
+                        # stock_items, its price) can change here.
                         item = invoice.items.filter(pk=item_id).first()
                         if item is None:
                             continue
                         kept_here = [int(x) for x in (v.get("kept_roll_ids") or [])]
-                        surviving = list(WarehouseProductRoll.objects.filter(pk__in=kept_here))
+                        surviving = list(WarehouseProductItem.objects.filter(pk__in=kept_here))
                         wp = surviving[0].product if surviving else None
                         if wp is None:
                             wp_id = v.get("warehouse_product_id")
                             wp = WarehouseProduct.objects.filter(pk=wp_id).first() if wp_id else None
 
-                        new_tops = v.get("new_tops") or []
+                        new_stock = v.get("new_stock") or []
                         new_roll_ids = []
-                        if wp is not None and new_tops:
+                        if wp is not None and new_stock:
                             line_prefix = _barcode_prefix_from_existing(wp, fallback_prefix)
                             line_mint = _barcode_minter(line_prefix, reserved=edit_manual)
-                            _added, new_roll_ids = _add_tops_to_variant(
-                                wp, new_tops, line_mint, user, notes_supplier=supplier_name,
+                            _added, new_roll_ids = _add_stock_to_variant(
+                                wp, new_stock, line_mint, user, notes_supplier=supplier_name,
                             )
                             touched_wp_ids.add(wp.pk)
 
                         surviving_meters = sum((r.meters for r in surviving), Decimal("0"))
                         new_meters = sum(
-                            (_safe_decimal(t.get("qty")) or Decimal("0") for t in new_tops),
+                            (_safe_decimal(t.get("qty")) or Decimal("0") for t in new_stock),
                             Decimal("0"),
                         )
                         update = {
@@ -3019,7 +3086,7 @@ class WarehousePurchaseEdit(View):
                             "new_roll_ids": new_roll_ids,
                         }
                         if not surviving:
-                            # No original tops left on this line — price/
+                            # No original stock items left on this line — price/
                             # currency can be revised (see plan: locked
                             # otherwise, to avoid silently rewriting the
                             # recorded cost of goods that are still on hand).
@@ -3029,8 +3096,8 @@ class WarehousePurchaseEdit(View):
                         line_updates.append(update)
                     else:
                         # BRAND-NEW line — full create-mode shape.
-                        tops = v.get("tops") or []
-                        if not tops or main_product is None and not base_name:
+                        stock_items = v.get("tops") or []
+                        if not stock_items or main_product is None and not base_name:
                             continue
                         if main_product is None:
                             sku_mint = _product_sku_minter(fallback_prefix)
@@ -3059,13 +3126,13 @@ class WarehousePurchaseEdit(View):
                                                 fallback_prefix, seen_skus)
                         )
                         line_mint = _barcode_minter(fallback_prefix, reserved=edit_manual)
-                        added_qty, new_roll_ids = _add_tops_to_variant(
-                            wp, tops, line_mint, user, notes_supplier=supplier_name,
+                        added_qty, new_roll_ids = _add_stock_to_variant(
+                            wp, stock_items, line_mint, user, notes_supplier=supplier_name,
                         )
                         touched_wp_ids.add(wp.pk)
                         try:
                             from .catalog_sync import sync_roll_to_catalog, CatalogSyncConflict
-                            first_barcode = (WarehouseProductRoll.objects
+                            first_barcode = (WarehouseProductItem.objects
                                              .filter(pk__in=new_roll_ids).order_by("id")
                                              .values_list("barcode", flat=True).first())
                             _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
@@ -3688,7 +3755,7 @@ def _ocr_label_gemini(image_file):
         "remember anything from previous images. Return ONLY a single "
         "JSON object — no commentary, no markdown fences:\n\n"
         '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
-        "LABEL STRUCTURE (top → bottom):\n"
+        "LABEL STRUCTURE (stock item → bottom):\n"
         "  1. BRAND   (e.g. KARVEN, DEMFIRAT)  ← IGNORE, never extract\n"
         "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
         "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
@@ -3856,7 +3923,7 @@ def _ocr_label_xai(image_file):
         "remember anything from previous images. Return ONLY a single "
         "JSON object — no commentary, no markdown fences:\n\n"
         '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
-        "LABEL STRUCTURE (top → bottom):\n"
+        "LABEL STRUCTURE (stock item → bottom):\n"
         "  1. BRAND   (e.g. KARVEN, DEMFIRAT)  ← IGNORE, never extract\n"
         "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
         "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
@@ -4222,13 +4289,13 @@ def reverse_consumption_for_order(order, user=None):
     moves = StockMovement.objects.filter(
         movement_type="out",
         reference__in=refs,
-    ).select_related("product", "roll")
+    ).select_related("product", "stock_item")
 
     restored = []
     with _tx.atomic():
         for mv in moves:
             wp = mv.product
-            roll = mv.roll
+            roll = mv.stock_item
             qty = mv.quantity or Decimal("0")
             if qty <= 0:
                 continue
@@ -4247,7 +4314,7 @@ def reverse_consumption_for_order(order, user=None):
 
             StockMovement.objects.create(
                 product=wp,
-                roll=roll,
+                stock_item=roll,
                 movement_type="in",
                 quantity=qty,
                 reason=f"Order edit · reversed {order_ref}",
@@ -4321,7 +4388,7 @@ def consume_for_order_items(order, user=None, reason_prefix="Order"):
                     continue
                 # Walk this warehouse's active rolls oldest first.
                 roll_qs = (
-                    wp.rolls.exclude(status="consumed")
+                    wp.stock_items.exclude(status="consumed")
                     .order_by("scanned_at")
                 )
                 for roll in roll_qs:
@@ -4347,7 +4414,7 @@ def consume_for_order_items(order, user=None, reason_prefix="Order"):
 
                     StockMovement.objects.create(
                         product=wp,
-                        roll=roll,
+                        stock_item=roll,
                         movement_type="out",
                         quantity=take,
                         reason=f"{reason_prefix} {order_ref}",
@@ -4372,7 +4439,7 @@ def consume_for_order_items(order, user=None, reason_prefix="Order"):
                 if wp:
                     StockMovement.objects.create(
                         product=wp,
-                        roll=None,
+                        stock_item=None,
                         movement_type="adjustment",
                         quantity=remaining_needed,
                         reason=f"⚠️ Shortage: {reason_prefix} {order_ref} needed {remaining_needed}m more",
@@ -4397,11 +4464,11 @@ def reserved_meters_for_products(product_ids):
     """Return {warehouse_product_id: reserved_meters(Decimal)} for the
     given products, summing only ACTIVE (unconsumed) reservations."""
     from django.db.models import Sum
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     ids = [p for p in (product_ids or []) if p]
     if not ids:
         return {}
-    rows = (OrderRollReservation.objects
+    rows = (OrderStockReservation.objects
             .filter(consumed=False, warehouse_product_id__in=ids)
             .values("warehouse_product_id")
             .annotate(s=Sum("meters")))
@@ -4413,8 +4480,8 @@ def reserved_meters_subquery():
     WarehouseProduct — safe to .annotate() alongside Sum()/Count() over
     the rolls join without multiplying those aggregates."""
     from django.db.models import OuterRef, Subquery, Sum, DecimalField as _DF
-    from .models import OrderRollReservation
-    sq = (OrderRollReservation.objects
+    from .models import OrderStockReservation
+    sq = (OrderStockReservation.objects
           .filter(warehouse_product_id=OuterRef("pk"), consumed=False)
           .values("warehouse_product_id")
           .annotate(s=Sum("meters"))
@@ -4434,13 +4501,13 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
     describing each cut."""
     from django.db import transaction as _tx
     from django.utils import timezone as _tz
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     results = []
     if not order:
         return results
     order_ref = getattr(order, "order_number", None) or f"Order #{order.pk}"
     with _tx.atomic():
-        resv = list(OrderRollReservation.objects
+        resv = list(OrderStockReservation.objects
                     .select_for_update()
                     .filter(order=order, consumed=False))
         # Fetch each distinct roll / product ONCE (locked) and share the
@@ -4450,14 +4517,14 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
         # from the ORIGINAL remaining and the last save won — under-
         # cutting stock exactly when one order line is covered by
         # several rolls (which the coverage gate now requires).
-        _roll_ids = {r.roll_id for r in resv if r.roll_id}
+        _roll_ids = {r.stock_item_id for r in resv if r.stock_item_id}
         _wp_ids = {r.warehouse_product_id for r in resv if r.warehouse_product_id}
-        _rolls = {x.pk: x for x in WarehouseProductRoll.objects
+        _rolls = {x.pk: x for x in WarehouseProductItem.objects
                   .select_for_update().filter(pk__in=_roll_ids)}
         _wps = {x.pk: x for x in WarehouseProduct.objects
                 .select_for_update().filter(pk__in=_wp_ids)}
         for r in resv:
-            roll = _rolls.get(r.roll_id)
+            roll = _rolls.get(r.stock_item_id)
             wp = _wps.get(r.warehouse_product_id)
             take = Decimal(str(r.meters or 0))
             if take <= 0 or roll is None or wp is None:
@@ -4478,7 +4545,7 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
             wp.save(update_fields=["quantity", "updated_at"])
 
             StockMovement.objects.create(
-                product=wp, roll=roll, movement_type="out",
+                product=wp, stock_item=roll, movement_type="out",
                 quantity=actual, reason=f"{reason_prefix} {order_ref}",
                 reference=str(order_ref),
                 # This ledger row and the hold it realises are the same
@@ -4491,7 +4558,7 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
             # visible on the timeline instead of silently swallowed.
             if actual < take:
                 StockMovement.objects.create(
-                    product=wp, roll=None, movement_type="adjustment",
+                    product=wp, stock_item=None, movement_type="adjustment",
                     quantity=(take - actual),
                     reason=f"⚠️ Shortage: {reason_prefix} {order_ref} reserved {take}m but only {actual}m was available",
                     reference=str(order_ref),
@@ -4513,25 +4580,25 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
     the reservation back to active (unconsumed). Used when an order
     moves OUT of 'shipped' (e.g. reverted to packing / cancelled)."""
     from django.db import transaction as _tx
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     restored = []
     if not order:
         return restored
     order_ref = getattr(order, "order_number", None) or f"Order #{order.pk}"
     with _tx.atomic():
-        resv = list(OrderRollReservation.objects
+        resv = list(OrderStockReservation.objects
                     .select_for_update()
                     .filter(order=order, consumed=True))
         # Shared locked instances per roll/product — same stale-copy fix
         # as consume_reservations_for_order (see comment there).
-        _roll_ids = {r.roll_id for r in resv if r.roll_id}
+        _roll_ids = {r.stock_item_id for r in resv if r.stock_item_id}
         _wp_ids = {r.warehouse_product_id for r in resv if r.warehouse_product_id}
-        _rolls = {x.pk: x for x in WarehouseProductRoll.objects
+        _rolls = {x.pk: x for x in WarehouseProductItem.objects
                   .select_for_update().filter(pk__in=_roll_ids)}
         _wps = {x.pk: x for x in WarehouseProduct.objects
                 .select_for_update().filter(pk__in=_wp_ids)}
         for r in resv:
-            roll = _rolls.get(r.roll_id)
+            roll = _rolls.get(r.stock_item_id)
             wp = _wps.get(r.warehouse_product_id)
             qty = Decimal(str(r.meters or 0))
             if qty > 0 and roll is not None and wp is not None:
@@ -4550,7 +4617,7 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
                 wp.quantity = (wp.quantity or Decimal("0")) + qty
                 wp.save(update_fields=["quantity", "updated_at"])
                 StockMovement.objects.create(
-                    product=wp, roll=roll, movement_type="in",
+                    product=wp, stock_item=roll, movement_type="in",
                     quantity=qty, reason=f"{reason_prefix} {order_ref}",
                     reference=str(order_ref),
                     created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
@@ -4585,7 +4652,7 @@ def order_reservation_shortfalls(order):
     from functools import reduce
     import operator as _op
     from django.db.models import Sum, Q as _Q
-    from .models import OrderRollReservation, WarehouseProduct
+    from .models import OrderStockReservation, WarehouseProduct
 
     items = list(order.items.all().select_related("product", "product_variant"))
     if not items:
@@ -4593,7 +4660,7 @@ def order_reservation_shortfalls(order):
 
     reserved = {
         r["order_item_id"]: (r["s"] or Decimal("0"))
-        for r in (OrderRollReservation.objects
+        for r in (OrderStockReservation.objects
                   .filter(order=order, consumed=False, order_item__isnull=False)
                   .values("order_item_id").annotate(s=Sum("meters")))
     }
@@ -4805,7 +4872,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # to active ones above, and a non-shipped order's
                 # reservations were never consumed in the first place —
                 # either way they're plain soft holds now, safe to drop.
-                order.roll_reservations.filter(consumed=False).delete()
+                order.stock_reservations.filter(consumed=False).delete()
                 # A cancelled order must vanish from the books: the
                 # order_sale movement comes off the cari (retail posts
                 # at create too now), and any invoice cut from this
@@ -4851,7 +4918,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
 @method_decorator(login_required, name='dispatch')
 class WarehouseProductDetail(View):
     """Product detail under a warehouse — shows the product header
-    info, every roll (top) with its barcode + remaining meters, and
+    info, every roll (stock item) with its barcode + remaining meters, and
     the full stock-movement timeline (in/out/adjustments)."""
 
     template_name = "operating/warehouse_product_detail.html"
@@ -4861,21 +4928,22 @@ class WarehouseProductDetail(View):
         # product (the template reads it) — each avoided query is a full
         # round-trip to the remote DB.
         product = get_object_or_404(
-            WarehouseProduct.objects.select_related(
-                "warehouse", "catalog_variant__product"),
+            WarehouseProduct.with_stock_costs(
+                WarehouseProduct.objects.select_related(
+                    "warehouse", "catalog_variant__product")),
             pk=product_pk, warehouse_id=warehouse_pk,
         )
         warehouse = product.warehouse
         # Hide fully-consumed rolls — their stock is 0 and they only clutter
         # the list. Movement history below still preserves them.
-        rolls = list(product.rolls.exclude(status="consumed").order_by("-scanned_at"))
+        rolls = list(product.stock_items.exclude(status="consumed").order_by("-scanned_at"))
         movements = _decorate_movements(list(
-            product.movements.all().select_related("roll", "created_by", "order")[:200]))
+            product.movements.all().select_related("stock_item", "created_by", "order")[:200]))
 
         # Aggregate quick stats — in/out totals in a single query.
         from django.db.models import Sum, Q as _Q
         from decimal import Decimal as _Dec
-        from .models import OrderRollReservation
+        from .models import OrderStockReservation
         _io = product.movements.aggregate(
             i=Sum("quantity", filter=_Q(movement_type="in")),
             o=Sum("quantity", filter=_Q(movement_type="out")),
@@ -4893,23 +4961,39 @@ class WarehouseProductDetail(View):
         # held against this product's rolls. Shown as a "Rezerv stok" card
         # and per-roll on the rolls list — each with the order it's held
         # for, so "Rezerv: 40 m" is traceable instead of a dead-end number.
-        _resv_rows = (OrderRollReservation.objects
+        _resv_rows = (OrderStockReservation.objects
                       .filter(warehouse_product=product, consumed=False)
                       .select_related("order")
                       .order_by("-created_at"))
         reserved_by_roll = {}
         reservations_by_roll = {}
         for _resv in _resv_rows:
-            reserved_by_roll[_resv.roll_id] = reserved_by_roll.get(_resv.roll_id, _Dec("0")) + (_resv.meters or _Dec("0"))
-            reservations_by_roll.setdefault(_resv.roll_id, []).append(_resv)
+            reserved_by_roll[_resv.stock_item_id] = reserved_by_roll.get(_resv.stock_item_id, _Dec("0")) + (_resv.meters or _Dec("0"))
+            reservations_by_roll.setdefault(_resv.stock_item_id, []).append(_resv)
         reserved_total = sum(reserved_by_roll.values(), _Dec("0"))
+        # The Pricing card reads product.avg_cost / product.stock_value
+        # from with_stock_costs — the stock on the floor, not the SKU's
+        # last-purchase price, which intake rewrites whenever a batch
+        # lands dearer and which would therefore value goods bought months
+        # ago at today's price. Only the per-item line below is computed
+        # here, because these are already in memory.
         for r in rolls:
             r.reserved_m = reserved_by_roll.get(r.id, _Dec("0"))
             r.reservation_list = reservations_by_roll.get(r.id, [])
+            # What the quantity still on this item is worth, at what the
+            # item itself cost. None where no cost was ever recorded — the
+            # template shows a dash there, because an item nobody priced
+            # is not an item worth nothing.
+            _left = r.meters_remaining if r.meters_remaining is not None else r.meters
+            r.line_value = (
+                (_left or _Dec("0")) * r.unit_cost_base
+                if r.unit_cost_base is not None else None
+            )
 
         return render(request, self.template_name, {
             "warehouse": warehouse,
             "product": product,
+            "cost_sign": _cost_sign(product.warehouse),
             "rolls": rolls,
             "movements": movements,
             "rolls_count": len(rolls),
@@ -4952,14 +5036,14 @@ def _reversed_pair_ids(qs):
     only 2 IDs are hidden (1 pair) and the remaining unpaired ship stays."""
     from collections import defaultdict
     order_qs = qs.filter(_order_movement_q()).values(
-        'id', 'roll_id', 'reference', 'quantity', 'movement_type', 'created_at'
+        'id', 'stock_item_id', 'reference', 'quantity', 'movement_type', 'created_at'
     )
-    # Bucket by (roll_id, reference, |quantity|)
+    # Bucket by (stock_item_id, reference, |quantity|)
     buckets = defaultdict(lambda: {'in': [], 'out': []})
     for row in order_qs:
         if row['movement_type'] not in ('in', 'out'):
             continue
-        key = (row['roll_id'], row['reference'] or '', abs(row['quantity']))
+        key = (row['stock_item_id'], row['reference'] or '', abs(row['quantity']))
         buckets[key][row['movement_type']].append((row['created_at'], row['id']))
 
     to_hide = set()
@@ -4998,12 +5082,12 @@ _REASON_TR = [
     ("Order ship", "Sipariş sevkiyatı"),
     ("Web order", "Web siparişi"),
     ("Order", "Sipariş"),
-    ("Roll scanned", "Top okutuldu"),
+    ("Roll scanned", "Stock item okutuldu"),
     ("Manual add", "Manuel ekleme"),
     ("Manual stock-out", "Manuel stok çıkışı"),
-    ("Bulk roll delete", "Toplu top silme"),
-    ("Roll deleted", "Top silindi"),
-    ("Roll meters edited", "Top metresi düzenlendi"),
+    ("Bulk roll delete", "Toplu stock item silme"),
+    ("Roll deleted", "Stock item silindi"),
+    ("Roll meters edited", "Stock item metresi düzenlendi"),
     ("Manual adjustment", "Manuel düzeltme"),
     ("Product edited", "Ürün düzenlendi"),
     ("⚠️ Shortage", "⚠️ Eksik"),
@@ -5088,7 +5172,7 @@ class WarehouseMovementsAll(View):
         import operator
 
         qs = (StockMovement.objects
-              .select_related("product", "product__warehouse", "roll", "created_by"))
+              .select_related("product", "product__warehouse", "stock_item", "created_by"))
 
         wh_param = (request.GET.get("warehouse") or "").strip()
         if wh_param.isdigit():
@@ -5115,7 +5199,7 @@ class WarehouseMovementsAll(View):
                 return reduce(operator.or_,
                               (_Q(**{f"{field}__icontains": v}) for v in variants))
             qs = qs.filter(_fq("reason") | _fq("reference") | _fq("product__name")
-                           | _fq("product__sku") | _fq("roll__barcode"))
+                           | _fq("product__sku") | _fq("stock_item__barcode"))
 
         # Stats reflect every filter EXCEPT the category, so picking
         # "Sipariş" doesn't zero the intake/out totals.
@@ -5196,7 +5280,7 @@ class WarehouseMovements(View):
         qs = (
             StockMovement.objects
             .filter(product__warehouse=warehouse)
-            .select_related("product", "roll", "created_by")
+            .select_related("product", "stock_item", "created_by")
         )
 
         types_param = (request.GET.get("type") or "").strip()
@@ -5231,7 +5315,7 @@ class WarehouseMovements(View):
                 return reduce(operator.or_,
                               (_Q(**{f"{field}__icontains": v}) for v in variants))
             qs = qs.filter(_fq("reason") | _fq("reference") | _fq("product__name")
-                           | _fq("product__sku") | _fq("roll__barcode"))
+                           | _fq("product__sku") | _fq("stock_item__barcode"))
 
         from decimal import Decimal as _D
         min_qty = (request.GET.get("min_qty") or "").strip().replace(",", ".")
@@ -5398,7 +5482,7 @@ class WarehouseProductEdit(View):
                     update_fields.append("quantity")
                     StockMovement.objects.create(
                         product=product,
-                        roll=None,
+                        stock_item=None,
                         movement_type="adjustment",
                         quantity=abs(delta),
                         reason=f"Manual adjustment: {old_qty}m → {new_qty}m",
@@ -5419,7 +5503,7 @@ class WarehouseProductEdit(View):
             try:
                 StockMovement.objects.create(
                     product=product,
-                    roll=None,
+                    stock_item=None,
                     movement_type="adjustment",
                     quantity=Decimal("0"),
                     reason=("Product edited: " + "; ".join(non_qty_changes))[:255],
@@ -5456,7 +5540,7 @@ class WarehouseProductEdit(View):
 
         # Same SKU = same variant: if editing made this product's SKU match
         # OTHER products in the warehouse, merge them into this one so they stop
-        # appearing as duplicate rows (tops + movements moved here, qty re-rolled).
+        # appearing as duplicate rows (stock_items + movements moved here, qty re-rolled).
         merged_dupes = 0
         if product.sku:
             product, merged_dupes = _merge_warehouse_dupes_by_sku(
@@ -5518,13 +5602,13 @@ class WarehouseRollDelete(View):
     def post(self, request, warehouse_pk, product_pk, roll_pk):
         warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
         product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
-        roll = get_object_or_404(WarehouseProductRoll, pk=roll_pk, product=product)
+        roll = get_object_or_404(WarehouseProductItem, pk=roll_pk, product=product)
 
         # Don't delete a roll that's actively reserved for an order.
-        from .models import OrderRollReservation
-        if OrderRollReservation.objects.filter(roll=roll, consumed=False).exists():
+        from .models import OrderStockReservation
+        if OrderStockReservation.objects.filter(stock_item=roll, consumed=False).exists():
             return JsonResponse({"success": False,
-                "error": "Bu top aktif bir siparişte rezerve edilmiş — önce ilgili siparişin paketlemesinden kaldırın."}, status=409)
+                "error": "Bu stock item aktif bir siparişte rezerve edilmiş — önce ilgili siparişin paketlemesinden kaldırın."}, status=409)
 
         reason = (request.POST.get("reason") or "").strip() or "Roll deleted"
         remaining = (
@@ -5541,11 +5625,11 @@ class WarehouseRollDelete(View):
             product.save(update_fields=["quantity", "updated_at"])
 
         # ADJUSTMENT (correction) — NOT an "out", so it never inflates the
-        # Stock OUT total. Keep `roll=None` because the FK would dangle
+        # Stock OUT total. Keep `stock_item=None` because the FK would dangle
         # after the delete; embed the roll's identity in the reason.
         StockMovement.objects.create(
             product=product,
-            roll=None,
+            stock_item=None,
             movement_type="adjustment",
             quantity=remaining or Decimal("0"),
             reason=f"{reason} (roll #{roll.pk}"
@@ -5567,17 +5651,17 @@ class WarehouseRollDelete(View):
             "product": {
                 "id": product.pk,
                 "quantity": float(product.quantity or 0),
-                "rolls_count": product.rolls.count(),
-                "active_rolls_count": product.rolls.exclude(status="consumed").count(),
+                "rolls_count": product.stock_items.count(),
+                "active_rolls_count": product.stock_items.exclude(status="consumed").count(),
             },
         })
 
 
 @method_decorator(login_required, name='dispatch')
 class WarehouseRollBulkDelete(View):
-    """Delete MANY rolls (tops) at once — same CORRECTION semantics as the
+    """Delete MANY rolls (stock_items) at once — same CORRECTION semantics as the
     single delete: each removed roll logs an ADJUSTMENT movement and decrements
-    the parent quantity once, all in one transaction. Accepts `roll_ids` as a
+    the parent quantity once, all in one transaction. Accepts `stock_item_ids` as a
     repeated form field or a JSON list."""
 
     def post(self, request, warehouse_pk, product_pk):
@@ -5585,13 +5669,13 @@ class WarehouseRollBulkDelete(View):
         warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
         product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
 
-        raw_ids = request.POST.getlist("roll_ids")
+        raw_ids = request.POST.getlist("stock_item_ids")
         # Only touch request.body for a JSON payload — reading it after the form
         # POST stream was parsed raises RawPostDataException.
         if not raw_ids and "application/json" in (request.content_type or ""):
             try:
                 payload = json.loads((request.body or b"").decode("utf-8") or "{}")
-                raw_ids = payload.get("roll_ids") or []
+                raw_ids = payload.get("stock_item_ids") or []
             except (ValueError, UnicodeDecodeError):
                 raw_ids = []
         ids = []
@@ -5601,19 +5685,19 @@ class WarehouseRollBulkDelete(View):
             except (TypeError, ValueError):
                 pass
         if not ids:
-            return JsonResponse({"success": False, "error": "Silinecek top seçilmedi."}, status=400)
+            return JsonResponse({"success": False, "error": "Silinecek stock item seçilmedi."}, status=400)
 
         reason = (request.POST.get("reason") or "").strip() or "Bulk roll delete"
-        rolls = list(WarehouseProductRoll.objects.filter(pk__in=ids, product=product))
+        rolls = list(WarehouseProductItem.objects.filter(pk__in=ids, product=product))
         if not rolls:
             return JsonResponse({"success": False, "error": "Seçilen toplar bulunamadı."}, status=404)
 
         # Don't delete rolls actively reserved for an order — their hold
         # would be silently lost. Skip them and report the count.
-        from .models import OrderRollReservation
-        reserved_ids = set(OrderRollReservation.objects
-                           .filter(roll__in=rolls, consumed=False)
-                           .values_list("roll_id", flat=True))
+        from .models import OrderStockReservation
+        reserved_ids = set(OrderStockReservation.objects
+                           .filter(stock_item__in=rolls, consumed=False)
+                           .values_list("stock_item_id", flat=True))
         skipped = len(reserved_ids)
         rolls = [r for r in rolls if r.id not in reserved_ids]
         if not rolls:
@@ -5629,7 +5713,7 @@ class WarehouseRollBulkDelete(View):
                 if remaining and remaining > 0:
                     qty = max(Decimal("0"), qty - remaining)
                 StockMovement.objects.create(
-                    product=product, roll=None, movement_type="adjustment",
+                    product=product, stock_item=None, movement_type="adjustment",
                     quantity=remaining or Decimal("0"),
                     reason=f"{reason} (roll #{roll.pk}"
                            + (f" · {roll.barcode}" if roll.barcode else "") + ")",
@@ -5647,8 +5731,8 @@ class WarehouseRollBulkDelete(View):
             "product": {
                 "id": product.pk,
                 "quantity": float(product.quantity or 0),
-                "rolls_count": product.rolls.count(),
-                "active_rolls_count": product.rolls.exclude(status="consumed").count(),
+                "rolls_count": product.stock_items.count(),
+                "active_rolls_count": product.stock_items.exclude(status="consumed").count(),
             },
         })
 
@@ -5664,7 +5748,7 @@ class WarehouseRollEdit(View):
         from django.db.models.functions import Coalesce
         warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
         product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
-        roll = get_object_or_404(WarehouseProductRoll, pk=roll_pk, product=product)
+        roll = get_object_or_404(WarehouseProductItem, pk=roll_pk, product=product)
 
         changes = []
         roll_fields = []
@@ -5672,7 +5756,7 @@ class WarehouseRollEdit(View):
         # ── Barcode (required, and unique across EVERY warehouse) ──
         barcode = (request.POST.get("barcode") or "").strip()
         if (barcode or "") != (roll.barcode or ""):
-            # A top must keep a barcode. Editing one away used to be allowed
+            # A stock item must keep a barcode. Editing one away used to be allowed
             # and left stock that picking cannot scan — the same state the
             # scan form now refuses to create.
             if not barcode and roll.barcode:
@@ -5763,7 +5847,7 @@ class WarehouseRollEdit(View):
         # Recompute the parent quantity authoritatively from its rolls
         # (current stock = remaining meters, falling back to full meters).
         if meters_changed:
-            total = product.rolls.aggregate(
+            total = product.stock_items.aggregate(
                 s=Coalesce(Sum(Coalesce(F("meters_remaining"), F("meters"))),
                            Decimal("0"),
                            output_field=DecimalField(max_digits=18, decimal_places=2)))["s"]
@@ -5772,7 +5856,7 @@ class WarehouseRollEdit(View):
                 product.quantity = total
                 product.save(update_fields=["quantity", "updated_at"])
                 StockMovement.objects.create(
-                    product=product, roll=roll, movement_type="adjustment",
+                    product=product, stock_item=roll, movement_type="adjustment",
                     quantity=abs(total - old_qty),
                     reason=(
                         f"Roll meters edited (roll: {old_full:.2f}m → {new_full:.2f}m; "
@@ -5806,7 +5890,7 @@ class WarehouseRollEdit(View):
 class WarehouseStockOut(View):
     """POST endpoint to record manual stock-out from a product. Body:
         amount: decimal meters
-        roll_id (optional): consume from a specific roll
+        stock_item_id (optional): consume from a specific roll
         reason (optional)
         reference (optional)
     Returns JSON with the updated totals."""
@@ -5830,9 +5914,9 @@ class WarehouseStockOut(View):
             }, status=400)
 
         roll = None
-        roll_id = request.POST.get("roll_id")
-        if roll_id:
-            roll = product.rolls.filter(pk=roll_id).first()
+        stock_item_id = request.POST.get("stock_item_id")
+        if stock_item_id:
+            roll = product.stock_items.filter(pk=stock_item_id).first()
             if not roll:
                 return JsonResponse({"success": False, "error": "Roll not found"}, status=404)
             roll_rem = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
@@ -5855,7 +5939,7 @@ class WarehouseStockOut(View):
 
         StockMovement.objects.create(
             product=product,
-            roll=roll,
+            stock_item=roll,
             movement_type="out",
             quantity=amount,
             reason=(request.POST.get("reason") or "Manual stock-out").strip() or "Manual stock-out",
@@ -5868,8 +5952,8 @@ class WarehouseStockOut(View):
             "product": {
                 "id": product.pk,
                 "quantity": float(product.quantity or 0),
-                "rolls_count": product.rolls.count(),
-                "active_rolls_count": product.rolls.exclude(status="consumed").count(),
+                "rolls_count": product.stock_items.count(),
+                "active_rolls_count": product.stock_items.exclude(status="consumed").count(),
             },
         })
 
@@ -6011,7 +6095,7 @@ class WarehouseRollScan(View):
                         "name": match.name,
                         "sku": match.sku,
                         "quantity": float(match.quantity or 0),
-                        "rolls_count": match.rolls.count(),
+                        "rolls_count": match.stock_items.count(),
                     } if match else None
                 ),
             })
@@ -6035,7 +6119,7 @@ class WarehouseRollScan(View):
         # different roll of the same product and is allowed.)
         dup_barcode = (request.POST.get("barcode") or "").strip()
         if dup_barcode:
-            existing_roll = (WarehouseProductRoll.objects
+            existing_roll = (WarehouseProductItem.objects
                              .filter(product__warehouse=warehouse, barcode=dup_barcode)
                              .select_related("product").first())
             if existing_roll:
@@ -6074,15 +6158,15 @@ class WarehouseRollScan(View):
             )
 
         # Barcode (per-roll) is REQUIRED. It is what picking and stock-out
-        # scan, what keeps a re-scan from counting the same top twice, and —
-        # being unique across every warehouse — what names the top's label
-        # photo on the CDN. A top saved without one is stock nobody can find
+        # scan, what keeps a re-scan from counting the same stock item twice, and —
+        # being unique across every warehouse — what names the stock item's label
+        # photo on the CDN. A stock item saved without one is stock nobody can find
         # by scanning it, so refuse rather than store it that way.
         barcode = (request.POST.get("barcode") or "").strip() or None
         if not barcode:
             return JsonResponse({
                 "success": False,
-                "error": "Barkod zorunlu — bu top olmadan kaydedilemez.",
+                "error": "Barkod zorunlu — bu stock item olmadan kaydedilemez.",
             }, status=400)
         # Price is optional. Barcode is not.
         purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
@@ -6119,7 +6203,7 @@ class WarehouseRollScan(View):
 
         # Save the roll.
         cdn_url, local_image = _store_roll_label_image(image, product, barcode)
-        roll = WarehouseProductRoll.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=product,
             meters=meters,
             meters_remaining=meters,
@@ -6142,7 +6226,7 @@ class WarehouseRollScan(View):
         # Stock-in ledger entry — drives the product detail timeline.
         StockMovement.objects.create(
             product=product,
-            roll=roll,
+            stock_item=roll,
             movement_type="in",
             quantity=meters,
             reason="Roll scanned",
@@ -6225,7 +6309,7 @@ class WarehouseRollScan(View):
                 "sku": product.sku,
                 "barcode": product.barcode,
                 "quantity": float(product.quantity or 0),
-                "rolls_count": product.rolls.count(),
+                "rolls_count": product.stock_items.count(),
                 "main_product": (catalog_info["product_title"] if catalog_info else None),
             },
             "catalog": catalog_info,

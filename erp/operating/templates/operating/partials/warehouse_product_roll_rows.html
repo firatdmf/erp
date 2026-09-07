@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n accounts_tags %}
 {% get_current_language as LANGUAGE_CODE %}
 {% comment %}The rolls ("top" in Turkish) inside one product, injected as ONE row under
 that product's line when it is expanded. A single full-width cell rather
@@ -6,7 +6,7 @@ than cells aligned to the parent columns: a roll's fields (barcode, length
 left, status, who scanned it) don't line up with a product's, and forcing
 them into the same grid squeezed both.{% endcomment %}
 <tr class="wh-rollrow">
-  <td colspan="6" class="wh-rolls-cell">
+  <td colspan="{{ col_count|default:6 }}" class="wh-rolls-cell">
     {% if rolls %}
     <div class="wh-rolls-head">
       <span class="wh-rolls-count">
@@ -35,6 +35,14 @@ them into the same grid squeezed both.{% endcomment %}
           {% if r.meters and r.meters_remaining is not None and r.meters_remaining < r.meters %}
             <span class="wh-roll-of">{% trans "of" %} {{ r.meters|floatformat:2 }} m</span>
             <span class="wh-roll-bar"><span style="width:{% widthratio r.meters_remaining r.meters 100 %}%;"></span></span>
+          {% endif %}
+        </div>
+
+        <div class="wh-roll-cost">
+          {% if r.unit_cost_base is not None %}
+            {{ cost_sign }}{{ r.unit_cost_base|money }}
+          {% else %}
+            <span style="color:#C5CCD3;" title="{% trans 'No cost recorded for this roll.' %}">&mdash;</span>
           {% endif %}
         </div>
 

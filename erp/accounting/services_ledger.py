@@ -308,10 +308,11 @@ def _signed_cash():
 def subsidiary_equation(book):
     """Assets, liabilities and equity as the subsidiary ledgers have them.
 
-    Every figure is base currency. Inventory is valued only where a cost
-    basis exists — rolls received before purchase invoicing have none, and
-    the count of those is returned beside the value so an unvalued asset
-    cannot quietly read as a zero one.
+    Every figure is base currency. Inventory is the stock standing in the
+    warehouses this book owns, valued at the purchase-invoice line where
+    there is one and the product's cost_usd otherwise; the rolls with
+    neither are counted beside the value, so an unvalued asset cannot
+    quietly read as a zero one.
     """
     from django.contrib.contenttypes.models import ContentType
     from django.db.models import Count, F, DecimalField, ExpressionWrapper, Q
@@ -412,31 +413,52 @@ def subsidiary_equation(book):
 def _inventory_value(book):
     """(value, unvalued roll count, unvalued metres) for a book's stock.
 
-    Cost comes from the purchase-invoice line a roll arrived on. Rolls
-    received before purchase invoicing existed have no cost basis at all,
-    and there is no honest way to invent one — so they are counted, not
-    guessed at.
+    Stock belongs to whoever owns the shelves it sits on. Warehouse
+    .accounting_book is a required FK, so the rolls in Ergene Fabrika are
+    Ergene's whether or not anyone ever invoiced them.
+
+    This used to scope by the purchase-invoice line the roll arrived on,
+    which reported every book's inventory as zero: not one roll in the
+    company carries a purchase_invoice_item, so the filter matched
+    nothing and 100,888 metres of real fabric read as $0.00.
+
+    Cost is what the item itself was stamped with at intake, falling
+    back to the purchase-invoice line and then to the product's current
+    cost for items received before the stamp existed. The item's own
+    figure comes first because it is the only one that cannot move:
+    cost_usd is a last-purchase price and the intake path rewrites it on
+    every new batch, so valuing old stock by it revalues goods nobody
+    re-bought.
+
+    Only live items count — a consumed one is not an asset — and items
+    with no cost basis at all are counted, not guessed at.
     """
-    from django.db.models import Count, DecimalField, ExpressionWrapper, F
+    from django.db.models import DecimalField, ExpressionWrapper, F
+    from django.db.models.functions import Coalesce
 
     try:
-        from operating.models import WarehouseProductRoll
+        from operating.models import WarehouseProductItem
     except ImportError:          # operating not installed — inventory is 0
         return ZERO, 0, ZERO
 
-    rolls = WarehouseProductRoll.objects.filter(
-        purchase_invoice_item__invoice__book=book)
-    value = ExpressionWrapper(
-        F("meters_remaining") * F("purchase_invoice_item__unit_price"),
-        output_field=DecimalField(max_digits=16, decimal_places=4))
-    priced = rolls.exclude(meters_remaining=None)
-    total = priced.aggregate(v=Sum(value))["v"] or ZERO
+    money = DecimalField(max_digits=18, decimal_places=6)
+    live = (WarehouseProductItem.objects
+            .filter(product__warehouse__accounting_book=book,
+                    status__in=("in_stock", "partial"))
+            .exclude(meters_remaining=None))
 
-    # Unpriced rolls carry no invoice, so they cannot be filtered by book at
-    # all — they are reported whole, which is itself part of the problem.
-    unpriced = WarehouseProductRoll.objects.filter(purchase_invoice_item=None)
+    unit_cost = Coalesce(F("unit_cost_base"),
+                         F("purchase_invoice_item__unit_price"),
+                         F("product__cost_usd"),
+                         output_field=money)
+    value = ExpressionWrapper(F("meters_remaining") * unit_cost,
+                              output_field=money)
+    total = live.aggregate(v=Sum(value))["v"] or ZERO
+
+    unvalued = live.filter(unit_cost_base=None, purchase_invoice_item=None,
+                           product__cost_usd=None)
     return (
         Decimal(total).quantize(Decimal("0.01")),
-        unpriced.count(),
-        unpriced.aggregate(m=Sum("meters_remaining"))["m"] or ZERO,
+        unvalued.count(),
+        unvalued.aggregate(m=Sum("meters_remaining"))["m"] or ZERO,
     )

@@ -60,13 +60,13 @@ class StockMovementAdmin(admin.ModelAdmin):
     caused it. The app's own screens (product detail → Stock movements)
     show the same rows formatted; this is for searching across them."""
     list_display = ["created_at", "movement_type", "quantity", "product",
-                    "roll", "order", "reason", "created_by"]
+                    "stock_item", "order", "reason", "created_by"]
     list_filter = ["movement_type", "created_at", "product__warehouse"]
-    search_fields = ["reason", "reference", "roll__barcode",
+    search_fields = ["reason", "reference", "stock_item__barcode",
                      "product__name", "product__sku"]
     # FK dropdowns over thousands of rolls/products would render as huge
     # selects and time the page out; raw ids keep it usable.
-    raw_id_fields = ["product", "roll", "order", "reservation", "created_by"]
+    raw_id_fields = ["product", "stock_item", "order", "reservation", "created_by"]
     date_hierarchy = "created_at"
     # The ledger is a record of what happened — editable here only because
     # a wrong row occasionally needs correcting by hand; nothing recomputes
@@ -74,16 +74,16 @@ class StockMovementAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at"]
 
 
-class OrderRollReservationAdmin(admin.ModelAdmin):
+class OrderStockReservationAdmin(admin.ModelAdmin):
     """Which rolls are spoken for by which orders. `consumed=False` is a
     live hold (nothing deducted yet); True means it shipped and became a
     StockMovement(out)."""
-    list_display = ["created_at", "order", "roll", "meters",
+    list_display = ["created_at", "order", "stock_item", "meters",
                     "warehouse_product", "consumed", "consumed_at", "created_by"]
     list_filter = ["consumed", "created_at"]
-    search_fields = ["roll__barcode", "order__order_number",
+    search_fields = ["stock_item__barcode", "order__order_number",
                      "warehouse_product__name", "warehouse_product__sku"]
-    raw_id_fields = ["order", "order_item", "roll", "warehouse_product", "created_by"]
+    raw_id_fields = ["order", "order_item", "stock_item", "warehouse_product", "created_by"]
     date_hierarchy = "created_at"
     readonly_fields = ["created_at"]
 
@@ -97,7 +97,7 @@ admin.site.register(RawMaterialGood)
 admin.site.register(RawMaterialGoodReceipt)
 admin.site.register(RawMaterialGoodItem)
 admin.site.register(StockMovement, StockMovementAdmin)
-admin.site.register(OrderRollReservation, OrderRollReservationAdmin)
+admin.site.register(OrderStockReservation, OrderStockReservationAdmin)
 
 # Purchasing admin, moved in from the old `procurement` app.
 from . import admin_procurement  # noqa: E402,F401

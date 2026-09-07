@@ -398,7 +398,7 @@ class LongVariantSkuTest(TestCase):
     """A SKU must survive being typed.
 
     variant_sku was 20 characters, and "PETEK.FONLUK KUMAŞ." is 19 of them —
-    so eight tops entered as PETEK.FONLUK KUMAŞ.<colour> were all cut to one
+    so eight stock items entered as PETEK.FONLUK KUMAŞ.<colour> were all cut to one
     character past the prefix, collided, and were de-duplicated into .1/.2/.3.
     """
 

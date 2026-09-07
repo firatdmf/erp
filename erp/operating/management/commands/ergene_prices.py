@@ -9,7 +9,7 @@ The exported sheet is laid out like the factory's own "STOK" price list —
 DESEN / KUPON / METRE / FIYAT / TUTAR, with FIYAT blank — so whatever comes
 back reads the same way whether they filled in our sheet or sent a fresh
 export of their own. Two extra columns after TUTAR carry the product name
-and the tops' barcodes, so a human can tell which fabric is being quoted;
+and the stock items' barcodes, so a human can tell which fabric is being quoted;
 the reader ignores them, and finds FIYAT by its header rather than its
 position so the extra columns cannot shift it out from under itself.
 
@@ -102,7 +102,7 @@ class Command(BaseCommand):
 
         products = (WarehouseProduct.objects
                     .filter(warehouse=warehouse, purchase_price__isnull=True)
-                    .prefetch_related("rolls").order_by("-quantity"))
+                    .prefetch_related("stock_items").order_by("-quantity"))
         wb = Workbook()
         ws = wb.active
         ws.title = "FIYAT BEKLEYEN"
@@ -117,10 +117,10 @@ class Command(BaseCommand):
 
         rows = 0
         for p in products:
-            tops = [r for r in p.rolls.all() if r.status != "consumed"]
-            ws.append([p.sku, len(tops), float(p.quantity or 0), None, None,
+            stock_items = [r for r in p.stock_items.all() if r.status != "consumed"]
+            ws.append([p.sku, len(stock_items), float(p.quantity or 0), None, None,
                        p.name,
-                       ", ".join(r.barcode for r in tops if r.barcode)])
+                       ", ".join(r.barcode for r in stock_items if r.barcode)])
             rows += 1
             ws.cell(row=ws.max_row, column=4).fill = fill_me
             # Left as a formula, so a price typed in shows its own line total

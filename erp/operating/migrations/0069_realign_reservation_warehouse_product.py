@@ -3,13 +3,13 @@ from django.db.models import F
 
 
 def realign_reservations(apps, schema_editor):
-    """Point every live reservation at the warehouse its top is ACTUALLY in.
+    """Point every live reservation at the warehouse its stock item is ACTUALLY in.
 
-    Moving a top between warehouses (barcode read in another depot →
+    Moving a stock item between warehouses (barcode read in another depot →
     "bu depoya taşı") only re-pointed WarehouseProductRoll.product; the
     denormalised OrderRollReservation.warehouse_product kept naming the
     source warehouse's product. The reserved metres therefore stayed
-    displayed in the warehouse the top had left, never showed up in the one
+    displayed in the warehouse the stock item had left, never showed up in the one
     it arrived at, and would have been cut out of the source warehouse's
     quantity at ship time. The same-SKU dupe merge drifted the same way.
 
@@ -32,7 +32,7 @@ def realign_reservations(apps, schema_editor):
 
 
 def unrealign(apps, schema_editor):
-    """No-op: the pre-fix pointer named a warehouse the top is no longer in,
+    """No-op: the pre-fix pointer named a warehouse the stock item is no longer in,
     so there is nothing worth restoring."""
     pass
 

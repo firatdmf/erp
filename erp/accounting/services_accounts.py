@@ -399,7 +399,7 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
     """Apply an edit-diff to a purchase invoice's items IN PLACE.
 
     Never deletes and recreates `InvoiceItem` rows — that's exactly what the
-    generic invoice editor does, and because `WarehouseProductRoll.
+    generic invoice editor does, and because `WarehouseProductItem.
     purchase_invoice_item` is SET_NULL, that wipe+recreate silently orphans
     the roll↔invoice-item traceability link every time. This updates
     existing items in place and only ever CREATEs a row for a genuinely new
@@ -413,16 +413,16 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
        "description": str, "unit": str, "unit_price": Decimal,
        "quantity": Decimal,                 # recomputed from roll.meters
                                              # (NOT meters_remaining) across
-                                             # this line's surviving + new tops
+                                             # this line's surviving + new stock items
        "new_roll_ids": [int, ...]}          # rolls to backfill onto this item
 
-    A line whose resulting quantity is 0 (every top removed, nothing added
+    A line whose resulting quantity is 0 (every stock item removed, nothing added
     back) has its InvoiceItem deleted outright — no $0 ghost lines; its
     `post_delete` signal recomputes the invoice total for free.
 
     Returns the invoice, refreshed with final totals.
     """
-    from operating.models import WarehouseProductRoll
+    from operating.models import WarehouseProductItem
     from .models import InvoiceItem
 
     existing_items = {it.pk: it for it in invoice.items.all()}
@@ -449,7 +449,7 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
                 item.description = line["description"][:300]
             item.save()
             if new_roll_ids:
-                WarehouseProductRoll.objects.filter(pk__in=new_roll_ids).update(
+                WarehouseProductItem.objects.filter(pk__in=new_roll_ids).update(
                     purchase_invoice_item=item
                 )
         else:
@@ -465,7 +465,7 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
             )
             next_line_no += 1
             if new_roll_ids:
-                WarehouseProductRoll.objects.filter(pk__in=new_roll_ids).update(
+                WarehouseProductItem.objects.filter(pk__in=new_roll_ids).update(
                     purchase_invoice_item=item
                 )
 

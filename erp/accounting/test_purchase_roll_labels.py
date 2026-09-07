@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CariAccount, Invoice, InvoiceItem
-from operating.models import Warehouse, WarehouseProduct, WarehouseProductRoll
+from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
 class PurchaseLineLabelsTest(TestCase):
@@ -46,11 +46,11 @@ class PurchaseLineLabelsTest(TestCase):
         self.product = WarehouseProduct.objects.create(
             warehouse=self.wh, name="K24644 G07", sku="K24644.G07",
             quantity=Decimal("55.00"))
-        self.rolls = [
-            WarehouseProductRoll.objects.create(
+        self.stock_items = [
+            WarehouseProductItem.objects.create(
                 product=self.product, meters=Decimal("30.00"),
                 barcode="KRV0000001", purchase_invoice_item=self.item),
-            WarehouseProductRoll.objects.create(
+            WarehouseProductItem.objects.create(
                 product=self.product, meters=Decimal("25.00"),
                 barcode="KRV0000002", purchase_invoice_item=self.item),
         ]
@@ -85,7 +85,7 @@ class PurchaseLineLabelsTest(TestCase):
         other_item = InvoiceItem.objects.create(
             invoice=self.invoice, line_no=2, description="K24644 G09",
             quantity=Decimal("12.000"), unit="mt", unit_price=Decimal("3.50"))
-        WarehouseProductRoll.objects.create(
+        WarehouseProductItem.objects.create(
             product=self.product, meters=Decimal("12.00"),
             barcode="KRV0000003", purchase_invoice_item=other_item)
 
@@ -100,7 +100,7 @@ class PurchaseLineLabelsTest(TestCase):
         other_product = WarehouseProduct.objects.create(
             warehouse=self.wh, name="K24644 G11", sku="K24644.G11",
             quantity=Decimal("8.00"))
-        WarehouseProductRoll.objects.create(
+        WarehouseProductItem.objects.create(
             product=other_product, meters=Decimal("8.00"),
             barcode="KRV0000004", purchase_invoice_item=self.item)
 

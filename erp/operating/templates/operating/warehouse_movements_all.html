@@ -408,7 +408,7 @@
           </td>
           <td class="reason-cell">
             {{ m.reason_display|default:"—" }}
-            {% if m.roll %}<span class="roll-tag">top #{{ m.roll.pk }}{% if m.roll.barcode %} · {{ m.roll.barcode }}{% endif %}</span>{% endif %}
+            {% if m.stock_item %}<span class="roll-tag">top #{{ m.stock_item.pk }}{% if m.stock_item.barcode %} · {{ m.stock_item.barcode }}{% endif %}</span>{% endif %}
             {% if m.reference %}
               {% if m.order_pk %}
                 <a class="ref" href="{% url 'operating:order_detail' m.order_pk %}" title="{% trans 'Open order' %}">

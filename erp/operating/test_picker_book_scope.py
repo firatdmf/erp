@@ -15,7 +15,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from marketing.models import Product, ProductVariant
 
-from .models import Warehouse, WarehouseProduct, WarehouseProductRoll
+from .models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
 class PickerSeesOnlyItsOwnBooksShelves(TestCase):
@@ -44,7 +44,7 @@ class PickerSeesOnlyItsOwnBooksShelves(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name=name, sku=f"SKU-{book.pk}",
             quantity=Decimal("50"), catalog_variant=variant)
-        return WarehouseProductRoll.objects.create(
+        return WarehouseProductItem.objects.create(
             product=wp, meters=Decimal("50"), meters_remaining=Decimal("50"),
             barcode=barcode, status="in_stock")
 

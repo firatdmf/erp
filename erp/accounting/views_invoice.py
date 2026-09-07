@@ -437,16 +437,16 @@ class InvoiceEdit(View):
     def _purchase_redirect(self, request, invoice):
         """Purchase invoices can't go through this generic item editor —
         it deletes and recreates InvoiceItem rows, which silently orphans
-        WarehouseProductRoll.purchase_invoice_item (SET_NULL) and never
+        WarehouseProductItem.purchase_invoice_item (SET_NULL) and never
         touches stock quantities at all. Redirect (server-side, so a
         bookmarked/typed URL can't bypass this either) to the dedicated
         goods-receipt edit page instead. Returns a redirect response,
         or None if this isn't a purchase invoice."""
         if invoice.type != "purchase":
             return None
-        from operating.models import WarehouseProductRoll
+        from operating.models import WarehouseProductItem
         warehouse_id = (
-            WarehouseProductRoll.objects
+            WarehouseProductItem.objects
             .filter(purchase_invoice_item__invoice_id=invoice.pk)
             .values_list("product__warehouse_id", flat=True)
             .first()
@@ -569,28 +569,28 @@ class InvoiceDetail(View):
 
     def get(self, request, pk):
         from django.db.models import Prefetch
-        from operating.models import WarehouseProductRoll
+        from operating.models import WarehouseProductItem
 
         invoice = get_object_or_404(
             Invoice.objects.select_related("cari", "book", "currency", "order",
                                            "posted_movement"),
             pk=pk,
         )
-        # Roll-level traceability — "which physical tops" per line, for
+        # Roll-level traceability — "which physical stock items" per line, for
         # both directions: purchase invoices link rolls directly
         # (purchase_invoice_item), sales invoices via the order line's
-        # consumed reservations (order_item -> roll_reservations).
+        # consumed reservations (order_item -> stock_reservations).
         items = list(invoice.items.select_related(
             "product", "product__category", "variant",
         ).prefetch_related(
-            Prefetch("warehouse_rolls",
-                     queryset=WarehouseProductRoll.objects.select_related("product")),
-            "order_item__roll_reservations__roll",
+            Prefetch("warehouse_stock_items",
+                     queryset=WarehouseProductItem.objects.select_related("product")),
+            "order_item__roll_reservations__stock_item",
         ).order_by("line_no"))
         for it in items:
-            purchase_rolls = list(it.warehouse_rolls.all())
+            purchase_rolls = list(it.warehouse_stock_items.all())
             if purchase_rolls:
-                # Each roll here IS the physical top this PO line put
+                # Each roll here IS the physical stock item this PO line put
                 # into stock — its own .meters is exactly that line's
                 # contribution, safe to show as-is.
                 it.display_rolls = [
@@ -601,8 +601,8 @@ class InvoiceDetail(View):
                 # cuts) — the reservation's own .meters is what THIS
                 # line actually used, not the roll's full size.
                 it.display_rolls = [
-                    {"barcode": r.roll.barcode, "meters": r.meters}
-                    for r in it.order_item.roll_reservations.all() if r.consumed
+                    {"barcode": r.stock_item.barcode, "meters": r.meters}
+                    for r in it.order_item.stock_reservations.all() if r.consumed
                 ]
             else:
                 it.display_rolls = []
@@ -653,7 +653,7 @@ class InvoiceCancel(View):
 
         if invoice.type == "purchase":
             # Purchase invoices go through the dedicated, stock-aware
-            # cancel path — hard-deletes the physical tops it brought in
+            # cancel path — hard-deletes the physical stock items it brought in
             # (blocked if any is already reserved elsewhere), not just the
             # money side. Same function the purchases page's own Cancel
             # button calls, so there's exactly one implementation of this

@@ -5,9 +5,9 @@ system exports:
   FACTORY_GOODS.xlsx                     one row per physical TOP (kupon)
   Factory Stock Price <date> STOK.xlsx   one row per PATTERN (desen), priced
 
-The goods file is the physical truth — 4,641 tops, ~100,888 metres — and the
+The goods file is the physical truth — 4,641 stock_items, ~100,888 metres — and the
 price file is the money. They agree: 800 of the 840 patterns appear in both,
-and for 785 of those the top count and metre total match to the decimal. So
+and for 785 of those the stock item count and metre total match to the decimal. So
 metres come from the goods file only, and the price file is read for FIYAT
 alone; where the two disagree on quantity, the shelf wins.
 
@@ -24,7 +24,7 @@ as "TEKST݌" and the pattern code "K24018INCI.G47" as "K24018ݎCݮG47".
 repair correct — it cut the unmatched patterns from 40 down to 29, and those
 29 are genuinely absent from the price list rather than misspelled.
 
-Idempotent. Products match on SKU, tops on their printed barcode — or on
+Idempotent. Products match on SKU, stock items on their printed barcode — or on
 the factory's roll id for the two rows that carry no barcode. So a re-run of
 the same files changes nothing, and a re-run of a NEWER export adds what is
 new and re-states quantities and prices.
@@ -43,7 +43,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from operating.models import (StockMovement, Warehouse, WarehouseProduct,
-                              WarehouseProductRoll)
+                              WarehouseProductItem)
 
 DEFAULT_WAREHOUSE = "Ergene Factory"
 DEFAULT_GOODS = Path.home() / "Desktop" / "FACTORY_GOODS.xlsx"
@@ -51,17 +51,17 @@ DEFAULT_PRICES = Path.home() / "Desktop" / "Factory Stock Price 16.07.2026 STOK.
 
 # Zero-based positions in the goods sheet. See the module docstring on why
 # these are hardcoded rather than looked up by header.
-C_ROLL_ID = 1      # the factory's own id for this top
+C_ROLL_ID = 1      # the factory's own id for this stock item
 C_DESEN = 3        # pattern code — the SKU, and the join to the price file
 C_QUALITY = 4      # fabric type: GREK TUL, KARE SANAL, ...
 C_COLOUR = 5       # colour: 317 KREM, 1395 BEYAZ, ...
-C_METRES = 7       # metres on this top
+C_METRES = 7       # metres on this stock item
 C_GRADE = 11       # 1K first quality, 1A / 2K seconds
 C_DESC = 15        # composition: "630 BEYAZ POLYESTER+KROSE"
 C_LOCATION = 20    # MAMUL DEPO / RE-SEVKE HAZIR DEPO
-C_BARCODE = 78     # the barcode printed on the top's label
+C_BARCODE = 78     # the barcode printed on the stock item's label
 
-# Everything not graded 1K is a factory second. Only 44 of 4,641 tops.
+# Everything not graded 1K is a factory second. Only 44 of 4,641 stock items.
 FIRST_QUALITY = "1K"
 
 # The price file's FIYAT is dollars per metre — it runs 1.70-17.00, the same
@@ -87,7 +87,7 @@ def repair(value):
     """Undo the goods export's mangling of Turkish text.
 
     A cp1254 Turkish byte was glued to the byte after it and the pair read
-    as one UTF-8 two-byte sequence, which drops the second byte's top two
+    as one UTF-8 two-byte sequence, which drops the second byte's stock item two
     bits. Those bits are gone, so the second character is recovered by what
     the remaining six can only have been: 0x20-0x3F is punctuation, a digit
     or a space and stands as itself; 0x1D and 0x1E are another Turkish
@@ -127,17 +127,17 @@ def text(value):
     return "" if s in ("None", "-") else s
 
 
-def top_key(barcode, lot):
-    """What identifies one physical top, for matching it against what the
+def stock_key(barcode, lot):
+    """What identifies one physical stock item, for matching it against what the
     warehouse already holds.
 
-    The printed barcode, normally — 4,639 of the 4,641 tops carry a unique
+    The printed barcode, normally — 4,639 of the 4,641 stock items carry a unique
     13-digit one. Two rows have no barcode at all, so those fall back to the
     factory's own roll id, which is unique across the whole file. Prefixed,
     so a roll id can never be mistaken for a barcode.
 
-    Returns None when a top has neither, which no row currently does — such
-    a top cannot be recognised on a later run and is always taken as new.
+    Returns None when a stock item has neither, which no row currently does — such
+    a stock item cannot be recognised on a later run and is always taken as new.
     """
     if barcode:
         return barcode
@@ -173,12 +173,12 @@ def read_prices(path):
         wb.close()
 
 
-def read_tops(path):
-    """Tops grouped by pattern: {DESEN: {"name": ..., "tops": [...]}}.
+def read_stock(path):
+    """Stock items grouped by pattern: {DESEN: {"name": ..., "tops": [...]}}.
 
-    The per-pattern attributes are read off the FIRST top of that pattern —
+    The per-pattern attributes are read off the FIRST stock item of that pattern —
     checked across the whole file, quality, colour and description never
-    vary within a pattern; only the top number does.
+    vary within a pattern; only the stock item number does.
     """
     from openpyxl import load_workbook
     wb = load_workbook(path, read_only=True, data_only=True)
@@ -229,7 +229,7 @@ class Command(BaseCommand):
         parser.add_argument("--apply", action="store_true",
                             help="Commit. Without it the run is rolled back.")
         parser.add_argument("--undo", action="store_true",
-                            help="Take the import back out: remove the tops "
+                            help="Take the import back out: remove the stock items "
                                  "whose barcodes are in the goods file, and "
                                  "the products left holding none.")
 
@@ -247,9 +247,9 @@ class Command(BaseCommand):
                                "and holds no stock of its own.")
 
         prices = read_prices(price_path)
-        patterns, skipped = read_tops(goods_path)
-        top_count = sum(len(p["tops"]) for p in patterns.values())
-        self.stdout.write(f"{len(patterns)} patterns, {top_count} tops "
+        patterns, skipped = read_stock(goods_path)
+        stock_count = sum(len(p["tops"]) for p in patterns.values())
+        self.stdout.write(f"{len(patterns)} patterns, {stock_count} stock items "
                           f"in {goods_path.name}")
         self.stdout.write(f"{len(prices)} priced patterns in {price_path.name}")
         if skipped:
@@ -281,38 +281,38 @@ class Command(BaseCommand):
 
     def _undo(self, warehouse, patterns, prices, usd_try):
         """Take an import back out, using the goods file as the record of
-        what it put in — a top is identified the same way the import matched
-        it (see `top_key`), so this removes what the file describes and
+        what it put in — a stock item is identified the same way the import matched
+        it (see `stock_key`), so this removes what the file describes and
         nothing else.
 
-        Tops that have since been consumed or partly used are LEFT ALONE:
+        Stock items that have since been consumed or partly used are LEFT ALONE:
         they record real metres leaving the building, and deleting them
         would erase that. Same for a product still holding other stock —
         only ones the import left holding nothing at all are removed.
         """
-        tops = [t for e in patterns.values() for t in e["tops"]]
-        barcodes = {t["barcode"] for t in tops if t["barcode"]}
-        lots = {t["lot"] for t in tops if not t["barcode"] and t["lot"]}
+        stock_items = [t for e in patterns.values() for t in e["tops"]]
+        barcodes = {t["barcode"] for t in stock_items if t["barcode"]}
+        lots = {t["lot"] for t in stock_items if not t["barcode"] and t["lot"]}
         described = Q(barcode__in=barcodes)
         if lots:
             # Matched on the factory's roll id alone, WITHOUT also requiring
-            # the barcode to still be empty: an unlabelled top gets a house
+            # the barcode to still be empty: an unlabelled stock item gets a house
             # barcode minted at import, so insisting on a blank one here
-            # would strand exactly the tops this branch exists to catch.
+            # would strand exactly the stock items this branch exists to catch.
             described |= Q(lot_number__in=lots)
-        mine = WarehouseProductRoll.objects.filter(
+        mine = WarehouseProductItem.objects.filter(
             Q(product__warehouse=warehouse) & described)
         # Untouched since the import: still whole, still in stock.
         rolls = mine.filter(status="in_stock", meters_remaining=F("meters"))
         touched = set(rolls.values_list("product_id", flat=True))
-        removed_tops = rolls.count()
-        kept = mine.count() - removed_tops
+        removed_stock = rolls.count()
+        kept = mine.count() - removed_stock
         rolls.delete()
         StockMovement.objects.filter(product__warehouse=warehouse,
                                      reference=IMPORT_REFERENCE).delete()
 
         emptied = (WarehouseProduct.objects
-                   .filter(pk__in=touched, rolls__isnull=True)
+                   .filter(pk__in=touched, stock_items__isnull=True)
                    .exclude(reservations__consumed=False))
         removed_products = emptied.count()
         emptied.delete()
@@ -322,34 +322,34 @@ class Command(BaseCommand):
             total = sum(
                 (r.meters_remaining if r.meters_remaining is not None
                  else r.meters)
-                for r in product.rolls.exclude(status="consumed")
+                for r in product.stock_items.exclude(status="consumed")
             ) or Decimal("0")
             if product.quantity != total:
                 product.quantity = total
                 product.save(update_fields=["quantity", "updated_at"])
                 restated += 1
-        return {"tops": removed_tops, "kept": kept,
+        return {"tops": removed_stock, "kept": kept,
                 "products": removed_products, "restated": restated}
 
     def _report_undo(self, s, applied):
         w = self.stdout.write
         w("")
-        w(f"  tops removed      {s['tops']:>7}")
-        w(f"  tops kept (used)  {s['kept']:>7}")
+        w(f"  stock items removed      {s['tops']:>7}")
+        w(f"  stock items kept (used)  {s['kept']:>7}")
         w(f"  products removed  {s['products']:>7}")
         w(f"  products restated {s['restated']:>7}")
         if s["kept"]:
             w(self.style.WARNING(
-                "  Tops that were partly or fully used are left in place — "
+                "  Stock items that were partly or fully used are left in place — "
                 "they record metres that really left the warehouse."))
 
     def _import(self, warehouse, patterns, prices, usd_try):
         stats = {"products_created": 0, "products_updated": 0,
-                 "tops_created": 0, "tops_existing": 0, "unpriced": [],
+                 "stock_created": 0, "stock_existing": 0, "unpriced": [],
                  "barcodes_minted": 0,
                  "metres": Decimal("0"), "value_usd": Decimal("0")}
 
-        # House codes for tops the factory shipped without a printed label.
+        # House codes for stock items the factory shipped without a printed label.
         # The warehouse's own minter, so an imported code can never collide
         # with one issued at the counter.
         from operating.views_warehouse import _barcode_minter
@@ -363,22 +363,22 @@ class Command(BaseCommand):
                     WarehouseProduct.objects.filter(warehouse=warehouse)
                     .exclude(sku__isnull=True).exclude(sku="")}
 
-        # Identity of every top already on these shelves, so a re-run — or an
-        # overlap with tops scanned in by hand — adds nothing twice. Live
+        # Identity of every stock item already on these shelves, so a re-run — or an
+        # overlap with stock items scanned in by hand — adds nothing twice. Live
         # metres per product come along for the ride: a merged product may
-        # already hold tops the file knows nothing about, and they still
+        # already hold stock items the file knows nothing about, and they still
         # count as stock.
         #
-        # BOTH keys are recorded for each top, not just the one `top_key`
-        # would pick. A top that arrived unlabelled is matched by the
-        # factory's roll id, but once we mint it a house barcode `top_key`
+        # BOTH keys are recorded for each stock item, not just the one `stock_key`
+        # would pick. A stock item that arrived unlabelled is matched by the
+        # factory's roll id, but once we mint it a house barcode `stock_key`
         # starts answering with that barcode instead — and the file, which
         # still has no barcode for it, would stop matching and import it a
         # second time on the next run.
         seen = set()
         held = {}
         for pid, barcode, lot, meters, remaining in (
-                WarehouseProductRoll.objects
+                WarehouseProductItem.objects
                 .filter(product__warehouse=warehouse)
                 .exclude(status="consumed")
                 .values_list("product_id", "barcode", "lot_number", "meters",
@@ -417,36 +417,36 @@ class Command(BaseCommand):
                                     if usd_try else None)
 
             fresh = []
-            for top in entry["tops"]:
-                barcode = top["barcode"]
-                key = top_key(barcode, top["lot"])
+            for item in entry["tops"]:
+                barcode = item["barcode"]
+                key = stock_key(barcode, item["lot"])
                 if key is not None and key in seen:
-                    stats["tops_existing"] += 1
+                    stats["stock_existing"] += 1
                     continue
                 seen.add(key)
-                notes = [top["location"], "2. kalite" if top["second"] else None]
+                notes = [item["location"], "2. kalite" if item["second"] else None]
                 if not barcode:
-                    # The factory sometimes ships a top with no printed label,
-                    # and the goods file leaves the column empty. Every top
+                    # The factory sometimes ships a stock item with no printed label,
+                    # and the goods file leaves the column empty. Every stock item
                     # must still be scannable, so mint a house code in the
                     # same X0 series the warehouse uses, and say on the roll
                     # why it does not carry a factory barcode.
                     barcode = mint_barcode()
                     stats["barcodes_minted"] += 1
                     notes.append(f"Fabrikadan barkodsuz geldi; {barcode} basıldı")
-                fresh.append(WarehouseProductRoll(
-                    product=product, meters=top["metres"],
-                    meters_remaining=top["metres"], barcode=barcode,
-                    lot_number=top["lot"], status="in_stock",
-                    is_second=top["second"],
+                fresh.append(WarehouseProductItem(
+                    product=product, meters=item["metres"],
+                    meters_remaining=item["metres"], barcode=barcode,
+                    lot_number=item["lot"], status="in_stock",
+                    is_second=item["second"],
                     notes=" · ".join(x for x in notes if x) or None,
                 ))
             rolls.extend(fresh)
-            stats["tops_created"] += len(fresh)
+            stats["stock_created"] += len(fresh)
             if fresh:
                 movements.append((product, sum(r.meters for r in fresh)))
 
-            # Quantity is restated from the tops on the shelf rather than
+            # Quantity is restated from the stock items on the shelf rather than
             # incremented, so a partial or repeated run cannot double it.
             total = (held.get(product.pk, Decimal("0"))
                      + sum(r.meters for r in fresh))
@@ -470,7 +470,7 @@ class Command(BaseCommand):
         # are built above but only written once every product exists.
         for roll in rolls:
             roll.product_id = roll.product.pk
-        WarehouseProductRoll.objects.bulk_create(rolls, batch_size=1000)
+        WarehouseProductItem.objects.bulk_create(rolls, batch_size=1000)
         StockMovement.objects.bulk_create([
             StockMovement(product_id=p.pk, movement_type="in", quantity=q,
                           reason="Ergene factory stock import",
@@ -483,11 +483,11 @@ class Command(BaseCommand):
         w("")
         w(f"  products created  {s['products_created']:>7}")
         w(f"  products updated  {s['products_updated']:>7}")
-        w(f"  tops created      {s['tops_created']:>7}")
+        w(f"  stock items created      {s['stock_created']:>7}")
         if s["barcodes_minted"]:
             w(f"  barcodes minted   {s['barcodes_minted']:>7}  "
-              f"(tops that arrived with no factory label)")
-        w(f"  tops already held {s['tops_existing']:>7}")
+              f"(stock_items that arrived with no factory label)")
+        w(f"  stock items already held {s['stock_existing']:>7}")
         w(f"  metres in stock   {s['metres']:>12,.2f}")
         w(f"  stock value       {s['value_usd']:>12,.2f} USD")
         if s["unpriced"]:
@@ -496,5 +496,5 @@ class Command(BaseCommand):
                 f"were imported unpriced:"))
             w("    " + ", ".join(s["unpriced"]))
         if applied:
-            w(self.style.SUCCESS("\nImported. This run's tops are traceable via:"))
+            w(self.style.SUCCESS("\nImported. This run's stock items are traceable via:"))
             w(f'  StockMovement.objects.filter(reference="{IMPORT_REFERENCE}")')

@@ -9050,3 +9050,11 @@ msgstr "Depoda %(n)d sonuç daha — daraltmak için yazmaya devam edin"
 #, python-format
 msgid "%(n)d more in the catalog (not in a warehouse)"
 msgstr "Katalogda %(n)d sonuç daha (depoda yok)"
+
+#: operating/templates/operating/warehouse_detail.html
+msgid "Weighted-average unit cost of the stock on the floor"
+msgstr "Raftaki stoğun miktara göre ağırlıklı ortalama birim maliyeti"
+
+#: operating/templates/operating/partials/warehouse_product_rows.html
+msgid "Weighted-average unit cost across the variants of this product"
+msgstr "Bu ürünün varyantları genelinde ağırlıklı ortalama birim maliyet"

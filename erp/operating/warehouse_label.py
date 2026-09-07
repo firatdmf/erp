@@ -206,7 +206,7 @@ def warehouse_product_code(request, warehouse_pk, product_pk):
 @login_required
 def warehouse_product_label(request, warehouse_pk, product_pk):
     """Inline PDF of printable labels for a product (one per roll). Pass
-    ?roll=<pk> for a single roll's label."""
+    ?stock_item=<pk> for a single roll's label."""
     warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
     product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
 
@@ -214,7 +214,7 @@ def warehouse_product_label(request, warehouse_pk, product_pk):
     if roll_pk.isdigit():
         # An explicitly named roll always prints, consumed or not — asking
         # for one specific label is asking for that label.
-        rolls = list(product.rolls.filter(pk=int(roll_pk)))
+        rolls = list(product.stock_items.filter(pk=int(roll_pk)))
     else:
         # Print what the product page shows: fully-consumed rolls are hidden
         # there (WarehouseProductDetail excludes them), so they can't be
@@ -222,7 +222,7 @@ def warehouse_product_label(request, warehouse_pk, product_pk):
         # the printer, carrying whatever barcode they were retired with.
         # A label for a roll that no longer physically exists has nothing
         # to be stuck on.
-        rolls = list(product.rolls.exclude(status="consumed").order_by("id"))
+        rolls = list(product.stock_items.exclude(status="consumed").order_by("id"))
 
     from django.urls import reverse
     detail_url = request.build_absolute_uri(reverse(

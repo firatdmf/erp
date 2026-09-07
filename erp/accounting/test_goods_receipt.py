@@ -11,7 +11,7 @@ from django.utils import translation
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CariAccount, Invoice, InvoiceItem
-from operating.models import Warehouse, WarehouseProduct, WarehouseProductRoll
+from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
 class GoodsReceiptPageTest(TestCase):
@@ -57,7 +57,7 @@ class GoodsReceiptPageTest(TestCase):
                 warehouse=warehouse, name="GREK Beyaz", sku="KZL001-BEYAZ",
                 quantity=Decimal("50.00"),
             )
-            WarehouseProductRoll.objects.create(
+            WarehouseProductItem.objects.create(
                 product=wp, meters=Decimal("50.00"), barcode="KZL000001",
                 purchase_invoice_item=item,
             )

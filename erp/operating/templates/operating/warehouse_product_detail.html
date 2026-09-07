@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n static %}
+{% load i18n static accounts_tags %}
 
 {% block title %}{{ product.sku|default:product.name }} · {{ warehouse.name }} | Nejum ERP{% endblock %}
 
@@ -191,6 +191,7 @@
   }
   .roll-2nd-badge:hover::after,
   .roll-2nd-badge:hover::before { opacity: 1; }
+  .roll-cost { font-weight: 700; font-variant-numeric: tabular-nums; color: #0F1419; white-space: nowrap; }
   .roll-barcode {
     font: 600 11.5px var(--font-mono); color: var(--gray-700);
     background: #F4F7FB; padding: 3px 8px; border-radius: 6px;
@@ -678,6 +679,7 @@
               <th>#</th>
               <th>{% trans "Barcode" %}</th>
               <th>{% trans "Length" %}</th>
+              <th>{% trans "Cost" %}</th>
               <th>{% trans "Status" %}</th>
               <th>{% trans "Scanned" %}</th>
               <th style="width:78px;"></th>
@@ -723,6 +725,20 @@
                       <span style="color:var(--gray-500);">({{ resv.meters|floatformat:2 }} m)</span>
                     </div>
                   {% endfor %}
+                {% endif %}
+              </td>
+              {% comment %}What THIS item cost when it was received, not what
+              the SKU costs today — see WarehouseProductItem.unit_cost_base. An
+              item taken in before the field existed shows a dash rather than a
+              zero: unpriced and free are not the same thing.{% endcomment %}
+              <td>
+                {% if r.unit_cost_base is not None %}
+                  <span class="roll-cost">{{ cost_sign }}{{ r.unit_cost_base|money }}</span>
+                  {% if r.line_value is not None %}
+                    <div style="font-size:10.5px;color:var(--gray-500);margin-top:2px;">{{ cost_sign }}{{ r.line_value|money }}</div>
+                  {% endif %}
+                {% else %}
+                  <span style="color:#C5CCD3;" title="{% trans 'No cost recorded for this roll.' %}">—</span>
                 {% endif %}
               </td>
               <td>
@@ -817,7 +833,7 @@
                 {% if m.order_pk %}<a class="mv-order" href="{% url 'operating:order_detail' m.order_pk %}"
                      title="{% trans 'Open order' %}"
                   ><i class="fa fa-up-right-from-square"></i>{{ m.reason }}</a>{% else %}{{ m.reason|default:"" }}{% endif %}
-                {% if m.roll %}<span style="color:var(--gray-400);"> · roll #{{ m.roll.pk }}</span>{% endif %}
+                {% if m.stock_item %}<span style="color:var(--gray-400);"> · roll #{{ m.stock_item.pk }}</span>{% endif %}
                 {% if m.reference and not m.ref_redundant %}<span style="color:var(--gray-400);"> · {{ m.reference }}</span>{% endif %}
                 {% if m.created_by %}<span style="color:var(--gray-400);"> · {{ m.created_by.username }}</span>{% endif %}
               </div>
@@ -900,13 +916,16 @@
           <div class="info-row">
             <span class="info-k">{% trans "Unit cost (USD)" %}</span>
             <span class="info-v">
-              {% if product.cost_usd %}${{ product.cost_usd|floatformat:2 }}{% else %}<span class="muted">—</span>{% endif %}
+              {% comment %}Weighted average of the stock on the floor, not the
+              SKU's last-purchase price — see the view. Four decimals: a unit cost
+              of $1.9033 is not $1.90 once 27 metres are multiplied back in.{% endcomment %}
+              {% if product.avg_cost %}<span class="avg-cost">{{ cost_sign }}{{ product.avg_cost|money:4 }}</span>{% else %}<span class="muted">—</span>{% endif %}
             </span>
           </div>
           <div class="info-row" style="grid-column: 1 / -1;">
             <span class="info-k">{% trans "Total value (USD)" %}</span>
             <span class="info-v">
-              {% if product.total_cost_usd %}<b>${{ product.total_cost_usd|floatformat:2 }}</b>{% else %}<span class="muted">—</span>{% endif %}
+              {% if product.stock_value %}<b class="stock-value">{{ cost_sign }}{{ product.stock_value|money }}</b>{% else %}<span class="muted">—</span>{% endif %}
             </span>
           </div>
         </div>

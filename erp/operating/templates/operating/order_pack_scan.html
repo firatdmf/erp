@@ -372,18 +372,18 @@
         <div id="pkList">
           {% for r in reservations %}
           <div class="pk-row" data-id="{{ r.id }}"
-               data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters }}">
+               data-remaining="{{ r.stock_item.meters_remaining|default:r.stock_item.meters }}">
             <div class="pk-row-top">
               <div>
                 <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
                 <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
-                <span class="pk-row-bc">{{ r.roll.barcode|default:'—' }}</span>
+                <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
               </div>
             </div>
-            <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }}">
+            <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.stock_item.meters_remaining|default:r.stock_item.meters|floatformat:2 }}">
               <span class="pk-cut-view">
-                <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.roll.meters_remaining|default:r.roll.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-                <span class="pk-avail">/ {{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }} m</span>
+                <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.stock_item.meters_remaining|default:r.stock_item.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
+                <span class="pk-avail">/ {{ r.stock_item.meters_remaining|default:r.stock_item.meters|floatformat:2 }} m</span>
               </span>
             </div>
           </div>
@@ -437,18 +437,18 @@
               {% for r in reservations %}{% if r.order_item_id == it.pk and not r.pack_id %}
               <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
                    data-order-item-id="{{ it.pk }}" data-assigned-pack=""
-                   data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters }}">
+                   data-remaining="{{ r.stock_item.meters_remaining|default:r.stock_item.meters }}">
                 <div class="pk-row-top">
                   <div>
                     <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
                     <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
-                    <span class="pk-row-bc">{{ r.roll.barcode|default:'—' }}</span>
+                    <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
                   </div>
                 </div>
-                <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }}">
+                <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.stock_item.meters_remaining|default:r.stock_item.meters|floatformat:2 }}">
                   <span class="pk-cut-view">
-                    <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.roll.meters_remaining|default:r.roll.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-                    <span class="pk-avail">/ {{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }} m</span>
+                    <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.stock_item.meters_remaining|default:r.stock_item.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
+                    <span class="pk-avail">/ {{ r.stock_item.meters_remaining|default:r.stock_item.meters|floatformat:2 }} m</span>
                   </span>
                 </div>
               </div>
@@ -470,18 +470,18 @@
               {% for r in unassigned_reservations %}
               <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
                    data-order-item-id="" data-assigned-pack=""
-                   data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters }}">
+                   data-remaining="{{ r.stock_item.meters_remaining|default:r.stock_item.meters }}">
                 <div class="pk-row-top">
                   <div>
                     <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
                     <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
-                    <span class="pk-row-bc">{{ r.roll.barcode|default:'—' }}</span>
+                    <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
                   </div>
                 </div>
-                <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }}">
+                <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.stock_item.meters_remaining|default:r.stock_item.meters|floatformat:2 }}">
                   <span class="pk-cut-view">
-                    <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.roll.meters_remaining|default:r.roll.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-                    <span class="pk-avail">/ {{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }} m</span>
+                    <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.stock_item.meters_remaining|default:r.stock_item.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
+                    <span class="pk-avail">/ {{ r.stock_item.meters_remaining|default:r.stock_item.meters|floatformat:2 }} m</span>
                   </span>
                 </div>
               </div>
@@ -533,18 +533,18 @@
             {% for r in reservations %}{% if r.pack_id == p.pk %}
             <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
                  data-order-item-id="{{ r.order_item_id }}" data-assigned-pack="{{ p.pk }}"
-                 data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters }}">
+                 data-remaining="{{ r.stock_item.meters_remaining|default:r.stock_item.meters }}">
               <div class="pk-row-top">
                 <div>
                   <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
                   <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
-                  <span class="pk-row-bc">{{ r.roll.barcode|default:'—' }}</span>
+                  <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
                 </div>
               </div>
-              <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }}">
+              <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.stock_item.meters_remaining|default:r.stock_item.meters|floatformat:2 }}">
                 <span class="pk-cut-view">
-                  <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.roll.meters_remaining|default:r.roll.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-                  <span class="pk-avail">/ {{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }} m</span>
+                  <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.stock_item.meters_remaining|default:r.stock_item.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
+                  <span class="pk-avail">/ {{ r.stock_item.meters_remaining|default:r.stock_item.meters|floatformat:2 }} m</span>
                 </span>
               </div>
             </div>

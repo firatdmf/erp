@@ -20,7 +20,7 @@ Cost model, as decided:
   * The basis is REPLACEMENT cost — what the next roll costs — not an average
     over stock held, so prices do not sag as cheap old stock sells down.
 
-    NOTE: WarehouseProductRoll has no cost column yet, so "warehouse cost"
+    NOTE: WarehouseProductItem has no cost column yet, so "warehouse cost"
     below is the parent WarehouseProduct.cost_usd — which today IS the single
     cost shared by every roll. Once per-roll cost lands this should read the
     newest roll instead; that is the only line that needs to change.

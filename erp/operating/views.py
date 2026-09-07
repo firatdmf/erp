@@ -43,7 +43,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.html import escape
 from .models import (
     OrderItem,
-    OrderRollReservation,
+    OrderStockReservation,
 )  # if it's not already in __init__.py
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.contrib import messages
@@ -388,8 +388,8 @@ class OrderDetail(DetailView):
         # Consumed reservations stay visible (read-only history on a
         # shipped order), matching the old pack screen.
         reservations = list(
-            self.object.roll_reservations
-            .select_related("roll", "warehouse_product",
+            self.object.stock_reservations
+            .select_related("stock_item", "warehouse_product",
                             "warehouse_product__warehouse", "pack")
             .order_by("-created_at")
         )
@@ -816,7 +816,7 @@ class OrderDetail(DetailView):
 #
 # The middle stage of the 3-step lifecycle (Açık → Paketleniyor →
 # Gönderildi). Staff open the packing page and scan the barcodes of the
-# physical rolls (tops) being packed. Each scanned roll must belong to
+# physical rolls (stock_items) being packed. Each scanned roll must belong to
 # one of the order's products (else it's rejected) and reserves its
 # metres — editable, so a partial cut reserves less and leaves the rest
 # on the roll. Reservations are a SOFT hold: NO stock is physically cut
@@ -893,17 +893,17 @@ def _roll_available_meters(roll, exclude_reservation_id=None, exclude_order_id=N
     already hold — the ceiling so a roll can't be over-committed.
 
     `exclude_order_id` drops one order's own holds from that subtraction.
-    The edit form needs it: a top this order already reserved is not
-    competition for itself, and counting it made an unticked top read as
+    The edit form needs it: a stock item this order already reserved is not
+    competition for itself, and counting it made an unticked stock item read as
     "reserved by #276" to the very form editing #276 — so it could never
     be re-picked. What the order finally holds is decided by the save's
     reconcile, not by these read-only availability lookups.
     """
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     from django.db.models import Sum
     phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
     phys = phys or _PDecimal("0")
-    qs = OrderRollReservation.objects.filter(roll=roll, consumed=False)
+    qs = OrderStockReservation.objects.filter(stock_item=roll, consumed=False)
     if exclude_reservation_id is not None:
         qs = qs.exclude(pk=exclude_reservation_id)
     if exclude_order_id is not None:
@@ -925,12 +925,12 @@ def _roll_unavailable_response(roll, exclude_order_id=None):
     physically-empty roll and a roll fully held by other orders' active
     reservations are different problems for the staff scanning it, so
     the reserved case names the holding order(s)."""
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
     phys = phys or _PDecimal("0")
     if phys > 0:
         refs = []
-        holds = OrderRollReservation.objects.filter(roll=roll, consumed=False)
+        holds = OrderStockReservation.objects.filter(stock_item=roll, consumed=False)
         if exclude_order_id is not None:
             holds = holds.exclude(order_id=exclude_order_id)
         for h in holds.select_related("order"):
@@ -940,7 +940,7 @@ def _roll_unavailable_response(roll, exclude_order_id=None):
         ref_txt = ", ".join(refs[:3]) + ("…" if len(refs) > 3 else "")
         return JsonResponse({
             "ok": False, "kind": "reserved",
-            "error": f"Bu top rezerve durumunda — {float(phys):g} m başka sipariş için ayrılmış ({ref_txt}).",
+            "error": f"Bu stock item rezerve durumunda — {float(phys):g} m başka sipariş için ayrılmış ({ref_txt}).",
         }, status=409)
     return JsonResponse({"ok": False, "kind": "no_stock",
                          "error": "Bu topta uygun metre kalmadı."}, status=409)
@@ -967,7 +967,7 @@ def _outsourced_qty(item_data):
 
 
 def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
-    """Find a WarehouseProductRoll by barcode whose product matches
+    """Find a WarehouseProductItem by barcode whose product matches
     target_sku (variant SKU or plain warehouse SKU) directly. Used when
     the caller already knows exactly which product/variant a barcode
     should belong to (e.g. a not-yet-saved order-create line) — unlike
@@ -979,11 +979,11 @@ def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
     a scan from an order in one book must not reach another book's
     stock. Left None for the internal callers that are already working
     within a known order's own rolls."""
-    from .models import WarehouseProductRoll
+    from .models import WarehouseProductItem
     target = (target_sku or "").strip().lower()
     if not target:
         return None, "no_target"
-    qs = (WarehouseProductRoll.objects
+    qs = (WarehouseProductItem.objects
           .select_related("product", "product__catalog_variant", "product__warehouse")
           .filter(barcode__iexact=code))
     if books is not None:
@@ -1005,14 +1005,14 @@ def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
 
 def _create_roll_reservation(order, order_item, roll, req_meters, user):
     """Lock the roll, cap the requested metres to what's actually
-    reservable, and create the OrderRollReservation row. Shared by the
+    reservable, and create the OrderStockReservation row. Shared by the
     packing-scan endpoint and the retail order-create flow so both
     enforce the exact same no-over-commit rule. Returns
     (reservation_or_None, capped: bool, error_code_or_None) where
     error_code is 'no_stock' on failure."""
-    from .models import OrderRollReservation, WarehouseProductRoll
+    from .models import OrderStockReservation, WarehouseProductItem
     with transaction.atomic():
-        locked = WarehouseProductRoll.objects.select_for_update().get(pk=roll.pk)
+        locked = WarehouseProductItem.objects.select_for_update().get(pk=roll.pk)
         avail = _roll_available_meters(locked)
         if avail <= 0:
             return None, False, "no_stock"
@@ -1024,8 +1024,8 @@ def _create_roll_reservation(order, order_item, roll, req_meters, user):
                 capped = True
         else:
             meters = avail
-        r = OrderRollReservation.objects.create(
-            order=order, order_item=order_item, roll=locked,
+        r = OrderStockReservation.objects.create(
+            order=order, order_item=order_item, stock_item=locked,
             warehouse_product=locked.product, meters=meters,
             created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
         )
@@ -1033,20 +1033,20 @@ def _create_roll_reservation(order, order_item, roll, req_meters, user):
 
 
 def _order_edit_release_unticked(order, items_payload):
-    """Release, across the WHOLE order, every unconsumed hold whose top
+    """Release, across the WHOLE order, every unconsumed hold whose stock item
     was unticked in the submission — before any line reserves anything.
 
     Order matters. The per-line reconcile below releases at the end, so a
-    top moved from line A to line B in one save would try to reserve for B
+    stock item moved from line A to line B in one save would try to reserve for B
     while A still held it, see nothing available, and drop the pick. Doing
     all the releases first makes the freed metres visible to the adds.
 
     Only lines actually present in the submission are considered, and only
-    tops with a barcode — a hold with no barcode on its roll can't be
+    stock items with a barcode — a hold with no barcode on its roll can't be
     matched against the form's selection either way, so it is left alone
     rather than silently released.
     """
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     submitted = {}
     for item_data in items_payload:
         raw_id = item_data.get("item_id")
@@ -1060,10 +1060,10 @@ def _order_edit_release_unticked(order, items_payload):
         submitted[int(raw_id)] = keys
     if not submitted:
         return
-    for r in (OrderRollReservation.objects
+    for r in (OrderStockReservation.objects
               .filter(order=order, consumed=False, order_item_id__in=submitted)
-              .select_related("roll")):
-        bc = ((r.roll.barcode or "").strip().lower() if r.roll else "")
+              .select_related("stock_item")):
+        bc = ((r.stock_item.barcode or "").strip().lower() if r.stock_item else "")
         if bc and bc not in submitted[r.order_item_id]:
             r.delete()
 
@@ -1071,7 +1071,7 @@ def _order_edit_release_unticked(order, items_payload):
 def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcodes):
     """RECONCILE an order line's roll reservations against the edit
     form's submitted selection — `rolls_data` is the line's FINAL desired
-    set of tops, exactly as ticked in the sidebar (saved rolls hydrate
+    set of stock_items, exactly as ticked in the sidebar (saved rolls hydrate
     into the same list as fresh picks):
 
       * submitted barcode matching an existing unconsumed reservation →
@@ -1094,8 +1094,8 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
     target_sku = variant.variant_sku if variant else (product.sku if product else "")
 
     existing = {}
-    for r in order_item.roll_reservations.filter(consumed=False).select_related("roll"):
-        key = ((r.roll.barcode or "").strip().lower() if r.roll else "")
+    for r in order_item.stock_reservations.filter(consumed=False).select_related("stock_item"):
+        key = ((r.stock_item.barcode or "").strip().lower() if r.stock_item else "")
         if key:
             existing[key] = r
 
@@ -1116,7 +1116,7 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
         if held is not None:
             # Kept — apply a metres change (scissors) if any.
             if req_m is not None and req_m > 0 and abs(held.meters - req_m) > _PDecimal("0.004"):
-                avail = _roll_available_meters(held.roll, exclude_reservation_id=held.pk)
+                avail = _roll_available_meters(held.stock_item, exclude_reservation_id=held.pk)
                 new_m = req_m if req_m <= avail else avail
                 if new_m > 0:
                     held.meters = new_m
@@ -1142,15 +1142,15 @@ def _reservation_payload(r):
     wp = r.warehouse_product
     return {
         "id": r.id,
-        "roll_id": r.roll_id,
-        "barcode": (r.roll.barcode if r.roll else None),
+        "stock_item_id": r.stock_item_id,
+        "barcode": (r.stock_item.barcode if r.stock_item else None),
         "product_id": r.warehouse_product_id,
         "product_name": (wp.name if wp else ""),
         "sku": (wp.sku if wp else ""),
         "warehouse": (wp.warehouse.name if (wp and wp.warehouse_id) else ""),
         "meters": float(r.meters or 0),
-        "roll_meters": (float(r.roll.meters or 0) if r.roll else None),
-        "roll_remaining": (float(r.roll.meters_remaining) if (r.roll and r.roll.meters_remaining is not None) else None),
+        "roll_meters": (float(r.stock_item.meters or 0) if r.stock_item else None),
+        "roll_remaining": (float(r.stock_item.meters_remaining) if (r.stock_item and r.stock_item.meters_remaining is not None) else None),
         "consumed": r.consumed,
         "order_item_id": r.order_item_id,
         "pack_id": r.pack_id,
@@ -1158,13 +1158,13 @@ def _reservation_payload(r):
 
 
 def _annotate_pack_contents(packs, reservations, untracked_items):
-    """What each package physically holds: tops, metres, and extra lines.
+    """What each package physically holds: stock_items, metres, and extra lines.
 
-    The package header used to say only how many tops were in it, and only
+    The package header used to say only how many stock items were in it, and only
     after the JS had run. A packer closing a sack wants the metres too —
     that is the quantity on the packing list and on the pack label — so it
     is counted here, server-side, from the rows already loaded for the
-    page (no per-pack query), and the JS keeps both figures live as tops
+    page (no per-pack query), and the JS keeps both figures live as stock items
     are dragged in and out.
 
     Untracked lines (trade goods with no roll to scan) are counted apart
@@ -1193,7 +1193,7 @@ def _annotate_pack_contents(packs, reservations, untracked_items):
 def order_pack_scan(request, pk):
     """The packing page for an order — item checklist + roll scanner +
     live list of reserved rolls. Non-retail (B2B) orders additionally
-    get the package (Pack) drag-and-drop grouping — scanned tops sorted
+    get the package (Pack) drag-and-drop grouping — scanned stock items sorted
     into named packages so it's visible which sack/box holds what;
     retail orders keep the plain flat list. PACKING ONLY — editing the
     order's lines/prices happens on its own full page (OrderEdit)."""
@@ -1204,8 +1204,8 @@ def order_pack_scan(request, pk):
         messages.error(request, "İptal edilmiş sipariş paketlenemez.")
         return redirect("operating:order_detail", pk=order.pk)
     reservations = list(
-        order.roll_reservations
-        .select_related("roll", "warehouse_product", "warehouse_product__warehouse", "pack")
+        order.stock_reservations
+        .select_related("stock_item", "warehouse_product", "warehouse_product__warehouse", "pack")
         .order_by("-created_at")
     )
     items = list(order.items.all().select_related("product", "product_variant", "pack"))
@@ -1218,7 +1218,7 @@ def order_pack_scan(request, pk):
             Pack.objects.create(order=order, pack_number=1)
         packs = list(order.packs.order_by("pack_number"))
 
-    # Split into lines that have a physical top to scan ("tracked" — a
+    # Split into lines that have a physical stock item to scan ("tracked" — a
     # warehouse/roll match exists) vs. lines that never can (bought-and-
     # resold trade goods that live only in the Products catalog, no
     # warehouse entry at all). Tracked lines get the scan/pack UI below;
@@ -1229,8 +1229,8 @@ def order_pack_scan(request, pk):
     tracked_items = [it for it in items if tracked_map.get(it.pk, False)]
     untracked_items = [it for it in items if not tracked_map.get(it.pk, False)]
 
-    # Tops scanned for a line that was later edited/removed on the order
-    # form. Editing an order NEVER touches reservations (top scanning is
+    # Stock items scanned for a line that was later edited/removed on the order
+    # form. Editing an order NEVER touches reservations (stock item scanning is
     # only ever done here, on the packing screen) — so these don't
     # disappear or free up, they just lose their item grouping. Surfaced
     # in their own section so staff can still see/remove/re-pack them
@@ -1239,7 +1239,7 @@ def order_pack_scan(request, pk):
 
     # What is in each sack, ready for the header — after untracked_items,
     # since those are the lines that get dropped into a package alongside
-    # the scanned tops.
+    # the scanned stock items.
     _annotate_pack_contents(packs, reservations, untracked_items)
 
     return render(request, "operating/order_pack_scan.html", {
@@ -1275,13 +1275,13 @@ def order_pack_reserve_add(request, pk):
     (see Order.billable_value) — is settled on the order form. A roll
     the order does not hold is refused there instead of quietly joining
     the order from the packing bench."""
-    from .models import WarehouseProductRoll, OrderRollReservation
+    from .models import WarehouseProductItem, OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
     if order.order_status in {"cancelled", "returned"}:
         # Cancelling an order deletes its reservations and is terminal —
-        # a top scanned onto it afterwards would hold warehouse stock
+        # a stock item scanned onto it afterwards would hold warehouse stock
         # forever with nothing to ever release it.
         return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
 
@@ -1293,12 +1293,12 @@ def order_pack_reserve_add(request, pk):
     if not items:
         return JsonResponse({"ok": False, "error": "Siparişte ürün yok."}, status=400)
 
-    rolls = list(WarehouseProductRoll.objects
+    rolls = list(WarehouseProductItem.objects
                  .select_related("product", "product__catalog_variant", "product__warehouse")
                  .filter(barcode__iexact=code))
     if not rolls:
         return JsonResponse({"ok": False, "kind": "not_found",
-                             "error": "Bu barkodla bir top (roll) bulunamadı."}, status=404)
+                             "error": "Bu barkodla bir stock item (roll) bulunamadı."}, status=404)
 
     # All rolls sharing this barcode whose product belongs to the order
     # (a barcode is code-unique but not DB-unique, so there can be more
@@ -1311,7 +1311,7 @@ def order_pack_reserve_add(request, pk):
     if not matched:
         return JsonResponse({
             "ok": False, "kind": "wrong_product",
-            "error": "Bu top bu siparişteki ürünlere ait değil — eklenmedi.",
+            "error": "Bu stock item bu siparişteki ürünlere ait değil — eklenmedi.",
             "product_name": (rolls[0].product.name if rolls[0].product else ""),
         }, status=409)
 
@@ -1330,8 +1330,8 @@ def order_pack_reserve_add(request, pk):
     # whole point: a preview must never be able to change anything.
     if (request.POST.get("preview") or "").strip() == "1":
         for roll, _mi in matched:
-            existing = OrderRollReservation.objects.filter(
-                order=order, roll=roll, consumed=False).first()
+            existing = OrderStockReservation.objects.filter(
+                order=order, stock_item=roll, consumed=False).first()
             if existing:
                 return JsonResponse({
                     "ok": True, "preview": True, "held": True,
@@ -1343,7 +1343,7 @@ def order_pack_reserve_add(request, pk):
         if place_only:
             return JsonResponse({
                 "ok": False, "kind": "not_in_order",
-                "error": "Bu top bu siparişe ait değil — pakete eklenemez.",
+                "error": "Bu stock item bu siparişe ait değil — pakete eklenemez.",
             }, status=409)
         pick = next(((roll, mi) for (roll, mi) in matched
                      if _roll_available_meters(roll) > 0), None)
@@ -1366,7 +1366,7 @@ def order_pack_reserve_add(request, pk):
     # package is named and the roll is not in it yet, in which case the
     # scan moves it there.
     for roll, _mi in matched:
-        existing = OrderRollReservation.objects.filter(order=order, roll=roll, consumed=False).first()
+        existing = OrderStockReservation.objects.filter(order=order, stock_item=roll, consumed=False).first()
         if existing:
             moved = False
             if target_pack is not None and existing.pack_id != target_pack.pk:
@@ -1383,7 +1383,7 @@ def order_pack_reserve_add(request, pk):
     if place_only:
         return JsonResponse({
             "ok": False, "kind": "not_in_order",
-            "error": "Bu top bu siparişe ait değil — pakete eklenemez.",
+            "error": "Bu stock item bu siparişe ait değil — pakete eklenemez.",
         }, status=409)
 
     # Prefer the first matching roll that still has reservable metres.
@@ -1425,7 +1425,7 @@ def order_pack_reserve_add(request, pk):
 @require_POST
 def order_pack_reserve_update(request, pk):
     """Edit the reserved metres of one reservation (partial cut)."""
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
@@ -1434,7 +1434,7 @@ def order_pack_reserve_update(request, pk):
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
-    r = OrderRollReservation.objects.filter(pk=rid, order=order, consumed=False).first()
+    r = OrderStockReservation.objects.filter(pk=rid, order=order, consumed=False).first()
     if r is None:
         return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
     raw = (request.POST.get("meters") or "").strip()
@@ -1444,7 +1444,7 @@ def order_pack_reserve_update(request, pk):
         return JsonResponse({"ok": False, "error": "Geçersiz metre."}, status=400)
     if meters <= 0:
         return JsonResponse({"ok": False, "error": "Metre sıfırdan büyük olmalı."}, status=400)
-    avail = _roll_available_meters(r.roll, exclude_reservation_id=r.pk)
+    avail = _roll_available_meters(r.stock_item, exclude_reservation_id=r.pk)
     capped = meters > avail
     if capped:
         meters = avail
@@ -1461,7 +1461,7 @@ def order_pack_reserve_update(request, pk):
 @require_POST
 def order_pack_reserve_remove(request, pk):
     """Release a reservation (remove a scanned roll) before shipping."""
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
@@ -1470,7 +1470,7 @@ def order_pack_reserve_remove(request, pk):
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
-    r = OrderRollReservation.objects.filter(pk=rid, order=order, consumed=False).first()
+    r = OrderStockReservation.objects.filter(pk=rid, order=order, consumed=False).first()
     if r is None:
         return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
     removed = r.id
@@ -1485,10 +1485,10 @@ def order_pack_reserve_remove(request, pk):
 @login_required
 @require_POST
 def order_pack_reserve_assign_pack(request, pk):
-    """Drag-and-drop target for the packing screen — put a scanned top
+    """Drag-and-drop target for the packing screen — put a scanned stock item
     into a package (or back to unassigned if pack_id is blank). Non-
     retail orders only; retail keeps the flat, packless list."""
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
@@ -1497,7 +1497,7 @@ def order_pack_reserve_assign_pack(request, pk):
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
-    r = OrderRollReservation.objects.filter(pk=rid, order=order, consumed=False).first()
+    r = OrderStockReservation.objects.filter(pk=rid, order=order, consumed=False).first()
     if r is None:
         return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
     pack_id = (request.POST.get("pack_id") or "").strip()
@@ -1558,16 +1558,16 @@ def order_create_barcode_check(request):
     roll, err = _lookup_roll_by_barcode_for_sku(
         code, sku, books=_books_in_scope(request))
     if err == "not_found":
-        return JsonResponse({"ok": False, "kind": "not_found", "error": "Bu barkodla bir top bulunamadı."}, status=404)
+        return JsonResponse({"ok": False, "kind": "not_found", "error": "Bu barkodla bir stock item bulunamadı."}, status=404)
     if err == "wrong_product":
-        return JsonResponse({"ok": False, "kind": "wrong_product", "error": "Bu top bu ürüne ait değil."}, status=409)
+        return JsonResponse({"ok": False, "kind": "wrong_product", "error": "Bu stock item bu ürüne ait değil."}, status=409)
     editing = _editing_order_id(request)
     avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
         return _roll_unavailable_response(roll, exclude_order_id=editing)
     return JsonResponse({
         "ok": True,
-        "roll_id": roll.pk,
+        "stock_item_id": roll.pk,
         "available": float(avail),
         "warehouse": (roll.product.warehouse.name if (roll.product and roll.product.warehouse_id) else ""),
     })
@@ -1596,8 +1596,8 @@ def _books_in_scope(request):
 @login_required
 def order_create_barcode_resolve(request):
     """Resolve a scanned roll barcode with NO pre-selected product — the
-    order-create/edit form's global "barkodla top ekle" bar. Finds the
-    physical top, and returns everything the form needs to mint the order
+    order-create/edit form's global "barkodla stock item ekle" bar. Finds the
+    physical stock item, and returns everything the form needs to mint the order
     line itself: the variant SKU, a variant-labeled title ("2086 — ALTIN
     A.BEYAZ", same rule as the product autocomplete), the sale price (or
     flagged purchase cost), and the roll's availability. Read-only —
@@ -1605,15 +1605,15 @@ def order_create_barcode_resolve(request):
     code = (request.GET.get("barcode") or "").strip()
     if not code:
         return JsonResponse({"ok": False, "error": "Barkod eksik."}, status=400)
-    from .models import WarehouseProductRoll
-    roll = (WarehouseProductRoll.objects
+    from .models import WarehouseProductItem
+    roll = (WarehouseProductItem.objects
             .select_related("product__warehouse",
                             "product__catalog_variant__product")
             .filter(barcode__iexact=code, status__in=["in_stock", "partial"])
             .filter(product__warehouse__accounting_book__in=_books_in_scope(request))
             .first())
     if roll is None:
-        return JsonResponse({"ok": False, "error": "Bu barkodla bir top bulunamadı."}, status=404)
+        return JsonResponse({"ok": False, "error": "Bu barkodla bir stock item bulunamadı."}, status=404)
     editing = _editing_order_id(request)
     avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
@@ -1669,36 +1669,67 @@ def order_create_barcode_resolve(request):
 
 @login_required
 def order_create_roll_list(request):
-    """Browsable list of available rolls (tops) for a SKU — lets the
+    """Browsable list of available rolls (stock_items) for a SKU — lets the
     order-create/edit product card offer a click-to-pick list instead
-    of requiring every top to be typed/scanned by barcode. Same SKU
+    of requiring every stock item to be typed/scanned by barcode. Same SKU
     match rule as _lookup_roll_by_barcode_for_sku (variant SKU or plain
     warehouse SKU), and the same reservation-aware availability as
     order_create_barcode_check. Read-only — reserves nothing."""
-    from django.db.models import Q
-    from .models import WarehouseProductRoll
+    from django.db.models import DecimalField, F, Q
+    from django.db.models.functions import Coalesce
+    from .models import WarehouseProductItem
     sku = (request.GET.get("sku") or "").strip()
     if not sku:
         return JsonResponse({"ok": False, "error": "Ürün bilgisi eksik."}, status=400)
+    # OLDEST first — FIFO. Fabric that has sat longest goes out first
+    # instead of ageing on the shelf behind items scanned last week.
+    #
+    # This orders by age rather than by price on purpose. Draining the
+    # cheap stock first reads like thrift, but items of one SKU are
+    # interchangeable, so whichever one is picked decides what the sale
+    # cost — and picking the cheapest every time books the widest margin
+    # now and leaves the dear stock to be sold at a loss later. The
+    # margin would then describe the picking order rather than the
+    # trade. IAS 2 says the same thing: interchangeable goods take FIFO
+    # or weighted average, and specific identification is for items that
+    # genuinely are not interchangeable.
+    #
+    # Cost still breaks ties, and the basis is the one the balance sheet
+    # values this item at (see accounting.services_ledger
+    # ._inventory_value) — the purchase-invoice line where there is one,
+    # the product's cost otherwise — so the list and the books never
+    # disagree about what an item costs.
+    unit_cost = Coalesce(
+        F("unit_cost_base"), F("purchase_invoice_item__unit_price"),
+        F("product__cost_usd"),
+        output_field=DecimalField(max_digits=18, decimal_places=6))
     rolls = (
-        WarehouseProductRoll.objects
+        WarehouseProductItem.objects
         .select_related("product", "product__warehouse")
         .filter(status__in=["in_stock", "partial"])
+        # Its two siblings — the product search and order_create_barcode_check
+        # — narrow to the working book; this one never did, so it offered
+        # another business's shelf to anyone who knew the SKU. Ordering by
+        # cost turned that from a latent leak into the default: the same SKU
+        # stands in Laleli Fabrika at $2.16 and Ergene Fabrika at $2.40, so
+        # the cheapest-first list put the other book's stock first.
+        .filter(product__warehouse__accounting_book__in=_books_in_scope(request))
         .filter(Q(product__catalog_variant__variant_sku__iexact=sku) | Q(product__sku__iexact=sku))
-        .order_by("-scanned_at")[:60]
+        .annotate(unit_cost=unit_cost)
+        .order_by("scanned_at", F("unit_cost").asc(nulls_last=True))[:60]
     )
     editing = _editing_order_id(request)
     rolls = list(rolls)
-    # One grouped aggregate for the whole page of tops, not
+    # One grouped aggregate for the whole page of stock_items, not
     # _roll_available_meters() per roll — that was a SUM query each, and
-    # against a remote database 60 tops meant 60 round trips before the
+    # against a remote database 60 stock items meant 60 round trips before the
     # card's list could render at all.
     from django.db.models import Sum
-    from .models import OrderRollReservation
-    holds = OrderRollReservation.objects.filter(roll__in=rolls, consumed=False)
+    from .models import OrderStockReservation
+    holds = OrderStockReservation.objects.filter(stock_item__in=rolls, consumed=False)
     if editing is not None:
         holds = holds.exclude(order_id=editing)
-    reserved = dict(holds.values_list("roll_id").annotate(s=Sum("meters")))
+    reserved = dict(holds.values_list("stock_item_id").annotate(s=Sum("meters")))
 
     out = []
     for roll in rolls:
@@ -1730,10 +1761,10 @@ def order_pack_complete(request, pk):
         # Also blocks the raw order_status='packaging' save below from
         # reviving a terminal order outside the status funnel.
         return JsonResponse({"ok": False, "error": "İptal edilmiş bir sipariş tekrar açılamaz."}, status=400)
-    n = order.roll_reservations.filter(consumed=False).count()
+    n = order.stock_reservations.filter(consumed=False).count()
     if n < 1:
         return JsonResponse({"ok": False,
-                             "error": "Paketlemeyi tamamlamak için en az bir top okutmalısınız."}, status=400)
+                             "error": "Paketlemeyi tamamlamak için en az bir stock item okutmalısınız."}, status=400)
     if order.order_status != "packaging":
         order.order_status = "packaging"
         order.save(update_fields=["order_status", "updated_at"])
@@ -2048,17 +2079,17 @@ def build_order_print_rows(order):
     """
     from decimal import Decimal, ROUND_HALF_UP
 
-    # Physical packs scanned for this order (a "top"/roll for fabric,
+    # Physical packs scanned for this order (a "stock item"/roll for fabric,
     # but the goods aren't only fabric — the printed document calls
     # them packs), per line and in total. Consumed reservations count
     # too: on a shipped order those ARE the packs that went out. The
     # same pack scanned twice on one line is still one physical
     # pack, hence the sets.
     packs_by_item, all_pack_ids = {}, set()
-    for r in order.roll_reservations.values("order_item_id", "roll_id"):
-        all_pack_ids.add(r["roll_id"])
+    for r in order.stock_reservations.values("order_item_id", "stock_item_id"):
+        all_pack_ids.add(r["stock_item_id"])
         if r["order_item_id"]:
-            packs_by_item.setdefault(r["order_item_id"], set()).add(r["roll_id"])
+            packs_by_item.setdefault(r["order_item_id"], set()).add(r["stock_item_id"])
 
     items = []
     total = Decimal("0.00")
@@ -2444,7 +2475,7 @@ class OrderCreate(View):
                             order_item.custom_fabric_used_meters = item_data.get("custom_fabric_used_meters") or None
                             order_item.save()
 
-                        # Roll (top) reservations — entered right on this
+                        # Roll (stock item) reservations — entered right on this
                         # product card instead of a later packing-scan
                         # visit, for ANY order (not just Perakende). Each
                         # already passed the live order_create_barcode_check
@@ -2480,7 +2511,7 @@ class OrderCreate(View):
                     # picked rolls don't cover the ordered quantities the
                     # order simply stays "Açık" and we tell the user below.
                     order_stayed_open = False
-                    if order.roll_reservations.filter(consumed=False).exists():
+                    if order.stock_reservations.filter(consumed=False).exists():
                         from .views_warehouse import apply_order_status_change
                         _adv_ok, _adv_code = apply_order_status_change(order, "packaging", user=member)
                         order_stayed_open = (not _adv_ok and _adv_code == "insufficient_reservation")
@@ -2656,7 +2687,7 @@ class OrderEdit(UpdateView):
         items = (self.object.items.all()
                  .select_related("product", "product_variant")
                  .prefetch_related(
-                     "roll_reservations__roll__product__warehouse",
+                     "stock_reservations__stock_item__product__warehouse",
                      "product_variant__warehouse_products",
                      "product_variant__product_variant_attribute_values",
                  ))
@@ -2694,7 +2725,7 @@ class OrderEdit(UpdateView):
                     if it.outsourced_quantity is not None else None
                 ),
                 "price": float(it.price) if it.price is not None else 0,
-                # Tops already reserved for this line — shown read-only in
+                # Stock items already reserved for this line — shown read-only in
                 # the product card. "available" excludes this reservation's
                 # OWN hold from the other-reservations subtraction (same
                 # rule order_pack_reserve_update uses), so it's already the
@@ -2703,22 +2734,22 @@ class OrderEdit(UpdateView):
                 "rolls": [
                     {
                         # reservation_id lets the edit sidebar RELEASE a
-                        # saved top explicitly (posts to
+                        # saved stock item explicitly (posts to
                         # order_pack_reserve_remove) — an intentional
                         # user action, not the silent auto-release that
                         # was reverted earlier.
                         "reservation_id": r.pk,
-                        "barcode": r.roll.barcode or "" if r.roll else "",
-                        "warehouse": (r.roll.product.warehouse.name
-                                     if (r.roll and r.roll.product and r.roll.product.warehouse_id)
+                        "barcode": r.stock_item.barcode or "" if r.stock_item else "",
+                        "warehouse": (r.stock_item.product.warehouse.name
+                                     if (r.stock_item and r.stock_item.product and r.stock_item.product.warehouse_id)
                                      else ""),
                         "meters": float(r.meters or 0),
                         "available": float(
-                            _roll_available_meters(r.roll, exclude_reservation_id=r.pk)
-                            if r.roll else (r.meters or 0)
+                            _roll_available_meters(r.stock_item, exclude_reservation_id=r.pk)
+                            if r.stock_item else (r.meters or 0)
                         ),
                     }
-                    for r in it.roll_reservations.all()
+                    for r in it.stock_reservations.all()
                     if not r.consumed
                 ],
             }
@@ -2838,7 +2869,7 @@ class OrderEdit(UpdateView):
                         # Release any active roll reservations tied to these items
                         # before deleting them — otherwise SET_NULL on order_item
                         # orphans the reservations and rolls stay "reserved" forever.
-                        OrderRollReservation.objects.filter(
+                        OrderStockReservation.objects.filter(
                             order_item__pk__in=deleted_items,
                             order=self.object,
                             consumed=False,
@@ -2878,8 +2909,8 @@ class OrderEdit(UpdateView):
                         #     "item_id": 8
                         #   }]
 
-                        # Unticked tops go back to the pool BEFORE any line
-                        # reserves, so a top moved between lines in one save
+                        # Unticked stock items go back to the pool BEFORE any line
+                        # reserves, so a stock item moved between lines in one save
                         # isn't blocked by its own soon-to-be-dropped hold.
                         _order_edit_release_unticked(self.object, product_json_input)
 
@@ -3277,8 +3308,8 @@ def _packing_list_customer(order):
 
 
 def _pack_roll_rows(pack):
-    """The physical tops actually assigned to a Pack, sourced from
-    OrderRollReservation.pack — the SAME data order_pack_scan.html's
+    """The physical stock items actually assigned to a Pack, sourced from
+    OrderStockReservation.pack — the SAME data order_pack_scan.html's
     drag-into-package UI writes. This is the one place item assignment
     happens; packing_list/PDF only ever READ this, they never let
     staff re-assign, so there's no second place to "pack" an order."""
@@ -3286,8 +3317,8 @@ def _pack_roll_rows(pack):
     # The variant's attributes are a M2M, so they are prefetched rather
     # than joined — one extra query for the pack, not one per roll.
     attr_values = ("product_variant_attribute_values__product_variant_attribute")
-    for r in (pack.roll_reservations
-              .select_related("roll",
+    for r in (pack.stock_reservations
+              .select_related("stock_item",
                               "order_item__product__category",
                               "order_item__product_variant",
                               "warehouse_product__catalog_variant__product__category")
@@ -3312,7 +3343,7 @@ def _pack_roll_rows(pack):
             "title": title, "sku": sku,
             "variant": _variant_label(variant),
             "product_type": _product_type_label(product),
-            "barcode": r.roll.barcode if r.roll_id else "-",
+            "barcode": r.stock_item.barcode if r.stock_item_id else "-",
             "meters": r.meters,
         })
     return rows
@@ -3322,7 +3353,7 @@ class OrderPackingList(View):
     """Read-only packing list + print/export — NOT an assignment UI.
 
     Item-to-package assignment happens in exactly ONE place,
-    order_pack_scan.html's drag-and-drop (OrderRollReservation.pack).
+    order_pack_scan.html's drag-and-drop (OrderStockReservation.pack).
     This screen used to have its OWN competing assign/unassign
     interface backed by a separate model (PackedOrderItem), which
     never saw what was actually scanned+packed on the other screen —
@@ -3333,7 +3364,7 @@ class OrderPackingList(View):
     export, and nothing that writes an assignment.
 
     GET  → render each pack's real contents + any scanned-but-not-yet-
-           -packed tops. Auto-creates Pack #1 the first time it's opened
+           -packed stock items. Auto-creates Pack #1 the first time it's opened
            (order_pack_scan.html relies on that pre-existing pack too).
     POST → JSON API, pack HOUSEKEEPING only (no item assignment):
            - action=add_pack    → create the next-numbered Pack
@@ -3362,7 +3393,7 @@ class OrderPackingList(View):
                 item_no += 1
                 r["item_no"] = item_no
 
-        unassigned_count = order.roll_reservations.filter(pack__isnull=True).count()
+        unassigned_count = order.stock_reservations.filter(pack__isnull=True).count()
 
         return render(request, self.template_name, {
             "order": order,
@@ -3404,7 +3435,7 @@ class OrderPackingList(View):
             # Refuse to delete the last remaining pack.
             if order.packs.count() <= 1:
                 return JsonResponse({"ok": False, "error": "Cannot delete the only pack"}, status=400)
-            pack.delete()  # SET_NULL releases its roll_reservations back to unassigned
+            pack.delete()  # SET_NULL releases its stock_reservations back to unassigned
             return JsonResponse({"ok": True})
 
         return JsonResponse({"ok": False, "error": "Unknown action"}, status=400)
@@ -3757,9 +3788,9 @@ def product_autocomplete(request):
     # reserved into another order are spoken for, and offering them here is
     # how a roll gets promised twice. One query for the whole result set.
     from decimal import Decimal as _D
-    from .models import OrderRollReservation
+    from .models import OrderStockReservation
     reserved_by_wp = {}
-    for wp_id, meters in (OrderRollReservation.objects
+    for wp_id, meters in (OrderStockReservation.objects
                           .filter(warehouse_product__in=[w.pk for w in wh_rows], consumed=False)
                           .values_list("warehouse_product_id", "meters")):
         reserved_by_wp[wp_id] = reserved_by_wp.get(wp_id, _D("0")) + (meters or _D("0"))

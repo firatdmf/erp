@@ -1402,9 +1402,9 @@
                 <td><span class="mono">{{ oi.sku|default:"—" }}</span></td>
                 <td>
                   {{ oi.variant_label|default:"—" }}
-                  {% if oi.rolls %}
+                  {% if oi.stock_items %}
                     <div style="margin-top:3px;">
-                      {% for rl in oi.rolls %}
+                      {% for rl in oi.stock_items %}
                         {% if rl.barcode %}
                         <span class="mono" style="display:inline-block; font-size:10.5px; color:var(--gray-600); background:#F4F7FB; border-radius:5px; padding:1px 6px; margin:1px 3px 1px 0;">{{ rl.barcode }} · {{ rl.meters|floatformat:"-2" }}</span>
                         {% endif %}

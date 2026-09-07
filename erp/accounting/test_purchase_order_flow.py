@@ -12,7 +12,7 @@ from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CariAccount, Invoice
 from authentication.models import Permission
 from marketing.models import Product
-from operating.models import Warehouse, WarehouseProduct, WarehouseProductRoll
+from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
 class PurchaseOrderFlowTest(TestCase):
@@ -82,7 +82,7 @@ class PurchaseOrderFlowTest(TestCase):
 
         # Nothing anywhere else.
         self.assertFalse(WarehouseProduct.objects.exists())
-        self.assertFalse(WarehouseProductRoll.objects.exists())
+        self.assertFalse(WarehouseProductItem.objects.exists())
         self.assertFalse(Product.objects.exists())
         self.cari.refresh_from_db()
         self.assertEqual(self.cari.cached_balance, Decimal("0.00"))
@@ -126,11 +126,11 @@ class PurchaseOrderFlowTest(TestCase):
         wp = WarehouseProduct.objects.get(warehouse=self.wh)
         self.assertEqual(wp.sku, "K24644.G07")
         self.assertEqual(wp.quantity, Decimal("55.00"))
-        self.assertEqual(WarehouseProductRoll.objects.count(), 2)
+        self.assertEqual(WarehouseProductItem.objects.count(), 2)
         self.assertEqual(Product.objects.get().sku, "K24644")
-        # Every top traces back to a line of THIS document — one invoice, not two.
+        # Every stock item traces back to a line of THIS document — one invoice, not two.
         self.assertEqual(Invoice.objects.filter(type="purchase").count(), 1)
-        for roll in WarehouseProductRoll.objects.all():
+        for roll in WarehouseProductItem.objects.all():
             self.assertEqual(roll.purchase_invoice_item.invoice_id, inv_id)
 
     def test_confirming_twice_is_refused(self):
@@ -138,7 +138,7 @@ class PurchaseOrderFlowTest(TestCase):
         self.client.post(reverse("accounts:purchase_order_confirm", args=[inv_id]))
         r = self.client.post(reverse("accounts:purchase_order_confirm", args=[inv_id]))
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(WarehouseProductRoll.objects.count(), 2)   # not doubled
+        self.assertEqual(WarehouseProductItem.objects.count(), 2)   # not doubled
 
     def test_a_confirmed_order_is_no_longer_editable_as_an_order(self):
         inv_id = self._save_order().json()["invoice_id"]
@@ -158,7 +158,7 @@ class PurchaseOrderFlowTest(TestCase):
         self.assertEqual(r.status_code, 400)
         inv = Invoice.objects.get(pk=inv_id)
         self.assertEqual(inv.status, "draft")                    # still confirmable
-        self.assertFalse(WarehouseProductRoll.objects.exists())
+        self.assertFalse(WarehouseProductItem.objects.exists())
         self.assertIsNone(inv.posted_movement)
 
     # ── Who may confirm ─────────────────────────────────────────────
@@ -176,7 +176,7 @@ class PurchaseOrderFlowTest(TestCase):
         inv_id = r.json()["invoice_id"]
         c = self.client.post(reverse("accounts:purchase_order_confirm", args=[inv_id]))
         self.assertEqual(c.status_code, 403)
-        self.assertFalse(WarehouseProductRoll.objects.exists())
+        self.assertFalse(WarehouseProductItem.objects.exists())
 
         form = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         self.assertFalse(form.context["can_confirm"])
@@ -244,22 +244,22 @@ class ReceivedPurchaseEditTest(TestCase):
             "variants": [{
                 "invoice_item_id": v["invoice_item_id"],
                 "warehouse_product_id": v["warehouse_product_id"],
-                "kept_roll_ids": [t["roll_id"] for t in v["tops"]],
-                "new_tops": [],
+                "kept_roll_ids": [t["stock_item_id"] for t in v["tops"]],
+                "new_stock": [],
             } for v in group["variants"]],
         } for group in d["products"]]
 
     def test_the_notes_can_still_be_changed(self):
         r = self.client.post(
             self._edit_url(),
-            data=json.dumps({"unit": "mt", "notes": "arrived damaged, 2 tops short",
+            data=json.dumps({"unit": "mt", "notes": "arrived damaged, 2 stock items short",
                              "products": self._current_diff()}),
             content_type="application/json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(Invoice.objects.get(pk=self.invoice_id).notes,
-                         "arrived damaged, 2 tops short")
+                         "arrived damaged, 2 stock items short")
         # ...and the stock it already had is untouched.
-        self.assertEqual(WarehouseProductRoll.objects.count(), 1)
+        self.assertEqual(WarehouseProductItem.objects.count(), 1)
 
     def test_omitting_notes_leaves_them_alone(self):
         """The field is only touched when the client actually sends it."""

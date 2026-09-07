@@ -112,7 +112,7 @@ class Command(BaseCommand):
             tracked = order.classify_items_by_tracking(line_items)
             scanned = {
                 r["order_item_id"]: (r["s"] or Decimal("0"))
-                for r in (order.roll_reservations
+                for r in (order.stock_reservations
                           .filter(order_item__isnull=False)
                           .values("order_item_id").annotate(s=Sum("meters")))
             }

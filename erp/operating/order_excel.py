@@ -139,7 +139,7 @@ def fit_columns(ws, first_row, last_row, ncols, header_row=None,
 
     `pad` is one character, which is all a cell needs: Excel already
     insets its text a couple of pixels from the border. `arrow` is the
-    three the header row gets on top — the filter's dropdown sits
+    three the header row gets on stock item — the filter's dropdown sits
     INSIDE the cell and covers the end of the label otherwise, which is
     what several of these columns were doing before they were measured.
     """

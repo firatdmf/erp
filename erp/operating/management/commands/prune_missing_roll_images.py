@@ -1,7 +1,7 @@
 """
 Clear the roll label-photo paths whose files are gone.
 
-`WarehouseProductRoll.source_image` used to be written to MEDIA_ROOT, which
+`WarehouseProductItem.source_image` used to be written to MEDIA_ROOT, which
 on this deployment is a container path with no volume mounted — so every
 deploy wiped the photos while the database kept pointing at them. The column
 then claims audit evidence that cannot be produced, which is worse than
@@ -28,7 +28,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from operating.models import WarehouseProductRoll
+from operating.models import WarehouseProductItem
 
 
 class _DryRun(Exception):
@@ -36,7 +36,7 @@ class _DryRun(Exception):
 
 
 class Command(BaseCommand):
-    help = ("Clear WarehouseProductRoll.source_image where the file is gone. "
+    help = ("Clear WarehouseProductItem.source_image where the file is gone. "
             "Must run on the host that holds MEDIA_ROOT.")
 
     def add_arguments(self, parser):
@@ -51,7 +51,7 @@ class Command(BaseCommand):
                                  "running on the wrong host looks like.")
 
     def handle(self, *args, **opts):
-        qs = (WarehouseProductRoll.objects
+        qs = (WarehouseProductItem.objects
               .exclude(source_image="").exclude(source_image__isnull=True)
               .select_related("product", "product__warehouse"))
         if opts["warehouse"]:
@@ -100,7 +100,7 @@ class Command(BaseCommand):
                     note = (roll.notes or "").strip()
                     stamp = f"Label photo lost before {now:%Y-%m-%d} (local disk not persisted)"
                     roll.notes = f"{note} · {stamp}".strip(" ·")
-                WarehouseProductRoll.objects.bulk_update(
+                WarehouseProductItem.objects.bulk_update(
                     missing, ["source_image", "notes"], batch_size=500)
                 if not opts["apply"]:
                     raise _DryRun

@@ -6,16 +6,16 @@ warehouse page lists member warehouses' rows.{% endcomment %}
 {% comment %}Same behaviour as the flat rows: a plain click expands this
 variant's rolls, the SKU pill opens the product.{% endcomment %}
 <tr class="wh-vrow wh-vrow-nested" style="cursor:pointer;" data-roll-count="{{ p.roll_count|default:0 }}"
-    onclick="toggleWhRolls(event, this, '{% url 'operating:warehouse_product_rolls' p.warehouse_id p.pk %}')">
-  <td class="wh-vrow-sku wh-chev-cell" data-label="SKU">
+    onclick="toggleWhRolls(event, this, '{% url 'operating:warehouse_product_rolls' warehouse.pk p.pk %}')">
+  {% comment %}Spans SKU + Catalog: this cell carries both (the catalog link
+  sits inline here rather than in its own column), and without the span every
+  nested row sat one column left of the headings it belongs under.{% endcomment %}
+  <td class="wh-vrow-sku wh-chev-cell" colspan="2" data-label="SKU">
     <i class="fa fa-chevron-right wh-vrow-chev{% if not p.roll_count %} is-empty{% endif %}"
        title="{% trans 'Show the rolls in this product' %}"></i>
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link wh-cell-nav" style="text-decoration:none; color:inherit;">
       {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
-    {% if warehouse.is_combined %}
-      <span style="margin-left:6px; font:700 10px var(--font-sans,sans-serif); color:#5B21B6; background:#EDE9FE; border-radius:5px; padding:1px 6px; vertical-align:middle; white-space:nowrap;">{{ p.warehouse.name }}</span>
-    {% endif %}
     {% if p.catalog_variant_id and p.catalog_variant.product_id %}
       <a href="{% url 'marketing:product_detail' p.catalog_variant.product_id %}"
          onclick="event.stopPropagation();" target="_blank" rel="noopener"
@@ -29,23 +29,37 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
     <div class="pname" style="font-weight:600;">{{ p.name }}</div>
     {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
   </td>
+  {% if warehouse.is_combined %}
+  {% comment %}Which member warehouse holds this variant — the same Location
+  column the flat list has, so an expanded group reads the same way.{% endcomment %}
+  <td data-label="{% trans 'Location' %}">
+    <a href="{% url 'operating:warehouse_detail' p.warehouse_id %}" class="wh-cell-link wh-loc-link"
+       onclick="event.stopPropagation();"
+       title="{{ p.warehouse.location|default:p.warehouse.name }}">
+      <i class="fa fa-warehouse"></i> {{ p.warehouse.name }}
+    </a>
+  </td>
+  {% endif %}
   <td class="num" data-label="{% trans 'Stock' %}">
     <div class="qty">{{ p.quantity|floatformat:2 }} m</div>
     {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each roll has its own barcode' %}">{{ p.roll_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=p.roll_count %}roll{% plural %}rolls{% endblocktrans %}{% endif %}</div>{% endif %}
     {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} m</div>{% endif %}
   </td>
-  <td class="num" data-label="{% trans 'Unit cost' %}">
-    {% if p.purchase_price %}
-      <span class="mono">{{ p.purchase_currency|currency_sign }}{{ p.purchase_price|floatformat:2 }}</span>
+  {% comment %}Weighted average of the stock on the floor, matching the flat
+  list — not the SKU's last-purchase price.{% endcomment %}
+  <td class="num" data-label="{% trans 'Unit cost' %}"
+      {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:4 }}"{% endif %}>
+    {% if p.avg_cost %}
+      <span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:2 }}</span>
     {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
-  <td class="num" data-label="{% trans 'Total (USD)' %}">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num" data-label="{% trans 'Total' %}">{% if p.line_usd %}<span class="cost-usd">{{ p.warehouse|book_sign }}{{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
 </tr>
 {% empty %}
-<tr><td colspan="6" style="padding:12px 34px; color:#94A3B8;">{% trans "No variants." %}</td></tr>
+<tr><td colspan="{{ col_count|default:6 }}" style="padding:12px 34px; color:#94A3B8;">{% trans "No variants." %}</td></tr>
 {% endfor %}
 {% if truncated %}
-<tr><td colspan="6" style="padding:10px 34px; color:#94A3B8; background:#FBFCFE;">
+<tr><td colspan="{{ col_count|default:6 }}" style="padding:10px 34px; color:#94A3B8; background:#FBFCFE;">
   {% blocktrans %}Showing first {{ shown }} of {{ total }} variants — use search to narrow down.{% endblocktrans %}
 </td></tr>
 {% endif %}

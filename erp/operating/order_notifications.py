@@ -356,7 +356,7 @@ def _render_order_pdf(order):
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LINEBELOW", (0, 0), (-1, 0), 1, INK),       # header underline
             ("LINEBELOW", (0, 1), (-1, -2), 0.4, HAIR),   # row separators
-            ("LINEABOVE", (0, -1), (-1, -1), 1, INK),     # total top rule
+            ("LINEABOVE", (0, -1), (-1, -1), 1, INK),     # total stock item rule
             ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
         ]))

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load i18n %}
 {% load static %}
+{% load humanize %}
 
 {% block title %}{% trans "Warehouse" %} · {{ warehouse.name }} | Nejum ERP{% endblock %}
 
@@ -296,6 +297,19 @@
     border: 1px solid rgba(20,127,116,0.30);
   }
   .od-prods .qty { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; }
+  /* Location column — only rendered on a combined (ortak) warehouse, where
+     each row belongs to a different member. Muted violet, matching the
+     "Combined" chip in the header, so the eye reads it as "which shelf"
+     rather than as part of the product's identity. */
+  .od-prods .wh-loc-link, .od-prods .wh-loc-name {
+    display: inline-block; padding: 3px 9px; border-radius: 6px;
+    background: #F4F1FE; color: #5B21B6; border: 1px solid #E4DDFB;
+    font: 700 11.5px var(--font-sans); white-space: nowrap;
+    text-decoration: none;
+  }
+  .od-prods .wh-loc-name + .wh-loc-name { margin-top: 3px; }
+  .od-prods .wh-loc-link:hover { background: #EDE9FE; border-color: #C9BCF6; }
+  .od-prods .wh-loc-link i { font-size: 10px; opacity: 0.75; margin-right: 3px; }
   .od-prods .rolls-pill {
     display: inline-flex; align-items: center; gap: 4px;
     margin-top: 3px;
@@ -345,7 +359,7 @@
   .wh-rolls-list { display: flex; flex-direction: column; gap: 1px; background: #E8EEF5; border: 1px solid #E2E8EE; border-radius: 8px; overflow: hidden; }
   .wh-roll {
     display: grid; align-items: center; gap: 10px; background: #fff;
-    grid-template-columns: minmax(140px, 1.4fr) minmax(120px, 1fr) minmax(150px, 1.3fr) minmax(110px, .9fr) 32px;
+    grid-template-columns: minmax(140px, 1.4fr) minmax(120px, 1fr) minmax(78px, .6fr) minmax(150px, 1.3fr) minmax(110px, .9fr) 32px;
     padding: 7px 10px; font: 500 12px var(--font-sans);
   }
   .wh-roll .roll-barcode {
@@ -358,6 +372,7 @@
   }
   .wh-roll-lot { margin-left: 6px; font-size: 10.5px; color: var(--gray-500); }
   .wh-roll-m { font-weight: 800; font-variant-numeric: tabular-nums; color: #0F1419; }
+  .wh-roll-cost { font-variant-numeric: tabular-nums; color: var(--gray-600, #55636F); white-space: nowrap; }
   .wh-roll-of { margin-left: 5px; font-size: 10.5px; color: var(--gray-500); }
   .wh-roll-bar {
     display: block; height: 3px; margin-top: 4px; border-radius: 2px;
@@ -383,7 +398,7 @@
   .wh-rolls-empty i { margin-right: 6px; }
   .wh-rolls-more a, .wh-rolls-empty a { color: var(--nejum-teal-700); margin-left: 6px; }
   @media (max-width: 820px) {
-    /* Stack a top's fields — the 5-column grid squeezes them unreadable. */
+    /* Stack an item's fields — the 6-column grid squeezes them unreadable. */
     .wh-roll { grid-template-columns: 1fr auto; row-gap: 4px; }
     .wh-roll-when { grid-column: 1 / -1; }
     .wh-rolls-cell { padding-left: 14px !important; }
@@ -734,12 +749,13 @@
     .wh-rolls-list { border-radius: 9px; }
     .wh-roll {
       grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas: "code act" "len len" "state state" "when when";
+      grid-template-areas: "code act" "len len" "cost cost" "state state" "when when";
       row-gap: 5px; padding: 9px 10px;
     }
     .wh-roll-code  { grid-area: code; min-width: 0; }
     .wh-roll-act   { grid-area: act; }
     .wh-roll-len   { grid-area: len; }
+    .wh-roll-cost  { grid-area: cost; }
     .wh-roll-state { grid-area: state; }
     .wh-roll-when  { grid-area: when; }
     /* Barcodes are long and unbreakable — let them wrap instead of pushing
@@ -1266,19 +1282,19 @@
         </span>
         <span class="od-dot"></span>
         <span title="{% trans 'Main products (packages)' %}">
-          <i class="fa fa-box"></i>{{ group_count|default:0 }} {% trans "main products" %}
+          <i class="fa fa-box"></i>{{ group_count|default:0|intcomma }} {% trans "main products" %}
         </span>
         <span class="od-dot"></span>
         <span title="{% trans 'Variants' %}">
-          <i class="fa fa-list-ul"></i>{{ variant_count|default:0 }} {% trans "variants" %}
+          <i class="fa fa-list-ul"></i>{{ variant_count|default:0|intcomma }} {% trans "variants" %}
         </span>
         <span class="od-dot"></span>
         <span title="{% trans 'Rolls' %}">
-          <i class="fa fa-scroll"></i>{{ roll_count|default:0 }} {% trans "rolls" %}
+          <i class="fa fa-scroll"></i>{{ roll_count|default:0|intcomma }} {% trans "rolls" %}
         </span>
         <span class="od-dot"></span>
         <span>
-          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:0 }} m {% trans "in stock" %}
+          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:0|intcomma }} m {% trans "in stock" %}
         </span>
         {% if warehouse.created_at %}
           <span class="od-dot"></span>
@@ -1496,9 +1512,16 @@
                 <th>{% trans "SKU" %}</th>
                 <th>{% trans "Catalog" %}</th>
                 <th>{% trans "Name" %}</th>
+                {% comment %}A combined (ortak) warehouse lists its members'
+                stock in one table, so every row has to say WHICH shelf it is
+                on — its own column rather than a pill tacked onto the SKU,
+                which is unreadable once the list is scanned down.{% endcomment %}
+                {% if warehouse.is_combined %}
+                <th>{% trans "Location" %}</th>
+                {% endif %}
                 <th class="num">{% trans "Qty" %}</th>
-                <th class="num">{% trans "Unit cost" %}</th>
-                <th class="num">{% trans "Total (USD)" %}</th>
+                <th class="num" title="{% trans 'Weighted-average unit cost of the stock on the floor' %}">{% trans "Unit cost" %}</th>
+                <th class="num">{% trans "Total" %}</th>
               </tr>
             </thead>
             <tbody id="wh-rows">
@@ -1624,23 +1647,23 @@
 
         <div class="od-stats-grid">
           <div class="od-stat teal">
-            <div class="val">{{ group_count|default:0 }}</div>
+            <div class="val">{{ group_count|default:0|intcomma }}</div>
             <div class="lbl">{% trans "Main products" %}</div>
           </div>
           <div class="od-stat">
-            <div class="val">{{ variant_count|default:0 }}</div>
+            <div class="val">{{ variant_count|default:0|intcomma }}</div>
             <div class="lbl">{% trans "Variants" %}</div>
           </div>
           <div class="od-stat">
-            <div class="val">{{ roll_count|default:0 }}</div>
+            <div class="val">{{ roll_count|default:0|intcomma }}</div>
             <div class="lbl">{% trans "Rolls" %}</div>
           </div>
           <div class="od-stat">
-            <div class="val">{{ total_quantity|floatformat:0 }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> m</span></div>
+            <div class="val">{{ total_quantity|floatformat:0|intcomma }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> m</span></div>
             <div class="lbl">{% trans "Total stock" %}</div>
           </div>
           <div class="od-stat full">
-            <div class="val">${{ total_value_usd|floatformat:2 }}</div>
+            <div class="val">${{ total_value_usd|floatformat:2|intcomma }}</div>
             <div class="lbl">{% trans "Net worth (USD)" %}</div>
           </div>
         </div>
@@ -2136,7 +2159,7 @@
     }
     if (chev) chev.style.transform = 'rotate(90deg)';
     headerEl.insertAdjacentHTML('afterend',
-      '<tr class="whg-rows-' + gid + ' whg-loading"><td colspan="6" '
+      '<tr class="whg-rows-' + gid + ' whg-loading"><td colspan="' + headerEl.closest('table').tHead.rows[0].cells.length + '" '
       + 'style="padding:12px 34px;color:#94A3B8;font:500 12.5px var(--font-sans);">'
       + '<i class="fa fa-spinner fa-spin"></i> …</td></tr>');
     fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -2293,7 +2316,10 @@
     const groupCls = Array.from(rowEl.classList).filter(function (c) {
       return c.indexOf('whg-rows-') === 0;
     });
-    const cols = rowEl.children.length;
+    // Header cell count, not this row's: a nested (grouped) row spans SKU
+    // and Catalog in one cell, so counting its cells came up short and the
+    // spinner sat in a half-width box.
+    const cols = rowEl.closest('table').tHead.rows[0].cells.length;
     rowEl.insertAdjacentHTML('afterend',
       '<tr class="wh-rollrow wh-rolls-loading"><td colspan="' + cols + '" '
       + 'style="padding:10px 42px;color:#94A3B8;font:500 12px var(--font-sans);">'

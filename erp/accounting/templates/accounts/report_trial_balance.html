@@ -113,7 +113,11 @@
   <div class="tb-head">
     <div class="tb-eyebrow">{% trans "Period Summary" %}</div>
     <h1 class="tb-title">{% trans "Trial Balance" %}</h1>
-    <p class="tb-sub">{% trans "Opening / debit / credit / closing for period" %} {{ date_from }} → {{ date_to }}</p>
+    <p class="tb-sub">{% trans "Opening / debit / credit / closing for period" %} {{ date_from }} → {{ date_to }}{% if base_currency %}{% comment %}
+      Said out loud because the figures used to be a silent mix: entered
+      amounts in dollars, lira and euro added together as though they were
+      one unit. They are all base currency now.
+    {% endcomment %} · {{ base_currency.code }}{% endif %}</p>
   </div>
 
   <form class="tb-toolbar no-print" method="get">

@@ -1,4 +1,4 @@
-"""The mizan answers in a fixed number of queries, whatever the book holds.
+"""The mizan answers fast, and in one currency.
 
 Run with:
     python manage.py test accounting.test_trial_balance_speed
@@ -94,3 +94,76 @@ class TrialBalanceQueryCount(TestCase):
         with CaptureQueriesContext(connection) as ctx:
             self._page()
         return len(ctx)
+
+
+class EveryFigureIsBaseCurrency(TestCase):
+    """It summed `amount` — the ENTERED figure, in whatever currency the
+    movement was written in. Laleli holds 877 dollar movements, 16 lira and
+    2 euro, and six accounts carry more than one, so the page added lira to
+    dollars as though they were the same unit. The grand total read
+    302,676.10 against a real position of 349,327.22.
+    """
+
+    def setUp(self):
+        self.usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.try_ = CurrencyCategory.objects.create(
+            code="TRY", name="Turkish Lira", symbol="\u20ba")
+        self.book = Book.objects.create(
+            name="Laleli Fabric", base_currency=self.usd)
+        user = get_user_model().objects.create_user("mizan", password="pw")
+        user.member.books.set([self.book])
+        user.member.default_book = self.book
+        user.member.save(update_fields=["default_book"])
+        self.client.force_login(user)
+
+        self.cari = CariAccount.objects.create(
+            book=self.book, code="00001", name="MIXED",
+            default_currency=self.usd)
+
+    def _mv(self, amount, currency, rate=None):
+        return CariMovement.objects.create(
+            cari=self.cari, book=self.book, date="2026-03-01",
+            amount=Decimal(amount), currency=currency, exchange_rate=rate,
+            movement_type="opening", description="ob")
+
+    def _row(self):
+        resp = self.client.get(
+            reverse("accounts:report_trial_balance", args=[self.book.pk]),
+            {"date_from": "2026-01-01", "date_to": "2026-12-31"})
+        self.assertEqual(resp.status_code, 200)
+        return resp.context["rows"][0]
+
+    def test_a_lira_movement_counts_as_what_it_is_worth(self):
+        self._mv("100.00", self.usd)
+        lira = self._mv("300.00", self.try_, Decimal("0.02083300"))
+        # Whatever rate the movement resolves for itself, 300 lira is worth
+        # a few dollars and nothing like 300 of them. The assertion reads
+        # amount_base rather than restating the FX arithmetic, which is
+        # CariMovement's job and tested where that lives.
+        lira.refresh_from_db()
+        self.assertLess(lira.amount_base, Decimal("50.00"))
+        self.assertEqual(self._row()["debits"],
+                         Decimal("100.00") + lira.amount_base)
+
+    def test_the_page_no_longer_adds_lira_to_dollars(self):
+        self._mv("100.00", self.usd)
+        self._mv("300.00", self.try_, Decimal("0.02083300"))
+        # The old sum over `amount` would have said 400.00.
+        self.assertNotEqual(self._row()["debits"], Decimal("400.00"))
+
+    def test_the_closing_total_agrees_with_the_account_balance(self):
+        """cached_balance is already base currency, so the mizan and the
+        account page used to contradict each other."""
+        self._mv("100.00", self.usd)
+        self._mv("300.00", self.try_, Decimal("0.02083300"))
+        self.cari.recompute_balance(save=True)
+        self.cari.refresh_from_db()
+        self.assertEqual(self._row()["closing"], self.cari.cached_balance)
+
+    def test_the_header_says_which_currency(self):
+        self._mv("100.00", self.usd)
+        resp = self.client.get(
+            reverse("accounts:report_trial_balance", args=[self.book.pk]),
+            {"date_from": "2026-01-01", "date_to": "2026-12-31"})
+        self.assertContains(resp, "USD")

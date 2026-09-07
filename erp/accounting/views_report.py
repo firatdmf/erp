@@ -179,6 +179,18 @@ class TrialBalance(View):
         # 3,831 round trips to a database at the end of a proxy connection
         # and the page took minutes to answer. The same three figures fall
         # out of a single query with filtered aggregates.
+        #
+        # amount_base, not amount. `amount` is what was ENTERED, in
+        # whatever currency the movement was written in, and this page adds
+        # those together: 877 dollar movements, 16 lira and 2 euro on
+        # Laleli, six accounts holding more than one currency, all summed
+        # as though a lira were a dollar. The grand total read 302,676.10
+        # against a real position of 349,327.22 — understated by 46,651.12
+        # by an addition that was never meaningful. amount_base is what
+        # cached_balance and the balance sheet already use, so the mizan
+        # now agrees with the account pages instead of quietly contradicting
+        # them. Every figure on the page is the book's base currency, which
+        # the header now says out loud.
         ZERO = Decimal("0.00")
         totals = {
             r["cari_id"]: r
@@ -186,11 +198,11 @@ class TrialBalance(View):
                       .filter(cari__in=cari_qs, date__lte=date_to)
                       .values("cari_id")
                       .annotate(
-                          opening=Sum("amount", filter=Q(date__lt=date_from)),
-                          debits=Sum("amount", filter=Q(date__gte=date_from,
-                                                        amount__gt=0)),
-                          credits=Sum("amount", filter=Q(date__gte=date_from,
-                                                         amount__lt=0)),
+                          opening=Sum("amount_base", filter=Q(date__lt=date_from)),
+                          debits=Sum("amount_base", filter=Q(date__gte=date_from,
+                                                             amount_base__gt=0)),
+                          credits=Sum("amount_base", filter=Q(date__gte=date_from,
+                                                              amount_base__lt=0)),
                       ))
         }
 
@@ -232,6 +244,7 @@ class TrialBalance(View):
             "date_from": date_from,
             "date_to": date_to,
             "filter_book": book_id,
+            "base_currency": getattr(request.book, "base_currency", None),
             "zero_filter": zero_filter,
             "books": Book.objects.all().order_by("name"),
         })

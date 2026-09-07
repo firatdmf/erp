@@ -174,14 +174,34 @@ class TrialBalance(View):
         # debits  = sum positive movements in [date_from, date_to]
         # credits = sum negative movements in [date_from, date_to]
         # closing = opening + debits + credits
+        # One grouped aggregate for every account, not three per account in
+        # a Python loop. Laleli has 1,277 active accounts, so the loop was
+        # 3,831 round trips to a database at the end of a proxy connection
+        # and the page took minutes to answer. The same three figures fall
+        # out of a single query with filtered aggregates.
+        ZERO = Decimal("0.00")
+        totals = {
+            r["cari_id"]: r
+            for r in (CariMovement.objects
+                      .filter(cari__in=cari_qs, date__lte=date_to)
+                      .values("cari_id")
+                      .annotate(
+                          opening=Sum("amount", filter=Q(date__lt=date_from)),
+                          debits=Sum("amount", filter=Q(date__gte=date_from,
+                                                        amount__gt=0)),
+                          credits=Sum("amount", filter=Q(date__gte=date_from,
+                                                         amount__lt=0)),
+                      ))
+        }
+
         rows = []
         for cari in cari_qs:
-            mvs = cari.movements.filter(date__lte=date_to)
-            opening = (mvs.filter(date__lt=date_from).aggregate(s=Sum("amount"))["s"]
-                       or Decimal("0.00"))
-            in_period = mvs.filter(date__gte=date_from)
-            debits  = in_period.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-            credits = in_period.filter(amount__lt=0).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+            # An account with no movements at all is absent from the
+            # aggregate rather than present with zeros.
+            t = totals.get(cari.pk)
+            opening = (t["opening"] if t and t["opening"] is not None else ZERO)
+            debits = (t["debits"] if t and t["debits"] is not None else ZERO)
+            credits = (t["credits"] if t and t["credits"] is not None else ZERO)
             closing = opening + debits + credits
 
             if zero_filter == "hide" and opening == 0 and debits == 0 and credits == 0:

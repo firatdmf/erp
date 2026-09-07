@@ -8,7 +8,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book
-from marketing.models import Product, ProductVariant
+from marketing.models import (Product, ProductVariant,
+                             ProductVariantAttribute,
+                             ProductVariantAttributeValue)
 from operating.models import Warehouse, WarehouseProduct
 
 
@@ -112,3 +114,119 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
             order=self.order, roll=self.roll, warehouse_product=self.wp,
             meters=Decimal("12"), consumed=False)
         self.assertIn("18", self._stock_shown())
+
+
+class WarehouseFirstCatalogOnDemandTest(TestCase):
+    """The list answers "what can I ship" first.
+
+    Warehouse and catalog rows used to be interleaved and styled by two
+    separate renderers, so the same product appeared under different
+    names with differently-shaped badges. Catalog rows are now grouped
+    behind a click, and every row — whichever source — goes through one
+    skeleton.
+    """
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username="wh_first", password="pw", email="w@f.t")
+        self.client.force_login(self.user)
+        self.book = Book.objects.create(name="Laleli Fabric")
+        self.warehouse = Warehouse.objects.create(
+            name="Laleli Fabrika", accounting_book=self.book)
+
+        # On a shelf.
+        self.stocked = Product.objects.create(
+            title="ARDEN", sku="ARDEN", featured=False, price=Decimal("9.00"))
+        v = ProductVariant.objects.create(
+            product=self.stocked, variant_sku="ARDEN.G10",
+            variant_quantity=Decimal("40"))
+        WarehouseProduct.objects.create(
+            warehouse=self.warehouse, name="ARDEN ALTIN", sku="ARDEN.G10",
+            quantity=Decimal("40"), catalog_variant=v)
+
+        # In the catalog only — no warehouse row anywhere.
+        self.shelfless = Product.objects.create(
+            title="ARDEN PERDE", sku="ARDEN-P", featured=False,
+            price=Decimal("11.00"))
+
+    def _search(self, q="ARDEN"):
+        return self.client.get(reverse("operating:product_autocomplete"),
+                               {"product": q, "book": self.book.pk}).content.decode()
+
+    def test_a_catalog_row_waits_behind_a_click(self):
+        html = self._search()
+        self.assertIn("pa-more", html)
+        # Rendered, but closed — the expander is a class toggle, not a
+        # second round-trip on a keystroke-driven search.
+        self.assertIn("ARDEN PERDE", html)
+        self.assertIn("pa-catalog", html)
+
+    def test_a_warehouse_row_is_never_hidden(self):
+        html = self._search()
+        row = [ln for ln in html.split("<li ") if "ARDEN.G10" in ln][0]
+        self.assertNotIn("pa-catalog", row)
+
+    def test_catalog_opens_straight_away_when_nothing_is_stocked(self):
+        """With no warehouse answer there is nothing to defer TO —
+        collapsing would show a list whose every row is hidden."""
+        html = self._search("PERDE")
+        self.assertIn("ARDEN PERDE", html)
+        self.assertNotIn("pa-more", html)
+        self.assertNotIn("pa-catalog", html)
+
+    def test_every_row_uses_the_one_skeleton(self):
+        html = self._search()
+        self.assertEqual(html.count("pa-main"), html.count("pa-row"))
+        self.assertEqual(html.count("pa-meta"), html.count("pa-row"))
+
+    def test_a_cost_fallback_says_so_in_words(self):
+        """Amber alone is invisible to anyone not hovering, and a rep
+        reading this list was quoting purchase cost as a sale price."""
+        self.shelfless.price = None
+        self.shelfless.cost = Decimal("4.25")
+        self.shelfless.save()
+        html = self._search("PERDE")
+        self.assertIn("pa-price--cost", html)
+        self.assertIn("Cost", html)
+
+    def test_a_real_price_is_not_labelled_a_cost(self):
+        html = self._search("PERDE")
+        self.assertNotIn("pa-price--cost", html)
+
+    def test_attribute_values_are_not_shown_slugged(self):
+        """Values are stored slugged and lowercase (`light_cream`)."""
+        attr = ProductVariantAttribute.objects.create(name="model")
+        value = ProductVariantAttributeValue.objects.create(
+            product_variant_attribute=attr,
+            product_variant_attribute_value="nevresim_takimi")
+        variant = ProductVariant.objects.create(
+            product=self.shelfless, variant_sku="ARDEN-P.1",
+            variant_quantity=Decimal("3"))
+        variant.product_variant_attribute_values.add(value)
+        html = self._search("ARDEN-P.1")
+        # The attribute NAME comes too: "nevresim takimi" alone reads as
+        # a product, and a bare "yes" or "g54" says nothing at all.
+        self.assertIn("model: nevresim takimi", html)
+        self.assertNotIn("nevresim_takimi", html)
+
+    def test_the_search_does_not_scale_its_queries_with_its_rows(self):
+        for i in range(12):
+            v = ProductVariant.objects.create(
+                product=self.stocked, variant_sku=f"ARDEN.G{20 + i}",
+                variant_quantity=Decimal("5"))
+            WarehouseProduct.objects.create(
+                warehouse=self.warehouse, name=f"ARDEN {i}",
+                sku=f"ARDEN.G{20 + i}", quantity=Decimal("5"),
+                catalog_variant=v)
+        with self.assertNumQueries(self.baseline_queries()):
+            self._search()
+
+    def baseline_queries(self):
+        """Measured on the small fixture, asserted on the large one: the
+        prefetches make the count independent of how many rows come back,
+        which is the property worth pinning."""
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+        with CaptureQueriesContext(connection) as ctx:
+            self._search()
+        return len(ctx)

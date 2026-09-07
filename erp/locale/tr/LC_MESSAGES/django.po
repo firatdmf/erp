@@ -9032,3 +9032,21 @@ msgstr "Çalışma defteri \"%(name)s\" olarak ayarlandı."
 
 msgid "Orders created via the Retail toggle will appear here"
 msgstr "Perakende seçeneğiyle oluşturulan siparişler burada görünecek"
+
+#: operating/views.py
+msgid "No results found"
+msgstr "Sonuç bulunamadı"
+
+#: operating/views.py
+msgid "Catalog — not in a warehouse"
+msgstr "Katalog — depoda yok"
+
+#: operating/views.py
+#, python-format
+msgid "%(n)d more in the warehouse — type more to narrow it down"
+msgstr "Depoda %(n)d sonuç daha — daraltmak için yazmaya devam edin"
+
+#: operating/views.py
+#, python-format
+msgid "%(n)d more in the catalog (not in a warehouse)"
+msgstr "Katalogda %(n)d sonuç daha (depoda yok)"

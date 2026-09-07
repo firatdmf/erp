@@ -3701,16 +3701,26 @@ def webclient_autocomplete(request):
 def product_autocomplete(request):
     """Order-create/edit product search.
 
-    Sources, in priority order:
-      1. WAREHOUSE products — anything held in any warehouse (searched by
-         warehouse name/SKU and by the linked catalog title/variant-sku,
-         Turkish İ/ı-folded). Stock comes from the WAREHOUSE, shown per
-         warehouse. Products existing in both places surface HERE.
-      2. Catalog-only products — products/variants with no warehouse
-         link, so the whole assortment stays searchable.
-    Every row shows name + SKU."""
+    What the list answers by default is "what can I ship": WAREHOUSE
+    products, anything held on a shelf of the book being worked in
+    (searched by warehouse name/SKU and by the linked catalog
+    title/variant-sku, Turkish İ/ı-folded), with stock shown per
+    warehouse. A product held in both places surfaces HERE.
+
+    Catalog-only products — no warehouse row anywhere — are a different
+    question, so they wait behind a click rather than padding every
+    search. They are still reachable: most of the assortment sits on no
+    shelf, and dropping them would make those products unsellable from
+    this form. When the warehouse has no answer at all they open
+    straight away, because there is then nothing to defer to.
+
+    Every row is built by one `row()` skeleton so the two sources cannot
+    drift apart in wording or badge shape. Appearance lives in
+    erp/css/product_autocomplete.css.
+    """
     from functools import reduce
     import operator as _op
+    from django.utils.translation import gettext as _
     from .views_warehouse import _tr_ci_variants
     from .models import WarehouseProduct
 
@@ -3739,7 +3749,8 @@ def product_autocomplete(request):
                 | _fq("catalog_variant__variant_sku")
                 | _fq("catalog_variant__product__title"))
         .select_related("warehouse", "catalog_variant__product__category")
-        .prefetch_related("catalog_variant__product_variant_attribute_values")
+        .prefetch_related("catalog_variant__product_variant_attribute_values"
+                          "__product_variant_attribute")
         .order_by("name")[:60]
     )
     # What is actually SELLABLE, not what is on the shelf: metres already
@@ -3767,35 +3778,38 @@ def product_autocomplete(request):
         )
         .select_related("category")
         .distinct()
-        .prefetch_related("variants__product_variant_attribute_values")[:12]
+        .prefetch_related("variants__product_variant_attribute_values"
+                          "__product_variant_attribute")[:12]
     )
 
     def js_str(s):
         """Escape string for safe use inside JS onclick single quotes"""
         return (s or "").replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", " ")
 
-    def stock_badge(qty, allow_oversell):
-        """Render a small "Stok: N" pill so the user sees availability
-        right in the autocomplete row. None → unlimited (no badge).
-        Zero → red badge. Positive → grey/green badge. allow_oversell
-        flips the negative-stock case to neutral instead of red."""
-        if qty is None:
-            return ""
-        try:
-            q = float(qty)
-        except (TypeError, ValueError):
-            return ""
-        if q <= 0 and not allow_oversell:
-            color, bg = "#B91C1C", "#FEE2E2"
-        elif q < 10:
-            color, bg = "#92400E", "#FEF3C7"
-        else:
-            color, bg = "#065F46", "#D1FAE5"
-        return (
-            f"<span style='font-size:10.5px;font-weight:600;padding:2px 6px;"
-            f"border-radius:6px;color:{color};background:{bg};margin-right:8px;white-space:nowrap;'>"
-            f"Stok: {q:g}</span>"
-        )
+    def unslug(s):
+        """Attribute values are stored slugged and lowercase
+        (`light_cream`, see catalog_sync._norm_value). Un-slug for
+        display, but do NOT title-case: Turkish suffixes carry an
+        apostrophe, and .title() turns "3'lü" into "3'Lü"."""
+        return (s or "").replace("_", " ").strip()
+
+    def variant_values(variant, with_names=False):
+        """Which variant of the product this is.
+
+        With names ("color: petrol, cristal: yes") for the dropdown row,
+        because a bare value is often not self-describing — "yes" and
+        "g54" say nothing on their own. Without them for the order line
+        the pick creates, where the product is already named and the
+        card wants to stay short.
+        """
+        parts = []
+        for v in variant.product_variant_attribute_values.all():
+            value = unslug(v.product_variant_attribute_value)
+            if not value:
+                continue
+            name = unslug(getattr(v.product_variant_attribute, "name", ""))
+            parts.append(f"{name}: {value}" if (with_names and name) else value)
+        return ", ".join(parts)
 
     def resolve_price(product, variant=None):
         """Selling price if one was ever set, else fall back to purchase
@@ -3816,70 +3830,90 @@ def product_autocomplete(request):
         cost = product.cost
         return (cost, True) if cost else (0, False)
 
-    def price_span(price, is_cost):
+    def price_cell(price, is_cost):
+        """A cost fallback says so ON the row. It used to be an amber
+        tint plus a title= tooltip, which is invisible to anyone not
+        hovering — a rep reading this list was quoting purchase cost as
+        if it were a sale price. The word is translated: "Cost" reads
+        "Maliyet" for a Turkish reader."""
         if is_cost:
             return (
-                f"<span style='color:#92400E;font-weight:600;' title='Satış fiyatı girilmemiş — alış fiyatı gösteriliyor'>"
-                f"Alış: ${price}</span>"
+                f"<span class='pa-price pa-price--cost'>${price}"
+                f"<small class='pa-price-note'>{escape(_('Cost'))}</small></span>"
             )
-        return f"<span style='color:#059669;font-weight:600;'>${price}</span>"
+        return f"<span class='pa-price'>${price}</span>"
 
-    def render_item(product, variant=None):
-        title = escape(product.title or "")
-        cat_name = escape(product.category.name if product.category else "")
-        title_js = js_str(product.title or "")
-        cat_js = js_str(product.category.name if product.category else "")
+    def stock_cell(qty, allow_oversell):
+        """Catalog stock — a plain count, no warehouse behind it."""
+        if qty is None:
+            return ""
+        q = float(qty)
+        if q > 0:
+            state = "ok"
+        elif allow_oversell:
+            state = "backorder"
+        else:
+            state = "out"
+        return (f"<span class='pa-stock pa-stock--{state}'>"
+                f"{escape(_('Stock'))} {q:g}</span>")
+
+    def warehouse_cells(stocks):
+        """Warehouse stock — named shelves and metres. At most three;
+        the JS still receives the total."""
+        return "".join(
+            f"<span class='pa-stock pa-stock--wh'>"
+            f"{escape((wh or '')[:14])} {float(q or 0):g} m</span>"
+            for wh, q in stocks[:3]
+        )
+
+    def row(sku, title, qualifier, price, is_cost, meta,
+            js_args, extra_class=""):
+        """The ONE row skeleton. Every result — warehouse or catalog —
+        goes through here, so a product cannot be named one way on one
+        row and another way three rows down, and the badges cannot drift
+        apart. Appearance lives in erp/css/product_autocomplete.css; the
+        only thing decided here is WHAT the row says."""
+        name = f"<strong>{escape(title)}</strong>"
+        if qualifier:
+            name += f" <span class='pa-qual'>— {escape(qualifier)}</span>"
+        return (
+            f"<li class='pa-row {extra_class}' onclick=\"selectProduct({js_args})\">"
+            f"<span class='pa-main'>{name} <code class='pa-sku'>{escape(sku)}</code></span>"
+            f"<span class='pa-meta'>{meta}{price_cell(price, is_cost)}</span>"
+            f"</li>"
+        )
+
+    def render_item(product, variant=None, extra_class=""):
+        """A catalog row: the product is not on any shelf of this book."""
         allow_oversell = bool(getattr(product, "selling_while_out_of_stock", False))
+        base_title = (product.title or "").strip()
+        cat_js = js_str(product.category.name if product.category else "")
 
         if variant:
-            sku = escape(variant.variant_sku or "")
+            sku = variant.variant_sku or ""
             price, is_cost = resolve_price(product, variant)
-            cost_arg = "true" if is_cost else "false"
             stock = variant.variant_quantity
-            stock_arg = "null" if stock is None else f"{float(stock):g}"
-            oversell_arg = "true" if allow_oversell else "false"
-            attr_info = variant.attribute_summary() if hasattr(variant, 'attribute_summary') else ''
-            attr_display = f' <span style="color:#6b7280;font-size:11px;">({escape(attr_info)})</span>' if attr_info else ''
-            # The picked item's card title must NAME the variant, not just
-            # the base product — "2086 — Beyaz", never a bare "2086".
-            vals = ", ".join(
-                v.product_variant_attribute_value
-                for v in variant.product_variant_attribute_values.all()
-                if v.product_variant_attribute_value
-            )
-            if vals:
-                title_js = js_str(f"{product.title} — {vals}" if product.title else vals)
-            return (
-                f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg},{cost_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
-                f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
-                f"<strong>{title}</strong> - <code>{sku}</code>{attr_display}"
-                f"</span>"
-                f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
-                f"{stock_badge(stock, allow_oversell)}"
-                f"{price_span(price, is_cost)}"
-                f"</span></li>"
-            )
+            qualifier = variant_values(variant, with_names=True)
+            card_label = variant_values(variant)
         else:
-            sku = escape(product.sku or "")
+            sku = product.sku or ""
             price, is_cost = resolve_price(product)
-            cost_arg = "true" if is_cost else "false"
             stock = product.quantity
-            stock_arg = "null" if stock is None else f"{float(stock):g}"
-            oversell_arg = "true" if allow_oversell else "false"
-            return (
-                f"<li onclick=\"selectProduct('{sku}',false,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg},{cost_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
-                f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
-                f"<strong>{title}</strong> - <code>{sku}</code>"
-                f"</span>"
-                f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
-                f"{stock_badge(stock, allow_oversell)}"
-                f"{price_span(price, is_cost)}"
-                f"</span></li>"
-            )
+            qualifier = card_label = ""
+
+        # The picked item's card must NAME the variant, not just the base
+        # product — "2086 — Beyaz", never a bare "2086".
+        title_js = js_str(f"{base_title} — {card_label}" if card_label else base_title)
+        stock_arg = "null" if stock is None else f"{float(stock):g}"
+        js_args = (f"'{escape(js_str(sku))}',{'true' if variant else 'false'},"
+                   f"'{title_js}',{price},'{cat_js}',{stock_arg},"
+                   f"{'true' if allow_oversell else 'false'},"
+                   f"{'true' if is_cost else 'false'}")
+        return row(sku, base_title, qualifier, price, is_cost,
+                   stock_cell(stock, allow_oversell), js_args, extra_class)
 
     def render_wh_item(group):
-        """One row per catalog variant held in warehouses. Stock badges
-        are PER WAREHOUSE (name + metres); the JS stock arg is the total."""
+        """A warehouse row: stock this book actually holds, per shelf."""
         wp = group["wp"]
         variant = wp.catalog_variant
         parent = variant.product
@@ -3887,58 +3921,37 @@ def product_autocomplete(request):
         base_title = (parent.title or "").strip()
         # Variant qualifier: the part of the warehouse name beyond the base
         # title ("2086 ALTIN" → "ALTIN"), the whole warehouse name if it's
-        # unrelated to the base, else the variant's attribute values. The
-        # picked card then reads "2086 — ALTIN", never a bare "2086".
-        label = ""
+        # unrelated to the base, else the variant's attribute values.
+        qualifier = ""
         if display_name and base_title and display_name.lower() != base_title.lower():
             if display_name.lower().startswith(base_title.lower()):
-                label = display_name[len(base_title):].strip(" -–—·/")
+                qualifier = display_name[len(base_title):].strip(" -–—·/")
             else:
-                label = display_name
-        if not label:
-            label = ", ".join(
-                v.product_variant_attribute_value
-                for v in variant.product_variant_attribute_values.all()
-                if v.product_variant_attribute_value
-            )
-        if base_title and label:
-            full_title = f"{base_title} — {label}"
-        else:
-            full_title = display_name or base_title or label
-        title = escape(full_title)
-        sku = escape(variant.variant_sku or "")
-        title_js = js_str(full_title)
-        cat_js = js_str(parent.category.name if parent.category else "")
+                qualifier = display_name
+        if not qualifier:
+            qualifier = variant_values(variant)
+        if not base_title:
+            base_title, qualifier = (display_name or qualifier), ""
+
+        sku = variant.variant_sku or ""
         allow_oversell = bool(getattr(parent, "selling_while_out_of_stock", False))
         price, is_cost = resolve_price(parent, variant)
-        cost_arg = "true" if is_cost else "false"
-        total = sum((q or 0) for _, q in group["stocks"])
-        stock_arg = f"{float(total):g}"
-        oversell_arg = "true" if allow_oversell else "false"
-        wh_badges = "".join(
-            f"<span style='font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;"
-            f"color:#005354;background:#E5F1F0;margin-right:5px;white-space:nowrap;'>"
-            f"{escape((wh or '')[:14])}: {float(q or 0):g} m</span>"
-            for wh, q in group["stocks"][:3]
-        )
-        hint = ""
-        if base_title and base_title.lower() not in full_title.lower():
-            hint = f" <span style='color:#6b7280;font-size:11px;'>→ {escape(parent.title)}</span>"
-        return (
-            f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg},{cost_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
-            f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
-            f"<span style='font-size:9.5px;font-weight:800;letter-spacing:.05em;color:#0F766E;background:#CCFBF1;border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:middle;'>DEPO</span>"
-            f"<strong>{title}</strong> - <code>{sku}</code>{hint}"
-            f"</span>"
-            f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
-            f"{wh_badges}"
-            f"{price_span(price, is_cost)}"
-            f"</span></li>"
-        )
+        total = sum((q or 0) for _wh, q in group["stocks"])
+        title_js = js_str(f"{base_title} — {qualifier}" if qualifier else base_title)
+        cat_js = js_str(parent.category.name if parent.category else "")
+        js_args = (f"'{escape(js_str(sku))}',true,'{title_js}',{price},'{cat_js}',"
+                   f"{float(total):g},{'true' if allow_oversell else 'false'},"
+                   f"{'true' if is_cost else 'false'}")
+        return row(sku, base_title, qualifier, price, is_cost,
+                   warehouse_cells(group["stocks"]), js_args)
+
+    def note(text, cls):
+        return (f"<li class='{cls}' onmousedown='event.preventDefault()'>"
+                f"{escape(text)}</li>")
 
     items = []
 
-    # Warehouse rows first — shared products get picked FROM the warehouse.
+    # ── Warehouse rows: the default answer ───────────────────────────
     # The cap used to be 8 and cut silently, so searching "PETEK" showed
     # seven colours of one fabric and hid the eighth with no sign anything
     # was missing. A list this size is still comfortable to scan, and
@@ -3948,14 +3961,16 @@ def product_autocomplete(request):
     for group in wh_all[:WH_ROWS]:
         items.append(render_wh_item(group))
     if len(wh_all) > WH_ROWS:
-        items.append(
-            f"<li style='padding:7px 12px;font-size:11.5px;color:#6B7280;"
-            f"background:#F8FAFC;cursor:default;' onmousedown='event.preventDefault()'>"
-            f"+{len(wh_all) - WH_ROWS} more in the warehouse — type more to narrow it down</li>"
-        )
+        items.append(note(
+            _("%(n)d more in the warehouse — type more to narrow it down")
+            % {"n": len(wh_all) - WH_ROWS}, "pa-note"))
 
-    # Catalog-only: skip every variant that lives in a warehouse (those
-    # are the rows above); keep variant-less products and unlinked variants.
+    # ── Catalog rows: on demand ──────────────────────────────────────
+    # These are products no warehouse of this book holds — back-orders and
+    # storefront-only goods. They stay reachable (44% of the catalog sits
+    # on no shelf, and refusing to list them would make those unsellable
+    # from this form) but they are not the answer to "what can I ship",
+    # so they wait behind a click instead of padding every search.
     cand_variant_ids = [v.id for p in products for v in p.variants.all()]
     linked_ids = set(
         WarehouseProduct.objects
@@ -3963,31 +3978,49 @@ def product_autocomplete(request):
         .values_list("catalog_variant_id", flat=True)
     ) | wh_variant_ids
 
-    shown_catalog = 0
+    CATALOG_ROWS = 12
+    catalog_rows = []
     for product in products:
-        if shown_catalog >= 6:
+        if len(catalog_rows) >= CATALOG_ROWS:
             break
-        variants = [v for v in product.variants.all() if v.id not in linked_ids]
-
         matches_parent = (
             query in (product.title or "").lower()
             or query in (product.sku or "").lower()
         )
-
         if not product.variants.all():
             if matches_parent:
-                items.append(render_item(product))
-                shown_catalog += 1
+                catalog_rows.append((product, None))
         else:
-            for variant in variants:
+            for variant in product.variants.all():
+                if variant.id in linked_ids:
+                    continue
                 if matches_parent or query in (variant.variant_sku or "").lower():
-                    items.append(render_item(product, variant))
-                    shown_catalog += 1
+                    catalog_rows.append((product, variant))
+
+    if catalog_rows:
+        # With nothing on the shelf there is no default answer to defer
+        # TO — collapsing here would show a list whose every row is
+        # hidden behind a click. So the fallback only hides when the
+        # warehouse actually answered.
+        hidden = bool(items)
+        cls = "pa-catalog" if hidden else ""
+        if hidden:
+            items.append(
+                f"<li class='pa-more' onmousedown='event.preventDefault()' "
+                f"onclick=\"this.closest('.product_autocomplete_list')"
+                f".classList.add('pa-expanded');this.remove()\">"
+                f"{escape(_('%(n)d more in the catalog (not in a warehouse)') % {'n': len(catalog_rows)})}"
+                f"</li>")
+        items.append(f"<li class='pa-group {cls}'>"
+                     f"{escape(_('Catalog — not in a warehouse'))}</li>")
+        for product, variant in catalog_rows:
+            items.append(render_item(product, variant, cls))
 
     if not items:
-        items.append("<li style='color:#9ca3af;padding:12px;'>Sonuç bulunamadı</li>")
+        items.append(note(_("No results found"), "pa-empty"))
 
-    html = f"<div class='product_autocomplete_list'><ul>{''.join(items)}</ul></div>"
+    html = (f"<div class='product_autocomplete_list'>"
+            f"<ul>{''.join(items)}</ul></div>")
     return HttpResponse(html)
 
 

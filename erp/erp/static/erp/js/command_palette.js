@@ -10,8 +10,45 @@ const FILTER_CATEGORIES = [
     { id: 'blogs', name: 'Blogs', icon: 'fa-newspaper' },
 ];
 
-// Use MENU_ITEMS from search_sidebar.js if available, otherwise define our own
-const CMD_MENU_ITEMS = (typeof MENU_ITEMS !== 'undefined') ? MENU_ITEMS : [
+// The navigation the CURRENT user actually has.
+//
+// This list used to be hard-coded here (and again in search_sidebar.js),
+// which meant the palette offered Settings, Reports and Task List to a
+// sales rep whose role cannot open any of them — a found result that
+// 403s on click is worse than no result. The sidebar on the page has
+// already been filtered by the real gate (erp.roles.may_use_nav_item via
+// the nav_sections tag), so read it instead of keeping a third copy:
+// what the palette offers is then whatever the user can see, forever, in
+// step with erp/nav.py without anyone maintaining a mapping.
+//
+// The literal below stays as the fallback for any page rendered without
+// the Nejum shell.
+function cmdMenuFromSidebar() {
+    const seen = new Set();
+    const items = [];
+    document.querySelectorAll('.nj-nav-item[href], .nj-fly-item[href]').forEach(a => {
+        const url = a.getAttribute('href');
+        // Flyout ACTIONS are `href="#"` plus an onclick — a sidebar you
+        // open, not a page you navigate to. Nothing for the palette to
+        // link at, so they are skipped rather than offered as dead rows.
+        if (!url || url === '#' || seen.has(url)) return;
+        const label = a.querySelector('.nj-fi-label, .nj-label');
+        const name = (label ? label.textContent : a.textContent).trim();
+        if (!name) return;
+        seen.add(url);
+        const flyout = a.closest('[data-flyout]');
+        const group = flyout && flyout.querySelector('.nj-label');
+        items.push({
+            name,
+            url,
+            icon: 'fa-arrow-right',
+            category: group ? group.textContent.trim() : 'Navigation',
+        });
+    });
+    return items;
+}
+
+const CMD_MENU_FALLBACK = (typeof MENU_ITEMS !== 'undefined') ? MENU_ITEMS : [
     { name: 'Dashboard', url: '/dashboard/', icon: 'fa-chart-line', category: 'General' },
     { name: 'Reports', url: '/reports/', icon: 'fa-paste', category: 'General' },
     { name: 'Settings', url: '/settings/', icon: 'fa-cog', category: 'General' },
@@ -253,7 +290,9 @@ async function performCmdSearch(query) {
     // Menu search (local) — include in both 'menu' and 'all' tabs
     let menuResults = [];
     if (searchType === 'menu' || searchType === 'all') {
-        menuResults = CMD_MENU_ITEMS.filter(item =>
+        const fromSidebar = cmdMenuFromSidebar();
+        const menuItems = fromSidebar.length ? fromSidebar : CMD_MENU_FALLBACK;
+        menuResults = menuItems.filter(item =>
             item.name.toLowerCase().includes(query.toLowerCase()) ||
             item.category.toLowerCase().includes(query.toLowerCase())
         );

@@ -1,0 +1,171 @@
+/* Rows of the order-screen product search (operating.views.product_autocomplete).
+ *
+ * The rows used to be styled by inline style= strings written in Python,
+ * in two separate renderers, so warehouse and catalog results drifted
+ * apart: different badge shapes, different stock wording, the same
+ * product named three ways. Appearance is owned HERE now, in one place,
+ * and the view decides only what a row says.
+ *
+ * Three screens render these rows into containers of their own —
+ * the create-order sidebar, the full create-order page, and the
+ * order-detail add-product box. Those containers keep owning the list
+ * frame (its width, density, shadow), which legitimately differs between
+ * a sidebar and a detail panel. Everything INSIDE a row is `pa-`
+ * prefixed, which none of them style, so there is no specificity fight.
+ */
+
+.product_autocomplete_list li.pa-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.product_autocomplete_list .pa-main {
+  min-width: 0;
+  flex-grow: 1;
+  word-break: break-word;
+}
+
+.product_autocomplete_list .pa-qual {
+  color: #475569;
+  font-weight: 600;
+}
+
+.product_autocomplete_list .pa-sku {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11.5px;
+  color: #64748B;
+  margin-left: 4px;
+}
+
+.product_autocomplete_list .pa-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Stock badges. One shape for every source; only the tint changes, and
+ * the tint means one thing — whether the number is a problem. Each
+ * carries a border because the row's hover state is itself a pale
+ * teal: without one, a warehouse badge dissolved into the highlight
+ * and the hovered row looked unstyled next to its neighbours. */
+.product_autocomplete_list .pa-stock {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.product_autocomplete_list .pa-stock--wh {
+  color: #005354;
+  background: #FFFFFF;
+  border-color: rgba(0, 83, 84, .35);
+}
+.product_autocomplete_list .pa-stock--ok {
+  color: #047857;
+  background: #FFFFFF;
+  border-color: rgba(4, 120, 87, .35);
+}
+.product_autocomplete_list .pa-stock--backorder {
+  color: #92400E;
+  background: #FFFFFF;
+  border-color: rgba(146, 64, 14, .35);
+}
+.product_autocomplete_list .pa-stock--out {
+  color: #B91C1C;
+  background: #FFFFFF;
+  border-color: rgba(185, 28, 28, .35);
+}
+
+/* Price. Green is a real selling price. Amber is NOT a price at all —
+ * it is purchase cost, shown because nobody ever set a selling one —
+ * so it says so in words under the figure rather than in a title=
+ * tooltip that only a hovering reader would ever find. */
+.product_autocomplete_list .pa-price {
+  color: #059669;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.product_autocomplete_list .pa-price--cost {
+  color: #92400E;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+.product_autocomplete_list .pa-price-note {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .85;
+}
+
+/* Non-selectable rows: the group heading, the truncation note, the
+ * empty state.
+ *
+ * !important, reluctantly and only here. All three host containers
+ * style `<li>` generically — `.co-autocomplete-results
+ * .product_autocomplete_list ul li` and friends — which outweighs any
+ * single-class selector this file can write, and those rules say
+ * "clickable row": pointer cursor, hover highlight. On a heading that
+ * is a lie. The alternative is editing three templates to carve out
+ * exceptions, which is the duplication this file exists to end. */
+.product_autocomplete_list li.pa-group,
+.product_autocomplete_list li.pa-note,
+.product_autocomplete_list li.pa-empty {
+  cursor: default !important;
+  color: #6B7280;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.product_autocomplete_list li.pa-group {
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: 10px;
+  color: #94A3B8;
+  padding-top: 10px;
+  border-top: 1px solid #EEF2F6;
+  margin-top: 4px;
+  border-radius: 0;
+}
+.product_autocomplete_list li.pa-note,
+.product_autocomplete_list li.pa-empty {
+  background: #F8FAFC;
+  justify-content: center;
+}
+.product_autocomplete_list li.pa-group:hover {
+  background: transparent !important;
+  color: #94A3B8 !important;
+}
+.product_autocomplete_list li.pa-note:hover,
+.product_autocomplete_list li.pa-empty:hover {
+  background: #F8FAFC !important;
+  color: #6B7280 !important;
+}
+
+.product_autocomplete_list li.pa-more {
+  cursor: pointer;
+  color: #005354;
+  background: #F1F7F6;
+  font-size: 11.5px;
+  font-weight: 700;
+  justify-content: center;
+}
+.product_autocomplete_list li.pa-more::before {
+  content: "⌄";
+  margin-right: 6px;
+  font-weight: 900;
+}
+
+/* Catalog rows ship with the response but stay closed until asked for.
+ * Rendering them up front is what makes the expander instant — it is a
+ * class toggle, not a second round-trip on a keystroke-driven search. */
+.product_autocomplete_list .pa-catalog { display: none; }
+.product_autocomplete_list.pa-expanded .pa-catalog { display: flex; }
+.product_autocomplete_list.pa-expanded li.pa-group.pa-catalog { display: flex; }

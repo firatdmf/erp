@@ -225,9 +225,47 @@ from django.http import JsonResponse
 from django.urls import reverse
 
 class GlobalSearch(View):
+    """The top-bar command palette's backend.
+
+    Every row it returns is a door, so every row has to open. A result
+    the viewer may not reach is worse than no result: it looks like the
+    thing was found and then refuses on click. `_visible` therefore runs
+    each result's own URL through the same gate the middleware enforces
+    (erp.roles.may_read) rather than through a second hand-written list
+    of what a role may search — the same reasoning as
+    erp.roles.may_use_nav_item. A result type added here tomorrow is
+    filtered correctly without anyone remembering to come back.
+    """
+
+    def _product_url(self, product, restricted):
+        """Where a product result goes.
+
+        The edit form for anyone who may open it; the read-only detail
+        page for anyone who may not. A search result is a way to LOOK
+        something up, so the detail page is a fair answer — an empty
+        result list is not.
+        """
+        for name in (("marketing:product_detail",) if restricted
+                     else ("marketing:product_edit", "marketing:product_detail")):
+            try:
+                return reverse(name, args=[product.id])
+            except Exception:
+                continue
+        return '#'
+
+    def _visible(self, results, restricted):
+        if not restricted:
+            return results
+        from erp.roles import may_read
+        return [r for r in results if may_read(r.get('url') or '')]
+
     def get(self, request, *args, **kwargs):
+        from erp.roles import is_sales_rep
+
         query = request.GET.get('q', '').strip()
         search_type = request.GET.get('type', 'all')
+        # Whether this viewer's reach is narrower than the search's.
+        restricted = is_sales_rep(request.user)
         results = []
 
         # If query is empty, we might want to return "Recent" items for specific tabs
@@ -241,10 +279,7 @@ class GlobalSearch(View):
                     .order_by('-id')[:50]
                 )
                 for p in recent_products:
-                    try:
-                        url = reverse('marketing:product_edit', args=[p.id])
-                    except:
-                        url = '#'
+                    url = self._product_url(p, restricted)
                     pi = getattr(p, 'primary_image', None)
                     image = (
                         getattr(pi, 'thumbnail_url', None)
@@ -259,7 +294,7 @@ class GlobalSearch(View):
                         'icon': 'fa-box',
                         'image': image,
                     })
-                return JsonResponse({'results': results})
+                return JsonResponse({'results': self._visible(results, restricted)})
             
             elif search_type == 'orders':
                 from operating.models import Order
@@ -277,7 +312,7 @@ class GlobalSearch(View):
                         'url': url,
                         'icon': 'fa-shopping-cart'
                     })
-                return JsonResponse({'results': results})
+                return JsonResponse({'results': self._visible(results, restricted)})
             
             # For other cases (all, contacts, etc.) return empty or let frontend handle defaults
             return JsonResponse({'results': []})
@@ -344,10 +379,7 @@ class GlobalSearch(View):
                 .select_related('primary_image')[:limit]
             )
             for p in products:
-                try:
-                    url = reverse('marketing:product_edit', args=[p.id])
-                except:
-                    url = '#'
+                url = self._product_url(p, restricted)
                 # Prefer the small thumbnail; fall back to full file_url.
                 pi = getattr(p, 'primary_image', None)
                 image = (
@@ -406,5 +438,5 @@ class GlobalSearch(View):
                     'icon': 'fa-shopping-cart'
                 })
 
-        return JsonResponse({'results': results})
+        return JsonResponse({'results': self._visible(results, restricted)})
 

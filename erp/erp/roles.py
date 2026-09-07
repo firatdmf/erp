@@ -181,6 +181,26 @@ READ_PATHS = frozenset({
     "/operating/orders/create/roll_list/",
     "/operating/orders/create/barcode_check/",
     "/operating/orders/create/barcode_resolve/",
+    # The two lookups the order form is USELESS without. Writing an
+    # order is the one thing this role exists to do, and an order needs
+    # a product and a customer; with these closed the rep could open the
+    # sidebar and post it, but could not find anything to put in it —
+    # both searches returned the read-only 403 page into the dropdown,
+    # which renders as a silently empty list.
+    #
+    # Neither widens what she can reach. The product search is already
+    # scoped to the books she is assigned (_books_in_scope), and the
+    # customer search reads the same contact/company names that
+    # /crm/contact/list/ hands her in full above.
+    "/operating/product_autocomplete/",
+    "/crm/customer_autocomplete/",
+    # The top-bar command palette (Ctrl-K). It is on every page she can
+    # reach, so leaving it closed meant a search box that answered every
+    # keystroke with a 403 and rendered as "no results". What it hands
+    # back is filtered to what she may open — erp.views.GlobalSearch runs
+    # each result's own URL through may_read — so this opens the box, not
+    # the records behind it.
+    "/search/",
 })
 
 # GET prefixes that must bypass WRITE_SEGMENTS: the edit form is loaded

@@ -6,6 +6,7 @@ functions, so a middleware left out of settings would fail them.
 """
 from django.contrib.auth.models import User
 from django.test import Client, TestCase
+from django.utils import timezone
 
 from authentication.models import Member, Permission
 
@@ -45,6 +46,70 @@ class SalesRepRoleTests(TestCase):
         self.assertNotEqual(
             self.client.post("/operating/orders/create", {}).status_code, 403
         )
+
+    def test_the_order_form_can_look_up_a_product_and_a_customer(self):
+        """The one write this role has is useless without these two.
+
+        The form was reachable and postable, but both of its lookups
+        sat outside the read allowlist, so each returned the read-only
+        403 page into the dropdown — which renders as a silently empty
+        list. She could open the New Order sidebar and submit it, and
+        could not find a product or a customer to put in it.
+        """
+        for path in ("/operating/product_autocomplete/?product=a",
+                     "/crm/customer_autocomplete/?customer=a"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_the_lookups_are_exact_paths_not_prefixes(self):
+        """Same rule as every other entry: a prefix would hand over
+        whatever route happens to start the same way."""
+        for path in ("/operating/product_autocomplete/edit/",
+                     "/crm/customer_autocomplete/delete/1/"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 403)
+
+    def test_the_command_palette_answers_her(self):
+        """It sits on every page she can reach. Closed, it answered each
+        keystroke with a 403 that the palette renders as "no results"."""
+        response = self.client.get("/search/?q=al&type=all")
+        self.assertEqual(response.status_code, 200)
+
+    def test_the_palette_only_returns_doors_that_open(self):
+        """A result she cannot reach is worse than no result: it looks
+        found, then refuses on click. Tasks are not part of this role, so
+        they must not come back at all — and a product must point at the
+        detail page, because the edit form is closed to her."""
+        import json
+
+        from crm.models import Contact
+        from marketing.models import Product
+        from todo.models import Task
+
+        Contact.objects.create(name="Alanya Tekstil")
+        Product.objects.create(title="Alanya Kumas", sku="ALANYA", featured=False)
+        Task.objects.create(name="Alanya follow-up",
+                            due_date=timezone.now().date())
+
+        results = json.loads(
+            self.client.get("/search/?q=alanya&type=all").content)["results"]
+        self.assertTrue(results)
+        self.assertNotIn("Task", {r["type"] for r in results})
+        for result in results:
+            with self.subTest(url=result["url"]):
+                self.assertNotEqual(self.client.get(result["url"]).status_code, 403)
+
+    def test_a_product_result_points_where_she_can_go(self):
+        import json
+
+        from marketing.models import Product
+
+        product = Product.objects.create(
+            title="Alanya Kumas", sku="ALANYA", featured=False)
+        results = json.loads(
+            self.client.get("/search/?q=alanya&type=products").content)["results"]
+        self.assertEqual([r["url"] for r in results],
+                         [f"/marketing/product_detail/{product.pk}/"])
 
     def test_write_allowlist_is_exact_not_a_prefix(self):
         # The trailing-slash sibling is create_web_order (the storefront
@@ -157,9 +222,12 @@ class SalesRepRoleTests(TestCase):
                 self.assertEqual(self.client.get(path).status_code, 403)
 
     def test_other_sections_are_closed(self):
+        # "/search/" is deliberately NOT here any more: the command
+        # palette is open to her, and what it hands back is filtered to
+        # what she may open. See test_the_palette_only_returns_doors_that_open.
         for path in ("/accounting/", "/accounting/sales-dashboard/",
                      "/crm/", "/team/", "/operating/procurement/",
-                     "/admin/", "/settings/", "/search/"):
+                     "/admin/", "/settings/"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 403)
 

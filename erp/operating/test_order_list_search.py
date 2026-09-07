@@ -32,7 +32,7 @@ class OrderListSearchIndexTest(TestCase):
             title="Bamboo Plise", sku="TTEMPILISE", featured=False)
         self.variant = ProductVariant.objects.create(
             product=self.product, variant_sku="K24649.G34",
-            variant_quantity=Decimal("30"))
+)
 
         self.order = Order.objects.create(
             order_number="DK-501", current_account=self.current_account, is_retail_order=True)

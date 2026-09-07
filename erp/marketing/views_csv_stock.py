@@ -1,7 +1,15 @@
 """
-CSV / Excel Stock Update View
-Uploads a CSV or XLS/XLSX file and updates Product + ProductVariant stock quantities.
-Required columns: Kodu (SKU), Miktar (Quantity)
+CSV / Excel stock COMPARISON view.
+
+Uploads a CSV or XLS/XLSX sheet and reports where its quantities disagree
+with what the warehouse actually holds. Required columns: Kodu (SKU),
+Miktar (Quantity).
+
+It used to write those figures into Product.quantity /
+ProductVariant.variant_quantity. Those columns are gone — catalog stock is
+the sum of the WarehouseProduct rows behind a variant — so a sheet can no
+longer overwrite the shelf. What it is still good for is exactly this:
+telling you which lines disagree, so someone can go and count.
 """
 
 import csv
@@ -11,7 +19,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required
-from .models import Product, ProductVariant
+from .models import Product, ProductVariant, with_live_quantity
 
 
 def parse_decimal_smart(value):
@@ -204,73 +212,75 @@ def csv_stock_update(request):
             }, status=400)
 
         matched_count = 0
-        updated_count = 0
+        differing_count = 0
         not_found = []
-        updated_items = []
+        differences = []
         matched_codes = set()
 
+        def _diff(sku, name, kind, sheet_qty, live_qty, tracked):
+            """A line is only a disagreement if the warehouse has an opinion.
+            An untracked SKU (no warehouse row at all) is reported apart —
+            the sheet is not wrong about it, we simply hold none of it."""
+            return {
+                'sku': sku, 'name': name, 'type': kind,
+                'sheet': str(sheet_qty),
+                'warehouse': str(live_qty) if live_qty is not None else None,
+                'stock_tracked': tracked,
+                'difference': (str(sheet_qty - live_qty)
+                               if live_qty is not None else None),
+            }
+
         # 1) Match against ProductVariant.variant_sku
-        variants = ProductVariant.objects.filter(variant_sku__in=csv_data.keys()).select_related('product')
-        variant_map = {}
-        for v in variants:
-            variant_map.setdefault(v.variant_sku, []).append(v)
+        variants = with_live_quantity(
+            ProductVariant.objects.filter(variant_sku__in=csv_data.keys())
+        ).select_related('product')
 
-        for code, variant_list in variant_map.items():
-            new_quantity = csv_data[code]
+        for variant in variants:
+            code = variant.variant_sku
+            sheet_qty = csv_data[code]
             matched_codes.add(code)
+            matched_count += 1
 
-            for variant in variant_list:
-                matched_count += 1
-                old_quantity = variant.variant_quantity or Decimal('0')
-
-                if old_quantity != new_quantity:
-                    variant.variant_quantity = new_quantity
-                    variant.save(update_fields=['variant_quantity'])
-                    updated_count += 1
-                    updated_items.append({
-                        'sku': code,
-                        'name': f"{variant.product.title} / {code}",
-                        'old': str(old_quantity),
-                        'new': str(new_quantity),
-                        'type': 'variant'
-                    })
+            live = variant.live_quantity
+            if live is None or live != sheet_qty:
+                differing_count += 1
+                differences.append(_diff(
+                    code, f"{variant.product.title} / {code}", 'variant',
+                    sheet_qty, live, variant.stock_tracked))
 
         # 2) Match remaining codes against Product.sku
         remaining_codes = set(csv_data.keys()) - matched_codes
         if remaining_codes:
             products = Product.objects.filter(sku__in=remaining_codes)
             for product in products:
-                new_quantity = csv_data[product.sku]
+                sheet_qty = csv_data[product.sku]
                 matched_codes.add(product.sku)
                 matched_count += 1
-                old_quantity = product.quantity or Decimal('0')
 
-                if old_quantity != new_quantity:
-                    product.quantity = new_quantity
-                    product.save(update_fields=['quantity'])
-                    updated_count += 1
-                    updated_items.append({
-                        'sku': product.sku,
-                        'name': product.title,
-                        'old': str(old_quantity),
-                        'new': str(new_quantity),
-                        'type': 'product'
-                    })
+                live = product.live_quantity
+                if live is None or live != sheet_qty:
+                    differing_count += 1
+                    differences.append(_diff(
+                        product.sku, product.title, 'product',
+                        sheet_qty, live, live is not None))
 
         # 3) Codes not found in either
         not_found = [code for code in csv_data.keys() if code not in matched_codes]
 
-        print(f"[IMPORT] Matched: {matched_count}, Updated: {updated_count}, Not found: {len(not_found)}")
+        print(f"[COMPARE] Matched: {matched_count}, Differing: {differing_count}, "
+              f"Not found: {len(not_found)}")
 
         return JsonResponse({
             'success': True,
+            'read_only': True,
             'total_rows': total_rows,
             'matched': matched_count,
-            'updated': updated_count,
+            'differing': differing_count,
             'not_found_count': len(not_found),
             'not_found': not_found[:20],
-            'updated_items': updated_items[:50],
-            'message': f'{updated_count} item(s) stock updated'
+            'differences': differences[:50],
+            'message': (f'{differing_count} of {matched_count} matched line(s) '
+                        f'disagree with the warehouse. Nothing was changed.'),
         })
 
     except ValueError as e:

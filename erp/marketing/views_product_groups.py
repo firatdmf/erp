@@ -17,7 +17,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from django.views import View
 
-from .models import Product, ProductCategory, ProductVariant
+from .models import (Product, ProductCategory, ProductVariant,
+                     with_product_live_quantity)
 
 
 def _safe_decimal(value):
@@ -115,7 +116,7 @@ class ProductGroupDetail(View):
     def get(self, request, pk):
         group = get_object_or_404(ProductCategory, pk=pk)
         products = (
-            group.product_set
+            with_product_live_quantity(group.product_set.all())
             .select_related("primary_image")
             .prefetch_related("variants")
             .order_by("title")
@@ -126,9 +127,8 @@ class ProductGroupDetail(View):
         for p in products:
             variants = list(p.variants.all())
             v_count = len(variants)
-            stock = p.quantity or Decimal("0")
-            if variants:
-                stock = sum((v.variant_quantity or Decimal("0")) for v in variants)
+            # Stock is the warehouse's answer, annotated in one query above.
+            stock = p.live_quantity or Decimal("0")
             total_stock += stock
             has_cost = bool(p.cost) or any(v.variant_cost for v in variants)
             if has_cost:

@@ -44,7 +44,7 @@
                 </div>
             </td>
             <td style="text-align: center;">
-                <span style="font-weight: 600; font-size: 13px; color: #334155;">{{ variant.variant_quantity }}</span>
+                <span style="font-weight: 600; font-size: 13px; color: #334155;">{% if variant.stock_tracked %}{{ variant.live_quantity|floatformat:"-2" }}{% else %}<span style="color:#94A3B8;font-weight:400;">{% trans "made to order" %}</span>{% endif %}</span>
             </td>
             <td style="text-align: right;">
                 <span

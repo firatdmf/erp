@@ -18,10 +18,10 @@ from operating.models import (
 
 
 class RollDeleteKeepsCatalogInStepTest(TestCase):
-    """Deleting a roll drops the warehouse quantity — the catalog variant
-    mirrors that quantity, so it has to come down too. It didn't, which is
-    why N1464T.G54 still read 33.66 in the intake chips after its only roll
-    was deleted.
+    """Deleting a roll drops the warehouse quantity, and the catalog reads
+    that quantity rather than mirroring it — which is why N1464T.G54 can no
+    longer do what it used to: still read 33.66 in the intake chips after
+    its only roll was deleted.
     """
 
     def setUp(self):
@@ -32,7 +32,7 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
             accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         product = Product.objects.create(title="N1464T", sku="N1464T", featured=False)
         self.variant = ProductVariant.objects.create(
-            product=product, variant_sku="N1464T.G54", variant_quantity=Decimal("33.66"))
+            product=product, variant_sku="N1464T.G54")
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="MARLETTOO", sku="N1464T.G54",
             quantity=Decimal("33.66"), catalog_variant=self.variant)
@@ -47,12 +47,14 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
             headers={"x-requested-with": "XMLHttpRequest"})
 
     def test_both_sides_come_down_together(self):
+        """There are no longer two sides to keep in step: the variant reads
+        the warehouse row, so dropping the row's metres IS the catalog
+        coming down. Kept as a test because that equivalence is the point."""
         r = self._delete(self.stock_item)
         self.assertEqual(r.status_code, 200, r.content)
         self.wp.refresh_from_db()
-        self.variant.refresh_from_db()
         self.assertEqual(self.wp.quantity, Decimal("0.00"))
-        self.assertEqual(self.variant.variant_quantity, Decimal("0.00"))
+        self.assertEqual(self.variant.live_quantity, Decimal("0.00"))
 
     def test_it_is_still_a_correction_not_a_sale(self):
         """The distinction is deliberate: real stock-out happens when an

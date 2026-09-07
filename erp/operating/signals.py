@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from .models import (
@@ -22,138 +20,19 @@ def sync_order_status(sender, instance, **kwargs):
     order.update_status_from_items()
 
 
-def _adjust_catalog_stock(product_id, variant_id, delta):
-    """Apply `delta` (Decimal, signed) to catalog stock.
-    Positive delta = restore (e.g. order item removed / qty reduced).
-    Negative delta = consume (e.g. order item created / qty raised).
-
-    Uses F() so concurrent updates don't lose deductions. If the variant
-    has its own stock field we touch that; otherwise fall back to the
-    product's own quantity. Both fields are nullable — treat NULL as 0
-    so existing rows without an initialised count still get decremented
-    correctly."""
-    if not delta:
-        return
-    from django.db.models import F, Value
-    from django.db.models.functions import Coalesce
-    from marketing.models import Product, ProductVariant
-
-    try:
-        if variant_id:
-            (ProductVariant.objects
-                .filter(pk=variant_id)
-                .update(variant_quantity=Coalesce(F("variant_quantity"), Value(Decimal("0"))) + delta))
-        elif product_id:
-            (Product.objects
-                .filter(pk=product_id)
-                .update(quantity=Coalesce(F("quantity"), Value(Decimal("0"))) + delta))
-    except Exception:
-        # Catalog stock should never block the order edit — surface to
-        # the stock report instead.
-        pass
-
-
-def _warehouse_managed_variant_ids(variant_ids):
-    """Subset of the given variant ids that are stocked in a warehouse
-    (i.e. some WarehouseProduct.catalog_variant points at them). For
-    those variants the physical rolls are the single stock authority —
-    the reservation system cuts them at ship and re-mirrors the catalog
-    quantity — so the catalog-stock signals must NOT also deduct them,
-    or the variant is double-counted."""
-    ids = [v for v in (variant_ids or []) if v]
-    if not ids:
-        return set()
-    try:
-        from .models import WarehouseProduct
-        return set(WarehouseProduct.objects
-                   .filter(catalog_variant_id__in=ids)
-                   .values_list("catalog_variant_id", flat=True))
-    except Exception:
-        return set()
-
-
-@receiver(pre_save, sender=OrderItem)
-def _capture_orderitem_stock_state(sender, instance, **kwargs):
-    """Stash the pre-save (quantity, product_id, variant_id) on the
-    instance itself so post_save can compute the delta. Only relevant
-    for updates — for new rows post_save knows `created=True` and
-    consumes the full quantity."""
-    if not instance.pk:
-        instance._stock_old_state = None
-        return
-    try:
-        old = OrderItem.objects.only("quantity", "product_id", "product_variant_id").get(pk=instance.pk)
-        instance._stock_old_state = {
-            "quantity": Decimal(str(old.quantity or 0)),
-            "product_id": old.product_id,
-            "product_variant_id": old.product_variant_id,
-        }
-    except OrderItem.DoesNotExist:
-        instance._stock_old_state = None
-
-
-def _order_has_consumed_stock(order_id):
-    """Read stock_consumed_at directly from DB so a stale Python copy
-    of the Order can't make this signal silently skip a deduction."""
-    if not order_id:
-        return False
-    try:
-        return Order.objects.filter(pk=order_id).exclude(stock_consumed_at__isnull=True).exists()
-    except Exception:
-        return False
-
-
-@receiver(post_save, sender=OrderItem)
-def sync_catalog_stock_on_item_save(sender, instance, created, **kwargs):
-    """Adjust catalog stock based on OrderItem changes — but ONLY when
-    the parent order has already "consumed" stock (i.e. it's in a
-    fulfilment status). Orders that sit in pending/preparing/packaging
-    do NOT touch the catalog until they ship; that lets staff create
-    orders even for products that are temporarily out of stock.
-
-    The Order.stock_consumed_at flag marks "this order has deducted its
-    items already". The Order status-transition signal below sets it
-    when status crosses into STOCK_DEDUCT_STATUSES (and restores +
-    clears it on the way back out)."""
-    if not _order_has_consumed_stock(instance.order_id):
-        return
-
-    new_qty = Decimal(str(instance.quantity or 0))
-    if created:
-        # Item added to an already-shipped order: deduct immediately.
-        if new_qty > 0:
-            _adjust_catalog_stock(instance.product_id, instance.product_variant_id, -new_qty)
-        return
-
-    state = getattr(instance, "_stock_old_state", None)
-    if not state:
-        return
-    old_qty = state["quantity"]
-    old_pid = state["product_id"]
-    old_vid = state["product_variant_id"]
-
-    if old_pid == instance.product_id and old_vid == instance.product_variant_id:
-        delta = old_qty - new_qty  # positive = restore, negative = consume
-        if delta:
-            _adjust_catalog_stock(instance.product_id, instance.product_variant_id, delta)
-    else:
-        if old_qty > 0:
-            _adjust_catalog_stock(old_pid, old_vid, old_qty)
-        if new_qty > 0:
-            _adjust_catalog_stock(instance.product_id, instance.product_variant_id, -new_qty)
-
-
-@receiver(post_delete, sender=OrderItem)
-def restore_catalog_stock_on_item_delete(sender, instance, **kwargs):
-    """When an OrderItem is removed — and its order had already
-    consumed stock — return its quantity to the catalog. Items removed
-    from pre-fulfilment orders never deducted anything so we skip."""
-    if not _order_has_consumed_stock(instance.order_id):
-        return
-    qty = Decimal(str(instance.quantity or 0))
-    if qty > 0:
-        _adjust_catalog_stock(instance.product_id, instance.product_variant_id, qty)
-
+# Catalog stock is NOT mirrored into the catalog any more, so the receivers
+# that used to do it are gone: _adjust_catalog_stock, the OrderItem pre/post
+# save + delete pair, and sync_catalog_stock_on_order_status_change.
+#
+# They existed only to keep Product.quantity / ProductVariant.variant_quantity
+# in step as orders shipped and un-shipped, and those columns no longer exist
+# — a variant's stock is read from the WarehouseProduct rows behind it (see
+# marketing.models.ProductVariant.live_quantity). Physical stock is untouched
+# by this: rolls are still cut from the shelf at ship time by
+# OrderStockReservation, which is what actually moves metres.
+#
+# Order.stock_consumed_at was written and read only by that machinery. It is
+# now vestigial — nothing sets it and nothing reads it.
 
 # ────────────────────────────────────────────────────────────────────
 #  Order status-transition signals — deduct/restore the whole order's
@@ -206,74 +85,6 @@ def email_customer_on_status_change(sender, instance, created, **kwargs):
     except Exception as _exc:
         import traceback as _tb
         _tb.print_exc()
-
-
-@receiver(post_save, sender=Order)
-def sync_catalog_stock_on_order_status_change(sender, instance, created, **kwargs):
-    """When the order moves INTO a fulfilment status (shipped / in
-    transit / out for delivery / delivered) the catalog stock for every
-    item is deducted, and stock_consumed_at is stamped. When it moves
-    back OUT (cancelled, returned, or reverted to preparing), the
-    deduction is reversed and the flag is cleared.
-
-    IMPORTANT: only acts on real transitions. Any save() that leaves
-    `order_status` unchanged (e.g. `update_status_from_items` writing
-    the legacy `.status` field) is a no-op here. We rely on the
-    DB-truth `stock_consumed_at` rather than the in-memory copy so a
-    stale Python instance can't trigger a double-deduct."""
-    from django.utils import timezone
-    from .models import STOCK_DEDUCT_STATUSES
-
-    new_status = instance.order_status
-    old_status = getattr(instance, "_old_status", None) if not created else None
-
-    # No transition → nothing to do. This is the common case (signals
-    # firing on related-field saves that don't touch order_status).
-    if old_status == new_status and not created:
-        return
-
-    # Always check the DB for the canonical stock_consumed_at — the
-    # in-memory instance.stock_consumed_at can be stale because we
-    # update it via .update() which bypasses the ORM cache.
-    try:
-        db_row = Order.objects.only("stock_consumed_at").get(pk=instance.pk)
-        is_consumed = bool(db_row.stock_consumed_at)
-    except Order.DoesNotExist:
-        return
-
-    should_deduct = new_status in STOCK_DEDUCT_STATUSES
-
-    items = list(instance.items.all().only("product_id", "product_variant_id", "quantity"))
-    # Variants that are stocked in a warehouse (WarehouseProduct.catalog_variant)
-    # are cut from their physical ROLLS at ship time by the reservation
-    # system — the catalog quantity is then re-mirrored from the warehouse.
-    # Deducting them here as well would double-count them. Skip.
-    managed = _warehouse_managed_variant_ids([it.product_variant_id for it in items])
-
-    # Going INTO a deduct state and haven't deducted yet → consume.
-    if should_deduct and not is_consumed:
-        for it in items:
-            if it.product_variant_id and it.product_variant_id in managed:
-                continue
-            qty = Decimal(str(it.quantity or 0))
-            if qty > 0:
-                _adjust_catalog_stock(it.product_id, it.product_variant_id, -qty)
-        now = timezone.now()
-        Order.objects.filter(pk=instance.pk).update(stock_consumed_at=now)
-        instance.stock_consumed_at = now  # keep the in-memory copy honest
-        return
-
-    # Going OUT of a deduct state and already deducted → restore.
-    if not should_deduct and is_consumed:
-        for it in items:
-            if it.product_variant_id and it.product_variant_id in managed:
-                continue
-            qty = Decimal(str(it.quantity or 0))
-            if qty > 0:
-                _adjust_catalog_stock(it.product_id, it.product_variant_id, qty)
-        Order.objects.filter(pk=instance.pk).update(stock_consumed_at=None)
-        instance.stock_consumed_at = None
-        return
 
 
 @receiver([post_save, post_delete], sender=OrderItem)

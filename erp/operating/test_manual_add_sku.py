@@ -246,7 +246,7 @@ class VariantMatchBySkuTest(TestCase):
         # Catalogued the way the real rows are: a raw Turkish colour value
         # translate_color() does not recognise.
         v = ProductVariant.objects.create(
-            product=self.product, variant_sku="N1464T.G54", variant_quantity=Decimal("33.66"))
+            product=self.product, variant_sku="N1464T.G54")
         WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="MARLETTOO", sku="N1464T.G54",
             quantity=Decimal("33.66"), catalog_variant=v)
@@ -287,13 +287,13 @@ class VariantMatchBySkuTest(TestCase):
         """
         from marketing.models import ProductVariant
         orphan = ProductVariant.objects.create(
-            product=self.product, variant_sku="N1464T.G77",
-            variant_quantity=Decimal("0"))
+            product=self.product, variant_sku="N1464T.G77")
         self.assertEqual(orphan.warehouse_products.count(), 0)
 
         d = self._match(sku="N1464T.G77", name="YARIMAT ALTIN")
         self.assertTrue(d["exists"])
         self.assertEqual(d["variant_sku"], "N1464T.G77")
+        # No warehouse row behind it, so there is no quantity to quote.
         self.assertAlmostEqual(d["variant_quantity"], 0.0, places=2)
 
     def test_an_orphan_is_still_never_matched_on_its_colour_alone(self):

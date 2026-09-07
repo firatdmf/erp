@@ -67,7 +67,9 @@ class DryRunPredictsTheApplyRunTest(TestCase):
         parent = Product.objects.get()
         self.assertEqual(parent.title, "K12504")
         self.assertFalse(parent.featured, "auto-created parents stay off the site")
-        self.assertEqual(parent.quantity, Decimal("70.00"))
+        # Stock is not copied anywhere: linking the seven warehouse rows IS
+        # the product's 7 x 10.00 metres.
+        self.assertEqual(parent.live_quantity, Decimal("70.00"))
         self.assertFalse(
             WarehouseProduct.objects.filter(catalog_variant=None).exists())
 

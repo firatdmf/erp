@@ -38,7 +38,7 @@ class ProductAutocompleteBreadthTest(TestCase):
     def _stock(self, colour):
         sku = f"PETEK.FONLUK KUMAŞ.{colour}.310"
         v = ProductVariant.objects.create(
-            product=self.product, variant_sku=sku, variant_quantity=Decimal("30"))
+            product=self.product, variant_sku=sku)
         WarehouseProduct.objects.create(
             warehouse=self.warehouse, name=f"PETEK FONLUK KUMAŞ {colour}",
             sku=sku, quantity=Decimal("30"), catalog_variant=v)
@@ -85,7 +85,7 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
             accounting_book=Book.objects.create(name="Laleli Fabric"))
         product = Product.objects.create(title="PETEK", sku="PETEK-T", featured=False)
         self.variant = ProductVariant.objects.create(
-            product=product, variant_sku="PETEK.94.310", variant_quantity=Decimal("30"))
+            product=product, variant_sku="PETEK.94.310")
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="PETEK FONLUK KUMAŞ 94",
             sku="PETEK.94.310", quantity=Decimal("30"), catalog_variant=self.variant)
@@ -138,8 +138,7 @@ class WarehouseFirstCatalogOnDemandTest(TestCase):
         self.stocked = Product.objects.create(
             title="ARDEN", sku="ARDEN", featured=False, price=Decimal("9.00"))
         v = ProductVariant.objects.create(
-            product=self.stocked, variant_sku="ARDEN.G10",
-            variant_quantity=Decimal("40"))
+            product=self.stocked, variant_sku="ARDEN.G10")
         WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="ARDEN ALTIN", sku="ARDEN.G10",
             quantity=Decimal("40"), catalog_variant=v)
@@ -200,8 +199,7 @@ class WarehouseFirstCatalogOnDemandTest(TestCase):
             product_variant_attribute=attr,
             product_variant_attribute_value="nevresim_takimi")
         variant = ProductVariant.objects.create(
-            product=self.shelfless, variant_sku="ARDEN-P.1",
-            variant_quantity=Decimal("3"))
+            product=self.shelfless, variant_sku="ARDEN-P.1")
         variant.product_variant_attribute_values.add(value)
         html = self._search("ARDEN-P.1")
         # The attribute NAME comes too: "nevresim takimi" alone reads as
@@ -212,8 +210,7 @@ class WarehouseFirstCatalogOnDemandTest(TestCase):
     def test_the_search_does_not_scale_its_queries_with_its_rows(self):
         for i in range(12):
             v = ProductVariant.objects.create(
-                product=self.stocked, variant_sku=f"ARDEN.G{20 + i}",
-                variant_quantity=Decimal("5"))
+                product=self.stocked, variant_sku=f"ARDEN.G{20 + i}")
             WarehouseProduct.objects.create(
                 warehouse=self.warehouse, name=f"ARDEN {i}",
                 sku=f"ARDEN.G{20 + i}", quantity=Decimal("5"),

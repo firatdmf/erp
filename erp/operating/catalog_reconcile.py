@@ -17,17 +17,18 @@ first, Turkish-fold alphanumeric-only comparison as fallback):
      when nothing exists.
 
 Existing variants of FEATURED products are never re-featured,
-re-attributed or moved away — only their stock mirror is updated.
-Quantity mirror: variant_quantity = SUM over every warehouse row
-sharing the SKU; each touched parent's quantity = sum of its variants.
+re-attributed or moved away.
+
+NO quantities are written anywhere. Linking a warehouse row to a variant
+IS the stock: the variant's quantity is the sum of the WarehouseProduct
+rows pointing at it, read through live_quantity. This reconciler used to
+be one of five writers mirroring that sum into a column, which is how the
+column drifted in the first place.
 Hidden products left with zero variants after moves are deleted.
 
 Ambiguities are REPORTED in the summary's `conflicts`, never guessed.
 """
 from contextlib import nullcontext as _nullcontext
-from decimal import Decimal
-
-from django.db.models import Sum
 
 from .catalog_sync import _fold, _norm_attr, _norm_value, derive_catalog
 from marketing.models import SKU_MAX_LENGTH
@@ -86,7 +87,6 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
         "products_created": 0, "products_deleted": 0,
         "conflicts": [], "actions": [],
     }
-    touched_product_ids = set()
     maybe_empty_product_ids = set()
     planned_parents = set()
 
@@ -119,9 +119,6 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
         cat = derive_catalog(sku, wp0.name or "")
         base = (cat["base_name"] or sku).strip()
 
-        total_qty = Decimal("0")
-        for w in group:
-            total_qty += (w.quantity or Decimal("0"))
         cost = next((w.cost_usd for w in group if w.cost_usd), None)
         barcode = next((w.barcode for w in group if w.barcode), None)
 
@@ -158,16 +155,11 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                             if apply:
                                 variant.product = target
                                 variant.save(update_fields=["product"])
-                    # Stock mirror only — never touch a pre-existing variant's
-                    # featured flag or attributes here.
-                    if apply:
-                        variant.variant_quantity = total_qty
-                        upd = ["variant_quantity"]
-                        if cost is not None and variant.variant_cost is None:
-                            variant.variant_cost = cost
-                            upd.append("variant_cost")
-                        variant.save(update_fields=upd)
-                    touched_product_ids.add(target.id)
+                    # Cost only — never touch a pre-existing variant's stock
+                    # (there is no stock column), featured flag or attributes.
+                    if apply and cost is not None and variant.variant_cost is None:
+                        variant.variant_cost = cost
+                        variant.save(update_fields=["variant_cost"])
                 else:
                     if parent is None:
                         parent = p_title_hidden.get(base.lower())
@@ -186,7 +178,6 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                             parent = Product.objects.create(
                                 title=base, sku=(None if taken else (base[:SKU_MAX_LENGTH] or None)),
                                 featured=False, unit_of_measurement="mt",
-                                quantity=Decimal("0"),
                             )
                             if parent.sku:
                                 p_sku_exact[parent.sku.strip().lower()] = parent
@@ -199,7 +190,7 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                             product=parent, variant_sku=sku[:SKU_MAX_LENGTH],
                             variant_featured=False,
                             variant_barcode=(barcode or None) and barcode[:14],
-                            variant_quantity=total_qty, variant_cost=cost,
+                            variant_cost=cost,
                         )
                         v_exact[sku.lower()] = variant
                         # Colour/model attribute — attached to THIS variant only.
@@ -210,7 +201,6 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                                 product_variant_attribute=attr,
                                 product_variant_attribute_value=_norm_value(cat["attribute_value"]))
                             variant.product_variant_attribute_values.add(val)
-                        touched_product_ids.add(parent.id)
 
                 # Counted in BOTH modes — how many rows actually change hands
                 # is the number a dry run exists to show, and it used to sit
@@ -230,12 +220,8 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
 
     if apply:
         with _tx.atomic():
-            # Parent stock = sum of variants (warehouse is the truth).
-            for pid in touched_product_ids:
-                agg = (ProductVariant.objects.filter(product_id=pid)
-                       .aggregate(s=Sum("variant_quantity")))
-                if agg["s"] is not None:
-                    Product.objects.filter(pk=pid).update(quantity=agg["s"])
+            # No parent stock rollup: a product's quantity is read from the
+            # warehouse through Product.live_quantity, never stored.
             # Hidden products left empty after moves → remove the husks.
             for pid in maybe_empty_product_ids:
                 try:

@@ -307,9 +307,9 @@ class OrderDetail(DetailView):
         # the user can bump it to (current qty + remaining stock).
         for it in self.object.items.all():
             if it.product_variant_id and it.product_variant:
-                stock = it.product_variant.variant_quantity
+                stock = it.product_variant.live_quantity
             elif it.product_id and it.product:
-                stock = it.product.quantity
+                stock = it.product.live_quantity
             else:
                 stock = None
             it.available_stock = stock
@@ -508,14 +508,12 @@ class OrderDetail(DetailView):
             item.save(update_fields=[field, "updated_at"])
             _sync_current_account_total()
 
-            # Refresh in-memory variant/product stock so the response
-            # mirrors the post-deduction state.
+            # No refresh needed: live_quantity reads the warehouse at access
+            # time, so it is already the post-deduction figure.
             if item.product_variant_id:
-                item.product_variant.refresh_from_db(fields=["variant_quantity"])
-                new_stock = item.product_variant.variant_quantity
+                new_stock = item.product_variant.live_quantity
             elif item.product_id:
-                item.product.refresh_from_db(fields=["quantity"])
-                new_stock = item.product.quantity
+                new_stock = item.product.live_quantity
             else:
                 new_stock = None
             allow_oversell = bool(getattr(item.product, "selling_while_out_of_stock", False))
@@ -577,7 +575,7 @@ class OrderDetail(DetailView):
                     return JsonResponse({"ok": False, "error": "Product not found"}, status=404)
 
             allow_oversell = bool(getattr(product, "selling_while_out_of_stock", False))
-            stock = variant.variant_quantity if is_variant else product.quantity
+            stock = variant.live_quantity if is_variant else product.live_quantity
             max_qty = None
             if stock is not None and not allow_oversell:
                 max_qty = float(qty) + float(stock)
@@ -641,14 +639,9 @@ class OrderDetail(DetailView):
             )
             _sync_current_account_total()
 
-            # Refresh stock for the response so the new row shows the
-            # post-deduction figure right away.
-            if variant:
-                variant.refresh_from_db(fields=["variant_quantity"])
-                new_stock = variant.variant_quantity
-            else:
-                product.refresh_from_db(fields=["quantity"])
-                new_stock = product.quantity
+            # live_quantity is read from the warehouse on access, so the new
+            # row already shows the post-deduction figure.
+            new_stock = variant.live_quantity if variant else product.live_quantity
             max_qty = None
             if new_stock is not None and not allow_oversell:
                 max_qty = float(qty) + float(new_stock)
@@ -3923,13 +3916,13 @@ def product_autocomplete(request):
         if variant:
             sku = variant.variant_sku or ""
             price, is_cost = resolve_price(product, variant)
-            stock = variant.variant_quantity
+            stock = variant.live_quantity
             qualifier = variant_values(variant, with_names=True)
             card_label = variant_values(variant)
         else:
             sku = product.sku or ""
             price, is_cost = resolve_price(product)
-            stock = product.quantity
+            stock = product.live_quantity
             qualifier = card_label = ""
 
         # The picked item's card must NAME the variant, not just the base

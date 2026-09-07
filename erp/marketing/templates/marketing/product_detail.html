@@ -116,7 +116,7 @@
             <span class="value price">${{ product.price|default:"0.00" }}</span>
           </div>
           {# B2B stock display: hide exact qty. Below 50 = hidden entirely, 50+ shown as "50+". #}
-          {% if product.quantity and product.quantity >= 50 %}
+          {% if product.live_quantity and product.live_quantity >= 50 %}
           <div class="info-item">
             <span class="label">{% trans "Availability" %}</span>
             <span class="value"><b>50+</b> {% trans "in stock" %}</span>
@@ -305,7 +305,10 @@
             </td>
             <td><span class="variant-price">${{ variant.variant_price|default:"0.00" }}</span></td>
             <td>
-              {% if variant.variant_quantity >= 50 %}
+              {% if not variant.stock_tracked %}
+                {# No warehouse carries it: made to order, NOT out of stock. #}
+                <span class="variant-availability">{% trans "Made to order" %}</span>
+              {% elif variant.live_quantity >= 50 %}
                 <span class="variant-availability"><b>50+</b></span>
               {% else %}
                 <span class="variant-availability is-out">{% trans "Unavailable" %}</span>

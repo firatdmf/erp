@@ -26,7 +26,6 @@ import re
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Sum
 from marketing.models import SKU_MAX_LENGTH
 
 
@@ -220,18 +219,18 @@ def _to_decimal(v):
 
 @transaction.atomic
 def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
-                         variant_sku, variant_barcode=None, quantity=None,
+                         variant_sku, variant_barcode=None,
                          cost=None, existing_base_product=None):
     """Idempotently create/link a HIDDEN catalog Product (main) + ProductVariant
     (the scanned item). Returns (product, variant, product_created, variant_created).
 
-    - quantity MIRRORS the warehouse stock onto the variant; the parent
-      Product.quantity is recomputed as the sum of its variants' quantities.
+    - NO quantity is passed or written. The variant's stock is the sum of the
+      WarehouseProduct rows pointing at it, read through live_quantity; the
+      caller writes the warehouse row, and that IS the stock.
     - Re-scanning the same variant_sku updates it in place (no duplicate).
     - A different variant_sku that matches an EXISTING (product, attribute_name,
-      attribute_value) is treated as the SAME logical variant: quantity is
-      ADDED to it instead of forking a second ProductVariant, and its own
-      variant_sku is left untouched.
+      attribute_value) is treated as the SAME logical variant rather than
+      forking a second ProductVariant; its own variant_sku is left untouched.
     - Raises CatalogSyncConflict if variant_sku already belongs to another product.
     """
     from marketing.models import (
@@ -244,7 +243,6 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         raise CatalogSyncConflict("variant_sku is required")
 
     base_name = (base_name or "").strip() or variant_sku
-    qty = _to_decimal(quantity)
     cost_dec = _to_decimal(cost)
 
     def _safe_sku(base):
@@ -282,7 +280,7 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         fabric = ProductCategory.objects.filter(name="fabric").first()
         product = Product.objects.create(
             title=base_name, sku=_safe_sku(base_name), featured=False,
-            unit_of_measurement="mt", quantity=Decimal("0"),
+            unit_of_measurement="mt",
             category=fabric,
         )
         product_created = True
@@ -338,26 +336,21 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         # old behaviour.
         if not product.featured:
             variant.variant_featured = False
-        if qty is not None:
-            if attr_matched:
-                # Matched by attribute, not by sku — this is additional
-                # stock coming in under its own roll(s), not a restatement
-                # of the matched variant's existing total.
-                variant.variant_quantity = (variant.variant_quantity or Decimal("0")) + qty
-            else:
-                variant.variant_quantity = qty          # mirror warehouse meters
+        # No quantity is written: the variant's stock is the sum of the
+        # WarehouseProduct rows pointing at it (live_quantity), and the
+        # caller has just written the row that this `qty` came from.
         if variant_barcode and not variant.variant_barcode:
             variant.variant_barcode = variant_barcode[:14]
         if cost_dec is not None:
             variant.variant_cost = cost_dec
         variant.save(update_fields=[
-            "variant_featured", "variant_quantity", "variant_barcode", "variant_cost",
+            "variant_featured", "variant_barcode", "variant_cost",
         ])
     else:
         variant = ProductVariant.objects.create(
             product=product, variant_sku=variant_sku, variant_featured=False,
             variant_barcode=(variant_barcode or None) and variant_barcode[:14],
-            variant_quantity=qty, variant_cost=cost_dec,
+            variant_cost=cost_dec,
         )
         variant_created = True
 
@@ -415,11 +408,9 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
             productvariant_id=variant.id,
             productvariantattributevalue_id=value_obj.id)
 
-    # 5) Parent product stock = sum of its variants' stock.
-    agg = (ProductVariant.objects.filter(product=product)
-           .aggregate(s=Sum("variant_quantity")))
-    product.quantity = agg["s"] or Decimal("0")
-    product.save(update_fields=["quantity"])
+    # 5) No parent stock to write. A product's quantity is everything the
+    #    warehouse holds across its variants, read through
+    #    Product.live_quantity rather than stored.
 
     return product, variant, product_created, variant_created
 
@@ -477,7 +468,7 @@ def resync_warehouse_product(wp, base_override=None):
             attribute_name=attr_name or cat["attribute_name"],
             attribute_value=attr_value or cat["attribute_value"],
             variant_sku=sku, variant_barcode=wp.barcode,
-            quantity=wp.quantity, cost=wp.cost_usd,
+            cost=wp.cost_usd,
         )
         wp.catalog_variant = variant
         wp.save(update_fields=["catalog_variant"])
@@ -564,7 +555,7 @@ def rebuild_catalog_from_warehouse(warehouse=None, apply=True):
                     attribute_name=s["attr_name"] or cat["attribute_name"],
                     attribute_value=s["attr_value"] or cat["attribute_value"],
                     variant_sku=s["sku"], variant_barcode=s["barcode"],
-                    quantity=s["qty"], cost=s["cost"],
+                    cost=s["cost"],
                 )
                 s["wp"].catalog_variant = variant
                 s["wp"].save(update_fields=["catalog_variant"])

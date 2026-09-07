@@ -105,15 +105,13 @@ def import_stock_from_excel(file_path=None):
             # variant_sku_suffix = str(row.get("sku")).split(".")[-1]
             variant_sku = row.get("sku")
             if variant_sku:
-                variant, _ = ProductVariant.objects.update_or_create(
+                # No quantity is seeded: stock is whatever the warehouse
+                # holds for this variant, not a number carried in on an
+                # import sheet. The row's "quantity" column is ignored.
+                variant, _ = ProductVariant.objects.get_or_create(
                     product=product,
                     variant_sku=variant_sku,
-                    # variant_quantity=row["quantity"],
-                    defaults={"variant_quantity": row.get("quantity")},
                 )
-                # If using variants, clear product-level quantity
-                product.quantity = None
-                product.save(update_fields=["quantity"])
 
                 # Handle attributes
                 for attr_field in ["fabric", "color", "yarn"]:

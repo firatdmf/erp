@@ -253,9 +253,9 @@ class Product(models.Model):
         default=QUANTITY_UNIT_TYPE_CHOICES[0][0],
     )
 
-    quantity = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True
-    )
+    # NO quantity column. A catalog product's stock is the sum of what the
+    # warehouse physically holds for its variants, read at the moment it is
+    # asked for — see `live_quantity` / with_product_live_quantity() below.
     minimum_inventory_level = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
@@ -353,6 +353,28 @@ class Product(models.Model):
             return self.minimum_order_quantity
         return self.category.minimum_order_quantity if self.category_id else None
 
+    @property
+    def live_quantity(self):
+        """This product's stock: everything the warehouse holds across all
+        of its variants. None when no warehouse carries any of them — the
+        product is made to order, not out of stock.
+
+        There is no stored counterpart. For lists, annotate instead with
+        with_product_live_quantity() so it costs one query rather than one
+        per row.
+        """
+        cached = self.__dict__.get("_live_quantity")
+        if cached is not None:
+            return cached
+        from django.db.models import Sum
+        return (_warehouse_product_model().objects
+                .filter(catalog_variant__product_id=self.pk)
+                .aggregate(s=Sum("quantity"))["s"])
+
+    @live_quantity.setter
+    def live_quantity(self, value):
+        self.__dict__["_live_quantity"] = value
+
     def _own_translation_text(self, lang, key):
         """A product's own per-language rich text, stored by the product form
         inside description as {"translations": {"en": {...}, "tr": {...}}}."""
@@ -403,14 +425,11 @@ class ProductVariant(models.Model):
         max_length=14, null=True, blank=True, db_index=True
     )
 
-    # STORED stock. Authoritative only for variants the warehouse does not
-    # carry — storefront-only goods kept by CSV import / the stock API.
-    # For anything with WarehouseProduct rows behind it the physical rolls
-    # are the truth and this column is a stale mirror: read `live_quantity`
-    # (or annotate with with_live_quantity()) instead of this field.
-    variant_quantity = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True
-    )
+    # NO variant_quantity column either. The physical rolls are the only
+    # stock authority; read `live_quantity` (or annotate a queryset with
+    # with_live_quantity()). A variant with no WarehouseProduct behind it
+    # has no stock to quote — it is made to order, which the storefront
+    # renders from `stock_tracked` rather than from a zero.
     variant_minimum_inventory_level = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
@@ -467,17 +486,18 @@ class ProductVariant(models.Model):
     def live_quantity(self):
         """How much of this variant there actually is.
 
-        The warehouse is the authority for anything it carries: a variant's
-        stock is the SUM of every WarehouseProduct linked to it, so a SKU
-        held in two depots reports both. `variant_quantity` is only consulted
-        for variants the warehouse does NOT carry — storefront-only goods
-        whose count comes from the CSV import or the stock API.
+        The warehouse is the ONLY authority: a variant's stock is the SUM of
+        every WarehouseProduct linked to it, so a SKU held in two depots
+        reports both. A variant no warehouse carries returns None — not
+        zero. The two mean different things to a buyer ("we are out of it"
+        versus "we make it to order"), and callers tell them apart with
+        `stock_tracked`.
 
-        Reading it rather than mirroring it into the column is deliberate.
-        The column had five separate writers (intake, order deductions, CSV,
-        the stock API, a reconciler) which is how 81 rows drifted out of step
-        and 2,978 variants with no warehouse row behind them ended up
-        advertising stock.
+        Deriving this rather than mirroring it into a column is the whole
+        point. The column had five separate writers (intake, order
+        deductions, CSV, the stock API, a reconciler) which is how 181 rows
+        drifted out of step and 1,507 variants with no warehouse row behind
+        them ended up advertising 31,533 metres that did not exist.
 
         One query per access — fine for a handful of variants. For lists use
         with_live_quantity() below, which resolves it in the same query and
@@ -487,9 +507,20 @@ class ProductVariant(models.Model):
         if cached is not None:
             return cached
         from django.db.models import Sum
-        total = (self.warehouse_products
-                 .aggregate(s=Sum("quantity"))["s"])
-        return total if total is not None else self.variant_quantity
+        return self.warehouse_products.aggregate(s=Sum("quantity"))["s"]
+
+    @property
+    def stock_tracked(self):
+        """False = no warehouse carries this variant, so there is no
+        quantity to quote and it must not read as out of stock."""
+        cached = self.__dict__.get("_stock_tracked")
+        if cached is not None:
+            return cached
+        return self.warehouse_products.exists()
+
+    @stock_tracked.setter
+    def stock_tracked(self, value):
+        self.__dict__["_stock_tracked"] = value
 
     @live_quantity.setter
     def live_quantity(self, value):
@@ -499,22 +530,37 @@ class ProductVariant(models.Model):
 
 
 def with_live_quantity(queryset):
-    """Annotate `live_quantity` onto a ProductVariant queryset — the same
-    rule as the property, resolved in SQL so a list costs one query."""
-    from django.db.models import DecimalField, OuterRef, Subquery, Sum
-    from django.db.models.functions import Coalesce
-    warehouse_total = (
-        _warehouse_product_model().objects
-        .filter(catalog_variant=OuterRef("pk"))
-        .values("catalog_variant")
-        .annotate(total=Sum("quantity"))
-        .values("total")[:1]
-    )
+    """Annotate `live_quantity` and `stock_tracked` onto a ProductVariant
+    queryset — the same rule as the properties, resolved in SQL so a list
+    costs one query. live_quantity stays NULL for a variant no warehouse
+    carries, exactly as the property returns None."""
+    from django.db.models import DecimalField, Exists, OuterRef, Subquery, Sum
+    rows = _warehouse_product_model().objects.filter(catalog_variant=OuterRef("pk"))
+    warehouse_total = (rows.values("catalog_variant")
+                       .annotate(total=Sum("quantity"))
+                       .values("total")[:1])
     return queryset.annotate(
-        live_quantity=Coalesce(
-            Subquery(warehouse_total, output_field=DecimalField(max_digits=14, decimal_places=2)),
-            "variant_quantity",
-        )
+        live_quantity=Subquery(
+            warehouse_total,
+            output_field=DecimalField(max_digits=14, decimal_places=2)),
+        stock_tracked=Exists(rows),
+    )
+
+
+def with_product_live_quantity(queryset):
+    """Annotate `live_quantity` onto a Product queryset: everything the
+    warehouse holds across all of that product's variants. Products the
+    warehouse does not carry at all annotate NULL, same rule as variants."""
+    from django.db.models import DecimalField, OuterRef, Subquery, Sum
+    per_product = (_warehouse_product_model().objects
+                   .filter(catalog_variant__product=OuterRef("pk"))
+                   .values("catalog_variant__product")
+                   .annotate(total=Sum("quantity"))
+                   .values("total")[:1])
+    return queryset.annotate(
+        live_quantity=Subquery(
+            per_product,
+            output_field=DecimalField(max_digits=14, decimal_places=2)),
     )
 
 

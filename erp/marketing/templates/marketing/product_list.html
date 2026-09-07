@@ -177,7 +177,7 @@
     </div>
     <div class="pl-head-r">
       <button class="pl-btn ghost" type="button" onclick="document.getElementById('csvModal').classList.add('show')">
-        <i data-lucide="upload"></i><span>{% trans "Import" %}</span>
+        <i data-lucide="scale"></i><span>{% trans "Compare stock" %}</span>
       </button>
       <a class="pl-btn primary" href="{% url 'marketing:product_create' %}">
         <i data-lucide="plus"></i><span>{% trans "Add product" %}</span>
@@ -283,8 +283,8 @@
 <div class="modal-backdrop" id="csvModal">
   <div class="modal-card" style="max-width: 520px;">
     <div class="modal-icon info"><i class="fas fa-file-import"></i></div>
-    <h3 class="modal-title">{% trans "Import stock update" %}</h3>
-    <p class="modal-desc">Upload a CSV or Excel file with SKU + Quantity columns to bulk-update variant stock.</p>
+    <h3 class="modal-title">{% trans "Compare sheet against warehouse" %}</h3>
+    <p class="modal-desc">Upload a CSV or Excel file with SKU + Quantity columns to see where it disagrees with what the warehouse holds. Nothing is changed &mdash; stock is only ever moved in the warehouse.</p>
 
     <div id="importDropZone"
          style="border: 2px dashed #DDE3E7; border-radius: 12px; padding: 28px; margin-bottom: 18px; background: #FAFBFD; text-align: center; cursor: pointer; transition: all .2s;"
@@ -318,7 +318,7 @@
     <div class="modal-actions" style="justify-content: space-between;">
       <button class="btn-secondary" type="button" onclick="closeImportModal()">{% trans "Cancel" %}</button>
       <button id="importBtn" class="btn-primary" type="button" disabled onclick="uploadImportFile()">
-        <i class="fas fa-upload"></i> Upload &amp; update
+        <i class="fas fa-upload"></i> Upload &amp; compare
       </button>
     </div>
   </div>
@@ -468,12 +468,11 @@ document.addEventListener('keydown', (e) => {
     resultsDiv.style.display = 'none';
   };
   window.closeImportModal = function() {
-    const ok = resultsDiv.querySelector('.fa-check-circle');
     document.getElementById('csvModal').classList.remove('show');
     clearImportFile();
-    importBtn.innerHTML = '<i class="fas fa-upload"></i> Yükle & Güncelle';
+    importBtn.innerHTML = '<i class="fas fa-upload"></i> Yükle & Karşılaştır';
     importBtn.onclick = uploadImportFile;
-    if (ok) location.reload();
+    // No reload: comparing writes nothing, so the list behind is unchanged.
   };
   window.uploadImportFile = function() {
     const file = fileInput._selectedFile || (fileInput.files && fileInput.files[0]);
@@ -486,38 +485,59 @@ document.addEventListener('keydown', (e) => {
       headers: { 'X-CSRFToken': '{{ csrf_token }}' },
       body: fd
     }).then(r => r.json()).then(data => {
-      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & update';
+      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & compare';
       importBtn.disabled = false;
       resultsDiv.style.display = 'block';
       if (data.success) {
         importBtn.innerHTML = '<i class="fas fa-times"></i> Close';
         importBtn.onclick = closeImportModal;
+        const agree = data.differing === 0;
+        const rows = (data.differences || []).map(d => {
+          const wh = d.warehouse === null
+            ? '<span style="color:#92400E;">not stocked</span>'
+            : `<strong>${d.warehouse}</strong>`;
+          return `<tr>
+              <td style="padding:3px 8px 3px 0;white-space:nowrap;">${d.sku}</td>
+              <td style="padding:3px 8px 3px 0;color:#64748B;">${d.name}</td>
+              <td style="padding:3px 8px 3px 0;text-align:right;">${d.sheet}</td>
+              <td style="padding:3px 0;text-align:right;">${wh}</td>
+            </tr>`;
+        }).join('');
         resultsDiv.innerHTML = `
-          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:14px;text-align:left;">
+          <div style="background:${agree?'#F0FDF4':'#FFFBEB'};border:1px solid ${agree?'#BBF7D0':'#FDE68A'};border-radius:9px;padding:14px;text-align:left;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-              <i class="fas fa-check-circle" style="color:#16A34A;"></i>
-              <strong style="color:#15803D;font-size:14px;">Import complete</strong>
+              <i class="fas fa-${agree?'check-circle':'balance-scale'}" style="color:${agree?'#16A34A':'#B45309'};"></i>
+              <strong style="color:${agree?'#15803D':'#92400E'};font-size:14px;">${agree?'Sheet agrees with the warehouse':'Differences found'}</strong>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px;color:#334155;">
               <div>Total: <strong>${data.total_rows}</strong></div>
               <div>Matched: <strong>${data.matched}</strong></div>
-              <div>Updated: <strong style="color:#16A34A;">${data.updated}</strong></div>
+              <div>Differing: <strong style="color:${data.differing>0?'#B45309':'#16A34A'};">${data.differing}</strong></div>
               <div>Not found: <strong style="color:${data.not_found_count>0?'#DC2626':'#16A34A'};">${data.not_found_count}</strong></div>
             </div>
+            ${rows ? `<div style="max-height:220px;overflow:auto;margin-top:10px;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead><tr style="color:#94A3B8;text-align:left;">
+                  <th style="padding:0 8px 4px 0;">SKU</th><th style="padding:0 8px 4px 0;">Name</th>
+                  <th style="padding:0 8px 4px 0;text-align:right;">Sheet</th>
+                  <th style="padding:0 0 4px;text-align:right;">Warehouse</th>
+                </tr></thead><tbody>${rows}</tbody>
+              </table></div>` : ''}
+            <p style="margin:10px 0 0;font-size:11.5px;color:#94A3B8;">Nothing was changed. Stock is only ever moved in the warehouse.</p>
           </div>`;
       } else {
         resultsDiv.innerHTML = `
           <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;padding:14px;text-align:left;">
             <div style="display:flex;align-items:center;gap:8px;">
               <i class="fas fa-exclamation-circle" style="color:#DC2626;"></i>
-              <strong style="color:#991B1B;font-size:14px;">Import failed</strong>
+              <strong style="color:#991B1B;font-size:14px;">Comparison failed</strong>
             </div>
             <p style="margin:8px 0 0;font-size:13px;color:#7F1D1D;">${data.error}</p>
           </div>`;
       }
     }).catch(err => {
       importBtn.disabled = false;
-      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & update';
+      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & compare';
       resultsDiv.style.display = 'block';
       resultsDiv.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;padding:14px;color:#991B1B;text-align:left;">${err.message}</div>`;
     });

@@ -696,7 +696,7 @@ def _resync_wp_catalog(wp):
     InvoiceItem.variant (and every other FK) pointing at it across ALL
     invoices that ever referenced this variant, not just the one being
     edited. sync_roll_to_catalog's existing-variant branch only updates
-    variant_quantity/variant_cost in place."""
+    variant_cost and the attributes in place."""
     if not wp.catalog_variant_id:
         return
     from .catalog_sync import sync_roll_to_catalog, CatalogSyncConflict
@@ -711,7 +711,6 @@ def _resync_wp_catalog(wp):
             attribute_name=attribute_name,
             attribute_value=attribute_value,
             variant_sku=wp.sku,
-            quantity=wp.quantity,
             cost=wp.cost_usd,
             existing_base_product=cv.product,
         )
@@ -798,12 +797,9 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
                 if (_Prod.objects.filter(pk=pid, featured=False).exists()
                         and not ProductVariant.objects.filter(product_id=pid).exists()):
                     _Prod.objects.filter(pk=pid).delete()
-            if survivor.catalog_variant_id:
-                ProductVariant.objects.filter(pk=survivor.catalog_variant_id).update(variant_quantity=total)
-                pv = ProductVariant.objects.filter(pk=survivor.catalog_variant_id).first()
-                if pv:
-                    agg = ProductVariant.objects.filter(product_id=pv.product_id).aggregate(s=_Sum("variant_quantity"))
-                    _Prod.objects.filter(pk=pv.product_id).update(quantity=agg["s"] or Decimal("0"))
+            # The survivor's catalog variant needs no quantity write: it
+            # reads whatever WarehouseProduct rows point at it, and the merge
+            # has just made that this one row holding `total`.
         except Exception:
             import traceback
             traceback.print_exc()
@@ -2416,7 +2412,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                     def _mint_main(sku):
                         return _Prod.objects.create(
                             title=base_name, sku=sku, featured=False,
-                            unit_of_measurement=prod_unit, quantity=Decimal("0"),
+                            unit_of_measurement=prod_unit,
                             category=category,
                         )
                     if desired_sku and not item["sku_is_auto"]:
@@ -2566,7 +2562,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                             attribute_name=attr_name,
                             attribute_value=attr_value,
                             variant_sku=v_sku, variant_barcode=first_barcode,
-                            quantity=total, cost=cost_usd,
+                            cost=cost_usd,
                             existing_base_product=main_product,
                         )
                         wp.catalog_variant = cat_variant
@@ -3109,7 +3105,6 @@ class WarehousePurchaseEdit(View):
                                             title=base_name, sku=candidate, featured=False,
                                             unit_of_measurement=_PRODUCT_UNIT_MAP.get(
                                                 (data.get("unit") or "mt"), "units"),
-                                            quantity=Decimal("0"),
                                         )
                                     break
                                 except IntegrityError:
@@ -3138,7 +3133,7 @@ class WarehousePurchaseEdit(View):
                             _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
                                 base_name=base_name, attribute_name=attr_name,
                                 attribute_value=attr_value, variant_sku=v_sku,
-                                variant_barcode=first_barcode, quantity=wp.quantity,
+                                variant_barcode=first_barcode,
                                 cost=(price if currency == "USD" else None),
                                 existing_base_product=main_product,
                             )
@@ -5865,11 +5860,8 @@ class WarehouseRollEdit(View):
                     reference=roll.barcode or f"Roll #{roll.pk}",
                     created_by=request.user if request.user.is_authenticated else None,
                 )
-            # Mirror onto the linked catalog variant.
-            if product.catalog_variant_id:
-                v = product.catalog_variant
-                v.variant_quantity = product.quantity
-                v.save(update_fields=["variant_quantity"])
+            # No catalog mirror: the variant reads this WarehouseProduct
+            # (and every other row for the same SKU) through live_quantity.
 
         return JsonResponse({
             "success": True,
@@ -6270,7 +6262,6 @@ class WarehouseRollScan(View):
                     attribute_value=attribute_value,
                     variant_sku=variant_sku,
                     variant_barcode=barcode,
-                    quantity=product.quantity,   # mirror this variant's warehouse stock
                     cost=product.cost_usd,
                     existing_base_product=existing_base,
                 )

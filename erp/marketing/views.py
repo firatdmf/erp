@@ -26,6 +26,8 @@ from .models import (
     ProductVariantAttributeValue,
     ProductFile,
     ProductCategory,
+    with_live_quantity,
+    with_product_live_quantity,
 )
 from .forms import ProductForm, ProductFileFormSet
 
@@ -135,7 +137,7 @@ class ProductList(generic.ListView):
                 except (ValueError, TypeError):
                     pass
 
-        return queryset.select_related(
+        queryset = queryset.select_related(
             'category',
             'primary_image',
             'supplier_account'
@@ -143,12 +145,13 @@ class ProductList(generic.ListView):
             'attributes',
         ).annotate(
             variant_count=Count('variants'),
-            total_stock=Coalesce(
-                Sum('variants__variant_quantity'),
-                F('quantity'),
-                Value(0, output_field=DecimalField())
-            )
         ).order_by('title')
+        # Stock is a warehouse subquery, not a join-and-Sum: summing across a
+        # second multi-valued join would multiply each variant's metres by the
+        # number of attributes prefetched alongside it.
+        return with_product_live_quantity(queryset).annotate(
+            total_stock=Coalesce(F('live_quantity'), Value(0, output_field=DecimalField())),
+        )
 
     def get_context_data(self, **kwargs):
         from django.db.models import Count, Sum, F, DecimalField, Value
@@ -172,15 +175,9 @@ class ProductList(generic.ListView):
         total_products = Product.objects.count()
         total_variants = ProductVariant.objects.count()
 
-        # Stock aggregates (use variant_quantity summed per product when variants exist)
-        product_stock = (
-            Product.objects.annotate(
-                total_stock=Coalesce(
-                    Sum('variants__variant_quantity'),
-                    F('quantity'),
-                    Value(0, output_field=DecimalField()),
-                )
-            )
+        # Stock aggregates — everything the warehouse holds per product.
+        product_stock = with_product_live_quantity(Product.objects.all()).annotate(
+            total_stock=Coalesce(F('live_quantity'), Value(0, output_field=DecimalField())),
         )
         out_of_stock = product_stock.filter(total_stock__lte=0).count()
         low_stock = product_stock.filter(total_stock__gt=0, total_stock__lt=10).count()
@@ -2696,16 +2693,15 @@ def get_products(request):
             WITH pids AS (SELECT unnest(%(pids)s::bigint[]) AS id),
             variants AS (
                 SELECT json_agg(sub) as data FROM (
-                    -- Stock comes from the warehouse for anything it carries
-                    -- (summed, so a SKU in two depots reports both); the stored
-                    -- column is the fallback for storefront-only variants that
-                    -- have no warehouse row. See ProductVariant.live_quantity.
+                    -- Stock IS the warehouse, summed so a SKU in two depots
+                    -- reports both. There is no stored fallback: a variant no
+                    -- warehouse carries reports NULL, and stock_tracked below
+                    -- is what tells the storefront apart from a real zero.
+                    -- See ProductVariant.live_quantity.
                     SELECT id, product_id, variant_sku, variant_price,
-                           COALESCE(
-                               (SELECT SUM(wp.quantity)
-                                  FROM operating_warehouseproduct wp
-                                 WHERE wp.catalog_variant_id = marketing_productvariant.id),
-                               variant_quantity
+                           (SELECT SUM(wp.quantity)
+                              FROM operating_warehouseproduct wp
+                             WHERE wp.catalog_variant_id = marketing_productvariant.id
                            ) AS variant_quantity, variant_featured,
                            -- False = the warehouse doesn't carry this variant, so
                            -- there is no quantity to quote: it's made to order.
@@ -2939,7 +2935,15 @@ def get_product(request):
         cursor.execute("""
             SELECT
                 p.id, p.created_at, p.title, p.description, p.sku, p.barcode,
-                p.tags, p.type, p.unit_of_measurement, p.quantity, p.price,
+                p.tags, p.type, p.unit_of_measurement,
+                -- No p.quantity column: a product's stock is everything the
+                -- warehouse holds across its variants. NULL = carried by no
+                -- warehouse at all, i.e. made to order.
+                (SELECT SUM(wp.quantity)
+                   FROM operating_warehouseproduct wp
+                   JOIN marketing_productvariant pv ON pv.id = wp.catalog_variant_id
+                  WHERE pv.product_id = p.id) AS quantity,
+                p.price,
                 p.featured, p.selling_while_out_of_stock, p.weight, p.unit_of_weight,
                 p.category_id, p.supplier_account_id, p.datasheet_url, p.minimum_inventory_level,
                 pi.file_url as primary_image_url,
@@ -2998,14 +3002,12 @@ def get_product(request):
             ),
             variants AS (
                 SELECT json_agg(sub) as data FROM (
-                    -- See the list query above: warehouse rows win, stored
-                    -- column is the fallback.
+                    -- See the list query above: the warehouse is the only
+                    -- source, and NULL means no warehouse carries it.
                     SELECT id, variant_sku, variant_barcode,
-                           COALESCE(
-                               (SELECT SUM(wp.quantity)
-                                  FROM operating_warehouseproduct wp
-                                 WHERE wp.catalog_variant_id = marketing_productvariant.id),
-                               variant_quantity
+                           (SELECT SUM(wp.quantity)
+                              FROM operating_warehouseproduct wp
+                             WHERE wp.catalog_variant_id = marketing_productvariant.id
                            ) AS variant_quantity, variant_price,
                            variant_featured, product_id,
                            EXISTS (SELECT 1 FROM operating_warehouseproduct wp2

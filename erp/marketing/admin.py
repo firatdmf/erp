@@ -106,7 +106,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
         "variant_sku",
         "variant_price",
         "variant_cost",
-        "variant_quantity",
+        "live_quantity",
         "product",
         "variant_featured",
     )

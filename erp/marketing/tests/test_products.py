@@ -58,7 +58,6 @@ class ProductModelTest(TestCase):
             product=product,
             variant_sku="VARIANT123",
             variant_price=Decimal("5.00"),
-            variant_quantity=Decimal("100.00")
         )
         
         # Try to clean the variant (it should fail because the product doesn't allow variants)
@@ -80,7 +79,6 @@ class ProductModelTest(TestCase):
             product=product,
             variant_sku="VARIANT001",
             variant_price=Decimal("10.00"),
-            variant_quantity=Decimal("200.00")
         )
 
         try:

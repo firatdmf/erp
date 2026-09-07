@@ -439,7 +439,7 @@
         <span></span>
       </div>
       {% for order in orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.pk }} {% if order.contact %}{{ order.contact.name }}{% elif order.company %}{{ order.company.name }}{% elif order.web_client %}{{ order.web_client.name }} {{ order.web_client.username }}{% endif %} {{ order.order_number }}">
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
@@ -559,7 +559,7 @@
         <span></span>
       </div>
       {% for order in b2b_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}">
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
@@ -626,7 +626,7 @@
         <span></span>
       </div>
       {% for order in b2c_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}">
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
@@ -696,7 +696,7 @@
         <span></span>
       </div>
       {% for order in retail_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}">
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
@@ -756,6 +756,29 @@
 </div>
 
 <script>
+  // Search filter over the active pane. Both sides go through foldText
+  // (erp/js/text_fold.js) so Turkish letters match their plain
+  // counterparts — "sise" finds "Şişe". The haystack is data-search,
+  // built server-side (views._order_search_index) so it holds the
+  // customer AND the line products, which the visible row does not.
+  const input = document.getElementById('ord-search-input');
+  const fold = (s) => (window.foldText ? window.foldText(s) : String(s || '').toLowerCase());
+
+  function applyOrderFilter() {
+    const activePane = document.querySelector('.ord-list-wrap.active');
+    if (!activePane) return;
+    const q = input ? fold(input.value).trim() : '';
+    let visible = 0;
+    activePane.querySelectorAll('.ord-row').forEach(row => {
+      const txt = fold(row.dataset.search || row.textContent);
+      const show = !q || txt.includes(q);
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    const counter = document.getElementById('ord-visible-count');
+    if (counter) counter.innerHTML = `<b>${visible}</b>`;
+  }
+
   // Tab switching
   document.querySelectorAll('.ord-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -763,34 +786,14 @@
       document.querySelectorAll('.ord-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       document.querySelectorAll('.ord-list-wrap').forEach(p => p.classList.toggle('active', p.dataset.pane === tab));
-      // Update visible-count for the active pane
-      const activeRows = document.querySelectorAll(`.ord-list-wrap[data-pane="${tab}"] .ord-row`).length;
-      const counter = document.getElementById('ord-visible-count');
-      if (counter) counter.innerHTML = `<b>${activeRows}</b>`;
+      // Re-run the filter rather than counting every row: the query the
+      // reader typed still stands, so the new pane has to honour it —
+      // otherwise switching tabs silently shows what was filtered out.
+      applyOrderFilter();
     });
   });
 
-  // Search filter (filters only the All Orders pane rows)
-  const input = document.getElementById('ord-search-input');
-  if (input) {
-    // Both sides go through foldText (erp/js/text_fold.js) so Turkish
-    // letters match their plain counterparts — "sise" finds "Şişe".
-    const fold = (s) => (window.foldText ? window.foldText(s) : String(s || '').toLowerCase());
-    input.addEventListener('input', (e) => {
-      const q = fold(e.target.value).trim();
-      const activePane = document.querySelector('.ord-list-wrap.active');
-      if (!activePane) return;
-      let visible = 0;
-      activePane.querySelectorAll('.ord-row').forEach(row => {
-        const txt = fold(row.dataset.search || row.textContent);
-        const show = !q || txt.includes(q);
-        row.style.display = show ? '' : 'none';
-        if (show) visible++;
-      });
-      const counter = document.getElementById('ord-visible-count');
-      if (counter) counter.innerHTML = `<b>${visible}</b>`;
-    });
-  }
+  if (input) input.addEventListener('input', applyOrderFilter);
 
   // ─────────────────────────────────────────────────────────────────
   //  Row selection + bulk delete

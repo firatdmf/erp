@@ -3047,6 +3047,13 @@ class OrderList(ListView):
         
         # Use the already-evaluated list to share prefetch cache across tabs
         all_orders = context.get('orders', [])
+
+        # What the search box actually filters on. Attached per row rather
+        # than built in the template so all four panes index the same
+        # thing — the tabs are the SAME orders, and a query that finds an
+        # order under "All" has to find it under "Retail" too.
+        for order in all_orders:
+            order.search_index = _order_search_index(order)
         
         # B2B orders: Has contact OR company, but NO web_client
         b2b_orders = [
@@ -3082,6 +3089,52 @@ class OrderList(ListView):
         context['is_admin'] = _is_admin(self.request.user)
 
         return context
+
+
+def _order_search_index(order):
+    """Everything the list's search box promises to match on one row.
+
+    The box says "order no, customer, product", so all three have to be
+    IN the row — the filter is client-side over what the page shipped,
+    and a name that was never rendered can never be typed to find it.
+
+    The customer is whichever of the four kinds this order actually has.
+    A walk-in has no contact/company/web_client at all: it is attached to
+    the shared Perakende cari, so the account's name and code ARE its
+    customer identity and belong here, not just in the visible cell.
+
+    Products come from the prefetched lines (`items__product`,
+    `items__product_variant`), so this costs no extra query. Both title
+    and the two SKUs go in: staff search by whichever is on the paper in
+    front of them.
+    """
+    parts = [str(order.pk), order.order_number or ""]
+
+    if order.contact_id:
+        parts.append(order.contact.name)
+    elif order.company_id:
+        parts.append(order.company.name)
+    elif order.web_client_id:
+        parts += [order.web_client.name or "", order.web_client.username or ""]
+    else:
+        parts += [order.guest_first_name or "", order.guest_last_name or ""]
+    if order.cari_id:
+        parts += [order.cari.name or "", order.cari.code or ""]
+
+    for item in order.items.all():
+        product = item.product
+        if product is not None:
+            parts += [product.title or "", product.sku or ""]
+        if item.product_variant_id:
+            parts.append(item.product_variant.variant_sku or "")
+
+    seen, out = set(), []
+    for part in parts:
+        part = (part or "").strip()
+        if part and part.lower() not in seen:
+            seen.add(part.lower())
+            out.append(part)
+    return " ".join(out)
 
 
 class OrderProduction(View):

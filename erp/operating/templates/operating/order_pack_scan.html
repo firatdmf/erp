@@ -82,7 +82,7 @@
   .pk-cut-val{font-weight:700;color:var(--pk-ink);}
   .pk-avail{color:var(--pk-gray);}
 
-  /* Product groups (non-retail: scanned tops sorted under their line) */
+  /* Product groups (non-retail: scanned stock items sorted under their line) */
   .pk-pgroup{border:1.5px solid var(--pk-line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
   .pk-pgroup-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#FAFCFB;
     border-bottom:1px solid var(--pk-line);}
@@ -102,7 +102,7 @@
   .pk-pack-body [data-empty-hint],.pk-pgroup-rolls [data-empty-hint],
   #pkUntrackedList [data-empty-hint]{grid-column:1/-1;}
 
-  /* Packages (non-retail: drag scanned tops here) */
+  /* Packages (non-retail: drag scanned stock items here) */
   .pk-packs-h{display:flex;align-items:center;gap:10px;}
   .pk-packs-h .pk-badge{padding:2px 8px;border-radius:999px;background:#F4F7FB;color:var(--pk-gray);
     font:700 11px var(--pk-font);}
@@ -657,7 +657,7 @@
   // Flat list (retail) or the union of every group/pack body (non-retail)
   // — used for count/total refresh and for locating rows by id.
   // Excludes .pk-citem (untracked/catalog-item rows) — those aren't
-  // physical tops, so they don't belong in the roll count/metre total
+  // physical stock items, so they don't belong in the roll count/metre total
   // or the "at least one scan" gate. They're regrouped separately below.
   function allRows(){ return document.querySelectorAll('.pk-row:not(.pk-citem)'); }
   function allCatalogRows(){ return document.querySelectorAll('.pk-citem'); }
@@ -742,7 +742,7 @@
       var hasRows = container.querySelectorAll('.pk-row').length > 0;
       if (hint) hint.style.display = hasRows ? 'none' : '';
     });
-    // Per-package header: how many tops, how many metres they carry, and
+    // Per-package header: how many stock items, how many metres they carry, and
     // how many untracked lines sit beside them. Metres come from each
     // row's data-meters — the reserved (possibly partially cut) length,
     // which is what is really in the sack, not the roll's full length.
@@ -1351,7 +1351,7 @@
   // ── read, then confirm ────────────────────────────────────────────
   // A scan does not place anything. It asks the server what the barcode
   // is, shows the roll, and waits — so the packer can see they have the
-  // right top in their hand before it goes in the sack. Only Confirm
+  // right stock item in their hand before it goes in the sack. Only Confirm
   // writes, and it reports what the package now holds.
   var stageEl = document.getElementById('pkScanStage');
   var resultEl = document.getElementById('pkScanResult');

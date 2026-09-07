@@ -810,7 +810,7 @@
     return (typed || cardEl._npPreviewSku || '').toUpperCase();
   }
 
-  // One card = one main product (new or existing) + its variants & tops.
+  // One card = one main product (new or existing) + its variants & stock items.
   // Per-card state (mode, has-variants, sku preview, existing-variant list)
   // lives directly on the card element so any number of products can be
   // built up side by side on this one page.
@@ -1380,7 +1380,7 @@
       '<span class="np-top-no">{% trans "Roll" %} ' + n + '</span>' +
       '<input class="np-input np-top-qty" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
       '<span class="np-top-unit">' + unitShort() + '</span>' +
-      // Blank = mint one from the account prefix at save. Filled = this top
+      // Blank = mint one from the account prefix at save. Filled = this stock item
       // arrived already labelled and keeps the code printed on it.
       '<input class="np-input np-top-bc" type="text" maxlength="64" spellcheck="false"' +
       ' placeholder="{% trans "Barcode (auto)" %}" oninput="npBarcodeInput(this)">' +
@@ -1849,12 +1849,12 @@
   };
 
   // ── Edit an existing purchase — this SAME page, pre-filled with its
-  // current lines/tops. Deliberately ADDITIVE: npAddProduct/npAddVariant/
+  // current lines/stock items. Deliberately ADDITIVE: npAddProduct/npAddVariant/
   // npAddTop (above) are untouched and keep meaning "add something brand
   // new" in both modes; existing/locked rows get their own renderer so the
   // two concepts never share one code path with a runtime flag. ──────────
 
-  // One read-only chip per EXISTING top. Locked (already reserved into a
+  // One read-only chip per EXISTING stock item. Locked (already reserved into a
   // customer order — even if not yet shipped/consumed) rows show a lock
   // icon and can't be removed; unlocked ones keep a delete control that
   // just drops the chip — nothing is sent to the server for a dropped
@@ -1903,9 +1903,9 @@
     return el;
   }
 
-  // Fetches the purchase's current lines/tops and fills #npProducts with
-  // them read-only (identity) + editable (tops, and price only on a line
-  // with zero surviving original tops) instead of a blank intake.
+  // Fetches the purchase's current lines/stock items and fills #npProducts with
+  // them read-only (identity) + editable (stock items, and price only on a line
+  // with zero surviving original stock items) instead of a blank intake.
   window.npLoadForEdit = function (invoiceId) {
     NP_EDIT_INVOICE_ID = invoiceId;
     npLoading = true;
@@ -1929,7 +1929,7 @@
           npSupSyncFromSelect();   // chip renders locked — account can't change mid-edit
         }
         // Show the unit the purchase was received in, not the "mt" default —
-        // its existing tops are labelled with it.
+        // its existing stock items are labelled with it.
         const unitSel = document.getElementById('npUnit');
         const firstUnit = (((d.products || [])[0] || {}).variants || [])[0];
         if (unitSel && firstUnit && firstUnit.unit) {
@@ -1998,7 +1998,7 @@
 
   function npSaveEdit() {
     const btn = document.getElementById('npSaveBtn');
-    // Same barcode gate as a fresh intake — tops added during an edit go
+    // Same barcode gate as a fresh intake — stock items added during an edit go
     // through the identical uniqueness rules.
     npBcSyncDupes();
     const badEdit = npBcRows().filter(function (el) {

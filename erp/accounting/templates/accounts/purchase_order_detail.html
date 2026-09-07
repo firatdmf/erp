@@ -205,7 +205,7 @@
 <script>
   // Confirm turns this order into stock; it is deliberately a POST with an
   // explicit "are you sure", since there is no undo short of cancelling the
-  // whole purchase (which deletes the tops it created).
+  // whole purchase (which deletes the stock items it created).
   window.poConfirm = function (btn) {
     if (!confirm("{% trans 'Receive this order into the warehouse? The stock and the supplier invoice are created now.' %}")) return;
     const orig = btn.innerHTML;

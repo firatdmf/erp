@@ -217,7 +217,7 @@
   .roll-status.partial { background: #FEF3C7; color: #8B5A00; }
   .roll-status.consumed { background: #E5E7EB; color: var(--gray-600); }
   .roll-time { font: 500 11px var(--font-sans); color: var(--gray-500); }
-  /* Bulk top selection toolbar + per-row checkbox */
+  /* Bulk stock item selection toolbar + per-row checkbox */
   .rolls-toolbar {
     display: flex; align-items: center; justify-content: space-between;
     gap: 12px; flex-wrap: wrap; padding: 2px 2px 12px;
@@ -1063,7 +1063,7 @@
   const csrftoken = '{{ csrf_token }}';
   const _isTR = "{% get_current_language as LC %}{{ LC|slice:':2' }}" === "tr";
 
-  // ── Bulk top selection ───────────────────────────────────────
+  // ── Bulk stock item selection ───────────────────────────────────────
   function rollPickChanged() {
     const all = document.querySelectorAll('.roll-cb');
     const sel = document.querySelectorAll('.roll-cb:checked');

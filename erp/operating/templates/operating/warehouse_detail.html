@@ -248,7 +248,7 @@
   /* PRODUCTS TABLE */
   .od-prods-wrap { overflow-x: auto; }
   .od-prods { width: 100%; border-collapse: collapse; }
-  /* Metre on top, small lowercase tops count below it (stacked, saves width) */
+  /* Metre on top, small lowercase stock items count below it (stacked, saves width) */
   .od-prods .qty { font-variant-numeric: tabular-nums; }
   .tops-sub {
     font: 600 10.5px var(--font-sans); color: var(--gray-500);
@@ -1914,7 +1914,7 @@
 <script>
 (function () {
   const MG_CSRF = "{{ csrf_token }}";
-  // Merge duplicate same-SKU variants — PREVIEW which tops/products merge, then confirm.
+  // Merge duplicate same-SKU variants — PREVIEW which stock items/products merge, then confirm.
   const MERGE_URL = "{% url 'operating:warehouse_merge_duplicates' warehouse.pk %}";
   const _mgTR = "{% get_current_language as LC2 %}{{ LC2|slice:':2' }}" === "tr";
   function mgEsc(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
@@ -3029,7 +3029,7 @@
       return;
     }
     // Barcode is required — it is what picking scans, what stops the same
-    // top being counted twice, and what names its label photo. Caught here
+    // stock item being counted twice, and what names its label photo. Caught here
     // so the camera stays open on the roll instead of the save failing
     // after the fact; the server refuses a blank one regardless.
     if (!barcode) {
@@ -3553,7 +3553,7 @@
     if (d && d.found && d.product) {
       var p = d.product;
       var tiles = '';
-      // HERO — the scanned top's meters, front and centre.
+      // HERO — the scanned stock item's meters, front and centre.
       if (d.roll) {
         var rm = (d.roll.meters || 0).toFixed(2);
         var rem = (d.roll.meters_remaining !== null && d.roll.meters_remaining !== undefined)
@@ -3619,7 +3619,7 @@
           '</div>' +
           '<div class="bl-actions">' +
             '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
-            // No move offer for a used-up top: there are no metres to carry,
+            // No move offer for a used-up stock item: there are no metres to carry,
             // and its row records where the stock went out from. The server
             // refuses it too, so a stale screen can't sneak one through.
             (d.cross_book

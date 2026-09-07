@@ -479,7 +479,7 @@
           // released).
           existingRolls: [],
           rolls: rolls,
-          // barcode → the hold this order already has on that top. These
+          // barcode → the hold this order already has on that stock item. These
           // holds live until the save reconciles them, so anything in
           // here can be re-ticked without asking the server whether it is
           // still free: it is ours the whole time the form is open.
@@ -491,7 +491,7 @@
           availableRolls: [], rollsLoading: true,
           manualMeters: manual || 0, manualNote: '',
           // Keep the section open when it holds a value, otherwise a line
-          // that also has tops would hide its out-of-warehouse metres.
+          // that also has stock items would hide its out-of-warehouse metres.
           showManualEntry: manual > 0
         });
         if (it.sku) editHydratedItems.push({ stableIndex: stableIndex, sku: it.sku });
@@ -630,7 +630,7 @@
   const ROLL_LIST_URL = "{% url 'operating:order_create_roll_list' %}";
   // Edit mode: every availability lookup must say WHICH order is asking,
   // so this order's own holds don't count against it. Without it an
-  // unticked top still reads as "reserved" — by this very order — and
+  // unticked stock item still reads as "reserved" — by this very order — and
   // could never be re-picked.
   const CO_ORDER_ID = {% if order %}{{ order.pk }}{% else %}null{% endif %};
   function coOrderParam() { return CO_ORDER_ID ? ('&order=' + CO_ORDER_ID) : ''; }
@@ -654,7 +654,7 @@
     // just added — important once the list grows past a few rows.
     orderItems.unshift({
       index: stableIndex, sku, variant, title: title||sku, price: parseFloat(price)||0,
-      // Quantity is derived from the tops picked below (not typed) —
+      // Quantity is derived from the stock items picked below (not typed) —
       // starts at 0 until a roll is selected.
       quantity: 0, description: '', categoryName: categoryName||'',
       stock: _stock, allow_oversell: _allowOversell, is_cost_price: _isCost,
@@ -701,7 +701,7 @@
     window.selectProduct = coSelectProduct;
   }
 
-  // Fetch the browsable "available tops" list for a product once (by its
+  // Fetch the browsable "available stock items" list for a product once (by its
   // stable index, not array position — items can shift/be removed while
   // this is in flight). Re-renders when it resolves.
   function fetchAvailableRolls(stableIndex, sku) {
@@ -720,9 +720,9 @@
       });
   }
 
-  // `force` = the user just changed the tops or the depo dışı metres, so
+  // `force` = the user just changed the stock items or the depo dışı metres, so
   // the sum IS the quantity even when it drops to zero. Without it,
-  // clearing the last top / the metres box left the previous quantity
+  // clearing the last stock item / the metres box left the previous quantity
   // behind. The unforced call is hydration only: a legacy item with no
   // reservations and no metres keeps its original hand-typed quantity.
   function syncQtyFromRolls(i, force) {
@@ -742,7 +742,7 @@
     if (!orderItems.length) { el.innerHTML = '<div class="co-empty">{% trans "No products added yet" %}</div>'; return; }
 
     // Every roll click re-renders the whole list, which destroys and
-    // recreates each product's scrollable tops list — without saving
+    // recreates each product's scrollable stock items list — without saving
     // scrollTop here, picking a roll mid-scroll snaps that list back
     // to the top every single time. Keyed by product index.
     const rollScroll = {};
@@ -777,16 +777,16 @@
     });
   }
 
-  // ── Top (roll) picking — replaces typing a quantity. A line's
-  //    quantity is the sum of the tops picked here. ALL of a product's
-  //    tops (already-reserved, picked-this-session, still-available)
+  // ── Stock item (roll) picking — replaces typing a quantity. A line's
+  //    quantity is the sum of the stock items picked here. ALL of a product's
+  //    stock items (already-reserved, picked-this-session, still-available)
   //    render as ONE checklist, each row with a tick — filled/green =
   //    picked, empty outline = not picked yet, lock = already reserved
   //    (read-only). Click a row to toggle it; scan/type a barcode
   //    (camera icon included) also adds one straight away. Each newly
-  //    picked top defaults to being taken WHOLE; the scissors icon
+  //    picked stock item defaults to being taken WHOLE; the scissors icon
   //    reveals a metres field for a partial cut — leave it alone and
-  //    the whole top is used. ──
+  //    the whole stock item is used. ──
   function escAttr(s) { return esc(s).replace(/"/g, '&quot;'); }
 
   // state: 'existing' (already reserved, locked) | 'picked' (this
@@ -836,7 +836,7 @@
     var picked = item.rolls || [];
     var pickedBarcodes = picked.map(function (r) { return (r.barcode || '').toLowerCase(); });
     var existingBarcodes = existing.map(function (r) { return (r.barcode || '').toLowerCase(); });
-    // Tops held by ANOTHER line of this same order: the availability
+    // Stock items held by ANOTHER line of this same order: the availability
     // lookup no longer counts this order's own holds, so they come back
     // as candidates here — but they're already spoken for, so don't
     // offer them a second time.
@@ -902,11 +902,11 @@
 
   // "Depo dışı ilave miktar" (extra quantity outside the warehouse) — a
   // plain meters entry with no roll/barcode behind it, for stock that'll
-  // be sourced elsewhere (or a product with no warehouse tops at all).
-  // Kept as its OWN section, separate from the tops checklist, so it
-  // never ends up buried at the bottom of a long/scrolling tops list.
+  // be sourced elsewhere (or a product with no warehouse stock items at all).
+  // Kept as its OWN section, separate from the stock items checklist, so it
+  // never ends up buried at the bottom of a long/scrolling stock items list.
   // It still counts toward the line's quantity/total, but — correctly —
-  // never counts as "covered" on the tops section's shortfall badge,
+  // never counts as "covered" on the stock items section's shortfall badge,
   // since nothing is actually reserved for it yet.
   function manualEntrySectionHtml(item, i) {
     var noStockAtAll = !item.rollsLoading && !(item.existingRolls || []).length
@@ -930,9 +930,9 @@
     '</div>';
   }
 
-  // ── Global "barkodla top ekle": resolve the barcode to its product,
+  // ── Global "barkodla stock item ekle": resolve the barcode to its product,
   //    add/reuse the order line, then run the normal pick flow so the
-  //    scanned top lands ticked on the right card. ──
+  //    scanned stock item lands ticked on the right card. ──
   window.coScanAddByBarcode = function (barcode) {
     barcode = (barcode || '').trim();
     if (!barcode) return;
@@ -966,7 +966,7 @@
     if (!barcode) return;
     // Checked across EVERY line, not just this one: the order's own holds
     // no longer block its availability lookups, so nothing else stops the
-    // same top being ticked on two lines — and the save would reserve it
+    // same stock item being ticked on two lines — and the save would reserve it
     // once and report the second as failed.
     var bcL = barcode.toLowerCase();
     var clash = orderItems.some(function (it) {
@@ -978,10 +978,10 @@
       showToast('Bu barkod zaten eklendi', 'warning');
       return;
     }
-    // A top we unticked a moment ago is still reserved to US until the
+    // A stock item we unticked a moment ago is still reserved to US until the
     // form is saved, so nobody else can have taken it and there is
     // nothing to re-validate. Re-tick it straight from the data already
-    // in hand — the server round trip made putting a top back feel much
+    // in hand — the server round trip made putting a stock item back feel much
     // slower than taking it off.
     var known = (item.ownHolds || {})[bcL];
     if (known) {
@@ -1000,7 +1000,7 @@
       .then(function (d) {
         if (!d.ok) { showToast(d.error || 'Barkod doğrulanamadı', 'error'); return; }
         if (!item.rolls) item.rolls = [];
-        // Default to the WHOLE top — the scissors icon reveals a field
+        // Default to the WHOLE stock item — the scissors icon reveals a field
         // to cut less; leaving it alone keeps the full amount.
         item.rolls.push({ barcode: barcode, roll_id: d.roll_id, available: d.available, warehouse: d.warehouse, meters: d.available });
         if (inputEl) inputEl.value = '';
@@ -1387,7 +1387,7 @@
     // emptied order is a real, saveable state rather than something the
     // form has to protect the server from.
     // A fabric/home-textile line's quantity comes entirely from the
-    // tops picked for it — zero tops means zero quantity, which is
+    // stock items picked for it — zero stock items means zero quantity, which is
     // never a valid line to submit.
     var emptyLine = orderItems.find(function (it) {
       return !it.is_custom_curtain && (parseFloat(it.quantity) || 0) <= 0;
@@ -1404,7 +1404,7 @@
     // New items (no existing_item_id) get added as fresh OrderItems.
     document.getElementById('product_json_input').value = JSON.stringify(orderItems.map(function(it){
       // The depo dışı METRES are already carried by the line's quantity
-      // (quantity − reserved tops), so they're re-derived on the next
+      // (quantity − reserved stock items), so they're re-derived on the next
       // edit and never written into the description. Only the optional
       // free-text note has nowhere else to live — appended once, and
       // skipped if the description already carries it.
@@ -1510,7 +1510,7 @@
   // Edit mode: reconcile each hydrated item's quantity against its
   // already-saved reservations (legacy items with none keep their DB
   // quantity untouched — see syncQtyFromRolls), then fetch the
-  // browsable "available tops" list for each, same as a fresh pick.
+  // browsable "available stock items" list for each, same as a fresh pick.
   editHydratedItems.forEach(function (h) {
     var idx = orderItems.findIndex(function (it) { return it.index === h.stableIndex; });
     if (idx !== -1) syncQtyFromRolls(idx);

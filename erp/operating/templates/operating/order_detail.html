@@ -495,7 +495,7 @@
   .od-card.editing #od-prods-edit-toggle,
   .od-card.editing #od-cust-edit-toggle { background: #147F74; color: #fff; border-color: #147F74; }
 
-  /* ══════════ Tops (scanned rolls) — READ-ONLY display ══════════
+  /* ══════════ Stock items (scanned rolls) — READ-ONLY display ══════════
      Each product line shows its scanned tops as compact pills right
      under it: barcode · metres · partial/cut/pack tags. All EDITING
      (scan, cut, remove, pack) lives on the separate "Düzenleme ve
@@ -549,7 +549,7 @@
   .od-untracked-note { display: inline-flex; align-items: center; gap: 6px;
     font: 600 10.5px var(--font-sans); color: #64748B; background: #F4F7FB;
     border-radius: 999px; padding: 2px 9px; }
-  /* Unassigned tops (line edited away) — read-only warning group */
+  /* Unassigned stock items (line edited away) — read-only warning group */
   .od-unassigned { margin-top: 10px; border: 1.5px solid #FDE68A; background: #FFFBEB; border-radius: 10px; padding: 10px 12px; }
   .od-unassigned-h { font: 700 12px var(--font-sans); color: #92400E; margin-bottom: 6px; }
   .od-unassigned-h small { font-weight: 600; color: #B45309; }
@@ -2127,7 +2127,7 @@
       const tbody = document.getElementById('od-items-tbody');
       if (tbody) {
         tbody.querySelectorAll('tr[data-item-row^="new-"]').forEach(row => row.remove());
-        // Restore deleted rows (and their paired tops sub-rows)
+        // Restore deleted rows (and their paired stock items sub-rows)
         tbody.querySelectorAll('tr[data-item-deleted="true"]').forEach(row => {
           row.removeAttribute('data-item-deleted');
           row.style.display = '';
@@ -2153,7 +2153,7 @@
       const origLabel = saveBtn.innerHTML;
       saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';
       // Structural changes (added/removed lines) get a reload after the
-      // flush — the tops sub-rows / scan match-maps / pack strip for the
+      // flush — the stock items sub-rows / scan match-maps / pack strip for the
       // new shape only exist server-side.
       const structural = newRows.length > 0 || deletedRows.length > 0;
 
@@ -2270,7 +2270,7 @@
             el.textContent = '$' + Number(latestTotal).toFixed(2);
           });
         }
-        // Structural change → reload so the new line's tops section, scan
+        // Structural change → reload so the new line's stock items section, scan
         // matching and pack strip come back consistent from the server.
         // Pure qty/price/notes saves stay in edit mode with no reload —
         // this is a packing work session, don't slam it shut.
@@ -2317,7 +2317,7 @@
 
   // ──────────────────────────────────────────────────────────
   //  Products card: clicking a product ROW expands/collapses its
-  //  scanned-tops row beneath (chevron rotates). The product-name
+  //  scanned-stock items row beneath (chevron rotates). The product-name
   //  link keeps navigating normally.
   // ──────────────────────────────────────────────────────────
   (function () {
@@ -2397,11 +2397,11 @@
       // When CANCELLING (leaving edit mode), discard any dirty input
       // values so the row reflects the persisted state. Without this
       // the save-bar lingered showing "unsaved change" even though the
-      // user clearly wanted to back out. (Top operations — scan/cut/
+      // user clearly wanted to back out. (Stock item operations — scan/cut/
       // remove/pack — were saved instantly and are NOT reverted here.)
       if (!willEdit) {
         tbody?.querySelectorAll('tr[data-item-row^="new-"]').forEach(row => row.remove());
-        // Restore deleted rows (and their paired tops sub-rows)
+        // Restore deleted rows (and their paired stock items sub-rows)
         tbody?.querySelectorAll('tr[data-item-deleted="true"]').forEach(row => {
           row.removeAttribute('data-item-deleted');
           row.style.display = '';
@@ -2590,7 +2590,7 @@
       const row = tbody.querySelector('[data-item-row="' + id + '"]');
       if (!row) return;
 
-      // Removing a line with scanned tops orphans its reservations —
+      // Removing a line with scanned stock items orphans its reservations —
       // they stay reserved (scanning is permanent) but drop out of the
       // cari billing. Make that an informed choice, not an accident.
       const topsRow = tbody.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');

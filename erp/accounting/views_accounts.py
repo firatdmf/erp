@@ -270,7 +270,7 @@ class CurrentAccountList(View):
         # Supplier left "All" reading the supplier count. Each tab now carries
         # its own, counted with every filter except type applied.
         untyped = _filter_current_accounts(request, apply_type=False)
-        # .order_by() clears the sort before grouping. _filter_current accounts orders by
+        # .order_by() clears the sort before grouping. _filter_current_accounts orders by
         # name and id, and Django folds ordering fields into the GROUP BY — so
         # without this the aggregate groups by (type, name, id) and every count
         # comes back as 1.
@@ -659,7 +659,7 @@ class CurrentAccountCrmLink(View):
 
         # Checked before saving rather than caught afterwards: a
         # constraint violation would say "duplicate key value violates
-        # uniq_current account_book_company", and the reader needs the account's
+        # uniq_current_account_book_company", and the reader needs the account's
         # code, which is the thing they were actually looking for.
         holder = (CurrentAccount.objects
                   .filter(book=current_account.book, **{kind: obj})

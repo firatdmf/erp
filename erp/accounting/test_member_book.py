@@ -178,7 +178,7 @@ class RetailCurrentAccountIsNamedInEnglish(TestCase):
 
     def setUp(self):
         from accounting.models import CurrencyCategory
-        # get_or_create_retail_current account resolves a currency for the new row,
+        # get_or_create_retail_current_account resolves a currency for the new row,
         # and default_currency is NOT NULL.
         CurrencyCategory.objects.create(code="USD", name="US Dollar",
                                         symbol="$")

@@ -57,7 +57,7 @@ _SUFFIXES = {
 }
 
 # Which link makes an account the canonical one. Matches the resolution
-# priority in services.get_or_create_current account_for_order (company wins).
+# priority in services.get_or_create_current_account_for_order (company wins).
 _LINK_RANK = {"company": 3, "supplier": 2, "contact": 1, "": 0}
 
 # Blank-only fields copied from the duplicate onto the survivor.

@@ -3,7 +3,7 @@
 /operating/orders/ listed every book's sales at once, so Ergene's page
 showed Laleli's customers. An Order carries no book of its own — the
 link is its current account, which is where the sale posts — so the list filters on
-current account__book.
+current_account__book.
 """
 from decimal import Decimal
 from unittest.mock import patch

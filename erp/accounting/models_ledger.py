@@ -1,6 +1,6 @@
 """The general ledger — the one place where the accounting equation is true.
 
-Everything else in this app is a SUBSIDIARY ledger: the current account accounts know
+Everything else in this app is a SUBSIDIARY ledger: the current accounts know
 what each customer owes, the cash journal knows what each account holds,
 the warehouse knows what stock sits on the shelves. Each is correct about
 its own subject and none of them says anything about the others, so
@@ -91,7 +91,7 @@ class ChartAccount(models.Model):
     description = models.TextField(blank=True)
 
     # A control account is summarised by a subsidiary ledger elsewhere —
-    # 1200 Accounts Receivable by the current account accounts, 1000 Cash by the cash
+    # 1200 Accounts Receivable by the current accounts, 1000 Cash by the cash
     # journal. Flagged so a reconciliation report can find them without a
     # hardcoded list of codes.
     is_control = models.BooleanField(

@@ -56,7 +56,7 @@ def get_default_book(member=None) -> Book:
     Not "the" ledger — every Book is its own ledger for its own
     business, and there will be several. This answers a narrower
     question the code is currently forced to answer: an Order carries no
-    book, so ensure_current account_for_order has to pick one.
+    book, so ensure_current_account_for_order has to pick one.
 
     The best answer to "which business is this?" is WHO IS ENTERING IT.
     One install runs several businesses at once; which one a record
@@ -104,8 +104,8 @@ def get_default_book(member=None) -> Book:
     Every step falls through rather than raising: a stale id must not stop
     an order being placed.
 
-    There used to be a Book.is_default_current account_target flag between steps 2 and
-    3, plus a step that guessed the book holding the most current account accounts and
+    There used to be a Book.is_default_current_account_target flag between steps 2 and
+    3, plus a step that guessed the book holding the most current accounts and
     wrote its guess back to that flag. Both are gone. An app-wide "default
     book" is a second answer to a question the working book already answers,
     and the two disagree the moment somebody's work moves; the guess was
@@ -186,7 +186,7 @@ def brand_name_for(book=None) -> str:
 
 
 def _resolve_currency(order=None) -> CurrencyCategory:
-    """Pick a CurrencyCategory for new movements/current account accounts.
+    """Pick a CurrencyCategory for new movements/current accounts.
 
     Order doesn't have a currency field — orders are stored in USD by
     convention (per the rest of the codebase). Fall back to whichever
@@ -234,7 +234,7 @@ def get_or_create_current_account_for_order(order, *, member=None) -> CurrentAcc
 def get_or_create_current_account_for_contact(contact, *, member=None, book=None) -> CurrentAccount:
     """Find (or create) the contact's current account — every B2B contact gets one
     so orders/invoices can post against it. Idempotent via the
-    uniq_current account_book_contact constraint (one current account per book+contact).
+    uniq_current_account_book_contact constraint (one current account per book+contact).
 
     Pass `book` when the caller already knows which one — a book-scoped
     page does, and must not silently create the account somewhere else
@@ -255,7 +255,7 @@ def get_or_create_current_account_for_contact(contact, *, member=None, book=None
 def get_or_create_current_account_for_company(company, *, member=None, book=None) -> CurrentAccount:
     """Find (or create) the company's current account — every B2B company gets one
     so orders/invoices can post against it. Idempotent via the
-    uniq_current account_book_company constraint (one current account per book+company).
+    uniq_current_account_book_company constraint (one current account per book+company).
 
     Pass `book` when the caller already knows which one."""
     book = book or get_default_book(member)
@@ -274,7 +274,7 @@ def get_or_create_current_account_for_company(company, *, member=None, book=None
 def get_or_create_current_account_for_supplier(supplier, *, member=None, book=None) -> CurrentAccount:
     """Find (or create) the supplier's current account — every supplier gets one so
     purchases (stock intake) can post debt against it. Idempotent via
-    the uniq_current account_book_supplier constraint (one current account per book+supplier).
+    the uniq_current_account_book_supplier constraint (one current account per book+supplier).
 
     Pass `book` when the caller already knows which one."""
     book = book or get_default_book(member)
@@ -911,7 +911,7 @@ def reverse_order_movement(order):
 # ---------------------------------------------------------------------------
 # Perakende (retail) — anonymous walk-in sales.
 #
-# Retail orders have no contact/company, so get_or_create_current account_for_order
+# Retail orders have no contact/company, so get_or_create_current_account_for_order
 # returns None and their revenue would vanish from the books entirely.
 # Instead they all post to ONE shared system current account ("Perakende
 # Satışları") when the order COMPLETES (moves to shipped): the sale

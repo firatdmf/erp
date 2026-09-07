@@ -1226,7 +1226,7 @@ def quick_create_customer(request):
     """Minimal inline customer creation from the order-creation screen —
     name/phone/email/address only. Tax info and currency live on the
     CurrentAccount, which is auto-created behind the scenes once the order
-    is saved (get_or_create_current account_for_order), so there's no need to ask
+    is saved (get_or_create_current_account_for_order), so there's no need to ask
     for them here.
 
     An order can be raised against a Contact or a Company (Order has a

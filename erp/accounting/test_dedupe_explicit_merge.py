@@ -84,7 +84,7 @@ class ExplicitMerge(TestCase):
     def test_cross_entity_still_needs_saying_out_loud(self):
         """Three different contacts is the blocker doing its job — after the
         merge the losing contacts have no account, and the next
-        get_or_create_current account_for_contact would mint them fresh ones."""
+        get_or_create_current_account_for_contact would mint them fresh ones."""
         out = self._run(book=self.book.pk, merge="88888,2025X", into="99999",
                         apply=True)
         self.assertIn("different CRM entities", out)

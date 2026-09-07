@@ -59,7 +59,10 @@ class PackTestCase(TestCase):
         
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
-        self.assertTrue(response['Content-Disposition'].startswith('attachment;'))
+        # inline, not attachment — order_packing_list_pdf serves this one
+        # for reading in a browser tab, and has since the Excel export took
+        # over downloading-and-editing. The assertion was left behind.
+        self.assertTrue(response['Content-Disposition'].startswith('inline;'))
 
     @patch('marketing.utils.bunny_storage.upload_to_bunny')
     def test_pack_label_pdf_view(self, mock_upload):

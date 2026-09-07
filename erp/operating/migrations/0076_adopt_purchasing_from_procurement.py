@@ -27,6 +27,18 @@ class Migration(migrations.Migration):
         ('crm', '0019_company_created_by_contact_created_by'),
         ('marketing', '0082_drop_superseded_mail_indexes'),
         ('operating', '0075_remove_warehouseproductroll_operating_w_barcode_39d55b_idx_and_more'),
+        # Same missing edge marketing/0080 had: the database_operations
+        # below RENAME the procurement tables, so procurement has to have
+        # created them first. Undeclared, the graph was free to run this
+        # before procurement/0001 and a fresh build died on
+        #
+        #   ProgrammingError: relation "procurement_purchaseorder"
+        #   does not exist
+        #
+        # procurement/0002 already waits for this migration before it
+        # releases the models from its state, so the order is
+        # 0001 -> operating.0076 -> 0002, no cycle.
+        ('procurement', '0001_initial'),
     ]
 
     operations = [

@@ -37,6 +37,19 @@ class Migration(migrations.Migration):
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('crm', '0019_company_created_by_contact_created_by'),
         ('marketing', '0079_alter_product_sku_alter_productvariant_variant_sku'),
+        # The database_operations below RENAME the email_automation tables,
+        # so those tables have to exist first. Without this the graph left
+        # the two apps unordered, and a database built from scratch picked
+        # this migration before email_automation had created anything:
+        #
+        #   ProgrammingError: relation "email_automation_emailaccount"
+        #   does not exist
+        #
+        # which took out every local test run and any fresh deploy. The
+        # reverse edge was already declared — email_automation.0007 waits
+        # for this migration before releasing the models from its state —
+        # so the full order is 0006 -> marketing.0080 -> 0007, no cycle.
+        ('email_automation', '0006_alter_email_is_read'),
     ]
 
     operations = [

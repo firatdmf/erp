@@ -90,8 +90,8 @@
 
 {% block content %}
 <div class="md">
-  <a href="{% url 'accounts:statement' transfer.from_cari.pk %}" class="md-back">
-    &larr; {{ transfer.from_cari.code }} — {{ transfer.from_cari.name }}
+  <a href="{% url 'accounts:statement' transfer.from_current_account.pk %}" class="md-back">
+    &larr; {{ transfer.from_current_account.code }} — {{ transfer.from_current_account.name }}
   </a>
 
   <div class="md-head">
@@ -127,20 +127,20 @@
         <h3>{% trans "The two rows it wrote" %}</h3>
       </div>
       <div class="md-legs">
-        {% for side, cari, mv in legs %}
+        {% for side, current_account, mv in legs %}
           {% if side == 'to' %}
             <span class="arrow"><i data-lucide="arrow-right"></i></span>
           {% endif %}
           <div class="md-leg">
-            <a class="acct" href="{% url 'accounts:detail' cari.pk %}">
-              <span class="code">{{ cari.code }}</span>
-              <span class="name">{{ cari.name }}</span>
+            <a class="acct" href="{% url 'accounts:detail' current_account.pk %}">
+              <span class="code">{{ current_account.code }}</span>
+              <span class="name">{{ current_account.name }}</span>
             </a>
             {% if mv %}
               <span class="amt {% if mv.amount > 0 %}pos{% else %}neg{% endif %}">
                 {% if mv.amount > 0 %}+{% endif %}{{ mv.amount|money }} {{ mv.currency.code }}
               </span>
-              <a class="row-link" href="{% url 'accounts:movement_detail' cari.pk mv.pk %}">
+              <a class="row-link" href="{% url 'accounts:movement_detail' current_account.pk mv.pk %}">
                 {% trans "See this ledger row" %} &rarr;
               </a>
             {% else %}

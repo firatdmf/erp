@@ -177,8 +177,8 @@
       <div class="dc-row">
         <a class="dc-num" href="{% url 'accounts:invoice_detail' x.inv.pk %}">{{ x.inv.display_number }}</a>
         <div>
-          <a class="dc-cari" href="{% url 'accounts:detail' x.inv.cari.pk %}">{{ x.inv.cari.name }}</a>
-          <div class="dc-cari-code">{{ x.inv.cari.code }}</div>
+          <a class="dc-cari" href="{% url 'accounts:detail' x.inv.current_account.pk %}">{{ x.inv.current_account.name }}</a>
+          <div class="dc-cari-code">{{ x.inv.current_account.code }}</div>
         </div>
         <div class="dc-due"><span class="lbl">{% trans "Due:" %}</span>{{ x.inv.due_date|date:"d.m.Y" }}</div>
         <div>

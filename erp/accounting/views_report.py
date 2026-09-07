@@ -3,7 +3,7 @@ Current-account reports (Phase 4).
 
     /accounting/accounts/reports/                → ReportIndex (landing page with 4 cards)
     /accounting/accounts/reports/aging/          → AgingReport     (aged receivables/payables)
-    /accounting/accounts/reports/trial-balance/  → TrialBalance    (cari mizan per book, period filter)
+    /accounting/accounts/reports/trial-balance/  → TrialBalance    (current account mizan per book, period filter)
     /accounting/accounts/reports/credit-limit/   → CreditLimitReport
     /accounting/accounts/reports/due-calendar/   → DueCalendar     (upcoming + overdue invoice due dates)
 """
@@ -19,7 +19,7 @@ from django.utils.translation import gettext_lazy as _, gettext as _g
 from django.views import View
 
 from accounting.models import Book
-from .models import CariAccount, CariMovement, Invoice
+from .models import CurrentAccount, CurrentAccountMovement, Invoice
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +38,7 @@ class ReportIndex(View):
         ).count()
 
         over_limit_count = (
-            CariAccount.objects
+            CurrentAccount.objects
             .filter(is_active=True, credit_limit__gt=0)
             .extra(where=["cached_balance > credit_limit"])
             .count()
@@ -83,7 +83,7 @@ class AgingReport(View):
         # Open invoices with balance > 0, not draft/cancelled
         qs = (Invoice.objects
               .filter(balance__gt=0, status__in=["issued", "partially_paid", "overdue"])
-              .select_related("cari", "currency", "book"))
+              .select_related("current_account", "currency", "book"))
 
         if kind == "receivable":
             qs = qs.filter(type__in=["sales", "purchase_return"])
@@ -93,11 +93,11 @@ class AgingReport(View):
         if book_id.isdigit():
             qs = qs.filter(book_id=int(book_id))
 
-        # Group: cari → buckets
-        per_cari = {}
-        for inv in qs.order_by("cari__code", "due_date"):
-            row = per_cari.setdefault(inv.cari_id, {
-                "cari": inv.cari,
+        # Group: current account → buckets
+        per_current_account = {}
+        for inv in qs.order_by("current_account__code", "due_date"):
+            row = per_current_account.setdefault(inv.current_account_id, {
+                "current_account": inv.current_account,
                 "currency": inv.currency.code,
                 "buckets": {k: Decimal("0") for k, *_ in BUCKETS},
                 "total": Decimal("0"),
@@ -124,7 +124,7 @@ class AgingReport(View):
             if days > row["max_days_overdue"]:
                 row["max_days_overdue"] = days
 
-        rows = sorted(per_cari.values(), key=lambda r: -r["total"])
+        rows = sorted(per_current_account.values(), key=lambda r: -r["total"])
 
         # Grand totals per bucket
         grand_buckets = {k: Decimal("0") for k, *_ in BUCKETS}
@@ -147,7 +147,7 @@ class AgingReport(View):
 
 
 # ---------------------------------------------------------------------------
-# 2. Trial Balance — Cari Mizan
+# 2. Trial Balance — Current account Mizan
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
 class TrialBalance(View):
@@ -164,12 +164,12 @@ class TrialBalance(View):
             # Default: start of current year
             date_from = today.replace(month=1, day=1).isoformat()
 
-        # Get all caris (filtered by book if specified)
-        cari_qs = CariAccount.objects.select_related("book", "default_currency").filter(is_active=True)
+        # Get all current accounts (filtered by book if specified)
+        current_account_qs = CurrentAccount.objects.select_related("book", "default_currency").filter(is_active=True)
         if book_id.isdigit():
-            cari_qs = cari_qs.filter(book_id=int(book_id))
+            current_account_qs = current_account_qs.filter(book_id=int(book_id))
 
-        # Per-cari aggregations
+        # Per-current account aggregations
         # opening = sum movements before date_from
         # debits  = sum positive movements in [date_from, date_to]
         # credits = sum negative movements in [date_from, date_to]
@@ -193,10 +193,10 @@ class TrialBalance(View):
         # the header now says out loud.
         ZERO = Decimal("0.00")
         totals = {
-            r["cari_id"]: r
-            for r in (CariMovement.objects
-                      .filter(cari__in=cari_qs, date__lte=date_to)
-                      .values("cari_id")
+            r["current_account_id"]: r
+            for r in (CurrentAccountMovement.objects
+                      .filter(current_account__in=current_account_qs, date__lte=date_to)
+                      .values("current_account_id")
                       .annotate(
                           opening=Sum("amount_base", filter=Q(date__lt=date_from)),
                           debits=Sum("amount_base", filter=Q(date__gte=date_from,
@@ -207,10 +207,10 @@ class TrialBalance(View):
         }
 
         rows = []
-        for cari in cari_qs:
+        for current_account in current_account_qs:
             # An account with no movements at all is absent from the
             # aggregate rather than present with zeros.
-            t = totals.get(cari.pk)
+            t = totals.get(current_account.pk)
             opening = (t["opening"] if t and t["opening"] is not None else ZERO)
             debits = (t["debits"] if t and t["debits"] is not None else ZERO)
             credits = (t["credits"] if t and t["credits"] is not None else ZERO)
@@ -220,14 +220,14 @@ class TrialBalance(View):
                 continue
 
             rows.append({
-                "cari":    cari,
+                "current_account":    current_account,
                 "opening": opening,
                 "debits":  debits,
                 "credits": abs(credits),
                 "closing": closing,
             })
 
-        rows.sort(key=lambda r: r["cari"].code)
+        rows.sort(key=lambda r: r["current_account"].code)
 
         # Grand totals
         g_opening = sum((r["opening"] for r in rows), Decimal("0.00"))
@@ -261,7 +261,7 @@ class CreditLimitReport(View):
         book_id = str(request.book.pk)
         view = request.GET.get("view") or "over"  # over | near | all
 
-        qs = (CariAccount.objects
+        qs = (CurrentAccount.objects
               .select_related("book", "default_currency")
               .filter(is_active=True, credit_limit__gt=0))
 
@@ -276,7 +276,7 @@ class CreditLimitReport(View):
             available = c.credit_limit - c.cached_balance
 
             row = {
-                "cari": c,
+                "current_account": c,
                 "balance": c.cached_balance,
                 "credit_limit": c.credit_limit,
                 "usage_pct": usage_pct,
@@ -315,7 +315,7 @@ class DueCalendar(View):
 
         qs = (Invoice.objects
               .filter(balance__gt=0, status__in=["issued", "partially_paid", "overdue"])
-              .select_related("cari", "currency"))
+              .select_related("current_account", "currency"))
         if kind == "receivable":
             qs = qs.filter(type__in=["sales", "purchase_return"])
         else:

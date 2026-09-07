@@ -80,7 +80,7 @@
 
 {% block content %}
 <div class="md">
-  <a href="{% url 'accounts:detail' cari.pk %}" class="md-back">&larr; {{ cari.code }} — {{ cari.name }}</a>
+  <a href="{% url 'accounts:detail' current_account.pk %}" class="md-back">&larr; {{ current_account.code }} — {{ current_account.name }}</a>
 
   <div class="md-head">
     <div>
@@ -91,10 +91,10 @@
     </div>
     <div class="md-actions">
       {% if row.editable %}
-        <a href="{% url 'accounts:movement_edit' cari.pk mv.pk %}" class="md-btn primary">
+        <a href="{% url 'accounts:movement_edit' current_account.pk mv.pk %}" class="md-btn primary">
           <i data-lucide="pencil"></i> {% trans "Edit" %}
         </a>
-        <a href="{% url 'accounts:movement_delete' cari.pk mv.pk %}" class="md-btn danger">
+        <a href="{% url 'accounts:movement_delete' current_account.pk mv.pk %}" class="md-btn danger">
           <i data-lucide="trash-2"></i> {% trans "Delete" %}
         </a>
       {% elif row.owner_edit_url %}

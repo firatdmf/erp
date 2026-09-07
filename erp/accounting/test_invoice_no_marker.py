@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from accounting.models import (
-    Book, CariAccount, CariMovement, CurrencyCategory, Invoice, InvoiceItem,
+    Book, CurrentAccount, CurrentAccountMovement, CurrencyCategory, Invoice, InvoiceItem,
 )
 
 
@@ -33,7 +33,7 @@ class InvoiceMarkerBase(TestCase):
         self.usd = CurrencyCategory.objects.create(
             code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-001", name="ACME",
             default_currency=self.usd)
         self.product = Product.objects.create(title="STAR BLACKOUT")
@@ -41,7 +41,7 @@ class InvoiceMarkerBase(TestCase):
 
     def invoice(self, order=None, type="sales", total="500.00"):
         inv = Invoice.objects.create(
-            cari=self.cari, book=self.book,
+            current_account=self.current_account, book=self.book,
             number="INV-%s-%s" % (type, "ord" if order else "std"),
             type=type, status="draft", date="2026-08-27",
             due_date="2026-09-27", currency=self.usd, order=order)
@@ -52,7 +52,7 @@ class InvoiceMarkerBase(TestCase):
         return inv
 
     def movements(self):
-        return CariMovement.objects.filter(cari=self.cari)
+        return CurrentAccountMovement.objects.filter(current_account=self.current_account)
 
 
 class OrderAttachedInvoiceTest(InvoiceMarkerBase):
@@ -72,8 +72,8 @@ class OrderAttachedInvoiceTest(InvoiceMarkerBase):
     def test_the_balance_is_untouched(self):
         inv = self.invoice(order=self.order)
         inv.issue()
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("0.00"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("0.00"))
 
     def test_editing_it_does_not_resurrect_the_row(self):
         """resync's `mv is None` branch exists to repost a movement that
@@ -93,8 +93,8 @@ class OrderAttachedInvoiceTest(InvoiceMarkerBase):
         inv.refresh_from_db()
         self.assertEqual(inv.status, "cancelled")
         self.assertEqual(self.movements().count(), 0)
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("0.00"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("0.00"))
 
 
 class StandaloneInvoiceStillPostsTest(InvoiceMarkerBase):
@@ -106,16 +106,16 @@ class StandaloneInvoiceStillPostsTest(InvoiceMarkerBase):
         mv = inv.issue()
         self.assertIsNotNone(mv)
         self.assertEqual(mv.amount, Decimal("500.00"))
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("500.00"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("500.00"))
 
     def test_a_standalone_purchase_posts_the_payable(self):
         inv = self.invoice(order=None, type="purchase", total="419.58")
         mv = inv.issue()
         self.assertIsNotNone(mv)
         self.assertEqual(mv.amount, Decimal("-419.58"))
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("-419.58"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("-419.58"))
 
     def test_editing_a_standalone_one_still_refreshes_its_row(self):
         inv = self.invoice(order=None, total="500.00")
@@ -127,5 +127,5 @@ class StandaloneInvoiceStillPostsTest(InvoiceMarkerBase):
 
         mv.refresh_from_db()
         self.assertEqual(mv.amount, Decimal("600.00"))
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("600.00"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("600.00"))

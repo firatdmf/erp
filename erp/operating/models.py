@@ -11,7 +11,7 @@ from crm.models import Contact, Company
 # )
 from marketing.models import Product, ProductVariant
 # Straight from crm — marketing used to re-export Supplier as a side effect
-# of Product.supplier, which is now a cari account instead.
+# of Product.supplier, which is now a current account account instead.
 from crm.models import Supplier
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -501,10 +501,10 @@ class Order(models.Model):
     billed_quantities_frozen_at = models.DateTimeField(null=True, blank=True)
 
     # Current-account link — auto-populated on save() for manual orders
-    # so cari pages can list this order's movements and so we don't
-    # double-create a cari for the same customer. Web orders skip this.
-    cari = models.ForeignKey(
-        "accounting.CariAccount",
+    # so current account pages can list this order's movements and so we don't
+    # double-create a current account for the same customer. Web orders skip this.
+    current_account = models.ForeignKey(
+        "accounting.CurrentAccount",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -533,7 +533,7 @@ class Order(models.Model):
         product doesn't count.
 
         This is the single source of truth for "tracked" — used by
-        get_billable_line_quantities() (what bills the cari/invoice) and
+        get_billable_line_quantities() (what bills the current account/invoice) and
         by the packing screen (which lines get a scan/pack UI vs. a
         plain checklist entry).
 
@@ -611,7 +611,7 @@ class Order(models.Model):
         This deliberately replaces billing off scanned metres. That rule
         (bill only what was packed) meant an order shipped without
         scanning billed nothing at all: order #145 showed a 116.80 total
-        while 75.00 of it would never reach the cari, and the gap was
+        while 75.00 of it would never reach the current account, and the gap was
         invisible on every screen. Under-scanning is a warehouse problem
         to surface — see scan_shortfall() and the warning it drives on
         the order page — not a silent discount.
@@ -699,7 +699,7 @@ class Order(models.Model):
             )
 
     def compute_billable_line_quantities(self, as_of=None):
-        """Per-order-item quantity that should actually be BILLED (cari +
+        """Per-order-item quantity that should actually be BILLED (current account +
         invoice) — the metres physically scanned into this order's
         packing (OrderStockReservation, whether still a pending hold or
         already consumed at ship time), NOT the ordered quantity. A line
@@ -713,7 +713,7 @@ class Order(models.Model):
           warehouse. No roll will ever be scanned for them, but they are
           being sold, so they bill. Without this, an outsourced line on a
           product that happens to be stocked was indistinguishable from
-          an unpacked one and vanished from the invoice/cari.
+          an unpacked one and vanished from the invoice/current account.
         * a product with NO warehouse/roll presence at all (nothing that
           could ever be scanned — e.g. a catalog-only line) falls back to
           its ordered quantity, since no scan data could ever exist for
@@ -767,7 +767,7 @@ class Order(models.Model):
         return result
 
     def billable_value(self):
-        """The amount that reflects on the cari/invoice — price × ORDERED
+        """The amount that reflects on the current account/invoice — price × ORDERED
         quantity per line, summed. Equals total_value() by construction:
         the account, the invoice and the order screen all show the one
         number. Kept as its own method because every money caller reads
@@ -968,7 +968,7 @@ class OrderItem(models.Model):
     # get_billable_line_quantities): without an explicit column, an
     # outsourced line on a product that happens to be stocked in a
     # warehouse looked identical to a line nobody had packed yet, and was
-    # silently dropped from the invoice and the customer's cari.
+    # silently dropped from the invoice and the customer's current account.
     # quantity = scanned metres + outsourced_quantity.
     # NULL means "never recorded" (a line saved before this column
     # existed) as opposed to an explicit 0 = "nothing outsourced". The

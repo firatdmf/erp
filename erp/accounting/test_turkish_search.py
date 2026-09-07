@@ -19,7 +19,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 from accounting.views_accounts import tr_fold
 
 
@@ -45,14 +45,14 @@ class SearchingTheAccountList(TestCase):
         self.client.force_login(self.user)
         for code, name in (("ACC-001", "GÜLŞEN TEKSTİL"), ("ACC-002", "ÇİFTÇİOĞLU"),
                            ("ACC-003", "IŞIL DOĞAN"), ("ACC-004", "İREM")):
-            CariAccount.objects.create(book=self.book, code=code, name=name,
+            CurrentAccount.objects.create(book=self.book, code=code, name=name,
                                        default_currency=self.usd)
 
     def found(self, q):
         r = self.client.get(reverse("accounts:list", kwargs={"book_id": self.book.pk}),
                             {"q": q})
         self.assertEqual(r.status_code, 200)
-        return {c.code for c in r.context["caris"]}
+        return {c.code for c in r.context["current_accounts"]}
 
     def test_typing_the_turkish_spelling_finds_it(self):
         self.assertEqual(self.found("GÜLŞEN"), {"ACC-001"})
@@ -74,7 +74,7 @@ class SearchingTheAccountList(TestCase):
         """Folding does not rescue NFD — translate() cannot see a
         combining mark as part of the letter before it. This is why the
         importer composes on the way in rather than relying on search."""
-        CariAccount.objects.create(
+        CurrentAccount.objects.create(
             book=self.book, code="ACC-009",
             name=unicodedata.normalize("NFD", "ZÜMRÜT AKÇA"),
             default_currency=self.usd)

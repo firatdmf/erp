@@ -53,8 +53,8 @@ in place instead of reloading the whole page.
         <td><span class="iv-type">{{ inv.get_type_display }}</span></td>
         <td>
           <div class="iv-cari-w">
-            <a class="iv-cari" href="{% url 'accounts:detail' inv.cari.pk %}">{{ inv.cari.name }}</a>
-            <span class="iv-cari-code">{{ inv.cari.code }}</span>
+            <a class="iv-cari" href="{% url 'accounts:detail' inv.current_account.pk %}">{{ inv.current_account.name }}</a>
+            <span class="iv-cari-code">{{ inv.current_account.code }}</span>
           </div>
         </td>
         <td>

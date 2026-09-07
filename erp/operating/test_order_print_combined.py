@@ -22,7 +22,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 from crm.models import Contact
 from marketing.models import Product
 
@@ -63,11 +63,11 @@ class OlegOrders:
         self.url = reverse(self.url_name)
 
     def _order(self, book, contact, number, qty, price):
-        cari, _ = CariAccount.objects.get_or_create(
+        current_account, _ = CurrentAccount.objects.get_or_create(
             book=book, contact=contact,
             defaults=dict(code=f"C-{book.pk}-{contact.pk}", name=contact.name,
                           type="customer", default_currency=self.usd))
-        order = Order.objects.create(order_number=number, cari=cari,
+        order = Order.objects.create(order_number=number, current_account=current_account,
                                      contact=contact)
         OrderItem.objects.create(order=order, product=self.crepe,
                                  quantity=qty, price=price)
@@ -104,18 +104,18 @@ class CombinedOrderSheet(OlegOrders, TestCase):
         book its money posts to — but this sheet posts nothing."""
         resp = self._get(self.laleli_a, self.ergene_a)
         self.assertEqual(resp.status_code, 200)
-        books = {g["order"].cari.book.name for g in resp.context["order_groups"]}
+        books = {g["order"].current_account.book.name for g in resp.context["order_groups"]}
         self.assertEqual(books, {"Laleli Fabric", "Ergene Fabric"})
 
     def test_it_writes_nothing(self):
         """No invoice is raised and no ledger row written. The
         receivable already sits on each order; a document that posted
         again would claim the same money twice."""
-        from accounting.models_accounts import CariMovement, Invoice
-        before = (Invoice.objects.count(), CariMovement.objects.count())
+        from accounting.models_accounts import CurrentAccountMovement, Invoice
+        before = (Invoice.objects.count(), CurrentAccountMovement.objects.count())
         self._get(self.laleli_a, self.laleli_b, self.ergene_a)
         self.assertEqual(
-            (Invoice.objects.count(), CariMovement.objects.count()), before)
+            (Invoice.objects.count(), CurrentAccountMovement.objects.count()), before)
 
     # ── what it refuses ───────────────────────────────────────────────
     def test_two_customers_cannot_share_a_sheet(self):
@@ -129,7 +129,7 @@ class CombinedOrderSheet(OlegOrders, TestCase):
     def test_an_order_with_no_customer_is_not_printable(self):
         """(None, None, None) matches (None, None, None), so without
         this an unattached order would combine with any other."""
-        nobody = Order.objects.create(order_number="DK-NOCARI")
+        nobody = Order.objects.create(order_number="DK-NOACCOUNT")
         resp = self._get(nobody)
         self.assertEqual(resp.status_code, 400)
 
@@ -145,7 +145,7 @@ class CombinedOrderSheet(OlegOrders, TestCase):
 
     def test_a_signed_out_visitor_gets_nothing(self):
         """The sheet carries a customer's prices. Every order with a
-        cari is already refused — member_can_use_book says no to a
+        current account is already refused — member_can_use_book says no to a
         viewer with no member — and this covers the one without."""
         self.client.logout()
         resp = self._get(self.laleli_a)
@@ -367,10 +367,10 @@ class SingleOrderPrintUnchanged(TestCase):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
         usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         book = Book.objects.create(name="Laleli Fabric")
-        cari = CariAccount.objects.create(
+        current_account = CurrentAccount.objects.create(
             book=book, code="C-1", name="Oleg", type="customer",
             default_currency=usd)
-        self.order = Order.objects.create(order_number="DK-284", cari=cari,
+        self.order = Order.objects.create(order_number="DK-284", current_account=current_account,
                                           contact=Contact.objects.create(name="OLEG"))
         OrderItem.objects.create(
             order=self.order,

@@ -2,25 +2,25 @@
 Current Account (Cari Hesap) module.
 
 Phase 1: Core ledger primitives.
-    - CariAccount    : Unified card per real-world counterparty (customer/supplier/both)
-    - CariMovement   : Atomic ledger row. Balance = SUM(amount) per cari.
-    - CariSettings   : Per-book counters & defaults (next code, next invoice no, etc.)
+    - CurrentAccount    : Unified card per real-world counterparty (customer/supplier/both)
+    - CurrentAccountMovement   : Atomic ledger row. Balance = SUM(amount) per current account.
+    - CurrentAccountSettings   : Per-book counters & defaults (next code, next invoice no, etc.)
 
 Phase 2: Invoicing.
     - Invoice        : Sales / purchase / return / proforma invoice header.
     - InvoiceItem    : Per-line item with quantity, price, KDV, discount.
                        Items recompute Invoice totals on save.
     - Issuing a non-draft, non-proforma invoice automatically creates a
-      CariMovement.
-    - Cancelling a posted invoice DELETES its CariMovement (terminal — no restore).
+      CurrentAccountMovement.
+    - Cancelling a posted invoice DELETES its CurrentAccountMovement (terminal — no restore).
 
 Phase 3: Payments (tahsilat / ödeme).
-    - Payment           : Atomic money movement between Cari and a CashAccount.
+    - Payment           : Atomic money movement between Current account and a CashAccount.
     - PaymentAllocation : Optional M2M-style row linking the Payment to one or
                           more Invoices (partial / full / advance).
-    - Confirming a Payment writes a CariMovement, updates the linked CashAccount
+    - Confirming a Payment writes a CurrentAccountMovement, updates the linked CashAccount
       balance, and recomputes paid_amount/status for each allocated Invoice.
-    - Cancelling a Payment creates the inverse CariMovement, reverses the cash
+    - Cancelling a Payment creates the inverse CurrentAccountMovement, reverses the cash
       account update, and undoes the invoice allocations. Original rows are
       flagged 'cancelled' (audit-safe), not deleted.
 
@@ -31,27 +31,27 @@ Phase 5: Çek / Senet (check / promissory note).
           (received direction)
           portfolio → cleared | returned | cancelled
           (given direction)
-    - Receiving a check from a customer creates a -X CariMovement (their balance
+    - Receiving a check from a customer creates a -X CurrentAccountMovement (their balance
       shrinks as if a collection happened) but DOES NOT touch cash. Clearing it
-      finally moves cash into a CashAccount. Bouncing reverses the cari side.
-    - Endorsing transfers the obligation to another cari (+X on that cari).
-    - Giving a check to a supplier creates +X on that cari (their owed-by-us
+      finally moves cash into a CashAccount. Bouncing reverses the current account side.
+    - Endorsing transfers the obligation to another current account (+X on that current account).
+    - Giving a check to a supplier creates +X on that current account (their owed-by-us
       shrinks). Cash only moves when the supplier deposits and it clears.
 
-Sign cheat sheet (paired CariMovement + CashAccount delta):
-    collection  (customer → us)    : CariMovement.amount = -X, cash += X
-    payment     (us → supplier)    : CariMovement.amount = +X, cash -= X
-    refund_in   (us → customer)    : CariMovement.amount = +X, cash -= X
-    refund_out  (supplier → us)    : CariMovement.amount = -X, cash += X
+Sign cheat sheet (paired CurrentAccountMovement + CashAccount delta):
+    collection  (customer → us)    : CurrentAccountMovement.amount = -X, cash += X
+    payment     (us → supplier)    : CurrentAccountMovement.amount = +X, cash -= X
+    refund_in   (us → customer)    : CurrentAccountMovement.amount = +X, cash -= X
+    refund_out  (supplier → us)    : CurrentAccountMovement.amount = -X, cash += X
 
-Sign convention for CariMovement.amount:
-    positive (+)  → cari owes us / we are owed money
+Sign convention for CurrentAccountMovement.amount:
+    positive (+)  → current account owes us / we are owed money
                     (e.g., sales invoice issued, interest charged)
-    negative (-)  → we owe cari / cari paid us
+    negative (-)  → we owe current account / current account paid us
                     (e.g., collection received, purchase invoice from supplier,
                      refund issued by us)
 
-CariAccount.cached_balance follows the same sign convention.
+CurrentAccount.cached_balance follows the same sign convention.
 
 A movement is the only record of what an account is owed or owes. It used
 to copy itself into the old AssetAccountsReceivable / LiabilityAccountsPayable
@@ -80,7 +80,7 @@ from crm.models import Company, Contact, Supplier
 
 
 # ---------------------------------------------------------------------------
-# 1. CariAccount — the unified customer/supplier card
+# 1. CurrentAccount — the unified customer/supplier card
 # ---------------------------------------------------------------------------
 @lru_cache(maxsize=1)
 def _base_currency_symbol():
@@ -105,7 +105,7 @@ def _base_currency_symbol():
     return cur.symbol or cur.code
 
 
-class CariAccount(models.Model):
+class CurrentAccount(models.Model):
     class Meta:
         verbose_name = _("Current Account")
         verbose_name_plural = _("Current Accounts")
@@ -115,18 +115,18 @@ class CariAccount(models.Model):
             models.Index(fields=["book", "type"]),
         ]
         constraints = [
-            # At most one cari per (book, contact/company/supplier).
+            # At most one current account per (book, contact/company/supplier).
             # Partial unique indexes (Postgres-only — works on our stack).
             models.UniqueConstraint(
-                fields=["book", "contact"], name="uniq_cari_book_contact",
+                fields=["book", "contact"], name="uniq_current_account_book_contact",
                 condition=models.Q(contact__isnull=False),
             ),
             models.UniqueConstraint(
-                fields=["book", "company"], name="uniq_cari_book_company",
+                fields=["book", "company"], name="uniq_current_account_book_company",
                 condition=models.Q(company__isnull=False),
             ),
             models.UniqueConstraint(
-                fields=["book", "supplier"], name="uniq_cari_book_supplier",
+                fields=["book", "supplier"], name="uniq_current_account_book_supplier",
                 condition=models.Q(supplier__isnull=False),
             ),
         ]
@@ -139,32 +139,32 @@ class CariAccount(models.Model):
         ("other",    _("Other")),
     ]
 
-    book = models.ForeignKey("accounting.Book", on_delete=models.CASCADE, related_name="cari_accounts")
+    book = models.ForeignKey("accounting.Book", on_delete=models.CASCADE, related_name="current_account_accounts")
 
     code = models.CharField(max_length=20, help_text="e.g., CARI-001")
     name = models.CharField(max_length=200)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="customer")
 
-    # CRM links — at most ONE of contact/company/supplier per cari (enforced in clean()).
-    # Foreign keys (not OneToOne) so a single CRM entity can have one cari PER BOOK.
+    # CRM links — at most ONE of contact/company/supplier per current account (enforced in clean()).
+    # Foreign keys (not OneToOne) so a single CRM entity can have one current account PER BOOK.
     # Per-book uniqueness is enforced via the constraint in Meta below.
     contact = models.ForeignKey(
         Contact,
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        related_name="cari_accounts",
+        related_name="current_account_accounts",
     )
     company = models.ForeignKey(
         Company,
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        related_name="cari_accounts",
+        related_name="current_account_accounts",
     )
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        related_name="cari_accounts",
+        related_name="current_account_accounts",
     )
 
     # Tax info (TR — e-Arşiv hazır)
@@ -183,7 +183,7 @@ class CariAccount(models.Model):
     default_currency = models.ForeignKey(
         "accounting.CurrencyCategory",
         on_delete=models.PROTECT,
-        related_name="cari_accounts",
+        related_name="current_account_accounts",
     )
     payment_term_days = models.PositiveIntegerField(default=30, help_text="Payment term (days)")
     credit_limit      = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
@@ -211,7 +211,7 @@ class CariAccount(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True,
-                                   related_name="created_cari_accounts")
+                                   related_name="created_current_account_accounts")
 
     def __str__(self):
         return f"{self.code} | {self.name}"
@@ -270,7 +270,7 @@ class CariAccount(models.Model):
         only ever equal by argument.
         """
         # .live() — the same rule the statement asks, so the two can never
-        # print different numbers for this account. See CariMovementQuerySet.
+        # print different numbers for this account. See CurrentAccountMovementQuerySet.
         agg = self.movements.live().aggregate(
             total_base=Sum("amount_base"),
             last=models.Max("created_at"),
@@ -278,7 +278,7 @@ class CariAccount(models.Model):
         self.cached_balance   = (agg["total_base"] or Decimal("0.00"))
         self.last_movement_at = agg["last"]
         if save:
-            CariAccount.objects.filter(pk=self.pk).update(
+            CurrentAccount.objects.filter(pk=self.pk).update(
                 cached_balance=self.cached_balance,
                 last_movement_at=self.last_movement_at,
             )
@@ -318,9 +318,9 @@ class CariAccount(models.Model):
 
 
 # ---------------------------------------------------------------------------
-# 2. CariMovement — the atomic ledger row
+# 2. CurrentAccountMovement — the atomic ledger row
 # ---------------------------------------------------------------------------
-class CariMovementQuerySet(models.QuerySet):
+class CurrentAccountMovementQuerySet(models.QuerySet):
     """The one definition of which rows count.
 
     Balances and statements are two views of the same ledger, and they
@@ -345,12 +345,12 @@ class CariMovementQuerySet(models.QuerySet):
         return self.filter(is_void=True)
 
 
-class CariMovement(models.Model):
+class CurrentAccountMovement(models.Model):
     class Meta:
         verbose_name = _("Account Movement")
         verbose_name_plural = _("Account Movements")
         indexes = [
-            models.Index(fields=["cari", "-date"]),
+            models.Index(fields=["current_account", "-date"]),
             models.Index(fields=["book", "due_date"]),
             models.Index(fields=["movement_type"]),
         ]
@@ -381,8 +381,8 @@ class CariMovement(models.Model):
         ("legacy_ap",        _("Legacy - Payable")),
     ]
 
-    cari     = models.ForeignKey(CariAccount, on_delete=models.CASCADE, related_name="movements")
-    book     = models.ForeignKey("accounting.Book", on_delete=models.CASCADE, related_name="cari_movements")
+    current_account     = models.ForeignKey(CurrentAccount, on_delete=models.CASCADE, related_name="movements")
+    book     = models.ForeignKey("accounting.Book", on_delete=models.CASCADE, related_name="current_account_movements")
     date     = models.DateField()
     due_date = models.DateField(null=True, blank=True)
 
@@ -411,7 +411,7 @@ class CariMovement(models.Model):
     reference   = models.CharField(max_length=50,  blank=True, help_text="Invoice no, check no, etc.")
 
     # Kept for history, excluded from every total. Set on both halves of
-    # a cancelled document's pair — see CariMovementQuerySet. Stored
+    # a cancelled document's pair — see CurrentAccountMovementQuerySet. Stored
     # rather than derived so a balance and a statement cannot reach
     # different answers about the same row; migration 0086 backfills it
     # from the predicate the statement used to recompute per render.
@@ -423,13 +423,13 @@ class CariMovement(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True,
-                                   related_name="created_cari_movements")
+                                   related_name="created_current_account_movements")
 
-    objects = CariMovementQuerySet.as_manager()
+    objects = CurrentAccountMovementQuerySet.as_manager()
 
     def __str__(self):
         sign = "+" if self.amount >= 0 else ""
-        return f"{self.cari.code} | {self.date} | {sign}{self.amount} {self.currency.code}"
+        return f"{self.current_account.code} | {self.date} | {sign}{self.amount} {self.currency.code}"
 
     def entered_rate(self):
         """A rate the document that posted this row says applies.
@@ -438,7 +438,7 @@ class CariMovement(models.Model):
         always used, which this model was missing: whoever recorded the
         transaction was there, and a cash exchange at the döviz bürosu is
         not the mid-market rate. Without this the rate typed on the payment
-        form reached the cash ledger and stopped — the cari movement went on
+        form reached the cash ledger and stopped — the current account movement went on
         converting at the published rate, so the figure the operator
         corrected was not the figure their balance moved by.
 
@@ -489,30 +489,30 @@ class CariMovement(models.Model):
             self.exchange_rate = Decimal(str(rate))
             self.amount_base = (self.amount * self.exchange_rate).quantize(Decimal("0.01"))
 
-        if not self.book_id and self.cari_id:
-            self.book_id = self.cari.book_id
+        if not self.book_id and self.current_account_id:
+            self.book_id = self.current_account.book_id
 
         with transaction.atomic():
             super().save(*args, **kwargs)
-            self.cari.recompute_balance(save=True)
+            self.current_account.recompute_balance(save=True)
 
 
 # ---------------------------------------------------------------------------
-# 3. CariSettings — per-book counters & defaults
+# 3. CurrentAccountSettings — per-book counters & defaults
 # ---------------------------------------------------------------------------
-class CariSettings(models.Model):
+class CurrentAccountSettings(models.Model):
     class Meta:
         verbose_name = "Account Settings"
         verbose_name_plural = "Account Settings"
 
-    book = models.OneToOneField("accounting.Book", on_delete=models.CASCADE, related_name="cari_settings")
+    book = models.OneToOneField("accounting.Book", on_delete=models.CASCADE, related_name="current_account_settings")
 
-    next_cari_seq    = models.PositiveIntegerField(default=1)
+    next_current_account_seq    = models.PositiveIntegerField(default=1)
     next_invoice_seq = models.PositiveIntegerField(default=1)
     next_payment_seq = models.PositiveIntegerField(default=1)
 
-    cari_code_prefix  = models.CharField(max_length=10, default="CARI")
-    cari_code_padding = models.PositiveSmallIntegerField(default=3)
+    current_account_code_prefix  = models.CharField(max_length=10, default="CARI")
+    current_account_code_padding = models.PositiveSmallIntegerField(default=3)
 
     default_tax_rate          = models.DecimalField(max_digits=5, decimal_places=2,
                                                     default=Decimal("20.00"))
@@ -521,7 +521,7 @@ class CariSettings(models.Model):
         "accounting.CurrencyCategory",
         on_delete=models.PROTECT,
         null=True, blank=True,
-        related_name="cari_settings_default",
+        related_name="current_account_settings_default",
     )
 
     # Language the printable invoice DOCUMENT renders in (independent of
@@ -532,15 +532,15 @@ class CariSettings(models.Model):
     )
 
     def __str__(self):
-        return f"Cari Settings ({self.book.name})"
+        return f"Current account settings ({self.book.name})"
 
-    def next_cari_code(self):
-        """Generate next CARI code and bump the counter atomically."""
+    def next_current_account_code(self):
+        """Generate the next account code and bump the counter atomically."""
         with transaction.atomic():
-            locked = CariSettings.objects.select_for_update().get(pk=self.pk)
-            code = f"{locked.cari_code_prefix}-{str(locked.next_cari_seq).zfill(locked.cari_code_padding)}"
-            locked.next_cari_seq += 1
-            locked.save(update_fields=["next_cari_seq"])
+            locked = CurrentAccountSettings.objects.select_for_update().get(pk=self.pk)
+            code = f"{locked.current_account_code_prefix}-{str(locked.next_current_account_seq).zfill(locked.current_account_code_padding)}"
+            locked.next_current_account_seq += 1
+            locked.save(update_fields=["next_current_account_seq"])
             return code
 
     def next_invoice_number(self, series="INV"):
@@ -558,7 +558,7 @@ class CariSettings(models.Model):
         from django.conf import settings as _s
 
         with transaction.atomic():
-            locked = CariSettings.objects.select_for_update().get(pk=self.pk)
+            locked = CurrentAccountSettings.objects.select_for_update().get(pk=self.pk)
             year = timezone.now().year
             seq = locked.next_invoice_seq
             prefix = getattr(_s, "BRAND_INVOICE_PREFIX", "").strip()
@@ -588,7 +588,7 @@ class Invoice(models.Model):
         unique_together = ("book", "series", "number")
         indexes = [
             models.Index(fields=["book", "-date"]),
-            models.Index(fields=["cari", "-date"]),
+            models.Index(fields=["current_account", "-date"]),
             models.Index(fields=["status"]),
             models.Index(fields=["due_date"]),
         ]
@@ -610,7 +610,7 @@ class Invoice(models.Model):
         ("cancelled",      _("Cancelled")),
     ]
 
-    cari   = models.ForeignKey(CariAccount, on_delete=models.PROTECT, related_name="invoices")
+    current_account   = models.ForeignKey(CurrentAccount, on_delete=models.PROTECT, related_name="invoices")
     book   = models.ForeignKey("accounting.Book", on_delete=models.PROTECT, related_name="invoices")
 
     series = models.CharField(max_length=10, default="INV")
@@ -662,10 +662,10 @@ class Invoice(models.Model):
     paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     balance     = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
 
-    # The CariMovement that posted this invoice to the ledger (set on issue()).
+    # The CurrentAccountMovement that posted this invoice to the ledger (set on issue()).
     # Cancellation DELETES the movement (SET_NULL clears this pointer).
     posted_movement = models.OneToOneField(
-        CariMovement, on_delete=models.SET_NULL, null=True, blank=True,
+        CurrentAccountMovement, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="invoice",
     )
 
@@ -674,10 +674,10 @@ class Invoice(models.Model):
     earsiv_status  = models.CharField(max_length=20, blank=True)
     earsiv_pdf_url = models.URLField(blank=True)
 
-    # ── Consignee snapshot (overrides cari values on THIS invoice).
-    # Blank → fall back to invoice.cari.* in the template. Letting
+    # ── Consignee snapshot (overrides current account values on THIS invoice).
+    # Blank → fall back to invoice.current account.* in the template. Letting
     # users edit these per-invoice means they can correct typos or
-    # use a different shipping address without polluting the cari
+    # use a different shipping address without polluting the current account
     # master record.
     bill_to_name        = models.CharField(max_length=200, blank=True)
     bill_to_address     = models.TextField(blank=True)
@@ -704,7 +704,7 @@ class Invoice(models.Model):
                                    related_name="created_invoices")
 
     def __str__(self):
-        return f"{self.display_number} | {self.cari.name} | {self.total} {self.currency.code}"
+        return f"{self.display_number} | {self.current_account.name} | {self.total} {self.currency.code}"
 
     # -- helpers -----------------------------------------------------------
     @property
@@ -763,9 +763,9 @@ class Invoice(models.Model):
     @property
     def ledger_sign(self):
         """
-        Sign applied when posting to CariMovement.
-            sales / proforma           → +  (cari owes us more)
-            purchase                   → −  (we owe cari more)
+        Sign applied when posting to CurrentAccountMovement.
+            sales / proforma           → +  (current account owes us more)
+            purchase                   → −  (we owe current account more)
             sales_return               → −  (we owe back to customer)
             purchase_return            → +  (supplier owes back to us)
         Proforma is excluded from posting at the call site, but kept here
@@ -876,8 +876,8 @@ class Invoice(models.Model):
 
         amount_signed = self.total * Decimal(self.ledger_sign)
 
-        movement = CariMovement.objects.create(
-            cari=self.cari,
+        movement = CurrentAccountMovement.objects.create(
+            current_account=self.current_account,
             book=self.book,
             date=self.date,
             due_date=self.due_date,
@@ -899,7 +899,7 @@ class Invoice(models.Model):
         """Refresh the ledger row after totals/date/currency change on an
         already-issued invoice. Order-attached invoices post no row at all
         (the order carries the receivable); standalone invoices get
-        amount/desc/date refreshed in place on the SAME CariMovement
+        amount/desc/date refreshed in place on the SAME CurrentAccountMovement
         (never delete+recreate — that would break anything referencing it
         by id).
 
@@ -907,7 +907,7 @@ class Invoice(models.Model):
         invoice (should not happen in normal flow, since issue() always sets
         it in the same transaction as status→issued), post a fresh one
         instead of silently doing nothing — a purchase/sales edit that
-        changes the total must never leave the cari balance stale.
+        changes the total must never leave the current account balance stale.
         """
         if self.status in ("draft", "cancelled"):
             return None
@@ -923,8 +923,8 @@ class Invoice(models.Model):
 
         mv = self.posted_movement
         if mv is None:
-            mv = CariMovement.objects.create(
-                cari=self.cari, book=self.book, date=self.date, due_date=self.due_date,
+            mv = CurrentAccountMovement.objects.create(
+                current_account=self.current_account, book=self.book, date=self.date, due_date=self.due_date,
                 amount=amount, currency=self.currency, movement_type=self.movement_type,
                 description=f"{self.get_type_display()} {self.display_number}",
                 reference=f"{self.display_number}",
@@ -943,14 +943,14 @@ class Invoice(models.Model):
         mv.currency = self.currency
         mv.description = f"{self.get_type_display()} {self.display_number}"
         mv.reference = f"{self.display_number}"
-        mv.save()   # CariMovement.save() already calls recompute_balance
+        mv.save()   # CurrentAccountMovement.save() already calls recompute_balance
         return mv
 
     def cancel(self, user=None, reason=""):
         """
-        Cancel an issued invoice. DELETES the posted CariMovement outright
+        Cancel an issued invoice. DELETES the posted CurrentAccountMovement outright
         (mirroring reverse_order_movement's semantics for orders) so the
-        cari history shows no trace of the dead invoice, then recomputes
+        current account history shows no trace of the dead invoice, then recomputes
         the balance. An order-attached invoice has no movement to delete —
         it never posted one — so this is a no-op for those beyond the
         status flip.
@@ -958,7 +958,7 @@ class Invoice(models.Model):
         Cancellation is TERMINAL — there is no restore path (restore()
         below refuses), which is exactly why deleting beats posting an
         audit counter-pair here: the ledger rows would never be needed
-        again and only clutter the cari statement.
+        again and only clutter the current account statement.
         """
         if self.status == "cancelled":
             return
@@ -974,11 +974,11 @@ class Invoice(models.Model):
             # later edit would silently re-post via resync_posted_movement).
             if self.posted_movement_id:
                 mv = self.posted_movement
-                cari = mv.cari
+                current_account = mv.current_account
                 mv.delete()   # OneToOne is SET_NULL → self.posted_movement clears
                 self.posted_movement = None
-                if cari:
-                    cari.recompute_balance(save=True)
+                if current_account:
+                    current_account.recompute_balance(save=True)
             self.status = "cancelled"
             self.save(update_fields=["status", "posted_movement", "updated_at"])
 
@@ -1112,7 +1112,7 @@ class Payment(models.Model):
         unique_together = ("book", "number")
         indexes = [
             models.Index(fields=["book", "-date"]),
-            models.Index(fields=["cari", "-date"]),
+            models.Index(fields=["current_account", "-date"]),
             models.Index(fields=["status"]),
         ]
         ordering = ["-date", "-id"]
@@ -1138,7 +1138,7 @@ class Payment(models.Model):
         ("cancelled", _("Cancelled")),
     ]
 
-    cari = models.ForeignKey(CariAccount, on_delete=models.PROTECT, related_name="payments")
+    current_account = models.ForeignKey(CurrentAccount, on_delete=models.PROTECT, related_name="payments")
     book = models.ForeignKey("accounting.Book", on_delete=models.PROTECT, related_name="payments")
 
     number = models.CharField(max_length=30)
@@ -1167,12 +1167,12 @@ class Payment(models.Model):
     # Cash side — money lands here (or leaves here)
     cash_account = models.ForeignKey(
         "accounting.CashAccount", on_delete=models.PROTECT,
-        null=True, blank=True, related_name="cari_payments",
+        null=True, blank=True, related_name="current_account_payments",
     )
 
-    # Posted CariMovement (set on confirm)
+    # Posted CurrentAccountMovement (set on confirm)
     posted_movement = models.OneToOneField(
-        CariMovement, on_delete=models.SET_NULL, null=True, blank=True,
+        CurrentAccountMovement, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="payment",
     )
 
@@ -1186,7 +1186,7 @@ class Payment(models.Model):
     # -- helpers -----------------------------------------------------------
     @property
     def ledger_sign(self):
-        """Sign applied to CariMovement.amount."""
+        """Sign applied to CurrentAccountMovement.amount."""
         return -1 if self.type in ("collection", "refund_out") else +1
 
     @property
@@ -1212,19 +1212,19 @@ class Payment(models.Model):
         return (self.amount or Decimal("0.00")) - self.allocated_amount
 
     def __str__(self):
-        return f"{self.number} | {self.cari.name} | {self.amount} {self.currency.code}"
+        return f"{self.number} | {self.current_account.name} | {self.amount} {self.currency.code}"
 
     def ledger_exchange_rate(self):
         """The rate this payment's ledger row converts at.
 
         None means nobody typed one and the published rate for the date
-        applies — see CariMovement.entered_rate, which is what asks.
+        applies — see CurrentAccountMovement.entered_rate, which is what asks.
         """
         return self.exchange_rate
 
     # -- lifecycle ---------------------------------------------------------
     def confirm(self, user=None):
-        """Draft → Confirmed. Posts to CariMovement and CashAccount."""
+        """Draft → Confirmed. Posts to CurrentAccountMovement and CashAccount."""
         if self.status == "confirmed":
             return
         if self.status == "cancelled":
@@ -1233,9 +1233,9 @@ class Payment(models.Model):
             raise ValidationError("Amount must be greater than zero.")
 
         with transaction.atomic():
-            # 1) Cari ledger entry
-            movement = CariMovement.objects.create(
-                cari=self.cari,
+            # 1) Current account ledger entry
+            movement = CurrentAccountMovement.objects.create(
+                current_account=self.current_account,
                 book=self.book,
                 date=self.date,
                 amount=self.amount * Decimal(self.ledger_sign),
@@ -1327,7 +1327,7 @@ class Payment(models.Model):
     def resync_posted_movement(self, user=None):
         """Refresh the ledger row after an edit to an already-confirmed payment.
 
-        The SAME CariMovement is updated in place — never delete+recreate,
+        The SAME CurrentAccountMovement is updated in place — never delete+recreate,
         because `posted_movement` and the statement both reference it by
         id. Draft payments have posted nothing yet and cancelled ones are
         terminal, so both are no-ops.
@@ -1335,7 +1335,7 @@ class Payment(models.Model):
         If `posted_movement` is somehow missing on a confirmed payment
         (confirm() always sets it in the same transaction, so this should
         not happen), post a fresh one rather than silently leaving the
-        cari balance stale.
+        current account balance stale.
         """
         if self.status != "confirmed":
             return None
@@ -1345,8 +1345,8 @@ class Payment(models.Model):
 
         mv = self.posted_movement
         if mv is None:
-            mv = CariMovement.objects.create(
-                cari=self.cari,
+            mv = CurrentAccountMovement.objects.create(
+                current_account=self.current_account,
                 book=self.book,
                 date=self.date,
                 amount=amount,
@@ -1369,11 +1369,11 @@ class Payment(models.Model):
         mv.movement_type = self.movement_type
         mv.description = description
         mv.reference = self.number
-        mv.save()   # CariMovement.save() already calls recompute_balance
+        mv.save()   # CurrentAccountMovement.save() already calls recompute_balance
         return mv
 
     def cancel(self, user=None, reason=""):
-        """Cancel a confirmed payment. Removes the CariMovement, reverses
+        """Cancel a confirmed payment. Removes the CurrentAccountMovement, reverses
         cash, and re-derives the invoice allocations.
 
         The posted movement is DELETED rather than reversed with a
@@ -1391,14 +1391,14 @@ class Payment(models.Model):
             return
 
         with transaction.atomic():
-            # 1) Drop the cari ledger row
+            # 1) Drop the current account ledger row
             if self.posted_movement_id:
                 mv = self.posted_movement
-                cari = mv.cari
+                current_account = mv.current_account
                 mv.delete()   # OneToOne is SET_NULL → posted_movement clears
                 self.posted_movement = None
-                if cari:
-                    cari.recompute_balance(save=True)
+                if current_account:
+                    current_account.recompute_balance(save=True)
 
             # 2) Reverse cash
             if self.cash_account_id:
@@ -1450,7 +1450,7 @@ class PaymentAllocation(models.Model):
         super().clean()
         if self.amount is None or self.amount <= 0:
             raise ValidationError({"amount": "Amount must be greater than zero."})
-        if self.invoice_id and self.invoice.cari_id != self.payment.cari_id:
+        if self.invoice_id and self.invoice.current_account_id != self.payment.current_account_id:
             raise ValidationError({"invoice": "Invoice's account must be the same as the payment's account."})
 
     def save(self, *args, **kwargs):
@@ -1478,7 +1478,7 @@ class CheckOrPromissoryNote(models.Model):
         verbose_name_plural = _("Checks / Promissory Notes")
         indexes = [
             models.Index(fields=["book", "status"]),
-            models.Index(fields=["cari", "-due_date"]),
+            models.Index(fields=["current_account", "-due_date"]),
             models.Index(fields=["due_date"]),
         ]
         ordering = ["-due_date", "-id"]
@@ -1502,7 +1502,7 @@ class CheckOrPromissoryNote(models.Model):
     ]
 
     book = models.ForeignKey("accounting.Book", on_delete=models.PROTECT, related_name="checks")
-    cari = models.ForeignKey(CariAccount, on_delete=models.PROTECT, related_name="checks",
+    current_account = models.ForeignKey(CurrentAccount, on_delete=models.PROTECT, related_name="checks",
                              help_text="Account that gave or received the instrument")
 
     instrument = models.CharField(max_length=20, choices=INSTRUMENT_TYPES, default="check")
@@ -1521,20 +1521,20 @@ class CheckOrPromissoryNote(models.Model):
     issue_date = models.DateField()
     due_date   = models.DateField()
 
-    # When endorsed to another cari
+    # When endorsed to another current account
     endorsed_to = models.ForeignKey(
-        CariAccount, on_delete=models.PROTECT, null=True, blank=True,
+        CurrentAccount, on_delete=models.PROTECT, null=True, blank=True,
         related_name="endorsed_checks",
     )
 
-    # Cari ledger row that recorded the original transfer (receive/give)
+    # Current account ledger row that recorded the original transfer (receive/give)
     posted_movement = models.OneToOneField(
-        CariMovement, on_delete=models.SET_NULL, null=True, blank=True,
+        CurrentAccountMovement, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="check_initial",
     )
-    # Cari ledger row that recorded the endorsement (received → endorsed)
+    # Current account ledger row that recorded the endorsement (received → endorsed)
     endorse_movement = models.OneToOneField(
-        CariMovement, on_delete=models.SET_NULL, null=True, blank=True,
+        CurrentAccountMovement, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="check_endorsement",
     )
     # CashAccount that received/lost money on clear
@@ -1550,18 +1550,18 @@ class CheckOrPromissoryNote(models.Model):
                                    related_name="created_checks")
 
     def __str__(self):
-        return f"{self.get_instrument_display()} #{self.serial_no} | {self.amount} {self.currency.code} | {self.cari.name}"
+        return f"{self.get_instrument_display()} #{self.serial_no} | {self.amount} {self.currency.code} | {self.current_account.name}"
 
     # ---- lifecycle: initial post --------------------------------------
     def _post_initial_movement(self, user=None):
         """
-        Post the first CariMovement when the instrument enters the portfolio.
-        - received: amount = -X on cari (their balance shrinks, like a collection)
-        - given   : amount = +X on cari (their balance moves toward zero, like a payment)
+        Post the first CurrentAccountMovement when the instrument enters the portfolio.
+        - received: amount = -X on current account (their balance shrinks, like a collection)
+        - given   : amount = +X on current account (their balance moves toward zero, like a payment)
         """
         sign = -1 if self.direction == "received" else +1
-        mv = CariMovement.objects.create(
-            cari=self.cari,
+        mv = CurrentAccountMovement.objects.create(
+            current_account=self.current_account,
             book=self.book,
             date=self.issue_date,
             due_date=self.due_date,
@@ -1585,32 +1585,32 @@ class CheckOrPromissoryNote(models.Model):
             self._post_initial_movement()
 
     # ---- state transitions --------------------------------------------
-    def endorse(self, to_cari, user=None):
+    def endorse(self, to_current_account, user=None):
         """Hand a received check over to another account (typically a supplier)."""
         if self.direction != "received":
             raise ValidationError("Only received checks/notes can be endorsed.")
         if self.status != "portfolio":
             raise ValidationError(f"Cannot endorse from status: {self.status}")
-        if to_cari.book_id != self.book_id:
+        if to_current_account.book_id != self.book_id:
             raise ValidationError("Endorsed account must be in the same book.")
 
         with transaction.atomic():
-            # New CariMovement: +X on the endorsed-to cari (we 'paid' them with the check)
-            mv = CariMovement.objects.create(
-                cari=to_cari,
+            # New CurrentAccountMovement: +X on the endorsed-to current account (we 'paid' them with the check)
+            mv = CurrentAccountMovement.objects.create(
+                current_account=to_current_account,
                 book=self.book,
                 date=timezone.now().date(),
                 due_date=self.due_date,
                 amount=self.amount,
                 currency=self.currency,
                 movement_type="check_out",
-                description=f"Endorsement — {self.get_instrument_display()} #{self.serial_no} (source: {self.cari.code})",
+                description=f"Endorsement — {self.get_instrument_display()} #{self.serial_no} (source: {self.current_account.code})",
                 reference=f"ENDORSE {self.serial_no}",
                 source_type=ContentType.objects.get_for_model(CheckOrPromissoryNote),
                 source_id=self.pk,
                 created_by=user.member if user and hasattr(user, "member") else None,
             )
-            self.endorsed_to = to_cari
+            self.endorsed_to = to_current_account
             self.endorse_movement = mv
             self.status = "endorsed"
             self.save(update_fields=["endorsed_to", "endorse_movement", "status", "updated_at"])
@@ -1651,7 +1651,7 @@ class CheckOrPromissoryNote(models.Model):
     def bounce(self, user=None, reason=""):
         """
         Received check came back unpaid.
-        Reverse the original cari posting (+X back to drawer).
+        Reverse the original current account posting (+X back to drawer).
         If it was already deposited or endorsed, we still reverse the drawer
         side — operator decides downstream how to chase the funds.
         """
@@ -1660,8 +1660,8 @@ class CheckOrPromissoryNote(models.Model):
         if self.status in ("bounced", "cancelled"):
             return
         with transaction.atomic():
-            CariMovement.objects.create(
-                cari=self.cari,
+            CurrentAccountMovement.objects.create(
+                current_account=self.current_account,
                 book=self.book,
                 date=timezone.now().date(),
                 amount=self.amount,  # +X — drawer owes us again
@@ -1699,7 +1699,7 @@ class CheckOrPromissoryNote(models.Model):
         with transaction.atomic():
             touched = []
 
-            # Initial movement (this cari) and the endorsement (the cari
+            # Initial movement (this current account) and the endorsement (the current account
             # it was handed to). Both are OneToOne SET_NULL, so deleting
             # the row clears the FK — assign None as well so the instance
             # in hand matches what was just saved.
@@ -1707,23 +1707,23 @@ class CheckOrPromissoryNote(models.Model):
                 mv = getattr(self, field)
                 if mv is None:
                     continue
-                touched.append(mv.cari)
+                touched.append(mv.current_account)
                 mv.delete()
                 setattr(self, field, None)
 
             # The BOUNCED counter-row, if this one came back unpaid.
-            bounced = CariMovement.objects.filter(
+            bounced = CurrentAccountMovement.objects.filter(
                 source_type=ContentType.objects.get_for_model(CheckOrPromissoryNote),
                 source_id=self.pk,
                 reference__startswith="BOUNCE",
             )
-            touched.extend(mv.cari for mv in bounced)
+            touched.extend(mv.current_account for mv in bounced)
             bounced.delete()
 
             # De-duplicate by pk: the same account can own more than one
             # of the rows above, and recomputing it twice is wasted work.
-            for cari in {c.pk: c for c in touched if c}.values():
-                cari.recompute_balance(save=True)
+            for current_account in {c.pk: c for c in touched if c}.values():
+                current_account.recompute_balance(save=True)
 
             self.status = "cancelled"
             self.save(update_fields=["status", "posted_movement",
@@ -1732,9 +1732,9 @@ class CheckOrPromissoryNote(models.Model):
 
 
 # ---------------------------------------------------------------------------
-# CariTransfer — move a balance from one current account to another
+# CurrentAccountTransfer — move a balance from one current account to another
 # ---------------------------------------------------------------------------
-class CariTransfer(models.Model):
+class CurrentAccountTransfer(models.Model):
     """A virman: the debt moves, the money does not.
 
     Transferring X from A to B posts -X on A and +X on B, so whatever A
@@ -1743,7 +1743,7 @@ class CariTransfer(models.Model):
     the question of who owes it.
 
     Both legs are posted in ONE currency on ONE date, which is what makes
-    them cancel: CariMovement derives its base-currency amount from the
+    them cancel: CurrentAccountMovement derives its base-currency amount from the
     rate of its own date, so a pair sharing both fields converts at the
     same rate and nets to zero in USD as well as in the currency typed.
     Posting each leg in its own account's default currency would leave a
@@ -1763,18 +1763,18 @@ class CariTransfer(models.Model):
         ]
 
     book = models.ForeignKey("accounting.Book", on_delete=models.CASCADE,
-                             related_name="cari_transfers")
+                             related_name="current_account_transfers")
     date = models.DateField()
 
-    from_cari = models.ForeignKey(CariAccount, on_delete=models.PROTECT,
+    from_current_account = models.ForeignKey(CurrentAccount, on_delete=models.PROTECT,
                                   related_name="transfers_out")
-    to_cari   = models.ForeignKey(CariAccount, on_delete=models.PROTECT,
+    to_current_account   = models.ForeignKey(CurrentAccount, on_delete=models.PROTECT,
                                   related_name="transfers_in")
 
     amount   = models.DecimalField(max_digits=14, decimal_places=2)
     currency = models.ForeignKey("accounting.CurrencyCategory",
                                  on_delete=models.PROTECT,
-                                 related_name="cari_transfers")
+                                 related_name="current_account_transfers")
 
     # The rate the person recording this transfer says applies, to the
     # book's base currency. Null means they did not say, and the published
@@ -1785,7 +1785,7 @@ class CariTransfer(models.Model):
     # deliberate entry, so a transfer in lira carrying "1.000000" would
     # read as an instruction to treat one lira as one dollar. Null says
     # nothing, which is what an untouched field means.
-    # 8 decimals for the reason CariMovement.exchange_rate gives — and it
+    # 8 decimals for the reason CurrentAccountMovement.exchange_rate gives — and it
     # has to match that column, since post() stamps this straight onto both
     # legs. Widening one without the other would round the rate right back
     # on the way into the ledger.
@@ -1798,20 +1798,20 @@ class CariTransfer(models.Model):
     description = models.CharField(max_length=300, blank=True)
 
     # The rows this transfer wrote — set by post(), cleared by unpost().
-    from_movement = models.OneToOneField(CariMovement, on_delete=models.SET_NULL,
+    from_movement = models.OneToOneField(CurrentAccountMovement, on_delete=models.SET_NULL,
                                          null=True, blank=True,
                                          related_name="transfer_from")
-    to_movement   = models.OneToOneField(CariMovement, on_delete=models.SET_NULL,
+    to_movement   = models.OneToOneField(CurrentAccountMovement, on_delete=models.SET_NULL,
                                          null=True, blank=True,
                                          related_name="transfer_to")
 
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(Member, on_delete=models.SET_NULL,
                                    null=True, blank=True,
-                                   related_name="created_cari_transfers")
+                                   related_name="created_current_account_transfers")
 
     def __str__(self):
-        return (f"{self.from_cari.code} → {self.to_cari.code} | "
+        return (f"{self.from_current_account.code} → {self.to_current_account.code} | "
                 f"{self.amount} {self.currency.code}")
 
     @property
@@ -1834,7 +1834,7 @@ class CariTransfer(models.Model):
 
     def clean(self):
         super().clean()
-        if self.from_cari_id and self.from_cari_id == self.to_cari_id:
+        if self.from_current_account_id and self.from_current_account_id == self.to_current_account_id:
             raise ValidationError(
                 _("Pick two different accounts — a transfer to itself moves nothing.")
             )
@@ -1850,9 +1850,9 @@ class CariTransfer(models.Model):
         # spanning two books would silently move a balance out of one set of
         # books and into another.
         if self.book_id:
-            for field in ("from_cari", "to_cari"):
-                cari = getattr(self, field, None)
-                if cari and cari.book_id != self.book_id:
+            for field in ("from_current_account", "to_current_account"):
+                current_account = getattr(self, field, None)
+                if current_account and current_account.book_id != self.book_id:
                     raise ValidationError({
                         field: _("This account belongs to another book.")
                     })
@@ -1868,13 +1868,13 @@ class CariTransfer(models.Model):
             return
 
         member = getattr(user, "member", None) if user else self.created_by
-        source_type = ContentType.objects.get_for_model(CariTransfer)
+        source_type = ContentType.objects.get_for_model(CurrentAccountTransfer)
         label = self.description or _("Account transfer")
         rate = self.resolved_rate()
 
-        def leg(cari, signed, other):
-            mv = CariMovement(
-                cari=cari,
+        def leg(current_account, signed, other):
+            mv = CurrentAccountMovement(
+                current_account=current_account,
                 book=self.book,
                 date=self.date,
                 amount=signed,
@@ -1899,8 +1899,8 @@ class CariTransfer(models.Model):
             return mv
 
         # The debt moves: the source owes us less, the destination more.
-        self.from_movement = leg(self.from_cari, -self.amount, self.to_cari)
-        self.to_movement   = leg(self.to_cari,    self.amount, self.from_cari)
+        self.from_movement = leg(self.from_current_account, -self.amount, self.to_current_account)
+        self.to_movement   = leg(self.to_current_account,    self.amount, self.from_current_account)
         # update_fields, so full_clean() in save() is not re-run on rows the
         # form has already validated.
         super().save(update_fields=["from_movement", "to_movement"])
@@ -1919,7 +1919,7 @@ class CariTransfer(models.Model):
         rate for the date when nobody typed one.
 
         Falls back to 1.0 only when the lookup itself comes back empty,
-        which is what CariMovement.save() does on its own — a transfer
+        which is what CurrentAccountMovement.save() does on its own — a transfer
         should not be blocked because a rate source is unreachable.
         """
         base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
@@ -1953,7 +1953,7 @@ class CariTransfer(models.Model):
         to zero in base currency as well as in the currency typed.
 
         Rewriting rather than deleting is also why the accounts a leg moved
-        AWAY from have to be recomputed by name. CariMovement.save() refreshes
+        AWAY from have to be recomputed by name. CurrentAccountMovement.save() refreshes
         the account the row belongs to NOW; the one it just left keeps a
         cached balance still counting a row that is no longer there.
 
@@ -1967,31 +1967,31 @@ class CariTransfer(models.Model):
         rate = self.resolved_rate()
         touched = []
 
-        def leg(mv, cari, signed, other):
+        def leg(mv, current_account, signed, other):
             # Where the row was, before it is pointed anywhere else.
-            touched.append(mv.cari)
-            mv.cari = cari
+            touched.append(mv.current_account)
+            mv.current_account = current_account
             mv.book = self.book
             mv.date = self.date
             mv.amount = signed
             mv.currency = self.currency
             mv.description = f"{label} — {other.code} {other.name}"
             mv.reference = self.reference
-            # Stamped, not left to CariMovement.save() to derive: it only
+            # Stamped, not left to CurrentAccountMovement.save() to derive: it only
             # fills amount_base when falsy and would otherwise re-look-up a
             # rate per leg, which is the pair drifting apart — see post().
             mv.exchange_rate = rate
             mv.amount_base = (signed * rate).quantize(Decimal("0.01"))
             mv.save()
-            touched.append(cari)
+            touched.append(current_account)
 
         # created_by is left alone on purpose: whoever entered the row still
         # entered it. A correction is not a re-entry.
-        leg(self.from_movement, self.from_cari, -self.amount, self.to_cari)
-        leg(self.to_movement, self.to_cari, self.amount, self.from_cari)
+        leg(self.from_movement, self.from_current_account, -self.amount, self.to_current_account)
+        leg(self.to_movement, self.to_current_account, self.amount, self.from_current_account)
 
-        for cari in {c.pk: c for c in touched if c}.values():
-            cari.recompute_balance(save=True)
+        for current_account in {c.pk: c for c in touched if c}.values():
+            current_account.recompute_balance(save=True)
 
     def unpost(self):
         """Delete both legs and re-derive the two balances.
@@ -2001,12 +2001,12 @@ class CariTransfer(models.Model):
         transfer should leave both statements as if it never happened,
         not as two lines that cancel.
         """
-        touched = [self.from_cari, self.to_cari]
+        touched = [self.from_current_account, self.to_current_account]
         for field in ("from_movement", "to_movement"):
             mv = getattr(self, field)
             if mv:
                 mv.delete()
                 setattr(self, field, None)
         super().save(update_fields=["from_movement", "to_movement"])
-        for cari in {c.pk: c for c in touched if c}.values():
-            cari.recompute_balance(save=True)
+        for current_account in {c.pk: c for c in touched if c}.values():
+            current_account.recompute_balance(save=True)

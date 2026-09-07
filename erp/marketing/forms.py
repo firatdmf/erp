@@ -48,10 +48,10 @@ class ProductForm(forms.ModelForm):
         # Force fresh queryset for supplier to avoid stale cursor references
         if 'supplier_account' in self.fields:
             # Evaluate into a list only if absolutely necessary, otherwise ensure fresh queryset
-            from accounting.models_accounts import CariAccount
+            from accounting.models_accounts import CurrentAccount
             from accounting.services_accounts import get_default_book
             self.fields['supplier_account'].queryset = (
-                CariAccount.objects
+                CurrentAccount.objects
                 .filter(book=get_default_book(), is_active=True)
                 .order_by('name')
             )

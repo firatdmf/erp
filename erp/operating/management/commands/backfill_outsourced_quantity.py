@@ -7,10 +7,10 @@ dışı" metres, so it folded them into the line's description as
 SCANNED metres — which meant an outsourced line on a product that
 happens to be stocked in a warehouse was indistinguishable from a line
 nobody had packed yet and silently vanished from the invoice and the
-customer's cari.
+customer's current account.
 
 This command reads those descriptions back into the real column and
-re-posts the affected orders' cari movements so balances catch up.
+re-posts the affected orders' current account movements so balances catch up.
 
 Lines that need a HUMAN decision are reported, never guessed: a
 warehouse-tracked line with no reservations and no "depo dışı" note is
@@ -156,12 +156,12 @@ class Command(BaseCommand):
                 it.description = new_desc
                 it.save(update_fields=["outsourced_quantity", "description", "updated_at"])
 
-        # Re-post the cari movements so balances reflect the new billable
+        # Re-post the current account movements so balances reflect the new billable
         # totals. The OrderItem save signal already does this, but only
-        # for orders that HAVE a cari — call explicitly and report.
+        # for orders that HAVE a current account — call explicitly and report.
         from accounting.services_accounts import post_order_movement
         repriced = 0
-        for order in Order.objects.filter(pk__in=touched_orders, cari__isnull=False):
+        for order in Order.objects.filter(pk__in=touched_orders, current_account__isnull=False):
             try:
                 mv = post_order_movement(order)
             except Exception as exc:

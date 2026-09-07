@@ -179,8 +179,8 @@
         {% for r in rows %}
         <tr>
           <td>
-            <a class="ag-name" href="{% url 'accounts:detail' r.cari.pk %}">{{ r.cari.name }}</a>
-            <div class="ag-code">{{ r.cari.code }}</div>
+            <a class="ag-name" href="{% url 'accounts:detail' r.current_account.pk %}">{{ r.current_account.name }}</a>
+            <div class="ag-code">{{ r.current_account.code }}</div>
           </td>
           <td>
             {% if r.oldest_invoice %}

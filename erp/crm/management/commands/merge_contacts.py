@@ -17,7 +17,7 @@ Dry run by default; pass --apply to commit.
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 from crm.models import Contact, Note, Supplier
 
 # Single-valued fields the survivor adopts only where it has nothing of
@@ -74,8 +74,8 @@ class Command(BaseCommand):
             # One contact may hold only one account per book, so a genuine
             # clash here means these are not the same person after all.
             survivor_books = set(
-                CariAccount.objects.filter(contact=survivor).values_list("book_id", flat=True))
-            clashes = CariAccount.objects.filter(
+                CurrentAccount.objects.filter(contact=survivor).values_list("book_id", flat=True))
+            clashes = CurrentAccount.objects.filter(
                 contact=dup, book_id__in=survivor_books)
             if clashes.exists():
                 raise CommandError(
@@ -84,7 +84,7 @@ class Command(BaseCommand):
                     f"merge those accounts first, or they are different people."
                 )
 
-            moved_accounts = CariAccount.objects.filter(contact=dup).update(contact=survivor)
+            moved_accounts = CurrentAccount.objects.filter(contact=dup).update(contact=survivor)
             moved_notes = Note.objects.filter(contact=dup).update(contact=survivor)
             moved_suppliers = Supplier.objects.filter(
                 linked_contact=dup).update(linked_contact=survivor)
@@ -116,5 +116,5 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"\n#{survivor.pk} {survivor.name!r} | country={survivor.country!r} "
             f"email={survivor.email} phone={survivor.phone} | "
-            f"accounts: {[a.code for a in survivor.cari_accounts.all()]}"
+            f"accounts: {[a.code for a in survivor.current_account_accounts.all()]}"
         ))

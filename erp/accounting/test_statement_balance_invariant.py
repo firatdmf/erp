@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import (
-    Book, CariAccount, CariMovement, CurrencyCategory, Payment,
+    Book, CurrentAccount, CurrentAccountMovement, CurrencyCategory, Payment,
 )
 
 
@@ -23,7 +23,7 @@ class StatementBalanceInvariantTest(TestCase):
     happened to sum to zero. A hard-deleted payment broke that and the two
     pages disagreed by 150.00.
 
-    Both now sum CariMovementQuerySet.live(). These tests assert the
+    Both now sum CurrentAccountMovementQuerySet.live(). These tests assert the
     property that replaced the coincidence: whatever is voided, the two
     numbers are the same number, because there is only one rule.
     """
@@ -38,41 +38,41 @@ class StatementBalanceInvariantTest(TestCase):
         # Object pages are refused unless the viewer is assigned the
         # row's book (accounting.book_scope.book_guarded).
         self.user.member.books.add(self.book)
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="PERAKENDE", name="Retail Sales",
             default_currency=self.usd)
 
     # -- helpers ---------------------------------------------------------
     def collection(self, number, amount):
         p = Payment.objects.create(
-            cari=self.cari, book=self.book, number=number,
+            current_account=self.current_account, book=self.book, number=number,
             type="collection", method="cash", status="draft",
             date="2026-07-10", amount=Decimal(amount), currency=self.usd)
         p.confirm()
         return p
 
     def sale(self, amount):
-        return CariMovement.objects.create(
-            cari=self.cari, book=self.book, date="2026-07-10",
+        return CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date="2026-07-10",
             amount=Decimal(amount), currency=self.usd,
             movement_type="order_sale")
 
     def assert_agrees(self):
         """The account page and the statement, from the one rule."""
-        self.cari.refresh_from_db()
-        ledger = (self.cari.movements.live()
+        self.current_account.refresh_from_db()
+        ledger = (self.current_account.movements.live()
                   .aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00"))
         self.assertEqual(
-            ledger, self.cari.cached_balance,
+            ledger, self.current_account.cached_balance,
             "cached_balance must equal the sum of live movements")
         self.assertEqual(
-            self.statement_closing(), self.cari.cached_balance,
+            self.statement_closing(), self.current_account.cached_balance,
             "statement closing must equal the account balance")
         return ledger
 
     def statement_closing(self):
         response = self.client.get(
-            reverse("accounts:statement", kwargs={"pk": self.cari.pk}))
+            reverse("accounts:statement", kwargs={"pk": self.current_account.pk}))
         self.assertEqual(response.status_code, 200)
         return response.context["closing"]
 
@@ -102,8 +102,8 @@ class StatementBalanceInvariantTest(TestCase):
 
         # The historical shape: a cancel counter-row exists, and then the
         # payment row itself is deleted rather than cancelled.
-        CariMovement.objects.create(
-            cari=self.cari, book=self.book, date="2026-07-10",
+        CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date="2026-07-10",
             amount=Decimal("150.00"), currency=self.usd,
             movement_type="adjustment",
             reference="CANCEL TAH-2026-000022",
@@ -129,17 +129,17 @@ class StatementBalanceInvariantTest(TestCase):
         self.sale("150.00")
         extra = self.sale("40.00")
         self.assert_agrees()
-        self.assertEqual(self.cari.cached_balance, Decimal("190.00"))
+        self.assertEqual(self.current_account.cached_balance, Decimal("190.00"))
 
         extra.is_void = True
         extra.save()
 
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("150.00"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("150.00"))
         self.assert_agrees()
 
         shown = [r["mv"].pk for r in self.client.get(
-            reverse("accounts:statement", kwargs={"pk": self.cari.pk})
+            reverse("accounts:statement", kwargs={"pk": self.current_account.pk})
         ).context["rows"]]
         self.assertNotIn(extra.pk, shown,
                          "a voided row must leave the statement too")
@@ -152,7 +152,7 @@ class StatementBalanceInvariantTest(TestCase):
         extra.save()
 
         response = self.client.get(
-            reverse("accounts:statement", kwargs={"pk": self.cari.pk}),
+            reverse("accounts:statement", kwargs={"pk": self.current_account.pk}),
             {"status": "cancelled"})
         self.assertEqual([r["mv"].pk for r in response.context["rows"]], [extra.pk])
 
@@ -162,7 +162,7 @@ class StatementBalanceInvariantTest(TestCase):
         actually survive it."""
         self.sale("57.01")
         rows = self.client.get(
-            reverse("accounts:statement", kwargs={"pk": self.cari.pk})
+            reverse("accounts:statement", kwargs={"pk": self.current_account.pk})
         ).context["rows"]
         self.assertEqual(len(rows), 1)
         self.assert_agrees()

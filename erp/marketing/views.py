@@ -3087,7 +3087,7 @@ def get_product(request):
         "weight": float(p_weight) if p_weight is not None else None,
         "unit_of_weight": p_uow,
         "category_id": p_category_id,
-        # The accurate name for what this is: the cari ACCOUNT the product
+        # The accurate name for what this is: the current account ACCOUNT the product
         # is purchased from. `supplier_id` is the same value under the old
         # key, kept because the storefront lives outside this repo and can't
         # be updated in the same commit — drop it once nothing reads it.

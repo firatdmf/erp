@@ -94,11 +94,11 @@
     <td>
       <h3>{% trans "Supplier" %}</h3>
       <div class="card">
-        <div class="name">{{ invoice.cari.name }}</div>
-        <div class="role">{{ invoice.cari.get_type_display }}</div>
-        {% if invoice.cari.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ invoice.cari.phone }}</div>{% endif %}
-        {% if invoice.cari.email %}<div class="line"><b>{% trans "E-mail" %}:</b> {{ invoice.cari.email }}</div>{% endif %}
-        {% if invoice.cari.tax_number %}<div class="line"><b>{% trans "Tax no" %}:</b> {{ invoice.cari.tax_number }}</div>{% endif %}
+        <div class="name">{{ invoice.current_account.name }}</div>
+        <div class="role">{{ invoice.current_account.get_type_display }}</div>
+        {% if invoice.current_account.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ invoice.current_account.phone }}</div>{% endif %}
+        {% if invoice.current_account.email %}<div class="line"><b>{% trans "E-mail" %}:</b> {{ invoice.current_account.email }}</div>{% endif %}
+        {% if invoice.current_account.tax_number %}<div class="line"><b>{% trans "Tax no" %}:</b> {{ invoice.current_account.tax_number }}</div>{% endif %}
       </div>
     </td>
     <td>

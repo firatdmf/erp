@@ -480,7 +480,7 @@ def _sum_in_base(model, book, field):
 
     These tables carry a currency FK per row, so a plain Sum() adds TRY to
     USD and returns a number that is not money — the same trap
-    CariMovement.amount_base exists to avoid. Book 2's three capital rows
+    CurrentAccountMovement.amount_base exists to avoid. Book 2's three capital rows
     are one USD, one EUR and one TRY, so the naive total was wrong by
     whatever the non-USD pair happened to be worth.
 
@@ -529,24 +529,24 @@ class BookDetail(generic.DetailView):
             .order_by("currency__code", "name")
         )
 
-        # Who owes the book money and who it owes, read off the cari cards
+        # Who owes the book money and who it owes, read off the current account cards
         # rather than the AR/AP mirror tables the block above still holds.
         # Those mirrors are written per-movement by signals_accounts and
         # skip the movement types _mirror_to_legacy has no side for, so the
         # payable table lists ten rows against three hundred real ones.
         # Showing them would contradict the equation directly above, which
         # is built from the netted cached_balance.
-        cari_qs = CariAccount.objects.filter(book=book)
+        current_account_qs = CurrentAccount.objects.filter(book=book)
         context["top_receivables"] = (
-            cari_qs.filter(cached_balance__gt=0)
+            current_account_qs.filter(cached_balance__gt=0)
             .order_by("-cached_balance")[:10]
         )
         context["top_payables"] = (
-            cari_qs.filter(cached_balance__lt=0)
+            current_account_qs.filter(cached_balance__lt=0)
             .order_by("cached_balance")[:10]
         )
-        context["receivable_count"] = cari_qs.filter(cached_balance__gt=0).count()
-        context["payable_count"] = cari_qs.filter(cached_balance__lt=0).count()
+        context["receivable_count"] = current_account_qs.filter(cached_balance__gt=0).count()
+        context["payable_count"] = current_account_qs.filter(cached_balance__lt=0).count()
 
         # Stakeholders, with the stake each one's shares actually buy.
         # Book.total_shares is the pool every holding is measured against
@@ -581,7 +581,7 @@ class BookDetail(generic.DetailView):
     def _accounting_equation(book):
         """Assets = Liabilities + Equity, as far as the data supports it.
 
-        Receivables and payables are read off CariAccount.cached_balance,
+        Receivables and payables are read off CurrentAccount.cached_balance,
         which is now the only place they live. They were also mirrored into
         AssetAccountsReceivable / LiabilityAccountsPayable tables, which
         this function pointedly did not sum: those mirrors were written per
@@ -609,12 +609,12 @@ class BookDetail(generic.DetailView):
             # convert rather than 500-ing the whole page.
             cash = zero
 
-        cari = CariAccount.objects.filter(book=book).aggregate(
+        current_account = CurrentAccount.objects.filter(book=book).aggregate(
             receivable=Sum("cached_balance", filter=Q(cached_balance__gt=0)),
             payable=Sum("cached_balance", filter=Q(cached_balance__lt=0)),
         )
-        receivable = cari["receivable"] or zero
-        payable = abs(cari["payable"] or zero)
+        receivable = current_account["receivable"] or zero
+        payable = abs(current_account["payable"] or zero)
 
         fixed = _sum_in_base(AssetFixedAsset, book, "value")
         capital = _sum_in_base(EquityCapital, book, "amount")
@@ -875,14 +875,14 @@ def handle_expense_on_account(book, expense, member=None):
 
     The movement points back at the expense through the generic source FK,
     so the two halves are one document rather than two rows that happen to
-    agree — and so CariMovement.entered_rate can ask the expense what rate
+    agree — and so CurrentAccountMovement.entered_rate can ask the expense what rate
     it was recorded at, via EquityExpense.ledger_exchange_rate.
     """
-    return CariMovement.objects.create(
-        cari=expense.paid_by_cari,
+    return CurrentAccountMovement.objects.create(
+        current_account=expense.paid_by_current_account,
         book=book,
         date=expense.date,
-        # Negative: the book owes them. Same sign convention the cari
+        # Negative: the book owes them. Same sign convention the current account
         # detail page reads, where a negative balance is a payable.
         amount=-abs(expense.amount),
         currency=expense.currency,
@@ -938,7 +938,7 @@ def unpost_expense(expense):
     else:
         # post_delete recomputes the account's balance — see
         # signals_accounts.recompute_after_delete.
-        CariMovement.objects.filter(
+        CurrentAccountMovement.objects.filter(
             source_type=content_type, source_id=expense.pk
         ).delete()
 
@@ -1182,7 +1182,7 @@ class EquityExpensePage:
         form = context.get("form")
         if form is not None:
             context["cash_accounts"] = form.fields["cash_account"].queryset
-            context["cari_options"] = [
+            context["current_account_options"] = [
                 {
                     "id": c.pk,
                     "code": c.code,
@@ -1191,7 +1191,7 @@ class EquityExpensePage:
                     "currency_id": c.default_currency_id,
                     "currency_code": c.default_currency.code,
                 }
-                for c in form.fields["paid_by_cari"].queryset
+                for c in form.fields["paid_by_current_account"].queryset
             ]
             context["categories"] = form.fields["category"].queryset
             context["currencies"] = CurrencyCategory.objects.all().order_by("code")
@@ -1236,17 +1236,17 @@ class EquityExpensePage:
         return bool(form is not None and form.data.get("currency"))
 
     def ledger_movement(self):
-        """The cari movement this expense posted, if it posted one."""
+        """The current account movement this expense posted, if it posted one."""
         expense = getattr(self, "object", None)
-        if expense is None or not expense.pk or not expense.paid_by_cari_id:
+        if expense is None or not expense.pk or not expense.paid_by_current_account_id:
             return None
         return (
-            CariMovement.objects
+            CurrentAccountMovement.objects
             .filter(
                 source_type=ContentType.objects.get_for_model(EquityExpense),
                 source_id=expense.pk,
             )
-            .select_related("currency", "cari")
+            .select_related("currency", "current_account")
             .first()
         )
 
@@ -1265,9 +1265,9 @@ class EquityExpensePage:
         """What just happened, in the terms the entry was made in."""
         expense = self.object
         amount = f"{expense.amount} {expense.currency.code}"
-        if expense.paid_by_cari_id:
+        if expense.paid_by_current_account_id:
             return _g("%(amount)s expense recorded — %(account)s is owed it.") % {
-                "amount": amount, "account": expense.paid_by_cari.name,
+                "amount": amount, "account": expense.paid_by_current_account.name,
             }
         return _g("%(amount)s expense recorded, paid from %(account)s.") % {
             "amount": amount, "account": expense.cash_account.name,
@@ -1346,7 +1346,7 @@ class EquityExpenseDetail(generic.DetailView):
             .filter(book_id=self.kwargs.get("pk"))
             .select_related("book", "category", "currency",
                             "cash_account", "cash_account__currency",
-                            "paid_by_cari", "paid_by_cari__default_currency")
+                            "paid_by_current_account", "paid_by_current_account__default_currency")
         )
 
     def get_context_data(self, **kwargs):
@@ -1359,11 +1359,11 @@ class EquityExpenseDetail(generic.DetailView):
         # post_expense. Both are looked up rather than derived, because
         # what the page is for is showing that the entry really posted.
         context["ledger_movement"] = (
-            CariMovement.objects
+            CurrentAccountMovement.objects
             .filter(source_type=content_type, source_id=expense.pk)
-            .select_related("currency", "cari")
+            .select_related("currency", "current_account")
             .first()
-        ) if expense.paid_by_cari_id else None
+        ) if expense.paid_by_current_account_id else None
         context["cash_entry"] = (
             CashTransactionEntry.objects
             .filter(content_type=content_type, content_pk=expense.pk)
@@ -1395,7 +1395,7 @@ class EquityExpenseDetail(generic.DetailView):
 
         rate = getattr(posted, "exchange_rate", None)
         # CashTransactionEntry keeps the converted figure under one name,
-        # CariMovement under another; only one of the two ever posted.
+        # CurrentAccountMovement under another; only one of the two ever posted.
         amount = getattr(posted, "amount_in_base_currency", None)
         if amount is None:
             amount = getattr(posted, "amount_base", None)
@@ -1654,7 +1654,7 @@ class EquityExpenseList(generic.ListView):
         book_pk = self.kwargs.get("pk")
         return (
             EquityExpense.objects.filter(book=book_pk)
-            .select_related("category", "cash_account", "paid_by_cari", "currency")
+            .select_related("category", "cash_account", "paid_by_current_account", "currency")
             .order_by("-date", "-pk")
         )
 
@@ -1662,7 +1662,7 @@ class EquityExpenseList(generic.ListView):
 # The relations cash_entry_heading reads. Followed up front, because
 # reaching them one row at a time is how a 50-row page turns into 100
 # extra queries.
-DESCRIPTION_RELATIONS = ("cari", "member", "supplier", "category")
+DESCRIPTION_RELATIONS = ("current_account", "member", "supplier", "category")
 
 
 def _source_queryset(model):
@@ -1757,7 +1757,7 @@ def cash_entry_heading(obj):
     """
     if obj is None:
         return ""
-    for field in ("cari", "member", "supplier", "category"):
+    for field in ("current_account", "member", "supplier", "category"):
         related = getattr(obj, field, None)
         if related is not None:
             return str(related)
@@ -1976,7 +1976,7 @@ class MakeInTransfer(View):
     """
 
     template_name = "accounting/make_in_transfer.html"
-    MODES = ("cash", "cari")
+    MODES = ("cash", "current_account")
 
     def get_book(self):
         return get_object_or_404(Book, pk=self.kwargs.get("pk"))
@@ -1985,19 +1985,19 @@ class MakeInTransfer(View):
         mode = source.get("mode") or "cash"
         return mode if mode in self.MODES else "cash"
 
-    def render_page(self, book, mode, cash_form=None, cari_form=None):
+    def render_page(self, book, mode, cash_form=None, current_account_form=None):
         return render(self.request, self.template_name, {
             "book": book,
             "mode": mode,
             "form": cash_form or InTransferForm(book=book, initial={"book": book}),
-            "cari_form": cari_form or CariTransferForm(book=book, initial={"book": book}),
+            "current_account_form": current_account_form or CurrentAccountTransferForm(book=book, initial={"book": book}),
             "cash_accounts": CashAccount.objects.filter(book=book).order_by("name"),
-            # A cari's cached balance is a BASE-currency figure while the
+            # A current account's cached balance is a BASE-currency figure while the
             # transfer is typed in whichever currency is picked, so the
             # page needs to know which currency that is to convert.
             #
             # Deliberately settings.BASE_CURRENCY_CODE and NOT the book's
-            # own base: CariMovement.save() and CariAccount's balances
+            # own base: CurrentAccountMovement.save() and CurrentAccount's balances
             # convert against the former, so taking the latter here would
             # let the page label and convert against one currency while the
             # ledger used another — invisible today, since every book is
@@ -2014,8 +2014,8 @@ class MakeInTransfer(View):
     def post(self, request, pk):
         book = self.get_book()
         mode = self._mode(request.POST)
-        if mode == "cari":
-            return self.post_cari(request, book)
+        if mode == "current_account":
+            return self.post_current_account(request, book)
         return self.post_cash(request, book)
 
     # -- cash → cash ------------------------------------------------------
@@ -2071,12 +2071,12 @@ class MakeInTransfer(View):
         })
         return redirect(self.success_url(book, "cash"))
 
-    # -- cari → cari ------------------------------------------------------
+    # -- current account → current account ------------------------------------------------------
     @transaction.atomic
-    def post_cari(self, request, book):
-        form = CariTransferForm(request.POST, book=book)
+    def post_current_account(self, request, book):
+        form = CurrentAccountTransferForm(request.POST, book=book)
         if not form.is_valid():
-            return self.render_page(book, "cari", cari_form=form)
+            return self.render_page(book, "current_account", current_account_form=form)
 
         transfer = form.save(commit=False)
         transfer.book = book
@@ -2088,13 +2088,13 @@ class MakeInTransfer(View):
             # so this is the belt to the form's braces rather than a path
             # the UI can normally reach.
             form.add_error(None, exc.messages)
-            return self.render_page(book, "cari", cari_form=form)
+            return self.render_page(book, "current_account", current_account_form=form)
         transfer.post(user=request.user)
 
         messages.success(request, _g("Moved %(amount)s from %(src)s to %(dst)s.") % {
             "amount": f"{transfer.amount} {transfer.currency.code}",
-            "src": transfer.from_cari.name,
-            "dst": transfer.to_cari.name,
+            "src": transfer.from_current_account.name,
+            "dst": transfer.to_current_account.name,
         })
         # The transfer it just made, not the empty form again. A virman is a
         # document — it has two legs in two accounts and a rate they both

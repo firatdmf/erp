@@ -3,7 +3,7 @@
 The product search and the two barcode endpoints read every warehouse
 in the install. Stock belongs to the book that owns its warehouse, so
 offering a line off another book's shelf promises a different
-business's asset — and the order would bill it to this book's cari.
+business's asset — and the order would bill it to this book's current account.
 """
 from decimal import Decimal
 from unittest.mock import patch

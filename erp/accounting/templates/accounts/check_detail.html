@@ -179,7 +179,7 @@
           <span class="chk-d-dir given">↑ {% trans "Given to supplier" %}</span>
         {% endif %}
         <span class="chk-d-dot"></span>
-        <span><i data-lucide="user"></i><a href="{% url 'accounts:detail' check.cari.pk %}">{{ check.cari.name }}</a></span>
+        <span><i data-lucide="user"></i><a href="{% url 'accounts:detail' check.current_account.pk %}">{{ check.current_account.name }}</a></span>
       </div>
     </div>
   </div>
@@ -292,7 +292,7 @@
                 <label>{% trans "Endorse" %} →</label>
                 <select name="endorsed_to" required>
                   <option value="">{% trans "— Select account —" %}</option>
-                  {% for c in other_caris %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
+                  {% for c in other_current_accounts %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
                 </select>
                 <button type="submit" class="chk-d-btn warn"><i data-lucide="arrow-right"></i>{% trans "Endorse" %}</button>
               </div>
@@ -362,12 +362,12 @@
             <span class="ico"><i data-lucide="user"></i></span>
             <h3>{% trans "Account" %}</h3>
           </div>
-          <div class="chk-d-side-name">{{ check.cari.name }}</div>
-          <div class="chk-d-side-code">{{ check.cari.code }}</div>
+          <div class="chk-d-side-name">{{ check.current_account.name }}</div>
+          <div class="chk-d-side-code">{{ check.current_account.code }}</div>
           <div class="chk-d-side-bal">
-            {% trans "Current balance:" %} <strong>{{ check.cari.display_currency_symbol }}{{ check.cari.absolute_balance|money }}</strong>
+            {% trans "Current balance:" %} <strong>{{ check.current_account.display_currency_symbol }}{{ check.current_account.absolute_balance|money }}</strong>
           </div>
-          <a href="{% url 'accounts:detail' check.cari.pk %}" class="chk-d-side-link">{% trans "Go to account" %} <i data-lucide="arrow-right"></i></a>
+          <a href="{% url 'accounts:detail' check.current_account.pk %}" class="chk-d-side-link">{% trans "Go to account" %} <i data-lucide="arrow-right"></i></a>
         </div>
       </div>
     </div>

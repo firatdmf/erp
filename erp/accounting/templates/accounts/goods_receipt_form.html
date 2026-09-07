@@ -1923,7 +1923,7 @@
 
         const sel = document.getElementById('npSupplier');
         if (sel) {
-          if (d.cari_id) sel.value = String(d.cari_id);
+          if (d.current_account_id) sel.value = String(d.current_account_id);
           sel.disabled = true;
           npSupCancelNew();
           npSupSyncFromSelect();   // chip renders locked — account can't change mid-edit
@@ -2156,7 +2156,7 @@
       return;
     }
     return {
-      cari_id: sel.value,
+      current_account_id: sel.value,
       barcode_prefix: (opt && opt.getAttribute('data-prefix')) || '',
       unit: document.getElementById('npUnit').value || 'mt',
       // What the rate boxes above say, so the alım is cut at the rate the
@@ -2303,7 +2303,7 @@
     const unitSel = document.getElementById('npUnit');
     if (unitSel && plan.unit) unitSel.value = plan.unit;
     const sel = document.getElementById('npSupplier');
-    if (sel && plan.cari_id) sel.value = String(plan.cari_id);
+    if (sel && plan.current_account_id) sel.value = String(plan.current_account_id);
     npSupSyncFromSelect();
     npUpdatePrefix();
 

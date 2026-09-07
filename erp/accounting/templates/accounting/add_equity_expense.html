@@ -13,7 +13,7 @@
 
   The controls are hand-rendered rather than {{ form.as_p }}, but every name
   and id is EquityExpenseForm's own — id_amount, id_date, id_cash_account,
-  id_paid_by_cari, id_exchange_rate — because partials/fx_rate_field.html
+  id_paid_by_current_account, id_exchange_rate — because partials/fx_rate_field.html
   finds its inputs by those ids, and the view still posts through the form.
 {% endcomment %}
 
@@ -230,15 +230,15 @@
             <div class="pf-seg">
               <label>
                 <input type="radio" name="funding_source" value="cash" id="fundCash"
-                       {% if not form.paid_by_cari.value %}checked{% endif %}>
+                       {% if not form.paid_by_current_account.value %}checked{% endif %}>
                 <span>
                   <span class="t">{% trans "Paid from cash" %}</span>
                   <span class="d">{% trans "The money left one of the book's own accounts." %}</span>
                 </span>
               </label>
               <label>
-                <input type="radio" name="funding_source" value="cari" id="fundCari"
-                       {% if form.paid_by_cari.value %}checked{% endif %}>
+                <input type="radio" name="funding_source" value="cari" id="fundCurrentAccount"
+                       {% if form.paid_by_current_account.value %}checked{% endif %}>
                 <span>
                   <span class="t">{% trans "Someone paid it for the book" %}</span>
                   <span class="d">{% trans "Cash is untouched; the book ends up owing them instead." %}</span>
@@ -267,7 +267,7 @@
               </div>
             </div>
 
-            <div class="pf-fund" id="fundCariPane" hidden>
+            <div class="pf-fund" id="fundCurrentAccountPane" hidden>
               <div class="pf-row wide">
                 <div class="pf-f">
                   <label>{% trans "Current Account" %}</label>
@@ -278,28 +278,28 @@
                     currency off the selected option. The search box and chip
                     below are only ways of setting it.
                   {% endcomment %}
-                  <select name="paid_by_cari" id="id_paid_by_cari" style="display:none;">
+                  <select name="paid_by_current_account" id="id_paid_by_current_account" style="display:none;">
                     <option value=""></option>
-                    {% for c in cari_options %}
+                    {% for c in current_account_options %}
                       <option value="{{ c.id }}"
                               data-currency="{{ c.currency_id }}"
                               data-currency-code="{{ c.currency_code }}"
                               data-type="{{ c.type }}"
                               data-label="{{ c.code }} — {{ c.name }}"
-                              {% if form.paid_by_cari.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                              {% if form.paid_by_current_account.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
                     {% endfor %}
                   </select>
 
-                  <div class="np-sup" id="cariBox">
-                    <input type="text" id="cariSearch" class="np-input" autocomplete="off"
+                  <div class="np-sup" id="currentAccountBox">
+                    <input type="text" id="currentAccountSearch" class="np-input" autocomplete="off"
                            placeholder="{% trans 'Type an account name…' %}">
-                    <div class="np-sup-results" id="cariResults" hidden></div>
+                    <div class="np-sup-results" id="currentAccountResults" hidden></div>
                   </div>
 
-                  <div class="np-sup-chip" id="cariChip" hidden>
+                  <div class="np-sup-chip" id="currentAccountChip" hidden>
                     <i class="fa fa-user"></i>
-                    <span id="cariChipName"></span>
-                    <button type="button" class="np-sup-clear" id="cariClear"
+                    <span id="currentAccountChipName"></span>
+                    <button type="button" class="np-sup-clear" id="currentAccountClear"
                             title="{% trans 'Change account' %}">&times;</button>
                   </div>
 
@@ -413,13 +413,13 @@
             {% endcomment %}
             <div class="pf-posted">
               <div class="t">{% trans "Posted to the account" %}</div>
-              <a href="{% url 'accounts:detail' pk=ledger_movement.cari_id %}">
-                {{ ledger_movement.cari.code }} — {{ ledger_movement.cari.name }}
+              <a href="{% url 'accounts:detail' pk=ledger_movement.current_account_id %}">
+                {{ ledger_movement.current_account.code }} — {{ ledger_movement.current_account.name }}
               </a>
               <div class="n">
                 {{ ledger_movement.date }} ·
                 {{ ledger_movement.amount|floatformat:2 }} {{ ledger_movement.currency.code }}
-                {% if ledger_movement.currency_id != ledger_movement.cari.default_currency_id or ledger_movement.exchange_rate != 1 %}
+                {% if ledger_movement.currency_id != ledger_movement.current_account.default_currency_id or ledger_movement.exchange_rate != 1 %}
                   · {{ ledger_movement.amount_base|floatformat:2 }} {{ book.effective_base_currency.code }}
                 {% endif %}
               </div>
@@ -486,9 +486,9 @@
 <script>
 (function () {
   var cashPane = document.getElementById('fundCashPane');
-  var cariPane = document.getElementById('fundCariPane');
+  var currentAccountPane = document.getElementById('fundCurrentAccountPane');
   var cashSel  = document.getElementById('id_cash_account');
-  var cariSel  = document.getElementById('id_paid_by_cari');
+  var currentAccountSel  = document.getElementById('id_paid_by_current_account');
   var amountEl = document.getElementById('id_amount');
   var ccySel   = document.getElementById('id_currency');
   var ccyHint  = document.getElementById('currencyHint');
@@ -507,10 +507,10 @@
   // submits its value, and two funding sources is the one thing
   // EquityExpense's check constraint refuses.
   function applyFunding() {
-    var cari = document.getElementById('fundCari').checked;
-    cariPane.hidden = !cari;
+    var cari = document.getElementById('fundCurrentAccount').checked;
+    currentAccountPane.hidden = !cari;
     cashPane.hidden = cari;
-    if (cari) { cashSel.value = ''; } else { setCari(''); }
+    if (cari) { cashSel.value = ''; } else { setCurrentAccount(''); }
     cashSel.dispatchEvent(new Event('change'));
     syncCurrency();
     syncSummary();
@@ -521,29 +521,29 @@
   // account only has a DEFAULT currency — it can hold a mix — so there the
   // account merely proposes and the person disposes.
   function syncCurrency() {
-    var usingCari = document.getElementById('fundCari').checked;
-    var sel = usingCari ? cariSel : cashSel;
+    var usingCurrentAccount = document.getElementById('fundCurrentAccount').checked;
+    var sel = usingCurrentAccount ? currentAccountSel : cashSel;
     var opt = sel.options[sel.selectedIndex];
     var accountCcy = opt && opt.value ? opt.getAttribute('data-currency') : null;
 
-    ccySel.disabled = !usingCari;
-    if (accountCcy && (!usingCari || !ccyTouched)) { ccySel.value = accountCcy; }
+    ccySel.disabled = !usingCurrentAccount;
+    if (accountCcy && (!usingCurrentAccount || !ccyTouched)) { ccySel.value = accountCcy; }
 
-    ccyHint.textContent = usingCari ? S.ccyCari : S.ccyCash;
+    ccyHint.textContent = usingCurrentAccount ? S.ccyCurrentAccount : S.ccyCash;
     // The fx converter reads this select, and assigning .value fires nothing.
     ccySel.dispatchEvent(new Event('change'));
   }
-  ['fundCash', 'fundCari'].forEach(function (id) {
+  ['fundCash', 'fundCurrentAccount'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', applyFunding);
   });
 
   // ── Account picker ────────────────────────────────────────────────
   // Type-to-search over the hidden <select>'s options — the whole list is
   // already on the page, so filtering is instant and costs no round trip.
-  var search  = document.getElementById('cariSearch');
-  var results = document.getElementById('cariResults');
-  var chip    = document.getElementById('cariChip');
-  var box     = document.getElementById('cariBox');
+  var search  = document.getElementById('currentAccountSearch');
+  var results = document.getElementById('currentAccountResults');
+  var chip    = document.getElementById('currentAccountChip');
+  var box     = document.getElementById('currentAccountBox');
   var active  = -1;
 
   function esc(s) {
@@ -562,7 +562,7 @@
   }
 
   function options() {
-    return Array.prototype.slice.call(cariSel.options).filter(function (o) { return o.value; });
+    return Array.prototype.slice.call(currentAccountSel.options).filter(function (o) { return o.value; });
   }
 
   function labelOf(o) { return o.getAttribute('data-label') || o.textContent; }
@@ -591,7 +591,7 @@
     Array.prototype.forEach.call(results.querySelectorAll('.np-sup-opt'), function (el) {
       el.addEventListener('mousedown', function (e) {
         e.preventDefault();   // keep focus so blur doesn't close first
-        setCari(el.dataset.id);
+        setCurrentAccount(el.dataset.id);
       });
     });
   }
@@ -599,25 +599,25 @@
   // Every path funnels through here, so the hidden <select> and the chip
   // can never disagree — and the `change` it fires is what lets
   // fx_rate_field.html pick the rate up (assigning .value never fires one).
-  function setCari(id) {
-    cariSel.value = id || '';
+  function setCurrentAccount(id) {
+    currentAccountSel.value = id || '';
     syncChip();
-    cariSel.dispatchEvent(new Event('change'));
+    currentAccountSel.dispatchEvent(new Event('change'));
     syncSummary();
   }
 
   function syncChip() {
-    var opt = cariSel.options[cariSel.selectedIndex];
+    var opt = currentAccountSel.options[currentAccountSel.selectedIndex];
     var picked = !!(opt && opt.value);
     chip.hidden = !picked;
     box.hidden = picked;
     results.hidden = true;
-    if (picked) { document.getElementById('cariChipName').textContent = labelOf(opt); }
+    if (picked) { document.getElementById('currentAccountChipName').textContent = labelOf(opt); }
     else { search.value = ''; }
   }
 
-  document.getElementById('cariClear').addEventListener('click', function () {
-    setCari('');
+  document.getElementById('currentAccountClear').addEventListener('click', function () {
+    setCurrentAccount('');
     search.focus();
   });
   search.addEventListener('input', function () { render(this.value); });
@@ -636,7 +636,7 @@
     } else if (e.key === 'Enter') {
       e.preventDefault();
       var row = rows[active] || rows[0];
-      if (row) setCari(row.dataset.id);
+      if (row) setCurrentAccount(row.dataset.id);
     } else if (e.key === 'Escape') {
       results.hidden = true;
     }
@@ -645,7 +645,7 @@
   // The fx script clears whichever funding select the user did not pick;
   // the chip has to hear about it or it goes on naming an account the
   // form is no longer submitting.
-  cariSel.addEventListener('change', function () { syncChip(); syncCurrency(); syncSummary(); });
+  currentAccountSel.addEventListener('change', function () { syncChip(); syncCurrency(); syncSummary(); });
   cashSel.addEventListener('change', function () { syncCurrency(); syncSummary(); });
   amountEl.addEventListener('input', syncSummary);
 
@@ -655,8 +655,8 @@
     document.getElementById('sumAmount').textContent =
       isFinite(amount) ? amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00';
 
-    var usingCari = document.getElementById('fundCari').checked;
-    var sel = usingCari ? cariSel : cashSel;
+    var usingCurrentAccount = document.getElementById('fundCurrentAccount').checked;
+    var sel = usingCurrentAccount ? currentAccountSel : cashSel;
     var opt = sel.options[sel.selectedIndex];
     var picked = !!(opt && opt.value);
     // Off the currency control, which on the cari path need not agree with
@@ -673,7 +673,7 @@
     if (!picked) {
       effect.textContent = S.choose;
     } else {
-      var tpl = usingCari ? S.owe : S.cashDown;
+      var tpl = usingCurrentAccount ? S.owe : S.cashDown;
       effect.innerHTML = esc(tpl).replace('{name}', '<b>' + esc(labelOf(opt)) + '</b>');
     }
   }

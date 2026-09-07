@@ -17,7 +17,7 @@ from accounting.models import (
     CashTransactionEntry,
     CurrencyCategory,
 )
-from accounting.models_accounts import CariAccount, Payment
+from accounting.models_accounts import CurrentAccount, Payment
 
 
 class PaymentFormFxTests(TestCase):
@@ -39,7 +39,7 @@ class PaymentFormFxTests(TestCase):
         self.lira = CashAccount.objects.create(
             book=self.book, name="Cash", currency=self.try_, balance=Decimal("0.00")
         )
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-001", name="Rana", type="customer",
             default_currency=self.try_,
         )
@@ -84,7 +84,7 @@ class PaymentFormFxTests(TestCase):
     # -- the form ----------------------------------------------------------
     def test_the_form_tells_the_script_the_books_currency(self):
         response = self.client.get(
-            reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}), {"account": self.cari.pk}
+            reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}), {"account": self.current_account.pk}
         )
         self.assertContains(response, 'id="fxRow"')
         self.assertContains(response, f'"code": "USD"')
@@ -97,7 +97,7 @@ class PaymentFormFxTests(TestCase):
     # -- what gets saved ---------------------------------------------------
     def _create(self, **overrides):
         data = {
-            "account": self.cari.pk,
+            "account": self.current_account.pk,
             "type": "collection",
             "method": "cash",
             "date": "2026-08-17",

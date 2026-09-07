@@ -36,7 +36,7 @@ def build_invoice_workbook(invoice):
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
 
-    cari = invoice.cari
+    current_account = invoice.current_account
     ccode = invoice.currency.code if (invoice.currency_id and invoice.currency) else ""
     money = (f'#,##0.00" {ccode}"' if ccode else "#,##0.00")
 
@@ -54,10 +54,10 @@ def build_invoice_workbook(invoice):
     itax_office = invoice.issuer_tax_office or s("BRAND_TAX_OFFICE")
     itax_no = invoice.issuer_tax_number or s("BRAND_TAX_NUMBER")
 
-    # Consignee = per-invoice snapshot, else cari master.
+    # Consignee = per-invoice snapshot, else current account master.
     def cv(attr):
-        return getattr(cari, attr, "") if cari else ""
-    bname = invoice.bill_to_name or (cari.name if cari else "—")
+        return getattr(current_account, attr, "") if current_account else ""
+    bname = invoice.bill_to_name or (current_account.name if current_account else "—")
     baddr = invoice.bill_to_address or cv("billing_address")
     bcity = invoice.bill_to_city or cv("billing_city")
     bcountry = invoice.bill_to_country or cv("billing_country")

@@ -49,7 +49,7 @@ class MemberWorkingBook(TestCase):
 
     def test_no_member_at_all_still_resolves(self):
         """Cron jobs, imports and the shell have no member."""
-        with self.settings(CARI_BOOK_ID=str(self.laleli.pk)):
+        with self.settings(CURRENT_ACCOUNT_BOOK_ID=str(self.laleli.pk)):
             self.assertEqual(get_default_book(None).pk, self.laleli.pk)
 
     def test_it_is_read_from_the_request_when_not_passed(self):
@@ -82,17 +82,17 @@ class MemberWorkingBook(TestCase):
             type("R", (), {"user": self.user})())
         self.assertIsNone(acting_member())
 
-    def test_a_new_cari_lands_in_the_members_book(self):
+    def test_a_new_current_account_lands_in_the_members_book(self):
         from crm.models import Company
         from accounting.models import CurrencyCategory
-        from accounting.services_accounts import get_or_create_cari_for_company
+        from accounting.services_accounts import get_or_create_current_account_for_company
         CurrencyCategory.objects.get_or_create(code="USD",
                                                defaults={"name": "USD"})
         self.member.default_book = self.ergene
         self.member.save(update_fields=["default_book"])
         company = Company.objects.create(name="Acme Tekstil")
-        cari = get_or_create_cari_for_company(company, member=self.member)
-        self.assertEqual(cari.book_id, self.ergene.pk)
+        current_account = get_or_create_current_account_for_company(company, member=self.member)
+        self.assertEqual(current_account.book_id, self.ergene.pk)
 
 
 class WorkingBookEndpoint(TestCase):
@@ -172,20 +172,20 @@ class WorkingBookEndpoint(TestCase):
         self.assertEqual([str(m) for m in get_messages(resp.wsgi_request)], [])
 
 
-class RetailCariIsNamedInEnglish(TestCase):
+class RetailCurrentAccountIsNamedInEnglish(TestCase):
     """The shared walk-in account is written by code, never typed, so its
     name is ours to state — and the database states things in English."""
 
     def setUp(self):
         from accounting.models import CurrencyCategory
-        # get_or_create_retail_cari resolves a currency for the new row,
+        # get_or_create_retail_current account resolves a currency for the new row,
         # and default_currency is NOT NULL.
         CurrencyCategory.objects.create(code="USD", name="US Dollar",
                                         symbol="$")
 
     def test_a_fresh_install_creates_it_in_english(self):
-        from accounting.services_accounts import get_or_create_retail_cari
-        cari = get_or_create_retail_cari()
-        self.assertEqual(cari.code, "PERAKENDE")
-        self.assertEqual(cari.name, "Retail Sales")
-        self.assertNotIn("Perakende", cari.notes)
+        from accounting.services_accounts import get_or_create_retail_current_account
+        current_account = get_or_create_retail_current_account()
+        self.assertEqual(current_account.code, "PERAKENDE")
+        self.assertEqual(current_account.name, "Retail Sales")
+        self.assertNotIn("Perakende", current_account.notes)

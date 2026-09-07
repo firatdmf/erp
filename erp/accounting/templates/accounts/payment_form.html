@@ -215,13 +215,13 @@
               <span class="sub">{% trans "Account, type, method & amount" %}</span>
             </div>
 
-            {% if prefilled_cari %}
-            <input type="hidden" name="account" value="{{ prefilled_cari.id }}">
+            {% if prefilled_current_account %}
+            <input type="hidden" name="account" value="{{ prefilled_current_account.id }}">
             <div class="pf-cari-chip">
               <i data-lucide="user"></i>
-              <span class="code">{{ prefilled_cari.code }}</span>
-              <span class="name">{{ prefilled_cari.name }}</span>
-              <span class="balance">· {% trans "Balance:" %} {{ prefilled_cari.display_currency_symbol }}{{ prefilled_cari.absolute_balance|money }} ({{ prefilled_cari.balance_label }})</span>
+              <span class="code">{{ prefilled_current_account.code }}</span>
+              <span class="name">{{ prefilled_current_account.name }}</span>
+              <span class="balance">· {% trans "Balance:" %} {{ prefilled_current_account.display_currency_symbol }}{{ prefilled_current_account.absolute_balance|money }} ({{ prefilled_current_account.balance_label }})</span>
               {% if not payment %}<a href="{% url 'accounts:payment_create' current_book.pk %}" class="change">{% trans "change" %}</a>{% endif %}
             </div>
             {% else %}
@@ -230,7 +230,7 @@
                 <label>{% trans "Select Account" %}</label>
                 <select name="account" required onchange="if(this.value){ window.location.href = '{% url 'accounts:payment_create' current_book.pk %}?account=' + this.value; }">
                   <option value="">{% trans "— Select account —" %}</option>
-                  {% for c in cari_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
+                  {% for c in current_account_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
                 </select>
                 <span class="hint">{% trans "Open invoices will load after selecting an account." %}</span>
               </div>
@@ -267,7 +267,7 @@
               <div class="pf-f">
                 <label>{% trans "Currency" %}</label>
                 <select name="currency" id="paymentCurrency">
-                  {% for c in currencies %}<option value="{{ c.id }}" {% if payment %}{% if payment.currency_id == c.id %}selected{% endif %}{% elif prefilled_cari and prefilled_cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
+                  {% for c in currencies %}<option value="{{ c.id }}" {% if payment %}{% if payment.currency_id == c.id %}selected{% endif %}{% elif prefilled_current_account and prefilled_current_account.default_currency_id == c.id %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
                 </select>
               </div>
               <div class="pf-f">
@@ -327,7 +327,7 @@
         </div>
 
         <!-- Open Invoices -->
-        {% if prefilled_cari %}
+        {% if prefilled_current_account %}
         <div class="pf-card">
           <div class="pf-sect">
             <div class="pf-sect-h">

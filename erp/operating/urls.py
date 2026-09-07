@@ -59,9 +59,9 @@ urlpatterns = [
     path("warehouses/<int:warehouse_pk>/movements/", views_warehouse.WarehouseMovements.as_view(), name="warehouse_movements"),
     path("orders/create/", views.create_web_order, name="create_web_order"),
     path("orders/create", views.OrderCreate.as_view(), name="create_order"),
-    path("orders/edit/<int:pk>/", book_guarded(views.OrderEdit.as_view(), Order, "cari.book"), name="edit_order"),
+    path("orders/edit/<int:pk>/", book_guarded(views.OrderEdit.as_view(), Order, "current_account.book"), name="edit_order"),
     path("orders/web/<int:pk>/status/", views.WebOrderStatusEdit.as_view(), name="web_order_status"),
-    path("orders/<int:pk>/", book_guarded(views.OrderDetail.as_view(), Order, "cari.book"), name="order_detail"),
+    path("orders/<int:pk>/", book_guarded(views.OrderDetail.as_view(), Order, "current_account.book"), name="order_detail"),
     path("orders/<int:pk>/customer/", views.order_customer_card_view, name="order_customer_card"),
     path("orders/<int:pk>/print/", views.OrderPrint.as_view(), name="order_print"),
     # Not book_guarded, and not scoped to one order: the sheet is a
@@ -83,11 +83,11 @@ urlpatterns = [
     path("orders/create/barcode_resolve/", views.order_create_barcode_resolve, name="order_create_barcode_resolve"),
     path("orders/create/roll_list/", views.order_create_roll_list, name="order_create_roll_list"),
     path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
-    # An order's money lands in one book (through its cari), so the list
+    # An order's money lands in one book (through its current account), so the list
     # names the book the same way the ledger's collections do. The old
     # unscoped address stays as a redirect to the viewer's working book:
     # it is linked from the nav, the mobile drawer, the top bar and a
-    # cari's detail page, and those links carry no book of their own.
+    # current account's detail page, and those links carry no book of their own.
     path("books/<int:book_id>/orders/", book_scoped(views.OrderList.as_view()),
          name="order_list_scoped"),
     path("orders/", views.OrderListRedirect.as_view(), name="order_list"),

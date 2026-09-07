@@ -235,8 +235,8 @@
             {% endif %}
           </td>
           <td>
-            <a class="ck-cari-link" href="{% url 'accounts:detail' c.cari.pk %}">{{ c.cari.name }}</a>
-            <div class="ck-cari-code">{{ c.cari.code }}</div>
+            <a class="ck-cari-link" href="{% url 'accounts:detail' c.current_account.pk %}">{{ c.current_account.name }}</a>
+            <div class="ck-cari-code">{{ c.current_account.code }}</div>
           </td>
           <td>
             {% if c.bank %}<div class="ck-bank">{{ c.bank }}{% if c.branch %} · {{ c.branch }}{% endif %}</div>{% endif %}

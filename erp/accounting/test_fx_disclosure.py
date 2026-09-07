@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import (
-    Book, CariAccount, CariMovement, CashAccount, CashTransactionEntry,
+    Book, CurrentAccount, CurrentAccountMovement, CashAccount, CashTransactionEntry,
     CurrencyCategory, Payment,
 )
 from accounting.services_accounts import conversion_facts
@@ -25,13 +25,13 @@ class FxDisclosureBase(TestCase):
         # Object pages are refused unless the viewer is assigned the
         # row's book (accounting.book_scope.book_guarded).
         self.user.member.books.add(self.book)
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-078", name="RANA UYGUR",
             default_currency=self.try_)
 
     def payment(self, currency, rate=Decimal("0.020800"), confirm=True):
         p = Payment.objects.create(
-            cari=self.cari, book=self.book, number="COL-FX-%s" % currency.code,
+            current_account=self.current_account, book=self.book, number="COL-FX-%s" % currency.code,
             type="collection", method="cash", status="draft",
             date="2026-08-17", amount=Decimal("200.00"),
             currency=currency, exchange_rate=rate)
@@ -77,8 +77,8 @@ class ConversionFactsTest(FxDisclosureBase):
         self.assertEqual(fx["base_amount"], Decimal("4.16"))
 
     def test_a_movement_reports_its_own_figures(self):
-        mv = CariMovement.objects.create(
-            cari=self.cari, book=self.book, date="2026-08-17",
+        mv = CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date="2026-08-17",
             amount=Decimal("200.00"), currency=self.try_,
             movement_type="adjustment", exchange_rate=Decimal("0.020800"),
             amount_base=Decimal("4.16"))
@@ -138,7 +138,7 @@ class StatementRowTest(FxDisclosureBase):
     moved by 4.16 and nothing on the page connects them."""
 
     def url(self):
-        return reverse("accounts:statement", kwargs={"pk": self.cari.pk})
+        return reverse("accounts:statement", kwargs={"pk": self.current_account.pk})
 
     def test_a_foreign_row_states_what_it_came_to(self):
         self.payment(self.try_)
@@ -163,20 +163,20 @@ class StatementRowTest(FxDisclosureBase):
         200 lookups to display nothing. (The rows the statement does spend
         queries on are _attach_links fetching each row's document, which
         predates this.)"""
-        mv = CariMovement.objects.create(
-            cari=self.cari, book=self.book, date="2026-08-17",
+        mv = CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date="2026-08-17",
             amount=Decimal("10.00"), currency=self.usd,
             movement_type="adjustment")
-        mv = CariMovement.objects.select_related("currency").get(pk=mv.pk)
+        mv = CurrentAccountMovement.objects.select_related("currency").get(pk=mv.pk)
         with self.assertNumQueries(0):
             self.assertIsNone(conversion_facts(mv))
 
     def test_a_foreign_row_costs_one(self):
-        mv = CariMovement.objects.create(
-            cari=self.cari, book=self.book, date="2026-08-17",
+        mv = CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date="2026-08-17",
             amount=Decimal("200.00"), currency=self.try_,
             movement_type="adjustment", exchange_rate=Decimal("0.0208"),
             amount_base=Decimal("4.16"))
-        mv = CariMovement.objects.select_related("currency").get(pk=mv.pk)
+        mv = CurrentAccountMovement.objects.select_related("currency").get(pk=mv.pk)
         with self.assertNumQueries(1):
             self.assertIsNotNone(conversion_facts(mv))

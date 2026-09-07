@@ -22,7 +22,7 @@ from accounting.models import (
     ExpenseCategory,
     StakeholderBook,
 )
-from accounting.models_accounts import CariAccount, CariMovement, Payment
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement, Payment
 
 
 class ExpensePaidOnAccountTests(TestCase):
@@ -53,11 +53,11 @@ class ExpensePaidOnAccountTests(TestCase):
             book=self.book, name="Kasa", currency=self.usd,
             balance=Decimal("1000.00"),
         )
-        self.firat = CariAccount.objects.create(
+        self.firat = CurrentAccount.objects.create(
             book=self.book, code="FIRAT", name="MUHAMMED FIRAT ÖZTÜRK",
             type="customer", default_currency=self.usd,
         )
-        self.lira_cari = CariAccount.objects.create(
+        self.lira_current_account = CurrentAccount.objects.create(
             book=self.book, code="ORTAK", name="Partner", type="other",
             default_currency=self.try_,
         )
@@ -66,7 +66,7 @@ class ExpensePaidOnAccountTests(TestCase):
     def _post(self, follow=False, **overrides):
         payload = {
             "book": self.book.pk, "category": self.taxes.pk,
-            "cash_account": "", "paid_by_cari": self.firat.pk,
+            "cash_account": "", "paid_by_current_account": self.firat.pk,
             "currency": self.usd.pk, "amount": "180.59",
             "date": "2026-08-26", "exchange_rate": "",
             "description": "GELİR VERGİSİ S. (MUHTASAR)",
@@ -80,20 +80,20 @@ class ExpensePaidOnAccountTests(TestCase):
     # -- the form offers both, and says what each is in --------------------
     def test_the_form_offers_both_funding_sources_scoped_to_the_book(self):
         other_book = Book.objects.create(name="Other", base_currency=self.usd)
-        stranger = CariAccount.objects.create(
+        stranger = CurrentAccount.objects.create(
             book=other_book, code="X", name="Somebody Else",
             type="other", default_currency=self.usd,
         )
         response = self.client.get(
             reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk})
         )
-        self.assertContains(response, "id_paid_by_cari")
+        self.assertContains(response, "id_paid_by_current_account")
         self.assertContains(response, self.firat.name)
         self.assertNotContains(response, stranger.name)
 
     def test_current_account_options_carry_their_currency(self):
         """The rate converter reads the currency off whichever select is
-        filled, so a cari option has to state its own."""
+        filled, so a current account option has to state its own."""
         response = self.client.get(
             reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk})
         )
@@ -101,11 +101,11 @@ class ExpensePaidOnAccountTests(TestCase):
         # Scoped to this select: the page has several, and an account pk can
         # collide with a currency pk in another one.
         block = re.search(
-            r'id="id_paid_by_cari".*?</select>', html, re.S
+            r'id="id_paid_by_current_account".*?</select>', html, re.S
         )
-        self.assertIsNotNone(block, "no paid_by_cari select on the page")
+        self.assertIsNotNone(block, "no paid_by_current_account select on the page")
         match = re.search(
-            r'<option value="%d"(.*?)>' % self.lira_cari.pk, block.group(0), re.S
+            r'<option value="%d"(.*?)>' % self.lira_current_account.pk, block.group(0), re.S
         )
         self.assertIsNotNone(match, "no option rendered for the TRY account")
         self.assertIn(f'data-currency="{self.try_.pk}"', match.group(1))
@@ -141,8 +141,8 @@ class ExpensePaidOnAccountTests(TestCase):
         # A date object localized by the template renders as "28 Ağustos
         # 2026", which <input type="date"> silently drops.
         self.assertIn(f'value="{timezone.localdate().isoformat()}"', html)
-        self.assertIn('id="cariSearch"', html)
-        self.assertIn('id="cariChip"', html)
+        self.assertIn('id="currentAccountSearch"', html)
+        self.assertIn('id="currentAccountChip"', html)
 
     # -- the cash box is not touched ---------------------------------------
     def test_it_moves_no_cash_and_writes_no_cash_entry(self):
@@ -150,7 +150,7 @@ class ExpensePaidOnAccountTests(TestCase):
 
         expense = EquityExpense.objects.get()
         self.assertIsNone(expense.cash_account)
-        self.assertEqual(expense.paid_by_cari, self.firat)
+        self.assertEqual(expense.paid_by_current_account, self.firat)
         self.kasa.refresh_from_db()
         self.assertEqual(self.kasa.balance, Decimal("1000.00"))
         self.assertFalse(
@@ -165,8 +165,8 @@ class ExpensePaidOnAccountTests(TestCase):
         self._post()
 
         expense = EquityExpense.objects.get()
-        movement = CariMovement.objects.get(cari=self.firat)
-        # Negative is what the cari detail page reads as a payable: the
+        movement = CurrentAccountMovement.objects.get(current_account=self.firat)
+        # Negative is what the current account detail page reads as a payable: the
         # book owes him, which is the whole reason the expense went in.
         self.assertEqual(movement.amount, Decimal("-180.59"))
         self.assertEqual(movement.date, expense.date)
@@ -178,7 +178,7 @@ class ExpensePaidOnAccountTests(TestCase):
         """Nothing was collected, so nothing belongs in the tahsilat list."""
         self._post()
 
-        movement = CariMovement.objects.get(cari=self.firat)
+        movement = CurrentAccountMovement.objects.get(current_account=self.firat)
         self.assertEqual(movement.movement_type, "adjustment")
         self.assertFalse(Payment.objects.exists())
 
@@ -191,9 +191,9 @@ class ExpensePaidOnAccountTests(TestCase):
             self._post(currency=self.try_.pk, amount="8689.69")
 
         expense = EquityExpense.objects.get()
-        self.assertEqual(expense.paid_by_cari, self.firat)   # a USD account
+        self.assertEqual(expense.paid_by_current_account, self.firat)   # a USD account
         self.assertEqual(expense.currency, self.try_)
-        movement = CariMovement.objects.get(cari=self.firat)
+        movement = CurrentAccountMovement.objects.get(current_account=self.firat)
         self.assertEqual(movement.currency, self.try_)
         self.assertEqual(movement.amount, Decimal("-8689.69"))
 
@@ -210,7 +210,7 @@ class ExpensePaidOnAccountTests(TestCase):
         )
         with mock.patch("accounting.services.get_exchange_rate") as published:
             published.return_value = Decimal("0.025")
-            self._post(cash_account=lira_kasa.pk, paid_by_cari="",
+            self._post(cash_account=lira_kasa.pk, paid_by_current_account="",
                        currency=self.usd.pk, amount="800.00")
 
         expense = EquityExpense.objects.get()
@@ -221,7 +221,7 @@ class ExpensePaidOnAccountTests(TestCase):
     def test_the_entry_is_denominated_by_the_account_that_funded_it(self):
         with mock.patch("accounting.services.get_exchange_rate") as published:
             published.return_value = Decimal("0.025")
-            self._post(paid_by_cari=self.lira_cari.pk, currency="", amount="800.00")
+            self._post(paid_by_current_account=self.lira_current_account.pk, currency="", amount="800.00")
 
         expense = EquityExpense.objects.get()
         self.assertEqual(expense.currency, self.try_)
@@ -230,11 +230,11 @@ class ExpensePaidOnAccountTests(TestCase):
         with mock.patch("accounting.services.get_exchange_rate") as published:
             published.return_value = Decimal("0.025")
             self._post(
-                paid_by_cari=self.lira_cari.pk, currency=self.try_.pk,
+                paid_by_current_account=self.lira_current_account.pk, currency=self.try_.pk,
                 amount="800.00", exchange_rate="0.030000",
             )
 
-        movement = CariMovement.objects.get(cari=self.lira_cari)
+        movement = CurrentAccountMovement.objects.get(current_account=self.lira_current_account)
         self.assertEqual(movement.exchange_rate, Decimal("0.030000"))
         self.assertEqual(movement.amount_base, Decimal("-24.00"))
 
@@ -242,11 +242,11 @@ class ExpensePaidOnAccountTests(TestCase):
         with mock.patch("accounting.services.get_exchange_rate") as published:
             published.return_value = Decimal("0.025")
             self._post(
-                paid_by_cari=self.lira_cari.pk, currency=self.try_.pk,
+                paid_by_current_account=self.lira_current_account.pk, currency=self.try_.pk,
                 amount="800.00", exchange_rate="",
             )
 
-        movement = CariMovement.objects.get(cari=self.lira_cari)
+        movement = CurrentAccountMovement.objects.get(current_account=self.lira_current_account)
         self.assertEqual(movement.amount_base, Decimal("-20.00"))
 
     # -- where you land afterwards -----------------------------------------
@@ -262,7 +262,7 @@ class ExpensePaidOnAccountTests(TestCase):
         payload = {
             "book": self.book.pk, "category": self.taxes.pk,
             "cash_account": expense.cash_account_id or "",
-            "paid_by_cari": expense.paid_by_cari_id or "",
+            "paid_by_current_account": expense.paid_by_current_account_id or "",
             "currency": expense.currency_id, "amount": str(expense.amount),
             "date": expense.date.isoformat(), "exchange_rate": "",
             "description": expense.description,
@@ -316,7 +316,7 @@ class ExpensePaidOnAccountTests(TestCase):
             self._post(currency=self.try_.pk, amount="939.70")
         expense = EquityExpense.objects.get()
         self.assertEqual(expense.currency, self.try_)
-        self.assertEqual(expense.paid_by_cari.default_currency, self.usd)
+        self.assertEqual(expense.paid_by_current_account.default_currency, self.usd)
 
         response = self.client.get(
             reverse("accounting:edit_equity_expense",
@@ -358,7 +358,7 @@ class ExpensePaidOnAccountTests(TestCase):
             reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk}),
             {
                 "book": self.book.pk, "category": self.taxes.pk,
-                "cash_account": "", "paid_by_cari": "",   # rejected: unfunded
+                "cash_account": "", "paid_by_current_account": "",   # rejected: unfunded
                 "currency": self.try_.pk, "amount": "939.70",
                 "date": "2026-08-26", "exchange_rate": "", "description": "",
             },
@@ -382,7 +382,7 @@ class ExpensePaidOnAccountTests(TestCase):
         self.assertEqual(expense.currency, self.try_)
         self.assertEqual(expense.amount, Decimal("939.70"))
         self.assertEqual(
-            CariMovement.objects.get(cari=self.firat).currency, self.try_
+            CurrentAccountMovement.objects.get(current_account=self.firat).currency, self.try_
         )
 
     def test_changing_the_amount_moves_the_debt_with_it(self):
@@ -391,20 +391,20 @@ class ExpensePaidOnAccountTests(TestCase):
 
         self._edit(expense, amount="200.00")
 
-        self.assertEqual(CariMovement.objects.filter(cari=self.firat).count(), 1)
+        self.assertEqual(CurrentAccountMovement.objects.filter(current_account=self.firat).count(), 1)
         self.assertEqual(
-            CariMovement.objects.get(cari=self.firat).amount, Decimal("-200.00")
+            CurrentAccountMovement.objects.get(current_account=self.firat).amount, Decimal("-200.00")
         )
         self.firat.refresh_from_db()
         self.assertEqual(self.firat.cached_balance, Decimal("-200.00"))
 
     def test_moving_an_expense_from_cash_to_an_account_gives_the_cash_back(self):
-        self._post(cash_account=self.kasa.pk, paid_by_cari="")
+        self._post(cash_account=self.kasa.pk, paid_by_current_account="")
         expense = EquityExpense.objects.get()
         self.kasa.refresh_from_db()
         self.assertEqual(self.kasa.balance, Decimal("819.41"))
 
-        self._edit(expense, cash_account="", paid_by_cari=self.firat.pk)
+        self._edit(expense, cash_account="", paid_by_current_account=self.firat.pk)
 
         self.kasa.refresh_from_db()
         self.assertEqual(self.kasa.balance, Decimal("1000.00"))
@@ -421,9 +421,9 @@ class ExpensePaidOnAccountTests(TestCase):
         self._post()
         expense = EquityExpense.objects.get()
 
-        self._edit(expense, paid_by_cari="", cash_account=self.kasa.pk)
+        self._edit(expense, paid_by_current_account="", cash_account=self.kasa.pk)
 
-        self.assertFalse(CariMovement.objects.exists())
+        self.assertFalse(CurrentAccountMovement.objects.exists())
         self.firat.refresh_from_db()
         self.assertEqual(self.firat.cached_balance, Decimal("0.00"))
         self.kasa.refresh_from_db()
@@ -434,7 +434,7 @@ class ExpensePaidOnAccountTests(TestCase):
             book=self.book, name="Bank", currency=self.usd,
             balance=Decimal("500.00"),
         )
-        self._post(cash_account=self.kasa.pk, paid_by_cari="")
+        self._post(cash_account=self.kasa.pk, paid_by_current_account="")
         expense = EquityExpense.objects.get()
 
         self._edit(expense, cash_account=second.pk)
@@ -467,12 +467,12 @@ class ExpensePaidOnAccountTests(TestCase):
         self._delete(expense)
 
         self.assertFalse(EquityExpense.objects.exists())
-        self.assertFalse(CariMovement.objects.exists())
+        self.assertFalse(CurrentAccountMovement.objects.exists())
         self.firat.refresh_from_db()
         self.assertEqual(self.firat.cached_balance, Decimal("0.00"))
 
     def test_deleting_a_cash_expense_gives_the_cash_back(self):
-        self._post(cash_account=self.kasa.pk, paid_by_cari="")
+        self._post(cash_account=self.kasa.pk, paid_by_current_account="")
         expense = EquityExpense.objects.get()
 
         self._delete(expense)
@@ -529,10 +529,10 @@ class ExpensePaidOnAccountTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(EquityExpense.objects.exists())
-        self.assertFalse(CariMovement.objects.exists())
+        self.assertFalse(CurrentAccountMovement.objects.exists())
 
     def test_naming_neither_funding_source_is_rejected(self):
-        response = self._post(cash_account="", paid_by_cari="")
+        response = self._post(cash_account="", paid_by_current_account="")
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(EquityExpense.objects.exists())
@@ -548,7 +548,7 @@ class ExpensePaidOnAccountTests(TestCase):
 
     # -- the cash path still behaves --------------------------------------
     def test_an_expense_paid_from_cash_still_moves_cash(self):
-        self._post(cash_account=self.kasa.pk, paid_by_cari="")
+        self._post(cash_account=self.kasa.pk, paid_by_current_account="")
 
         expense = EquityExpense.objects.get()
         self.kasa.refresh_from_db()
@@ -559,4 +559,4 @@ class ExpensePaidOnAccountTests(TestCase):
                 content_pk=expense.pk,
             ).exists()
         )
-        self.assertFalse(CariMovement.objects.exists())
+        self.assertFalse(CurrentAccountMovement.objects.exists())

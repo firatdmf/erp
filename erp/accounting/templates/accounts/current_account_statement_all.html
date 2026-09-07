@@ -154,12 +154,12 @@
           </tr>
         </thead>
         <tbody>
-          {% for cari in debtors %}
+          {% for current_account in debtors %}
           <tr>
-            <td><span class="sa-code">{{ cari.code }}</span></td>
-            <td><a class="sa-name" href="{% url 'accounts:detail' cari.pk %}">{{ cari.name }}</a></td>
-            <td><span class="sa-book">{{ cari.book.name }}</span></td>
-            <td class="num pos">{{ cari.display_currency_symbol }}{{ cari.cached_balance|money }}</td>
+            <td><span class="sa-code">{{ current_account.code }}</span></td>
+            <td><a class="sa-name" href="{% url 'accounts:detail' current_account.pk %}">{{ current_account.name }}</a></td>
+            <td><span class="sa-book">{{ current_account.book.name }}</span></td>
+            <td class="num pos">{{ current_account.display_currency_symbol }}{{ current_account.cached_balance|money }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -193,12 +193,12 @@
           </tr>
         </thead>
         <tbody>
-          {% for cari in creditors %}
+          {% for current_account in creditors %}
           <tr>
-            <td><span class="sa-code">{{ cari.code }}</span></td>
-            <td><a class="sa-name" href="{% url 'accounts:detail' cari.pk %}">{{ cari.name }}</a></td>
-            <td><span class="sa-book">{{ cari.book.name }}</span></td>
-            <td class="num neg">{{ cari.display_currency_symbol }}{{ cari.absolute_balance|money }}</td>
+            <td><span class="sa-code">{{ current_account.code }}</span></td>
+            <td><a class="sa-name" href="{% url 'accounts:detail' current_account.pk %}">{{ current_account.name }}</a></td>
+            <td><span class="sa-book">{{ current_account.book.name }}</span></td>
+            <td class="num neg">{{ current_account.display_currency_symbol }}{{ current_account.absolute_balance|money }}</td>
           </tr>
           {% endfor %}
         </tbody>

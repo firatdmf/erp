@@ -147,7 +147,7 @@
 
       <h3>{% trans "First 3 steps" %}</h3>
       <ol>
-        <li>{% url 'accounts:legacy_create' as cari_create_url %}{% blocktrans %}<strong>Open an account card:</strong> <a href="{{ cari_create_url }}">New Account</a> → select customer or supplier, enter the previous opening balance if any.{% endblocktrans %}</li>
+        <li>{% url 'accounts:legacy_create' as current_account_create_url %}{% blocktrans %}<strong>Open an account card:</strong> <a href="{{ current_account_create_url }}">New Account</a> → select customer or supplier, enter the previous opening balance if any.{% endblocktrans %}</li>
         <li>{% blocktrans %}<strong>Issue an invoice:</strong> On the account page, <strong>"Issue Invoice"</strong> purple button → add line items → <strong>"Save & Issue"</strong>.{% endblocktrans %}</li>
         <li>{% blocktrans %}<strong>Take a collection:</strong> On the account page, <strong>"Take Collection"</strong> green button → open invoices are listed automatically, match them.{% endblocktrans %}</li>
       </ol>
@@ -256,7 +256,7 @@
 
       <h3>{% trans "Movement → Balance" %}</h3>
       <p>{% trans "Balance is not a stored field, it is the sum of movements:" %}</p>
-      <pre><code>Balance = SUM(CariMovement.amount) WHERE cari = X</code></pre>
+      <pre><code>Balance = SUM(CurrentAccountMovement.amount) WHERE cari = X</code></pre>
       <p>{% blocktrans %}That's why when you delete / change a movement, the balance auto-corrects. <strong>The cancel action does not delete the original row</strong>, it writes a reverse movement (audit-safe).{% endblocktrans %}</p>
 
       <h3>{% trans "Status flows" %}</h3>
@@ -281,7 +281,7 @@
       <h2 id="kart">{% trans "📇 Account Card" %}</h2>
 
       <h3>{% trans "Opening" %}</h3>
-      <p>{% url 'accounts:legacy_create' as cari_create_url2 %}{% blocktrans %}Opened from the <a href="{{ cari_create_url2 }}">New Account</a> page.{% endblocktrans %}</p>
+      <p>{% url 'accounts:legacy_create' as current_account_create_url2 %}{% blocktrans %}Opened from the <a href="{{ current_account_create_url2 }}">New Account</a> page.{% endblocktrans %}</p>
       <p>{% blocktrans %}<strong>Required:</strong> Name, Type, Book, Currency.{% endblocktrans %}</p>
       <p>{% blocktrans %}<strong>Recommended (tax & risk):</strong>{% endblocktrans %}</p>
       <ul>
@@ -316,7 +316,7 @@
       <h3>{% trans "Issuing flow" %}</h3>
       <ol>
         <li>{% blocktrans %}<strong>Create a draft</strong>: You add line items, VAT is calculated per row{% endblocktrans %}</li>
-        <li>{% blocktrans %}<strong>"Issue"</strong>: Status becomes <em>issued</em>, <code>CariMovement</code> is created automatically{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>"Issue"</strong>: Status becomes <em>issued</em>, <code>CurrentAccountMovement</code> is created automatically{% endblocktrans %}</li>
         <li>{% blocktrans %}<strong>"Cancel"</strong> (if issued): A reverse movement is written, the original is not deleted{% endblocktrans %}</li>
       </ol>
       <blockquote>{% trans "A draft invoice does not affect the current account. It only takes effect the moment you issue it." %}</blockquote>
@@ -381,7 +381,7 @@
       <p>{% trans "You give the check you received from your customer to your supplier. The system:" %}</p>
       <ol>
         <li>{% blocktrans %}Sets the check status to <em>Endorsed</em>, writes the target account in the <code>endorsed_to</code> field{% endblocktrans %}</li>
-        <li>{% blocktrans %}Writes <strong>+X CariMovement</strong> to the target account (as if you had made a payment to them){% endblocktrans %}</li>
+        <li>{% blocktrans %}Writes <strong>+X CurrentAccountMovement</strong> to the target account (as if you had made a payment to them){% endblocktrans %}</li>
         <li>{% trans "The original movement remains (the receipt from the customer is still valid)" %}</li>
       </ol>
 
@@ -389,7 +389,7 @@
       <p>{% trans "When the check is returned:" %}</p>
       <ul>
         <li>{% blocktrans %}Status → <em>Bounced</em>{% endblocktrans %}</li>
-        <li>{% blocktrans %}<strong>+X CariMovement</strong> is written to the customer's current account (the receivable reopens){% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>+X CurrentAccountMovement</strong> is written to the customer's current account (the receivable reopens){% endblocktrans %}</li>
         <li>{% trans "What to do next is up to you: legal action, agreement, etc." %}</li>
       </ul>
 

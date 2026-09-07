@@ -1,6 +1,6 @@
 """The general ledger — the one place where the accounting equation is true.
 
-Everything else in this app is a SUBSIDIARY ledger: the cari accounts know
+Everything else in this app is a SUBSIDIARY ledger: the current account accounts know
 what each customer owes, the cash journal knows what each account holds,
 the warehouse knows what stock sits on the shelves. Each is correct about
 its own subject and none of them says anything about the others, so
@@ -31,7 +31,7 @@ Three models:
                 can always be traced to the document it came from.
 
   JournalLine   one account, one amount, one side. The subsidiary links
-                (cari, cash_account) are what let a control account be
+                (current account, cash_account) are what let a control account be
                 reconciled against the ledger it summarises.
 
 Nothing posts to these yet. Wiring the existing paths and backfilling
@@ -91,12 +91,12 @@ class ChartAccount(models.Model):
     description = models.TextField(blank=True)
 
     # A control account is summarised by a subsidiary ledger elsewhere —
-    # 1200 Accounts Receivable by the cari accounts, 1000 Cash by the cash
+    # 1200 Accounts Receivable by the current account accounts, 1000 Cash by the cash
     # journal. Flagged so a reconciliation report can find them without a
     # hardcoded list of codes.
     is_control = models.BooleanField(
         default=False,
-        help_text="Summarises a subsidiary ledger (cari accounts, cash accounts).",
+        help_text="Summarises a subsidiary ledger (current accounts, cash accounts).",
     )
     is_active = models.BooleanField(default=True)
 
@@ -151,10 +151,10 @@ class JournalEntry(models.Model):
     description = models.CharField(max_length=300)
 
     # Batch marker, so a backfill or an import can be found and undone as
-    # a unit. Mirrors CariMovement.reference and the ERGENE-OB-* pattern.
+    # a unit. Mirrors CurrentAccountMovement.reference and the ERGENE-OB-* pattern.
     reference = models.CharField(max_length=60, blank=True, db_index=True)
 
-    # What caused this entry — a Payment, an Invoice, a CariMovement, an
+    # What caused this entry — a Payment, an Invoice, a CurrentAccountMovement, an
     # EquityExpense. Generic because the list will keep growing, and a
     # ledger row that cannot name its cause is a ledger row nobody can
     # check.
@@ -253,8 +253,8 @@ class JournalLine(models.Model):
     # Subsidiary links. A control account's balance has to be reconcilable
     # against the ledger that summarises it, and that is only possible if
     # each line says which customer or which cash account it was for.
-    cari = models.ForeignKey(
-        "accounting.CariAccount", on_delete=models.PROTECT,
+    current_account = models.ForeignKey(
+        "accounting.CurrentAccount", on_delete=models.PROTECT,
         null=True, blank=True, related_name="journal_lines",
     )
     cash_account = models.ForeignKey(
@@ -286,7 +286,7 @@ class JournalLine(models.Model):
         ]
         indexes = [
             models.Index(fields=["account"]),
-            models.Index(fields=["cari"]),
+            models.Index(fields=["current_account"]),
         ]
 
     def __str__(self):

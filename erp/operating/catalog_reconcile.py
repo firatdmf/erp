@@ -24,6 +24,7 @@ Hidden products left with zero variants after moves are deleted.
 
 Ambiguities are REPORTED in the summary's `conflicts`, never guessed.
 """
+from contextlib import nullcontext as _nullcontext
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -87,6 +88,7 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
     }
     touched_product_ids = set()
     maybe_empty_product_ids = set()
+    planned_parents = set()
 
     def find_variant(sku_l, sku_n):
         v = v_exact.get(sku_l)
@@ -130,80 +132,100 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
             continue
         parent = find_parent(base)
 
+        # Each group gets its OWN savepoint. Without one, a single DB-level
+        # error (a unique variant_sku collision, say) leaves the surrounding
+        # transaction unusable, so every later group fails on
+        # TransactionManagementError and one real conflict is reported as
+        # nineteen hundred fake ones. Counters are rolled back with the rows.
+        counters = {ck: cv for ck, cv in summary.items() if isinstance(cv, int)}
         try:
-            if variant is not None:
-                target = parent or variant.product
-                if variant.product_id != target.id:
-                    if variant.product.featured:
-                        # Never yank a variant off a real web product.
-                        summary["conflicts"].append(
-                            {"sku": sku,
-                             "error": (f"varyant featured ürün '{variant.product.title}' altında; "
-                                       f"sku-eşleşen '{target.title}' ile çelişiyor — taşınmadı")})
-                        target = variant.product
-                    else:
-                        maybe_empty_product_ids.add(variant.product_id)
-                        summary["variants_moved"] += 1
-                        summary["actions"].append(
-                            f"MOVE {variant.variant_sku}: '{variant.product.title}' -> '{target.title}'")
-                        if apply:
-                            variant.product = target
-                            variant.save(update_fields=["product"])
-                # Stock mirror only — never touch a pre-existing variant's
-                # featured flag or attributes here.
-                if apply:
-                    variant.variant_quantity = total_qty
-                    upd = ["variant_quantity"]
-                    if cost is not None and variant.variant_cost is None:
-                        variant.variant_cost = cost
-                        upd.append("variant_cost")
-                    variant.save(update_fields=upd)
-                touched_product_ids.add(target.id)
-            else:
-                if parent is None:
-                    parent = p_title_hidden.get(base.lower())
-                if parent is None:
-                    summary["products_created"] += 1
-                    summary["actions"].append(f"NEW PRODUCT '{base}' (hidden) for {sku}")
+            with (_tx.atomic() if apply else _nullcontext()):
+                if variant is not None:
+                    target = parent or variant.product
+                    if variant.product_id != target.id:
+                        if variant.product.featured:
+                            # Never yank a variant off a real web product.
+                            summary["conflicts"].append(
+                                {"sku": sku,
+                                 "error": (f"varyant featured ürün '{variant.product.title}' altında; "
+                                           f"sku-eşleşen '{target.title}' ile çelişiyor — taşınmadı")})
+                            target = variant.product
+                        else:
+                            maybe_empty_product_ids.add(variant.product_id)
+                            summary["variants_moved"] += 1
+                            summary["actions"].append(
+                                f"MOVE {variant.variant_sku}: '{variant.product.title}' -> '{target.title}'")
+                            if apply:
+                                variant.product = target
+                                variant.save(update_fields=["product"])
+                    # Stock mirror only — never touch a pre-existing variant's
+                    # featured flag or attributes here.
                     if apply:
-                        taken = Product.objects.filter(sku__iexact=base[:SKU_MAX_LENGTH]).exists()
-                        parent = Product.objects.create(
-                            title=base, sku=(None if taken else (base[:SKU_MAX_LENGTH] or None)),
-                            featured=False, unit_of_measurement="mt",
-                            quantity=Decimal("0"),
+                        variant.variant_quantity = total_qty
+                        upd = ["variant_quantity"]
+                        if cost is not None and variant.variant_cost is None:
+                            variant.variant_cost = cost
+                            upd.append("variant_cost")
+                        variant.save(update_fields=upd)
+                    touched_product_ids.add(target.id)
+                else:
+                    if parent is None:
+                        parent = p_title_hidden.get(base.lower())
+                    if parent is None and base.lower() not in planned_parents:
+                        # A dry run creates nothing, so p_title_hidden never fills
+                        # and every sibling SKU of the same base used to be counted
+                        # as another new product — K12504.G07/.G28/.G47/... read as
+                        # seven products where apply mode makes one. Remember the
+                        # bases we have already decided on so the preview states
+                        # the number that the --apply run will really create.
+                        planned_parents.add(base.lower())
+                        summary["products_created"] += 1
+                        summary["actions"].append(f"NEW PRODUCT '{base}' (hidden) for {sku}")
+                        if apply:
+                            taken = Product.objects.filter(sku__iexact=base[:SKU_MAX_LENGTH]).exists()
+                            parent = Product.objects.create(
+                                title=base, sku=(None if taken else (base[:SKU_MAX_LENGTH] or None)),
+                                featured=False, unit_of_measurement="mt",
+                                quantity=Decimal("0"),
+                            )
+                            if parent.sku:
+                                p_sku_exact[parent.sku.strip().lower()] = parent
+                            p_title_hidden[base.lower()] = parent
+                    summary["variants_created"] += 1
+                    summary["actions"].append(
+                        f"NEW VARIANT {sku} under '{parent.title if parent else base}'")
+                    if apply:
+                        variant = ProductVariant.objects.create(
+                            product=parent, variant_sku=sku[:SKU_MAX_LENGTH],
+                            variant_featured=False,
+                            variant_barcode=(barcode or None) and barcode[:14],
+                            variant_quantity=total_qty, variant_cost=cost,
                         )
-                        if parent.sku:
-                            p_sku_exact[parent.sku.strip().lower()] = parent
-                        p_title_hidden[base.lower()] = parent
-                summary["variants_created"] += 1
-                summary["actions"].append(
-                    f"NEW VARIANT {sku} under '{parent.title if parent else base}'")
-                if apply:
-                    variant = ProductVariant.objects.create(
-                        product=parent, variant_sku=sku[:SKU_MAX_LENGTH],
-                        variant_featured=False,
-                        variant_barcode=(barcode or None) and barcode[:14],
-                        variant_quantity=total_qty, variant_cost=cost,
-                    )
-                    v_exact[sku.lower()] = variant
-                    # Colour/model attribute — attached to THIS variant only.
-                    if cat["attribute_name"] and cat["attribute_value"]:
-                        attr, _c = ProductVariantAttribute.objects.get_or_create(
-                            name=_norm_attr(cat["attribute_name"]))
-                        val, _c = ProductVariantAttributeValue.objects.get_or_create(
-                            product_variant_attribute=attr,
-                            product_variant_attribute_value=_norm_value(cat["attribute_value"]))
-                        variant.product_variant_attribute_values.add(val)
-                    touched_product_ids.add(parent.id)
+                        v_exact[sku.lower()] = variant
+                        # Colour/model attribute — attached to THIS variant only.
+                        if cat["attribute_name"] and cat["attribute_value"]:
+                            attr, _c = ProductVariantAttribute.objects.get_or_create(
+                                name=_norm_attr(cat["attribute_name"]))
+                            val, _c = ProductVariantAttributeValue.objects.get_or_create(
+                                product_variant_attribute=attr,
+                                product_variant_attribute_value=_norm_value(cat["attribute_value"]))
+                            variant.product_variant_attribute_values.add(val)
+                        touched_product_ids.add(parent.id)
 
-            if apply and variant is not None:
-                for w in group:
-                    if w.catalog_variant_id != variant.id:
-                        summary["relinked_wps"] += 1
-                    w.catalog_variant = variant
-                WarehouseProduct.objects.bulk_update(group, ["catalog_variant"])
-            summary["linked_wps"] += len(group)
+                # Counted in BOTH modes — how many rows actually change hands
+                # is the number a dry run exists to show, and it used to sit
+                # inside the `if apply` and so always previewed as zero. A
+                # variant we would create links every row in the group.
+                summary["relinked_wps"] += (
+                    len(group) if variant is None else
+                    sum(1 for w in group if w.catalog_variant_id != variant.id))
+                if apply and variant is not None:
+                    for w in group:
+                        w.catalog_variant = variant
+                    WarehouseProduct.objects.bulk_update(group, ["catalog_variant"])
+                summary["linked_wps"] += len(group)
         except Exception as exc:
+            summary.update(counters)
             summary["conflicts"].append({"sku": sku, "error": str(exc)})
 
     if apply:

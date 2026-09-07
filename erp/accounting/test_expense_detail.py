@@ -17,7 +17,7 @@ from accounting.models import (
     ExpenseCategory,
     StakeholderBook,
 )
-from accounting.models_accounts import CariAccount, CariMovement
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
 
 
 class ExpenseDetailPageTests(TestCase):
@@ -46,7 +46,7 @@ class ExpenseDetailPageTests(TestCase):
             book=self.book, name="Kasa", currency=self.usd,
             balance=Decimal("1000.00"),
         )
-        self.firat = CariAccount.objects.create(
+        self.firat = CurrentAccount.objects.create(
             book=self.book, code="FIRAT", name="MUHAMMED FIRAT ÖZTÜRK",
             type="customer", default_currency=self.usd,
         )
@@ -62,7 +62,7 @@ class ExpenseDetailPageTests(TestCase):
     def _add(self, **overrides):
         payload = {
             "book": self.book.pk, "category": self.taxes.pk,
-            "cash_account": self.kasa.pk, "paid_by_cari": "",
+            "cash_account": self.kasa.pk, "paid_by_current_account": "",
             "currency": self.usd.pk, "amount": "180.59",
             "date": "2026-08-26", "exchange_rate": "",
             "description": "GELİR VERGİSİ S. (MUHTASAR)",
@@ -99,7 +99,7 @@ class ExpenseDetailPageTests(TestCase):
                     kwargs={"pk": self.book.pk, "expense_pk": expense.pk}),
             {
                 "book": self.book.pk, "category": self.taxes.pk,
-                "cash_account": self.kasa.pk, "paid_by_cari": "",
+                "cash_account": self.kasa.pk, "paid_by_current_account": "",
                 "currency": self.usd.pk, "amount": "200.00",
                 "date": "2026-08-26", "exchange_rate": "",
                 "description": "GELİR VERGİSİ S. (MUHTASAR)",
@@ -127,7 +127,7 @@ class ExpenseDetailPageTests(TestCase):
         html = self._detail(expense).content.decode()
 
         self.assertNotIn('name="amount"', html)
-        self.assertNotIn('id_paid_by_cari', html)
+        self.assertNotIn('id_paid_by_current_account', html)
         self.assertIn(
             reverse("accounting:edit_equity_expense",
                     kwargs={"pk": self.book.pk, "expense_pk": expense.pk}),
@@ -151,12 +151,12 @@ class ExpenseDetailPageTests(TestCase):
         self.assertIsNone(response.context["ledger_movement"])
 
     def test_an_expense_on_account_shows_the_ledger_row_it_posted(self):
-        self._add(cash_account="", paid_by_cari=self.firat.pk)
+        self._add(cash_account="", paid_by_current_account=self.firat.pk)
         expense = EquityExpense.objects.get()
 
         response = self._detail(expense)
 
-        movement = CariMovement.objects.get()
+        movement = CurrentAccountMovement.objects.get()
         self.assertEqual(response.context["ledger_movement"], movement)
         self.assertIsNone(response.context["cash_entry"])
         self.assertContains(response, self.firat.code)

@@ -10,7 +10,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, Invoice, InvoiceItem
+from accounting.models_accounts import CurrentAccount, Invoice, InvoiceItem
 from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
@@ -25,7 +25,7 @@ class PurchaseLineLabelsTest(TestCase):
     def setUp(self):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd,
         )
@@ -35,7 +35,7 @@ class PurchaseLineLabelsTest(TestCase):
         self.client.force_login(self.user)
 
         self.invoice = Invoice.objects.create(
-            book=self.book, cari=self.cari, currency=self.usd, type="purchase",
+            book=self.book, current_account=self.current_account, currency=self.usd, type="purchase",
             number="ALIM-2026-000001", date=date(2026, 8, 21),
             due_date=date(2026, 9, 21), intake_warehouse=self.wh,
         )
@@ -116,7 +116,7 @@ class PurchaseLineLabelsTest(TestCase):
 
     def test_an_item_of_another_invoice_is_not_reachable(self):
         other = Invoice.objects.create(
-            book=self.book, cari=self.cari, currency=self.usd, type="purchase",
+            book=self.book, current_account=self.current_account, currency=self.usd, type="purchase",
             number="ALIM-2026-000002", date=date(2026, 8, 22),
             due_date=date(2026, 9, 22))
         url = reverse("accounts:purchase_item_labels", args=[other.pk, self.item.pk])

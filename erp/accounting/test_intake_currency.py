@@ -7,7 +7,7 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 from accounting.services_accounts import (
     MixedCurrencyError, convert_lines_to_currency, invoice_currency_for,
 )
@@ -24,20 +24,20 @@ class InvoiceCurrencyTest(TestCase):
         self.try_ = CurrencyCategory.objects.create(code="TRY", name="Turkish Lira", symbol="₺")
         self.book = Book.objects.create(name="Demfirat")
 
-    def _cari(self, currency, code="CARI-001"):
-        return CariAccount.objects.create(
+    def _current_account(self, currency, code="CARI-001"):
+        return CurrentAccount.objects.create(
             book=self.book, code=code, name="Kızılırmak",
             type="supplier", default_currency=currency,
         )
 
     def test_the_alim_is_denominated_in_what_we_owe_them(self):
-        self.assertEqual(invoice_currency_for(self._cari(self.try_)), "TRY")
-        self.assertEqual(invoice_currency_for(self._cari(self.usd, "CARI-002")), "USD")
+        self.assertEqual(invoice_currency_for(self._current_account(self.try_)), "TRY")
+        self.assertEqual(invoice_currency_for(self._current_account(self.usd, "CARI-002")), "USD")
 
     def test_an_account_with_no_currency_falls_back_to_base(self):
         """Defensive only — the column is NOT NULL, so this cannot come out
         of the database. It guards the unsaved instance and the None."""
-        self.assertEqual(invoice_currency_for(CariAccount()), "USD")
+        self.assertEqual(invoice_currency_for(CurrentAccount()), "USD")
         self.assertEqual(invoice_currency_for(None), "USD")
 
 

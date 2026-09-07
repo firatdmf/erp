@@ -1,4 +1,4 @@
-"""Each cari movement gets the other half it never had.
+"""Each current account movement gets the other half it never had.
 
 Run with:
     python manage.py test accounting.test_posting
@@ -8,7 +8,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, CariMovement
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
 from accounting.models_ledger import ChartAccount, JournalEntry
 from accounting.services_ledger import balance_sheet, ensure_chart
 from accounting.services_posting import (NoRuleFor, lines_for_movement,
@@ -22,15 +22,15 @@ class PostingRules(TestCase):
         self.book = Book.objects.create(
             name="Ergene Fabric", base_currency=self.usd)
         ensure_chart()
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="00554", name="OLEG", default_currency=self.usd)
 
     def _mv(self, kind, amount, date="2026-07-01"):
-        mv = CariMovement.objects.create(
-            cari=self.cari, book=self.book, date=date,
+        mv = CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date=date,
             amount=Decimal(amount), currency=self.usd,
             movement_type=kind, description=kind)
-        self.cari.recompute_balance(save=True)
+        self.current_account.recompute_balance(save=True)
         return mv
 
     def _balances(self):
@@ -67,9 +67,9 @@ class PostingRules(TestCase):
         self.assertEqual(control["credit"], Decimal("250.00"))
         self.assertEqual(contra["debit"], Decimal("250.00"))
 
-    def test_the_cari_is_carried_onto_the_control_leg(self):
+    def test_the_current_account_is_carried_onto_the_control_leg(self):
         entry = post_movement(self._mv("order_sale", "10.00"))
-        self.assertEqual(entry.lines.get(account__code="1200").cari, self.cari)
+        self.assertEqual(entry.lines.get(account__code="1200").current_account, self.current_account)
 
     def test_a_zero_movement_posts_nothing(self):
         self.assertIsNone(post_movement(self._mv("invoice_sale", "0.00")))
@@ -101,19 +101,19 @@ class CreditBalancesBecomePayables(TestCase):
         ensure_chart()
         self.usd = usd
 
-    def _cari(self, code, amount):
-        c = CariAccount.objects.create(
+    def _current_account(self, code, amount):
+        c = CurrentAccount.objects.create(
             book=self.book, code=code, name=code, default_currency=self.usd)
-        mv = CariMovement.objects.create(
-            cari=c, book=self.book, date="2026-07-01", amount=Decimal(amount),
+        mv = CurrentAccountMovement.objects.create(
+            current_account=c, book=self.book, date="2026-07-01", amount=Decimal(amount),
             currency=self.usd, movement_type="opening", description="ob")
         c.recompute_balance(save=True)
         post_movement(mv)
         return c
 
     def test_a_book_that_owes_reports_a_payable_not_a_negative_asset(self):
-        self._cari("A", "1000.00")
-        self._cari("B", "-250.00")
+        self._current_account("A", "1000.00")
+        self._current_account("B", "-250.00")
         entry, n = reclassify_payables(self.book, date="2026-09-03")
         self.assertEqual(n, 1)
         b = {r["code"]: r["balance"]
@@ -122,14 +122,14 @@ class CreditBalancesBecomePayables(TestCase):
         self.assertEqual(b["2000"], Decimal("250.00"))
 
     def test_it_does_nothing_when_no_account_is_in_credit(self):
-        self._cari("A", "1000.00")
+        self._current_account("A", "1000.00")
         entry, n = reclassify_payables(self.book, date="2026-09-03")
         self.assertIsNone(entry)
         self.assertEqual(n, 0)
 
     def test_the_equation_still_holds_afterwards(self):
-        self._cari("A", "1000.00")
-        self._cari("B", "-250.00")
+        self._current_account("A", "1000.00")
+        self._current_account("B", "-250.00")
         reclassify_payables(self.book, date="2026-09-03")
         gl = balance_sheet(self.book)
         self.assertTrue(gl["balanced"])
@@ -151,16 +151,16 @@ class TheBackfillCommand(TestCase):
         self.usd = usd
         ensure_chart()
 
-        owing = CariAccount.objects.create(
+        owing = CurrentAccount.objects.create(
             book=self.book, code="A", name="A", default_currency=usd)
-        owed = CariAccount.objects.create(
+        owed = CurrentAccount.objects.create(
             book=self.book, code="B", name="B", default_currency=usd)
-        for cari, kind, amt in ((owing, "opening", "1000.00"),
+        for current_account, kind, amt in ((owing, "opening", "1000.00"),
                                 (owing, "order_sale", "200.00"),
                                 (owing, "collection", "-300.00"),
                                 (owed, "opening", "-150.00")):
-            CariMovement.objects.create(
-                cari=cari, book=self.book, date="2026-07-01",
+            CurrentAccountMovement.objects.create(
+                current_account=current_account, book=self.book, date="2026-07-01",
                 amount=Decimal(amt), currency=usd, movement_type=kind,
                 description=kind)
         for c in (owing, owed):

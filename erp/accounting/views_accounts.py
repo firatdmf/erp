@@ -1,15 +1,15 @@
 """
 Current account (Cari Hesap) views — Phase 1.
 
-    /accounting/accounts/                     → CariList
-    /accounting/accounts/new/                 → CariCreate
-    /accounting/accounts/<id>/                → CariDetail    (summary + tabs)
-    /accounting/accounts/<id>/statement/      → CariStatement (ekstre)
-    /accounting/accounts/<id>/edit/           → CariEdit
-    /accounting/accounts/<id>/delete/         → CariDelete
-    /accounting/accounts/<id>/movements/new/  → CariMovementCreate (manual entry)
-    /accounting/accounts/<id>/movements/<mid>/edit/    → CariMovementEdit
-    /accounting/accounts/<id>/movements/<mid>/delete/  → CariMovementDelete (POST)
+    /accounting/accounts/                     → CurrentAccountList
+    /accounting/accounts/new/                 → CurrentAccountCreate
+    /accounting/accounts/<id>/                → CurrentAccountDetail    (summary + tabs)
+    /accounting/accounts/<id>/statement/      → CurrentAccountStatement (ekstre)
+    /accounting/accounts/<id>/edit/           → CurrentAccountEdit
+    /accounting/accounts/<id>/delete/         → CurrentAccountDelete
+    /accounting/accounts/<id>/movements/new/  → CurrentAccountMovementCreate (manual entry)
+    /accounting/accounts/<id>/movements/<mid>/edit/    → CurrentAccountMovementEdit
+    /accounting/accounts/<id>/movements/<mid>/delete/  → CurrentAccountMovementDelete (POST)
 """
 import json
 import re
@@ -32,9 +32,9 @@ from django.views import View
 
 from accounting.models import Book, CurrencyCategory
 from .models import (
-    CariAccount, CariMovement, CariSettings, CariTransfer, Payment, Invoice,
+    CurrentAccount, CurrentAccountMovement, CurrentAccountSettings, CurrentAccountTransfer, Payment, Invoice,
 )
-from .forms import CariTransferForm
+from .forms import CurrentAccountTransferForm
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ def _currencies():
 _HIDDEN_MOVEMENT_TYPES = {"legacy_ar", "legacy_ap", "check_in", "check_out"}
 
 def _user_movement_choices():
-    return [(v, l) for v, l in CariMovement.MOVEMENT_TYPES if v not in _HIDDEN_MOVEMENT_TYPES]
+    return [(v, l) for v, l in CurrentAccountMovement.MOVEMENT_TYPES if v not in _HIDDEN_MOVEMENT_TYPES]
 
 
 def _movement_choices_including(current):
@@ -83,7 +83,7 @@ def _movement_choices_including(current):
     the movement."""
     choices = _user_movement_choices()
     if current and current not in {v for v, _l in choices}:
-        label = dict(CariMovement.MOVEMENT_TYPES).get(current, current)
+        label = dict(CurrentAccountMovement.MOVEMENT_TYPES).get(current, current)
         choices = [(current, label)] + choices
     return choices
 
@@ -134,7 +134,7 @@ def _tr_case_variants(q):
     return {q, tr_upper, tr_lower}
 
 
-def _filter_caris(request, apply_type=True):
+def _filter_current_accounts(request, apply_type=True):
     """Filtered account queryset.
 
     apply_type=False leaves the type filter off so the tab counts can be
@@ -143,7 +143,7 @@ def _filter_caris(request, apply_type=True):
     search, book, balance and active filters — but its own type, not the one
     already selected.
     """
-    qs = CariAccount.objects.select_related("book", "default_currency").all()
+    qs = CurrentAccount.objects.select_related("book", "default_currency").all()
 
     q = (request.GET.get("q") or "").strip()
     if q:
@@ -165,7 +165,7 @@ def _filter_caris(request, apply_type=True):
     qs = qs.filter(book=request.book)
 
     type_filter = request.GET.get("type") or ""
-    if apply_type and type_filter in dict(CariAccount.TYPE_CHOICES):
+    if apply_type and type_filter in dict(CurrentAccount.TYPE_CHOICES):
         qs = qs.filter(type=type_filter)
 
     balance_filter = request.GET.get("balance") or ""
@@ -248,11 +248,11 @@ class LegacyCollectionRedirect(generic.RedirectView):
 # List
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
-class CariList(View):
-    template_name = "accounts/cari_list.html"
+class CurrentAccountList(View):
+    template_name = "accounts/current_account_list.html"
 
     def get(self, request):
-        qs = _filter_caris(request)
+        qs = _filter_current_accounts(request)
 
         # Aggregate totals across the filtered set (positive vs negative legs)
         totals = qs.aggregate(
@@ -269,8 +269,8 @@ class CariList(View):
         # the fetch handler wrote the FILTERED count into it, so selecting
         # Supplier left "All" reading the supplier count. Each tab now carries
         # its own, counted with every filter except type applied.
-        untyped = _filter_caris(request, apply_type=False)
-        # .order_by() clears the sort before grouping. _filter_caris orders by
+        untyped = _filter_current_accounts(request, apply_type=False)
+        # .order_by() clears the sort before grouping. _filter_current accounts orders by
         # name and id, and Django folds ordering fields into the GROUP BY — so
         # without this the aggregate groups by (type, name, id) and every count
         # comes back as 1.
@@ -280,7 +280,7 @@ class CariList(View):
         # (value, label, count) so the template can just iterate — a template
         # cannot index a dict by a loop variable without a custom filter.
         type_tabs = [(val, label, per_type.get(val, 0))
-                     for val, label in CariAccount.TYPE_CHOICES]
+                     for val, label in CurrentAccount.TYPE_CHOICES]
         tab_counts = {"": all_count}
         tab_counts.update({val: n for val, _l, n in type_tabs})
 
@@ -293,7 +293,7 @@ class CariList(View):
             page = paginator.page(1)
 
         ctx = {
-            "caris":          page.object_list,
+            "current_accounts":          page.object_list,
             "page":           page,
             "paginator":      paginator,
             "total_count":    totals["n"] or 0,
@@ -301,7 +301,7 @@ class CariList(View):
             "we_owe":         abs(totals["we_owe"] or Decimal("0.00")),
             "net":            (totals["owes_us"] or Decimal("0.00")) + (totals["we_owe"] or Decimal("0.00")),
             "books":          _member_books(request),
-            "type_choices":   CariAccount.TYPE_CHOICES,
+            "type_choices":   CurrentAccount.TYPE_CHOICES,
             "all_count":      all_count,
             "type_tabs":      type_tabs,
             "tab_counts_json": json.dumps(tab_counts),
@@ -316,7 +316,7 @@ class CariList(View):
         # Dynamic search/filter: the page JS fetches with this header and
         # swaps ONLY the results block — no full page reload per keystroke.
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return render(request, "accounts/partials/cari_list_results.html", ctx)
+            return render(request, "accounts/partials/current_account_list_results.html", ctx)
         return render(request, self.template_name, ctx)
 
 
@@ -324,29 +324,29 @@ class CariList(View):
 # Create / Edit
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
-class CariCreate(View):
-    template_name = "accounts/cari_form.html"
+class CurrentAccountCreate(View):
+    template_name = "accounts/current_account_form.html"
 
     ENTITY_TYPES = ("company", "contact", "supplier")
 
     def get(self, request):
         return render(request, self.template_name, {
-            "cari": None,
+            "current_account": None,
             "books": _member_books(request),
             "currencies": _currencies(),
-            "type_choices": CariAccount.TYPE_CHOICES,
+            "type_choices": CurrentAccount.TYPE_CHOICES,
             "entity_types": self.ENTITY_TYPES,
         })
 
     def post(self, request):
-        # A cari is never a floating record any more — creating one here
+        # A current account is never a floating record any more — creating one here
         # always creates the matching CRM entity (company/contact) or
-        # Supplier alongside it (the same "supplier gets a cari" rule
+        # Supplier alongside it (the same "supplier gets a current account" rule
         # applied uniformly), so there's one job instead of two.
         from crm.models import Company, Contact, Supplier
         from .services_accounts import (
-            get_or_create_cari_for_company,
-            get_or_create_cari_for_contact, get_or_create_cari_for_supplier,
+            get_or_create_current_account_for_company,
+            get_or_create_current_account_for_contact, get_or_create_current_account_for_supplier,
         )
 
         entity_type = request.POST.get("entity_type", "company")
@@ -381,7 +381,7 @@ class CariCreate(View):
                     address=address,
                     country=country,
                 )
-                cari = get_or_create_cari_for_company(
+                current_account = get_or_create_current_account_for_company(
                     entity, member=member, book=request.book)
             elif entity_type == "contact":
                 entity = Contact.objects.create(
@@ -391,7 +391,7 @@ class CariCreate(View):
                     address=address,
                     country=country,
                 )
-                cari = get_or_create_cari_for_contact(
+                current_account = get_or_create_current_account_for_contact(
                     entity, member=member, book=request.book)
             else:
                 entity = Supplier.objects.create(
@@ -400,96 +400,96 @@ class CariCreate(View):
                     address=address, country=country,
                 )
                 # The post_save signal on Supplier already creates the
-                # cari unconditionally — this call is idempotent and
+                # current account unconditionally — this call is idempotent and
                 # just fetches that same row.
-                cari = get_or_create_cari_for_supplier(
+                current_account = get_or_create_current_account_for_supplier(
                     entity, member=member, book=request.book)
         except Exception as exc:
             messages.error(request, _g("Could not create record: %(error)s") % {"error": exc})
             return redirect("accounts:create", book_id=request.book.pk)
 
-        # Layer the cari-specific commercial/tax fields on top of the
+        # Layer the current account-specific commercial/tax fields on top of the
         # row the service function just created.
-        cari.default_currency_id = int(currency_id)
-        cari.payment_term_days = int(request.POST.get("payment_term_days") or 30)
-        cari.credit_limit = Decimal(request.POST.get("credit_limit") or "0")
-        cari.discount_rate = Decimal(request.POST.get("discount_rate") or "0")
-        cari.tax_office = request.POST.get("tax_office", "")
-        cari.tax_number = request.POST.get("tax_number", "")
-        cari.identity_number = request.POST.get("identity_number", "")
-        cari.billing_address = address
-        cari.billing_city = request.POST.get("billing_city", "")
-        cari.billing_country = country
-        cari.email = email
-        cari.phone = phone
-        cari.notes = request.POST.get("notes", "")
+        current_account.default_currency_id = int(currency_id)
+        current_account.payment_term_days = int(request.POST.get("payment_term_days") or 30)
+        current_account.credit_limit = Decimal(request.POST.get("credit_limit") or "0")
+        current_account.discount_rate = Decimal(request.POST.get("discount_rate") or "0")
+        current_account.tax_office = request.POST.get("tax_office", "")
+        current_account.tax_number = request.POST.get("tax_number", "")
+        current_account.identity_number = request.POST.get("identity_number", "")
+        current_account.billing_address = address
+        current_account.billing_city = request.POST.get("billing_city", "")
+        current_account.billing_country = country
+        current_account.email = email
+        current_account.phone = phone
+        current_account.notes = request.POST.get("notes", "")
         opening_balance = Decimal(request.POST.get("opening_balance") or "0")
-        cari.opening_balance = opening_balance
-        cari.opening_balance_date = request.POST.get("opening_balance_date") or None
+        current_account.opening_balance = opening_balance
+        current_account.opening_balance_date = request.POST.get("opening_balance_date") or None
 
         try:
-            cari.full_clean(exclude=["code"])
+            current_account.full_clean(exclude=["code"])
         except Exception as exc:
             messages.error(request, _g("Invalid data: %(error)s") % {"error": exc})
             return redirect("accounts:create", book_id=request.book.pk)
-        cari.save()
+        current_account.save()
 
         # If opening balance non-zero, drop a single opening movement
         if opening_balance and opening_balance != Decimal("0"):
-            CariMovement.objects.create(
-                cari=cari,
-                book=cari.book,
-                date=cari.opening_balance_date or timezone.now().date(),
+            CurrentAccountMovement.objects.create(
+                current_account=current_account,
+                book=current_account.book,
+                date=current_account.opening_balance_date or timezone.now().date(),
                 amount=opening_balance,
-                currency=cari.default_currency,
+                currency=current_account.default_currency,
                 movement_type="opening",
                 description="Opening balance",
                 created_by=member,
             )
 
-        messages.success(request, _g("Account created: %(code)s") % {"code": cari.code})
-        return redirect("accounts:detail", pk=cari.pk)
+        messages.success(request, _g("Account created: %(code)s") % {"code": current_account.code})
+        return redirect("accounts:detail", pk=current_account.pk)
 
 
 @method_decorator(login_required, name="dispatch")
-class CariEdit(View):
-    template_name = "accounts/cari_form.html"
+class CurrentAccountEdit(View):
+    template_name = "accounts/current_account_form.html"
 
     def get(self, request, pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
         return render(request, self.template_name, {
-            "cari": cari,
+            "current_account": current_account,
             "books": _member_books(request),
             "currencies": _currencies(),
-            "type_choices": CariAccount.TYPE_CHOICES,
+            "type_choices": CurrentAccount.TYPE_CHOICES,
         })
 
     def post(self, request, pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
 
-        cari.name = request.POST.get("name", cari.name).strip()
-        cari.type = request.POST.get("type", cari.type)
-        cari.payment_term_days = int(request.POST.get("payment_term_days") or cari.payment_term_days)
-        cari.credit_limit = Decimal(request.POST.get("credit_limit") or "0")
-        cari.discount_rate = Decimal(request.POST.get("discount_rate") or "0")
-        cari.tax_office = request.POST.get("tax_office", "")
-        cari.tax_number = request.POST.get("tax_number", "")
-        cari.identity_number = request.POST.get("identity_number", "")
-        cari.billing_address = request.POST.get("billing_address", "")
-        cari.billing_city = request.POST.get("billing_city", "")
-        cari.billing_country = request.POST.get("billing_country", "TR")
-        cari.email = request.POST.get("email", "")
-        cari.phone = request.POST.get("phone", "")
-        cari.notes = request.POST.get("notes", "")
-        cari.is_active = request.POST.get("is_active") == "on"
+        current_account.name = request.POST.get("name", current_account.name).strip()
+        current_account.type = request.POST.get("type", current_account.type)
+        current_account.payment_term_days = int(request.POST.get("payment_term_days") or current_account.payment_term_days)
+        current_account.credit_limit = Decimal(request.POST.get("credit_limit") or "0")
+        current_account.discount_rate = Decimal(request.POST.get("discount_rate") or "0")
+        current_account.tax_office = request.POST.get("tax_office", "")
+        current_account.tax_number = request.POST.get("tax_number", "")
+        current_account.identity_number = request.POST.get("identity_number", "")
+        current_account.billing_address = request.POST.get("billing_address", "")
+        current_account.billing_city = request.POST.get("billing_city", "")
+        current_account.billing_country = request.POST.get("billing_country", "TR")
+        current_account.email = request.POST.get("email", "")
+        current_account.phone = request.POST.get("phone", "")
+        current_account.notes = request.POST.get("notes", "")
+        current_account.is_active = request.POST.get("is_active") == "on"
 
         currency_id = request.POST.get("default_currency")
-        if currency_id and str(cari.default_currency_id) != str(currency_id):
-            cari.default_currency_id = int(currency_id)
+        if currency_id and str(current_account.default_currency_id) != str(currency_id):
+            current_account.default_currency_id = int(currency_id)
 
-        cari.save()
+        current_account.save()
         messages.success(request, _g("Account updated."))
-        return redirect("accounts:detail", pk=cari.pk)
+        return redirect("accounts:detail", pk=current_account.pk)
 
 
 # ---------------------------------------------------------------------------
@@ -498,10 +498,10 @@ class CariEdit(View):
 # An account is meant to stand for someone the CRM already knows, and
 # creating one here always mints the matching record. Nothing did that for
 # the accounts carried in from the legacy Laleli ledger, and until now
-# nothing could: CariEdit never touched the three link fields, so 1,148
+# nothing could: CurrentAccountEdit never touched the three link fields, so 1,148
 # accounts had no CRM record and no way to be given one short of a shell.
 # Downstream code had begun working around the hole rather than closing it
-# (warehouse intake reads through cari.supplier, which is empty for every
+# (warehouse intake reads through current account.supplier, which is empty for every
 # imported account).
 #
 # So: a picker on the account page. Attach an existing record, mint one
@@ -514,7 +514,7 @@ class CariEdit(View):
 # One list, defined on the model beside the fields themselves — this used
 # to be spelled out again here, and two copies of "which three FKs" is how
 # a fourth would end up honoured in one place and not the other.
-_CRM_KINDS = CariAccount.CRM_FIELDS
+_CRM_KINDS = CurrentAccount.CRM_FIELDS
 
 
 def _crm_subtitle(obj):
@@ -541,7 +541,7 @@ def _crm_model(kind):
 
 
 @method_decorator(login_required, name="dispatch")
-class CariCrmSearch(View):
+class CurrentAccountCrmSearch(View):
     """Candidate CRM records for the account page's link picker (JSON).
 
     Matched with the same Turkish fold the account list searches by, so
@@ -559,7 +559,7 @@ class CariCrmSearch(View):
     def get(self, request, pk):
         from crm.models import Company, Contact, Supplier
 
-        cari = get_object_or_404(CariAccount, pk=pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
         q = (request.GET.get("q") or "").strip()
         if not q:
             return JsonResponse({"results": []})
@@ -592,9 +592,9 @@ class CariCrmSearch(View):
             # One query per kind, not one per row.
             holders = {
                 getattr(c, f"{kind}_id"): c
-                for c in CariAccount.objects
-                .filter(book=cari.book, **{f"{kind}__in": rows})
-                .exclude(pk=cari.pk)
+                for c in CurrentAccount.objects
+                .filter(book=current_account.book, **{f"{kind}__in": rows})
+                .exclude(pk=current_account.pk)
             }
             for obj in rows:
                 held = holders.get(obj.pk)
@@ -613,7 +613,7 @@ class CariCrmSearch(View):
 
 
 @method_decorator(login_required, name="dispatch")
-class CariCrmLink(View):
+class CurrentAccountCrmLink(View):
     """Attach the account to a CRM record, mint one for it, or detach it.
 
     Three actions on one route because they are one decision — who is
@@ -622,48 +622,48 @@ class CariCrmLink(View):
     """
 
     def post(self, request, pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
         action = (request.POST.get("action") or "").strip()
 
         if action == "detach":
-            if not cari.crm_link_field:
+            if not current_account.crm_link_field:
                 messages.info(request, _g("This account has no CRM link."))
-                return redirect("accounts:detail", pk=cari.pk)
-            was = str(cari.crm_link)
-            cari.contact = cari.company = cari.supplier = None
-            cari.save(update_fields=["contact", "company", "supplier", "updated_at"])
+                return redirect("accounts:detail", pk=current_account.pk)
+            was = str(current_account.crm_link)
+            current_account.contact = current_account.company = current_account.supplier = None
+            current_account.save(update_fields=["contact", "company", "supplier", "updated_at"])
             messages.success(
                 request,
                 _g("CRM link removed (%(name)s). The account and its ledger are untouched.")
                 % {"name": was},
             )
-            return redirect("accounts:detail", pk=cari.pk)
+            return redirect("accounts:detail", pk=current_account.pk)
 
         kind = (request.POST.get("kind") or "").strip()
         if kind not in _CRM_KINDS:
             messages.error(request, _g("Pick a contact, company or supplier."))
-            return redirect("accounts:detail", pk=cari.pk)
+            return redirect("accounts:detail", pk=current_account.pk)
 
         if action == "create":
-            obj = self._create(request, cari, kind)
+            obj = self._create(request, current_account, kind)
             if obj is None:
-                return redirect("accounts:detail", pk=cari.pk)
+                return redirect("accounts:detail", pk=current_account.pk)
         elif action == "attach":
             obj = _crm_model(kind).objects.filter(pk=request.POST.get("id")).first()
             if obj is None:
                 messages.error(request, _g("That CRM record no longer exists."))
-                return redirect("accounts:detail", pk=cari.pk)
+                return redirect("accounts:detail", pk=current_account.pk)
         else:
             messages.error(request, _g("Unknown action."))
-            return redirect("accounts:detail", pk=cari.pk)
+            return redirect("accounts:detail", pk=current_account.pk)
 
         # Checked before saving rather than caught afterwards: a
         # constraint violation would say "duplicate key value violates
-        # uniq_cari_book_company", and the reader needs the account's
+        # uniq_current account_book_company", and the reader needs the account's
         # code, which is the thing they were actually looking for.
-        holder = (CariAccount.objects
-                  .filter(book=cari.book, **{kind: obj})
-                  .exclude(pk=cari.pk).first())
+        holder = (CurrentAccount.objects
+                  .filter(book=current_account.book, **{kind: obj})
+                  .exclude(pk=current_account.pk).first())
         if holder is not None:
             messages.error(
                 request,
@@ -673,17 +673,17 @@ class CariCrmLink(View):
                    "belong on one of them.")
                 % {"name": str(obj), "code": holder.code, "account": holder.name},
             )
-            return redirect("accounts:detail", pk=cari.pk)
+            return redirect("accounts:detail", pk=current_account.pk)
 
         # Exactly one of the three, always — clean() refuses two, and
         # re-pointing a link has to clear the old one to obey that.
         for field in _CRM_KINDS:
-            setattr(cari, field, obj if field == kind else None)
-        cari.save(update_fields=[*_CRM_KINDS, "updated_at"])
+            setattr(current_account, field, obj if field == kind else None)
+        current_account.save(update_fields=[*_CRM_KINDS, "updated_at"])
         messages.success(request, _g("Linked to %(name)s.") % {"name": str(obj)})
-        return redirect("accounts:detail", pk=cari.pk)
+        return redirect("accounts:detail", pk=current_account.pk)
 
-    def _create(self, request, cari, kind):
+    def _create(self, request, current_account, kind):
         """Mint the CRM record this account has been standing in for.
 
         Seeded from the account's own fields — the name, address and
@@ -695,18 +695,18 @@ class CariCrmLink(View):
         """
         from crm.models import Company, Contact, Supplier
 
-        name = (request.POST.get("name") or cari.name or "").strip()
+        name = (request.POST.get("name") or current_account.name or "").strip()
         if not name:
             messages.error(request, _g("Name is required."))
             return None
 
-        email = (cari.email or "").strip()
-        phone = (cari.phone or "").strip()
-        address = (cari.billing_address or "").strip()
-        country = (cari.billing_country or "").strip()
+        email = (current_account.email or "").strip()
+        phone = (current_account.phone or "").strip()
+        address = (current_account.billing_address or "").strip()
+        country = (current_account.billing_country or "").strip()
 
         if kind == "company":
-            # Company.name is unique, and CariCreate refuses a duplicate
+            # Company.name is unique, and CurrentAccountCreate refuses a duplicate
             # rather than quietly reusing the existing row. Same here:
             # attaching to someone else's company because the names match
             # is a judgement only the reader can make, and the search box
@@ -788,7 +788,7 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
                     reverse("accounting:equity_expense_detail",
                             kwargs={"pk": mv.book_id, "expense_pk": mv.source_id}),
                     False)
-        if model is not None and model.__name__ == "CariTransfer":
+        if model is not None and model.__name__ == "CurrentAccountTransfer":
             # One leg of a pair. Editing it alone would move a balance out
             # of one account without moving it into the other, so the row
             # is read-only here and corrected on the transfer, which
@@ -844,8 +844,8 @@ def _row_description(mv, linked_payment=None, linked_invoice=None, is_cancel_row
 # matched on reference text that outlived the document while its partner
 # was matched on a status that did not.
 #
-# The answer is now stored on the row as CariMovement.is_void, backfilled
-# once by migration 0086, and read through CariMovementQuerySet.live() by
+# The answer is now stored on the row as CurrentAccountMovement.is_void, backfilled
+# once by migration 0086, and read through CurrentAccountMovementQuerySet.live() by
 # both the statement and recompute_balance. One rule, one answer.
 # ---------------------------------------------------------------------------
 
@@ -911,7 +911,7 @@ def _attach_links(rows):
         r["owner_edit_url"] = owner_url
         r["editable"] = editable
         r["edit_url"] = (
-            reverse("accounts:movement_edit", args=[mv.cari_id, mv.pk])
+            reverse("accounts:movement_edit", args=[mv.current_account_id, mv.pk])
             if editable else owner_url
         )
     return rows
@@ -920,46 +920,46 @@ def _attach_links(rows):
 # ---------------------------------------------------------------------------
 # Detail
 # ---------------------------------------------------------------------------
-class RetailCariRedirect(View):
+class RetailCurrentAccountRedirect(View):
     """Jump to the shared walk-in sales account.
 
     Retail used to have a defter of its own (a "Perakende" Book with its
-    own till and EquityRevenue rows) alongside this cari, which recorded
+    own till and EquityRevenue rows) alongside this current account, which recorded
     every walk-in sale twice in two places that drifted apart. The book
-    is gone; the PERAKENDE cari is the single retail record, so the
+    is gone; the PERAKENDE current account is the single retail record, so the
     nav's "Perakende Satışları" entry lands here.
 
     Resolved by code rather than a hardcoded pk because each brand runs
-    its own schema — cari 17 on demfirat is not cari 17 on another brand.
+    its own schema — current account 17 on demfirat is not current account 17 on another brand.
     """
 
     def get(self, request):
         from accounting.services_accounts import (
-            RETAIL_CARI_CODE, get_or_create_retail_cari,
+            RETAIL_CURRENT_ACCOUNT_CODE, get_or_create_retail_current_account,
         )
 
-        cari = CariAccount.objects.filter(code=RETAIL_CARI_CODE).first()
-        if not cari:
+        current_account = CurrentAccount.objects.filter(code=RETAIL_CURRENT_ACCOUNT_CODE).first()
+        if not current_account:
             # Nothing sold at the counter yet — create the account so the
             # link never dead-ends on a fresh install.
-            cari = get_or_create_retail_cari(
+            current_account = get_or_create_retail_current_account(
                 member=getattr(request.user, "member", None))
-        return redirect("accounts:detail", pk=cari.pk)
+        return redirect("accounts:detail", pk=current_account.pk)
 
 
-class CariDetail(View):
-    template_name = "accounts/cari_detail.html"
+class CurrentAccountDetail(View):
+    template_name = "accounts/current_account_detail.html"
 
     def get(self, request, pk):
-        cari = get_object_or_404(
-            CariAccount.objects.select_related("book", "default_currency",
+        current_account = get_object_or_404(
+            CurrentAccount.objects.select_related("book", "default_currency",
                                                "contact", "company", "supplier"),
             pk=pk,
         )
         # A few more than the 20 shown, because cancelled pairs are
         # dropped below and would otherwise shorten the list.
         recent_movements = (
-            cari.movements
+            current_account.movements
             .select_related("currency", "created_by__user")
             .order_by("-date", "-id")[:30]
         )
@@ -967,7 +967,7 @@ class CariDetail(View):
         # cached_balance is a base-currency (USD) figure, so the walk back
         # through it has to use amount_base too — subtracting a raw EUR
         # `amount` from a USD balance is what made these columns disagree.
-        running = cari.cached_balance
+        running = current_account.cached_balance
         for mv in recent_movements:
             movements_with_balance.append({"mv": mv, "balance_after": running})
             running -= mv.amount_base
@@ -980,18 +980,18 @@ class CariDetail(View):
         ][:20]
         _attach_links(movements_with_balance)
 
-        recent_invoices = cari.invoices.select_related("currency").order_by("-date", "-id")[:10]
+        recent_invoices = current_account.invoices.select_related("currency").order_by("-date", "-id")[:10]
 
-        # Orders attached to this cari — newest first. Items prefetched
+        # Orders attached to this current account — newest first. Items prefetched
         # so gross_profit() can run cheaply in the template if needed.
         recent_orders = (
-            cari.orders.select_related("contact", "company", "web_client")
+            current_account.orders.select_related("contact", "company", "web_client")
             .prefetch_related("items__product", "items__product_variant")
             .order_by("-created_at")[:20]
         )
 
         ctx = {
-            "cari":     cari,
+            "current_account":     current_account,
             "movements": movements_with_balance,
             "recent_invoices": recent_invoices,
             "recent_orders": recent_orders,
@@ -1012,7 +1012,7 @@ class CariDetail(View):
 # ---------------------------------------------------------------------------
 # Statement (Ekstre)
 # ---------------------------------------------------------------------------
-def _cancelled_documents(cari, date_from="", date_to=""):
+def _cancelled_documents(current_account, date_from="", date_to=""):
     """This account's cancelled documents, for the statement's cancelled view.
 
     That view filters movements on is_void, and a cancelled INVOICE leaves
@@ -1038,7 +1038,7 @@ def _cancelled_documents(cari, date_from="", date_to=""):
 
     docs = []
     for inv in _window(
-        cari.invoices.filter(status="cancelled").select_related("currency"), "date"
+        current_account.invoices.filter(status="cancelled").select_related("currency"), "date"
     ):
         docs.append({
             "kind": _("Invoice"), "label": inv.display_number, "date": inv.date,
@@ -1046,7 +1046,7 @@ def _cancelled_documents(cari, date_from="", date_to=""):
             "url": _reverse("accounts:invoice_detail", args=[inv.pk]),
         })
     for pay in _window(
-        cari.payments.filter(status="cancelled").select_related("currency"), "date"
+        current_account.payments.filter(status="cancelled").select_related("currency"), "date"
     ):
         docs.append({
             "kind": pay.get_type_display(), "label": pay.number, "date": pay.date,
@@ -1054,7 +1054,7 @@ def _cancelled_documents(cari, date_from="", date_to=""):
             "url": _reverse("accounts:payment_detail", args=[pay.pk]),
         })
     for chk in _window(
-        cari.checks.filter(status="cancelled").select_related("currency"), "issue_date"
+        current_account.checks.filter(status="cancelled").select_related("currency"), "issue_date"
     ):
         docs.append({
             "kind": chk.get_instrument_display(), "label": chk.serial_no,
@@ -1068,11 +1068,11 @@ def _cancelled_documents(cari, date_from="", date_to=""):
 
 
 @method_decorator(login_required, name="dispatch")
-class CariStatement(View):
-    template_name = "accounts/cari_statement.html"
+class CurrentAccountStatement(View):
+    template_name = "accounts/current_account_statement.html"
 
     def get(self, request, pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
 
         # ── Filters from query string ──────────────────────────────
         date_from = request.GET.get("date_from") or ""
@@ -1082,7 +1082,7 @@ class CariStatement(View):
 
         # Base queryset — date range first so the prior-balance
         # calculation stays correct.
-        base = cari.movements.select_related("currency", "created_by__user").all()
+        base = current_account.movements.select_related("currency", "created_by__user").all()
         qs = base.order_by("date", "id")
         if date_from:
             qs = qs.filter(date__gte=date_from)
@@ -1093,9 +1093,9 @@ class CariStatement(View):
         #   default / direction filters → ACTIVE only (cancelled hidden
         #     from list and totals)
         #   status=cancelled → ONLY cancelled rows
-        # is_void is the SAME rule CariAccount.recompute_balance sums by,
+        # is_void is the SAME rule CurrentAccount.recompute_balance sums by,
         # so an unfiltered statement closes on the account's balance by
-        # construction rather than by argument. See CariMovementQuerySet.
+        # construction rather than by argument. See CurrentAccountMovementQuerySet.
         if status_f == "cancelled":
             qs = qs.void()
         else:
@@ -1119,7 +1119,7 @@ class CariStatement(View):
             prior_qs = prior_qs.none()
         if status_f != "cancelled":
             prior_qs = prior_qs.live()
-        # Base currency throughout — see CariAccount.recompute_balance.
+        # Base currency throughout — see CurrentAccount.recompute_balance.
         opening = prior_qs.aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00")
         running = opening
 
@@ -1151,10 +1151,10 @@ class CariStatement(View):
             rows = list(reversed(rows))
 
         ctx = {
-            "cari":         cari,
+            "current_account":         current_account,
             "rows":         rows,
             "cancelled_documents": (
-                _cancelled_documents(cari, date_from, date_to)
+                _cancelled_documents(current_account, date_from, date_to)
                 if status_f == "cancelled" else []
             ),
             "sort":         sort,
@@ -1170,28 +1170,28 @@ class CariStatement(View):
         # HTMX partial — when the filter bar fires, swap only the
         # results region instead of re-rendering the whole page.
         if request.headers.get("HX-Request") == "true":
-            return render(request, "accounts/_cari_statement_results.html", ctx)
+            return render(request, "accounts/_current_account_statement_results.html", ctx)
         return render(request, self.template_name, ctx)
 
 
 # ---------------------------------------------------------------------------
-# All-accounts printable statement — every cari's CURRENT balance, split
+# All-accounts printable statement — every current account's CURRENT balance, split
 # into who owes us (borçlular) vs who we owe (alacaklılar) so each side
 # can be printed on its own.
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
-class CariStatementAll(View):
-    template_name = "accounts/cari_statement_all.html"
+class CurrentAccountStatementAll(View):
+    template_name = "accounts/current_account_statement_all.html"
 
     def get(self, request):
-        caris = (
-            CariAccount.objects.filter(is_active=True)
+        current_accounts = (
+            CurrentAccount.objects.filter(is_active=True)
             .select_related("book", "default_currency")
             .exclude(cached_balance=0)
             .order_by("-cached_balance")
         )
-        debtors = [c for c in caris if c.cached_balance > 0]     # owe US
-        creditors = [c for c in caris if c.cached_balance < 0]   # WE owe them
+        debtors = [c for c in current_accounts if c.cached_balance > 0]     # owe US
+        creditors = [c for c in current_accounts if c.cached_balance < 0]   # WE owe them
 
         creditors_total = sum((c.cached_balance for c in creditors), Decimal("0.00"))
         return render(request, self.template_name, {
@@ -1207,35 +1207,35 @@ class CariStatementAll(View):
 # Manual movement (used until Invoice/Payment phases land)
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
-class CariMovementCreate(View):
+class CurrentAccountMovementCreate(View):
     template_name = "accounts/movement_form.html"
 
     def get(self, request, pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
         return render(request, self.template_name, {
-            "cari": cari,
+            "current_account": current_account,
             "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
         })
 
     def post(self, request, pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
 
         try:
             amount = Decimal(request.POST.get("amount") or "0")
         except Exception:
             messages.error(request, _g("Invalid amount."))
-            return redirect("accounts:movement_create", pk=cari.pk)
+            return redirect("accounts:movement_create", pk=current_account.pk)
 
         if amount == 0:
             messages.error(request, _g("Amount cannot be zero."))
-            return redirect("accounts:movement_create", pk=cari.pk)
+            return redirect("accounts:movement_create", pk=current_account.pk)
 
         # User picks "direction" — debit/credit — separately from absolute amount
         direction = request.POST.get("direction") or "debit"
         signed = abs(amount) if direction == "debit" else -abs(amount)
 
-        currency_id = request.POST.get("currency") or cari.default_currency_id
+        currency_id = request.POST.get("currency") or current_account.default_currency_id
         movement_type = request.POST.get("movement_type") or "adjustment"
 
         # The user always picks "Tahsilat" (collection) in the dropdown,
@@ -1243,12 +1243,12 @@ class CariMovementCreate(View):
         # this direction is semantically a PAYMENT (we're paying them),
         # so normalise here. Keeps Payment.type accurate downstream and
         # the tahsilat list labels match reality.
-        if movement_type == "collection" and cari.type == "supplier":
+        if movement_type == "collection" and current_account.type == "supplier":
             movement_type = "payment"
 
-        mv = CariMovement.objects.create(
-            cari=cari,
-            book=cari.book,
+        mv = CurrentAccountMovement.objects.create(
+            current_account=current_account,
+            book=current_account.book,
             date=request.POST.get("date") or timezone.now().date(),
             due_date=request.POST.get("due_date") or None,
             amount=signed,
@@ -1260,17 +1260,17 @@ class CariMovementCreate(View):
         )
 
         # Payment mirror (collection / payment types) is handled by the
-        # post_save signal on CariMovement — see signals.py. That way
+        # post_save signal on CurrentAccountMovement — see signals.py. That way
         # any code path that creates such a movement automatically
         # gets a matching Payment, not just this view.
         messages.success(request, _g("Movement added."))
-        return redirect("accounts:detail", pk=cari.pk)
+        return redirect("accounts:detail", pk=current_account.pk)
 
 
 # ---------------------------------------------------------------------------
 # Movement edit / delete — hand-entered rows only
 # ---------------------------------------------------------------------------
-def _own_movement_or_redirect(request, cari, mv_pk):
+def _own_movement_or_redirect(request, current_account, mv_pk):
     """Fetch a movement of THIS account and refuse it if a document owns
     it. Enforced server-side, not just by hiding the pencil: a typed or
     bookmarked URL must not be able to edit a row that a payment,
@@ -1278,7 +1278,7 @@ def _own_movement_or_redirect(request, cari, mv_pk):
 
     Returns (movement, None) or (None, redirect_response).
     """
-    mv = get_object_or_404(CariMovement, pk=mv_pk, cari=cari)
+    mv = get_object_or_404(CurrentAccountMovement, pk=mv_pk, current_account=current_account)
     rows = _attach_links([{"mv": mv, "balance_after": Decimal("0")}])
     row = rows[0]
     if row["editable"]:
@@ -1293,12 +1293,12 @@ def _own_movement_or_redirect(request, cari, mv_pk):
     messages.warning(request,
                      _g("This row belongs to a %(doc)s and can't be edited "
                         "from the statement.") % {"doc": label})
-    return None, redirect("accounts:statement", pk=cari.pk)
+    return None, redirect("accounts:statement", pk=current_account.pk)
 
 
 @method_decorator(login_required, name="dispatch")
 @method_decorator(login_required, name="dispatch")
-class CariMovementDetail(View):
+class CurrentAccountMovementDetail(View):
     """One ledger row, in full, and the way to correct it.
 
     The tables print a row across a handful of columns; this is the place
@@ -1317,49 +1317,49 @@ class CariMovementDetail(View):
     template_name = "accounts/movement_detail.html"
 
     def get(self, request, pk, mv_pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
         mv = get_object_or_404(
-            CariMovement.objects.select_related(
-                "currency", "cari", "book", "created_by__user"
+            CurrentAccountMovement.objects.select_related(
+                "currency", "current_account", "book", "created_by__user"
             ),
-            pk=mv_pk, cari=cari,
+            pk=mv_pk, current_account=current_account,
         )
 
         # The balance as of this row: everything up to and including it,
         # by the same rule the account page and the statement sum by.
         # Rebuilt rather than passed in, so the figure is right whichever
         # page the user arrived from.
-        running = cari.movements.live().filter(
+        running = current_account.movements.live().filter(
             Q(date__lt=mv.date) | Q(date=mv.date, id__lte=mv.id)
         ).aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00")
 
         row = _attach_links([{"mv": mv, "balance_after": running}])[0]
         return render(request, self.template_name, {
-            "cari": cari,
+            "current_account": current_account,
             "mv": mv,
             "row": row,
             "balance_after": running,
         })
 
 
-class CariMovementEdit(View):
+class CurrentAccountMovementEdit(View):
     """Edit a hand-entered ledger row — an opening balance, an
     adjustment, interest, a discount.
 
     Amount, direction, date, currency, type and the free text are all
-    fair game. Saving re-derives the account balance (CariMovement.save)
+    fair game. Saving re-derives the account balance (CurrentAccountMovement.save)
     and refreshes the legacy AR/AP mirror through the same post_save
     signal that created it.
     """
     template_name = "accounts/movement_form.html"
 
     def get(self, request, pk, mv_pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
-        mv, blocked = _own_movement_or_redirect(request, cari, mv_pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
+        mv, blocked = _own_movement_or_redirect(request, current_account, mv_pk)
         if blocked:
             return blocked
         return render(request, self.template_name, {
-            "cari": cari,
+            "current_account": current_account,
             "movement": mv,
             # The form asks for a magnitude plus a debit/credit radio;
             # the stored amount carries the sign.
@@ -1372,8 +1372,8 @@ class CariMovementEdit(View):
         })
 
     def post(self, request, pk, mv_pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
-        mv, blocked = _own_movement_or_redirect(request, cari, mv_pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
+        mv, blocked = _own_movement_or_redirect(request, current_account, mv_pk)
         if blocked:
             return blocked
 
@@ -1381,15 +1381,15 @@ class CariMovementEdit(View):
             amount = Decimal(request.POST.get("amount") or "0")
         except Exception:
             messages.error(request, _g("Invalid amount."))
-            return redirect("accounts:movement_edit", pk=cari.pk, mv_pk=mv.pk)
+            return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
         if amount == 0:
             messages.error(request, _g("Amount cannot be zero."))
-            return redirect("accounts:movement_edit", pk=cari.pk, mv_pk=mv.pk)
+            return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
 
         direction = request.POST.get("direction") or "debit"
         mv.amount = abs(amount) if direction == "debit" else -abs(amount)
         # amount_base is what the balance is summed from, and
-        # CariMovement.save() only recomputes it when it is falsy —
+        # CurrentAccountMovement.save() only recomputes it when it is falsy —
         # leaving it as-is would save a new amount that never reached
         # the balance.
         mv.amount_base = Decimal("0")
@@ -1402,7 +1402,7 @@ class CariMovementEdit(View):
         movement_type = request.POST.get("movement_type") or mv.movement_type
         # Same supplier normalisation as the create form — the dropdown
         # only ever shows "collection".
-        if movement_type == "collection" and cari.type == "supplier":
+        if movement_type == "collection" and current_account.type == "supplier":
             movement_type = "payment"
         mv.movement_type = movement_type
 
@@ -1411,29 +1411,29 @@ class CariMovementEdit(View):
         mv.save()   # recomputes amount_base + the account balance
 
         messages.success(request, _g("Movement updated."))
-        return redirect("accounts:statement", pk=cari.pk)
+        return redirect("accounts:statement", pk=current_account.pk)
 
 
 @method_decorator(login_required, name="dispatch")
-class CariMovementDelete(View):
+class CurrentAccountMovementDelete(View):
     """Delete a hand-entered ledger row. The post_delete signal drops the
     legacy AR/AP mirror and recomputes the balance."""
 
     def post(self, request, pk, mv_pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
-        mv, blocked = _own_movement_or_redirect(request, cari, mv_pk)
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
+        mv, blocked = _own_movement_or_redirect(request, current_account, mv_pk)
         if blocked:
             return blocked
         mv.delete()
         messages.success(request, _g("Movement deleted."))
-        return redirect("accounts:statement", pk=cari.pk)
+        return redirect("accounts:statement", pk=current_account.pk)
 
 
 # ---------------------------------------------------------------------------
 # Account transfer (virman) — the document behind a pair of ledger legs
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
-class CariTransferDetail(View):
+class CurrentAccountTransferDetail(View):
     """One transfer, in full, and the way to correct it.
 
     Sits at transfers/<pk>/ with the edit form at transfers/<pk>/edit/,
@@ -1451,8 +1451,8 @@ class CariTransferDetail(View):
 
     def get(self, request, pk):
         transfer = get_object_or_404(
-            CariTransfer.objects.select_related(
-                "from_cari", "to_cari", "currency", "book", "created_by__user",
+            CurrentAccountTransfer.objects.select_related(
+                "from_current_account", "to_current_account", "currency", "book", "created_by__user",
                 "from_movement", "to_movement",
             ),
             pk=pk,
@@ -1462,14 +1462,14 @@ class CariTransferDetail(View):
             # The legs, paired with the account each one lands on, so the
             # template does not have to re-derive which is which.
             "legs": [
-                ("from", transfer.from_cari, transfer.from_movement),
-                ("to", transfer.to_cari, transfer.to_movement),
+                ("from", transfer.from_current_account, transfer.from_movement),
+                ("to", transfer.to_current_account, transfer.to_movement),
             ],
         })
 
 
 @method_decorator(login_required, name="dispatch")
-class CariTransferEdit(View):
+class CurrentAccountTransferEdit(View):
     """Correct a posted transfer, from either of the legs it wrote.
 
     A transfer owns two ledger rows in two different accounts, so neither
@@ -1491,8 +1491,8 @@ class CariTransferEdit(View):
 
     def _transfer(self, pk):
         return get_object_or_404(
-            CariTransfer.objects.select_related(
-                "from_cari", "to_cari", "currency", "book", "created_by__user"
+            CurrentAccountTransfer.objects.select_related(
+                "from_current_account", "to_current_account", "currency", "book", "created_by__user"
             ),
             pk=pk,
         )
@@ -1500,11 +1500,11 @@ class CariTransferEdit(View):
     def _render(self, request, transfer, form=None):
         return render(request, self.template_name, {
             "transfer": transfer,
-            "form": form or CariTransferForm(instance=transfer, book=transfer.book),
+            "form": form or CurrentAccountTransferForm(instance=transfer, book=transfer.book),
             # Where to go back to. A transfer belongs to two accounts and
             # favours neither, so the source is where the operator most
             # likely came from — the leg that lost the balance.
-            "back_cari": transfer.from_cari,
+            "back_current_account": transfer.from_current_account,
             # What the rate row converts INTO. Deliberately
             # settings.BASE_CURRENCY_CODE and not the book's own base, for
             # the reason MakeInTransfer.render_page spells out: the ledger
@@ -1521,7 +1521,7 @@ class CariTransferEdit(View):
 
     def post(self, request, pk):
         transfer = self._transfer(pk)
-        form = CariTransferForm(request.POST, instance=transfer, book=transfer.book)
+        form = CurrentAccountTransferForm(request.POST, instance=transfer, book=transfer.book)
         if not form.is_valid():
             return self._render(request, transfer, form=form)
         try:
@@ -1541,17 +1541,17 @@ class CariTransferEdit(View):
 
 
 @method_decorator(login_required, name="dispatch")
-class CariTransferUndo(View):
+class CurrentAccountTransferUndo(View):
     """Take a transfer back: both legs go, both balances re-derive.
 
     Deleted rather than reversed with counter-movements — see
-    CariTransfer.unpost(). The transfer row itself goes too, so an undone
+    CurrentAccountTransfer.unpost(). The transfer row itself goes too, so an undone
     transfer leaves no document behind claiming to have moved something.
     """
 
     def post(self, request, pk):
-        transfer = get_object_or_404(CariTransfer, pk=pk)
-        from_pk = transfer.from_cari_id
+        transfer = get_object_or_404(CurrentAccountTransfer, pk=pk)
+        from_pk = transfer.from_current_account_id
         with transaction.atomic():
             transfer.unpost()
             transfer.delete()
@@ -1563,16 +1563,16 @@ class CariTransferUndo(View):
 # Delete (soft — flips is_active=False; hard delete only if no movements)
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
-class CariDelete(View):
+class CurrentAccountDelete(View):
     def post(self, request, pk):
-        cari = get_object_or_404(CariAccount, pk=pk)
-        book_id = cari.book_id          # read before the row may go
-        if cari.movements.exists():
-            cari.is_active = False
-            cari.save(update_fields=["is_active"])
-            messages.info(request, _g("Account %(code)s was deactivated (not deleted because it has movements).") % {"code": cari.code})
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
+        book_id = current_account.book_id          # read before the row may go
+        if current_account.movements.exists():
+            current_account.is_active = False
+            current_account.save(update_fields=["is_active"])
+            messages.info(request, _g("Account %(code)s was deactivated (not deleted because it has movements).") % {"code": current_account.code})
         else:
-            code = cari.code
-            cari.delete()
+            code = current_account.code
+            current_account.delete()
             messages.success(request, _g("Account %(code)s deleted.") % {"code": code})
         return redirect("accounts:list", book_id=book_id)

@@ -219,7 +219,7 @@ class StakeholderBook(models.Model):
     def recompute_shares(self, save=True):
         """Re-derive the holding from its issuance records.
 
-        `shares` is a cache, the way CariAccount.cached_balance caches its
+        `shares` is a cache, the way CurrentAccount.cached_balance caches its
         movements. The issuances are the truth — every existing read of
         `.shares` keeps working, and nothing can change a holding without
         leaving a record of why.
@@ -767,9 +767,9 @@ class EquityExpense(models.Model):
             models.CheckConstraint(
                 check=(
                     models.Q(cash_account__isnull=False,
-                             paid_by_cari__isnull=True)
+                             paid_by_current_account__isnull=True)
                     | models.Q(cash_account__isnull=True,
-                               paid_by_cari__isnull=False)
+                               paid_by_current_account__isnull=False)
                 ),
                 name="equityexpense_one_funding_source",
             )
@@ -786,7 +786,7 @@ class EquityExpense(models.Model):
     category = models.ForeignKey(
         ExpenseCategory, on_delete=models.CASCADE, blank=True, null=True
     )
-    # Nullable now, and only because paid_by_cari can stand in its place —
+    # Nullable now, and only because paid_by_current_account can stand in its place —
     # see the constraint above. An expense funded by neither is rejected.
     cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, blank=True, null=True
@@ -794,8 +794,8 @@ class EquityExpense(models.Model):
     # The account of whoever settled this out of their own pocket. PROTECT
     # rather than CASCADE: deleting the account they are owed through must
     # not quietly delete the expense that explains the debt.
-    paid_by_cari = models.ForeignKey(
-        "accounting.CariAccount",
+    paid_by_current_account = models.ForeignKey(
+        "accounting.CurrentAccount",
         on_delete=models.PROTECT,
         blank=True, null=True,
         related_name="funded_expenses",
@@ -836,7 +836,7 @@ class EquityExpense(models.Model):
         "constraint equityexpense_one_funding_source is violated".
         """
         super().clean()
-        if self.cash_account_id and self.paid_by_cari_id:
+        if self.cash_account_id and self.paid_by_current_account_id:
             raise ValidationError(
                 {
                     "cash_account": "An expense is funded once. Name the cash "
@@ -844,7 +844,7 @@ class EquityExpense(models.Model):
                                     "of whoever paid it — not both."
                 }
             )
-        if not self.cash_account_id and not self.paid_by_cari_id:
+        if not self.cash_account_id and not self.paid_by_current_account_id:
             raise ValidationError(
                 {
                     "cash_account": "Say what funded this expense: a cash "
@@ -854,11 +854,11 @@ class EquityExpense(models.Model):
             )
 
     def ledger_exchange_rate(self):
-        """The rate the cari movement this expense posts converts at.
+        """The rate the current account movement this expense posts converts at.
 
         None means nobody typed one and the published rate for the date
-        applies — see CariMovement.entered_rate, which is what asks. Only
-        reached on the paid_by_cari path; an expense taken out of cash
+        applies — see CurrentAccountMovement.entered_rate, which is what asks. Only
+        reached on the paid_by_current_account path; an expense taken out of cash
         posts no movement to convert.
         """
         return self.exchange_rate
@@ -1159,7 +1159,7 @@ class Metric(models.Model):
 
 
 # ---------------------------------------------------------------------------
-# Current-account (cari) ledger — CariAccount, CariMovement, CariSettings,
+# Current-account (current account) ledger — CurrentAccount, CurrentAccountMovement, CurrentAccountSettings,
 # Invoice, InvoiceItem, Payment, PaymentAllocation, CheckOrPromissoryNote.
 #
 # Defined in models_accounts.py to keep this file navigable, and imported here
@@ -1170,5 +1170,5 @@ class Metric(models.Model):
 from .models_accounts import *  # noqa: E402,F401,F403
 
 # The general ledger, same arrangement and for the same reason. It sits
-# after models_accounts because a JournalLine points at a CariAccount.
+# after models_accounts because a JournalLine points at a CurrentAccount.
 from .models_ledger import *  # noqa: E402,F401,F403

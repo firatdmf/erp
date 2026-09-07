@@ -406,11 +406,11 @@ def _slug_token(text):
 
 
 def _account_choices():
-    """Cari accounts for the goods-receipt account picker, each with its derived
+    """Current account accounts for the goods-receipt account picker, each with its derived
     barcode prefix so the UI can preview it instantly.
 
     Lists the accounts THEMSELVES rather than crm.Supplier rows. Intake
-    used to pick a Supplier and resolve its cari through the supplier FK,
+    used to pick a Supplier and resolve its current account through the supplier FK,
     but the accounts carrying the real balances were imported from KARVEN
     with no Supplier row at all — so picking "MARKISS" in this panel minted
     a brand-new supplier + cari and posted the alım there, while the money
@@ -418,12 +418,12 @@ def _account_choices():
     the account directly removes that whole class of drift: what you pick
     is what gets credited.
 
-    All types are listed (not just type="supplier") — a cari can trade both
+    All types are listed (not just type="supplier") — a current account can trade both
     ways, and hiding the rest is what made the right account unpickable."""
     try:
-        from accounting.models_accounts import CariAccount
+        from accounting.models_accounts import CurrentAccount
         from accounting.services_accounts import get_default_book
-        rows = (CariAccount.objects
+        rows = (CurrentAccount.objects
                 .filter(book=get_default_book(), is_active=True)
                 .select_related("default_currency")
                 .order_by("name")[:1000])
@@ -475,7 +475,7 @@ def warehouse_barcode_available(request):
 
 @login_required
 def warehouse_account_create(request):
-    """Create (or reuse) a cari account straight from the manual-add
+    """Create (or reuse) a current account account straight from the manual-add
     panel's account box, so a delivery from a new supplier doesn't force
     a detour through the accounting pages. Matching is by folded name —
     the same Turkish-aware fold the barcode prefix uses — so "Kızılırmak"
@@ -484,7 +484,7 @@ def warehouse_account_create(request):
 
     Creates the ACCOUNT only, deliberately not a crm.Supplier: a Supplier
     used to be the thing minted here, and its post_save auto-created a
-    second cari alongside whatever account already held that vendor's
+    second current account alongside whatever account already held that vendor's
     balance. Suppliers remain a CRM/procurement concept; purchases post
     to accounts.
 
@@ -493,7 +493,7 @@ def warehouse_account_create(request):
     if request.method != "POST":
         return JsonResponse({"success": False, "error": "POST required"}, status=405)
 
-    from accounting.models_accounts import CariAccount
+    from accounting.models_accounts import CurrentAccount
     from accounting.services_accounts import get_default_book, _resolve_currency
     from .catalog_sync import _fold
 
@@ -511,7 +511,7 @@ def warehouse_account_create(request):
     book = get_default_book()
     folded = _fold(name)
     existing = next(
-        (c for c in CariAccount.objects.filter(book=book, is_active=True)
+        (c for c in CurrentAccount.objects.filter(book=book, is_active=True)
          if _fold(c.name) == folded), None
     )
     if existing is not None:
@@ -520,15 +520,15 @@ def warehouse_account_create(request):
             "name": existing.name, "prefix": _consonant_prefix(existing.name),
         })
 
-    cari = CariAccount.objects.create(
+    current_account = CurrentAccount.objects.create(
         book=book, name=name, type="supplier",
         default_currency=_resolve_currency(),
         phone=phone[:30], email=email,
         created_by=getattr(request.user, "member", None),
     )
     return JsonResponse({
-        "success": True, "created": True, "id": cari.id,
-        "name": cari.name, "prefix": _consonant_prefix(cari.name),
+        "success": True, "created": True, "id": current_account.id,
+        "name": current_account.name, "prefix": _consonant_prefix(current_account.name),
     })
 
 
@@ -2252,20 +2252,20 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     # REQUIRED. Goods arriving are goods we owe for, so an intake with
     # no account to post against is always a mistake — it used to be
     # allowed, and silently added stock while the alım never happened.
-    from accounting.models_accounts import CariAccount
-    cari_obj = None
-    cari_id = data.get("cari_id")
-    if cari_id not in (None, ""):
+    from accounting.models_accounts import CurrentAccount
+    current_account_obj = None
+    current_account_id = data.get("current_account_id")
+    if current_account_id not in (None, ""):
         try:
-            cari_obj = CariAccount.objects.filter(pk=int(cari_id)).first()
+            current_account_obj = CurrentAccount.objects.filter(pk=int(current_account_id)).first()
         except (TypeError, ValueError):
-            cari_obj = None
-    if cari_obj is None:
+            current_account_obj = None
+    if current_account_obj is None:
         raise IntakeError(
             {"success": False,
              "error": "Cari hesap seçin — alım faturası bu hesaba işlenir."},
             status=400)
-    account_name = cari_obj.name
+    account_name = current_account_obj.name
 
     prefix = (data.get("barcode_prefix") or "").strip().upper()
     if not prefix:
@@ -2280,7 +2280,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     from accounting.services_accounts import (
         convert_lines_to_currency, invoice_currency_for, MixedCurrencyError,
     )
-    _billing_code = invoice_currency_for(cari_obj)
+    _billing_code = invoice_currency_for(current_account_obj)
     _priced = [
         {"unit_price": Decimal("1"), "currency": (v.get("currency") or "USD")}
         for p_in in products_in
@@ -2601,9 +2601,9 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
 
     # ── Alış faturası (purchase invoice) — the intake above IS a
     # purchase: we now owe this account for the goods, across every
-    # product in the batch. Posted to the CHOSEN cari as ONE issued
+    # product in the batch. Posted to the CHOSEN current account as ONE issued
     # purchase invoice so the alım shows up in the invoice list
-    # (type=purchase) and the cari statement links straight back to it.
+    # (type=purchase) and the current account statement links straight back to it.
     # Best-effort: a bookkeeping hiccup must never roll back the physical
     # stock that was just added.
     purchase_info = None
@@ -2618,11 +2618,11 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
             # receipt showed the operator — not summed in as though the
             # numbers already matched.
             billed_lines = convert_lines_to_currency(
-                purchase_lines, invoice_currency_for(cari_obj),
+                purchase_lines, invoice_currency_for(current_account_obj),
                 rates=data.get("rates"), on_date=None,
             )
             inv = create_purchase_invoice_for_intake(
-                cari_obj, billed_lines, member=member, user=user,
+                current_account_obj, billed_lines, member=member, user=user,
                 invoice=invoice,
             )
             purchase_info = {
@@ -2682,7 +2682,7 @@ class WarehouseManualAdd(View):
 
     JSON body:
       {
-        "cari_id": 163,                   # REQUIRED → barcode prefix + alım
+        "current_account_id": 163,                   # REQUIRED → barcode prefix + alım
         "barcode_prefix": "KZL",          # optional explicit override
         "unit": "mt",                     # mt | adet | kg | paket | ...
         "products": [
@@ -2821,7 +2821,7 @@ class WarehousePurchaseEdit(View):
            for the goods-receipt page to render (see `get`).
     POST → applies the diff: removes unreserved stock items the client dropped,
            adds any new stock items/lines, and syncs the purchase invoice + the
-           supplier's cari balance to match. All-or-nothing: if ANY
+           supplier's current account balance to match. All-or-nothing: if ANY
            targeted-for-removal roll turns out to be reserved, the WHOLE
            request is rejected before anything is written.
     """
@@ -2833,7 +2833,7 @@ class WarehousePurchaseEdit(View):
 
         get_object_or_404(Warehouse, pk=pk)
         invoice = get_object_or_404(
-            Invoice.objects.select_related("cari__supplier", "currency"),
+            Invoice.objects.select_related("current_account__supplier", "currency"),
             pk=invoice_id, type="purchase",
         )
         if invoice.status == "cancelled":
@@ -2885,11 +2885,11 @@ class WarehousePurchaseEdit(View):
             "success": True,
             "invoice_id": invoice.pk,
             "number": invoice.display_number,
-            # The account itself — the panel's picker is keyed on caris now,
-            # and reading through cari.supplier returned nothing for the
+            # The account itself — the panel's picker is keyed on current accounts now,
+            # and reading through current account.supplier returned nothing for the
             # imported accounts, leaving the field blank mid-edit.
-            "cari_id": invoice.cari_id,
-            "cari_name": invoice.cari.name,
+            "current_account_id": invoice.current_account_id,
+            "current_account_name": invoice.current_account.name,
             "currency": invoice.currency.code,
             "products": [groups[k] for k in order],
         })
@@ -2926,7 +2926,7 @@ class WarehousePurchaseEdit(View):
         user = request.user if request.user.is_authenticated else None
 
         with transaction.atomic():
-            # NB: lock the invoice row alone — the cari is read (not
+            # NB: lock the invoice row alone — the current account is read (not
             # locked) separately, which is fine: it's not what concurrent
             # requests race on here, the rolls are (locked individually
             # below).
@@ -2947,9 +2947,9 @@ class WarehousePurchaseEdit(View):
                     invoice.save(update_fields=["notes", "updated_at"])
 
             # Name the stock items' notes/prefix after the ACCOUNT the alım sits
-            # on — cari.supplier is empty for every imported account, which
+            # on — current account.supplier is empty for every imported account, which
             # made added stock items fall back to a generic prefix mid-edit.
-            supplier_name = invoice.cari.name
+            supplier_name = invoice.current_account.name
             fallback_prefix = _consonant_prefix(supplier_name)
 
             # ── Hand-typed barcodes on stock items being ADDED to this alım. Same
@@ -4759,7 +4759,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         the user explicitly wants cargo-less completion.);
       * entering 'packaging'/a shipped status does NOT require the
         scanned reservations to cover the ordered metres — a mismatch
-        between ordered and scanned quantity is allowed; the cari/
+        between ordered and scanned quantity is allowed; the current account/
         invoice bill only the actually-scanned amount regardless (see
         Order.billable_value), so under/over-scanning can never
         mis-charge the customer;
@@ -4770,7 +4770,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         warehouse capacity falsely held for stock that'll never ship;
       * 'cancelled' is TERMINAL — once an order is cancelled it can
         never move to any other status again (mirrors purchase invoices
-        after PurchaseCancel). Its cari posting was reversed and its
+        after PurchaseCancel). Its current account posting was reversed and its
         invoice(s) cancelled with it; silently re-posting those on an
         un-cancel was the bug this closes, not a feature to preserve.
         A mis-cancelled order needs a brand-new order, not a reopen;
@@ -4823,7 +4823,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     # NOTE: entering 'packaging'/a shipped status used to require the
     # scanned reservations to fully COVER every line's ordered metres
     # (order_reservation_shortfalls) — deliberately removed. Ordered vs.
-    # actually-scanned quantity are allowed to disagree; the cari/invoice
+    # actually-scanned quantity are allowed to disagree; the current account/invoice
     # already bill only what was really scanned (Order.billable_value),
     # so under- or over-scanning can never mis-charge the customer, and
     # staff no longer get blocked from shipping over a metre mismatch.
@@ -4850,9 +4850,9 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # A roll can have had less on it than was reserved by the
                 # time it's actually cut (consume_reservations_for_order
                 # clamps r.meters down to what was really available) — the
-                # cari must reflect that final, physically-true amount,
+                # current account must reflect that final, physically-true amount,
                 # not whatever was scanned/reserved a moment earlier.
-                if order.cari_id:
+                if order.current_account_id:
                     from accounting.services_accounts import post_order_movement
                     post_order_movement(order, member=getattr(user, "member", None))
             elif leaving_ship:
@@ -4874,7 +4874,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # either way they're plain soft holds now, safe to drop.
                 order.stock_reservations.filter(consumed=False).delete()
                 # A cancelled order must vanish from the books: the
-                # order_sale movement comes off the cari (retail posts
+                # order_sale movement comes off the current account (retail posts
                 # at create too now), and any invoice cut from this
                 # order is cancelled with it (its counter-movement is
                 # 0-amount, the order movement carries the receivable —
@@ -4899,7 +4899,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                     reverse_retail_order_financials(order, user=user)
             # Completed sale → its invoice cuts itself, retail included
             # — no manual step. Runs AFTER the retail leg so a legacy
-            # retail order that only gets its cari linked there is still
+            # retail order that only gets its current account linked there is still
             # invoiceable. Swallow-and-log: a numbering hiccup must
             # never un-ship the order (the order-detail button stays as
             # the manual fallback).

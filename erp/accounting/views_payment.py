@@ -32,8 +32,8 @@ from django.views import View
 
 from accounting.models import CashAccount, CurrencyCategory
 from .models import (
-    CariAccount,
-    CariSettings,
+    CurrentAccount,
+    CurrentAccountSettings,
     Invoice,
     Payment,
     PaymentAllocation,
@@ -110,10 +110,10 @@ def _next_payment_number(book, ptype):
     carrying those prefixes keep them. The sequence itself is shared and
     carries straight on, so renaming the prefixes leaves no gap.
     """
-    settings_obj = CariSettings.for_book(book)
+    settings_obj = CurrentAccountSettings.for_book(book)
     prefix = "COL" if ptype in ("collection", "refund_out") else "PAY"
     with transaction.atomic():
-        locked = CariSettings.objects.select_for_update().get(pk=settings_obj.pk)
+        locked = CurrentAccountSettings.objects.select_for_update().get(pk=settings_obj.pk)
         year = timezone.now().year
         number = f"{prefix}-{year}-{str(locked.next_payment_seq).zfill(6)}"
         locked.next_payment_seq += 1
@@ -123,17 +123,17 @@ def _next_payment_number(book, ptype):
 
 def _filter_payments(request):
     qs = (Payment.objects
-          .select_related("cari", "book", "currency", "cash_account")
+          .select_related("current_account", "book", "currency", "cash_account")
           .all())
 
     # Both free-text filters fold each side to plain uppercase ASCII —
-    # cari names are stored in uppercase Turkish, ILIKE folds only ASCII
+    # current account names are stored in uppercase Turkish, ILIKE folds only ASCII
     # case, and "gurhan" has to find GÜRHAN whatever keyboard produced it.
     from .views_accounts import tr_fold, tr_fold_expr
 
     qs = qs.annotate(
-        _f_name=tr_fold_expr("cari__name"),
-        _f_code=tr_fold_expr("cari__code"),
+        _f_name=tr_fold_expr("current_account__name"),
+        _f_code=tr_fold_expr("current_account__code"),
     )
 
     q = (request.GET.get("q") or "").strip()
@@ -146,16 +146,16 @@ def _filter_payments(request):
             | Q(description__icontains=q)
         )
 
-    cari_id = request.GET.get("account") or ""
-    if cari_id.isdigit():
-        qs = qs.filter(cari_id=int(cari_id))
+    current_account_id = request.GET.get("account") or ""
+    if current_account_id.isdigit():
+        qs = qs.filter(current_account_id=int(current_account_id))
 
-    # Free-text cari filter: matches against name OR code so the user
+    # Free-text current account filter: matches against name OR code so the user
     # doesn't have to remember the exact spelling. Anchored by the
     # filter bar's "Account" input.
-    cari_q = (request.GET.get("cari_q") or "").strip()
-    if cari_q:
-        needle = tr_fold(cari_q)
+    current_account_q = (request.GET.get("current_account_q") or "").strip()
+    if current_account_q:
+        needle = tr_fold(current_account_q)
         qs = qs.filter(Q(_f_name__contains=needle) | Q(_f_code__contains=needle))
 
     type_ = request.GET.get("type") or ""
@@ -211,7 +211,7 @@ class PaymentList(View):
             "q":            request.GET.get("q", ""),
             "filter_type":  request.GET.get("type", ""),
             "filter_status":request.GET.get("status", ""),
-            "filter_cari_q":request.GET.get("cari_q", ""),
+            "filter_current_account_q":request.GET.get("current_account_q", ""),
             "filter_direction": request.GET.get("direction", ""),
             "date_from":    request.GET.get("date_from", ""),
             "date_to":      request.GET.get("date_to", ""),
@@ -277,31 +277,31 @@ class PaymentCreate(View):
     template_name = "accounts/payment_form.html"
 
     def get(self, request):
-        prefilled_cari = None
-        cari_id = request.GET.get("account")
-        if cari_id and cari_id.isdigit():
-            prefilled_cari = CariAccount.objects.filter(pk=int(cari_id)).first()
+        prefilled_current_account = None
+        current_account_id = request.GET.get("account")
+        if current_account_id and current_account_id.isdigit():
+            prefilled_current_account = CurrentAccount.objects.filter(pk=int(current_account_id)).first()
 
-        cari_options = (
-            CariAccount.objects.filter(is_active=True).order_by("name")
-            if not prefilled_cari else CariAccount.objects.none()
+        current_account_options = (
+            CurrentAccount.objects.filter(is_active=True).order_by("name")
+            if not prefilled_current_account else CurrentAccount.objects.none()
         )
 
-        # Open invoices for the prefilled cari
+        # Open invoices for the prefilled current account
         open_invoices = []
-        if prefilled_cari:
+        if prefilled_current_account:
             open_invoices = list(
-                prefilled_cari.invoices
+                prefilled_current_account.invoices
                 .filter(status__in=["issued", "partially_paid", "overdue"])
                 .order_by("date", "id")
                 .values("id", "series", "number", "date", "due_date", "total", "balance",
                         "currency__code", "type")
             )
 
-        # Cash accounts scoped to prefilled cari's book if known
+        # Cash accounts scoped to prefilled current account's book if known
         cash_qs = CashAccount.objects.select_related("currency", "book").all().order_by("book", "name")
-        if prefilled_cari:
-            cash_qs = cash_qs.filter(book=prefilled_cari.book)
+        if prefilled_current_account:
+            cash_qs = cash_qs.filter(book=prefilled_current_account.book)
 
         # "Take Payment" / "Make Payment" land here with ?type= so the
         # form opens on the right side without the user re-picking it.
@@ -311,23 +311,23 @@ class PaymentCreate(View):
 
         return render(request, self.template_name, {
             "payment": None,
-            "prefilled_cari": prefilled_cari,
-            "cari_options": cari_options,
+            "prefilled_current_account": prefilled_current_account,
+            "current_account_options": current_account_options,
             "cash_accounts": cash_qs,
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "type_choices":   Payment.PAYMENT_TYPES,
             "method_choices": Payment.METHOD_CHOICES,
             "initial_type":   initial_type,
-            "base_currency": _fx_context(prefilled_cari.book if prefilled_cari else None),
+            "base_currency": _fx_context(prefilled_current_account.book if prefilled_current_account else None),
             "open_invoices_json": json.dumps(_serialize_invoices(open_invoices), default=str),
         })
 
     def post(self, request):
-        cari_id = request.POST.get("account")
-        if not cari_id:
+        current_account_id = request.POST.get("account")
+        if not current_account_id:
             messages.error(request, _g("An account must be selected."))
             return redirect("accounts:payment_create", book_id=request.book.pk)
-        cari = get_object_or_404(CariAccount, pk=int(cari_id))
+        current_account = get_object_or_404(CurrentAccount, pk=int(current_account_id))
 
         amount = _D(request.POST.get("amount"))
         if amount <= 0:
@@ -350,14 +350,14 @@ class PaymentCreate(View):
 
         ptype = request.POST.get("type") or "collection"
         method = request.POST.get("method") or "bank_transfer"
-        currency_id = int(request.POST.get("currency") or cari.default_currency_id)
+        currency_id = int(request.POST.get("currency") or current_account.default_currency_id)
         cash_account_id = request.POST.get("cash_account") or None
 
         with transaction.atomic():
             payment = Payment.objects.create(
-                cari=cari,
-                book=cari.book,
-                number=_next_payment_number(cari.book, ptype),
+                current_account=current_account,
+                book=current_account.book,
+                number=_next_payment_number(current_account.book, ptype),
                 type=ptype,
                 method=method,
                 status="draft",
@@ -377,10 +377,10 @@ class PaymentCreate(View):
                 if a["invoice_id"]:
                     # Cancelled invoices are terminal (no restore path) — money
                     # allocated onto one could never be reconciled again.
-                    inv = (Invoice.objects.filter(pk=a["invoice_id"], cari=cari)
+                    inv = (Invoice.objects.filter(pk=a["invoice_id"], current_account=current_account)
                            .exclude(status="cancelled").first())
                     if not inv:
-                        continue  # invoice not found / wrong cari / cancelled → skip silently
+                        continue  # invoice not found / wrong current account / cancelled → skip silently
                 PaymentAllocation.objects.create(
                     payment=payment,
                     invoice=inv,
@@ -424,7 +424,7 @@ class PaymentDetail(View):
 
     def get(self, request, pk):
         payment = get_object_or_404(
-            Payment.objects.select_related("cari", "book", "currency", "cash_account",
+            Payment.objects.select_related("current_account", "book", "currency", "cash_account",
                                            "posted_movement"),
             pk=pk,
         )
@@ -456,7 +456,7 @@ def _edit_invoice_rows(payment):
     for inv_id, amt in payment.allocations.exclude(invoice=None).values_list("invoice_id", "amount"):
         applied[inv_id] += amt
 
-    rows = (payment.cari.invoices
+    rows = (payment.current_account.invoices
             .filter(Q(status__in=["issued", "partially_paid", "overdue"])
                     | Q(pk__in=list(applied)))
             .exclude(status="cancelled")
@@ -479,7 +479,7 @@ class PaymentEdit(View):
     """Edit a draft or a confirmed payment.
 
     A confirmed payment has already moved money — it posted a
-    CariMovement, shifted a cash account balance and paid invoices down —
+    CurrentAccountMovement, shifted a cash account balance and paid invoices down —
     so an edit has to walk all three back and re-apply them: the ledger
     row is refreshed in place (resync_posted_movement), the old cash
     effect is reversed before the new one lands, and every invoice on
@@ -487,7 +487,7 @@ class PaymentEdit(View):
 
     Cancelled payments are terminal, exactly as with invoices: no edit.
     The account can't be switched either — moving a posted payment to a
-    different cari is a new document, not an edit.
+    different current account is a new document, not an edit.
     """
     template_name = "accounts/payment_form.html"
 
@@ -499,7 +499,7 @@ class PaymentEdit(View):
 
     def get(self, request, pk):
         payment = get_object_or_404(
-            Payment.objects.select_related("cari", "book", "currency"), pk=pk)
+            Payment.objects.select_related("current_account", "book", "currency"), pk=pk)
         blocked = self._block_if_cancelled(request, payment)
         if blocked:
             return blocked
@@ -509,23 +509,23 @@ class PaymentEdit(View):
         # isn't silently dropped by a select that can't show it.
         cash_qs = (CashAccount.objects
                    .select_related("currency", "book")
-                   .filter(Q(book=payment.cari.book) | Q(pk=payment.cash_account_id))
+                   .filter(Q(book=payment.current_account.book) | Q(pk=payment.cash_account_id))
                    .order_by("book", "name"))
 
         return render(request, self.template_name, {
             "payment": payment,
-            "prefilled_cari": payment.cari,
-            "cari_options": CariAccount.objects.none(),
+            "prefilled_current_account": payment.current_account,
+            "current_account_options": CurrentAccount.objects.none(),
             "cash_accounts": cash_qs,
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "type_choices":   Payment.PAYMENT_TYPES,
             "method_choices": Payment.METHOD_CHOICES,
-            "base_currency": _fx_context(payment.book or payment.cari.book),
+            "base_currency": _fx_context(payment.book or payment.current_account.book),
             "open_invoices_json": json.dumps(_edit_invoice_rows(payment), default=str),
         })
 
     def post(self, request, pk):
-        payment = get_object_or_404(Payment.objects.select_related("cari", "currency"), pk=pk)
+        payment = get_object_or_404(Payment.objects.select_related("current_account", "currency"), pk=pk)
         blocked = self._block_if_cancelled(request, payment)
         if blocked:
             return blocked
@@ -579,10 +579,10 @@ class PaymentEdit(View):
             for a in allocations:
                 inv = None
                 if a["invoice_id"]:
-                    inv = (Invoice.objects.filter(pk=a["invoice_id"], cari=payment.cari)
+                    inv = (Invoice.objects.filter(pk=a["invoice_id"], current_account=payment.current_account)
                            .exclude(status="cancelled").first())
                     if not inv:
-                        continue  # invoice not found / wrong cari / cancelled → skip silently
+                        continue  # invoice not found / wrong current account / cancelled → skip silently
                     touched.add(inv.pk)
                 PaymentAllocation.objects.create(
                     payment=payment,

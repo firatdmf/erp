@@ -159,15 +159,15 @@
         <h3>{% trans "What funded it" %}</h3>
       </div>
 
-      {% if expense.paid_by_cari %}
+      {% if expense.paid_by_current_account %}
         <div class="xd-note info">
           <i data-lucide="info"></i>
           <div>{% trans "Somebody settled this for the book. No cash moved — the book owes them instead." %}</div>
         </div>
         <div class="xd-posted">
           <div class="who">
-            <span class="code">{{ expense.paid_by_cari.code }}</span>
-            <a class="name" href="{% url 'accounts:detail' pk=expense.paid_by_cari_id %}">{{ expense.paid_by_cari.name }}</a>
+            <span class="code">{{ expense.paid_by_current_account.code }}</span>
+            <a class="name" href="{% url 'accounts:detail' pk=expense.paid_by_current_account_id %}">{{ expense.paid_by_current_account.name }}</a>
           </div>
           {% if ledger_movement %}
             {# The base equivalent is stated once, up in the rate row. #}
@@ -176,7 +176,7 @@
             </span>
             <div class="n">
               {{ ledger_movement.date|date:"d.m.Y" }} ·
-              <a href="{% url 'accounts:movement_detail' expense.paid_by_cari_id ledger_movement.pk %}">{% trans "See this ledger row" %} &rarr;</a>
+              <a href="{% url 'accounts:movement_detail' expense.paid_by_current_account_id ledger_movement.pk %}">{% trans "See this ledger row" %} &rarr;</a>
             </div>
           {% else %}
             {# Every funded expense posts one. Saying so is better than showing nothing. #}

@@ -59,7 +59,7 @@ class ContactCreateForm(ModelForm):
         widget=forms.HiddenInput(attrs={"id": "task_member_id"})
     )
 
-    create_cari = forms.BooleanField(
+    create_current_account = forms.BooleanField(
         required=False, initial=True, label="Cari hesabı aç"
     )
 
@@ -335,7 +335,7 @@ class CompanyForm(ModelForm):
         widget=forms.Textarea, label="Task Description", required=False
     )
 
-    create_cari = forms.BooleanField(
+    create_current_account = forms.BooleanField(
         required=False, initial=True, label="Cari hesabı aç"
     )
 

@@ -177,7 +177,7 @@ INSTALLED_APPS = [
     # app stays registered so its own migration history and marketing's
     # adoption migration keep resolving. See its apps.py.
     "email_automation",
-    # Migrations-only stub. The cari ledger now lives in `accounting`; this
+    # Migrations-only stub. The current account ledger now lives in `accounting`; this
     # app stays registered so migration dependencies on ('current_account', …)
     # in operating/ and its own history keep resolving. See its apps.py.
     "current_account",
@@ -277,7 +277,7 @@ BRAND_DEFAULTS = {
         "BRAND_TAX_NUMBER": "",
         "BRAND_LOGO_URL": "",
         # Empty → invoices use the legacy dashed format INV-YEAR-NNNNNN
-        # (see CariSettings.next_invoice_number). Set a non-empty value
+        # (see CurrentAccountSettings.next_invoice_number). Set a non-empty value
         # to switch to the compact PREFIX+YEAR+SEQ shape.
         "BRAND_INVOICE_PREFIX": "",
         # Last resort for an auto-minted product SKU or roll barcode, used
@@ -302,7 +302,11 @@ DB_SCHEMA = config("DB_SCHEMA", default=_brand_cfg["DB_SCHEMA"]).strip()
 # work with NO member at all — cron, imports, the shell — which would
 # otherwise land on the lowest-id book.
 # See accounting.services_accounts.get_default_book().
-CARI_BOOK_ID = config("CARI_BOOK_ID", default="").strip()
+# Reads either name. The setting is CURRENT_ACCOUNT_BOOK_ID now, but a
+# deploy may still define CARI_BOOK_ID in its environment, and losing
+# it would silently unpin which book the shared records belong to.
+CURRENT_ACCOUNT_BOOK_ID = (config("CURRENT_ACCOUNT_BOOK_ID", default="")
+                          or config("CARI_BOOK_ID", default="")).strip()
 BRAND_NAME = config("BRAND_NAME", default=_brand_cfg["BRAND_NAME"]).strip()
 BRAND_DISPLAY_NAME = config(
     "BRAND_DISPLAY_NAME", default=_brand_cfg.get("BRAND_DISPLAY_NAME", "")

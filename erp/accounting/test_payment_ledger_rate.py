@@ -8,8 +8,8 @@ from django.test import TestCase
 
 from accounting.models import (
     Book,
-    CariAccount,
-    CariMovement,
+    CurrentAccount,
+    CurrentAccountMovement,
     CurrencyCategory,
     Invoice,
     Payment,
@@ -18,7 +18,7 @@ from accounting.models import (
 
 class LedgerRateTestBase(TestCase):
     """The rate typed on a document must be the rate its ledger row
-    converts at. It reached the cash ledger and stopped there: the cari
+    converts at. It reached the cash ledger and stopped there: the current account
     movement went on using the published rate, so the figure the operator
     corrected was not the figure their balance moved by."""
 
@@ -31,14 +31,14 @@ class LedgerRateTestBase(TestCase):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.try_ = CurrencyCategory.objects.create(code="TRY", name="Turkish Lira", symbol="₺")
         self.book = Book.objects.create(name="Laleli Fabric")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-078", name="RANA UYGUR",
             default_currency=self.try_,
         )
 
     def make_payment(self, rate, amount="200.00", currency=None):
         return Payment.objects.create(
-            cari=self.cari, book=self.book,
+            current_account=self.current_account, book=self.book,
             number="COL-TEST-%s" % (rate or "none"),
             type="collection", method="cash", status="draft",
             date="2026-08-17",
@@ -64,8 +64,8 @@ class PaymentLedgerRateTest(LedgerRateTestBase):
         payment = self.make_payment(self.ENTERED)
         payment.confirm()
 
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("-4.16"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("-4.16"))
 
     def test_no_rate_typed_still_uses_the_published_one(self):
         """Null means nobody said, not "one to one" — the whole reason
@@ -87,8 +87,8 @@ class PaymentLedgerRateTest(LedgerRateTestBase):
         payment.posted_movement.refresh_from_db()
         self.assertEqual(payment.posted_movement.exchange_rate, Decimal("0.030000"))
         self.assertEqual(payment.posted_movement.amount_base, Decimal("-6.00"))
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("-6.00"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("-6.00"))
 
     def test_a_base_currency_payment_ignores_a_stray_rate(self):
         """Nothing to convert — a rate left behind by a currency switch
@@ -114,14 +114,14 @@ class InvoiceRateIsNotConsultedTest(LedgerRateTestBase):
         from django.contrib.contenttypes.models import ContentType
 
         invoice = Invoice.objects.create(
-            cari=self.cari, book=self.book, number="INV-TEST-1",
+            current_account=self.current_account, book=self.book, number="INV-TEST-1",
             type="sale", status="draft", date="2026-08-17",
             due_date="2026-09-17", currency=self.try_,
         )
         self.assertEqual(invoice.exchange_rate, Decimal("1.000000"))
 
-        movement = CariMovement.objects.create(
-            cari=self.cari, book=self.book, date="2026-08-17",
+        movement = CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date="2026-08-17",
             amount=Decimal("200.00"), currency=self.try_,
             movement_type="invoice_sale",
             source_type=ContentType.objects.get_for_model(Invoice),
@@ -132,8 +132,8 @@ class InvoiceRateIsNotConsultedTest(LedgerRateTestBase):
         self.assertNotEqual(movement.amount_base, Decimal("200.00"))
 
     def test_a_movement_with_no_source_is_unaffected(self):
-        movement = CariMovement.objects.create(
-            cari=self.cari, book=self.book, date="2026-08-17",
+        movement = CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date="2026-08-17",
             amount=Decimal("200.00"), currency=self.try_,
             movement_type="adjustment",
         )

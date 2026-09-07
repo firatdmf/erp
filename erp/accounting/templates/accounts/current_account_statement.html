@@ -300,8 +300,8 @@
 <div class="st">
 
   <div class="st-crumbs no-print">
-    <a class="st-back" href="{% url 'accounts:detail' cari.pk %}">
-      <i data-lucide="arrow-left"></i> {{ cari.name }}
+    <a class="st-back" href="{% url 'accounts:detail' current_account.pk %}">
+      <i data-lucide="arrow-left"></i> {{ current_account.name }}
     </a>
   </div>
 
@@ -309,7 +309,7 @@
     <div class="st-head-l">
       <div class="st-eyebrow">{% trans "Account Statement" %}</div>
       <h1 class="st-title">{% blocktrans with name=cari.name %}Statement — {{ name }}{% endblocktrans %}</h1>
-      <p class="st-sub"><span class="code">{{ cari.code }}</span> · {{ cari.book.name }}{% if date_from or date_to %} · {{ date_from|default:'…' }} → {{ date_to|default:'…' }}{% endif %}</p>
+      <p class="st-sub"><span class="code">{{ current_account.code }}</span> · {{ current_account.book.name }}{% if date_from or date_to %} · {{ date_from|default:'…' }} → {{ date_to|default:'…' }}{% endif %}</p>
     </div>
     <button class="st-btn ghost no-print" onclick="window.print();">
       <i data-lucide="printer"></i> {% trans "Print" %}
@@ -318,7 +318,7 @@
 
   <form class="st-toolbar no-print"
         method="get"
-        hx-get="{% url 'accounts:statement' cari.pk %}"
+        hx-get="{% url 'accounts:statement' current_account.pk %}"
         hx-target="#stmt-results"
         hx-swap="innerHTML"
         hx-trigger="change, submit"
@@ -329,7 +329,7 @@
       <button type="button"
               data-dir="" data-status=""
               class="st-pill {% if not filter_direction and not filter_status %}active{% endif %}"
-              hx-get="{% url 'accounts:statement' cari.pk %}?{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% if sort == 'desc' %}sort=desc{% endif %}"
+              hx-get="{% url 'accounts:statement' current_account.pk %}?{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% if sort == 'desc' %}sort=desc{% endif %}"
               hx-target="#stmt-results"
               hx-swap="innerHTML"
               hx-push-url="true">
@@ -338,7 +338,7 @@
       <button type="button"
               data-dir="in" data-status=""
               class="st-pill st-pill-in {% if filter_direction == 'in' and not filter_status %}active{% endif %}"
-              hx-get="{% url 'accounts:statement' cari.pk %}?direction=in{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
+              hx-get="{% url 'accounts:statement' current_account.pk %}?direction=in{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
               hx-target="#stmt-results"
               hx-swap="innerHTML"
               hx-push-url="true">
@@ -347,7 +347,7 @@
       <button type="button"
               data-dir="out" data-status=""
               class="st-pill st-pill-out {% if filter_direction == 'out' and not filter_status %}active{% endif %}"
-              hx-get="{% url 'accounts:statement' cari.pk %}?direction=out{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
+              hx-get="{% url 'accounts:statement' current_account.pk %}?direction=out{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
               hx-target="#stmt-results"
               hx-swap="innerHTML"
               hx-push-url="true">
@@ -356,7 +356,7 @@
       <button type="button"
               data-dir="" data-status="cancelled"
               class="st-pill st-pill-void {% if filter_status == 'cancelled' %}active{% endif %}"
-              hx-get="{% url 'accounts:statement' cari.pk %}?status=cancelled{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
+              hx-get="{% url 'accounts:statement' current_account.pk %}?status=cancelled{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
               hx-target="#stmt-results"
               hx-swap="innerHTML"
               hx-push-url="true">
@@ -379,7 +379,7 @@
 
     <button type="button" class="st-sort"
             title="{% trans 'Change the reading order' %}"
-            hx-get="{% url 'accounts:statement' cari.pk %}?sort={% if sort == 'desc' %}asc{% else %}desc{% endif %}{% if filter_direction %}&direction={{ filter_direction }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+            hx-get="{% url 'accounts:statement' current_account.pk %}?sort={% if sort == 'desc' %}asc{% else %}desc{% endif %}{% if filter_direction %}&direction={{ filter_direction }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
             hx-target="#stmt-results"
             hx-swap="innerHTML"
             hx-push-url="true">
@@ -387,11 +387,11 @@
       <span>{% if sort == 'desc' %}{% trans "Newest first" %}{% else %}{% trans "Oldest first" %}{% endif %}</span>
     </button>
 
-    <a href="{% url 'accounts:statement' cari.pk %}" class="clear-link">{% trans "Clear" %}</a>
+    <a href="{% url 'accounts:statement' current_account.pk %}" class="clear-link">{% trans "Clear" %}</a>
   </form>
 
   <div id="stmt-results">
-    {% include "accounts/_cari_statement_results.html" %}
+    {% include "accounts/_current_account_statement_results.html" %}
   </div>
 </div>
 

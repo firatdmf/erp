@@ -25,7 +25,7 @@ from django.utils.translation import gettext_lazy as _, gettext as _g
 from django.views import View
 
 from accounting.models import CashAccount, CurrencyCategory
-from .models import CariAccount, CheckOrPromissoryNote
+from .models import CurrentAccount, CheckOrPromissoryNote
 
 
 def _D(val, default="0"):
@@ -37,7 +37,7 @@ def _D(val, default="0"):
 
 def _filter_checks(request):
     qs = (CheckOrPromissoryNote.objects
-          .select_related("cari", "book", "currency", "endorsed_to")
+          .select_related("current_account", "book", "currency", "endorsed_to")
           .all())
 
     q = (request.GET.get("q") or "").strip()
@@ -46,13 +46,13 @@ def _filter_checks(request):
             Q(serial_no__icontains=q)
             | Q(bank__icontains=q)
             | Q(drawer__icontains=q)
-            | Q(cari__name__icontains=q)
-            | Q(cari__code__icontains=q)
+            | Q(current_account__name__icontains=q)
+            | Q(current_account__code__icontains=q)
         )
 
-    cari_id = request.GET.get("account") or ""
-    if cari_id.isdigit():
-        qs = qs.filter(cari_id=int(cari_id))
+    current_account_id = request.GET.get("account") or ""
+    if current_account_id.isdigit():
+        qs = qs.filter(current_account_id=int(current_account_id))
 
     instr = request.GET.get("instrument") or ""
     if instr in dict(CheckOrPromissoryNote.INSTRUMENT_TYPES):
@@ -108,31 +108,31 @@ class CheckCreate(View):
     template_name = "accounts/check_form.html"
 
     def get(self, request):
-        prefilled_cari = None
-        cari_id = request.GET.get("account")
-        if cari_id and cari_id.isdigit():
-            prefilled_cari = CariAccount.objects.filter(pk=int(cari_id)).first()
+        prefilled_current_account = None
+        current_account_id = request.GET.get("account")
+        if current_account_id and current_account_id.isdigit():
+            prefilled_current_account = CurrentAccount.objects.filter(pk=int(current_account_id)).first()
 
-        cari_options = (
-            CariAccount.objects.filter(is_active=True).order_by("name")
-            if not prefilled_cari else CariAccount.objects.none()
+        current_account_options = (
+            CurrentAccount.objects.filter(is_active=True).order_by("name")
+            if not prefilled_current_account else CurrentAccount.objects.none()
         )
 
         return render(request, self.template_name, {
             "check": None,
-            "prefilled_cari": prefilled_cari,
-            "cari_options": cari_options,
+            "prefilled_current_account": prefilled_current_account,
+            "current_account_options": current_account_options,
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "instrument_choices": CheckOrPromissoryNote.INSTRUMENT_TYPES,
             "direction_choices":  CheckOrPromissoryNote.DIRECTION_CHOICES,
         })
 
     def post(self, request):
-        cari_id = request.POST.get("account")
-        if not cari_id:
+        current_account_id = request.POST.get("account")
+        if not current_account_id:
             messages.error(request, _g("An account must be selected."))
             return redirect("accounts:check_create", book_id=request.book.pk)
-        cari = get_object_or_404(CariAccount, pk=int(cari_id))
+        current_account = get_object_or_404(CurrentAccount, pk=int(current_account_id))
 
         amount = _D(request.POST.get("amount"))
         if amount <= 0:
@@ -141,8 +141,8 @@ class CheckCreate(View):
 
         try:
             check = CheckOrPromissoryNote.objects.create(
-                book=cari.book,
-                cari=cari,
+                book=current_account.book,
+                current_account=current_account,
                 instrument=request.POST.get("instrument") or "check",
                 direction=request.POST.get("direction") or "received",
                 serial_no=request.POST.get("serial_no", "").strip()[:50],
@@ -151,7 +151,7 @@ class CheckCreate(View):
                 account_no=request.POST.get("account_no", "")[:50],
                 drawer=request.POST.get("drawer", "")[:200],
                 amount=amount,
-                currency_id=int(request.POST.get("currency") or cari.default_currency_id),
+                currency_id=int(request.POST.get("currency") or current_account.default_currency_id),
                 issue_date=request.POST.get("issue_date") or timezone.now().date(),
                 due_date=request.POST.get("due_date") or timezone.now().date(),
                 notes=request.POST.get("notes", ""),
@@ -175,7 +175,7 @@ class CheckDetail(View):
     def get(self, request, pk):
         check = get_object_or_404(
             CheckOrPromissoryNote.objects.select_related(
-                "cari", "book", "currency", "endorsed_to",
+                "current_account", "book", "currency", "endorsed_to",
                 "posted_movement", "endorse_movement", "cleared_cash_account",
             ),
             pk=pk,
@@ -183,14 +183,14 @@ class CheckDetail(View):
 
         # Cash accounts in the same book (for clear action)
         cash_accounts = CashAccount.objects.filter(book=check.book).order_by("name")
-        # Other caris for endorsement target
-        other_caris = (CariAccount.objects.filter(book=check.book, is_active=True)
-                       .exclude(pk=check.cari_id).order_by("name"))
+        # Other current accounts for endorsement target
+        other_current_accounts = (CurrentAccount.objects.filter(book=check.book, is_active=True)
+                       .exclude(pk=check.current_account_id).order_by("name"))
 
         return render(request, self.template_name, {
             "check": check,
             "cash_accounts": cash_accounts,
-            "other_caris": other_caris,
+            "other_current_accounts": other_current_accounts,
             "today": timezone.now().date(),
         })
 
@@ -206,9 +206,9 @@ class CheckEndorse(View):
         if not target_id:
             messages.error(request, _g("An account to endorse to must be selected."))
             return redirect("accounts:check_detail", pk=pk)
-        target = get_object_or_404(CariAccount, pk=int(target_id))
+        target = get_object_or_404(CurrentAccount, pk=int(target_id))
         try:
-            check.endorse(to_cari=target, user=request.user)
+            check.endorse(to_current_account=target, user=request.user)
             messages.success(request, _g("Check endorsed to %(name)s.") % {"name": target.name})
         except ValidationError as ve:
             messages.error(request, _g("Endorsement failed: %(error)s") % {"error": ve})

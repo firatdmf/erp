@@ -277,17 +277,17 @@ def sync_catalog_stock_on_order_status_change(sender, instance, created, **kwarg
 
 
 @receiver([post_save, post_delete], sender=OrderItem)
-def sync_order_cari_movement(sender, instance, **kwargs):
+def sync_order_current_account_movement(sender, instance, **kwargs):
     """Whenever an OrderItem changes (qty/price/add/remove), keep the
-    linked cari movement AND the order's live invoice in sync so the
+    linked current account movement AND the order's live invoice in sync so the
     customer's balance and their invoice both reflect the latest order
     total in real time — regardless of which view did the save.
 
     The invoice half matters because it used to be cut once and never
-    revisited: an edit moved the cari but left the invoice on the old
+    revisited: an edit moved the current account but left the invoice on the old
     figure, so the two documents disagreed with nothing flagging it."""
     order = instance.order
-    if not getattr(order, "cari_id", None):
+    if not getattr(order, "current_account_id", None):
         return
     try:
         from accounting.services_accounts import (
@@ -296,8 +296,8 @@ def sync_order_cari_movement(sender, instance, **kwargs):
         post_order_movement(order)
         sync_invoice_for_order(order)
     except Exception:
-        # Don't let cari sync break order edits. Errors here surface in
-        # the order's "Open cari" view instead.
+        # Don't let current account sync break order edits. Errors here surface in
+        # the order's "Open current account" view instead.
         pass
 
 
@@ -319,7 +319,7 @@ def update_receipt_liability(sender, instance, **kwargs):
 # A raw-material receipt used to sync a LiabilityAccountsPayable row here.
 # That table is gone, and nothing replaces the receiver: a purchase now
 # posts its debt to a current account through the intake panel, which
-# writes a purchase Invoice against the cari the operator picks (see
+# writes a purchase Invoice against the current account the operator picks (see
 # accounting.views_purchase.GoodsReceipt). Reviving this would post the
 # same debt twice.
 

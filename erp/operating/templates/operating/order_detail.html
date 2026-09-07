@@ -1519,7 +1519,7 @@
       <!-- CUSTOMER (HTMX-managed partial) -->
       {% include "operating/partials/_customer_card.html" with cust_card_mode='view' %}
 
-      {% if order.cari %}
+      {% if order.current_account %}
       <!-- CURRENT ACCOUNT (CARI) — internal ledger snapshot -->
       <section class="od-card">
         <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
@@ -1540,7 +1540,7 @@
               </span>
               {% endif %}
             {% endif %}
-            <a href="{% url 'accounts:detail' order.cari.pk %}"
+            <a href="{% url 'accounts:detail' order.current_account.pk %}"
                class="od-link" style="font-size: 11.5px;">
               {% trans "Open account" %} <i class="fa fa-external-link-alt"></i>
             </a>
@@ -1550,27 +1550,27 @@
         <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#F8FAFC; border:1px solid #E2E8EE; border-radius:10px; margin-top:8px;">
           <div>
             <div style="font:600 11px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
-              {{ order.cari.code }} · {{ order.cari.get_type_display }}
+              {{ order.current_account.code }} · {{ order.current_account.get_type_display }}
             </div>
-            <div style="font:700 14px var(--font-sans); color:#0F1419; margin-top:2px;">{{ order.cari.name }}</div>
+            <div style="font:700 14px var(--font-sans); color:#0F1419; margin-top:2px;">{{ order.current_account.name }}</div>
           </div>
           <div style="text-align:right;">
             <div id="od-cari-label" style="font:600 10.5px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
-              {{ order.cari.balance_label }}
+              {{ order.current_account.balance_label }}
             </div>
-            <div id="od-cari-balance" style="font:800 16px var(--font-sans); color:{% if order.cari.cached_balance > 0 %}#B45309{% elif order.cari.cached_balance < 0 %}#147F74{% else %}#374151{% endif %}; font-variant-numeric:tabular-nums; margin-top:2px;">
-              {{ order.cari.display_currency_symbol }}{{ order.cari.absolute_balance|floatformat:2 }}
+            <div id="od-cari-balance" style="font:800 16px var(--font-sans); color:{% if order.current_account.cached_balance > 0 %}#B45309{% elif order.current_account.cached_balance < 0 %}#147F74{% else %}#374151{% endif %}; font-variant-numeric:tabular-nums; margin-top:2px;">
+              {{ order.current_account.display_currency_symbol }}{{ order.current_account.absolute_balance|floatformat:2 }}
             </div>
           </div>
         </div>
 
-        {% if cari_recent_movements %}
+        {% if current_account_recent_movements %}
         <div style="margin-top:12px;">
           <div style="font:700 10.5px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;">
             {% trans "Recent movements" %}
           </div>
           <div style="display:flex; flex-direction:column; gap:6px;">
-            {% for mv in cari_recent_movements %}
+            {% for mv in current_account_recent_movements %}
             <div {% if mv.source_id == order.pk and mv.movement_type == 'order_sale' %}id="od-cari-order-mv"{% endif %}
                  style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#FFF; border:1px solid #EEF1F5; border-radius:8px; font-size:12px;">
               <div style="min-width:0; flex:1;">
@@ -1987,7 +1987,7 @@
     // Refresh the right-sidebar cari card from the snapshot the server
     // returns after each mutating action. Keeps balance in sync without
     // a page reload.
-    function applyCariSnapshot(snap) {
+    function applyCurrentAccountSnapshot(snap) {
       if (!snap) return;
       const balEl   = document.getElementById('od-cari-balance');
       const labelEl = document.getElementById('od-cari-label');
@@ -2008,7 +2008,7 @@
         }
       }
     }
-    window.__odApplyCari = applyCariSnapshot;
+    window.__odApplyCurrentAccount = applyCurrentAccountSnapshot;
 
     // Refresh Total cost / Profit / Margin from the snapshot the server
     // returns alongside every mutating action.
@@ -2167,7 +2167,7 @@
             const r = await postUpdate({ action: 'remove_item', item_id: id });
             if (!(r && r.ok)) throw new Error(r && r.error || 'Remove failed');
             if (r.order_total !== undefined) latestTotal = r.order_total;
-            if (r.cari) applyCariSnapshot(r.cari);
+            if (r.cari) applyCurrentAccountSnapshot(r.cari);
             if (r.profit) applyProfitSnapshot(r.profit);
           }
           const delTops = document.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
@@ -2235,7 +2235,7 @@
           }
 
           if (r.order_total !== undefined) latestTotal = r.order_total;
-          if (r.cari) applyCariSnapshot(r.cari);
+          if (r.cari) applyCurrentAccountSnapshot(r.cari);
           if (r.profit) applyProfitSnapshot(r.profit);
         }
 
@@ -2260,7 +2260,7 @@
               if (sub) sub.innerHTML = '<b>$' + Number(r.subtotal).toFixed(2) + '</b>';
             }
             if (r.order_total !== undefined) latestTotal = r.order_total;
-            if (r.cari) applyCariSnapshot(r.cari);
+            if (r.cari) applyCurrentAccountSnapshot(r.cari);
             if (r.profit) applyProfitSnapshot(r.profit);
             updateRowStock(el.getAttribute('data-item-id'), r.stock, r.max_qty, r.allow_oversell);
           }

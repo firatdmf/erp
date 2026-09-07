@@ -13,7 +13,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 
 
 class BookScopedLedger(TestCase):
@@ -29,17 +29,17 @@ class BookScopedLedger(TestCase):
         self.member.save(update_fields=["default_book"])
         self.client.force_login(self.user)
 
-        CariAccount.objects.create(book=self.ergene, code="ACC-001", name="Gürhan",
+        CurrentAccount.objects.create(book=self.ergene, code="ACC-001", name="Gürhan",
                                    default_currency=self.usd,
                                    cached_balance=Decimal("100.00"))
-        CariAccount.objects.create(book=self.laleli, code="00010", name="Ercan",
+        CurrentAccount.objects.create(book=self.laleli, code="00010", name="Ercan",
                                    default_currency=self.usd,
                                    cached_balance=Decimal("900.00"))
 
     def test_the_list_shows_only_its_own_book(self):
         r = self.client.get(reverse("accounts:list", kwargs={"book_id": self.ergene.pk}))
         self.assertEqual(r.status_code, 200)
-        codes = {c.code for c in r.context["caris"]}
+        codes = {c.code for c in r.context["current_accounts"]}
         self.assertEqual(codes, {"ACC-001"})
 
     def test_the_totals_cover_one_business(self):
@@ -88,8 +88,8 @@ class BookScopedLedger(TestCase):
              "type": "customer", "default_currency": self.usd.pk},
         )
         self.assertIn(r.status_code, (200, 302))
-        cari = CariAccount.objects.get(name="Yeni Tekstil")
-        self.assertEqual(cari.book_id, self.laleli.pk)
+        current_account = CurrentAccount.objects.get(name="Yeni Tekstil")
+        self.assertEqual(current_account.book_id, self.laleli.pk)
 
 
 class LegacyLedgerUrls(TestCase):

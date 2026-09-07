@@ -139,7 +139,7 @@ TR = {
     "Endorse": "Ciro Et",
     "Endorse →": "Ciro Et →",
     # NOTE: bare "Clear" is shared with generic "clear filters" buttons
-    # elsewhere (cari_list, invoice_list, payment_list, dashboard...) —
+    # elsewhere (current account_list, invoice_list, payment_list, dashboard...) —
     # do NOT map it here or this script will clobber those to "Tahsil".
     # The check-detail "mark as cleared" button uses a msgctxt="check"
     # entry maintained directly in django.po instead (this script's

@@ -31,7 +31,7 @@
             {% if expense.cash_account %}
               {{ expense.cash_account.name }} <span class="ccy">{{ expense.cash_account.currency.code }}</span>
             {% else %}
-              {{ expense.paid_by_cari.name }} <span class="ccy">{{ expense.currency.code }}</span>
+              {{ expense.paid_by_current_account.name }} <span class="ccy">{{ expense.currency.code }}</span>
             {% endif %}
           </td>
         </tr>

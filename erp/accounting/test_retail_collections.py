@@ -6,9 +6,9 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from accounting.models import Book, CariAccount, Payment
+from accounting.models import Book, CurrentAccount, Payment
 from accounting.services_accounts import (
-    RETAIL_CARI_CODE,
+    RETAIL_CURRENT_ACCOUNT_CODE,
     post_retail_order_financials,
     reverse_retail_order_financials,
 )
@@ -40,21 +40,21 @@ class RetailPostingBase(TestCase):
             order=self.order, product=self.product,
             quantity=Decimal("5.60"), price=Decimal("10.18"))
 
-    def retail_cari(self):
-        return CariAccount.objects.filter(code=RETAIL_CARI_CODE).first()
+    def retail_current_account(self):
+        return CurrentAccount.objects.filter(code=RETAIL_CURRENT_ACCOUNT_CODE).first()
 
     def collections(self):
         return Payment.objects.filter(
-            cari=self.retail_cari(), type="collection", status="confirmed")
+            current_account=self.retail_current_account(), type="collection", status="confirmed")
 
 
 class RetailCompletionTest(RetailPostingBase):
 
     def test_completing_posts_the_sale(self):
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.retail_cari()
-        self.assertIsNotNone(cari)
-        self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 1)
+        current_account = self.retail_current_account()
+        self.assertIsNotNone(current_account)
+        self.assertEqual(current_account.movements.filter(movement_type="order_sale").count(), 1)
 
     def test_completing_collects_nothing(self):
         """The whole point of the change — money is recorded by whoever
@@ -66,17 +66,17 @@ class RetailCompletionTest(RetailPostingBase):
         """A deliberate consequence: the retail account no longer nets to
         zero on its own and carries a real receivable."""
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.retail_cari()
-        cari.refresh_from_db()
-        self.assertEqual(cari.cached_balance, Decimal("57.01"))
+        current_account = self.retail_current_account()
+        current_account.refresh_from_db()
+        self.assertEqual(current_account.cached_balance, Decimal("57.01"))
 
     def test_a_hand_entered_collection_is_not_duplicated(self):
         """The exact shape of the ORD-286 bug: a collection typed by a
         person, carrying no ORD tag, then the order completes."""
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.retail_cari()
+        current_account = self.retail_current_account()
         Payment.objects.create(
-            cari=cari, book=cari.book, number="COL-MANUAL-1",
+            current_account=current_account, book=current_account.book, number="COL-MANUAL-1",
             type="collection", method="cash", status="draft",
             date="2026-08-27", amount=Decimal("57.00"), currency=self.usd,
             description="FIRATIN HESABINA GONDERDI",
@@ -86,16 +86,16 @@ class RetailCompletionTest(RetailPostingBase):
         post_retail_order_financials(self.order, user=self.user)
 
         self.assertEqual(self.collections().count(), 1)
-        cari.refresh_from_db()
-        self.assertEqual(cari.cached_balance, Decimal("0.01"))
+        current_account.refresh_from_db()
+        self.assertEqual(current_account.cached_balance, Decimal("0.01"))
 
     def test_completing_twice_posts_one_sale(self):
         post_retail_order_financials(self.order, user=self.user)
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.retail_cari()
-        self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 1)
-        cari.refresh_from_db()
-        self.assertEqual(cari.cached_balance, Decimal("57.01"))
+        current_account = self.retail_current_account()
+        self.assertEqual(current_account.movements.filter(movement_type="order_sale").count(), 1)
+        current_account.refresh_from_db()
+        self.assertEqual(current_account.cached_balance, Decimal("57.01"))
 
 
 class RetailUnshipTest(RetailPostingBase):
@@ -103,16 +103,16 @@ class RetailUnshipTest(RetailPostingBase):
     def test_unshipping_removes_the_sale(self):
         post_retail_order_financials(self.order, user=self.user)
         reverse_retail_order_financials(self.order, user=self.user)
-        cari = self.retail_cari()
-        self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 0)
+        current_account = self.retail_current_account()
+        self.assertEqual(current_account.movements.filter(movement_type="order_sale").count(), 0)
 
     def test_unshipping_leaves_a_hand_entered_collection_alone(self):
         """Un-shipping an order does not un-receive money that actually
         changed hands."""
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.retail_cari()
+        current_account = self.retail_current_account()
         Payment.objects.create(
-            cari=cari, book=cari.book, number="COL-MANUAL-2",
+            current_account=current_account, book=current_account.book, number="COL-MANUAL-2",
             type="collection", method="cash", status="draft",
             date="2026-08-27", amount=Decimal("57.01"), currency=self.usd,
             description="Müşteri ödedi",
@@ -126,9 +126,9 @@ class RetailUnshipTest(RetailPostingBase):
         """Orders shipped before this change carry an AUTO collection, and
         un-shipping one must still reverse cleanly."""
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.retail_cari()
+        current_account = self.retail_current_account()
         Payment.objects.create(
-            cari=cari, book=cari.book, number="COL-AUTO-1",
+            current_account=current_account, book=current_account.book, number="COL-AUTO-1",
             type="collection", method="cash", status="draft",
             date="2026-08-27", amount=Decimal("57.01"), currency=self.usd,
             description="Retail automatic collection — Order #%d" % self.order.pk,
@@ -138,15 +138,15 @@ class RetailUnshipTest(RetailPostingBase):
         reverse_retail_order_financials(self.order, user=self.user)
 
         self.assertEqual(self.collections().count(), 0)
-        cari.refresh_from_db()
-        self.assertEqual(cari.cached_balance, Decimal("0.00"))
+        current_account.refresh_from_db()
+        self.assertEqual(current_account.cached_balance, Decimal("0.00"))
 
 
 class RetailReversalFindsTheOrdersOwnAccount(RetailPostingBase):
     """Un-shipping reverses against the account the order actually posted
     to, not against whichever book the acting member happens to work in.
 
-    It used to look the retail cari up with
+    It used to look the retail current account up with
     `filter(book=get_default_book(), code=PERAKENDE)`. That is a guess,
     and when it guessed a book the account was not in it found nothing,
     reversed nothing, and left confirmed collections standing on an
@@ -165,10 +165,10 @@ class RetailReversalFindsTheOrdersOwnAccount(RetailPostingBase):
 
     def test_a_collection_is_reversed_from_another_book(self):
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.order.cari
-        self.assertIsNotNone(cari)
+        current_account = self.order.current_account
+        self.assertIsNotNone(current_account)
         pay = Payment.objects.create(
-            cari=cari, book=cari.book, number="TAH-TEST-1",
+            current_account=current_account, book=current_account.book, number="TAH-TEST-1",
             type="collection", method="cash", status="draft",
             date=self.order.order_date or __import__("datetime").date.today(),
             amount=Decimal("10.00"), currency=self.usd,
@@ -182,10 +182,10 @@ class RetailReversalFindsTheOrdersOwnAccount(RetailPostingBase):
 
     def test_the_sale_movement_is_reversed_too(self):
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.order.cari
-        self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 1)
+        current_account = self.order.current_account
+        self.assertEqual(current_account.movements.filter(movement_type="order_sale").count(), 1)
         reverse_retail_order_financials(self.order, user=self.user)
-        self.assertEqual(cari.movements.filter(movement_type="order_sale").count(), 0)
+        self.assertEqual(current_account.movements.filter(movement_type="order_sale").count(), 0)
 
 
 class TheAutoCollectionPrefixMatchesWhatIsStored(RetailPostingBase):
@@ -210,9 +210,9 @@ class TheAutoCollectionPrefixMatchesWhatIsStored(RetailPostingBase):
         the reversal has to find."""
         from accounting.services_accounts import _RETAIL_AUTO_DESC
         post_retail_order_financials(self.order, user=self.user)
-        cari = self.retail_cari()
+        current_account = self.retail_current_account()
         Payment.objects.create(
-            cari=cari, book=cari.book, number="COL-AUTO-EN",
+            current_account=current_account, book=current_account.book, number="COL-AUTO-EN",
             type="collection", method="cash", status="draft",
             date="2026-08-27", amount=Decimal("57.01"), currency=self.usd,
             description=f"{_RETAIL_AUTO_DESC} — Order #{self.order.pk}",
@@ -222,5 +222,5 @@ class TheAutoCollectionPrefixMatchesWhatIsStored(RetailPostingBase):
         reverse_retail_order_financials(self.order, user=self.user)
 
         self.assertEqual(self.collections().count(), 0)
-        cari.refresh_from_db()
-        self.assertEqual(cari.cached_balance, Decimal("0.00"))
+        current_account.refresh_from_db()
+        self.assertEqual(current_account.cached_balance, Decimal("0.00"))

@@ -542,7 +542,7 @@ class CashEntryHtmxTests(CashEntryTestBase):
 
 
 class CashEntryExpenseHeadingTests(CashEntryTestBase):
-    """An expense is identified by its category, the way a payment is by its cari."""
+    """An expense is identified by its category, the way a payment is by its current account."""
 
     def setUp(self):
         super().setUp()

@@ -112,8 +112,8 @@
 {% block content %}
 <div class="mf">
 
-  <a class="mf-back" href="{% if movement %}{% url 'accounts:statement' cari.pk %}{% else %}{% url 'accounts:detail' cari.pk %}{% endif %}">
-    <i data-lucide="arrow-left"></i> {% if movement %}{% trans "Statement" %}{% else %}{{ cari.name }}{% endif %}
+  <a class="mf-back" href="{% if movement %}{% url 'accounts:statement' current_account.pk %}{% else %}{% url 'accounts:detail' current_account.pk %}{% endif %}">
+    <i data-lucide="arrow-left"></i> {% if movement %}{% trans "Statement" %}{% else %}{{ current_account.name }}{% endif %}
   </a>
 
   <div class="mf-head">
@@ -128,13 +128,13 @@
 
       <div class="mf-chip">
         <div class="mf-chip-l">
-          <span class="code">{{ cari.code }}</span>
-          <span class="name">{{ cari.name }}</span>
+          <span class="code">{{ current_account.code }}</span>
+          <span class="name">{{ current_account.name }}</span>
         </div>
         <div class="mf-chip-r">
           <span class="lbl">{% trans "Current Balance" %}</span>
-          <span class="val">{{ cari.display_currency_symbol }}{{ cari.absolute_balance|money }}</span>
-          <span class="sub">{{ cari.balance_label }}</span>
+          <span class="val">{{ current_account.display_currency_symbol }}{{ current_account.absolute_balance|money }}</span>
+          <span class="sub">{{ current_account.balance_label }}</span>
         </div>
       </div>
 
@@ -164,7 +164,7 @@
             <label>{% trans "Currency" %}</label>
             <select name="currency">
               {% for c in currencies %}
-                <option value="{{ c.id }}" {% if movement %}{% if movement.currency_id == c.id %}selected{% endif %}{% elif c.id == cari.default_currency_id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
+                <option value="{{ c.id }}" {% if movement %}{% if movement.currency_id == c.id %}selected{% endif %}{% elif c.id == current_account.default_currency_id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
               {% endfor %}
             </select>
           </div>
@@ -215,7 +215,7 @@
           {% trans "Debit increases the balance owed to us. Credit reduces it." %}
         </div>
         <div class="mf-foot-r">
-          <a href="{% if movement %}{% url 'accounts:statement' cari.pk %}{% else %}{% url 'accounts:detail' cari.pk %}{% endif %}" class="mf-btn ghost">{% trans "Cancel" %}</a>
+          <a href="{% if movement %}{% url 'accounts:statement' current_account.pk %}{% else %}{% url 'accounts:detail' current_account.pk %}{% endif %}" class="mf-btn ghost">{% trans "Cancel" %}</a>
           <button type="submit" class="mf-btn primary">
             <i data-lucide="check"></i>{% if movement %}{% trans "Save Changes" %}{% else %}{% trans "Save Movement" %}{% endif %}
           </button>

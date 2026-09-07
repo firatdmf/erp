@@ -1,6 +1,6 @@
 """Find — and optionally merge — duplicate current accounts.
 
-The DB constraints on CariAccount already stop the *same* CRM entity from
+The DB constraints on CurrentAccount already stop the *same* CRM entity from
 getting two accounts in one book. What they can't catch is one real-world
 customer showing up twice behind different rows:
 
@@ -16,17 +16,17 @@ invoices, payments, checks, orders — discovered via Django's relation graph,
 so new FKs are picked up automatically) onto the surviving account, then
 deletes the duplicate.
 
-    python manage.py dedupe_cari_accounts                  # report only
-    python manage.py dedupe_cari_accounts --include-names  # + name matches
-    python manage.py dedupe_cari_accounts --apply          # merge them
-    python manage.py dedupe_cari_accounts --apply --deactivate  # keep the row
+    python manage.py dedupe_current_accounts                  # report only
+    python manage.py dedupe_current_accounts --include-names  # + name matches
+    python manage.py dedupe_current_accounts --apply          # merge them
+    python manage.py dedupe_current_accounts --apply --deactivate  # keep the row
 
 Some duplicates the rules cannot see, because the names differ by exactly
 the thing that makes them separate rows — a customer the legacy ledger
 split per year ("ÖZCAN ŞAHSİ 2024/2025/2026") or per shipment. Name those
 groups yourself; the merge, the blockers and the dry run are the same:
 
-    python manage.py dedupe_cari_accounts --book 2 \\
+    python manage.py dedupe_current_accounts --book 2 \\
         --merge 88888,2025Ö --into 99999 --merge-cross-entity
 
 NB: after a cross-entity merge the losing CRM records have no account
@@ -41,7 +41,7 @@ from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
 
-from accounting.models import CariAccount
+from accounting.models import CurrentAccount
 
 # Turkish → ASCII, so "GÜMÜŞ TEKSTİL" and "GUMUS TEKSTIL" land in one group.
 _TR = str.maketrans({
@@ -57,7 +57,7 @@ _SUFFIXES = {
 }
 
 # Which link makes an account the canonical one. Matches the resolution
-# priority in services.get_or_create_cari_for_order (company wins).
+# priority in services.get_or_create_current account_for_order (company wins).
 _LINK_RANK = {"company": 3, "supplier": 2, "contact": 1, "": 0}
 
 # Blank-only fields copied from the duplicate onto the survivor.
@@ -80,22 +80,22 @@ def _norm_tax(value):
     return digits if len(digits) >= 10 else ""
 
 
-def _link_kind(cari):
-    if cari.company_id:
+def _link_kind(current_account):
+    if current_account.company_id:
         return "company"
-    if cari.supplier_id:
+    if current_account.supplier_id:
         return "supplier"
-    if cari.contact_id:
+    if current_account.contact_id:
         return "contact"
     return ""
 
 
-def _link_key(cari):
+def _link_key(current_account):
     """Identifies WHICH real entity an account points at."""
-    kind = _link_kind(cari)
+    kind = _link_kind(current_account)
     if not kind:
         return None
-    return (kind, getattr(cari, f"{kind}_id"))
+    return (kind, getattr(current_account, f"{kind}_id"))
 
 
 class Command(BaseCommand):
@@ -157,7 +157,7 @@ class Command(BaseCommand):
         self.cross_entity = opts["merge_cross_entity"]
         self.allow_currency = opts["allow_currency_mismatch"]
 
-        qs = CariAccount.objects.select_related(
+        qs = CurrentAccount.objects.select_related(
             "book", "contact", "contact__company", "company", "supplier",
             "default_currency",
         ).annotate(n_moves=Count("movements"))
@@ -323,24 +323,24 @@ class Command(BaseCommand):
         return ([survivor] + losers, ["named on the command line"])
 
     # ------------------------------------------------------------------
-    def _rank(self, cari):
+    def _rank(self, current_account):
         """Higher is more likely to be the keeper."""
         return (
-            _LINK_RANK[_link_kind(cari)],
-            getattr(cari, "n_moves", 0),
-            -cari.created_at.timestamp() if cari.created_at else 0,
-            -cari.pk,
+            _LINK_RANK[_link_kind(current_account)],
+            getattr(current_account, "n_moves", 0),
+            -current_account.created_at.timestamp() if current_account.created_at else 0,
+            -current_account.pk,
         )
 
-    def _describe(self, cari, tag=""):
-        kind = _link_kind(cari) or "unlinked"
+    def _describe(self, current_account, tag=""):
+        kind = _link_kind(current_account) or "unlinked"
         link = ""
         if kind != "unlinked":
-            link = f" → {kind} #{getattr(cari, kind + '_id')}"
-        return (f"    {tag:<6} [{cari.pk}] {cari.code} | {cari.name}{link} | "
-                f"{getattr(cari, 'n_moves', 0)} movement(s) | "
-                f"balance {cari.cached_balance} "
-                f"{cari.default_currency.code if cari.default_currency_id else ''}")
+            link = f" → {kind} #{getattr(current_account, kind + '_id')}"
+        return (f"    {tag:<6} [{current_account.pk}] {current_account.code} | {current_account.name}{link} | "
+                f"{getattr(current_account, 'n_moves', 0)} movement(s) | "
+                f"balance {current_account.cached_balance} "
+                f"{current_account.default_currency.code if current_account.default_currency_id else ''}")
 
     def _handle_group(self, group):
         members, why = group
@@ -393,7 +393,7 @@ class Command(BaseCommand):
 
     def _merge(self, survivor, loser):
         """Re-point everything that references `loser` at `survivor`."""
-        for rel in CariAccount._meta.related_objects:
+        for rel in CurrentAccount._meta.related_objects:
             model, field = rel.related_model, rel.field.name
             if rel.many_to_many:
                 raise CommandError(

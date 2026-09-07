@@ -312,7 +312,7 @@ class Product(models.Model):
     # had no account behind it at all. Warehouse intake posts purchases to
     # accounts, so the product's vendor is the same account or it's a lie.
     supplier_account = models.ForeignKey(
-        "accounting.CariAccount",
+        "accounting.CurrentAccount",
         related_name="products",
         on_delete=models.SET_NULL,
         blank=True,

@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CashAccount, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 
 
 class PaymentFormDefaultsTest(TestCase):
@@ -31,13 +31,13 @@ class PaymentFormDefaultsTest(TestCase):
         self.cash_try = CashAccount.objects.create(
             book=self.book, name="Cash", currency=self.try_
         )
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-001", name="Maria", type="customer",
             default_currency=self.usd,
         )
 
     def url(self):
-        return reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}) + "?account=%d" % self.cari.pk
+        return reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}) + "?account=%d" % self.current_account.pk
 
     def method_options(self, html):
         block = re.search(r'<select name="method">(.*?)</select>', html, re.S).group(1)
@@ -66,7 +66,7 @@ class PaymentFormDefaultsTest(TestCase):
         for account in (self.cash_usd, self.cash_try):
             self.assertIn('value="%d"' % account.pk, block)
 
-    def test_cash_accounts_are_scoped_to_the_cari_book(self):
+    def test_cash_accounts_are_scoped_to_the_current_account_book(self):
         other = Book.objects.create(name="Başka Defter")
         stranger = CashAccount.objects.create(
             book=other, name="Cash", currency=self.usd

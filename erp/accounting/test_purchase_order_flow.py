@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, Invoice
+from accounting.models_accounts import CurrentAccount, Invoice
 from authentication.models import Permission
 from marketing.models import Product
 from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
@@ -22,7 +22,7 @@ class PurchaseOrderFlowTest(TestCase):
     def setUp(self):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd,
         )
@@ -46,7 +46,7 @@ class PurchaseOrderFlowTest(TestCase):
     def _plan(self, qty_a=30, qty_b=25):
         return {
             "warehouse_id": self.wh.pk,
-            "cari_id": self.cari.pk,
+            "current_account_id": self.current_account.pk,
             "unit": "mt",
             "date": "2026-08-21",
             "delivery_date": "2026-09-01",
@@ -84,8 +84,8 @@ class PurchaseOrderFlowTest(TestCase):
         self.assertFalse(WarehouseProduct.objects.exists())
         self.assertFalse(WarehouseProductItem.objects.exists())
         self.assertFalse(Product.objects.exists())
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("0.00"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("0.00"))
         self.assertIsNone(inv.posted_movement)
 
     def test_an_order_stays_editable(self):
@@ -119,8 +119,8 @@ class PurchaseOrderFlowTest(TestCase):
         self.assertEqual(inv.status, "issued")
         self.assertEqual(inv.total, Decimal("192.50"))
         self.assertIsNotNone(inv.posted_movement)               # the debt is posted now
-        self.cari.refresh_from_db()
-        self.assertEqual(self.cari.cached_balance, Decimal("-192.50"))
+        self.current_account.refresh_from_db()
+        self.assertEqual(self.current_account.cached_balance, Decimal("-192.50"))
 
         # ...and the warehouse has it.
         wp = WarehouseProduct.objects.get(warehouse=self.wh)
@@ -208,7 +208,7 @@ class ReceivedPurchaseEditTest(TestCase):
     def setUp(self):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
         self.wh = Warehouse.objects.create(name="Fabrika",
@@ -220,7 +220,7 @@ class ReceivedPurchaseEditTest(TestCase):
         r = self.client.post(
             reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
             data=json.dumps({
-                "warehouse_id": self.wh.pk, "cari_id": self.cari.pk, "unit": "mt",
+                "warehouse_id": self.wh.pk, "current_account_id": self.current_account.pk, "unit": "mt",
                 "date": "2026-08-21", "notes": "first note",
                 "products": [{
                     "main_product": {"mode": "new", "name": "K24644", "sku": "K24644"},
@@ -299,14 +299,14 @@ class PurchaseListBookScopeTest(TestCase):
         self.karven = self._purchase(self.laleli, "Karven", "600.00")
 
     def _purchase(self, book, supplier, total):
-        cari = CariAccount.objects.create(
+        current_account = CurrentAccount.objects.create(
             book=book, code=f"C-{supplier[:3].upper()}-{book.pk}", name=supplier,
             type="supplier", default_currency=self.usd)
         Invoice.objects.create(
-            book=book, cari=cari, type="purchase", status="draft",
+            book=book, current_account=current_account, type="purchase", status="draft",
             date="2026-08-21", due_date="2026-09-21",
             currency=self.usd, total=Decimal(total))
-        return cari
+        return current_account
 
     def _page(self, book):
         resp = self.client.get(
@@ -330,16 +330,16 @@ class PurchaseListBookScopeTest(TestCase):
         dropdown: picking one would return an empty list with no
         explanation."""
         self.assertEqual(
-            [s["cari__name"] for s in self._page(self.ergene)["suppliers"]], [])
+            [s["current_account__name"] for s in self._page(self.ergene)["suppliers"]], [])
         self.assertEqual(
-            [s["cari__name"] for s in self._page(self.laleli)["suppliers"]],
+            [s["current_account__name"] for s in self._page(self.laleli)["suppliers"]],
             ["Karven"])
 
     def test_each_book_sees_only_its_own_when_both_have_purchases(self):
         self._purchase(self.ergene, "Bursa Tekstil", "150.00")
         self.assertEqual(
-            [i.cari.name for i in self._page(self.ergene)["invoices"]],
+            [i.current_account.name for i in self._page(self.ergene)["invoices"]],
             ["Bursa Tekstil"])
         self.assertEqual(self._page(self.ergene)["total_sum"], Decimal("150.00"))
         self.assertEqual(
-            [i.cari.name for i in self._page(self.laleli)["invoices"]], ["Karven"])
+            [i.current_account.name for i in self._page(self.laleli)["invoices"]], ["Karven"])

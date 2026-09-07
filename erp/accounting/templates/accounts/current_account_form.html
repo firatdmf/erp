@@ -112,9 +112,9 @@
 
   <div class="cf-head">
     <div>
-      <div class="cf-eyebrow">{% if cari %}{% trans "Edit" %}{% else %}{% trans "Create New" %}{% endif %}</div>
+      <div class="cf-eyebrow">{% if current_account %}{% trans "Edit" %}{% else %}{% trans "Create New" %}{% endif %}</div>
       <h1 class="cf-title">
-        {% if cari %}{{ cari.name }}<span class="code">{{ cari.code }}</span>{% else %}{% trans "New Account" %}{% endif %}
+        {% if current_account %}{{ current_account.name }}<span class="code">{{ current_account.code }}</span>{% else %}{% trans "New Account" %}{% endif %}
       </h1>
     </div>
   </div>
@@ -130,7 +130,7 @@
           <span class="sub">{% trans "Basic info & classification" %}</span>
         </div>
 
-        {% if not cari %}
+        {% if not current_account %}
         <input type="hidden" name="entity_type" id="cf-entity-type" value="company">
         <div class="cf-etype">
           <div class="cf-etype-btn active" data-etype="company" onclick="cfPickEtype('company')">
@@ -149,15 +149,15 @@
         <div class="cf-row">
           <div class="cf-f span-2">
             <label id="cf-name-label">{% trans "Name" %}<span class="req">*</span></label>
-            <input type="text" name="name" id="cf-name-input" required maxlength="200" value="{{ cari.name|default:'' }}" placeholder="{% trans 'e.g., Acme Inc.' %}">
+            <input type="text" name="name" id="cf-name-input" required maxlength="200" value="{{ current_account.name|default:'' }}" placeholder="{% trans 'e.g., Acme Inc.' %}">
           </div>
 
-          {% if cari %}
+          {% if current_account %}
           <div class="cf-f">
             <label>{% trans "Type" %}<span class="req">*</span></label>
             <select name="type" required>
               {% for val,label in type_choices %}
-                <option value="{{ val }}" {% if cari.type == val %}selected{% endif %}>{{ label }}</option>
+                <option value="{{ val }}" {% if current_account.type == val %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
           </div>
@@ -169,7 +169,7 @@
           <div class="cf-f span-2">
             <label>{% trans "Currency" %}<span class="req">*</span></label>
             <select name="default_currency" required>
-              {% for c in currencies %}<option value="{{ c.id }}" {% if cari and cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>{% endfor %}
+              {% for c in currencies %}<option value="{{ c.id }}" {% if current_account and current_account.default_currency_id == c.id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>{% endfor %}
             </select>
           </div>
         </div>
@@ -184,18 +184,18 @@
           <span class="sub">{% trans "Discount and opening balance" %}</span>
         </div>
 
-        <input type="hidden" name="payment_term_days" value="{{ cari.payment_term_days|default:30 }}">
-        <input type="hidden" name="credit_limit" value="{{ cari.credit_limit|default:'0.00' }}">
+        <input type="hidden" name="payment_term_days" value="{{ current_account.payment_term_days|default:30 }}">
+        <input type="hidden" name="credit_limit" value="{{ current_account.credit_limit|default:'0.00' }}">
         <div class="cf-row three">
           <div class="cf-f">
             <label>{% trans "Discount Rate" %}</label>
             <div class="ins with-suffix">
-              <input type="number" step="0.01" name="discount_rate" value="{{ cari.discount_rate|default:'0.00' }}" placeholder="0.00">
+              <input type="number" step="0.01" name="discount_rate" value="{{ current_account.discount_rate|default:'0.00' }}" placeholder="0.00">
               <span class="suffix">%</span>
             </div>
           </div>
 
-          {% if not cari %}
+          {% if not current_account %}
           <div class="cf-f">
             <label>{% trans "Opening Balance" %}</label>
             <div class="ins with-prefix">
@@ -224,15 +224,15 @@
         <div class="cf-row three">
           <div class="cf-f">
             <label>{% trans "Tax Office" %}</label>
-            <input type="text" name="tax_office" maxlength="100" value="{{ cari.tax_office|default:'' }}">
+            <input type="text" name="tax_office" maxlength="100" value="{{ current_account.tax_office|default:'' }}">
           </div>
           <div class="cf-f">
             <label>{% trans "Tax Number (VKN)" %}</label>
-            <input type="text" name="tax_number" maxlength="11" value="{{ cari.tax_number|default:'' }}" placeholder="1234567890">
+            <input type="text" name="tax_number" maxlength="11" value="{{ current_account.tax_number|default:'' }}" placeholder="1234567890">
           </div>
           <div class="cf-f">
             <label>{% trans "ID Number (TCKN)" %}</label>
-            <input type="text" name="identity_number" maxlength="11" value="{{ cari.identity_number|default:'' }}" placeholder="12345678901">
+            <input type="text" name="identity_number" maxlength="11" value="{{ current_account.identity_number|default:'' }}" placeholder="12345678901">
           </div>
         </div>
       </div>
@@ -248,29 +248,29 @@
         <div class="cf-row">
           <div class="cf-f">
             <label>{% trans "Email" %}</label>
-            <input type="email" name="email" value="{{ cari.email|default:'' }}" placeholder="contact@example.com">
+            <input type="email" name="email" value="{{ current_account.email|default:'' }}" placeholder="contact@example.com">
           </div>
           <div class="cf-f">
             <label>{% trans "Phone" %}</label>
-            <input type="text" name="phone" maxlength="30" value="{{ cari.phone|default:'' }}" placeholder="+90 555 555 5555">
+            <input type="text" name="phone" maxlength="30" value="{{ current_account.phone|default:'' }}" placeholder="+90 555 555 5555">
           </div>
         </div>
 
         <div class="cf-row wide" style="margin-top: 14px;">
           <div class="cf-f">
             <label>{% trans "Billing Address" %}</label>
-            <textarea name="billing_address" placeholder="{% trans 'Street, building, district…' %}">{{ cari.billing_address|default:'' }}</textarea>
+            <textarea name="billing_address" placeholder="{% trans 'Street, building, district…' %}">{{ current_account.billing_address|default:'' }}</textarea>
           </div>
         </div>
 
         <div class="cf-row" style="margin-top: 14px;">
           <div class="cf-f">
             <label>{% trans "City" %}</label>
-            <input type="text" name="billing_city" maxlength="100" value="{{ cari.billing_city|default:'' }}">
+            <input type="text" name="billing_city" maxlength="100" value="{{ current_account.billing_city|default:'' }}">
           </div>
           <div class="cf-f">
             <label>{% trans "Country" %}</label>
-            <input type="text" name="billing_country" maxlength="50" value="{{ cari.billing_country|default:'TR' }}">
+            <input type="text" name="billing_country" maxlength="50" value="{{ current_account.billing_country|default:'TR' }}">
           </div>
         </div>
       </div>
@@ -284,14 +284,14 @@
         </div>
         <div class="cf-row wide">
           <div class="cf-f">
-            <textarea name="notes" placeholder="{% trans 'Internal notes about this account…' %}">{{ cari.notes|default:'' }}</textarea>
+            <textarea name="notes" placeholder="{% trans 'Internal notes about this account…' %}">{{ current_account.notes|default:'' }}</textarea>
           </div>
         </div>
 
-        {% if cari %}
+        {% if current_account %}
         <div style="margin-top: 14px;">
           <label class="cf-toggle">
-            <input type="checkbox" name="is_active" {% if cari.is_active %}checked{% endif %}>
+            <input type="checkbox" name="is_active" {% if current_account.is_active %}checked{% endif %}>
             <div class="lbl-w">
               <b>{% trans "Active" %}</b>
               <span>{% trans "Inactive accounts are hidden from default filters." %}</span>
@@ -304,17 +304,17 @@
       <div class="cf-foot">
         <div class="cf-foot-l">
           <i data-lucide="info"></i>
-          {% if cari %}
+          {% if current_account %}
             {% trans "Account code stays the same." %}
           {% else %}
             {% trans "Account code is generated automatically (CARI-001…)." %}
           {% endif %}
         </div>
         <div class="cf-foot-r">
-          <a href="{% if cari %}{% url 'accounts:detail' cari.pk %}{% else %}{% url 'accounts:list' current_book.pk %}{% endif %}" class="cf-btn ghost">{% trans "Cancel" %}</a>
+          <a href="{% if current_account %}{% url 'accounts:detail' current_account.pk %}{% else %}{% url 'accounts:list' current_book.pk %}{% endif %}" class="cf-btn ghost">{% trans "Cancel" %}</a>
           <button type="submit" class="cf-btn primary">
             <i data-lucide="check"></i>
-            {% if cari %}{% trans "Save Changes" %}{% else %}{% trans "Create Account" %}{% endif %}
+            {% if current_account %}{% trans "Save Changes" %}{% else %}{% trans "Create Account" %}{% endif %}
           </button>
         </div>
       </div>

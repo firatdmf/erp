@@ -16,7 +16,7 @@ from accounting.models import (
     CurrencyCategory,
     EquityExpense,
 )
-from accounting.models_accounts import CariAccount, Payment
+from accounting.models_accounts import CurrentAccount, Payment
 
 
 class CashEntryRateTests(TestCase):
@@ -36,7 +36,7 @@ class CashEntryRateTests(TestCase):
         self.dollars = CashAccount.objects.create(
             book=self.book, name="Cash", currency=self.usd, balance=Decimal("0.00")
         )
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-001", name="Rana", type="customer",
             default_currency=self.try_,
         )
@@ -76,7 +76,7 @@ class CashEntryRateTests(TestCase):
     # -- entered rate wins -------------------------------------------------
     def test_a_rate_entered_on_the_payment_beats_the_published_one(self):
         payment = Payment.objects.create(
-            cari=self.cari, book=self.book, number="COL-1", type="collection",
+            current_account=self.current_account, book=self.book, number="COL-1", type="collection",
             method="cash", status="draft", date=date(2026, 8, 17),
             amount=Decimal("200.00"), currency=self.try_,
             cash_account=self.lira,

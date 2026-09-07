@@ -48,7 +48,7 @@ class SharesTestBase(TestCase):
 
 
 class HoldingIsDerivedTest(SharesTestBase):
-    """`shares` is a cache of the issuance rows, like the cari balance."""
+    """`shares` is a cache of the issuance rows, like the current account balance."""
 
     def test_an_issuance_updates_the_holding(self):
         self.issue(self.cuma, 10000000)

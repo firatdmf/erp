@@ -211,7 +211,7 @@ class ExchangeRateFormMixin:
             rate.widget.attrs.update({
                 "step": "0.000001", "min": "0", "placeholder": "0.000000",
             })
-        for name in ("cash_account", "paid_by_cari"):
+        for name in ("cash_account", "paid_by_current_account"):
             account = self.fields.get(name)
             if account is not None:
                 account.widget = CurrencyTaggedSelect(
@@ -337,13 +337,13 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         # Left required, the cash account would reject every expense
         # somebody else paid before clean() ever got to look.
         self.fields["cash_account"].required = False
-        self.fields["paid_by_cari"].required = False
+        self.fields["paid_by_current_account"].required = False
         # Derived in clean() from whatever funded the expense, so the POST
         # need not carry it — which is what lets the page lock the control
         # on the cash path (a disabled <select> submits nothing).
         self.fields["currency"].required = False
         self.fields["cash_account"].empty_label = "— paid from cash —"
-        self.fields["paid_by_cari"].empty_label = "— paid by someone else —"
+        self.fields["paid_by_current_account"].empty_label = "— paid by someone else —"
 
         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
@@ -352,7 +352,7 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
             ).select_related("currency", "book").order_by("name")
             # Same restriction, same reason: an expense belongs to one
             # book, so the account that funded it has to be that book's.
-            self.fields["paid_by_cari"].queryset = CariAccount.objects.filter(
+            self.fields["paid_by_current_account"].queryset = CurrentAccount.objects.filter(
                 book=book, is_active=True
             ).select_related("default_currency").order_by("name")
             # self.fields["book"].queryset = Book.objects.filter(book=book)
@@ -376,7 +376,7 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         account's own currency is the only correct answer, and anything
         the form was sent is overruled.
 
-        A current account merely has a DEFAULT currency. CariMovement
+        A current account merely has a DEFAULT currency. CurrentAccountMovement
         carries its own currency and recompute_balance sums amount_base, so
         an account holds a mix by design — which is the whole point here: a
         USD account can perfectly well have settled a lira tax bill. The
@@ -385,11 +385,11 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         """
         cleaned = super().clean()
         cash = cleaned.get("cash_account")
-        cari = cleaned.get("paid_by_cari")
-        if cash and not cari:
+        current_account = cleaned.get("paid_by_current_account")
+        if cash and not current_account:
             cleaned["currency"] = cash.currency
-        elif cari and not cash:
-            cleaned["currency"] = cleaned.get("currency") or cari.default_currency
+        elif current_account and not cash:
+            cleaned["currency"] = cleaned.get("currency") or current_account.default_currency
         return cleaned
 
 
@@ -498,7 +498,7 @@ class CurrencyCodeSelect(forms.Select):
         return option
 
 
-class CariTransferForm(forms.ModelForm):
+class CurrentAccountTransferForm(forms.ModelForm):
     """Move a balance from one current account to another.
 
     The currency is asked for rather than inferred from either account:
@@ -508,8 +508,8 @@ class CariTransferForm(forms.ModelForm):
     """
 
     class Meta:
-        model = CariTransfer
-        fields = ["book", "date", "from_cari", "to_cari", "amount",
+        model = CurrentAccountTransfer
+        fields = ["book", "date", "from_current_account", "to_current_account", "amount",
                   "currency", "exchange_rate", "description"]
         widgets = {
             "book": forms.HiddenInput(),
@@ -519,8 +519,8 @@ class CariTransferForm(forms.ModelForm):
             ),
         }
         labels = {
-            "from_cari": "From account (owes us less after)",
-            "to_cari": "To account (owes us more after)",
+            "from_current_account": "From account (owes us less after)",
+            "to_current_account": "To account (owes us more after)",
         }
 
     def __init__(self, *args, **kwargs):
@@ -546,15 +546,15 @@ class CariTransferForm(forms.ModelForm):
         if book:
             # Only this book's accounts, and only live ones — a transfer
             # onto an archived account hides the balance it just moved.
-            accounts = (CariAccount.objects
+            accounts = (CurrentAccount.objects
                         .filter(book=book, is_active=True)
                         .order_by("code"))
-            self.fields["from_cari"].queryset = accounts
-            self.fields["to_cari"].queryset = accounts
+            self.fields["from_current_account"].queryset = accounts
+            self.fields["to_current_account"].queryset = accounts
             self.fields["currency"].initial = book.effective_base_currency
         # Balances on the options, so the page can show what each side
         # stands at before and after — see BalanceSelect.
-        for name in ("from_cari", "to_cari"):
+        for name in ("from_current_account", "to_current_account"):
             self.fields[name].empty_label = "Select an account"
             self.fields[name].widget = BalanceSelect(
                 choices=self.fields[name].choices
@@ -564,9 +564,9 @@ class CariTransferForm(forms.ModelForm):
         cleaned = super().clean()
         # Duplicated from the model so the page comes back with the error
         # on the field instead of a 500 out of full_clean() in save().
-        if cleaned.get("from_cari") and cleaned.get("from_cari") == cleaned.get("to_cari"):
+        if cleaned.get("from_current_account") and cleaned.get("from_current_account") == cleaned.get("to_current_account"):
             self.add_error(
-                "to_cari",
+                "to_current_account",
                 "Pick two different accounts — a transfer to itself moves nothing.",
             )
         amount = cleaned.get("amount")

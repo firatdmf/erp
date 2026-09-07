@@ -1,7 +1,7 @@
 """Detect accounts whose cached balance has drifted from their ledger.
 
-`CariAccount.cached_balance` is a cache, kept in step by
-CariMovement.save() and recompute_balance(). Anything that writes rows
+`CurrentAccount.cached_balance` is a cache, kept in step by
+CurrentAccountMovement.save() and recompute_balance(). Anything that writes rows
 around those — a bulk update, a migration, a hand repair in a shell —
 leaves it stale, and a stale balance is invisible: the number simply
 looks like a number.
@@ -17,7 +17,7 @@ a cron can fail on it rather than someone noticing months later.
 
 It no longer has to check the statement against the account page. Those
 were two computations that agreed only by argument until migration 0086;
-both now sum CariMovementQuerySet.live(), so they cannot differ. What is
+both now sum CurrentAccountMovementQuerySet.live(), so they cannot differ. What is
 left to check is whether the cache matches the rows.
 """
 from decimal import Decimal
@@ -25,7 +25,7 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db.models import Sum
 
-from accounting.models import CariAccount
+from accounting.models import CurrentAccount
 
 
 class Command(BaseCommand):
@@ -42,18 +42,18 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        accounts = CariAccount.objects.all().order_by("book_id", "code")
+        accounts = CurrentAccount.objects.all().order_by("book_id", "code")
         if options["book"]:
             accounts = accounts.filter(book_id=options["book"])
 
         bad = []
         checked = 0
-        for cari in accounts.iterator():
+        for current_account in accounts.iterator():
             checked += 1
-            actual = (cari.movements.live()
+            actual = (current_account.movements.live()
                       .aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00"))
-            if actual != cari.cached_balance:
-                bad.append((cari, actual))
+            if actual != current_account.cached_balance:
+                bad.append((current_account, actual))
 
         if not bad:
             self.stdout.write(self.style.SUCCESS(
@@ -65,17 +65,17 @@ class Command(BaseCommand):
         self.stdout.write(self.style.ERROR(
             f"{len(bad)} of {checked} accounts have a stale cached balance:"
         ))
-        for cari, actual in bad:
+        for current_account, actual in bad:
             self.stdout.write(
-                f"  #{cari.pk} {cari.code} {cari.name}\n"
-                f"      cached  {cari.cached_balance}\n"
+                f"  #{current_account.pk} {current_account.code} {current_account.name}\n"
+                f"      cached  {current_account.cached_balance}\n"
                 f"      ledger  {actual}\n"
-                f"      drift   {actual - cari.cached_balance}"
+                f"      drift   {actual - current_account.cached_balance}"
             )
 
         if options["fix"]:
-            for cari, _actual in bad:
-                cari.recompute_balance(save=True)
+            for current_account, _actual in bad:
+                current_account.recompute_balance(save=True)
             self.stdout.write(self.style.SUCCESS(
                 f"Recomputed {len(bad)} accounts."
             ))

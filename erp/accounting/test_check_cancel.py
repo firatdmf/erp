@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import (
-    CariAccount, CariMovement, CheckOrPromissoryNote,
+    CurrentAccount, CurrentAccountMovement, CheckOrPromissoryNote,
 )
 
 
@@ -25,11 +25,11 @@ class CheckCancelTest(TestCase):
         self.usd = CurrencyCategory.objects.create(
             code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
-        self.customer = CariAccount.objects.create(
+        self.customer = CurrentAccount.objects.create(
             book=self.book, code="CARI-001", name="Maria", type="customer",
             default_currency=self.usd,
         )
-        self.supplier = CariAccount.objects.create(
+        self.supplier = CurrentAccount.objects.create(
             book=self.book, code="CARI-002", name="Karven", type="supplier",
             default_currency=self.usd,
         )
@@ -37,7 +37,7 @@ class CheckCancelTest(TestCase):
     def _received_check(self, serial="CHK-001"):
         today = timezone.localdate()
         return CheckOrPromissoryNote.objects.create(
-            book=self.book, cari=self.customer, instrument="check",
+            book=self.book, current_account=self.customer, instrument="check",
             direction="received", serial_no=serial,
             amount=Decimal("500.00"), currency=self.usd,
             issue_date=today, due_date=today,
@@ -60,7 +60,7 @@ class CheckCancelTest(TestCase):
         check = self._received_check()
         check.cancel(user=self.user)
         self.assertFalse(
-            CariMovement.objects.filter(reference__startswith="CANCEL").exists()
+            CurrentAccountMovement.objects.filter(reference__startswith="CANCEL").exists()
         )
 
     def test_cancel_clears_the_endorsement_too(self):
@@ -84,22 +84,22 @@ class CheckCancelTest(TestCase):
         self.assertEqual(self.customer.movements.count(), 0)
 
     def test_cancel_restores_both_account_balances(self):
-        before_customer = CariAccount.objects.get(pk=self.customer.pk).cached_balance
-        before_supplier = CariAccount.objects.get(pk=self.supplier.pk).cached_balance
+        before_customer = CurrentAccount.objects.get(pk=self.customer.pk).cached_balance
+        before_supplier = CurrentAccount.objects.get(pk=self.supplier.pk).cached_balance
 
         check = self._received_check()
         check.endorse(self.supplier, user=self.user)
         self.assertNotEqual(
-            CariAccount.objects.get(pk=self.customer.pk).cached_balance,
+            CurrentAccount.objects.get(pk=self.customer.pk).cached_balance,
             before_customer)
 
         check.cancel(user=self.user)
 
         self.assertEqual(
-            CariAccount.objects.get(pk=self.customer.pk).cached_balance,
+            CurrentAccount.objects.get(pk=self.customer.pk).cached_balance,
             before_customer)
         self.assertEqual(
-            CariAccount.objects.get(pk=self.supplier.pk).cached_balance,
+            CurrentAccount.objects.get(pk=self.supplier.pk).cached_balance,
             before_supplier)
 
     def test_cancel_is_idempotent(self):

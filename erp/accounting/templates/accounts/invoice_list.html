@@ -194,7 +194,7 @@
   <form method="get" id="iv-filter-form">
     <input type="hidden" name="status" id="iv-status-input" value="{{ filter_status }}">
     {% if filter_book %}<input type="hidden" name="book" value="{{ filter_book }}">{% endif %}
-    {% if filter_cari %}<input type="hidden" name="account" value="{{ filter_cari }}">{% endif %}
+    {% if filter_current_account %}<input type="hidden" name="account" value="{{ filter_current_account }}">{% endif %}
 
     <div class="iv-tabs">
       <button type="button" data-status="" class="iv-tab {% if not filter_status %}active{% endif %}">

@@ -206,13 +206,13 @@ class Traceability(LedgerBase):
     def test_an_entry_can_name_the_document_that_caused_it(self):
         """A ledger row that cannot be traced to its cause is a row nobody
         can check."""
-        cari_book = self.book
+        current_account_book = self.book
         entry = post_entry(
-            book=cari_book, date="2026-07-16", description="from a document",
+            book=current_account_book, date="2026-07-16", description="from a document",
             lines=[debit("1200", "10.00"), credit("4000", "10.00")],
-            source=cari_book, reference="BACKFILL-001")
+            source=current_account_book, reference="BACKFILL-001")
         entry.refresh_from_db()
-        self.assertEqual(entry.source, cari_book)
+        self.assertEqual(entry.source, current_account_book)
         self.assertEqual(entry.reference, "BACKFILL-001")
 
     def test_a_batch_reference_finds_the_whole_run(self):
@@ -225,9 +225,9 @@ class Traceability(LedgerBase):
     def test_a_line_can_name_the_customer_behind_a_control_account(self):
         """Without this a control account cannot be reconciled against the
         ledger that summarises it."""
-        from accounting.models_accounts import CariAccount
-        cari = CariAccount.objects.create(
+        from accounting.models_accounts import CurrentAccount
+        current_account = CurrentAccount.objects.create(
             book=self.book, code="00554", name="GÜRHAN", default_currency=self.usd)
-        entry = self.post([debit("1200", "10.00", cari=cari), credit("4000", "10.00")])
+        entry = self.post([debit("1200", "10.00", current_account=current_account), credit("4000", "10.00")])
         line = entry.lines.get(account__code="1200")
-        self.assertEqual(line.cari, cari)
+        self.assertEqual(line.current_account, current_account)

@@ -31,7 +31,7 @@ from django.utils.translation import gettext_lazy as _
 
 # Sections the drawer floats to the top, in this order. The daily flow
 # on a phone is warehouse → orders → current accounts, so those come first
-# there; the desktop keeps the declared order. "cari" used to name its own
+# there; the desktop keeps the declared order. "current account" used to name its own
 # section and is now a group inside accounting, so the phone floats
 # accounting instead — dropping the key entirely would have silently
 # reordered the drawer.
@@ -96,7 +96,7 @@ NAV_SECTIONS = [
     # Deliberately absent: "Add Receivable" and "Add Payable". A receivable
     # is what an order or an invoice leaves behind, and a payable what a
     # purchase does; typing one in directly creates a balance with no
-    # document under it, which is how the ledger and the cari cards drift
+    # document under it, which is how the ledger and the current account cards drift
     # apart. Raise an order or record a payment instead.
     {
         "key": "accounting",

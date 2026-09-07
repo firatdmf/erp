@@ -134,14 +134,14 @@
 
       <div class="mf-legs">
         <div class="mf-leg">
-          <span class="code">{{ transfer.from_cari.code }}</span>
-          <span class="name">{{ transfer.from_cari.name }}</span>
+          <span class="code">{{ transfer.from_current_account.code }}</span>
+          <span class="name">{{ transfer.from_current_account.name }}</span>
           <span class="sub">{% trans "Owes us less afterwards" %}</span>
         </div>
         <span class="arrow"><i data-lucide="arrow-right"></i></span>
         <div class="mf-leg">
-          <span class="code">{{ transfer.to_cari.code }}</span>
-          <span class="name">{{ transfer.to_cari.name }}</span>
+          <span class="code">{{ transfer.to_current_account.code }}</span>
+          <span class="name">{{ transfer.to_current_account.name }}</span>
           <span class="sub">{% trans "Owes us more afterwards" %}</span>
         </div>
         <div class="mf-amt">
@@ -161,18 +161,18 @@
       <div class="mf-section">
         <div class="mf-grid">
 
-          <div class="mf-f {% if form.from_cari.errors %}has-error{% endif %}">
+          <div class="mf-f {% if form.from_current_account.errors %}has-error{% endif %}">
             <label>{% trans "From account" %}<span class="req">*</span></label>
-            {{ form.from_cari }}
+            {{ form.from_current_account }}
             <span class="hint">{% trans "Owes us less afterwards" %}</span>
-            {{ form.from_cari.errors }}
+            {{ form.from_current_account.errors }}
           </div>
 
-          <div class="mf-f {% if form.to_cari.errors %}has-error{% endif %}">
+          <div class="mf-f {% if form.to_current_account.errors %}has-error{% endif %}">
             <label>{% trans "To account" %}<span class="req">*</span></label>
-            {{ form.to_cari }}
+            {{ form.to_current_account }}
             <span class="hint">{% trans "Owes us more afterwards" %}</span>
-            {{ form.to_cari.errors }}
+            {{ form.to_current_account.errors }}
           </div>
 
           <div class="mf-f {% if form.amount.errors %}has-error{% endif %}">

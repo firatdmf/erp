@@ -10,7 +10,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, CariMovement
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
 from accounting.services_ledger import credit, debit, ensure_chart, post_entry
 
 
@@ -28,13 +28,13 @@ class BalanceSheetPage(TestCase):
 
         # A receivable in the subsidiary ledger with no contra anywhere —
         # exactly the shape the legacy import left behind.
-        cari = CariAccount.objects.create(
+        current_account = CurrentAccount.objects.create(
             book=self.book, code="00554", name="GÜRHAN", default_currency=self.usd)
-        CariMovement.objects.create(
-            cari=cari, book=self.book, date="2026-07-16",
+        CurrentAccountMovement.objects.create(
+            current_account=current_account, book=self.book, date="2026-07-16",
             amount=Decimal("1000.00"), currency=self.usd,
             movement_type="opening", description="Carried forward")
-        cari.recompute_balance()
+        current_account.recompute_balance()
 
     def _page(self):
         r = self.client.get(reverse("accounts:report_balance_sheet",
@@ -109,21 +109,21 @@ class BalanceSheetPage(TestCase):
         from accounting.services_ledger import subsidiary_equation
         from django.contrib.contenttypes.models import ContentType
 
-        cari = CariAccount.objects.get(code="00554")
+        current_account = CurrentAccount.objects.get(code="00554")
         before = subsidiary_equation(self.book)
 
         expense = EquityExpense.objects.create(
             book=self.book, currency=self.usd, amount=Decimal("100.00"),
             date="2026-08-01", description="Electricity settled by the customer",
-            paid_by_cari=cari,
+            paid_by_current_account=current_account,
             category=ExpenseCategory.objects.create(name="Utilities"))
-        CariMovement.objects.create(
-            cari=cari, book=self.book, date="2026-08-01",
+        CurrentAccountMovement.objects.create(
+            current_account=current_account, book=self.book, date="2026-08-01",
             amount=Decimal("-100.00"), currency=self.usd,
             movement_type="adjustment", description="Paid our electricity",
             source_type=ContentType.objects.get_for_model(EquityExpense),
             source_id=expense.pk)
-        cari.recompute_balance()
+        current_account.recompute_balance()
 
         after = subsidiary_equation(self.book)
         # The receivable fell by 100 and equity fell by 100 — the pair is
@@ -131,6 +131,6 @@ class BalanceSheetPage(TestCase):
         self.assertEqual(after["receivable"], before["receivable"] - Decimal("100.00"))
         self.assertEqual(after["equity"], before["equity"] - Decimal("100.00"))
         self.assertEqual(after["residual"], before["residual"])
-        self.assertEqual(after["equity_from_cari"], Decimal("-100.00"))
+        self.assertEqual(after["equity_from_current_account"], Decimal("-100.00"))
         # And the causes still account for the residual exactly.
         self.assertEqual(after["causes_total"], after["residual"])

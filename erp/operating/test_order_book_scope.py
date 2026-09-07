@@ -2,8 +2,8 @@
 
 /operating/orders/ listed every book's sales at once, so Ergene's page
 showed Laleli's customers. An Order carries no book of its own — the
-link is its cari, which is where the sale posts — so the list filters on
-cari__book.
+link is its current account, which is where the sale posts — so the list filters on
+current account__book.
 """
 from decimal import Decimal
 from unittest.mock import patch
@@ -13,7 +13,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 
 from .models import Order
 from .views import OrderList
@@ -31,8 +31,8 @@ class OrderListIsPerBook(TestCase):
         self.laleli_order = self._order(self.laleli, "Karven")
         self.ergene_order = self._order(self.ergene, "Bursa Tekstil")
         # No customer at all — the shape order 237 is in: cancelled, and
-        # never resolved to a cari.
-        self.homeless = Order.objects.create(order_number="DK-NOCARI")
+        # never resolved to a current account.
+        self.homeless = Order.objects.create(order_number="DK-NOACCOUNT")
 
         User = get_user_model()
         self.boss = User.objects.create_superuser("boss", "b@t.com", "pw")
@@ -42,10 +42,10 @@ class OrderListIsPerBook(TestCase):
         self.ergene_only.member.save()
 
     def _order(self, book, supplier):
-        cari = CariAccount.objects.create(
+        current_account = CurrentAccount.objects.create(
             book=book, code=f"C-{book.pk}", name=supplier, type="customer",
             default_currency=self.usd)
-        return Order.objects.create(order_number=f"DK-{book.pk}", cari=cari)
+        return Order.objects.create(order_number=f"DK-{book.pk}", current_account=current_account)
 
     def _ids(self, book, user=None):
         from django.test import RequestFactory
@@ -68,7 +68,7 @@ class OrderListIsPerBook(TestCase):
     def test_the_books_never_show_the_same_order_twice(self):
         self.assertEqual(self._ids(self.laleli) & self._ids(self.ergene), set())
 
-    def test_an_order_with_no_cari_is_in_no_book(self):
+    def test_an_order_with_no_current_account_is_in_no_book(self):
         """There should never BE one — the only one that existed (order
         237: empty, cancelled, no customer) was deleted rather than
         given a home. Pinning such an order to a fallback book was tried

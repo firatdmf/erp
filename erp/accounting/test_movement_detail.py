@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CashAccount, CurrencyCategory, EquityExpense
-from accounting.models_accounts import CariAccount, CariMovement, Payment
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement, Payment
 
 
 class MovementDetailTests(TestCase):
@@ -37,14 +37,14 @@ class MovementDetailTests(TestCase):
         # Object pages are refused unless the viewer is assigned the
         # row's book (accounting.book_scope.book_guarded).
         self.user.member.books.add(self.book)
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="FIRAT", name="MUHAMMED FIRAT ÖZTÜRK",
             type="customer", default_currency=self.usd,
         )
 
     def _manual(self, amount="-939.70", currency=None, rate=None, base=None):
-        mv = CariMovement(
-            cari=self.cari, book=self.book, date="2026-08-26",
+        mv = CurrentAccountMovement(
+            current_account=self.current_account, book=self.book, date="2026-08-26",
             amount=Decimal(amount), currency=currency or self.try_,
             movement_type="adjustment", description="stopaj",
             created_by=self.member,
@@ -57,14 +57,14 @@ class MovementDetailTests(TestCase):
 
     def _url(self, mv):
         return reverse("accounts:movement_detail",
-                       kwargs={"pk": self.cari.pk, "mv_pk": mv.pk})
+                       kwargs={"pk": self.current_account.pk, "mv_pk": mv.pk})
 
     # -- the account page gets there ---------------------------------------
     def test_the_account_page_links_each_row_to_its_movement(self):
         mv = self._manual(rate="0.020790", base="-19.54")
 
         response = self.client.get(
-            reverse("accounts:detail", kwargs={"pk": self.cari.pk})
+            reverse("accounts:detail", kwargs={"pk": self.current_account.pk})
         )
 
         self.assertContains(response, self._url(mv))
@@ -98,12 +98,12 @@ class MovementDetailTests(TestCase):
         self.assertContains(
             response,
             reverse("accounts:movement_edit",
-                    kwargs={"pk": self.cari.pk, "mv_pk": mv.pk}),
+                    kwargs={"pk": self.current_account.pk, "mv_pk": mv.pk}),
         )
 
     def test_a_row_a_payment_posted_sends_you_to_the_payment(self):
         payment = Payment.objects.create(
-            cari=self.cari, book=self.book, number="COL-2026-000075",
+            current_account=self.current_account, book=self.book, number="COL-2026-000075",
             type="collection", method="cash", status="draft",
             date="2026-08-26", amount=Decimal("180.59"), currency=self.usd,
         )
@@ -119,7 +119,7 @@ class MovementDetailTests(TestCase):
         self.assertNotContains(
             response,
             reverse("accounts:movement_edit",
-                    kwargs={"pk": self.cari.pk, "mv_pk": mv.pk}),
+                    kwargs={"pk": self.current_account.pk, "mv_pk": mv.pk}),
         )
 
     def test_a_row_an_expense_posted_sends_you_to_the_expense(self):
@@ -132,10 +132,10 @@ class MovementDetailTests(TestCase):
         self.assertTrue(kasa.pk)
         expense = EquityExpense.objects.create(
             book=self.book, currency=self.try_, amount=Decimal("939.70"),
-            date="2026-08-26", paid_by_cari=self.cari, description="stopaj",
+            date="2026-08-26", paid_by_current_account=self.current_account, description="stopaj",
         )
-        mv = CariMovement.objects.create(
-            cari=self.cari, book=self.book, date=expense.date,
+        mv = CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date=expense.date,
             amount=Decimal("-939.70"), currency=self.try_,
             movement_type="adjustment",
             source_type=ContentType.objects.get_for_model(EquityExpense),
@@ -152,7 +152,7 @@ class MovementDetailTests(TestCase):
         )
 
     def test_a_movement_of_another_account_is_a_404(self):
-        other = CariAccount.objects.create(
+        other = CurrentAccount.objects.create(
             book=self.book, code="X", name="Someone else",
             type="other", default_currency=self.usd,
         )

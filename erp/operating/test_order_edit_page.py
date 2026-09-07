@@ -16,7 +16,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 from marketing.models import Product
 from .models import Order, OrderItem
 
@@ -25,15 +25,15 @@ class OrderEditIsAFullPage(TestCase):
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def setUp(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
-        # The order needs its cari: an order page is refused unless the
+        # The order needs its current account: an order page is refused unless the
         # viewer is assigned the book the row belongs to, and an Order
-        # reaches its book through cari.book.
+        # reaches its book through current account.book.
         book = Book.objects.create(name="Laleli Fabric")
-        cari = CariAccount.objects.create(
+        current_account = CurrentAccount.objects.create(
             book=book, code="C-284", name="Oleg", type="customer",
             default_currency=CurrencyCategory.objects.create(
                 code="USD", name="US Dollar", symbol="$"))
-        self.order = Order.objects.create(order_number="DK0000284", cari=cari)
+        self.order = Order.objects.create(order_number="DK0000284", current_account=current_account)
         product = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
         OrderItem.objects.create(order=self.order, product=product,
                                  quantity=Decimal("156.00"), price=Decimal("2.50"))
@@ -89,11 +89,11 @@ class SavingAnEditLandsOnTheOrder(TestCase):
     def setUp(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
         book = Book.objects.create(name="Laleli Fabric")
-        cari = CariAccount.objects.create(
+        current_account = CurrentAccount.objects.create(
             book=book, code="C-294", name="Oleg", type="customer",
             default_currency=CurrencyCategory.objects.create(
                 code="USD", name="US Dollar", symbol="$"))
-        self.order = Order.objects.create(order_number="DK0000294", cari=cari)
+        self.order = Order.objects.create(order_number="DK0000294", current_account=current_account)
         product = Product.objects.create(title="Crepe", sku="KZL000316", price=10)
         OrderItem.objects.create(order=self.order, product=product,
                                  quantity=Decimal("10.00"), price=Decimal("2.50"))
@@ -128,11 +128,11 @@ class AnOrderCanBeEmptied(TestCase):
     def setUp(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
         book = Book.objects.create(name="Laleli Fabric")
-        cari = CariAccount.objects.create(
+        current_account = CurrentAccount.objects.create(
             book=book, code="C-295", name="Oleg", type="customer",
             default_currency=CurrencyCategory.objects.create(
                 code="USD", name="US Dollar", symbol="$"))
-        self.order = Order.objects.create(order_number="DK0000295", cari=cari)
+        self.order = Order.objects.create(order_number="DK0000295", current_account=current_account)
         product = Product.objects.create(title="Crepe", sku="KZL000317", price=10)
         self.item = OrderItem.objects.create(
             order=self.order, product=product,

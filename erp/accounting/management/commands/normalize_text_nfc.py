@@ -21,8 +21,8 @@ from django.db import transaction
 
 # (app_label.Model, [text fields to compose])
 TARGETS = [
-    ("accounting.CariAccount", ["name", "notes", "billing_address", "billing_city"]),
-    ("accounting.CariMovement", ["description", "reference"]),
+    ("accounting.CurrentAccount", ["name", "notes", "billing_address", "billing_city"]),
+    ("accounting.CurrentAccountMovement", ["description", "reference"]),
     ("crm.Contact", ["name", "address", "backgroundInfo"]),
     ("crm.Company", ["name", "address", "backgroundInfo"]),
     ("crm.Supplier", ["company_name", "contact_name", "address"]),

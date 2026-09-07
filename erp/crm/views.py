@@ -143,15 +143,15 @@ class ContactCreate(generic.edit.CreateView):
                 # Save the contact (pass request for task member)
                 self.object = form.save(request=self.request)
 
-                cari_warning = None
-                if form.cleaned_data.get("create_cari", True):
+                current_account_warning = None
+                if form.cleaned_data.get("create_current_account", True):
                     try:
-                        from accounting.services_accounts import get_or_create_cari_for_contact
+                        from accounting.services_accounts import get_or_create_current_account_for_contact
                         member = getattr(self.request.user, "member", None)
-                        get_or_create_cari_for_contact(self.object, member=member)
+                        get_or_create_current_account_for_contact(self.object, member=member)
                     except Exception as exc:
                         logger.exception("Cari creation failed for contact %s: %s", self.object.pk, exc)
-                        cari_warning = str(exc)
+                        current_account_warning = str(exc)
 
                 # Check if AJAX request (from nested sidebar)
                 if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -166,8 +166,8 @@ class ContactCreate(generic.edit.CreateView):
                             'company_name': self.object.company.name if self.object.company else ''
                         }
                     }
-                    if cari_warning:
-                        response['cari_warning'] = cari_warning
+                    if current_account_warning:
+                        response['current_account_warning'] = current_account_warning
                     return JsonResponse(response)
 
                 return super().form_valid(form)
@@ -331,15 +331,15 @@ class CompanyCreate(generic.edit.CreateView):
             else:
                 logger.info(f"⊘ Email automation DISABLED for {self.object.name} - Checkbox not checked")
 
-            cari_warning = None
-            if form.cleaned_data.get("create_cari", True):
+            current_account_warning = None
+            if form.cleaned_data.get("create_current_account", True):
                 try:
-                    from accounting.services_accounts import get_or_create_cari_for_company
+                    from accounting.services_accounts import get_or_create_current_account_for_company
                     member = getattr(self.request.user, "member", None)
-                    get_or_create_cari_for_company(self.object, member=member)
+                    get_or_create_current_account_for_company(self.object, member=member)
                 except Exception as exc:
                     logger.exception("Cari creation failed for company %s: %s", self.object.pk, exc)
-                    cari_warning = str(exc)
+                    current_account_warning = str(exc)
 
             # Check if AJAX request
             if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -348,8 +348,8 @@ class CompanyCreate(generic.edit.CreateView):
                     'redirect_url': self.get_success_url(),
                     'company_name': self.object.name
                 }
-                if cari_warning:
-                    response['cari_warning'] = cari_warning
+                if current_account_warning:
+                    response['current_account_warning'] = current_account_warning
                 return JsonResponse(response)
 
             # return super().form_valid(form)
@@ -467,9 +467,9 @@ class ContactDetail(generic.DetailView):
         # One client can hold an account in more than one book — the
         # factory and the wholesaler trade with the same people — so
         # this is the only place their whole position is visible.
-        from accounting.models_accounts import CariAccount
-        context["cari_accounts"] = (
-            CariAccount.objects.filter(contact=contact)
+        from accounting.models_accounts import CurrentAccount
+        context["current_account_accounts"] = (
+            CurrentAccount.objects.filter(contact=contact)
             .select_related("book", "default_currency")
             .order_by("book__name")
         )
@@ -615,9 +615,9 @@ class CompanyDetail(generic.DetailView):
         # One client can hold an account in more than one book — the
         # factory and the wholesaler trade with the same people — so
         # this is the only place their whole position is visible.
-        from accounting.models_accounts import CariAccount
-        context["cari_accounts"] = (
-            CariAccount.objects.filter(company=company)
+        from accounting.models_accounts import CurrentAccount
+        context["current_account_accounts"] = (
+            CurrentAccount.objects.filter(company=company)
             .select_related("book", "default_currency")
             .order_by("book__name")
         )
@@ -1225,8 +1225,8 @@ def customer_autocomplete(request):
 def quick_create_customer(request):
     """Minimal inline customer creation from the order-creation screen —
     name/phone/email/address only. Tax info and currency live on the
-    CariAccount, which is auto-created behind the scenes once the order
-    is saved (get_or_create_cari_for_order), so there's no need to ask
+    CurrentAccount, which is auto-created behind the scenes once the order
+    is saved (get_or_create_current account_for_order), so there's no need to ask
     for them here.
 
     An order can be raised against a Contact or a Company (Order has a

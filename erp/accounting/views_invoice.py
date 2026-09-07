@@ -3,7 +3,7 @@ Invoice views (Phase 2).
 
     /accounting/accounts/invoices/                   → InvoiceList
     /accounting/accounts/invoices/new/               → InvoiceCreate (with line items)
-    /accounting/accounts/invoices/new/?account=<id>  → InvoiceCreate prefilled for a cari
+    /accounting/accounts/invoices/new/?account=<id>  → InvoiceCreate prefilled for a current account
     /accounting/accounts/invoices/<id>/              → InvoiceDetail
     /accounting/accounts/invoices/<id>/edit/         → InvoiceEdit (draft only)
     /accounting/accounts/invoices/<id>/issue/        → InvoiceIssue
@@ -30,8 +30,8 @@ from django.views import View
 
 from accounting.models import CurrencyCategory
 from .models import (
-    CariAccount,
-    CariSettings,
+    CurrentAccount,
+    CurrentAccountSettings,
     Invoice,
     InvoiceItem,
 )
@@ -84,18 +84,18 @@ def _parse_items(items_json):
 
 
 def _filter_invoices(request):
-    qs = Invoice.objects.select_related("cari", "book", "currency").all()
+    qs = Invoice.objects.select_related("current_account", "book", "currency").all()
 
     q = (request.GET.get("q") or "").strip()
     if q:
-        # Fold both sides to plain uppercase ASCII, like the cari list:
+        # Fold both sides to plain uppercase ASCII, like the current account list:
         # ILIKE folds only ASCII case, and a reader on a UK keyboard still
         # has to be able to find GÜRHAN by typing "gurhan".
         from .views_accounts import tr_fold, tr_fold_expr
         needle = tr_fold(q)
         qs = qs.annotate(
-            _f_name=tr_fold_expr("cari__name"),
-            _f_code=tr_fold_expr("cari__code"),
+            _f_name=tr_fold_expr("current_account__name"),
+            _f_code=tr_fold_expr("current_account__code"),
         )
         qs = qs.filter(
             Q(_f_name__contains=needle)
@@ -104,9 +104,9 @@ def _filter_invoices(request):
             | Q(notes__icontains=q)
         )
 
-    cari_id = request.GET.get("account") or ""
-    if cari_id.isdigit():
-        qs = qs.filter(cari_id=int(cari_id))
+    current_account_id = request.GET.get("account") or ""
+    if current_account_id.isdigit():
+        qs = qs.filter(current_account_id=int(current_account_id))
 
     qs = qs.filter(book=request.book)
 
@@ -163,10 +163,10 @@ class InvoiceList(View):
             "filter_book": str(request.book.pk),
             "filter_type": request.GET.get("type", ""),
             "filter_status": request.GET.get("status", ""),
-            "filter_cari": request.GET.get("cari", ""),
+            "filter_current_account": request.GET.get("current_account", ""),
             "date_from":   request.GET.get("date_from", ""),
             "date_to":     request.GET.get("date_to", ""),
-            "invoice_language": (CariSettings.objects
+            "invoice_language": (CurrentAccountSettings.objects
                                  .values_list("invoice_language", flat=True)
                                  .first() or "en"),
         }
@@ -183,16 +183,16 @@ class InvoiceList(View):
 @method_decorator(login_required, name="dispatch")
 class InvoiceSettingsUpdate(View):
     """Set the printable invoice document's language (fatura dili). Stored
-    per-book on CariSettings but applied to EVERY book here — the company
+    per-book on CurrentAccountSettings but applied to EVERY book here — the company
     wants one behavior, and per-book divergence would only confuse."""
 
     def post(self, request):
         lang = (request.POST.get("invoice_language") or "en").strip().lower()
-        if lang not in dict(CariSettings.INVOICE_LANGUAGE_CHOICES):
+        if lang not in dict(CurrentAccountSettings.INVOICE_LANGUAGE_CHOICES):
             lang = "en"
         from accounting.models import Book
         for book in Book.objects.all():
-            s = CariSettings.for_book(book)
+            s = CurrentAccountSettings.for_book(book)
             if s.invoice_language != lang:
                 s.invoice_language = lang
                 s.save(update_fields=["invoice_language"])
@@ -211,24 +211,24 @@ class InvoiceCreate(View):
     template_name = "accounts/invoice_form.html"
 
     def get(self, request):
-        prefilled_cari = None
+        prefilled_current_account = None
         prefilled_order = None
         items_json = "[]"
 
         # ── Path A: explicit ?account=<id> ────────────────────────
-        cari_id = request.GET.get("account")
-        if cari_id and cari_id.isdigit():
-            prefilled_cari = CariAccount.objects.filter(pk=int(cari_id)).first()
+        current_account_id = request.GET.get("account")
+        if current_account_id and current_account_id.isdigit():
+            prefilled_current_account = CurrentAccount.objects.filter(pk=int(current_account_id)).first()
 
-        # ── Path B: ?order=<id> — pre-fill cari + line items from
+        # ── Path B: ?order=<id> — pre-fill current account + line items from
         # the operating order so the user can create an invoice
-        # straight from the order detail page. The cari comes from
-        # the order's auto-linked cari (see operating/views.py).
+        # straight from the order detail page. The current account comes from
+        # the order's auto-linked current account (see operating/views.py).
         order_id = request.GET.get("order")
         if order_id and order_id.isdigit():
             from operating.models import Order
             prefilled_order = (
-                Order.objects.select_related("cari")
+                Order.objects.select_related("current_account")
                 .prefetch_related("items__product", "items__product_variant")
                 .filter(pk=int(order_id)).first()
             )
@@ -256,8 +256,8 @@ class InvoiceCreate(View):
                         % {"num": existing.display_number},
                     )
                     return redirect("operating:order_detail", pk=prefilled_order.pk)
-                if prefilled_order.cari and not prefilled_cari:
-                    prefilled_cari = prefilled_order.cari
+                if prefilled_order.current_account and not prefilled_current_account:
+                    prefilled_current_account = prefilled_order.current_account
                 # Shape order items into the invoice items_json format
                 # expected by _parse_items / the form's JS handler.
                 items = []
@@ -280,16 +280,16 @@ class InvoiceCreate(View):
                 import json as _json
                 items_json = _json.dumps(items)
 
-        cari_options = (
-            CariAccount.objects.filter(is_active=True).order_by("name")
-            if not prefilled_cari else CariAccount.objects.none()
+        current_account_options = (
+            CurrentAccount.objects.filter(is_active=True).order_by("name")
+            if not prefilled_current_account else CurrentAccount.objects.none()
         )
 
         return render(request, self.template_name, {
             "invoice": None,
-            "prefilled_cari": prefilled_cari,
+            "prefilled_current_account": prefilled_current_account,
             "prefilled_order": prefilled_order,
-            "cari_options": cari_options,
+            "current_account_options": current_account_options,
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "type_choices": Invoice.INVOICE_TYPES,
             "default_due_days": 30,
@@ -297,12 +297,12 @@ class InvoiceCreate(View):
         })
 
     def post(self, request):
-        cari_id = request.POST.get("account")
-        if not cari_id:
+        current_account_id = request.POST.get("account")
+        if not current_account_id:
             messages.error(request, _g("An account must be selected."))
             return redirect("accounts:invoice_create", book_id=request.book.pk)
 
-        cari = get_object_or_404(CariAccount, pk=int(cari_id))
+        current_account = get_object_or_404(CurrentAccount, pk=int(current_account_id))
 
         # Parse items first — bail early if invalid
         try:
@@ -316,19 +316,19 @@ class InvoiceCreate(View):
 
         invoice_type = request.POST.get("type") or "sales"
         series = request.POST.get("series") or "INV"
-        currency_id = int(request.POST.get("currency") or cari.default_currency_id)
+        currency_id = int(request.POST.get("currency") or current_account.default_currency_id)
 
-        settings_obj = CariSettings.for_book(cari.book)
+        settings_obj = CurrentAccountSettings.for_book(current_account.book)
         number = settings_obj.next_invoice_number(series=series)
 
         try:
             date = request.POST.get("date") or timezone.now().date().isoformat()
             due_date = request.POST.get("due_date")
             if not due_date:
-                # Default to cari payment_term_days
+                # Default to current account payment_term_days
                 from datetime import date as _date, timedelta
                 d = _date.fromisoformat(date)
-                due_date = (d + timedelta(days=cari.payment_term_days)).isoformat()
+                due_date = (d + timedelta(days=current_account.payment_term_days)).isoformat()
         except ValueError:
             messages.error(request, _g("Invalid date."))
             return redirect("accounts:invoice_create", book_id=request.book.pk)
@@ -360,7 +360,7 @@ class InvoiceCreate(View):
                     )
                     return redirect("operating:order_detail", pk=order_obj.pk)
 
-        # Per-invoice consignee/issuer overrides (blank = use cari/brand)
+        # Per-invoice consignee/issuer overrides (blank = use current account/brand)
         snapshot = {
             "bill_to_name":       (request.POST.get("bill_to_name") or "").strip(),
             "bill_to_address":    (request.POST.get("bill_to_address") or "").strip(),
@@ -381,8 +381,8 @@ class InvoiceCreate(View):
 
         with transaction.atomic():
             invoice = Invoice.objects.create(
-                cari=cari,
-                book=cari.book,
+                current_account=current_account,
+                book=current_account.book,
                 series=series,
                 number=number,
                 type=invoice_type,
@@ -416,8 +416,8 @@ class InvoiceCreate(View):
 # Edit
 #   - Draft   → freely editable (no ledger movement yet)
 #   - Issued / Partially Paid / Paid / Overdue → editable; on save we
-#     refresh the linked CariMovement (description, date, due, amount)
-#     so the cari ledger stays in lock-step with the invoice. The
+#     refresh the linked CurrentAccountMovement (description, date, due, amount)
+#     so the current account ledger stays in lock-step with the invoice. The
 #     amount-zero rule for order-attached invoices still applies, so
 #     edits to such invoices NEVER touch the balance.
 #   - Cancelled → not editable; the cancellation counter-movement
@@ -471,11 +471,11 @@ class InvoiceEdit(View):
 
         return render(request, self.template_name, {
             "invoice": invoice,
-            "prefilled_cari": invoice.cari,
+            "prefilled_current_account": invoice.current_account,
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "type_choices": Invoice.INVOICE_TYPES,
             # Order-linked invoices mirror the order's items — the order
-            # itself is what the cari balance is actually computed from
+            # itself is what the current account balance is actually computed from
             # (see issue()/post_order_movement), so letting someone edit
             # quantities/prices HERE would silently detach the invoice
             # from what's really owed. Items are read-only in that case;
@@ -503,7 +503,7 @@ class InvoiceEdit(View):
         if redirected:
             return redirected
 
-        # Order-linked invoices mirror the order — the cari balance is
+        # Order-linked invoices mirror the order — the current account balance is
         # computed from the ORDER (see issue()/post_order_movement), not
         # from these items, so item edits here would just make the
         # printed invoice lie about what's actually owed. Ignore
@@ -572,7 +572,7 @@ class InvoiceDetail(View):
         from operating.models import WarehouseProductItem
 
         invoice = get_object_or_404(
-            Invoice.objects.select_related("cari", "book", "currency", "order",
+            Invoice.objects.select_related("current_account", "book", "currency", "order",
                                            "posted_movement"),
             pk=pk,
         )
@@ -618,7 +618,7 @@ class InvoiceDetail(View):
         # The printable document renders in its own language (fatura dili,
         # per-book setting) — export invoices go out in English by default,
         # regardless of the UI locale.
-        inv_lang = CariSettings.for_book(invoice.book).invoice_language or "en"
+        inv_lang = CurrentAccountSettings.for_book(invoice.book).invoice_language or "en"
 
         return render(request, self.template_name, {
             "invoice": invoice,
@@ -674,7 +674,7 @@ class InvoiceCancel(View):
             else:
                 messages.success(
                     request,
-                    _g("Purchase cancelled — its stock was removed and the cari debt reversed."),
+                    _g("Purchase cancelled — its stock was removed and the account debt reversed."),
                 )
             return redirect("accounts:invoice_detail", pk=invoice.pk)
 
@@ -684,7 +684,7 @@ class InvoiceCancel(View):
 
         # Invoice and order live or die together: cancelling the invoice
         # cancels its source order too, which reverses the order_sale
-        # movement off the cari and (if it was shipped) restores the cut
+        # movement off the current account and (if it was shipped) restores the cut
         # stock — all via the single status funnel so nothing diverges.
         if invoice.order_id:
             order = invoice.order
@@ -694,7 +694,7 @@ class InvoiceCancel(View):
                 if ok:
                     messages.success(
                         request,
-                        _g("Linked order #%(num)s was cancelled as well — its cari posting was reversed and any shipped stock restored.")
+                        _g("Linked order #%(num)s was cancelled as well — its account posting was reversed and any shipped stock restored.")
                         % {"num": order.pk},
                     )
                 else:
@@ -712,7 +712,7 @@ class InvoiceCancel(View):
 @method_decorator(login_required, name="dispatch")
 class InvoiceRestore(View):
     """Cancelled invoices are TERMINAL — cancel() now deletes the posted
-    cari movement (and cascades: order terminally cancelled / purchase
+    current account movement (and cascades: order terminally cancelled / purchase
     stock hard-deleted), so there is nothing consistent to restore to.
     The URL is kept only so old bookmarks fail with a clear message
     instead of a 404."""

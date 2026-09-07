@@ -10,7 +10,7 @@ from django.urls import reverse
 import json
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 from marketing.models import Product, ProductVariant
 from operating.models import (
     StockMovement, Warehouse, WarehouseProduct, WarehouseProductItem,
@@ -99,7 +99,7 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
             accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
 
@@ -107,7 +107,7 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
         return self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "cari_id": self.cari.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "mt",
                 "products": [{
                     "main_product": main or {"mode": "new", "name": "K24644", "sku": "K24644"},
                     "has_variants": True,

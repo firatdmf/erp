@@ -64,9 +64,9 @@ class NavDefinitionTest(TestCase):
 
     def test_daily_flow_sections_come_first_on_mobile(self):
         # Checked against MOBILE_FIRST rather than a hardcoded pair. Sections
-        # keep absorbing each other — cari went into accounting, procurement
+        # keep absorbing each other — current account went into accounting, procurement
         # into operating — and a literal list here goes stale silently every
-        # time one does, which is how this test came to expect a "cari"
+        # time one does, which is how this test came to expect a "current account"
         # section that no longer existed.
         for key in MOBILE_FIRST:
             section = next((s for s in NAV_SECTIONS if s["key"] == key), None)

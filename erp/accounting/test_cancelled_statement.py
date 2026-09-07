@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CashAccount, CurrencyCategory
-from accounting.models_accounts import CariAccount, CariMovement, Payment
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement, Payment
 
 
 class CancelledStatementTests(TestCase):
@@ -36,14 +36,14 @@ class CancelledStatementTests(TestCase):
         self.kasa = CashAccount.objects.create(
             book=self.book, name="Kasa", currency=self.usd, balance=Decimal("1000.00"),
         )
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="FIRAT", name="MUHAMMED FIRAT ÖZTÜRK",
             type="customer", default_currency=self.usd,
         )
 
     def _cancelled_payment(self, amount="180.59", when="2026-08-26"):
         payment = Payment.objects.create(
-            cari=self.cari, book=self.book, number="COL-2026-000075",
+            current_account=self.current_account, book=self.book, number="COL-2026-000075",
             type="collection", method="other", status="draft",
             date=when, amount=Decimal(amount), currency=self.usd,
         )
@@ -52,7 +52,7 @@ class CancelledStatementTests(TestCase):
         return payment
 
     def _url(self, **params):
-        url = reverse("accounts:statement", kwargs={"pk": self.cari.pk})
+        url = reverse("accounts:statement", kwargs={"pk": self.current_account.pk})
         if params:
             url += "?" + "&".join(f"{k}={v}" for k, v in params.items())
         return url
@@ -64,7 +64,7 @@ class CancelledStatementTests(TestCase):
 
         self.assertEqual(payment.status, "cancelled")
         self.assertIsNone(payment.posted_movement_id)
-        self.assertEqual(CariMovement.objects.filter(cari=self.cari).count(), 0)
+        self.assertEqual(CurrentAccountMovement.objects.filter(current_account=self.current_account).count(), 0)
 
     def test_the_cancelled_view_lists_the_payment(self):
         self._cancelled_payment()
@@ -82,7 +82,7 @@ class CancelledStatementTests(TestCase):
 
     def test_a_confirmed_payment_is_not_listed_as_cancelled(self):
         payment = Payment.objects.create(
-            cari=self.cari, book=self.book, number="COL-2026-000099",
+            current_account=self.current_account, book=self.book, number="COL-2026-000099",
             type="collection", method="cash", status="draft",
             date="2026-08-26", amount=Decimal("50.00"), currency=self.usd,
         )

@@ -544,7 +544,7 @@
 
   <!-- ============== INVOICE DOCUMENT (Karven-style) ============== -->
   {% comment %}The document renders in its own language (fatura dili — a
-  per-book CariSettings choice, English by default), independent of the UI
+  per-book CurrentAccountSettings choice, English by default), independent of the UI
   locale: {% language %} switches every {% trans %}, get_type_display and
   |date inside the block.{% endcomment %}
   {% language inv_lang|default:"en" %}
@@ -583,13 +583,13 @@
     </div>
 
     <!-- Consignee + Invoice meta side-by-side -->
-    {% with bname=invoice.bill_to_name|default:invoice.cari.name baddr=invoice.bill_to_address|default:invoice.cari.billing_address bcity=invoice.bill_to_city|default:invoice.cari.billing_city bcountry=invoice.bill_to_country|default:invoice.cari.billing_country bphone=invoice.bill_to_phone|default:invoice.cari.phone bemail=invoice.bill_to_email|default:invoice.cari.email btax_office=invoice.bill_to_tax_office|default:invoice.cari.tax_office btax_number=invoice.bill_to_tax_number|default:invoice.cari.tax_number %}
+    {% with bname=invoice.bill_to_name|default:invoice.current_account.name baddr=invoice.bill_to_address|default:invoice.current_account.billing_address bcity=invoice.bill_to_city|default:invoice.current_account.billing_city bcountry=invoice.bill_to_country|default:invoice.current_account.billing_country bphone=invoice.bill_to_phone|default:invoice.current_account.phone bemail=invoice.bill_to_email|default:invoice.current_account.email btax_office=invoice.bill_to_tax_office|default:invoice.current_account.tax_office btax_number=invoice.bill_to_tax_number|default:invoice.current_account.tax_number %}
     <div class="doc-consign">
       <div class="doc-consign-l">
         <div class="hdr">{% trans "Consignee" %}</div>
         <div class="body">
           <div class="name">
-            <a href="{% url 'accounts:detail' invoice.cari.pk %}">{{ bname }}</a>
+            <a href="{% url 'accounts:detail' invoice.current_account.pk %}">{{ bname }}</a>
           </div>
           {% if baddr %}
             <div class="line" style="white-space:pre-wrap;">{{ baddr }}</div>
@@ -650,7 +650,7 @@
           <th style="width: 110px;">{% trans "Design ID" %}</th>
           <th style="width: 100px;">{% trans "Product Type" %}</th>
           <th>{% trans "Description" %}</th>
-          <th class="num" style="width: 80px;">{% trans "Quantity" %}<span class="sub">{{ invoice.cari.default_currency.code|default:"" }}</span></th>
+          <th class="num" style="width: 80px;">{% trans "Quantity" %}<span class="sub">{{ invoice.current_account.default_currency.code|default:"" }}</span></th>
           <th class="num" style="width: 90px;">{% trans "Unit Price" %}<span class="sub">({{ invoice.currency.symbol }}{{ invoice.currency.code }} / {% trans "Unit" %})</span></th>
           <th class="num" style="width: 100px;">{% trans "Total Value" %}<span class="sub">({{ invoice.currency.symbol }}{{ invoice.currency.code }})</span></th>
         </tr>

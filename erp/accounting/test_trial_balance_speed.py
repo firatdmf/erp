@@ -10,7 +10,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, CariMovement
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
 
 
 class TrialBalanceQueryCount(TestCase):
@@ -32,18 +32,18 @@ class TrialBalanceQueryCount(TestCase):
 
     def _accounts(self, n, start=0):
         for i in range(start, start + n):
-            cari = CariAccount.objects.create(
+            current_account = CurrentAccount.objects.create(
                 book=self.book, code=f"{i:05d}", name=f"ACCOUNT {i}",
                 default_currency=self.usd)
-            CariMovement.objects.create(
-                cari=cari, book=self.book, date="2026-02-01",
+            CurrentAccountMovement.objects.create(
+                current_account=current_account, book=self.book, date="2026-02-01",
                 amount=Decimal("100.00"), currency=self.usd,
                 movement_type="opening", description="ob")
-            CariMovement.objects.create(
-                cari=cari, book=self.book, date="2026-03-01",
+            CurrentAccountMovement.objects.create(
+                current_account=current_account, book=self.book, date="2026-03-01",
                 amount=Decimal("-40.00"), currency=self.usd,
                 movement_type="collection", description="col")
-            cari.recompute_balance(save=True)
+            current_account.recompute_balance(save=True)
 
     def _page(self, **params):
         return self.client.get(
@@ -80,7 +80,7 @@ class TrialBalanceQueryCount(TestCase):
         self._accounts(5)
         small = self._measure()
         # Ten times the accounts, added rather than swapped in: a
-        # collection movement mints a Payment, and Payment.cari is
+        # collection movement mints a Payment, and Payment.current account is
         # PROTECTed, so these rows cannot be deleted and recreated.
         self._accounts(45, start=5)
         large = self._measure()
@@ -117,13 +117,13 @@ class EveryFigureIsBaseCurrency(TestCase):
         user.member.save(update_fields=["default_book"])
         self.client.force_login(user)
 
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="00001", name="MIXED",
             default_currency=self.usd)
 
     def _mv(self, amount, currency, rate=None):
-        return CariMovement.objects.create(
-            cari=self.cari, book=self.book, date="2026-03-01",
+        return CurrentAccountMovement.objects.create(
+            current_account=self.current_account, book=self.book, date="2026-03-01",
             amount=Decimal(amount), currency=currency, exchange_rate=rate,
             movement_type="opening", description="ob")
 
@@ -140,7 +140,7 @@ class EveryFigureIsBaseCurrency(TestCase):
         # Whatever rate the movement resolves for itself, 300 lira is worth
         # a few dollars and nothing like 300 of them. The assertion reads
         # amount_base rather than restating the FX arithmetic, which is
-        # CariMovement's job and tested where that lives.
+        # CurrentAccountMovement's job and tested where that lives.
         lira.refresh_from_db()
         self.assertLess(lira.amount_base, Decimal("50.00"))
         self.assertEqual(self._row()["debits"],
@@ -157,9 +157,9 @@ class EveryFigureIsBaseCurrency(TestCase):
         account page used to contradict each other."""
         self._mv("100.00", self.usd)
         self._mv("300.00", self.try_, Decimal("0.02083300"))
-        self.cari.recompute_balance(save=True)
-        self.cari.refresh_from_db()
-        self.assertEqual(self._row()["closing"], self.cari.cached_balance)
+        self.current_account.recompute_balance(save=True)
+        self.current_account.refresh_from_db()
+        self.assertEqual(self._row()["closing"], self.current_account.cached_balance)
 
     def test_the_header_says_which_currency(self):
         self._mv("100.00", self.usd)

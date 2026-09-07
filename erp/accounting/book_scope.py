@@ -56,7 +56,7 @@ def book_guarded(view, model, book_path="book"):
     customer's statement, and edit its orders, by walking sequential ids.
 
     `book_path` is how to get from the row to its book — "book" for an
-    invoice, "cari.book" for an order (an Order carries no book of its
+    invoice, "current_account.book" for an order (an Order carries no book of its
     own), "accounting_book" for a warehouse.
 
     404 rather than 403, for the same reason book_scoped does it: which

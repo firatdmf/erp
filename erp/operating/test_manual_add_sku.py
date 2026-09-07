@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount
+from accounting.models_accounts import CurrentAccount
 from marketing.models import Product
 from operating.models import Warehouse, WarehouseProduct
 
@@ -31,7 +31,7 @@ class ManualAddMainProductSkuTest(TestCase):
 
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-KRV", name="Karven", type="supplier",
             default_currency=self.usd,
         )
@@ -42,7 +42,7 @@ class ManualAddMainProductSkuTest(TestCase):
         return self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "cari_id": self.cari.pk,
+                "current_account_id": self.current_account.pk,
                 "unit": "mt",
                 "products": [{
                     "main_product": {"mode": "new", "name": name, "sku": main_sku},
@@ -99,7 +99,7 @@ class ManualAddMainProductSkuTest(TestCase):
         r = self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "cari_id": self.cari.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "mt",
                 "products": [{
                     "main_product": {"mode": "existing", "id": existing.pk,
                                      "title": "K24644", "sku": "K24644"},
@@ -127,7 +127,7 @@ class ManualAddPermissionTest(TestCase):
     def setUp(self):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
         self.warehouse = Warehouse.objects.create(name="Fabrika",
@@ -137,7 +137,7 @@ class ManualAddPermissionTest(TestCase):
         return self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "cari_id": self.cari.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "mt",
                 "products": [{
                     "main_product": {"mode": "new", "name": "GREK", "sku": ""},
                     "has_variants": True,
@@ -408,7 +408,7 @@ class LongVariantSkuTest(TestCase):
         self.client.force_login(self.user)
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
         self.warehouse = Warehouse.objects.create(name="Fabrika",
@@ -418,7 +418,7 @@ class LongVariantSkuTest(TestCase):
         return self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "cari_id": self.cari.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "mt",
                 "products": [{
                     "main_product": {"mode": "new", "name": "PETEK FONLUK KUMAŞ",
                                      "sku": "PETEK FONLUK KUMAŞ"},

@@ -149,16 +149,16 @@
           <td>
             <div class="cl-acct">
               <div class="cl-acct-top">
-                <a class="cl-name" href="{% url 'accounts:detail' r.cari.pk %}">{{ r.cari.name }}</a>
+                <a class="cl-name" href="{% url 'accounts:detail' r.current_account.pk %}">{{ r.current_account.name }}</a>
                 {% if r.is_over %}<span class="cl-badge over">{% trans "Limit Exceeded" %}</span>{% elif r.is_near %}<span class="cl-badge near">{% trans "Near Limit" %}</span>{% endif %}
               </div>
-              <div class="cl-meta"><span class="code">{{ r.cari.code }}</span> · {{ r.cari.book.name }}</div>
+              <div class="cl-meta"><span class="code">{{ r.current_account.code }}</span> · {{ r.current_account.book.name }}</div>
             </div>
           </td>
           <td class="num {% if r.balance > 0 %}pos{% elif r.balance < 0 %}neg{% else %}muted{% endif %}">
-            {{ r.cari.default_currency.symbol }}{{ r.balance|money }}
+            {{ r.current_account.default_currency.symbol }}{{ r.balance|money }}
           </td>
-          <td class="num">{{ r.cari.default_currency.symbol }}{{ r.credit_limit|money }}</td>
+          <td class="num">{{ r.current_account.default_currency.symbol }}{{ r.credit_limit|money }}</td>
           <td>
             <div class="cl-bar-wrap">
               <div class="cl-bar">
@@ -170,7 +170,7 @@
             </div>
           </td>
           <td class="num {% if r.available < 0 %}danger{% endif %}">
-            {{ r.cari.default_currency.symbol }}{{ r.available|money }}
+            {{ r.current_account.default_currency.symbol }}{{ r.available|money }}
           </td>
         </tr>
         {% endfor %}

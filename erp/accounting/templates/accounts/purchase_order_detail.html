@@ -125,7 +125,7 @@
   <div class="po-info">
     <div class="po-card">
       <div class="po-card-l">{% trans "Supplier" %}</div>
-      <div class="po-card-v"><a href="{% url 'accounts:detail' invoice.cari.pk %}">{{ invoice.cari.name }}</a></div>
+      <div class="po-card-v"><a href="{% url 'accounts:detail' invoice.current_account.pk %}">{{ invoice.current_account.name }}</a></div>
     </div>
     <div class="po-card">
       <div class="po-card-l">{% trans "Date" %}</div>

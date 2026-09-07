@@ -101,13 +101,13 @@ def credit(code, amount, **kwargs):
     return _line(code, credit=amount, **kwargs)
 
 
-def _line(code, debit=ZERO, credit=ZERO, *, cari=None, cash_account=None,
+def _line(code, debit=ZERO, credit=ZERO, *, current_account=None, cash_account=None,
           currency=None, amount_original=None, exchange_rate=None, memo=""):
     return {
         "code": code,
         "debit": Decimal(debit or 0).quantize(Decimal("0.01")),
         "credit": Decimal(credit or 0).quantize(Decimal("0.01")),
-        "cari": cari,
+        "current_account": current_account,
         "cash_account": cash_account,
         "currency": currency,
         "amount_original": amount_original,
@@ -151,7 +151,7 @@ def post_entry(*, book, date, description, lines, source=None, reference="",
             account=account(spec["code"]),
             debit=spec["debit"],
             credit=spec["credit"],
-            cari=spec["cari"],
+            current_account=spec["current_account"],
             cash_account=spec["cash_account"],
             currency=spec["currency"],
             amount_original=spec["amount_original"],
@@ -178,7 +178,7 @@ def trial_balance(book=None, date_to=None):
 
     This is a REAL trial balance — the sum of all debits against the sum of
     all credits, which is the check that the ledger is internally sound.
-    (The report currently called "Trial Balance" in this app is a per-cari
+    (The report currently called "Trial Balance" in this app is a per-current account
     opening/movement/closing listing, and it sums entered amounts across
     currencies, so on Laleli it reports 301,818.20 for a position of
     347,539.92.)
@@ -281,12 +281,12 @@ def balance_sheet(book, date_to=None):
 # This half does not balance and is not supposed to pretend otherwise. What
 # it does instead is account for its own residual exactly:
 #
-#     residual = net cari position
+#     residual = net current account position
 #              + cash that moved for a non-equity reason
 #              + inventory held
 #              + fixed assets held
 #
-# which is an identity, not an estimate: every cari movement lacks an equity
+# which is an identity, not an estimate: every current account movement lacks an equity
 # contra, and every payment/exchange/transfer moves cash without being income
 # or capital. Nothing is left over to hand-wave about.
 # ---------------------------------------------------------------------------
@@ -318,17 +318,17 @@ def subsidiary_equation(book):
     from django.db.models import Count, F, DecimalField, ExpressionWrapper, Q
 
     from .models import AssetFixedAsset, CashTransactionEntry
-    from .models_accounts import CariAccount, CariMovement
+    from .models_accounts import CurrentAccount, CurrentAccountMovement
 
     entries = CashTransactionEntry.objects.filter(book=book)
     signed = _signed_cash()
 
     cash = entries.aggregate(t=Sum(signed))["t"] or ZERO
 
-    cari = CariAccount.objects.filter(book=book)
-    receivable = cari.filter(cached_balance__gt=0).aggregate(
+    current_account = CurrentAccount.objects.filter(book=book)
+    receivable = current_account.filter(cached_balance__gt=0).aggregate(
         t=Sum("cached_balance"))["t"] or ZERO
-    payable = -(cari.filter(cached_balance__lt=0).aggregate(
+    payable = -(current_account.filter(cached_balance__lt=0).aggregate(
         t=Sum("cached_balance"))["t"] or ZERO)
 
     inventory, unvalued_rolls, unvalued_metres = _inventory_value(book)
@@ -346,18 +346,18 @@ def subsidiary_equation(book):
                        if m not in _EQUITY_SOURCES}
 
     # Equity does not only move through cash. An expense a customer settles
-    # on the book's behalf (EquityExpense.paid_by_cari) moves no money at
-    # all — it posts a CariMovement instead, reducing what they owe. Both
+    # on the book's behalf (EquityExpense.paid_by_current_account) moves no money at
+    # all — it posts a CurrentAccountMovement instead, reducing what they owe. Both
     # legs are real and both are already recorded; taking equity from the
     # cash journal alone counted the asset leg and dropped the equity one,
     # which inflated the residual by exactly those expenses.
     equity_ct = [ContentType.objects.get(app_label="accounting", model=m).pk
                  for m in _EQUITY_SOURCES
                  if ContentType.objects.filter(app_label="accounting", model=m).exists()]
-    equity_from_cari = CariMovement.objects.filter(
+    equity_from_current_account = CurrentAccountMovement.objects.filter(
         book=book, source_type_id__in=equity_ct
     ).aggregate(t=Sum("amount_base"))["t"] or ZERO
-    equity = equity_from_cash + equity_from_cari
+    equity = equity_from_cash + equity_from_current_account
 
     assets = cash + receivable + inventory + fixed
     residual = assets - payable - equity
@@ -365,18 +365,18 @@ def subsidiary_equation(book):
     # Why it does not balance, in terms that add up to the residual.
     movement_types = [
         {"type": r["movement_type"], "n": r["n"], "amount": r["s"] or ZERO}
-        for r in (CariMovement.objects.filter(book=book)
+        for r in (CurrentAccountMovement.objects.filter(book=book)
                   .values("movement_type")
                   .annotate(n=Count("id"), s=Sum("amount_base"))
                   .order_by("-n"))
     ]
-    cari_net = sum((r["amount"] for r in movement_types), ZERO)
+    current_account_net = sum((r["amount"] for r in movement_types), ZERO)
 
     causes = [
         {"label": "Cari ledger — movements with no contra anywhere",
-         # The cari-funded equity rows DO have both legs, so they are not
+         # The current account-funded equity rows DO have both legs, so they are not
          # part of the problem and must not be counted as if they were.
-         "amount": cari_net - equity_from_cari},
+         "amount": current_account_net - equity_from_current_account},
         *[{"label": f"Cash moved by {m} (not income or capital)", "amount": v}
           for m, v in sorted(non_equity_cash.items())],
         {"label": "Inventory held, never posted", "amount": inventory},
@@ -396,7 +396,7 @@ def subsidiary_equation(book):
         "liabilities": payable,
         "equity": equity,
         "equity_from_cash": equity_from_cash,
-        "equity_from_cari": equity_from_cari,
+        "equity_from_current_account": equity_from_current_account,
         "equity_by_source": {m: by_source.get(m, ZERO) for m in _EQUITY_SOURCES},
         "liabilities_plus_equity": payable + equity,
         "residual": residual,

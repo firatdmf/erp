@@ -5,7 +5,7 @@ unbalanced entry — but it starts empty, so until history is replayed it
 reports a tidy zero while the money sits somewhere else entirely. This
 puts what already happened into it:
 
-  * every cari movement, against the contra its type implies
+  * every current account movement, against the contra its type implies
   * the stock standing in the book's warehouses, at what it cost
   * one entry moving credit-balance accounts from receivable to payable
 
@@ -25,7 +25,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from accounting.models import Book
-from accounting.models_accounts import CariMovement
+from accounting.models_accounts import CurrentAccountMovement
 from accounting.models_ledger import JournalEntry
 from accounting.services_ledger import (balance_sheet, ensure_chart,
                                         subsidiary_equation)
@@ -60,14 +60,14 @@ class Command(BaseCommand):
         ref = f"LEDGER-BF-{book.pk}"
         ensure_chart()
 
-        movements = list(CariMovement.objects.filter(book=book)
-                         .select_related("cari", "currency").order_by("date", "id"))
+        movements = list(CurrentAccountMovement.objects.filter(book=book)
+                         .select_related("current_account", "currency").order_by("date", "id"))
         if not movements:
             raise CommandError(f"{book.name} has no cari movements.")
         cutover = opts["cutover"] or max(m.date for m in movements)
 
         # Movements already posted, so a half-finished run can be resumed.
-        ct = ContentType.objects.get_for_model(CariMovement)
+        ct = ContentType.objects.get_for_model(CurrentAccountMovement)
         done = set(JournalEntry.objects.filter(book=book, source_type=ct)
                    .values_list("source_id", flat=True))
 

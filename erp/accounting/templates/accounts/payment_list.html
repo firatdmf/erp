@@ -293,7 +293,7 @@
         <span class="pl-ctl-lbl">{% trans "Account" %}</span>
         <input type="text"
                name="cari_q"
-               value="{{ filter_cari_q }}"
+               value="{{ filter_current_account_q }}"
                placeholder="{% trans 'Search…' %}"
                autocomplete="off">
       </label>
@@ -361,10 +361,10 @@
         if (e.key === 'Enter') { e.preventDefault(); clearTimeout(debTimer); plFetch(); }
       });
     });
-    var cariQ = form.querySelector('input[name="cari_q"]');
-    if (cariQ) {
-      cariQ.addEventListener('input', debounced);
-      cariQ.addEventListener('keydown', function (e) {
+    var currentAccountQ = form.querySelector('input[name="cari_q"]');
+    if (currentAccountQ) {
+      currentAccountQ.addEventListener('input', debounced);
+      currentAccountQ.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); clearTimeout(debTimer); plFetch(); }
       });
     }

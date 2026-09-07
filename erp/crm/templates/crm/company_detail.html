@@ -629,10 +629,10 @@
           <div class="od-card-h">
             <i class="fa fa-book card-ico"></i>
             <h3>{% trans "Ledger accounts" %}</h3>
-            <span class="od-card-sub">{{ cari_accounts|length }} {% blocktrans count counter=cari_accounts|length %}book{% plural %}books{% endblocktrans %}</span>
+            <span class="od-card-sub">{{ current_account_accounts|length }} {% blocktrans count counter=cari_accounts|length %}book{% plural %}books{% endblocktrans %}</span>
           </div>
           <div class="od-order-list">
-            {% for a in cari_accounts %}
+            {% for a in current_account_accounts %}
               <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
                 <div class="od-order-id">
                   <div class="od-order-num">{{ a.book.name }}</div>

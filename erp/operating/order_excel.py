@@ -252,9 +252,9 @@ def build_order_workbook(order):
             payment = order.payment_status
     r = kv_pair(ws, r, "Order No", num, "Status", order.get_order_status_display() or order.order_status, NCOLS)
     r = kv_pair(ws, r, "Order Date", _dt(order.order_date) if order.order_date else _dt(order.created_at), "Payment", payment or "—", NCOLS)
-    cari_name = order.cari.name if (order.cari_id and order.cari) else "—"
+    current_account_name = order.current_account.name if (order.current_account_id and order.current_account) else "—"
     r = kv_pair(ws, r, "Last Update", _dt(order.updated_at), "Currency", ccode, NCOLS)
-    r = kv_full(ws, r, "Linked Account", cari_name, NCOLS)
+    r = kv_full(ws, r, "Linked Account", current_account_name, NCOLS)
     r += 1
 
     # ── Customer ──
@@ -459,7 +459,7 @@ def build_combined_workbook(orders):
     # this sheet exists: one customer, two ledgers, one document.
     books = []
     for o in orders:
-        b = o.cari.book.name if (o.cari_id and o.cari and o.cari.book_id) else None
+        b = o.current_account.book.name if (o.current_account_id and o.current_account and o.current_account.book_id) else None
         if b and b not in books:
             books.append(b)
     if books:

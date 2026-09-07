@@ -112,7 +112,7 @@
     <select name="supplier" onchange="this.form.submit()">
       <option value="">{% trans "All suppliers" %}</option>
       {% for s in suppliers %}
-      <option value="{{ s.cari_id }}" {% if filter_supplier == s.cari_id|stringformat:"s" %}selected{% endif %}>{{ s.cari__name }}</option>
+      <option value="{{ s.current_account_id }}" {% if filter_supplier == s.current_account_id|stringformat:"s" %}selected{% endif %}>{{ s.current_account__name }}</option>
       {% endfor %}
     </select>
     <select name="status" onchange="this.form.submit()">
@@ -143,7 +143,7 @@
         <tr class="po-row" data-href="{% url 'accounts:purchase_order_detail' inv.pk %}">
           <td><a class="po-num" href="{% url 'accounts:purchase_order_detail' inv.pk %}">{{ inv.number }}</a></td>
           <td><span class="po-date">{{ inv.date|date:"d.m.Y" }}</span></td>
-          <td><a class="po-supplier" href="{% url 'accounts:detail' inv.cari.pk %}">{{ inv.cari.name }}</a></td>
+          <td><a class="po-supplier" href="{% url 'accounts:detail' inv.current_account.pk %}">{{ inv.current_account.name }}</a></td>
           <td><span class="po-items-count">{{ inv.item_count }} {% trans "product" %}</span></td>
           <td>
             <span class="po-badge {{ inv.status }}">{{ inv.get_status_display }}</span>

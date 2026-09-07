@@ -273,7 +273,7 @@
           hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
           {% comment %}Which book's shelves to search. The server checks it
           against the member's assignments, so this only narrows.{% endcomment %}
-          hx-vals='{"book": "{% if order %}{{ order.cari.book_id|default:'' }}{% else %}{{ current_book.pk|default:'' }}{% endif %}"}'
+          hx-vals='{"book": "{% if order %}{{ order.current_account.book_id|default:'' }}{% else %}{{ current_book.pk|default:'' }}{% endif %}"}'
           hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
       </div>
       <div id="co-product-results" class="co-autocomplete-results"></div>

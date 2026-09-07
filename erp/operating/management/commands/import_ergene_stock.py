@@ -42,6 +42,7 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
+from operating.catalog_reconcile import reconcile_all_warehouse_links
 from operating.models import (StockMovement, Warehouse, WarehouseProduct,
                               WarehouseProductItem)
 
@@ -476,6 +477,14 @@ class Command(BaseCommand):
                           reason="Ergene factory stock import",
                           reference=IMPORT_REFERENCE)
             for p, q in movements], batch_size=500)
+
+        # Every path that creates a warehouse row owes that row a catalog
+        # link — the warehouse list, the storefront and live_quantity all
+        # join through catalog_variant. This one never did, which is why
+        # every product it has ever created sat unlinked. Runs inside the
+        # caller's transaction, so a dry run previews it and rolls it back.
+        stats["catalog"] = reconcile_all_warehouse_links(
+            apply=True, skus=[p.sku for p in to_create + to_update if p.sku])
         return stats
 
     def _report(self, s, applied):
@@ -488,6 +497,16 @@ class Command(BaseCommand):
             w(f"  barcodes minted   {s['barcodes_minted']:>7}  "
               f"(stock_items that arrived with no factory label)")
         w(f"  stock items already held {s['stock_existing']:>7}")
+        cat = s.get("catalog")
+        if cat:
+            w(f"  catalog links     {cat['linked_wps']:>7}  "
+              f"({cat['variants_created']} variants and "
+              f"{cat['products_created']} hidden products created)")
+            if cat["conflicts"]:
+                w(self.style.WARNING(
+                    f"  {len(cat['conflicts'])} SKU(s) could not be linked "
+                    f"automatically — run `manage.py reconcile_catalog` to see "
+                    f"them in full."))
         w(f"  metres in stock   {s['metres']:>12,.2f}")
         w(f"  stock value       {s['value_usd']:>12,.2f} USD")
         if s["unpriced"]:

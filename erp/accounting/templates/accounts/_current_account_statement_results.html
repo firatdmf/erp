@@ -114,12 +114,12 @@
         <td class="st-actions no-print">
           {% if r.editable %}
             <span class="st-act-group">
-              <a class="st-act" href="{% url 'accounts:movement_edit' cari.pk r.mv.pk %}"
+              <a class="st-act" href="{% url 'accounts:movement_edit' current_account.pk r.mv.pk %}"
                  title="{% trans 'Edit this row' %}" onclick="event.stopPropagation();">
                 <i data-lucide="pencil"></i>
               </a>
               <form class="st-act-form" method="post"
-                    action="{% url 'accounts:movement_delete' cari.pk r.mv.pk %}"
+                    action="{% url 'accounts:movement_delete' current_account.pk r.mv.pk %}"
                     onclick="event.stopPropagation();"
                     onsubmit="return confirm('{% trans "This movement will be deleted and the balance recalculated. Are you sure?" %}');">
                 {% csrf_token %}

@@ -7743,11 +7743,11 @@ msgid "Click to fill a variant row with this"
 msgstr "Bir varyant satırını bununla doldurmak için tıklayın"
 
 #: erp/templates/base.html:0
-msgid "Open a cari account"
+msgid "Open a current account"
 msgstr "Cari hesabı aç"
 
 #: erp/templates/base.html:0
-msgid "A cari account is automatically created for this record."
+msgid "A current account is automatically created for this record."
 msgstr "Bu kayıt için otomatik olarak bir cari hesap oluşturulur."
 
 #: erp/templates/base.html:0
@@ -7841,7 +7841,7 @@ msgstr ""
 #: current_account/templates/current_account/cari_detail.html
 #: operating/templates/operating/order_detail.html
 msgid ""
-"Linked order #%(num)s was cancelled as well — its cari posting was reversed "
+"Linked order #%(num)s was cancelled as well — its account posting was reversed "
 "and any shipped stock restored."
 msgstr ""
 "Bağlı sipariş #%(num)s de iptal edildi — cari kaydı geri alındı ve "
@@ -8372,7 +8372,7 @@ msgstr ""
 "Bir alımı sadece yönetici iptal edebilir — bu işlem alımın getirdiği "
 "fiziksel stoğu kalıcı olarak siler."
 
-msgid "Purchase cancelled — its stock was removed and the cari debt reversed."
+msgid "Purchase cancelled — its stock was removed and the account debt reversed."
 msgstr "Alım iptal edildi — stoğu kaldırıldı ve cari borcu geri alındı."
 
 msgid ""

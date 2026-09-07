@@ -129,13 +129,13 @@
           <span class="sub">{% trans "Who is this instrument associated with" %}</span>
         </div>
 
-        {% if prefilled_cari %}
-        <input type="hidden" name="account" value="{{ prefilled_cari.id }}">
+        {% if prefilled_current_account %}
+        <input type="hidden" name="account" value="{{ prefilled_current_account.id }}">
         <div style="margin-bottom: 14px;">
           <div class="chk-f-cari-chip">
             <i data-lucide="user"></i>
-            <span class="code">{{ prefilled_cari.code }}</span>
-            <span>{{ prefilled_cari.name }}</span>
+            <span class="code">{{ prefilled_current_account.code }}</span>
+            <span>{{ prefilled_current_account.name }}</span>
             <a href="{% url 'accounts:check_create' current_book.pk %}" class="change-link">{% trans "change" %}</a>
           </div>
         </div>
@@ -145,7 +145,7 @@
             <label>{% trans "Account" %}<span class="req">*</span></label>
             <select name="account" required>
               <option value="">{% trans "— Select account —" %}</option>
-              {% for c in cari_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
+              {% for c in current_account_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
             </select>
           </div>
         </div>
@@ -229,7 +229,7 @@
           <div class="chk-f-f">
             <label>{% trans "Currency" %}<span class="req">*</span></label>
             <select name="currency" required>
-              {% for c in currencies %}<option value="{{ c.id }}" {% if prefilled_cari and prefilled_cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
+              {% for c in currencies %}<option value="{{ c.id }}" {% if prefilled_current_account and prefilled_current_account.default_currency_id == c.id %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
             </select>
           </div>
           <div class="chk-f-f">

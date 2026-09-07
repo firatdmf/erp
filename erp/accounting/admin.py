@@ -76,11 +76,11 @@ admin.site.register(AssetInventoryFinishedGood)
 admin.site.register(CurrencyExchange)
 
 # ---------------------------------------------------------------------------
-# Current-account (cari) ledger admin — merged in from the former
+# Current-account (current account) ledger admin — merged in from the former
 # current_account app. Models arrive via the `from .models import *` above.
 # ---------------------------------------------------------------------------
-@admin.register(CariAccount)
-class CariAccountAdmin(admin.ModelAdmin):
+@admin.register(CurrentAccount)
+class CurrentAccountAdmin(admin.ModelAdmin):
     list_display  = ("code", "name", "type", "book", "default_currency",
                      "cached_balance", "credit_limit", "is_active")
     list_filter   = ("type", "is_active", "book")
@@ -90,19 +90,19 @@ class CariAccountAdmin(admin.ModelAdmin):
                        "created_at", "updated_at")
 
 
-@admin.register(CariMovement)
-class CariMovementAdmin(admin.ModelAdmin):
-    list_display  = ("date", "cari", "movement_type", "amount", "currency",
+@admin.register(CurrentAccountMovement)
+class CurrentAccountMovementAdmin(admin.ModelAdmin):
+    list_display  = ("date", "current_account", "movement_type", "amount", "currency",
                      "amount_base", "reference")
     list_filter   = ("movement_type", "currency", "book")
-    search_fields = ("cari__code", "cari__name", "description", "reference")
-    raw_id_fields = ("cari",)
+    search_fields = ("current_account__code", "current_account__name", "description", "reference")
+    raw_id_fields = ("current_account",)
     readonly_fields = ("amount_base", "exchange_rate", "created_at")
 
 
-@admin.register(CariSettings)
-class CariSettingsAdmin(admin.ModelAdmin):
-    list_display = ("book", "cari_code_prefix", "next_cari_seq",
+@admin.register(CurrentAccountSettings)
+class CurrentAccountSettingsAdmin(admin.ModelAdmin):
+    list_display = ("book", "current_account_code_prefix", "next_current_account_seq",
                     "default_tax_rate", "default_payment_term_days")
 
 
@@ -116,11 +116,11 @@ class InvoiceItemInline(admin.TabularInline):
 
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
-    list_display = ("number", "series", "type", "status", "cari", "date",
+    list_display = ("number", "series", "type", "status", "current_account", "date",
                     "due_date", "total", "balance", "currency")
     list_filter = ("type", "status", "book", "currency")
-    search_fields = ("number", "cari__name", "cari__code", "notes")
-    raw_id_fields = ("cari", "book", "order", "posted_movement")
+    search_fields = ("number", "current_account__name", "current_account__code", "notes")
+    raw_id_fields = ("current_account", "book", "order", "posted_movement")
     readonly_fields = ("subtotal", "discount_amount", "tax_amount", "total",
                        "balance", "paid_amount", "created_at", "updated_at")
     inlines = [InvoiceItemInline]
@@ -134,11 +134,11 @@ class PaymentAllocationInline(admin.TabularInline):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ("number", "type", "method", "status", "cari", "date",
+    list_display = ("number", "type", "method", "status", "current_account", "date",
                     "amount", "currency", "cash_account")
     list_filter = ("type", "method", "status", "book", "currency")
-    search_fields = ("number", "cari__name", "cari__code", "description")
-    raw_id_fields = ("cari", "book", "cash_account", "posted_movement")
+    search_fields = ("number", "current_account__name", "current_account__code", "description")
+    raw_id_fields = ("current_account", "book", "cash_account", "posted_movement")
     readonly_fields = ("posted_movement", "created_at", "updated_at")
     inlines = [PaymentAllocationInline]
 
@@ -146,10 +146,10 @@ class PaymentAdmin(admin.ModelAdmin):
 @admin.register(CheckOrPromissoryNote)
 class CheckAdmin(admin.ModelAdmin):
     list_display = ("serial_no", "instrument", "direction", "status",
-                    "cari", "amount", "currency", "due_date")
+                    "current_account", "amount", "currency", "due_date")
     list_filter = ("instrument", "direction", "status", "book")
-    search_fields = ("serial_no", "bank", "drawer", "cari__name", "cari__code")
-    raw_id_fields = ("cari", "book", "endorsed_to", "posted_movement",
+    search_fields = ("serial_no", "bank", "drawer", "current_account__name", "current_account__code")
+    raw_id_fields = ("current_account", "book", "endorsed_to", "posted_movement",
                      "endorse_movement", "cleared_cash_account")
     readonly_fields = ("posted_movement", "endorse_movement", "cleared_cash_account",
                        "created_at", "updated_at")

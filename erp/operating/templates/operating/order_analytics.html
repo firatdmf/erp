@@ -548,10 +548,10 @@
               <span class="an-cust-kind {{ c.kind }}">
                 {% if c.kind == 'company' %}{% trans "Company" %}{% elif c.kind == 'contact' %}{% trans "Contact" %}{% else %}{% trans "Web" %}{% endif %}
               </span>
-              {% if c.cari %}
-                <span class="an-cust-cari" onclick="event.preventDefault(); window.location='{% url 'accounts:detail' c.cari.pk %}';" title="{% trans 'Open current account' %}">
-                  <i class="fa fa-wallet"></i>{{ c.cari.code }} ·
-                  <span class="bal {% if c.cari.balance > 0 %}owe{% elif c.cari.balance < 0 %}credit{% endif %}">{{ c.cari.symbol }}{{ c.cari.abs_balance|floatformat:2 }} {{ c.cari.label }}</span>
+              {% if c.current_account %}
+                <span class="an-cust-cari" onclick="event.preventDefault(); window.location='{% url 'accounts:detail' c.current_account.pk %}';" title="{% trans 'Open current account' %}">
+                  <i class="fa fa-wallet"></i>{{ c.current_account.code }} ·
+                  <span class="bal {% if c.current_account.balance > 0 %}owe{% elif c.current_account.balance < 0 %}credit{% endif %}">{{ c.current_account.symbol }}{{ c.current_account.abs_balance|floatformat:2 }} {{ c.current_account.label }}</span>
                 </span>
               {% endif %}
             </div>

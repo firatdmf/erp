@@ -19,7 +19,7 @@ carried in from an older book.
 
 Every movement is tagged with a batch reference so the run can be undone:
 
-    CariMovement.objects.filter(reference="ERGENE-OB-20260831").delete()
+    CurrentAccountMovement.objects.filter(reference="ERGENE-OB-20260831").delete()
 
 Dry run by default; pass --apply to commit.
 """
@@ -35,7 +35,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, CariMovement, CariSettings
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement, CurrentAccountSettings
 from crm.models import Company, Contact
 
 # The sheets are named for the customer, and for the foreign ones that name
@@ -230,11 +230,11 @@ class Command(BaseCommand):
                 "\nDry run — rolled back. Re-run with --apply to commit."))
 
     def _run(self, rows, balances, book, usd, cutover, batch_ref, prefix, apply):
-        settings_obj = CariSettings.for_book(book)
-        if settings_obj.cari_code_prefix != prefix:
-            self.stdout.write(f"code prefix {settings_obj.cari_code_prefix!r} -> {prefix!r}")
-            settings_obj.cari_code_prefix = prefix
-            settings_obj.save(update_fields=["cari_code_prefix"])
+        settings_obj = CurrentAccountSettings.for_book(book)
+        if settings_obj.current_account_code_prefix != prefix:
+            self.stdout.write(f"code prefix {settings_obj.current_account_code_prefix!r} -> {prefix!r}")
+            settings_obj.current_account_code_prefix = prefix
+            settings_obj.save(update_fields=["current_account_code_prefix"])
 
         created = posted = skipped = 0
         total = Decimal("0.00")
@@ -253,13 +253,13 @@ class Command(BaseCommand):
             field, target = link
 
             lookup = {field: target} if field else {"name": row["account_name"]}
-            account = CariAccount.objects.filter(book=book, **lookup).first()
+            account = CurrentAccount.objects.filter(book=book, **lookup).first()
             if account is None and action == "movement_only":
                 problems.append(f"{key}: map says movement_only but no account is linked")
                 continue
 
             if account is None:
-                account = CariAccount(
+                account = CurrentAccount(
                     book=book, name=row["account_name"],
                     type=row.get("account_type") or "customer",
                     default_currency=usd, opening_balance=balance,
@@ -277,7 +277,7 @@ class Command(BaseCommand):
             # For an account already carrying live movements (Eurofirany has
             # an order on it) that is a delta, not the full figure.
             delta = balance - account.cached_balance
-            if CariMovement.objects.filter(cari=account, reference=batch_ref).exists():
+            if CurrentAccountMovement.objects.filter(current_account=account, reference=batch_ref).exists():
                 self.stdout.write(f"  = {row['account_name'][:28]:29} already posted, skipping")
                 continue
             if delta == 0:
@@ -287,8 +287,8 @@ class Command(BaseCommand):
                 )
                 continue
 
-            CariMovement(
-                cari=account, book=book, date=cutover, amount=delta, currency=usd,
+            CurrentAccountMovement(
+                current_account=account, book=book, date=cutover, amount=delta, currency=usd,
                 movement_type="opening",
                 description=row.get("description") or "Opening balance (Ergene ledger migration)",
                 reference=batch_ref,

@@ -1,7 +1,7 @@
 {% load i18n %}{% load humanize %}{% load accounts_tags %}{% comment %}
 Results block for the cari list — stats + count + rows. Rendered inside
 #ca-results on full page load AND returned alone for the page's dynamic
-search/filter fetches (CariList returns just this when the request
+search/filter fetches (CurrentAccountList returns just this when the request
 carries X-Requested-With), so typing in the search box swaps this block
 in place instead of reloading the whole page.
 {% endcomment %}
@@ -35,7 +35,7 @@ in place instead of reloading the whole page.
   <div class="ca-result"><b>{{ total_count|intcomma }}</b> {% trans "accounts" %}</div>
 </div>
 
-{% if caris %}
+{% if current_accounts %}
 <div class="ca-list">
   <div class="ca-list-head">
     <div>{% trans "Code" %}</div>
@@ -46,7 +46,7 @@ in place instead of reloading the whole page.
     <div>{% trans "Recent" %}</div>
     <div></div>
   </div>
-  {% for c in caris %}
+  {% for c in current_accounts %}
   <a class="ca-row" href="{% url 'accounts:detail' c.pk %}">
     <div><span class="ca-code">{{ c.code }}</span></div>
     <div class="ca-name-w">

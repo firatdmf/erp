@@ -290,7 +290,7 @@
       #marketingExpanded,
       #operatingExpanded,
       #accountingExpanded,
-      #cariExpanded {
+      #currentAccountExpanded {
         position: fixed !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
@@ -308,7 +308,7 @@
       #marketingButton::after,
       #operatingButton::after,
       #accountingButton::after,
-      #cariButton::after {
+      #currentAccountButton::after {
         display: none !important;
       }
 
@@ -721,12 +721,12 @@
       </li>
 
       {# ============================== CURRENT ACCOUNT ============================== #}
-      <li class="nav-item" id="cariButton">
+      <li class="nav-item" id="currentAccountButton">
         <a href="#cari" class="nav-link">
           <i class="fa-solid fa-id-card-clip fa-2x" aria-hidden="true"></i>
           <span class="link-text">{% trans "Accounts" context "sidebar" %}</span>
         </a>
-        <div id="cariExpanded"
+        <div id="currentAccountExpanded"
           style="top: 225px !important; max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fa-solid fa-id-card-clip" aria-hidden="true"></i>
@@ -1436,8 +1436,8 @@
             <div class="email-checkbox-wrapper">
               <input type="checkbox" name="create_cari" id="company_create_cari" class="email-checkbox" checked>
               <label for="company_create_cari" class="email-checkbox-label">
-                <span class="email-checkbox-title">💳 {% trans "Open a cari account" %}</span>
-                <span class="email-checkbox-description">{% trans "A cari account is automatically created for this record." %}</span>
+                <span class="email-checkbox-title">💳 {% trans "Open a current account" %}</span>
+                <span class="email-checkbox-description">{% trans "A current account is automatically created for this record." %}</span>
               </label>
             </div>
           </div>
@@ -1609,8 +1609,8 @@
             <div class="email-checkbox-wrapper">
               <input type="checkbox" name="create_cari" id="main_contact_create_cari" class="email-checkbox" checked>
               <label for="main_contact_create_cari" class="email-checkbox-label">
-                <span class="email-checkbox-title">💳 {% trans "Open a cari account" %}</span>
-                <span class="email-checkbox-description">{% trans "A cari account is automatically created for this record." %}</span>
+                <span class="email-checkbox-title">💳 {% trans "Open a current account" %}</span>
+                <span class="email-checkbox-description">{% trans "A current account is automatically created for this record." %}</span>
               </label>
             </div>
           </div>
@@ -1769,8 +1769,8 @@
             <div class="email-checkbox-wrapper">
               <input type="checkbox" name="create_cari" id="nested_contact_create_cari" class="email-checkbox" checked>
               <label for="nested_contact_create_cari" class="email-checkbox-label">
-                <span class="email-checkbox-title">💳 {% trans "Open a cari account" %}</span>
-                <span class="email-checkbox-description">{% trans "A cari account is automatically created for this record." %}</span>
+                <span class="email-checkbox-title">💳 {% trans "Open a current account" %}</span>
+                <span class="email-checkbox-description">{% trans "A current account is automatically created for this record." %}</span>
               </label>
             </div>
           </div>

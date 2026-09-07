@@ -497,8 +497,8 @@
             </div>
             <div>
               {# default_if_none, not a bare render: "Tamer Bulgaristan None". #}
-              <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name|default_if_none:"" }} {{ order.guest_last_name|default_if_none:"" }}{% elif order.cari %}{{ order.cari.name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
-              <div class="ord-cust-c">{% trans "Retail" %}{% if order.cari %} · {{ order.cari.code }}{% endif %}</div>
+              <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name|default_if_none:"" }} {{ order.guest_last_name|default_if_none:"" }}{% elif order.current_account %}{{ order.current_account.name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
+              <div class="ord-cust-c">{% trans "Retail" %}{% if order.current_account %} · {{ order.current_account.code }}{% endif %}</div>
             </div>
           {% else %}
             <div class="ord-cust-avatar" style="background: #9CA3AF;">—</div>

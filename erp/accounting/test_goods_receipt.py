@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import translation
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, Invoice, InvoiceItem
+from accounting.models_accounts import CurrentAccount, Invoice, InvoiceItem
 from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
@@ -27,7 +27,7 @@ class GoodsReceiptPageTest(TestCase):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
         self.user.member.books.add(self.book)
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-001", name="Kızılırmak", type="supplier",
             default_currency=self.usd,
         )
@@ -43,7 +43,7 @@ class GoodsReceiptPageTest(TestCase):
 
     def _purchase(self, warehouse=None, number="PO-1"):
         inv = Invoice.objects.create(
-            cari=self.cari, book=self.book, series="ALS", number=number,
+            current_account=self.current_account, book=self.book, series="ALS", number=number,
             type="purchase", status="issued", date=date(2026, 8, 1),
             due_date=date(2026, 8, 31), currency=self.usd,
             total=Decimal("100.00"),

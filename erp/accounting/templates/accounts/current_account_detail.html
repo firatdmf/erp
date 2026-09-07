@@ -236,45 +236,45 @@
 
   <!-- CRUMBS -->
   <div class="cd-crumbs">
-    <a class="cd-back" href="{% url 'accounts:list' cari.book.pk %}">
+    <a class="cd-back" href="{% url 'accounts:list' current_account.book.pk %}">
       <i data-lucide="arrow-left"></i> {% trans "All Accounts" %}
     </a>
     <span class="cd-sep">/</span>
-    <span class="cd-crumb-here">{{ cari.code }}</span>
+    <span class="cd-crumb-here">{{ current_account.code }}</span>
   </div>
 
   <!-- HEAD -->
   <div class="cd-head">
     <div class="cd-head-l">
       <div class="cd-head-row">
-        <h1 class="cd-title">{{ cari.name }}</h1>
-        <span class="cd-code">{{ cari.code }}</span>
+        <h1 class="cd-title">{{ current_account.name }}</h1>
+        <span class="cd-code">{{ current_account.code }}</span>
         <span class="cd-type
-          {% if cari.type == 'customer' %}customer
-          {% elif cari.type == 'supplier' %}supplier
-          {% elif cari.type == 'both' %}both
-          {% elif cari.type == 'staff' %}staff
+          {% if current_account.type == 'customer' %}customer
+          {% elif current_account.type == 'supplier' %}supplier
+          {% elif current_account.type == 'both' %}both
+          {% elif current_account.type == 'staff' %}staff
           {% else %}other{% endif %}">
-          <span class="cd-type-dot"></span>{{ cari.get_type_display }}
+          <span class="cd-type-dot"></span>{{ current_account.get_type_display }}
         </span>
       </div>
       <div class="cd-meta">
-        <span><i data-lucide="book"></i>{{ cari.book.name }}</span>
+        <span><i data-lucide="book"></i>{{ current_account.book.name }}</span>
         <span class="cd-dot"></span>
-        <span><i data-lucide="dollar-sign"></i>{{ cari.default_currency.code }}</span>
+        <span><i data-lucide="dollar-sign"></i>{{ current_account.default_currency.code }}</span>
         <span class="cd-dot"></span>
-        <span><i data-lucide="clock"></i>{% trans "Term" %}: {{ cari.payment_term_days }} {% trans "days" %}</span>
-        {% if cari.credit_limit %}
+        <span><i data-lucide="clock"></i>{% trans "Term" %}: {{ current_account.payment_term_days }} {% trans "days" %}</span>
+        {% if current_account.credit_limit %}
           <span class="cd-dot"></span>
-          <span><i data-lucide="shield"></i>{% trans "Limit" %}: {{ cari.display_currency_symbol }}{{ cari.credit_limit|money }}</span>
+          <span><i data-lucide="shield"></i>{% trans "Limit" %}: {{ current_account.display_currency_symbol }}{{ current_account.credit_limit|money }}</span>
         {% endif %}
       </div>
     </div>
     <div class="cd-head-r">
-      <a class="cd-btn ghost" href="{% url 'accounts:statement' cari.pk %}"><i data-lucide="file-text"></i>{% trans "Statement" %}</a>
-      <a class="cd-btn ghost" href="{% url 'accounts:edit' cari.pk %}"><i data-lucide="edit-3"></i>{% trans "Edit" %}</a>
-      <a class="cd-btn ghost" href="{% url 'accounts:movement_create' cari.pk %}"><i data-lucide="plus-circle"></i>{% trans "Movement" %}</a>
-      <a class="cd-btn primary" href="{% url 'accounts:invoice_create' cari.book.pk %}?account={{ cari.pk }}"><i data-lucide="file-plus"></i>{% trans "New Invoice" %}</a>
+      <a class="cd-btn ghost" href="{% url 'accounts:statement' current_account.pk %}"><i data-lucide="file-text"></i>{% trans "Statement" %}</a>
+      <a class="cd-btn ghost" href="{% url 'accounts:edit' current_account.pk %}"><i data-lucide="edit-3"></i>{% trans "Edit" %}</a>
+      <a class="cd-btn ghost" href="{% url 'accounts:movement_create' current_account.pk %}"><i data-lucide="plus-circle"></i>{% trans "Movement" %}</a>
+      <a class="cd-btn primary" href="{% url 'accounts:invoice_create' current_account.book.pk %}?account={{ current_account.pk }}"><i data-lucide="file-plus"></i>{% trans "New Invoice" %}</a>
     </div>
   </div>
 
@@ -287,11 +287,11 @@
       <div class="cd-card">
         <div class="cd-balance">
           <div class="lbl">{% trans "Current Balance" %}</div>
-          <div class="amount {% if cari.cached_balance > 0 %}pos{% elif cari.cached_balance < 0 %}neg{% endif %}">
-            {{ cari.display_currency_symbol }}{{ cari.absolute_balance|money }}
+          <div class="amount {% if current_account.cached_balance > 0 %}pos{% elif current_account.cached_balance < 0 %}neg{% endif %}">
+            {{ current_account.display_currency_symbol }}{{ current_account.absolute_balance|money }}
           </div>
-          <div class="sub">{{ cari.balance_label }}</div>
-          {% if cari.is_over_credit_limit %}
+          <div class="sub">{{ current_account.balance_label }}</div>
+          {% if current_account.is_over_credit_limit %}
             <div class="warn"><i data-lucide="alert-triangle"></i>{% trans "Credit limit exceeded" %}</div>
           {% endif %}
         </div>
@@ -305,11 +305,11 @@
             <h3>{% trans "Quick Actions" %}</h3>
           </div>
           <div style="display:flex; gap:8px; flex-wrap: wrap;">
-            <a class="cd-btn primary" href="{% url 'accounts:invoice_create' cari.book.pk %}?account={{ cari.pk }}"><i data-lucide="file-plus"></i>{% trans "Issue Invoice" %}</a>
-            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FFFAF0, #FFFFFF); border-color: #FED7AA; color: #B27500;" href="{% url 'accounts:payment_create' cari.book.pk %}?account={{ cari.pk }}&type=collection"><i data-lucide="wallet"></i>{% trans "Take Payment" %}</a>
-            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FEF2F2, #FFFFFF); border-color: #FECACA; color: #B91C1C;" href="{% url 'accounts:payment_create' cari.book.pk %}?account={{ cari.pk }}&type=payment"><i data-lucide="banknote"></i>{% trans "Make Payment" %}</a>
-            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #F5F3FF, #FFFFFF); border-color: #DDD6FE; color: #7E22CE;" href="{% url 'accounts:check_create' cari.book.pk %}?account={{ cari.pk }}"><i data-lucide="scroll-text"></i>{% trans "Check / Note" %}</a>
-            <a class="cd-btn ghost" href="{% url 'accounts:movement_create' cari.pk %}"><i data-lucide="plus-circle"></i>{% trans "Add Movement" %}</a>
+            <a class="cd-btn primary" href="{% url 'accounts:invoice_create' current_account.book.pk %}?account={{ current_account.pk }}"><i data-lucide="file-plus"></i>{% trans "Issue Invoice" %}</a>
+            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FFFAF0, #FFFFFF); border-color: #FED7AA; color: #B27500;" href="{% url 'accounts:payment_create' current_account.book.pk %}?account={{ current_account.pk }}&type=collection"><i data-lucide="wallet"></i>{% trans "Take Payment" %}</a>
+            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FEF2F2, #FFFFFF); border-color: #FECACA; color: #B91C1C;" href="{% url 'accounts:payment_create' current_account.book.pk %}?account={{ current_account.pk }}&type=payment"><i data-lucide="banknote"></i>{% trans "Make Payment" %}</a>
+            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #F5F3FF, #FFFFFF); border-color: #DDD6FE; color: #7E22CE;" href="{% url 'accounts:check_create' current_account.book.pk %}?account={{ current_account.pk }}"><i data-lucide="scroll-text"></i>{% trans "Check / Note" %}</a>
+            <a class="cd-btn ghost" href="{% url 'accounts:movement_create' current_account.pk %}"><i data-lucide="plus-circle"></i>{% trans "Add Movement" %}</a>
           </div>
         </div>
       </div>
@@ -369,7 +369,7 @@
           <div class="cd-sect-h">
             <span class="ico"><i data-lucide="file-text"></i></span>
             <h3>{% trans "Recent Invoices" %}</h3>
-            <a href="{% url 'accounts:invoice_list' cari.book.pk %}?account={{ cari.pk }}" class="all">{% trans "All" %} →</a>
+            <a href="{% url 'accounts:invoice_list' current_account.book.pk %}?account={{ current_account.pk }}" class="all">{% trans "All" %} →</a>
           </div>
         </div>
         <table class="cd-tbl">
@@ -399,7 +399,7 @@
           <div class="cd-sect-h">
             <span class="ico"><i data-lucide="list"></i></span>
             <h3>{% trans "Recent Movements" %}</h3>
-            <a href="{% url 'accounts:statement' cari.pk %}" class="all">{% trans "Full Statement" %} →</a>
+            <a href="{% url 'accounts:statement' current_account.pk %}" class="all">{% trans "Full Statement" %} →</a>
           </div>
         </div>
         {% if movements %}
@@ -422,7 +422,7 @@
                 already carry a click of its own to the linked document.
               {% endcomment %}
               <td class="mv-id">
-                <a href="{% url 'accounts:movement_detail' cari.pk m.mv.pk %}"
+                <a href="{% url 'accounts:movement_detail' current_account.pk m.mv.pk %}"
                    onclick="event.stopPropagation();">{{ m.mv.pk }}</a>
               </td>
               <td style="color: var(--gray-600); font-size: 12.5px;">{{ m.mv.date|date:"d.m.Y" }}</td>
@@ -482,7 +482,7 @@
         </table>
         {% else %}
         <div class="cd-empty">
-          {% trans "No movements yet." %} <a href="{% url 'accounts:movement_create' cari.pk %}">{% trans "Add the first movement" %}</a>
+          {% trans "No movements yet." %} <a href="{% url 'accounts:movement_create' current_account.pk %}">{% trans "Add the first movement" %}</a>
         </div>
         {% endif %}
       </div>
@@ -498,10 +498,10 @@
             <h3>{% trans "General Info" %}</h3>
           </div>
           <div class="cd-info">
-            <div class="row"><div class="lbl">{% trans "Currency" %}</div><div class="val">{{ cari.default_currency.code }}</div></div>
-            <div class="row"><div class="lbl">{% trans "Payment Term" %}</div><div class="val">{{ cari.payment_term_days }} {% trans "days" %}</div></div>
-            <div class="row"><div class="lbl">{% trans "Credit Limit" %}</div><div class="val">{{ cari.display_currency_symbol }}{{ cari.credit_limit|money }}</div></div>
-            <div class="row"><div class="lbl">{% trans "Discount" %}</div><div class="val">%{{ cari.discount_rate }}</div></div>
+            <div class="row"><div class="lbl">{% trans "Currency" %}</div><div class="val">{{ current_account.default_currency.code }}</div></div>
+            <div class="row"><div class="lbl">{% trans "Payment Term" %}</div><div class="val">{{ current_account.payment_term_days }} {% trans "days" %}</div></div>
+            <div class="row"><div class="lbl">{% trans "Credit Limit" %}</div><div class="val">{{ current_account.display_currency_symbol }}{{ current_account.credit_limit|money }}</div></div>
+            <div class="row"><div class="lbl">{% trans "Discount" %}</div><div class="val">%{{ current_account.discount_rate }}</div></div>
           </div>
         </div>
       </div>
@@ -514,9 +514,9 @@
             <h3>{% trans "Tax Info" %}</h3>
           </div>
           <div class="cd-info">
-            <div class="row"><div class="lbl">{% trans "Tax Office" %}</div><div class="val {% if not cari.tax_office %}muted{% endif %}">{{ cari.tax_office|default:"—" }}</div></div>
-            <div class="row"><div class="lbl">{% trans "Tax No (VKN)" %}</div><div class="val mono {% if not cari.tax_number %}muted{% endif %}">{{ cari.tax_number|default:"—" }}</div></div>
-            <div class="row"><div class="lbl">{% trans "ID No (TCKN)" %}</div><div class="val mono {% if not cari.identity_number %}muted{% endif %}">{{ cari.identity_number|default:"—" }}</div></div>
+            <div class="row"><div class="lbl">{% trans "Tax Office" %}</div><div class="val {% if not current_account.tax_office %}muted{% endif %}">{{ current_account.tax_office|default:"—" }}</div></div>
+            <div class="row"><div class="lbl">{% trans "Tax No (VKN)" %}</div><div class="val mono {% if not current_account.tax_number %}muted{% endif %}">{{ current_account.tax_number|default:"—" }}</div></div>
+            <div class="row"><div class="lbl">{% trans "ID No (TCKN)" %}</div><div class="val mono {% if not current_account.identity_number %}muted{% endif %}">{{ current_account.identity_number|default:"—" }}</div></div>
           </div>
         </div>
       </div>
@@ -531,16 +531,16 @@
           <div class="cd-info">
             <div class="row" style="grid-column: 1/-1;">
               <div class="lbl">{% trans "Email" %}</div>
-              <div class="val {% if not cari.email %}muted{% endif %}">{% if cari.email %}<a href="mailto:{{ cari.email }}">{{ cari.email }}</a>{% else %}—{% endif %}</div>
+              <div class="val {% if not current_account.email %}muted{% endif %}">{% if current_account.email %}<a href="mailto:{{ current_account.email }}">{{ current_account.email }}</a>{% else %}—{% endif %}</div>
             </div>
             <div class="row" style="grid-column: 1/-1;">
               <div class="lbl">{% trans "Phone" %}</div>
-              <div class="val {% if not cari.phone %}muted{% endif %}">{{ cari.phone|default:"—" }}</div>
+              <div class="val {% if not current_account.phone %}muted{% endif %}">{{ current_account.phone|default:"—" }}</div>
             </div>
-            {% if cari.billing_address or cari.billing_city %}
+            {% if current_account.billing_address or current_account.billing_city %}
             <div class="row" style="grid-column: 1/-1;">
               <div class="lbl">{% trans "Billing Address" %}</div>
-              <div class="val" style="white-space: pre-wrap;">{{ cari.billing_address|default:"" }}{% if cari.billing_city %}{% if cari.billing_address %}<br>{% endif %}{{ cari.billing_city }}{% endif %}{% if cari.billing_country %}, {{ cari.billing_country }}{% endif %}</div>
+              <div class="val" style="white-space: pre-wrap;">{{ current_account.billing_address|default:"" }}{% if current_account.billing_city %}{% if current_account.billing_address %}<br>{% endif %}{{ current_account.billing_city }}{% endif %}{% if current_account.billing_country %}, {{ current_account.billing_country }}{% endif %}</div>
             </div>
             {% endif %}
           </div>
@@ -561,48 +561,48 @@
             <h3>{% trans "CRM Link" %}</h3>
           </div>
 
-          {% if cari.crm_link %}
+          {% if current_account.crm_link %}
           <div class="cd-info">
             {% comment %}
               Each row opens its CRM record in a NEW TAB: this card is
               read while working the ledger below it, so following the
               link shouldn't cost the account page you're standing on.
             {% endcomment %}
-            {% if cari.contact %}
+            {% if current_account.contact %}
             <div class="row" style="grid-column: 1/-1;">
               <div class="lbl">{% trans "Contact" %}</div>
               <div class="val">
-                <a class="cd-crm-link" href="{% url 'crm:contact_detail' cari.contact.pk %}"
+                <a class="cd-crm-link" href="{% url 'crm:contact_detail' current_account.contact.pk %}"
                    target="_blank" rel="noopener" title="{% trans 'Open in CRM (new tab)' %}">
-                  {{ cari.contact }}<i data-lucide="external-link"></i>
+                  {{ current_account.contact }}<i data-lucide="external-link"></i>
                 </a>
               </div>
             </div>
             {% endif %}
-            {% if cari.company %}
+            {% if current_account.company %}
             <div class="row" style="grid-column: 1/-1;">
               <div class="lbl">{% trans "Company" %}</div>
               <div class="val">
-                <a class="cd-crm-link" href="{% url 'crm:company_detail' cari.company.pk %}"
+                <a class="cd-crm-link" href="{% url 'crm:company_detail' current_account.company.pk %}"
                    target="_blank" rel="noopener" title="{% trans 'Open in CRM (new tab)' %}">
-                  {{ cari.company }}<i data-lucide="external-link"></i>
+                  {{ current_account.company }}<i data-lucide="external-link"></i>
                 </a>
               </div>
             </div>
             {% endif %}
-            {% if cari.supplier %}
+            {% if current_account.supplier %}
             <div class="row" style="grid-column: 1/-1;">
               <div class="lbl">{% trans "Supplier" %}</div>
               <div class="val">
-                <a class="cd-crm-link" href="{% url 'crm:supplier_detail' cari.supplier.pk %}"
+                <a class="cd-crm-link" href="{% url 'crm:supplier_detail' current_account.supplier.pk %}"
                    target="_blank" rel="noopener" title="{% trans 'Open in CRM (new tab)' %}">
-                  {{ cari.supplier }}<i data-lucide="external-link"></i>
+                  {{ current_account.supplier }}<i data-lucide="external-link"></i>
                 </a>
               </div>
             </div>
             {% endif %}
           </div>
-          <form method="post" action="{% url 'accounts:crm_link' cari.pk %}"
+          <form method="post" action="{% url 'accounts:crm_link' current_account.pk %}"
                 class="cd-crm-detach"
                 onsubmit="return confirm('{% trans "Remove the CRM link? The account, its balance and its ledger are untouched." %}');">
             {% csrf_token %}
@@ -626,7 +626,7 @@
             that can never be cleared. The picker stays available below,
             since the type can be wrong; only the alarm goes.
           {% endcomment %}
-          {% if cari.type == "other" %}
+          {% if current_account.type == "other" %}
           <p class="cd-crm-standalone">
             <i data-lucide="info"></i>
             {% trans "This account stands alone — no CRM record is expected." %}
@@ -638,16 +638,16 @@
           </p>
           {% endif %}
 
-          <div class="cd-crm-pick" data-search-url="{% url 'accounts:crm_search' cari.pk %}">
+          <div class="cd-crm-pick" data-search-url="{% url 'accounts:crm_search' current_account.pk %}">
             <div class="cd-crm-search">
               <i data-lucide="search"></i>
               <input type="text" id="cd-crm-q" autocomplete="off"
                      placeholder="{% trans 'Search contacts, companies, suppliers…' %}"
-                     value="{{ cari.name }}">
+                     value="{{ current_account.name }}">
             </div>
             <div id="cd-crm-results" class="cd-crm-results" hidden></div>
 
-            <form method="post" action="{% url 'accounts:crm_link' cari.pk %}" id="cd-crm-attach">
+            <form method="post" action="{% url 'accounts:crm_link' current_account.pk %}" id="cd-crm-attach">
               {% csrf_token %}
               <input type="hidden" name="action" value="attach">
               <input type="hidden" name="kind" id="cd-crm-kind">
@@ -664,11 +664,11 @@
               {% endcomment %}
               <div class="cd-crm-new-btns">
                 {% for kind, label in crm_new_kinds %}
-                <form method="post" action="{% url 'accounts:crm_link' cari.pk %}">
+                <form method="post" action="{% url 'accounts:crm_link' current_account.pk %}">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="create">
                   <input type="hidden" name="kind" value="{{ kind }}">
-                  <input type="hidden" name="name" value="{{ cari.name }}">
+                  <input type="hidden" name="name" value="{{ current_account.name }}">
                   <button type="submit" class="cd-btn ghost" style="width: 100%; justify-content: center;">
                     <i data-lucide="plus"></i>{{ label }}
                   </button>
@@ -682,14 +682,14 @@
       </div>
 
       <!-- Notes -->
-      {% if cari.notes %}
+      {% if current_account.notes %}
       <div class="cd-card">
         <div class="cd-sect">
           <div class="cd-sect-h">
             <span class="ico"><i data-lucide="sticky-note"></i></span>
             <h3>{% trans "Notes" %}</h3>
           </div>
-          <div style="color: var(--gray-700); font: 500 13px var(--font-sans); white-space: pre-wrap; line-height: 1.55;">{{ cari.notes }}</div>
+          <div style="color: var(--gray-700); font: 500 13px var(--font-sans); white-space: pre-wrap; line-height: 1.55;">{{ current_account.notes }}</div>
         </div>
       </div>
       {% endif %}
@@ -697,7 +697,7 @@
       <!-- Delete (less prominent at bottom) -->
       <div class="cd-card" style="background: #FAFBFD; border-style: dashed;">
         <div class="cd-sect">
-          <form method="post" action="{% url 'accounts:delete' cari.pk %}"
+          <form method="post" action="{% url 'accounts:delete' current_account.pk %}"
                 onsubmit="return confirm('{% trans "Are you sure you want to delete/deactivate this account?" %}');">
             {% csrf_token %}
             <button type="submit" class="cd-btn danger" style="width: 100%; justify-content: center;">

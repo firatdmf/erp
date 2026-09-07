@@ -24,7 +24,7 @@
   // of its own. Whichever one is filled decides — asking only about cash
   // would hide the rate row on a TRY expense somebody settled, and hiding
   // it clears the rate.
-  var accountEls = ['id_cash_account', 'id_paid_by_cari']
+  var accountEls = ['id_cash_account', 'id_paid_by_current_account']
     .map(function (id) { return document.getElementById(id); })
     .filter(Boolean);
   // An explicit currency control, where the form offers one. The expense

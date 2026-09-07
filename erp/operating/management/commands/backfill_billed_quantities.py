@@ -102,7 +102,7 @@ class Command(BaseCommand):
             qs = qs.filter(billed_line_quantities__isnull=True)
 
         ct = ContentType.objects.get_for_model(Order)
-        from accounting.models_accounts import CariMovement
+        from accounting.models_accounts import CurrentAccountMovement
 
         header = f"{'order':>6} {'ship basis':<11} {'now':>10} {'frozen':>10} {'recovers':>10} {'movement':>10}"
         self.stdout.write(header)
@@ -129,7 +129,7 @@ class Command(BaseCommand):
             live_val = _value_of(order, live_map)
             delta = frozen_val - live_val
 
-            mv = CariMovement.objects.filter(
+            mv = CurrentAccountMovement.objects.filter(
                 source_type=ct, source_id=order.pk, movement_type="order_sale",
             ).first()
             mv_txt = str(mv.amount) if mv else "—"
@@ -154,7 +154,7 @@ class Command(BaseCommand):
                         billed_line_quantities=order.billed_line_quantities,
                         billed_quantities_frozen_at=as_of,
                     )
-                    if repost and order.cari_id:
+                    if repost and order.current_account_id:
                         from accounting.services_accounts import post_order_movement
                         post_order_movement(order)
 

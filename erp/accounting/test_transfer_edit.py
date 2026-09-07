@@ -6,8 +6,8 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 
-from accounting.models import CariMovement, CariTransfer
-from accounting.test_cari_transfer import TransferTestBase
+from accounting.models import CurrentAccountMovement, CurrentAccountTransfer
+from accounting.test_current_account_transfer import TransferTestBase
 
 
 class TransferEditPageTest(TransferTestBase):
@@ -19,9 +19,9 @@ class TransferEditPageTest(TransferTestBase):
 
     def setUp(self):
         super().setUp()
-        self.transfer = CariTransfer.objects.create(
+        self.transfer = CurrentAccountTransfer.objects.create(
             book=self.book, date="2026-02-01",
-            from_cari=self.a, to_cari=self.b,
+            from_current_account=self.a, to_current_account=self.b,
             amount=Decimal("400.00"), currency=self.usd,
         )
         self.transfer.post()
@@ -60,7 +60,7 @@ class TransferEditPageTest(TransferTestBase):
         self.assertEqual(self.balances(), (Decimal("600.00"), Decimal("400.00")))
         r = self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
             "amount": "250.00", "currency": self.usd.pk,
         })
         self.assertEqual(r.status_code, 302)
@@ -74,7 +74,7 @@ class TransferEditPageTest(TransferTestBase):
         the two legs cancel in base currency as well as in the one typed."""
         self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-03-05",
-            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
             "amount": "250.00", "currency": self.usd.pk,
         })
         self.transfer.refresh_from_db()
@@ -87,18 +87,18 @@ class TransferEditPageTest(TransferTestBase):
         """One pair, however many times it is corrected."""
         self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
             "amount": "250.00", "currency": self.usd.pk,
         })
         self.assertEqual(
-            CariMovement.objects.filter(reference=self.transfer.reference).count(), 2)
+            CurrentAccountMovement.objects.filter(reference=self.transfer.reference).count(), 2)
 
     def test_redirecting_the_transfer_moves_the_balance_to_the_new_account(self):
         c = self.b.__class__.objects.create(
             book=self.book, code="01786", name="ÜÇÜNCÜ", default_currency=self.usd)
         self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": c.pk,
+            "from_current_account": self.a.pk, "to_current_account": c.pk,
             "amount": "400.00", "currency": self.usd.pk,
         })
         self.b.refresh_from_db(); c.refresh_from_db()
@@ -110,7 +110,7 @@ class TransferEditPageTest(TransferTestBase):
         legs must survive it — unpost() runs inside the transaction."""
         r = self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": self.a.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.a.pk,
             "amount": "250.00", "currency": self.usd.pk,
         })
         self.assertEqual(r.status_code, 200)
@@ -126,9 +126,9 @@ class TransferEditPageTest(TransferTestBase):
         r = self.client.post(self.undo_url())
         self.assertEqual(r.status_code, 302)
         self.assertEqual(self.balances(), (Decimal("1000.00"), Decimal("0.00")))
-        self.assertEqual(CariTransfer.objects.count(), 0)
+        self.assertEqual(CurrentAccountTransfer.objects.count(), 0)
         self.assertEqual(
-            CariMovement.objects.filter(reference=ref).count(), 0)
+            CurrentAccountMovement.objects.filter(reference=ref).count(), 0)
 
     def test_undo_is_post_only(self):
         self.assertEqual(self.client.get(self.undo_url()).status_code, 405)
@@ -160,7 +160,7 @@ class TransferEditPageTest(TransferTestBase):
         before = (self.transfer.from_movement_id, self.transfer.to_movement_id)
         self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-03-09",
-            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
             "amount": "250.00", "currency": self.usd.pk,
         })
         self.transfer.refresh_from_db()
@@ -175,13 +175,13 @@ class TransferEditPageTest(TransferTestBase):
                           args=[self.a.pk, self.transfer.from_movement_id])
         self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
             "amount": "250.00", "currency": self.usd.pk,
         })
         self.assertEqual(self.client.get(leg_url).status_code, 200)
 
     def test_a_leg_moved_to_another_account_leaves_no_balance_behind(self):
-        """CariMovement.save() refreshes the account the row belongs to NOW.
+        """CurrentAccountMovement.save() refreshes the account the row belongs to NOW.
         The one it just left would otherwise keep counting a row that is no
         longer on it."""
         c = self.b.__class__.objects.create(
@@ -189,7 +189,7 @@ class TransferEditPageTest(TransferTestBase):
         leg_id = self.transfer.to_movement_id
         self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": c.pk,
+            "from_current_account": self.a.pk, "to_current_account": c.pk,
             "amount": "400.00", "currency": self.usd.pk,
         })
         self.b.refresh_from_db(); c.refresh_from_db()
@@ -198,7 +198,7 @@ class TransferEditPageTest(TransferTestBase):
         # Moved, not replaced.
         self.transfer.refresh_from_db()
         self.assertEqual(self.transfer.to_movement_id, leg_id)
-        self.assertEqual(self.transfer.to_movement.cari_id, c.pk)
+        self.assertEqual(self.transfer.to_movement.current_account_id, c.pk)
 
     def test_an_unposted_transfer_is_simply_posted(self):
         """repost() has nothing to rewrite when the legs are gone."""
@@ -228,9 +228,9 @@ class TransferEditRateTest(TransferTestBase):
 
     def setUp(self):
         super().setUp()
-        self.transfer = CariTransfer.objects.create(
+        self.transfer = CurrentAccountTransfer.objects.create(
             book=self.book, date="2026-02-01",
-            from_cari=self.a, to_cari=self.b,
+            from_current_account=self.a, to_current_account=self.b,
             amount=Decimal("1000.00"), currency=self.try_,
             exchange_rate=Decimal("0.020000"),
         )
@@ -253,7 +253,7 @@ class TransferEditRateTest(TransferTestBase):
         point of the row, so it has to land on the rows that are written."""
         self.client.post(self.edit_url(), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
             "amount": "1000.00", "currency": self.try_.pk,
             "exchange_rate": "0.030000",
         })
@@ -266,15 +266,15 @@ class TransferEditRateTest(TransferTestBase):
     def test_an_edit_does_not_force_todays_date_into_the_widget(self):
         """The instance carries its own date. Forcing today's in beside it
         rendered a second value attribute after the real one."""
-        from accounting.forms import CariTransferForm
-        form = CariTransferForm(instance=self.transfer, book=self.book)
+        from accounting.forms import CurrentAccountTransferForm
+        form = CurrentAccountTransferForm(instance=self.transfer, book=self.book)
         self.assertNotIn("value", form.fields["date"].widget.attrs)
         self.assertEqual(str(form["date"]).count('value='), 1)
 
     def test_a_new_transfer_still_defaults_to_today(self):
         from datetime import date as _date
-        from accounting.forms import CariTransferForm
-        form = CariTransferForm(book=self.book)
+        from accounting.forms import CurrentAccountTransferForm
+        form = CurrentAccountTransferForm(book=self.book)
         self.assertEqual(form.fields["date"].widget.attrs.get("value"),
                          _date.today().strftime("%Y-%m-%d"))
 
@@ -286,9 +286,9 @@ class TransferEditRateTest(TransferTestBase):
         0.020778 and the ledger came back 912.99, every time. Eight decimals
         put every cent within reach.
         """
-        big = CariTransfer.objects.create(
+        big = CurrentAccountTransfer.objects.create(
             book=self.book, date="2026-02-01",
-            from_cari=self.a, to_cari=self.b,
+            from_current_account=self.a, to_current_account=self.b,
             amount=Decimal("43940.00"), currency=self.try_,
             exchange_rate=Decimal("0.02077800"),
         )
@@ -298,7 +298,7 @@ class TransferEditRateTest(TransferTestBase):
         # The rate the page derives from a typed total of 913.00.
         self.client.post(reverse("accounts:transfer_edit", args=[big.pk]), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
             "amount": "43940.00", "currency": self.try_.pk,
             "exchange_rate": "0.02077833",
         })
@@ -309,9 +309,9 @@ class TransferEditRateTest(TransferTestBase):
 
     def test_the_rate_column_keeps_all_eight_decimals(self):
         """Widening the transfer alone would not have worked: post() stamps
-        its rate straight onto both legs, so CariMovement had to widen with
+        its rate straight onto both legs, so CurrentAccountMovement had to widen with
         it or round the rate right back on the way into the ledger."""
-        from accounting.models import CariMovement
+        from accounting.models import CurrentAccountMovement
         rate = Decimal("0.02077833")
         self.transfer.exchange_rate = rate
         self.transfer.save()
@@ -320,13 +320,13 @@ class TransferEditRateTest(TransferTestBase):
         self.transfer.refresh_from_db()
         for leg in (self.transfer.from_movement, self.transfer.to_movement):
             self.assertEqual(leg.exchange_rate, rate)
-        self.assertEqual(CariMovement._meta.get_field("exchange_rate").decimal_places, 8)
+        self.assertEqual(CurrentAccountMovement._meta.get_field("exchange_rate").decimal_places, 8)
 
     def test_a_backdated_transfer_is_referenced_with_its_own_year(self):
         """The year belongs to the transfer, not to whoever opened the page."""
-        old = CariTransfer.objects.create(
+        old = CurrentAccountTransfer.objects.create(
             book=self.book, date="2024-11-03",
-            from_cari=self.a, to_cari=self.b,
+            from_current_account=self.a, to_current_account=self.b,
             amount=Decimal("10.00"), currency=self.usd,
         )
         old.post()
@@ -344,7 +344,7 @@ class TransferEditRateTest(TransferTestBase):
         ref = self.transfer.reference
         self.client.post(reverse("accounts:transfer_edit", args=[self.transfer.pk]), {
             "book": self.book.pk, "date": "2026-02-01",
-            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
             "amount": "500.00", "currency": self.try_.pk,
             "exchange_rate": "0.03000000",
         })
@@ -353,6 +353,6 @@ class TransferEditRateTest(TransferTestBase):
         self.assertEqual(self.transfer.to_movement.reference, ref)
 
     def test_the_rate_box_accepts_eight_decimals(self):
-        from accounting.forms import CariTransferForm
-        form = CariTransferForm(book=self.book)
+        from accounting.forms import CurrentAccountTransferForm
+        form = CurrentAccountTransferForm(book=self.book)
         self.assertEqual(form.fields["exchange_rate"].widget.attrs["step"], "0.00000001")

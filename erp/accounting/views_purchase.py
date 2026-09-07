@@ -28,7 +28,7 @@ from django.utils.translation import gettext as _
 from django.views import View
 
 from .models import Invoice, InvoiceItem
-from .models_accounts import CariAccount, CariSettings
+from .models_accounts import CurrentAccount, CurrentAccountSettings
 from .services_accounts import (
     _currency_by_code, convert_lines_to_currency, invoice_currency_for,
     mark_as_supplier, MixedCurrencyError,
@@ -67,17 +67,17 @@ class PurchaseOrderList(View):
         # Laleli's suppliers and Laleli's money.
         qs = (
             Invoice.objects.filter(type="purchase", book=request.book)
-            .select_related("cari", "currency")
+            .select_related("current_account", "currency")
             .order_by("-date", "-id")
         )
 
         q = (request.GET.get("q") or "").strip()
         if q:
-            qs = qs.filter(cari__name__icontains=q)
+            qs = qs.filter(current_account__name__icontains=q)
 
         supplier_id = (request.GET.get("supplier") or "").strip()
         if supplier_id.isdigit():
-            qs = qs.filter(cari_id=int(supplier_id))
+            qs = qs.filter(current_account_id=int(supplier_id))
 
         status = (request.GET.get("status") or "").strip()
         if status:
@@ -106,9 +106,9 @@ class PurchaseOrderList(View):
         # whose invoices this page can never show.
         suppliers = (
             Invoice.objects.filter(type="purchase", book=request.book)
-            .values("cari_id", "cari__name")
+            .values("current_account_id", "current_account__name")
             .distinct()
-            .order_by("cari__name")
+            .order_by("current_account__name")
         )
 
         return render(request, self.template_name, {
@@ -129,7 +129,7 @@ class PurchaseOrderDetail(View):
 
     def get(self, request, pk):
         invoice = get_object_or_404(
-            Invoice.objects.select_related("cari", "currency", "book", "intake_warehouse"),
+            Invoice.objects.select_related("current_account", "currency", "book", "intake_warehouse"),
             pk=pk, type="purchase",
         )
         items = list(
@@ -251,7 +251,7 @@ class GoodsReceipt(View):
 
         if pk is not None:
             doc = get_object_or_404(
-                Invoice.objects.select_related("cari", "currency", "intake_warehouse"),
+                Invoice.objects.select_related("current_account", "currency", "intake_warehouse"),
                 pk=pk, type="purchase",
             )
             if doc.status == "cancelled":
@@ -402,10 +402,10 @@ class PurchaseOrderSave(View):
             return JsonResponse({"success": False,
                                  "error": "Ortak depo sanaldır — sipariş üye depolardan birine yapılmalı."}, status=400)
 
-        cari = None
-        if str(data.get("cari_id") or "").isdigit():
-            cari = CariAccount.objects.filter(pk=int(data["cari_id"])).first()
-        if cari is None:
+        current_account = None
+        if str(data.get("current_account_id") or "").isdigit():
+            current_account = CurrentAccount.objects.filter(pk=int(data["current_account_id"])).first()
+        if current_account is None:
             return JsonResponse(
                 {"success": False, "error": "Cari hesap seçin — alım bu hesaba işlenir."}, status=400)
 
@@ -434,23 +434,23 @@ class PurchaseOrderSave(View):
             # would only be discovered when it was confirmed.
             try:
                 lines = convert_lines_to_currency(
-                    lines, invoice_currency_for(cari),
+                    lines, invoice_currency_for(current_account),
                     rates=data.get("rates"), on_date=order_date,
                 )
             except MixedCurrencyError as exc:
                 return JsonResponse({"success": False, "error": str(exc)}, status=400)
 
-            invoice.cari = cari
-            invoice.book = cari.book
-            invoice.currency = _currency_by_code(invoice_currency_for(cari))
+            invoice.current_account = current_account
+            invoice.book = current_account.book
+            invoice.currency = _currency_by_code(invoice_currency_for(current_account))
             invoice.date = order_date
             invoice.delivery_date = delivery
-            invoice.due_date = order_date + timedelta(days=cari.payment_term_days or 30)
+            invoice.due_date = order_date + timedelta(days=current_account.payment_term_days or 30)
             invoice.intake_warehouse = warehouse
             invoice.intake_plan = data
             invoice.notes = (data.get("notes") or "")[:2000]
             if not invoice.pk:
-                settings_obj = CariSettings.for_book(cari.book)
+                settings_obj = CurrentAccountSettings.for_book(current_account.book)
                 invoice.series = "PUR"
                 invoice.number = settings_obj.next_invoice_number(series="PUR")
                 invoice.created_by = getattr(request.user, "member", None)
@@ -471,7 +471,7 @@ class PurchaseOrderSave(View):
             # A draft order is already an intention to buy from them, and it
             # is the account page's own answer to "who do we buy from" that
             # goes stale otherwise.
-            mark_as_supplier(cari)
+            mark_as_supplier(current_account)
 
         return JsonResponse({
             "success": True,
@@ -547,7 +547,7 @@ class PurchaseOrderPrint(View):
         from .services_accounts import brand_name_for
 
         invoice = get_object_or_404(
-            Invoice.objects.select_related("cari", "currency", "book"),
+            Invoice.objects.select_related("current_account", "currency", "book"),
             pk=pk, type="purchase",
         )
         items = list(invoice.items.order_by("line_no"))
@@ -596,7 +596,7 @@ def cancel_purchase_invoice(invoice_pk, user):
     brought in (after confirming NONE has ever been reserved into a
     customer order — checked and acted on under a row lock in the SAME
     transaction, so a concurrent scan can't slip past the check), then
-    cancels the invoice/cari via Invoice.cancel() (which deletes the
+    cancels the invoice/current account via Invoice.cancel() (which deletes the
     posted supplier-debt movement and recomputes the balance).
 
     Raises PurchaseCancelBlocked (nothing mutated) if any stock item is reserved,
@@ -611,7 +611,7 @@ def cancel_purchase_invoice(invoice_pk, user):
 
     with transaction.atomic():
         invoice = (Invoice.objects.select_for_update()
-                   .select_related("cari").get(pk=invoice_pk, type="purchase"))
+                   .select_related("current_account").get(pk=invoice_pk, type="purchase"))
         if invoice.status == "cancelled":
             raise ValueError("Bu alım zaten iptal edilmiş.")
 
@@ -665,7 +665,7 @@ def cancel_purchase_invoice(invoice_pk, user):
 @method_decorator(login_required, name="dispatch")
 class PurchaseCancel(View):
     """Cancel a purchase — irreversible: hard-deletes every physical stock item
-    it brought in, then cancels the invoice/cari. Blocked entirely (no
+    it brought in, then cancels the invoice/current account. Blocked entirely (no
     partial cancel) if ANY of its stock items has ever been reserved into a
     customer order.
 

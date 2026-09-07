@@ -110,16 +110,16 @@ class InvoiceIssuer(TestCase):
 
     def setUp(self):
         from accounting.models import CurrencyCategory
-        from accounting.models_accounts import CariAccount, Invoice
+        from accounting.models_accounts import CurrentAccount, Invoice
         self.book = Book.objects.create(name="DEMFIRAT",
                                         brand_name="Karven Home Collection")
         currency = (CurrencyCategory.objects.filter(code="USD").first()
                     or CurrencyCategory.objects.create(code="USD", name="USD"))
-        cari = CariAccount.objects.create(book=self.book, name="Acme",
+        current_account = CurrentAccount.objects.create(book=self.book, name="Acme",
                                           code="CARI-001",
                                           default_currency=currency)
         self.invoice = Invoice.objects.create(
-            book=self.book, cari=cari, currency=currency, number="1",
+            book=self.book, current_account=current_account, currency=currency, number="1",
             date=date(2026, 8, 20), due_date=date(2026, 9, 20),
             total=Decimal("100.00"))
 
@@ -157,7 +157,7 @@ class InvoiceIssuer(TestCase):
         self.assertIn(self.invoice.issuer_display_name, text)
 
 
-class CariLedgerBook(TestCase):
+class CurrentAccountLedgerBook(TestCase):
     """Which book work lands in is a fact about the member doing it."""
 
     def setUp(self):
@@ -230,8 +230,8 @@ class CariLedgerBook(TestCase):
 
     def test_memberless_work_uses_the_pinned_id(self):
         """Cron, imports and the shell have nobody at the keyboard, so
-        CARI_BOOK_ID is the only place left to say which business they
+        CURRENT_ACCOUNT_BOOK_ID is the only place left to say which business they
         belong to."""
         from accounting.services_accounts import get_default_book
-        with self.settings(CARI_BOOK_ID=str(self.other.pk)):
+        with self.settings(CURRENT_ACCOUNT_BOOK_ID=str(self.other.pk)):
             self.assertEqual(get_default_book(None).pk, self.other.pk)

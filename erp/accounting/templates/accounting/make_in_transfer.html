@@ -217,14 +217,14 @@
       </div>
       <div class="tf-modes">
         <label>
-          <input type="radio" name="tf-mode" value="cash" {% if mode != 'cari' %}checked{% endif %}>
+          <input type="radio" name="tf-mode" value="cash" {% if mode != 'current_account' %}checked{% endif %}>
           <span class="lbl-w">
             <b>{% trans "Between cash accounts" %}</b>
             <span>{% trans "Money physically moves from one of this book's cash accounts to another. Both cash balances change." %}</span>
           </span>
         </label>
         <label>
-          <input type="radio" name="tf-mode" value="cari" {% if mode == 'cari' %}checked{% endif %}>
+          <input type="radio" name="tf-mode" value="cari" {% if mode == 'current_account' %}checked{% endif %}>
           <span class="lbl-w">
             <b>{% trans "Between current accounts" %}</b>
             <span>{% trans "A balance moves from one account to another. No cash goes anywhere — only who owes it changes." %}</span>
@@ -238,7 +238,7 @@
   {# Cash → cash                                                        #}
   {# ------------------------------------------------------------------ #}
   <form method="post" id="tfCashForm" class="tf-pane" data-mode="cash"
-        {% if mode == 'cari' %}style="display:none;"{% endif %}>
+        {% if mode == 'current_account' %}style="display:none;"{% endif %}>
     {% csrf_token %}
     <input type="hidden" name="mode" value="cash">
     {{ form.book }}{{ form.currency }}
@@ -335,11 +335,11 @@
   {# ------------------------------------------------------------------ #}
   {# Cari → cari                                                        #}
   {# ------------------------------------------------------------------ #}
-  <form method="post" id="tfCariForm" class="tf-pane" data-mode="cari"
-        {% if mode != 'cari' %}style="display:none;"{% endif %}>
+  <form method="post" id="tfCurrentAccountForm" class="tf-pane" data-mode="cari"
+        {% if mode != 'current_account' %}style="display:none;"{% endif %}>
     {% csrf_token %}
     <input type="hidden" name="mode" value="cari">
-    {{ cari_form.book }}
+    {{ current_account_form.book }}
 
     <div class="tf-grid">
       <div>
@@ -351,44 +351,44 @@
               <span class="sub">{% trans "The debt moves, the money stays put" %}</span>
             </div>
 
-            {% if cari_form.non_field_errors %}
+            {% if current_account_form.non_field_errors %}
             <div class="tf-alert">
               <i data-lucide="alert-triangle"></i>
-              <ul>{% for e in cari_form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+              <ul>{% for e in current_account_form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
             </div>
             {% endif %}
 
             <div class="tf-pair">
-              <div class="tf-f {% if cari_form.from_cari.errors %}has-error{% endif %}">
+              <div class="tf-f {% if current_account_form.from_current_account.errors %}has-error{% endif %}">
                 <label>{% trans "From" %}</label>
-                {{ cari_form.from_cari }}
+                {{ current_account_form.from_current_account }}
                 <span class="hint">{% trans "Owes us less afterwards" %}</span>
-                {{ cari_form.from_cari.errors }}
+                {{ current_account_form.from_current_account.errors }}
               </div>
               <div class="tf-pair-arrow"><i data-lucide="arrow-right"></i></div>
-              <div class="tf-f {% if cari_form.to_cari.errors %}has-error{% endif %}">
+              <div class="tf-f {% if current_account_form.to_current_account.errors %}has-error{% endif %}">
                 <label>{% trans "To" %}</label>
-                {{ cari_form.to_cari }}
+                {{ current_account_form.to_current_account }}
                 <span class="hint">{% trans "Owes us more afterwards" %}</span>
-                {{ cari_form.to_cari.errors }}
+                {{ current_account_form.to_current_account.errors }}
               </div>
             </div>
 
             <div class="tf-row" style="margin-top: 14px;">
-              <div class="tf-f {% if cari_form.amount.errors %}has-error{% endif %}">
+              <div class="tf-f {% if current_account_form.amount.errors %}has-error{% endif %}">
                 <label>{% trans "Amount" %}</label>
-                {{ cari_form.amount }}
-                {{ cari_form.amount.errors }}
+                {{ current_account_form.amount }}
+                {{ current_account_form.amount.errors }}
               </div>
-              <div class="tf-f {% if cari_form.currency.errors %}has-error{% endif %}">
+              <div class="tf-f {% if current_account_form.currency.errors %}has-error{% endif %}">
                 <label>{% trans "Currency" %}</label>
-                {{ cari_form.currency }}
-                {{ cari_form.currency.errors }}
+                {{ current_account_form.currency }}
+                {{ current_account_form.currency.errors }}
               </div>
-              <div class="tf-f {% if cari_form.date.errors %}has-error{% endif %}">
+              <div class="tf-f {% if current_account_form.date.errors %}has-error{% endif %}">
                 <label>{% trans "Date" %}</label>
-                {{ cari_form.date }}
-                {{ cari_form.date.errors }}
+                {{ current_account_form.date }}
+                {{ current_account_form.date.errors }}
               </div>
             </div>
 
@@ -403,13 +403,13 @@
               Both legs are stamped from this one number.
             {% endcomment %}
             <div class="tf-row wide" id="tfFxRow" style="display:none;">
-              <div class="tf-f {% if cari_form.exchange_rate.errors %}has-error{% endif %}">
+              <div class="tf-f {% if current_account_form.exchange_rate.errors %}has-error{% endif %}">
                 <label>
                   {% trans "Exchange rate" %}
                   <span class="tf-fx-note" id="tfFxNote"></span>
                 </label>
                 <div class="tf-fx-grid">
-                  {{ cari_form.exchange_rate }}
+                  {{ current_account_form.exchange_rate }}
                   <span class="tf-fx-eq" id="tfFxEq"></span>
                   <div class="tf-fx-total">
                     <input type="number" step="0.01" min="0" id="tfFxBaseTotal" placeholder="0.00">
@@ -421,16 +421,16 @@
                   </button>
                 </div>
                 <span class="hint">{% trans "Leave as fetched, or type the rate you actually got — either box updates the other." %}</span>
-                {{ cari_form.exchange_rate.errors }}
+                {{ current_account_form.exchange_rate.errors }}
               </div>
             </div>
 
             <div class="tf-row wide">
-              <div class="tf-f {% if cari_form.description.errors %}has-error{% endif %}">
+              <div class="tf-f {% if current_account_form.description.errors %}has-error{% endif %}">
                 <label>{% trans "Description" %}</label>
-                {{ cari_form.description }}
+                {{ current_account_form.description }}
                 <span class="hint">{% trans "Printed on both statements — say why the balance moved." %}</span>
-                {{ cari_form.description.errors }}
+                {{ current_account_form.description.errors }}
               </div>
             </div>
           </div>
@@ -497,8 +497,8 @@
   // what posts, what the summary reads, and what still works unaided if
   // this script never runs.
   var PICKER_PLACEHOLDER = {
-    from_cari:         "{% trans 'Type an account name or code…' %}",
-    to_cari:           "{% trans 'Type an account name or code…' %}",
+    from_current_account:         "{% trans 'Type an account name or code…' %}",
+    to_current_account:           "{% trans 'Type an account name or code…' %}",
     from_cash_account: "{% trans 'Type a cash account name…' %}",
     to_cash_account:   "{% trans 'Type a cash account name…' %}"
   };
@@ -779,7 +779,7 @@
     function syncRateFromTotal() {
       var t = parseFloat(totalInput.value);
       var a = typedAmount();
-      // 8dp, matching the column CariTransferForm writes to. At 6 the rate
+      // 8dp, matching the column CurrentAccountTransferForm writes to. At 6 the rate
       // implied by a typed total was quantised hard enough to move the total
       // itself: a step of the sixth decimal is 4.4 cents at 43,940 TRY, so
       // 913 came back 912.99.
@@ -855,7 +855,7 @@
   }
 
   // Every account field on the page is typed into, not scrolled through.
-  ['from_cari', 'to_cari', 'from_cash_account', 'to_cash_account'].forEach(function (name) {
+  ['from_current_account', 'to_current_account', 'from_cash_account', 'to_cash_account'].forEach(function (name) {
     document.querySelectorAll('select[name="' + name + '"]').forEach(enhancePicker);
   });
 
@@ -865,7 +865,7 @@
   }
   if (panes.cari) {
     var currentRate = setUpRateOverride(panes.cari);
-    fxRender = wire(panes.cari, 'from_cari', 'to_cari', currentRate);
+    fxRender = wire(panes.cari, 'from_current_account', 'to_current_account', currentRate);
   }
 })();
 </script>

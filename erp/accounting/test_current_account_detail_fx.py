@@ -1,5 +1,5 @@
 # to run this test, use the command:
-# python manage.py test accounting.test_cari_detail_fx
+# python manage.py test accounting.test_current_account_detail_fx
 
 from decimal import Decimal
 
@@ -8,10 +8,10 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, CariMovement
+from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
 
 
-class CariDetailConversionTests(TestCase):
+class CurrentAccountDetailConversionTests(TestCase):
     """A converted row has to say what it came to, and at what rate.
 
     The account page showed "-939.70 TRY" against a balance that moved by
@@ -35,14 +35,14 @@ class CariDetailConversionTests(TestCase):
         # Object pages are refused unless the viewer is assigned the
         # row's book (accounting.book_scope.book_guarded).
         self.user.member.books.add(self.book)
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="FIRAT", name="MUHAMMED FIRAT ÖZTÜRK",
             type="customer", default_currency=self.usd,
         )
 
     def _movement(self, amount, currency, rate=None, base=None):
-        mv = CariMovement(
-            cari=self.cari, book=self.book, date="2026-08-26",
+        mv = CurrentAccountMovement(
+            current_account=self.current_account, book=self.book, date="2026-08-26",
             amount=Decimal(amount), currency=currency,
             movement_type="adjustment", description="stopaj",
         )
@@ -54,7 +54,7 @@ class CariDetailConversionTests(TestCase):
 
     def _page(self):
         return self.client.get(
-            reverse("accounts:detail", kwargs={"pk": self.cari.pk})
+            reverse("accounts:detail", kwargs={"pk": self.current_account.pk})
         )
 
     def test_a_converted_row_states_its_base_value_and_rate(self):
@@ -73,12 +73,12 @@ class CariDetailConversionTests(TestCase):
         19.5364, and a page that recomputed would print 19.54 or 19.53
         depending on how it rounded, with no guarantee of matching."""
         mv = self._movement("-939.70", self.try_, rate="0.020790", base="-19.54")
-        self.cari.refresh_from_db()
+        self.current_account.refresh_from_db()
 
         html = self._page().content.decode()
 
         self.assertEqual(mv.amount_base, Decimal("-19.54"))
-        self.assertEqual(self.cari.cached_balance, Decimal("-19.54"))
+        self.assertEqual(self.current_account.cached_balance, Decimal("-19.54"))
         self.assertIn("19.54", html)
 
     def test_a_base_currency_row_says_nothing_extra(self):

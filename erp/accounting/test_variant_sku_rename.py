@@ -7,7 +7,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CariAccount, Invoice, InvoiceItem
+from accounting.models_accounts import CurrentAccount, Invoice, InvoiceItem
 from marketing.models import (
     Product, ProductVariant, ProductVariantAttribute, ProductVariantAttributeValue,
 )
@@ -26,7 +26,7 @@ class VariantSkuRenameReachesDocumentsTest(TestCase):
     def setUp(self):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-001", name="ZÜMRÜT", type="customer",
             default_currency=self.usd,
         )
@@ -47,7 +47,7 @@ class VariantSkuRenameReachesDocumentsTest(TestCase):
 
     def _invoice(self, status="issued", earsiv_uuid="", number="INV-1"):
         inv = Invoice.objects.create(
-            cari=self.cari, book=self.book, series="FAT", number=number,
+            current_account=self.current_account, book=self.book, series="FAT", number=number,
             type="sales", status=status, date=date(2026, 8, 14),
             due_date=date(2026, 9, 14),
             currency=self.usd, earsiv_uuid=earsiv_uuid,

@@ -235,35 +235,35 @@ def _order_profit_snapshot(order):
         return None
 
 
-def _order_cari_snapshot(order):
-    """Small JSON-able dict with the current cari balance so the client can
+def _order_current_account_snapshot(order):
+    """Small JSON-able dict with the current current account balance so the client can
     refresh the sidebar without a page reload.
 
-    Deliberately fetches a fresh CariAccount + CariMovement from the DB —
+    Deliberately fetches a fresh CurrentAccount + CurrentAccountMovement from the DB —
     the signal handler updates movement.amount and re-aggregates
     cached_balance via .update(), which does NOT touch any in-memory
     instance; a direct read is the only way to see the new value."""
-    if not order.cari_id:
+    if not order.current_account_id:
         return None
     try:
-        from accounting.models import CariAccount, CariMovement
+        from accounting.models import CurrentAccount, CurrentAccountMovement
         from django.contrib.contenttypes.models import ContentType
-        cari = CariAccount.objects.get(pk=order.cari_id)
+        current_account = CurrentAccount.objects.get(pk=order.current_account_id)
         ct = ContentType.objects.get_for_model(order.__class__)
-        mv = CariMovement.objects.filter(
+        mv = CurrentAccountMovement.objects.filter(
             source_type=ct, source_id=order.pk, movement_type="order_sale",
         ).first()
         mv_amount = float(mv.amount) if mv else None
         mv_symbol = (mv.currency.symbol if (mv and mv.currency_id) else "") or ""
-        bal = float(cari.cached_balance or 0)
+        bal = float(current_account.cached_balance or 0)
         if bal > 0: color = "#B45309"
         elif bal < 0: color = "#147F74"
         else: color = "#374151"
         return {
             "balance": bal,
             "absolute_balance": abs(bal),
-            "balance_label": cari.balance_label,
-            "currency_symbol": cari.display_currency_symbol or "",
+            "balance_label": current_account.balance_label,
+            "currency_symbol": current_account.display_currency_symbol or "",
             "color": color,
             "mv_amount": mv_amount,
             "mv_symbol": mv_symbol,
@@ -283,7 +283,7 @@ class OrderDetail(DetailView):
         # items for the line breakdown). The variant's warehouse products
         # + attribute values feed the human-readable variant label.
         return Order.objects.select_related(
-            "contact", "company", "web_client", "cari",
+            "contact", "company", "web_client", "current_account",
         ).prefetch_related(
             "items__product", "items__product_variant",
             "items__product_variant__warehouse_products",
@@ -331,14 +331,14 @@ class OrderDetail(DetailView):
                 i.pk,
             ),
         )
-        cari = self.object.cari
-        if cari:
+        current_account = self.object.current_account
+        if current_account:
             # Last 5 ledger movements for the sidebar widget — cheap
-            # query thanks to the (cari, -date) composite index.
-            ctx["cari_recent_movements"] = list(
-                cari.movements.select_related("currency").order_by("-date", "-id")[:5]
+            # query thanks to the (current account, -date) composite index.
+            ctx["current_account_recent_movements"] = list(
+                current_account.movements.select_related("currency").order_by("-date", "-id")[:5]
             )
-            ctx["cari_invoices_count"] = cari.invoices.count()
+            ctx["current_account_invoices_count"] = current_account.invoices.count()
 
         # Invoices linked to THIS order. Used to (a) show the user
         # what's already invoiced and (b) hide the "Create invoice"
@@ -346,7 +346,7 @@ class OrderDetail(DetailView):
         # accidental duplicates that the user would have to clean up.
         order_invoices = list(
             self.object.invoices
-            .select_related("cari", "currency")
+            .select_related("current_account", "currency")
             .order_by("-date", "-id")
         )
         ctx["order_invoices"] = order_invoices
@@ -437,14 +437,14 @@ class OrderDetail(DetailView):
         from decimal import Decimal, InvalidOperation
         from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES, OrderItem
         from accounting.services_accounts import (
-            get_or_create_cari_for_order, post_order_movement, reverse_order_movement,
+            get_or_create_current_account_for_order, post_order_movement, reverse_order_movement,
         )
 
         action = (request.POST.get("action") or "").strip()
         member = getattr(request.user, "member", None)
 
         # Once an order has shipped its rolls are already cut and the
-        # cari/invoice already reflect what was actually packed — editing
+        # current account/invoice already reflect what was actually packed — editing
         # items past that point would desync catalog/warehouse stock from
         # a sale that's already booked. Blocked here server-side (not just
         # by hiding the button) since these are separate POST endpoints
@@ -462,12 +462,12 @@ class OrderDetail(DetailView):
                 and order.order_status in {"cancelled", "returned"}):
             return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş düzenlenemez."}, status=400)
 
-        def _sync_cari_total():
-            """Re-post the cari movement for this order after its total
+        def _sync_current_account_total():
+            """Re-post the current account movement for this order after its total
             changed (qty/price/add/remove). Idempotent — updates in place
             when the movement already exists."""
             try:
-                if order.cari_id:
+                if order.current_account_id:
                     post_order_movement(order, member=member)
             except Exception:
                 pass
@@ -475,8 +475,8 @@ class OrderDetail(DetailView):
         def _profit_snapshot():
             return _order_profit_snapshot(order)
 
-        def _cari_snapshot():
-            return _order_cari_snapshot(order)
+        def _current_account_snapshot():
+            return _order_current_account_snapshot(order)
 
         # ── Inline item edit (qty / price) ──────────────────────
         if action == "update_item":
@@ -506,7 +506,7 @@ class OrderDetail(DetailView):
 
             setattr(item, field, dec)
             item.save(update_fields=[field, "updated_at"])
-            _sync_cari_total()
+            _sync_current_account_total()
 
             # Refresh in-memory variant/product stock so the response
             # mirrors the post-deduction state.
@@ -528,7 +528,7 @@ class OrderDetail(DetailView):
                 "item_id": item.pk,
                 "subtotal": float(item.subtotal()),
                 "order_total": float(order.total_value()),
-                "cari": _cari_snapshot(),
+                "current_account": _current_account_snapshot(),
                 "profit": _profit_snapshot(),
                 "stock": float(new_stock) if new_stock is not None else None,
                 "max_qty": max_qty,
@@ -639,7 +639,7 @@ class OrderDetail(DetailView):
                 order=order, product=product, product_variant=variant,
                 quantity=qty, price=price,
             )
-            _sync_cari_total()
+            _sync_current_account_total()
 
             # Refresh stock for the response so the new row shows the
             # post-deduction figure right away.
@@ -672,7 +672,7 @@ class OrderDetail(DetailView):
                     "allow_oversell": allow_oversell,
                 },
                 "order_total": float(order.total_value()),
-                "cari": _cari_snapshot(),
+                "current_account": _current_account_snapshot(),
                 "profit": _profit_snapshot(),
             })
 
@@ -684,11 +684,11 @@ class OrderDetail(DetailView):
                 return JsonResponse({"ok": False, "error": "Bad item_id"}, status=400)
             item = get_object_or_404(OrderItem, pk=item_id, order=order)
             item.delete()
-            _sync_cari_total()
+            _sync_current_account_total()
             return JsonResponse({
                 "ok": True,
                 "order_total": float(order.total_value()),
-                "cari": _cari_snapshot(),
+                "current_account": _current_account_snapshot(),
                 "profit": _profit_snapshot(),
             })
 
@@ -715,23 +715,23 @@ class OrderDetail(DetailView):
                 return JsonResponse({"ok": False, "error": "Bad customer"}, status=400)
             order.save(update_fields=["contact", "company", "updated_at"])
 
-            # Customer changed → re-resolve the cari and move the ledger
+            # Customer changed → re-resolve the current account and move the ledger
             # row to the new account. The old movement (if any) is reversed
-            # before posting fresh to avoid orphaning balance on the old cari.
+            # before posting fresh to avoid orphaning balance on the old current account.
             try:
-                new_cari = get_or_create_cari_for_order(order, member=member)
-                if order.cari_id and (not new_cari or new_cari.pk != order.cari_id):
+                new_current_account = get_or_create_current_account_for_order(order, member=member)
+                if order.current_account_id and (not new_current_account or new_current_account.pk != order.current_account_id):
                     reverse_order_movement(order)
-                if new_cari and order.cari_id != new_cari.pk:
-                    order.cari = new_cari
-                    order.save(update_fields=["cari", "updated_at"])
-                if new_cari:
+                if new_current_account and order.current_account_id != new_current_account.pk:
+                    order.current_account = new_current_account
+                    order.save(update_fields=["current_account", "updated_at"])
+                if new_current_account:
                     post_order_movement(order, member=member)
-                elif order.cari_id:
-                    # Customer cleared → drop the cari link entirely.
+                elif order.current_account_id:
+                    # Customer cleared → drop the current account link entirely.
                     reverse_order_movement(order)
-                    order.cari = None
-                    order.save(update_fields=["cari", "updated_at"])
+                    order.current_account = None
+                    order.save(update_fields=["current_account", "updated_at"])
             except Exception:
                 pass
             return JsonResponse({"ok": True})
@@ -1411,14 +1411,14 @@ def order_pack_reserve_add(request, pk):
     if target_pack is not None:
         r.pack = target_pack
         r.save(update_fields=["pack"])
-    # The cari receivable is sourced from scanned metres (see
+    # The current account receivable is sourced from scanned metres (see
     # Order.billable_value) — a fresh scan changes it, so re-post now
     # rather than waiting for some unrelated OrderItem save.
-    if order.cari_id:
+    if order.current_account_id:
         from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r),
-                         "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
+                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order)})
 
 
 @login_required
@@ -1450,11 +1450,11 @@ def order_pack_reserve_update(request, pk):
         meters = avail
     r.meters = meters
     r.save(update_fields=["meters"])
-    if order.cari_id:
+    if order.current_account_id:
         from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r),
-                         "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
+                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order)})
 
 
 @login_required
@@ -1475,11 +1475,11 @@ def order_pack_reserve_remove(request, pk):
         return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
     removed = r.id
     r.delete()
-    if order.cari_id:
+    if order.current_account_id:
         from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "removed": removed,
-                         "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
+                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order)})
 
 
 @login_required
@@ -1583,7 +1583,7 @@ def _books_in_scope(request):
 
     Stock belongs to the book that owns its warehouse. Offering a line
     from another book's shelf promises a different business's asset and
-    bills it to this book's cari.
+    bills it to this book's current account.
     """
     from accounting.services_accounts import member_books
     allowed = member_books(getattr(request.user, "member", None))
@@ -1751,7 +1751,7 @@ def order_create_roll_list(request):
 def order_pack_complete(request, pk):
     """Confirm packing. Moves the order to 'packaging' (Paketleniyor).
     Re-runnable; no stock cut. Scanned metres don't have to fully cover
-    every order line's ordered metres — a mismatch is allowed (the cari/
+    every order line's ordered metres — a mismatch is allowed (the current account/
     invoice bill only what was actually scanned, see
     Order.billable_value), only "nothing scanned at all" is rejected."""
     order = get_object_or_404(Order, pk=pk)
@@ -1891,29 +1891,29 @@ def order_customer_card_view(request, pk):
     from .models import Order
     from crm.models import Contact, Company
     from accounting.services_accounts import (
-        get_or_create_cari_for_order, post_order_movement, reverse_order_movement,
+        get_or_create_current_account_for_order, post_order_movement, reverse_order_movement,
     )
 
     order = get_object_or_404(Order, pk=pk)
     member = getattr(request.user, "member", None)
 
-    def _save_cari_link(prev_cari_id):
-        """After contact/company on the order changed, re-resolve the cari
+    def _save_current_account_link(prev_current_account_id):
+        """After contact/company on the order changed, re-resolve the current account
         and move the order_sale movement to the new account."""
         try:
-            new_cari = get_or_create_cari_for_order(order, member=member)
-            # If the cari is changing, reverse the old movement first.
-            if prev_cari_id and (not new_cari or new_cari.pk != prev_cari_id):
+            new_current_account = get_or_create_current_account_for_order(order, member=member)
+            # If the current account is changing, reverse the old movement first.
+            if prev_current_account_id and (not new_current_account or new_current_account.pk != prev_current_account_id):
                 reverse_order_movement(order)
-            if new_cari and order.cari_id != new_cari.pk:
-                order.cari = new_cari
-                order.save(update_fields=["cari", "updated_at"])
-            if new_cari:
+            if new_current_account and order.current_account_id != new_current_account.pk:
+                order.current_account = new_current_account
+                order.save(update_fields=["current_account", "updated_at"])
+            if new_current_account:
                 post_order_movement(order, member=member)
-            elif order.cari_id:
+            elif order.current_account_id:
                 reverse_order_movement(order)
-                order.cari = None
-                order.save(update_fields=["cari", "updated_at"])
+                order.current_account = None
+                order.save(update_fields=["current_account", "updated_at"])
         except Exception:
             pass
 
@@ -1929,7 +1929,7 @@ def order_customer_card_view(request, pk):
                 cpk = int(request.POST.get("customer_pk") or 0)
             except (TypeError, ValueError):
                 cpk = 0
-            prev_cari_id = order.cari_id
+            prev_current_account_id = order.current_account_id
             fields_changed = ["contact", "company", "web_client",
                               "is_guest_order", "updated_at"]
             # Clear all customer linkages first so the swap is atomic.
@@ -1947,16 +1947,16 @@ def order_customer_card_view(request, pk):
             elif ctype == "guest":
                 order.is_guest_order = True
             order.save(update_fields=fields_changed)
-            _save_cari_link(prev_cari_id)
+            _save_current_account_link(prev_current_account_id)
             mode = "edit"
 
         # ── Clear linked customer ────────────────────────────
         elif action == "clear":
-            prev_cari_id = order.cari_id
+            prev_current_account_id = order.current_account_id
             order.contact = None
             order.company = None
             order.save(update_fields=["contact", "company", "updated_at"])
-            _save_cari_link(prev_cari_id)
+            _save_current_account_link(prev_current_account_id)
             mode = "edit"
 
         # ── Inline field edit on the linked contact/company ──
@@ -1983,12 +1983,12 @@ def order_customer_card_view(request, pk):
                         target.save(update_fields=[field])
                     except Exception:
                         pass
-                    # If the contact's name changed AND the cari was named
-                    # after it, keep the cari label in sync. Safe / cheap.
-                    if field == "name" and order.cari_id:
+                    # If the contact's name changed AND the current account was named
+                    # after it, keep the current account label in sync. Safe / cheap.
+                    if field == "name" and order.current_account_id:
                         try:
-                            order.cari.name = value or order.cari.name
-                            order.cari.save(update_fields=["name"])
+                            order.current_account.name = value or order.current_account.name
+                            order.current_account.save(update_fields=["name"])
                         except Exception:
                             pass
             mode = "edit"
@@ -2014,13 +2014,13 @@ def order_customer_card_view(request, pk):
                 order.save(update_fields=[field, "updated_at"])
             mode = "edit"
 
-        # ── Create brand-new Contact + link + cari ───────────
+        # ── Create brand-new Contact + link + current account ───────────
         elif action == "create_contact":
             name = (request.POST.get("name") or "").strip()
             if not name:
                 mode = "create"
             else:
-                prev_cari_id = order.cari_id
+                prev_current_account_id = order.current_account_id
                 email_val = (request.POST.get("email") or "").strip()
                 phone_val = (request.POST.get("phone") or "").strip()
                 new_contact = Contact.objects.create(
@@ -2033,13 +2033,13 @@ def order_customer_card_view(request, pk):
                 order.contact = new_contact
                 order.company = None
                 order.save(update_fields=["contact", "company", "updated_at"])
-                _save_cari_link(prev_cari_id)
+                _save_current_account_link(prev_current_account_id)
                 mode = "view"
 
     elif request.method == "GET":
         mode = request.GET.get("mode") or "view"
 
-    # Re-fetch order to ensure related .cari, .contact etc. are fresh
+    # Re-fetch order to ensure related .current account, .contact etc. are fresh
     # for the template (the snapshot used by HTMX swap is independent of
     # whatever client mode toggle was in effect when the form fired).
     order = get_object_or_404(Order, pk=pk)
@@ -2230,7 +2230,7 @@ def select_combined_orders(request):
 
     orders = list(
         Order.objects.filter(pk__in=ids)
-        .select_related("contact", "company", "web_client", "cari", "cari__book")
+        .select_related("contact", "company", "web_client", "current_account", "current_account__book")
         .order_by("order_date", "pk")
     )
     if len(orders) != len(ids):
@@ -2243,7 +2243,7 @@ def select_combined_orders(request):
 
     member = getattr(request.user, "member", None)
     for o in orders:
-        book = o.cari.book if o.cari_id else None
+        book = o.current_account.book if o.current_account_id else None
         if book is not None and not member_can_use_book(member, book):
             raise Http404("No such order.")
 
@@ -2359,11 +2359,11 @@ class OrderCreate(View):
         customer_pk = request.POST.get("customer_pk")
         customer_type = request.POST.get("customer_type")
 
-        # A customer is mandatory. An order saved without one has no cari
+        # A customer is mandatory. An order saved without one has no current account
         # to bill, prints with a blank Customer card, and can't be fixed
         # from the order page afterwards — so refuse it at the door
         # instead of creating a record nobody can attach a client to.
-        # "retail" is a valid pick (the shared Perakende cari), a CRM
+        # "retail" is a valid pick (the shared Perakende current account), a CRM
         # contact/company needs its pk.
         if not (customer_type == "retail" or (customer_type in {"contact", "company"} and customer_pk)):
             from django.utils.translation import gettext as _
@@ -2426,7 +2426,7 @@ class OrderCreate(View):
 
                     # Payment method / amount-paid fields removed from
                     # the form — deposit is handled separately below as
-                    # a proper cari collection. We leave the fields on
+                    # a proper current account collection. We leave the fields on
                     # the model alone (they stay NULL for new orders).
 
                     # Delivery Address — CRM/B2B orders only (retail's
@@ -2549,40 +2549,40 @@ class OrderCreate(View):
                 except Exception:
                     pass
 
-                # ── Auto-link to a CariAccount + log the sales-order
+                # ── Auto-link to a CurrentAccount + log the sales-order
                 # movement so the customer's ledger reflects this
                 # order immediately — retail included: Perakende orders
-                # post their sale to the shared retail cari right at
+                # post their sale to the shared retail current account right at
                 # create (the auto COLLECTION + defter mirror still
                 # happen at completion via apply_order_status_change;
                 # post_order_movement there is idempotent so nothing
                 # double-posts on ship).
                 try:
                     from accounting.services_accounts import (
-                        get_or_create_cari_for_order, post_order_movement,
-                        get_or_create_retail_cari,
+                        get_or_create_current_account_for_order, post_order_movement,
+                        get_or_create_retail_current_account,
                     )
                     if order.is_retail_order:
-                        cari = get_or_create_retail_cari(member=member)
+                        current_account = get_or_create_retail_current_account(member=member)
                     else:
-                        cari = get_or_create_cari_for_order(order, member=member)
-                    if cari and order.cari_id != cari.pk:
-                        order.cari = cari
-                        order.save(update_fields=["cari"])
+                        current_account = get_or_create_current_account_for_order(order, member=member)
+                    if current_account and order.current_account_id != current_account.pk:
+                        order.current_account = current_account
+                        order.save(update_fields=["current_account"])
                     post_order_movement(order, member=member)
                 except Exception as _e:
                     messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
 
-                # ── Deposit (collection) — post against the cari if the
+                # ── Deposit (collection) — post against the current account if the
                 # user ticked "Deposit received" and entered an amount.
-                # Creates + confirms a Payment so it lands in the cari
+                # Creates + confirms a Payment so it lands in the current account
                 # ledger as a deduction.
                 deposit_flag = (request.POST.get("deposit_received") or "").strip()
                 try:
                     deposit_amount = float(request.POST.get("deposit_amount") or 0)
                 except (ValueError, TypeError):
                     deposit_amount = 0
-                if deposit_flag and deposit_amount > 0 and order.cari_id:
+                if deposit_flag and deposit_amount > 0 and order.current_account_id:
                     try:
                         from decimal import Decimal
                         from datetime import date
@@ -2594,12 +2594,12 @@ class OrderCreate(View):
                         # account it is collected against — never a
                         # guessed one. Guessing here meant a deposit
                         # taken by an Ergene member on a Laleli order
-                        # created a Payment in Ergene whose cari lived
+                        # created a Payment in Ergene whose current account lived
                         # in Laleli.
-                        book = order.cari.book
+                        book = order.current_account.book
                         currency = _resolve_currency(order)
                         pay = Payment.objects.create(
-                            cari=order.cari, book=book,
+                            current_account=order.current_account, book=book,
                             number=_next_payment_number(book, "collection"),
                             type="collection", method="cash", status="draft",
                             date=date.today(),
@@ -2669,7 +2669,7 @@ class OrderEdit(UpdateView):
         # transition away from it); returned is locked the same way while
         # in that status (it can only be revived through the status panel).
         # Editing either would silently mutate items and re-trigger
-        # cari/catalog signals on a dead order.
+        # current account/catalog signals on a dead order.
         if self.object.order_status in {"cancelled", "returned"}:
             messages.error(request, "İptal edilmiş sipariş düzenlenemez.")
             return redirect("operating:order_detail", pk=self.object.pk)
@@ -2998,19 +2998,19 @@ class OrderEdit(UpdateView):
                 # time from the reservations scanned during packing, so
                 # there is nothing to reverse/reapply here.
 
-                # ── Sync cari + movement after edit. If the customer
-                # was swapped, the order moves to the new cari and
+                # ── Sync current account + movement after edit. If the customer
+                # was swapped, the order moves to the new current account and
                 # post_order_movement() updates the amount in place
                 # for the existing source-linked movement.
                 try:
                     from accounting.services_accounts import (
-                        get_or_create_cari_for_order, post_order_movement,
+                        get_or_create_current_account_for_order, post_order_movement,
                     )
                     member = getattr(self.request.user, "member", None)
-                    cari = get_or_create_cari_for_order(self.object, member=member)
-                    if cari and self.object.cari_id != cari.pk:
-                        self.object.cari = cari
-                        self.object.save(update_fields=["cari"])
+                    current_account = get_or_create_current_account_for_order(self.object, member=member)
+                    if current_account and self.object.current_account_id != current_account.pk:
+                        self.object.current_account = current_account
+                        self.object.save(update_fields=["current_account"])
                     post_order_movement(self.object, member=member)
                 except Exception as _e:
                     messages.warning(self.request, f"Order updated but cari sync had an issue: {_e}")
@@ -3036,7 +3036,7 @@ class OrderListRedirect(RedirectView):
     """Send the pre-split /operating/orders/ to the working book.
 
     Kept rather than deleted because the address is linked from the nav,
-    the mobile drawer, the top bar and every cari detail page, none of
+    the mobile drawer, the top bar and every current account detail page, none of
     which know which book the reader is in.
     """
     permanent = False
@@ -3060,18 +3060,18 @@ class OrderList(ListView):
         # `items__product` and `items__product_variant` are needed because
         # the gross_profit() helper reads cost from those — without
         # prefetching, each order row would fire two extra queries per
-        # line item. `cari` joins for the same reason: the customer cell
+        # line item. `current account` joins for the same reason: the customer cell
         # names the account a retail order posts to.
         qs = (
             Order.objects
-            .select_related('contact', 'company', 'web_client', 'cari')
+            .select_related('contact', 'company', 'web_client', 'current_account')
             .prefetch_related('items__product', 'items__product_variant')
             .order_by("-created_at")
         )
         # One book's orders. An Order carries no book of its own; the
-        # link is its cari, which is where the sale actually posts, so
+        # link is its current account, which is where the sale actually posts, so
         # the book of the account is the book of the order.
-        return qs.filter(cari__book=self.request.book)
+        return qs.filter(current_account__book=self.request.book)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -3131,7 +3131,7 @@ def _order_search_index(order):
 
     The customer is whichever of the four kinds this order actually has.
     A walk-in has no contact/company/web_client at all: it is attached to
-    the shared Perakende cari, so the account's name and code ARE its
+    the shared Perakende current account, so the account's name and code ARE its
     customer identity and belong here, not just in the visible cell.
 
     Products come from the prefetched lines (`items__product`,
@@ -3149,8 +3149,8 @@ def _order_search_index(order):
         parts += [order.web_client.name or "", order.web_client.username or ""]
     else:
         parts += [order.guest_first_name or "", order.guest_last_name or ""]
-    if order.cari_id:
-        parts += [order.cari.name or "", order.cari.code or ""]
+    if order.current_account_id:
+        parts += [order.current_account.name or "", order.current_account.code or ""]
 
     for item in order.items.all():
         product = item.product
@@ -3641,7 +3641,7 @@ def delete_order(request, pk):
         return redirect("operating:order_detail", pk=order.pk)
     # A shipped/completed order's rolls are already cut and its money
     # posted — deleting it would cascade the consumed reservations away
-    # WITHOUT restoring stock, orphan the cari sale movement, and (for
+    # WITHOUT restoring stock, orphan the current account sale movement, and (for
     # retail) crash on the defter entry's RESTRICT FK. Force the proper
     # path: re-open first (which reverses everything), then delete.
     if order.order_status in _SHIPPED_CLASS:
@@ -3662,7 +3662,7 @@ def bulk_delete_orders(request):
     selection + floating "Delete selected" bar. Returns JSON with the
     count actually deleted so the JS can flash a confirmation.
 
-    OrderItem.post_delete signals (stock restore + cari reversal) fire
+    OrderItem.post_delete signals (stock restore + current account reversal) fire
     naturally as the cascade unfolds — no extra work needed here."""
     ids_raw = request.POST.getlist("order_ids[]") or request.POST.getlist("order_ids")
     if not ids_raw and request.content_type == "application/json":
@@ -3688,7 +3688,7 @@ def bulk_delete_orders(request):
     deletable = [o for o in qs if o.order_status not in _SHIPPED_CLASS]
     skipped_ids = [o.pk for o in qs if o.order_status in _SHIPPED_CLASS]
     # Iterate so each Order.delete() triggers its cascade signals
-    # (OrderItem post_delete restores catalog stock; cari movement is
+    # (OrderItem post_delete restores catalog stock; current account movement is
     # reversed). bulk delete via qs.delete() would still cascade but
     # we keep it per-row for predictable signal ordering on Postgres.
     deleted_ids = [o.pk for o in deletable]  # capture BEFORE delete() nulls pk
@@ -3767,7 +3767,7 @@ def product_autocomplete(request):
     # ── 1) Warehouse hits, grouped by their catalog variant ──────────
     # Only the working book's shelves. Offering a line from a warehouse
     # the book does not own means promising stock that is another
-    # business's asset, and the order would bill it to this book's cari.
+    # business's asset, and the order would bill it to this book's current account.
     # `book` is what the form is working in; it is still checked against
     # the member's assignments, because it arrives from the browser.
     allowed = _books_in_scope(request)
@@ -5147,7 +5147,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
         from django.utils import timezone
         from django.db.models import Sum, Count, F, Value, DecimalField
         from django.db.models.functions import Coalesce, Round, TruncDate, TruncWeek, TruncMonth
-        from accounting.models import CariAccount
+        from accounting.models import CurrentAccount
         from datetime import datetime, time
 
         DEC = DecimalField(max_digits=16, decimal_places=2)
@@ -5323,21 +5323,21 @@ class OrderAnalytics(LoginRequiredMixin, View):
         cust.sort(key=lambda c: c["spent"], reverse=True)
         top_customers = cust[:10]
 
-        # Attach cari snapshot for company / contact customers.
+        # Attach current account snapshot for company / contact customers.
         comp_ids = [c["id"] for c in top_customers if c["kind"] == "company"]
         cont_ids = [c["id"] for c in top_customers if c["kind"] == "contact"]
-        cari_by_company, cari_by_contact = {}, {}
+        current_account_by_company, current_account_by_contact = {}, {}
         if comp_ids:
-            for ca in CariAccount.objects.filter(company_id__in=comp_ids).select_related("default_currency"):
-                cari_by_company.setdefault(ca.company_id, ca)
+            for ca in CurrentAccount.objects.filter(company_id__in=comp_ids).select_related("default_currency"):
+                current_account_by_company.setdefault(ca.company_id, ca)
         if cont_ids:
-            for ca in CariAccount.objects.filter(contact_id__in=cont_ids).select_related("default_currency"):
-                cari_by_contact.setdefault(ca.contact_id, ca)
+            for ca in CurrentAccount.objects.filter(contact_id__in=cont_ids).select_related("default_currency"):
+                current_account_by_contact.setdefault(ca.contact_id, ca)
         for c in top_customers:
-            ca = cari_by_company.get(c["id"]) if c["kind"] == "company" else \
-                (cari_by_contact.get(c["id"]) if c["kind"] == "contact" else None)
+            ca = current_account_by_company.get(c["id"]) if c["kind"] == "company" else \
+                (current_account_by_contact.get(c["id"]) if c["kind"] == "contact" else None)
             if ca:
-                c["cari"] = {
+                c["current_account"] = {
                     "pk": ca.pk, "code": ca.code, "name": ca.name,
                     "balance": float(ca.cached_balance or 0),
                     "abs_balance": float(ca.absolute_balance or 0),
@@ -5345,7 +5345,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
                     "symbol": ca.display_currency_symbol or "",
                 }
             else:
-                c["cari"] = None
+                c["current_account"] = None
 
         # ── Status distribution (for the mix bar) ──
         status_rows = list(base_orders.values("order_status").annotate(n=Count("id")).order_by("-n"))

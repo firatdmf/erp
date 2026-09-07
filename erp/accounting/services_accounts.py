@@ -1,10 +1,10 @@
-"""Cari account service helpers — keep view code thin and signals clean.
+"""Current account account service helpers — keep view code thin and signals clean.
 
 The big picture:
 - Every Order placed manually (B2B contact/company) should land on the
-  customer's cari. If the contact belongs to a company we always book
+  customer's current account. If the contact belongs to a company we always book
   the order against the COMPANY so the company sees one consolidated
-  cari (the user explicitly asked for this).
+  current account (the user explicitly asked for this).
 - Web orders skip this entirely (they go through create_web_order
   which is not wired to call into here).
 - Each call site is responsible for invoking ensure_cari_for_order +
@@ -24,7 +24,7 @@ from django.db.models import Count
 
 from accounting.models import Book, CurrencyCategory
 
-from .models import CariAccount, CariMovement, CariSettings
+from .models import CurrentAccount, CurrentAccountMovement, CurrentAccountSettings
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ def get_default_book(member=None) -> Book:
     Not "the" ledger — every Book is its own ledger for its own
     business, and there will be several. This answers a narrower
     question the code is currently forced to answer: an Order carries no
-    book, so ensure_cari_for_order has to pick one.
+    book, so ensure_current account_for_order has to pick one.
 
     The best answer to "which business is this?" is WHO IS ENTERING IT.
     One install runs several businesses at once; which one a record
@@ -67,7 +67,7 @@ def get_default_book(member=None) -> Book:
     This used to take the lowest-id Book, on the assumption that the project
     has one book company-wide. It does not. Books also carry the general
     ledger — cash accounts, expenses, receivables — so several exist for
-    reasons that have nothing to do with cari, and the lowest-id one
+    reasons that have nothing to do with current account, and the lowest-id one
     ("Muhammed Firat Ozturk", id 1) is not the one the ledger uses.
 
     The cost of getting it wrong is silent. Every auto-created account landed
@@ -77,7 +77,7 @@ def get_default_book(member=None) -> Book:
     3,116.62. Nothing errored; the money simply went somewhere no one was
     reading.
 
-    The answer to that was settings.CARI_BOOK_NAME — a brand constant naming
+    The answer to that was settings.CURRENT_ACCOUNT_BOOK_NAME — a brand constant naming
     the book, matched here at read time. That turned out to be the same bug
     wearing a different hat. A book's name is a mutable label people edit from
     the UI; the constant lives in a deploy and cannot follow. Rename the book
@@ -95,24 +95,24 @@ def get_default_book(member=None) -> Book:
       2. Their first assigned book, for a member who has never picked one.
          With a single assignment there is nothing to pick, which is the
          common case.
-      3. settings.CARI_BOOK_ID — pins the answer from a deploy, for work
+      3. settings.CURRENT_ACCOUNT_BOOK_ID — pins the answer from a deploy, for work
          with no member at all: cron, imports, the shell.
       4. Lowest id, then create — only reachable on a fresh install, or on
-         a deployment that has left CARI_BOOK_ID unset while running
+         a deployment that has left CURRENT_ACCOUNT_BOOK_ID unset while running
          memberless work.
 
     Every step falls through rather than raising: a stale id must not stop
     an order being placed.
 
-    There used to be a Book.is_default_cari_target flag between steps 2 and
-    3, plus a step that guessed the book holding the most cari accounts and
+    There used to be a Book.is_default_current account_target flag between steps 2 and
+    3, plus a step that guessed the book holding the most current account accounts and
     wrote its guess back to that flag. Both are gone. An app-wide "default
     book" is a second answer to a question the working book already answers,
     and the two disagree the moment somebody's work moves; the guess was
     worse still, because it silently changed which business a record landed
     in as soon as the account counts crossed over. Which business a record
     belongs to is a fact about the person entering it. When there is no such
-    person, CARI_BOOK_ID is the place to say so.
+    person, CURRENT_ACCOUNT_BOOK_ID is the place to say so.
     """
     if member is None:
         member = acting_member()
@@ -125,7 +125,7 @@ def get_default_book(member=None) -> Book:
         if book is not None:
             return book
 
-    pinned = getattr(settings, "CARI_BOOK_ID", "") or ""
+    pinned = getattr(settings, "CURRENT_ACCOUNT_BOOK_ID", "") or ""
     if str(pinned).strip().isdigit():
         book = Book.objects.filter(pk=int(pinned)).first()
         if book:
@@ -144,7 +144,7 @@ def member_books(member):
     Returns an empty queryset for no member, which is the honest answer:
     work nobody is doing belongs to nobody's book. Callers that need one
     anyway (cron, imports) go through get_default_book and land on
-    CARI_BOOK_ID.
+    CURRENT_ACCOUNT_BOOK_ID.
     """
     if member is None:
         return Book.objects.none()
@@ -186,7 +186,7 @@ def brand_name_for(book=None) -> str:
 
 
 def _resolve_currency(order=None) -> CurrencyCategory:
-    """Pick a CurrencyCategory for new movements/cari accounts.
+    """Pick a CurrencyCategory for new movements/current account accounts.
 
     Order doesn't have a currency field — orders are stored in USD by
     convention (per the rest of the codebase). Fall back to whichever
@@ -202,18 +202,18 @@ def _resolve_currency(order=None) -> CurrencyCategory:
 
 
 # ---------------------------------------------------------------------------
-# Cari resolution
+# Current account resolution
 # ---------------------------------------------------------------------------
-def get_or_create_cari_for_order(order, *, member=None) -> CariAccount | None:
-    """Find (or create) the cari for an order's customer.
+def get_or_create_current_account_for_order(order, *, member=None) -> CurrentAccount | None:
+    """Find (or create) the current account for an order's customer.
 
     Resolution priority (per user spec):
-      1. If the order's contact is tied to a company → use COMPANY's cari.
+      1. If the order's contact is tied to a company → use COMPANY's current account.
       2. Else if order.company → use that.
-      3. Else if order.contact → use contact's cari.
+      3. Else if order.contact → use contact's current account.
       4. Else → return None (web_client / no customer = skip).
 
-    The CariAccount unique-constraints (one cari per book+entity)
+    The CurrentAccount unique-constraints (one current account per book+entity)
     guarantee idempotency: calling this multiple times for the same
     customer reuses the existing row.
     """
@@ -223,27 +223,27 @@ def get_or_create_cari_for_order(order, *, member=None) -> CariAccount | None:
     )
 
     if company:
-        return get_or_create_cari_for_company(company, member=member)
+        return get_or_create_current_account_for_company(company, member=member)
 
     if contact:
-        return get_or_create_cari_for_contact(contact, member=member)
+        return get_or_create_current_account_for_contact(contact, member=member)
 
     return None
 
 
-def get_or_create_cari_for_contact(contact, *, member=None, book=None) -> CariAccount:
-    """Find (or create) the contact's cari — every B2B contact gets one
+def get_or_create_current_account_for_contact(contact, *, member=None, book=None) -> CurrentAccount:
+    """Find (or create) the contact's current account — every B2B contact gets one
     so orders/invoices can post against it. Idempotent via the
-    uniq_cari_book_contact constraint (one cari per book+contact).
+    uniq_current account_book_contact constraint (one current account per book+contact).
 
     Pass `book` when the caller already knows which one — a book-scoped
     page does, and must not silently create the account somewhere else
     because that happens to be the member's working book."""
     book = book or get_default_book(member)
-    cari = CariAccount.objects.filter(book=book, contact=contact).first()
-    if cari:
-        return cari
-    return CariAccount.objects.create(
+    current_account = CurrentAccount.objects.filter(book=book, contact=contact).first()
+    if current_account:
+        return current_account
+    return CurrentAccount.objects.create(
         book=book, contact=contact,
         name=getattr(contact, "name", "") or f"Contact #{contact.pk}",
         type="customer",
@@ -252,17 +252,17 @@ def get_or_create_cari_for_contact(contact, *, member=None, book=None) -> CariAc
     )
 
 
-def get_or_create_cari_for_company(company, *, member=None, book=None) -> CariAccount:
-    """Find (or create) the company's cari — every B2B company gets one
+def get_or_create_current_account_for_company(company, *, member=None, book=None) -> CurrentAccount:
+    """Find (or create) the company's current account — every B2B company gets one
     so orders/invoices can post against it. Idempotent via the
-    uniq_cari_book_company constraint (one cari per book+company).
+    uniq_current account_book_company constraint (one current account per book+company).
 
     Pass `book` when the caller already knows which one."""
     book = book or get_default_book(member)
-    cari = CariAccount.objects.filter(book=book, company=company).first()
-    if cari:
-        return cari
-    return CariAccount.objects.create(
+    current_account = CurrentAccount.objects.filter(book=book, company=company).first()
+    if current_account:
+        return current_account
+    return CurrentAccount.objects.create(
         book=book, company=company,
         name=getattr(company, "name", "") or f"Company #{company.pk}",
         type="customer",
@@ -271,17 +271,17 @@ def get_or_create_cari_for_company(company, *, member=None, book=None) -> CariAc
     )
 
 
-def get_or_create_cari_for_supplier(supplier, *, member=None, book=None) -> CariAccount:
-    """Find (or create) the supplier's cari — every supplier gets one so
+def get_or_create_current_account_for_supplier(supplier, *, member=None, book=None) -> CurrentAccount:
+    """Find (or create) the supplier's current account — every supplier gets one so
     purchases (stock intake) can post debt against it. Idempotent via
-    the uniq_cari_book_supplier constraint (one cari per book+supplier).
+    the uniq_current account_book_supplier constraint (one current account per book+supplier).
 
     Pass `book` when the caller already knows which one."""
     book = book or get_default_book(member)
-    cari = CariAccount.objects.filter(book=book, supplier=supplier).first()
-    if cari:
-        return cari
-    return CariAccount.objects.create(
+    current_account = CurrentAccount.objects.filter(book=book, supplier=supplier).first()
+    if current_account:
+        return current_account
+    return CurrentAccount.objects.create(
         book=book, supplier=supplier,
         name=str(supplier) or f"Supplier #{supplier.pk}",
         type="supplier",
@@ -301,12 +301,12 @@ def _currency_by_code(code) -> CurrencyCategory:
     return _resolve_currency()
 
 
-def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
+def create_purchase_invoice_for_intake(current_account, lines, *, member=None, user=None,
                                        invoice_date=None, invoice=None):
     """Turn a warehouse stock intake into an issued PURCHASE invoice
     (alış faturası) on the given cari account.
 
-    Takes the cari DIRECTLY rather than a crm.Supplier: the intake panel
+    Takes the current account DIRECTLY rather than a crm.Supplier: the intake panel
     now picks the account staff actually keep the balance on, and most of
     those (imported from KARVEN) have no Supplier row to resolve through.
 
@@ -316,8 +316,8 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
 
     Creates Invoice(type="purchase", series="PUR") + one InvoiceItem per
     line (tax 0 — the entered price is what we owe), then issue()s it,
-    which posts the CariMovement(invoice_purchase, -total) with a source
-    link so the cari statement row is clickable through to the invoice.
+    which posts the CurrentAccountMovement(invoice_purchase, -total) with a source
+    link so the current account statement row is clickable through to the invoice.
     `invoice` — an existing DRAFT purchase order being confirmed. Its number,
     dates and account are already settled, so only its lines are rebuilt (from
     what actually arrived) before it is issued. Safe to wipe its items first:
@@ -331,12 +331,12 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
     # The invoice belongs in the book the account itself lives in — reading
     # the default book here would post the alım into a different ledger
     # than the balance it's supposed to move.
-    book = cari.book
+    book = current_account.book
     # The account's own currency, not lines[0]'s. Every line reaching here
     # has already been restated into it by convert_lines_to_currency.
-    currency = _currency_by_code(invoice_currency_for(cari))
-    settings_obj = CariSettings.for_book(book)
-    mark_as_supplier(cari)
+    currency = _currency_by_code(invoice_currency_for(current_account))
+    settings_obj = CurrentAccountSettings.for_book(book)
+    mark_as_supplier(current_account)
 
     if invoice is not None:
         with transaction.atomic():
@@ -363,10 +363,10 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
 
     with transaction.atomic():
         today = invoice_date or date.today()
-        term_days = cari.payment_term_days or 30
+        term_days = current_account.payment_term_days or 30
         from datetime import timedelta
         inv = Invoice.objects.create(
-            cari=cari, book=book,
+            current_account=current_account, book=book,
             series="PUR",
             number=settings_obj.next_invoice_number(series="PUR"),
             type="purchase", status="draft",
@@ -505,14 +505,14 @@ class MixedCurrencyError(Exception):
     """A line needs converting and there is no rate to do it with."""
 
 
-def invoice_currency_for(cari):
+def invoice_currency_for(current_account):
     """What an alım to this account is denominated in: what we owe THEM.
 
     Their own default currency, falling back to the book's base when an
     account has never been given one.
     """
     from django.conf import settings as _s
-    code = getattr(getattr(cari, "default_currency", None), "code", "") or ""
+    code = getattr(getattr(current_account, "default_currency", None), "code", "") or ""
     return (code or getattr(_s, "BASE_CURRENCY_CODE", "USD")).upper()
 
 
@@ -575,7 +575,7 @@ def convert_lines_to_currency(lines, target_code, rates=None, *, on_date=None):
     return out
 
 
-def mark_as_supplier(cari):
+def mark_as_supplier(current_account):
     """An account we have bought from is a supplier, and its type should say so.
 
     Buying does not stop someone being a customer — a mill that weaves for
@@ -590,14 +590,14 @@ def mark_as_supplier(cari):
 
     Returns True when the type actually moved.
     """
-    if cari is None or not cari.pk:
+    if current_account is None or not current_account.pk:
         return False
-    current = (cari.type or "").strip()
+    current = (current_account.type or "").strip()
     if current in ("supplier", "both", "staff"):
         return False
     new_type = "both" if current == "customer" else "supplier"
-    cari.type = new_type
-    cari.save(update_fields=["type"])
+    current_account.type = new_type
+    current_account.save(update_fields=["type"])
     return True
 
 
@@ -655,9 +655,9 @@ def sync_invoice_for_order(order):
     """Re-align a live order-attached invoice with its order.
 
     The account, the invoice and the order screen must show the same
-    number. post_order_movement already re-posts the cari the moment an
+    number. post_order_movement already re-posts the current account the moment an
     OrderItem changes, but the invoice was cut once and never looked
-    again: editing order #136 from 419.20 m to 416.09 m moved the cari
+    again: editing order #136 from 419.20 m to 416.09 m moved the current account
     to 1486.48 and left invoice FAT-2026-000008 sitting at 1486.75.
 
     Rewrites the invoice's lines from the order's (updating matched
@@ -724,7 +724,7 @@ def create_invoice_for_order(order, *, user=None):
     Called from apply_order_status_change the moment an order enters a
     shipped status — the invoice is the paper trail of the completed
     sale. Lines mirror the order items at their ORDERED quantity
-    (order.get_billable_line_quantities()), so the invoice, the cari and
+    (order.get_billable_line_quantities()), so the invoice, the current account and
     the order screen all state the same number. 0% tax so the invoice
     total equals order.billable_value(), i.e. exactly the receivable the
     order_sale movement already posted (issue() posts a 0-amount marker
@@ -740,7 +740,7 @@ def create_invoice_for_order(order, *, user=None):
     """
     from .models import Invoice, InvoiceItem
 
-    if not order or not order.cari_id:
+    if not order or not order.current_account_id:
         return None
     if order.invoices.exclude(status="cancelled").exists():
         return None
@@ -751,26 +751,26 @@ def create_invoice_for_order(order, *, user=None):
     if total <= 0:
         return None
 
-    cari = order.cari
-    # CariAccount.book is null=False, so the account always states its
+    current_account = order.current_account
+    # CurrentAccount.book is null=False, so the account always states its
     # book and there is nothing to fall back to.
-    book = cari.book
-    settings_obj = CariSettings.for_book(book)
+    book = current_account.book
+    settings_obj = CurrentAccountSettings.for_book(book)
     member = getattr(user, "member", None) if user else None
     today = date.today()
     from datetime import timedelta
-    term_days = cari.payment_term_days or 30
+    term_days = current_account.payment_term_days or 30
 
     qty_map = order.get_billable_line_quantities()
 
     with transaction.atomic():
         inv = Invoice.objects.create(
-            cari=cari, book=book,
+            current_account=current_account, book=book,
             series="INV",
             number=settings_obj.next_invoice_number(series="INV"),
             type="sales", status="draft",
             date=today, due_date=today + timedelta(days=term_days),
-            currency=cari.default_currency or _resolve_currency(order),
+            currency=current_account.default_currency or _resolve_currency(order),
             order=order,
             created_by=member,
         )
@@ -804,31 +804,31 @@ def create_invoice_for_order(order, *, user=None):
 def _order_movement(order):
     """Return the existing 'order_sale' movement for this order, if any.
 
-    Uses CariMovement's generic source FK so we can look the row up
+    Uses CurrentAccountMovement's generic source FK so we can look the row up
     without storing a pointer on Order itself.
     """
     if not order or not order.pk:
         return None
     ct = ContentType.objects.get_for_model(order.__class__)
-    return CariMovement.objects.filter(
+    return CurrentAccountMovement.objects.filter(
         source_type=ct, source_id=order.pk, movement_type="order_sale",
     ).first()
 
 
 @transaction.atomic
 def post_order_movement(order, *, member=None):
-    """Create (or update) the cari movement that represents this order.
+    """Create (or update) the current account movement that represents this order.
 
     Sign convention: order_sale is a debit on the customer (+ amount —
     the customer owes us more once the order goes out). This mirrors
-    invoice_sale; the customer's cari balance reflects pending orders
+    invoice_sale; the customer's current account balance reflects pending orders
     even before a formal invoice is issued.
 
     The amount is order.billable_value() — price × ORDERED quantity per
     line (see Order.get_billable_line_quantities), i.e. the order total
     the order screen shows, whatever the warehouse has or hasn't
     scanned. Called both by the OrderItem save signal (order edits) and
-    by every packing/reservation endpoint, so the cari matches the order
+    by every packing/reservation endpoint, so the current account matches the order
     from the moment it is saved.
 
     Idempotent: re-running after an edit updates the amount in place
@@ -837,8 +837,8 @@ def post_order_movement(order, *, member=None):
     if not order or not order.pk:
         return None
 
-    cari = order.cari
-    if not cari:
+    current_account = order.current_account
+    if not current_account:
         return None
 
     # The order total — see Order.billable_value().
@@ -855,13 +855,13 @@ def post_order_movement(order, *, member=None):
     if total <= 0 or getattr(order, "order_status", "") == "cancelled":
         if existing:
             existing.delete()
-            cari.recompute_balance(save=True)
+            current_account.recompute_balance(save=True)
         return None
 
     # The movement lives with the account it posts to, not with whoever
     # happens to be saving the order — a receivable in one book against
     # an account in another does not add up in either.
-    book = cari.book
+    book = current_account.book
     currency = _resolve_currency(order)
     ref = order.order_number or f"ORD-{order.pk}"
     desc = f"Order #{order.pk}"
@@ -880,8 +880,8 @@ def post_order_movement(order, *, member=None):
         existing.save()
         return existing
 
-    return CariMovement.objects.create(
-        cari=cari,
+    return CurrentAccountMovement.objects.create(
+        current_account=current_account,
         book=book,
         date=order.order_date or (order.created_at.date() if order.created_at else date.today()),
         amount=total,
@@ -896,24 +896,24 @@ def post_order_movement(order, *, member=None):
 
 
 def reverse_order_movement(order):
-    """Delete the cari movement tied to this order (e.g. on order
-    deletion or cancellation). Cari balance is recomputed inside
-    CariMovement.delete via the standard model flow."""
+    """Delete the current account movement tied to this order (e.g. on order
+    deletion or cancellation). Current account balance is recomputed inside
+    CurrentAccountMovement.delete via the standard model flow."""
     mv = _order_movement(order)
     if not mv:
         return
-    cari = mv.cari
+    current_account = mv.current_account
     mv.delete()
-    if cari:
-        cari.recompute_balance(save=True)
+    if current_account:
+        current_account.recompute_balance(save=True)
 
 
 # ---------------------------------------------------------------------------
 # Perakende (retail) — anonymous walk-in sales.
 #
-# Retail orders have no contact/company, so get_or_create_cari_for_order
+# Retail orders have no contact/company, so get_or_create_current account_for_order
 # returns None and their revenue would vanish from the books entirely.
-# Instead they all post to ONE shared system cari ("Perakende
+# Instead they all post to ONE shared system current account ("Perakende
 # Satışları") when the order COMPLETES (moves to shipped): the sale
 # movement, and nothing else.
 #
@@ -926,14 +926,14 @@ def reverse_order_movement(order):
 # carries a real receivable, and a retail sale is only closed out once
 # a collection is recorded against it.
 #
-# That cari IS the retail record — there is no second copy. Completion
+# That current account IS the retail record — there is no second copy. Completion
 # used to also mirror the sale into a separate "Perakende" accounting
 # Book (EquityRevenue + its own till), which meant every walk-in sale
 # was written twice in two places that could and did drift apart. The
 # book, its till and its revenue rows were removed; read retail off the
-# PERAKENDE cari and its statement.
+# PERAKENDE current account and its statement.
 # ---------------------------------------------------------------------------
-RETAIL_CARI_CODE = "PERAKENDE"
+RETAIL_CURRENT_ACCOUNT_CODE = "PERAKENDE"
 # The description those historical auto-collections carry. They were
 # written in Turkish and migration 0097 restated them in English;
 # this prefix has to keep matching whatever is in the column, so the
@@ -941,14 +941,14 @@ RETAIL_CARI_CODE = "PERAKENDE"
 _RETAIL_AUTO_DESC = "Retail automatic collection"
 
 
-def get_or_create_retail_cari(member=None) -> CariAccount:
-    """The single shared cari all retail orders post to."""
+def get_or_create_retail_current_account(member=None) -> CurrentAccount:
+    """The single shared current account all retail orders post to."""
     book = get_default_book(member)
-    cari = CariAccount.objects.filter(book=book, code=RETAIL_CARI_CODE).first()
-    if cari:
-        return cari
-    return CariAccount.objects.create(
-        book=book, code=RETAIL_CARI_CODE, name="Retail Sales",
+    current_account = CurrentAccount.objects.filter(book=book, code=RETAIL_CURRENT_ACCOUNT_CODE).first()
+    if current_account:
+        return current_account
+    return CurrentAccount.objects.create(
+        book=book, code=RETAIL_CURRENT_ACCOUNT_CODE, name="Retail Sales",
         # "other", not "customer": the counter is not a customer, it is
         # where anonymous walk-in sales land. Typing it as a customer put
         # it in the customer tab and made the account page ask which CRM
@@ -967,7 +967,7 @@ def get_or_create_retail_cari(member=None) -> CariAccount:
 
 def post_retail_order_financials(order, user=None):
     """Completion posting for a retail order: attach the shared retail
-    cari and post the order_sale movement. Idempotent — post_order_movement
+    current account and post the order_sale movement. Idempotent — post_order_movement
     checks its own marker, so a re-ship after an un-ship writes nothing new.
 
     Collections are NOT posted here. Retail used to auto-collect the
@@ -991,10 +991,10 @@ def post_retail_order_financials(order, user=None):
     if total <= 0:
         return
 
-    cari = get_or_create_retail_cari(member=member)
-    if order.cari_id != cari.pk:
-        order.cari = cari
-        order.save(update_fields=["cari", "updated_at"])
+    current_account = get_or_create_retail_current_account(member=member)
+    if order.current_account_id != current_account.pk:
+        order.current_account = current_account
+        order.save(update_fields=["current_account", "updated_at"])
     post_order_movement(order, member=member)
 
 
@@ -1012,15 +1012,15 @@ def reverse_retail_order_financials(order, user=None):
 
     reverse_order_movement(order)
 
-    # The order already carries the retail cari that
+    # The order already carries the retail current account that
     # post_retail_order_financials attached; ask it rather than guessing
     # which book to look in. A wrong guess found no account and silently
     # reversed nothing, leaving the collections standing on an un-shipped
     # order.
-    cari = order.cari if order.cari_id else None
-    if cari and cari.code == RETAIL_CARI_CODE:
+    current_account = order.current_account if order.current_account_id else None
+    if current_account and current_account.code == RETAIL_CURRENT_ACCOUNT_CODE:
         for pay in Payment.objects.filter(
-                cari=cari, type="collection", status="confirmed",
+                current_account=current_account, type="collection", status="confirmed",
                 notes=f"ORD-{order.pk}",
                 description__startswith=_RETAIL_AUTO_DESC):
             pay.cancel(user=user, reason="Order shipment cancelled")
@@ -1047,7 +1047,7 @@ def conversion_facts(obj):
     Every model that carries money in a currency is handled by shape
     rather than by name, so a new one needs no change here:
       * a posted-movement link  → ask the movement (Payment, Invoice)
-      * amount_base             → CariMovement
+      * amount_base             → CurrentAccountMovement
       * amount_in_base_currency → CashTransactionEntry
       * an exchange_rate alone  → compute, and say it is not posted yet
     """

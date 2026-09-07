@@ -14,7 +14,7 @@ from accounting.models import (
     CashTransactionEntry,
     CurrencyCategory,
 )
-from accounting.models_accounts import CariAccount, Payment
+from accounting.models_accounts import CurrentAccount, Payment
 
 
 class PaymentCashEntryTest(TestCase):
@@ -41,14 +41,14 @@ class PaymentCashEntryTest(TestCase):
         self.vault = CashAccount.objects.create(
             book=self.book, name="Vault", currency=self.usd, balance=Decimal("0.00")
         )
-        self.cari = CariAccount.objects.create(
+        self.current_account = CurrentAccount.objects.create(
             book=self.book, code="CARI-001", name="Maria", type="customer",
             default_currency=self.usd,
         )
 
     def _payment(self, cash_account=None, amount="400.00", ptype="collection"):
         return Payment.objects.create(
-            cari=self.cari, book=self.book, number=f"PAY-{ptype}-1",
+            current_account=self.current_account, book=self.book, number=f"PAY-{ptype}-1",
             type=ptype, method="cash", status="draft",
             date=timezone.localdate(),
             amount=Decimal(amount), currency=self.usd,

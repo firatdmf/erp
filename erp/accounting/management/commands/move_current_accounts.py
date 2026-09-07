@@ -4,7 +4,7 @@ The project is consolidating onto a single book. An account's book is not just
 a column on the account: its movements, invoices, payments and checks each
 carry their own book, and the book takes part in four unique constraints —
 
-    (book, code)             on CariAccount
+    (book, code)             on CurrentAccount
     (book, contact/company/supplier)  one account per book per CRM entity
     (book, series, number)   on Invoice
     (book, number)           on Payment
@@ -21,13 +21,13 @@ Two things this handles that are easy to miss:
   account whose code is taken is renumbered rather than refused.
 
 * The destination's own sequence has to be advanced past whatever arrived.
-  Book 2 sat at next_cari_seq=3 while accounts numbered up to CARI-074 moved
+  Book 2 sat at next_current_account_seq=3 while accounts numbered up to CARI-074 moved
   in; left alone it would have handed out CARI-003 and eventually collided
   with them.
 
-    python manage.py move_cari_accounts --to 2 --suppliers
-    python manage.py move_cari_accounts --to 2 --from-book 1 --apply
-    python manage.py move_cari_accounts --to 2 --ids 3,25,26 --apply
+    python manage.py move_current_accounts --to 2 --suppliers
+    python manage.py move_current_accounts --to 2 --from-book 1 --apply
+    python manage.py move_current_accounts --to 2 --ids 3,25,26 --apply
 """
 import re
 
@@ -35,12 +35,12 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from accounting.models import (
-    CariAccount, CariMovement, CariSettings,
+    CurrentAccount, CurrentAccountMovement, CurrentAccountSettings,
     CheckOrPromissoryNote, Invoice, Payment,
 )
 
-# Models holding both a cari FK and their own book column.
-CARRIERS = [CariMovement, Invoice, Payment, CheckOrPromissoryNote]
+# Models holding both a current account FK and their own book column.
+CARRIERS = [CurrentAccountMovement, Invoice, Payment, CheckOrPromissoryNote]
 
 
 class Command(BaseCommand):
@@ -62,19 +62,19 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
     def handle(self, *args, **o):
         target = o["to"]
-        if not CariAccount.objects.model.book.field.related_model.objects.filter(
+        if not CurrentAccount.objects.model.book.field.related_model.objects.filter(
                 pk=target).exists():
             raise CommandError(f"Book {target} does not exist.")
 
-        qs = CariAccount.objects.none()
+        qs = CurrentAccount.objects.none()
         if o["ids"]:
             ids = [int(x) for x in o["ids"].split(",") if x.strip()]
-            qs = qs | CariAccount.objects.filter(pk__in=ids)
+            qs = qs | CurrentAccount.objects.filter(pk__in=ids)
         if o["from_book"] is not None:
-            qs = qs | CariAccount.objects.filter(book_id=o["from_book"])
+            qs = qs | CurrentAccount.objects.filter(book_id=o["from_book"])
         if o["suppliers"]:
-            qs = (qs | CariAccount.objects.filter(supplier__isnull=False)
-                  | CariAccount.objects.filter(type__in=["supplier", "both"]))
+            qs = (qs | CurrentAccount.objects.filter(supplier__isnull=False)
+                  | CurrentAccount.objects.filter(type__in=["supplier", "both"]))
         if not (o["ids"] or o["from_book"] is not None or o["suppliers"]):
             raise CommandError("Give --ids, --from-book or --suppliers.")
 
@@ -90,7 +90,7 @@ class Command(BaseCommand):
             f"Moving {len(accounts)} account(s) into book {target}"))
 
         for a in accounts:
-            owned = {m.__name__: m.objects.filter(cari=a).count()
+            owned = {m.__name__: m.objects.filter(current_account=a).count()
                      for m in CARRIERS}
             owned = {k: v for k, v in owned.items() if v}
             self.stdout.write(
@@ -98,7 +98,7 @@ class Command(BaseCommand):
                 f"bal={a.cached_balance:>11,.2f} active={a.is_active}  "
                 f"{owned or ''}")
 
-            twin = (CariAccount.objects.filter(book_id=target, code=a.code)
+            twin = (CurrentAccount.objects.filter(book_id=target, code=a.code)
                     .exclude(pk=a.pk).first())
             if twin:
                 recode[a.id] = twin
@@ -108,7 +108,7 @@ class Command(BaseCommand):
 
             for field in ("contact_id", "company_id", "supplier_id"):
                 val = getattr(a, field)
-                if val and (CariAccount.objects
+                if val and (CurrentAccount.objects
                             .filter(book_id=target, **{field: val})
                             .exclude(pk=a.pk).exists()):
                     problems.append(
@@ -119,13 +119,13 @@ class Command(BaseCommand):
             # codes do — each book ran its own sequence — so they are
             # renumbered rather than refused. These are user-facing document
             # numbers, so every change is printed before anything is written.
-            for inv in Invoice.objects.filter(cari=a):
+            for inv in Invoice.objects.filter(current_account=a):
                 if (Invoice.objects
                         .filter(book_id=target, series=inv.series,
                                 number=inv.number)
                         .exclude(pk=inv.pk).exists()):
                     renum_inv.append(inv)
-            for pay in Payment.objects.filter(cari=a):
+            for pay in Payment.objects.filter(current_account=a):
                 if (Payment.objects.filter(book_id=target, number=pay.number)
                         .exclude(pk=pay.pk).exists()):
                     renum_pay.append(pay)
@@ -153,16 +153,16 @@ class Command(BaseCommand):
                 for d in doc:
                     self.stdout.write(
                         f"  {d.number} -> {mapping[d.pk]}   "
-                        f"{d.cari.name[:26]:28} {d.total if label == 'invoice' else d.amount:>10,.2f}")
+                        f"{d.current_account.name[:26]:28} {d.total if label == 'invoice' else d.amount:>10,.2f}")
 
-        settings_obj = CariSettings.objects.filter(book_id=target).first()
+        settings_obj = CurrentAccountSettings.objects.filter(book_id=target).first()
         need = self._next_seq(target, accounts, new_code)
         need_inv, need_pay = self._next_doc_seqs(target, renum_inv, renum_pay,
                                                  new_inv, new_pay)
         if settings_obj:
             bumps = []
-            if settings_obj.next_cari_seq < need:
-                bumps.append(f"next_cari_seq {settings_obj.next_cari_seq} -> {need}")
+            if settings_obj.next_current_account_seq < need:
+                bumps.append(f"next_current_account_seq {settings_obj.next_current_account_seq} -> {need}")
             if settings_obj.next_invoice_seq < need_inv:
                 bumps.append(f"next_invoice_seq {settings_obj.next_invoice_seq} -> {need_inv}")
             if settings_obj.next_payment_seq < need_pay:
@@ -196,29 +196,29 @@ class Command(BaseCommand):
                 # accounts had already left it. Those tables are gone, so
                 # the carriers below are the whole job.
                 for model in CARRIERS:
-                    model.objects.filter(cari=a).update(book_id=target)
+                    model.objects.filter(current_account=a).update(book_id=target)
                 upd = {"book_id": target}
                 if a.id in new_code:
                     upd["code"] = new_code[a.id]
-                CariAccount.objects.filter(pk=a.pk).update(**upd)
+                CurrentAccount.objects.filter(pk=a.pk).update(**upd)
             if settings_obj:
-                CariSettings.objects.filter(pk=settings_obj.pk).update(
-                    next_cari_seq=max(settings_obj.next_cari_seq, need),
+                CurrentAccountSettings.objects.filter(pk=settings_obj.pk).update(
+                    next_current_account_seq=max(settings_obj.next_current_account_seq, need),
                     next_invoice_seq=max(settings_obj.next_invoice_seq, need_inv),
                     next_payment_seq=max(settings_obj.next_payment_seq, need_pay),
                 )
             for a in accounts:
-                CariAccount.objects.get(pk=a.pk).recompute_balance(save=True)
+                CurrentAccount.objects.get(pk=a.pk).recompute_balance(save=True)
 
         self.stdout.write(self.style.SUCCESS(f"\nMoved {len(accounts)} account(s)."))
-        stray = sum(m.objects.filter(cari__book_id=target)
+        stray = sum(m.objects.filter(current_account__book_id=target)
                     .exclude(book_id=target).count() for m in CARRIERS)
         self.stdout.write(f"  rows in book {target} whose own book disagrees: {stray}")
 
     # ------------------------------------------------------------------
     def _allocate_codes(self, target, accounts, recode):
         """Fresh codes for arrivals whose own code is taken in the target."""
-        taken = set(CariAccount.objects.filter(book_id=target)
+        taken = set(CurrentAccount.objects.filter(book_id=target)
                     .values_list("code", flat=True))
         taken |= {a.code for a in accounts if a.id not in recode}
         out, n = {}, 0
@@ -234,7 +234,7 @@ class Command(BaseCommand):
 
     def _next_seq(self, target, accounts, new_code):
         """One past the highest CARI-nnn that will exist in the target book."""
-        codes = set(CariAccount.objects.filter(book_id=target)
+        codes = set(CurrentAccount.objects.filter(book_id=target)
                     .values_list("code", flat=True))
         codes |= {new_code.get(a.id, a.code) for a in accounts}
         highest = 0

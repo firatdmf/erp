@@ -176,9 +176,9 @@
       <tbody>
         {% for r in rows %}
         <tr>
-          <td><span class="tb-code">{{ r.cari.code }}</span></td>
-          <td><a class="tb-name" href="{% url 'accounts:detail' r.cari.pk %}">{{ r.cari.name }}</a></td>
-          <td><span class="tb-book">{{ r.cari.book.name }}</span></td>
+          <td><span class="tb-code">{{ r.current_account.code }}</span></td>
+          <td><a class="tb-name" href="{% url 'accounts:detail' r.current_account.pk %}">{{ r.current_account.name }}</a></td>
+          <td><span class="tb-book">{{ r.current_account.book.name }}</span></td>
           <td class="num {% if r.opening > 0 %}pos{% elif r.opening < 0 %}neg{% else %}muted{% endif %}">{{ r.opening|money }}</td>
           <td class="num {% if r.debits %}pos{% else %}muted{% endif %}">{% if r.debits %}{{ r.debits|money }}{% else %}—{% endif %}</td>
           <td class="num {% if r.credits %}neg{% else %}muted{% endif %}">{% if r.credits %}{{ r.credits|money }}{% else %}—{% endif %}</td>

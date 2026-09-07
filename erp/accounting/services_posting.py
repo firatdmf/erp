@@ -1,15 +1,15 @@
 """Turning what the subsidiary ledgers already recorded into journal entries.
 
-Every rule here says the same thing twice: a cari movement is one half of
-an event, and this names the other half. The cari ledger has always been
+Every rule here says the same thing twice: a current account movement is one half of
+an event, and this names the other half. The current account ledger has always been
 right about who owes what; what it never had was a contra, which is why
 the equation between the ledgers drifted by $1.67M while each one stayed
 internally correct.
 
 Posting is keyed on the SOURCE EVENT, not on the row. A Payment writes a
-CariMovement and a CashTransactionEntry; a CariTransfer writes two legs;
+CurrentAccountMovement and a CashTransactionEntry; a CurrentAccountTransfer writes two legs;
 a currency exchange writes two cash rows. Keying on rows would post a
-payment twice — once for the cari half and once for the cash half — and
+payment twice — once for the current account half and once for the cash half — and
 each entry would balance on its own, so nothing would catch it.
 """
 from decimal import Decimal
@@ -19,9 +19,9 @@ from django.db import transaction
 
 from .services_ledger import ZERO, account, credit, debit, post_entry
 
-# The cari control account. Every movement has a leg here: a positive
+# The current account control account. Every movement has a leg here: a positive
 # amount means the account owes the book more, which is a debit.
-CARI_CONTROL = "1200"
+CURRENT_ACCOUNT_CONTROL = "1200"
 
 # What the OTHER leg is, per movement type. A type with no rule raises
 # rather than guessing — a movement posted to the wrong account is worse
@@ -63,7 +63,7 @@ class NoRuleFor(ValidationError):
 
 
 def lines_for_movement(movement):
-    """The two lines this cari movement implies, balanced.
+    """The two lines this current account movement implies, balanced.
 
     Sign lives in one place. amount_base is positive when the account owes
     the book more, so the control leg is a debit then and a credit
@@ -84,15 +84,15 @@ def lines_for_movement(movement):
 
     memo = movement.description or movement.get_movement_type_display()
     if amount > ZERO:
-        return [debit(CARI_CONTROL, amount, cari=movement.cari, memo=memo),
+        return [debit(CURRENT_ACCOUNT_CONTROL, amount, current_account=movement.current_account, memo=memo),
                 credit(contra, amount, memo=memo)]
-    return [credit(CARI_CONTROL, -amount, cari=movement.cari, memo=memo),
+    return [credit(CURRENT_ACCOUNT_CONTROL, -amount, current_account=movement.current_account, memo=memo),
             debit(contra, -amount, memo=memo)]
 
 
 @transaction.atomic
 def post_movement(movement, *, reference=""):
-    """Post one cari movement, or nothing. Returns the entry or None."""
+    """Post one current account movement, or nothing. Returns the entry or None."""
     lines = lines_for_movement(movement)
     if not lines:
         return None
@@ -137,21 +137,21 @@ def post_opening_inventory(book, *, date, reference=""):
 def reclassify_payables(book, *, date, reference=""):
     """Move the accounts that are in credit from receivable to payable.
 
-    Every cari movement posts to 1200 because that is where the account's
+    Every current account movement posts to 1200 because that is where the account's
     running balance lives. An account whose balance ends up NEGATIVE is
     not a receivable at all — the book owes them — and a balance sheet
     that nets the two together understates both sides. One entry at the
     end moves the credit balances across, which is how a subsidiary
     ledger is reconciled to its control accounts anywhere else.
     """
-    from .models_accounts import CariAccount
+    from .models_accounts import CurrentAccount
 
-    total = -(CariAccount.objects.filter(book=book, cached_balance__lt=0)
+    total = -(CurrentAccount.objects.filter(book=book, cached_balance__lt=0)
               .aggregate(t=__import__("django.db.models", fromlist=["Sum"])
                          .Sum("cached_balance"))["t"] or ZERO)
     if total <= ZERO:
         return None, 0
-    count = CariAccount.objects.filter(book=book, cached_balance__lt=0).count()
+    count = CurrentAccount.objects.filter(book=book, cached_balance__lt=0).count()
     entry = post_entry(
         book=book, date=date,
         description="Reclassify credit balances to accounts payable",

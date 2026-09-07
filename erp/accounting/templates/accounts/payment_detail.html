@@ -161,7 +161,7 @@
         <span class="pd-dot"></span>
         <span><i data-lucide="credit-card"></i>{{ payment.get_method_display }}</span>
         <span class="pd-dot"></span>
-        <span><i data-lucide="user"></i><a href="{% url 'accounts:detail' payment.cari.pk %}">{{ payment.cari.name }}</a></span>
+        <span><i data-lucide="user"></i><a href="{% url 'accounts:detail' payment.current_account.pk %}">{{ payment.current_account.name }}</a></span>
       </div>
     </div>
     <div class="pd-head-r">
@@ -302,13 +302,13 @@
             <span class="ico"><i data-lucide="user"></i></span>
             <h3>{% trans "Account" %}</h3>
           </div>
-          <div class="pd-mini-name">{{ payment.cari.name }}</div>
-          <span class="pd-mini-code">{{ payment.cari.code }}</span>
+          <div class="pd-mini-name">{{ payment.current_account.name }}</div>
+          <span class="pd-mini-code">{{ payment.current_account.code }}</span>
           <div class="pd-mini-sub">
-            {% trans "Current balance:" %} <strong>{{ payment.cari.display_currency_symbol }}{{ payment.cari.absolute_balance|money }}</strong>
-            <br>{{ payment.cari.balance_label }}
+            {% trans "Current balance:" %} <strong>{{ payment.current_account.display_currency_symbol }}{{ payment.current_account.absolute_balance|money }}</strong>
+            <br>{{ payment.current_account.balance_label }}
           </div>
-          <a href="{% url 'accounts:detail' payment.cari.pk %}" class="pd-mini-link">
+          <a href="{% url 'accounts:detail' payment.current_account.pk %}" class="pd-mini-link">
             {% trans "Go to account" %} <i data-lucide="arrow-right"></i>
           </a>
         </div>

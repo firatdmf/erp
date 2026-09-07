@@ -1,6 +1,6 @@
-"""Current-account (cari) routes, mounted at /accounting/.
+"""Current-account (current account) routes, mounted at /accounting/.
 
-Formerly the standalone ``current_account`` app served from /cari/. The
+Formerly the standalone ``current_account`` app served from /current account/. The
 ledger belongs to accounting, so it lives here and the URLs read in
 English: /accounting/accounts/, /accounting/invoices/, and so on.
 
@@ -46,7 +46,7 @@ from . import (
 from . import views_accounts as views
 from .book_scope import book_guarded, book_scoped
 from .models import CheckOrPromissoryNote, Invoice, Payment
-from .models_accounts import CariAccount, CariTransfer
+from .models_accounts import CurrentAccount, CurrentAccountTransfer
 from .views_accounts import LegacyCollectionRedirect as _Legacy
 
 app_name = "accounts"
@@ -76,10 +76,10 @@ urlpatterns = [
     # ------------------------------------------------------------------
     # Collections — one book's worth, named in the path.
     # ------------------------------------------------------------------
-    scoped("accounts/",                  views.CariList.as_view(),           "list"),
-    scoped("accounts/new/",              views.CariCreate.as_view(),         "create"),
-    scoped("accounts/statement/",        views.CariStatementAll.as_view(),   "statement_all"),
-    scoped("accounts/retail/",           views.RetailCariRedirect.as_view(), "retail"),
+    scoped("accounts/",                  views.CurrentAccountList.as_view(),           "list"),
+    scoped("accounts/new/",              views.CurrentAccountCreate.as_view(),         "create"),
+    scoped("accounts/statement/",        views.CurrentAccountStatementAll.as_view(),   "statement_all"),
+    scoped("accounts/retail/",           views.RetailCurrentAccountRedirect.as_view(), "retail"),
 
     scoped("invoices/",                  views_invoice.InvoiceList.as_view(),           "invoice_list"),
     scoped("invoices/new/",              views_invoice.InvoiceCreate.as_view(),         "invoice_create"),
@@ -105,21 +105,21 @@ urlpatterns = [
     # ------------------------------------------------------------------
     # Objects — the row names its own book, so the path does not.
     # ------------------------------------------------------------------
-    owned("accounts/<int:pk>/", views.CariDetail.as_view(), "detail", CariAccount),
-    owned("accounts/<int:pk>/statement/", views.CariStatement.as_view(), "statement", CariAccount),
-    owned("accounts/<int:pk>/edit/", views.CariEdit.as_view(), "edit", CariAccount),
-    owned("accounts/<int:pk>/crm-link/", views.CariCrmLink.as_view(), "crm_link", CariAccount),
-    owned("accounts/<int:pk>/crm-search/", views.CariCrmSearch.as_view(), "crm_search", CariAccount),
-    owned("accounts/<int:pk>/delete/", views.CariDelete.as_view(), "delete", CariAccount),
-    owned("accounts/<int:pk>/movements/new/", views.CariMovementCreate.as_view(), "movement_create", CariAccount),
-    path("accounts/<int:pk>/movements/<int:mv_pk>/",        views.CariMovementDetail.as_view(), name="movement_detail"),
-    path("accounts/<int:pk>/movements/<int:mv_pk>/edit/",   views.CariMovementEdit.as_view(),   name="movement_edit"),
-    path("accounts/<int:pk>/movements/<int:mv_pk>/delete/", views.CariMovementDelete.as_view(), name="movement_delete"),
+    owned("accounts/<int:pk>/", views.CurrentAccountDetail.as_view(), "detail", CurrentAccount),
+    owned("accounts/<int:pk>/statement/", views.CurrentAccountStatement.as_view(), "statement", CurrentAccount),
+    owned("accounts/<int:pk>/edit/", views.CurrentAccountEdit.as_view(), "edit", CurrentAccount),
+    owned("accounts/<int:pk>/crm-link/", views.CurrentAccountCrmLink.as_view(), "crm_link", CurrentAccount),
+    owned("accounts/<int:pk>/crm-search/", views.CurrentAccountCrmSearch.as_view(), "crm_search", CurrentAccount),
+    owned("accounts/<int:pk>/delete/", views.CurrentAccountDelete.as_view(), "delete", CurrentAccount),
+    owned("accounts/<int:pk>/movements/new/", views.CurrentAccountMovementCreate.as_view(), "movement_create", CurrentAccount),
+    path("accounts/<int:pk>/movements/<int:mv_pk>/",        views.CurrentAccountMovementDetail.as_view(), name="movement_detail"),
+    path("accounts/<int:pk>/movements/<int:mv_pk>/edit/",   views.CurrentAccountMovementEdit.as_view(),   name="movement_edit"),
+    path("accounts/<int:pk>/movements/<int:mv_pk>/delete/", views.CurrentAccountMovementDelete.as_view(), name="movement_delete"),
 
     # A transfer belongs to two accounts, so it is not nested under either.
-    path("accounts/transfers/<int:pk>/",      views.CariTransferDetail.as_view(), name="transfer_detail"),
-    path("accounts/transfers/<int:pk>/edit/", views.CariTransferEdit.as_view(),   name="transfer_edit"),
-    path("accounts/transfers/<int:pk>/undo/", views.CariTransferUndo.as_view(),   name="transfer_undo"),
+    path("accounts/transfers/<int:pk>/",      views.CurrentAccountTransferDetail.as_view(), name="transfer_detail"),
+    path("accounts/transfers/<int:pk>/edit/", views.CurrentAccountTransferEdit.as_view(),   name="transfer_edit"),
+    path("accounts/transfers/<int:pk>/undo/", views.CurrentAccountTransferUndo.as_view(),   name="transfer_undo"),
 
     owned("accounts/invoices/<int:pk>/", views_invoice.InvoiceDetail.as_view(), "invoice_detail", Invoice),
     path("accounts/invoices/<int:pk>/excel/",   invoice_excel.invoice_excel,            name="invoice_excel"),

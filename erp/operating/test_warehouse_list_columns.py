@@ -188,3 +188,111 @@ class CombinedWarehouseSaysWhichShelf(TestCase):
             "operating:warehouse_product_rolls", args=[self.combined.pk, wp.pk]))
         self.assertEqual(resp.status_code, 200)
         self.assertIn('colspan="7"', resp.content.decode())
+
+
+class TheListDoesNotJoinTheStockItems(TestCase):
+    """The stock-item COUNT on each row must not be a join.
+
+    Count("stock_items") is a reverse-relation aggregate, so Django adds a
+    LEFT JOIN and groups the row by every other selected column. Those
+    other columns are the correlated subqueries behind stock_value,
+    stock_quantity and reserved — which then run once per JOINED STOCK
+    ITEM instead of once per product. On the combined warehouse (2,011
+    products over 8,343 stock items) that was 3,157 ms of server work
+    against 193 ms for the same page built with a subquery.
+
+    The counts come out identical either way, so nothing about the
+    RESULT can catch a regression here — only the shape of the query
+    can. Hence a test on the SQL rather than on the numbers.
+
+    The same trap, and the same fix, is documented in warehouse_search_q.
+    """
+
+    def setUp(self):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Laleli Fabric", base_currency=usd)
+        self.wh = Warehouse.objects.create(
+            name="Laleli Fabrika", accounting_book=self.book)
+        self.wp = WarehouseProduct.objects.create(
+            warehouse=self.wh, name="seta grey", sku="SETA-1",
+            quantity=Decimal("30"))
+        for n in range(3):
+            WarehouseProductItem.objects.create(
+                product=self.wp, quantity=Decimal("10"),
+                quantity_remaining=Decimal("10"), barcode=f"BC-{n}",
+                status="in_stock", unit_cost_base=Decimal("4"))
+
+        user = get_user_model().objects.create_user("wh2", password="pw")
+        user.member.books.add(self.book)
+        user.member.default_book = self.book
+        user.member.save()
+        self.client.force_login(user)
+
+    def _list_sql(self, **params):
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+        with CaptureQueriesContext(connection) as ctx:
+            resp = self.client.get(reverse(
+                "operating:warehouse_detail", args=[self.wh.pk]), params)
+            self.assertEqual(resp.status_code, 200)
+        return [" ".join(q["sql"].split()).lower() for q in ctx.captured_queries]
+
+    def _product_selects(self, sqls):
+        """The queries that build the product list — the ones selecting
+        warehouseproduct rows with the cost subqueries attached."""
+        return [s for s in sqls
+                if "from \"operating_warehouseproduct\"" in s
+                and "unit_cost_base" in s]
+
+    def test_the_outer_row_query_does_not_group_by(self):
+        """Only the OUTER query matters. Each correlated subquery carries a
+        GROUP BY of its own, correctly — it is the outer one, added by a
+        reverse-relation Count(), that forces the subqueries to be
+        re-evaluated per joined row."""
+        rows = self._product_selects(self._list_sql())
+        self.assertTrue(rows, "no product list query was captured")
+        for sql in rows:
+            outer = sql.rsplit('from "operating_warehouseproduct"', 1)[-1]
+            self.assertNotIn("group by", outer)
+
+    def test_the_row_query_does_not_join_the_stock_item_table(self):
+        rows = self._product_selects(self._list_sql())
+        self.assertTrue(rows, "no product list query was captured")
+        for sql in rows:
+            self.assertNotIn(
+                'inner join "operating_warehouseproductitem"', sql)
+            self.assertNotIn(
+                'left outer join "operating_warehouseproductitem"', sql)
+
+    def test_the_count_it_reports_is_still_right(self):
+        html = self._list_html()
+        self.assertIn("3", html)
+        from operating.views_warehouse import stock_item_count_subquery
+        got = (WarehouseProduct.objects.filter(pk=self.wp.pk)
+               .annotate(n=stock_item_count_subquery()).first().n)
+        self.assertEqual(got, 3)
+
+    def test_a_consumed_stock_item_is_not_counted(self):
+        from operating.views_warehouse import stock_item_count_subquery
+        self.wp.stock_items.filter(barcode="BC-0").update(status="consumed")
+        got = (WarehouseProduct.objects.filter(pk=self.wp.pk)
+               .annotate(n=stock_item_count_subquery()).first().n)
+        self.assertEqual(got, 2)
+
+    def test_a_product_with_no_stock_items_counts_zero_not_null(self):
+        """Coalesce, not a bare Subquery: a null would render as an empty
+        cell where the old join wrote 0."""
+        from operating.views_warehouse import stock_item_count_subquery
+        empty = WarehouseProduct.objects.create(
+            warehouse=self.wh, name="empty", sku="EMPTY-1",
+            quantity=Decimal("0"))
+        got = (WarehouseProduct.objects.filter(pk=empty.pk)
+               .annotate(n=stock_item_count_subquery()).first().n)
+        self.assertEqual(got, 0)
+
+    def _list_html(self):
+        resp = self.client.get(reverse(
+            "operating:warehouse_detail", args=[self.wh.pk]))
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode()

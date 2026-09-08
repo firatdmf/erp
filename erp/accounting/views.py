@@ -616,19 +616,30 @@ class BookDetail(generic.DetailView):
         receivable = current_account["receivable"] or zero
         payable = abs(current_account["payable"] or zero)
 
+        # Stock on the shelves is an asset, and this page left it out — it
+        # counted cash, receivables and fixed assets only, so Ergene showed
+        # nothing of the $376,906.10 standing in Ergene Fabrika. Valued by
+        # the same function the balance sheet uses, at what each item cost,
+        # so the two pages cannot report different inventories.
+        from .services_ledger import _inventory_value
+        inventory, unvalued_items, unvalued_qty = _inventory_value(book)
+
         fixed = _sum_in_base(AssetFixedAsset, book, "value")
         capital = _sum_in_base(EquityCapital, book, "amount")
         revenue = _sum_in_base(EquityRevenue, book, "amount")
         expense = _sum_in_base(EquityExpense, book, "amount")
         dividend = _sum_in_base(EquityDivident, book, "amount")
 
-        assets = cash + receivable + fixed
+        assets = cash + receivable + inventory + fixed
         equity = capital + revenue - expense - dividend
         liabilities = payable
 
         return {
             "eq_cash": cash,
             "eq_receivable": receivable,
+            "eq_inventory": inventory,
+            "eq_unvalued_items": unvalued_items,
+            "eq_unvalued_qty": unvalued_qty,
             "eq_fixed": fixed,
             "eq_assets": assets,
             "eq_payable": payable,

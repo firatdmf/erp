@@ -273,6 +273,13 @@
         <div class="eq-side-title">Assets</div>
         <div class="eq-line"><span>Cash accounts</span><span class="v">{{ eq_cash|format_money }}</span></div>
         <div class="eq-line"><span>Receivables</span><span class="v">{{ eq_receivable|format_money }}</span></div>
+        <div class="eq-line">
+          <span>Inventory{% if eq_unvalued_items %}
+            {% comment %}Items with no cost basis are outside the figure, so
+            say how many rather than letting unpriced read as free.{% endcomment %}
+            <small style="color:var(--gray-500);">({{ eq_unvalued_items }} unpriced)</small>{% endif %}</span>
+          <span class="v">{{ eq_inventory|format_money }}</span>
+        </div>
         <div class="eq-line"><span>Fixed assets</span><span class="v">{{ eq_fixed|format_money }}</span></div>
         <div class="eq-total"><span>Total</span><span class="v">{{ eq_assets|format_money }}</span></div>
       </div>

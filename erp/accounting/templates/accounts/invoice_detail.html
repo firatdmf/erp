@@ -677,7 +677,7 @@
               trade term in English is "Rolls", not a literal "Tops".{% endcomment %}
               <span class="rc-lbl">{% trans "Rolls" %}</span>
               {% for r in it.display_rolls %}
-              <span class="roll-chip"><code>{{ r.barcode|default:"—" }}</code>{{ r.meters|floatformat:2 }} m</span>
+              <span class="roll-chip"><code>{{ r.barcode|default:"—" }}</code>{{ r.quantity|floatformat:2 }} m</span>
               {% endfor %}
             </div>
             {% endif %}

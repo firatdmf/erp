@@ -640,7 +640,7 @@ def cancel_purchase_invoice(invoice_pk, user):
             touched_wp_ids.add(wp.pk)
             StockMovement.objects.create(
                 product=wp, stock_item=None, movement_type="adjustment",
-                quantity=-(roll.meters_remaining if roll.meters_remaining is not None else roll.meters),
+                quantity=-(roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity),
                 reason="Purchase cancelled",
                 reference=roll.barcode, created_by=user,
             )
@@ -652,7 +652,7 @@ def cancel_purchase_invoice(invoice_pk, user):
                 continue
             total = Decimal("0")
             for r in wp.stock_items.all():
-                rem = r.meters_remaining if r.meters_remaining is not None else (r.meters or Decimal("0"))
+                rem = r.quantity_remaining if r.quantity_remaining is not None else (r.quantity or Decimal("0"))
                 total += rem or Decimal("0")
             wp.quantity = total
             wp.save(update_fields=["quantity", "updated_at"])

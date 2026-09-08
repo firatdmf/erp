@@ -58,9 +58,9 @@ links so that keeps working.{% endcomment %}
   {% endif %}
   <td class="num" data-label="{% trans 'Stock' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
-      <div class="qty">{{ p.quantity|floatformat:2 }} m</div>
+      <div class="qty">{{ p.quantity|floatformat:2 }} {{ p.unit_short }}</div>
       {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each roll has its own barcode' %}">{{ p.roll_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=p.roll_count %}roll{% plural %}rolls{% endblocktrans %}{% endif %}</div>{% endif %}
-      {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} m</div>{% endif %}
+      {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} {{ p.unit_short }}</div>{% endif %}
     </a>
   </td>
   {% comment %}Unit cost is the quantity-weighted average of the rolls
@@ -119,9 +119,9 @@ links so that keeps working.{% endcomment %}
   </td>
   {% endif %}
   <td class="num" data-label="{% trans 'Total' %}">
-    <div class="qty">{{ g.total_qty|floatformat:2 }} m</div>
+    <div class="qty">{{ g.total_qty|floatformat:2 }} {{ g.unit_short }}</div>
     {% if g.roll_total %}<div class="tops-sub">{{ g.roll_total }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=g.roll_total %}roll{% plural %}rolls{% endblocktrans %}{% endif %}</div>{% endif %}
-    {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ g.reserved_total|floatformat:2 }} m</div>{% endif %}
+    {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ g.reserved_total|floatformat:2 }} {{ g.unit_short }}</div>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Unit cost' %}" title="{% trans 'Weighted-average unit cost across the variants of this product' %}">
     {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}

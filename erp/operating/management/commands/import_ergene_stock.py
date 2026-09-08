@@ -304,7 +304,7 @@ class Command(BaseCommand):
         mine = WarehouseProductItem.objects.filter(
             Q(product__warehouse=warehouse) & described)
         # Untouched since the import: still whole, still in stock.
-        rolls = mine.filter(status="in_stock", meters_remaining=F("meters"))
+        rolls = mine.filter(status="in_stock", quantity_remaining=F("quantity"))
         touched = set(rolls.values_list("product_id", flat=True))
         removed_stock = rolls.count()
         kept = mine.count() - removed_stock
@@ -321,8 +321,8 @@ class Command(BaseCommand):
         restated = 0
         for product in WarehouseProduct.objects.filter(pk__in=touched):
             total = sum(
-                (r.meters_remaining if r.meters_remaining is not None
-                 else r.meters)
+                (r.quantity_remaining if r.quantity_remaining is not None
+                 else r.quantity)
                 for r in product.stock_items.exclude(status="consumed")
             ) or Decimal("0")
             if product.quantity != total:
@@ -382,8 +382,8 @@ class Command(BaseCommand):
                 WarehouseProductItem.objects
                 .filter(product__warehouse=warehouse)
                 .exclude(status="consumed")
-                .values_list("product_id", "barcode", "lot_number", "meters",
-                             "meters_remaining")):
+                .values_list("product_id", "barcode", "lot_number", "quantity",
+                             "quantity_remaining")):
             if barcode:
                 seen.add(barcode)
             if lot:
@@ -436,8 +436,8 @@ class Command(BaseCommand):
                     stats["barcodes_minted"] += 1
                     notes.append(f"Fabrikadan barkodsuz geldi; {barcode} basıldı")
                 fresh.append(WarehouseProductItem(
-                    product=product, meters=item["metres"],
-                    meters_remaining=item["metres"], barcode=barcode,
+                    product=product, quantity=item["metres"],
+                    quantity_remaining=item["metres"], barcode=barcode,
                     lot_number=item["lot"], status="in_stock",
                     is_second=item["second"],
                     notes=" · ".join(x for x in notes if x) or None,
@@ -445,12 +445,12 @@ class Command(BaseCommand):
             rolls.extend(fresh)
             stats["stock_created"] += len(fresh)
             if fresh:
-                movements.append((product, sum(r.meters for r in fresh)))
+                movements.append((product, sum(r.quantity for r in fresh)))
 
             # Quantity is restated from the stock items on the shelf rather than
             # incremented, so a partial or repeated run cannot double it.
             total = (held.get(product.pk, Decimal("0"))
-                     + sum(r.meters for r in fresh))
+                     + sum(r.quantity for r in fresh))
             quantities[desen] = product.quantity = total
             stats["metres"] += total
             if price is not None:

@@ -2,7 +2,7 @@
 
 Re-creates the physical fabric-roll sticker: brand wordmark, DESEN (main
 product) + VARYANT, SKU, METRE, a Code128 barcode and a QR code — one label
-per roll (each roll has its own barcode + meters), so staff can reprint and
+per stock item (each carries its own barcode + quantity), so staff can reprint and
 stick a fresh label on a product.
 
 Uses reportlab (Code128) + segno (QR) — both already in the project, no new
@@ -78,16 +78,18 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
         token = cat["original_token"] or ""
         sku = product.sku or ""
         bc_val = (roll.barcode if (roll and roll.barcode) else (product.barcode or sku or ""))
-        # What is physically on the roll NOW, not the length it arrived
-        # at: a cut roll carries meters_remaining, and the reprinted label
-        # goes back on that shorter roll. meters_remaining is null for a
-        # roll that has never been cut, so fall back to meters there.
+        # What is physically on the stock item NOW, not what it arrived
+        # at: a cut roll carries quantity_remaining, and the reprinted label
+        # goes back on that shorter roll. quantity_remaining is null for a
+        # stock item that has never been cut, so fall back to the full
+        # quantity there.
         if roll is not None:
-            meters = (roll.meters_remaining
-                      if roll.meters_remaining is not None else roll.meters)
+            quantity = (roll.quantity_remaining
+                        if roll.quantity_remaining is not None else roll.quantity)
         else:
-            meters = product.quantity
-        meters = meters or 0
+            quantity = product.quantity
+        quantity = quantity or 0
+        unit = product.unit_short
 
         # ── QR (top-right) — encodes the ROLL barcode so a QR scan flows
         #    through the same warehouse-lookup pipeline as a 1D scan. QRs
@@ -146,7 +148,11 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
         c.drawRightString(W - 4 * mm, H - qsize - 8 * mm, "QUANTITY")
         c.setFillColorRGB(0, 0, 0)
         c.setFont(bold, 12)
-        c.drawRightString(W - 4 * mm, H - qsize - 13.5 * mm, f"{float(meters):.2f}")
+        # The unit goes on the label now that the warehouse holds more than
+        # fabric — "20.00" alone reads as metres to anyone who has only ever
+        # seen a roll tag, and a box of 20 curtain sets is not 20 metres.
+        c.drawRightString(W - 4 * mm, H - qsize - 13.5 * mm,
+                          f"{float(quantity):.2f} {unit}".strip())
 
         # ── Code128 barcode (bottom, auto-shrunk to fit) ──
         if bc_val:

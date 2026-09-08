@@ -104,7 +104,7 @@ def _roll_reservation_info(roll):
 
     A hold exists from the moment the roll is picked for an order — a
     barcode scanned into a line on the order form, the packing scan, or the
-    retail flow — and holds nothing back physically: meters_remaining and
+    retail flow — and holds nothing back physically: quantity_remaining and
     the product quantity are untouched until the order ships. So a reserved
     roll scans as ordinary free stock unless we say otherwise, and someone
     can walk off with metres another order is counting on.
@@ -130,11 +130,11 @@ def _roll_reservation_info(roll):
             sku = (item.product_variant.variant_sku
                    if item.product_variant_id else "") or ""
             line = f"{title} [{sku}]".strip() if sku else (title.strip() or None)
-        total += res.meters or Decimal("0")
+        total += res.quantity or Decimal("0")
         held.append({
             "label": str(order),
             "line": line,
-            "meters": float(res.meters or 0),
+            "quantity": float(res.quantity or 0),
             "date": (localtime(res.created_at).strftime("%d.%m.%Y")
                      if res.created_at else None),
             "url": reverse("operating:order_detail", args=[order.pk]),
@@ -143,7 +143,7 @@ def _roll_reservation_info(roll):
 
     if not held:
         return None
-    return {"meters": float(total), "entries": held}
+    return {"quantity": float(total), "entries": held}
 
 
 def _roll_usage_info(roll):
@@ -167,8 +167,8 @@ def _roll_usage_info(roll):
     metres taken by hand and reads from its own reason."""
     from django.utils.timezone import localtime
 
-    total = roll.meters or Decimal("0")
-    remaining = roll.meters_remaining if roll.meters_remaining is not None else total
+    total = roll.quantity or Decimal("0")
+    remaining = roll.quantity_remaining if roll.quantity_remaining is not None else total
     used = total - (remaining or Decimal("0"))
     if used <= 0:
         return None
@@ -201,7 +201,7 @@ def _roll_usage_info(roll):
                 "kind": "order",
                 "label": str(order),
                 "line": line,
-                "meters": float(mv.quantity or 0),
+                "quantity": float(mv.quantity or 0),
                 "date": date,
                 "url": reverse("operating:order_detail", args=[order.pk]),
                 # Straight to the packing list — the screen showing which
@@ -214,7 +214,7 @@ def _roll_usage_info(roll):
                 "kind": "movement",
                 "label": (mv.reason or mv.reference or "").strip() or None,
                 "line": None,
-                "meters": float(mv.quantity or 0),
+                "quantity": float(mv.quantity or 0),
                 "date": date,
                 "by": mv.created_by.get_username() if mv.created_by else None,
                 "url": None,
@@ -655,7 +655,7 @@ def _add_stock_to_variant(wp, stock_items, mint, user, *, notes_supplier=None,
         if first_barcode is None:
             first_barcode = code
         roll = WarehouseProductItem.objects.create(
-            product=wp, meters=qty, meters_remaining=qty,
+            product=wp, quantity=qty, quantity_remaining=qty,
             barcode=code,
             notes=(f"Supplier: {notes_supplier}" if notes_supplier else None),
             scanned_by=user,
@@ -673,7 +673,7 @@ def _add_stock_to_variant(wp, stock_items, mint, user, *, notes_supplier=None,
     # existing same-SKU product, not just the stock items just added here).
     total = Decimal("0")
     for rr in wp.stock_items.all():
-        rem = rr.meters_remaining if rr.meters_remaining is not None else (rr.meters or Decimal("0"))
+        rem = rr.quantity_remaining if rr.quantity_remaining is not None else (rr.quantity or Decimal("0"))
         total += rem or Decimal("0")
     wp.quantity = total
     # WarehouseProduct.barcode is NOT set from a roll. A barcode identifies
@@ -777,7 +777,7 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
         # Survivor quantity = sum of remaining metres across ALL its rolls.
         total = Decimal("0")
         for r in survivor.stock_items.all():
-            rem = r.meters_remaining if r.meters_remaining is not None else (r.meters or Decimal("0"))
+            rem = r.quantity_remaining if r.quantity_remaining is not None else (r.quantity or Decimal("0"))
             total += rem or Decimal("0")
         survivor.quantity = total
         survivor.save(update_fields=["quantity", "catalog_variant", "updated_at"])
@@ -1280,6 +1280,14 @@ class WarehouseDetail(View):
                        .values("base").annotate(
                 variant_count=Count("id"),
                 linked=Count("catalog_variant"),
+                # The unit the group is counted in. Max() rather than a
+                # GROUP BY member: every product under one base SKU is the
+                # same goods in different colours, so they share a unit, and
+                # grouping by it as well would split a group the moment one
+                # row was mis-set. A mixed group renders the alphabetically
+                # last code, which is wrong but visible — better than the
+                # hardcoded "m" that stood here before.
+                unit=Max("unit"),
                 total_qty=Coalesce(Sum("quantity"), Decimal("0"),
                                    output_field=DecimalField(max_digits=18, decimal_places=2)),
                 total_usd=Coalesce(Sum("stock_value"), Decimal("0"),
@@ -1364,6 +1372,8 @@ class WarehouseDetail(View):
                 "variant_count": g["variant_count"],
                 "roll_total": _roll_counts.get(g["base"], 0),
                 "total_qty": g["total_qty"],
+                "unit_short": WarehouseProduct.UNIT_SHORT.get(
+                    g.get("unit"), g.get("unit") or ""),
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "avg_cost_usd": g["avg_cost"],
@@ -1443,10 +1453,33 @@ class WarehouseDetail(View):
             # from a virtual view would move stock; disabled there.
             'dup_count': 0 if warehouse.is_combined else _warehouse_dup_sku_count(warehouse),
             'total_quantity': counts['qty'],
+            # The unit to print beside that total, or "" when the warehouse
+            # holds more than one. Summing metres of fabric and boxes of
+            # ready-made curtains into a single figure is meaningless, so a
+            # mixed warehouse gets a bare number and the per-product rows
+            # carry the units instead. Fabric-only warehouses, which is all
+            # of them until Ready-made Shop, still read "12,345 m".
+            'total_unit_short': _warehouse_unit_short(scope_ids),
             'combined_members': (list(warehouse.combined_sources.order_by('name'))
                                  if warehouse.is_combined else []),
         })
         return render(request, self.template_name, ctx)
+
+
+def _warehouse_unit_short(scope_ids):
+    """The single unit a warehouse counts in, short form, or "" if mixed.
+
+    Reads the DISTINCT units actually present rather than assuming, so a
+    warehouse that starts as fabric and later takes a pallet of curtains
+    stops claiming its total is in metres the moment that happens.
+    """
+    units = set(WarehouseProduct.objects
+                .filter(warehouse_id__in=scope_ids)
+                .values_list("unit", flat=True).distinct())
+    if len(units) != 1:
+        return ""
+    unit = units.pop()
+    return WarehouseProduct.UNIT_SHORT.get(unit, unit or "")
 
 
 @login_required
@@ -1588,7 +1621,7 @@ def warehouse_product_rolls(request, warehouse_pk, product_pk):
                      .select_related("order")
                      .order_by("-created_at")):
             reserved_by_roll[resv.stock_item_id] = (reserved_by_roll.get(resv.stock_item_id, _Dec("0"))
-                                              + (resv.meters or _Dec("0")))
+                                              + (resv.quantity or _Dec("0")))
             reservations_by_roll.setdefault(resv.stock_item_id, []).append(resv)
     for r in rolls:
         r.reserved_m = reserved_by_roll.get(r.id, _Dec("0"))
@@ -1665,9 +1698,9 @@ def warehouse_barcode_lookup(request, pk):
                 },
                 "roll": {
                     "id": other_roll.pk, "barcode": other_roll.barcode,
-                    "meters": float(other_roll.meters or 0),
-                    "meters_remaining": (float(other_roll.meters_remaining)
-                                          if other_roll.meters_remaining is not None else None),
+                    "quantity": float(other_roll.quantity or 0),
+                    "quantity_remaining": (float(other_roll.quantity_remaining)
+                                          if other_roll.quantity_remaining is not None else None),
                     "lot_number": other_roll.lot_number,
                     "status": other_roll.status,
                     "consumed": other_roll.status == "consumed",
@@ -1688,9 +1721,9 @@ def warehouse_barcode_lookup(request, pk):
                 },
                 "roll": {
                     "id": other_roll.pk, "barcode": other_roll.barcode,
-                    "meters": float(other_roll.meters or 0),
-                    "meters_remaining": (float(other_roll.meters_remaining)
-                                          if other_roll.meters_remaining is not None else None),
+                    "quantity": float(other_roll.quantity or 0),
+                    "quantity_remaining": (float(other_roll.quantity_remaining)
+                                          if other_roll.quantity_remaining is not None else None),
                     "lot_number": other_roll.lot_number,
                     "status": other_roll.status,
                     "consumed": other_roll.status == "consumed",
@@ -1750,8 +1783,8 @@ def warehouse_barcode_lookup(request, pk):
         "roll": ({
             "id": roll.pk,
             "barcode": roll.barcode,
-            "meters": float(roll.meters or 0),
-            "meters_remaining": (float(roll.meters_remaining) if roll.meters_remaining is not None else None),
+            "quantity": float(roll.quantity or 0),
+            "quantity_remaining": (float(roll.quantity_remaining) if roll.quantity_remaining is not None else None),
             "lot_number": roll.lot_number,
             "status": roll.status,
             "consumed": roll.status == "consumed",
@@ -1841,13 +1874,18 @@ def warehouse_roll_move_here(request, pk, roll_pk):
             target_wp = WarehouseProduct.objects.create(
                 warehouse=target_warehouse, name=source_wp.name, sku=source_wp.sku,
                 barcode=source_wp.barcode, quantity=Decimal("0"),
+                # Carried across, not defaulted: the same goods moving shelf
+                # to shelf are still counted the same way, and a destination
+                # row that fell back to metres would relabel a box of
+                # curtain sets the moment it was moved.
+                unit=source_wp.unit,
                 purchase_price=source_wp.purchase_price,
                 purchase_currency=source_wp.purchase_currency,
                 cost_usd=source_wp.cost_usd, cost_try=source_wp.cost_try,
                 catalog_variant=source_wp.catalog_variant,
             )
 
-        meters = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+        meters = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
         meters = meters or Decimal("0")
 
         StockMovement.objects.create(
@@ -1878,7 +1916,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
         for wp in (source_wp, target_wp):
             total = Decimal("0")
             for r in wp.stock_items.all():
-                rem = r.meters_remaining if r.meters_remaining is not None else (r.meters or Decimal("0"))
+                rem = r.quantity_remaining if r.quantity_remaining is not None else (r.quantity or Decimal("0"))
                 total += rem or Decimal("0")
             wp.quantity = total
             wp.save(update_fields=["quantity", "updated_at"])
@@ -1895,7 +1933,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
                                   args=[target_warehouse.pk, target_wp.pk]),
         },
         "roll": {
-            "id": roll.pk, "barcode": roll.barcode, "meters": float(meters),
+            "id": roll.pk, "barcode": roll.barcode, "quantity": float(meters),
         },
     })
 
@@ -2386,6 +2424,11 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     purchase_lines = []   # aggregated across the WHOLE batch → one alış faturası
     mint = _barcode_minter(prefix, reserved=manual_codes)
     prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
+    # What the WAREHOUSE row is counted in. `prod_unit` above is the
+    # catalog's flattened version (marketing.Product allows only
+    # units/mt/kg, so adet and paket both collapse to "units"); the
+    # warehouse keeps the distinction the form actually collected.
+    wh_unit = unit if unit in dict(WarehouseProduct.UNIT_CHOICES) else "mt"
     usd_try = _get_usd_try_rate() or Decimal("1")
 
     try:
@@ -2530,6 +2573,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                             purchase_price=(price if (price and price > 0) else None),
                             purchase_currency=currency,
                             cost_usd=cost_usd, cost_try=cost_try,
+                            unit=wh_unit,
                         )
                     elif price and price > 0:
                         wp.purchase_price = price
@@ -2872,7 +2916,7 @@ class WarehousePurchaseEdit(View):
                 "quantity": str(it.quantity),
                 "tops": [
                     {"stock_item_id": r.pk, "barcode": r.barcode,
-                     "meters": str(r.meters), "locked": bool(r.is_locked)}
+                     "quantity": str(r.quantity), "locked": bool(r.is_locked)}
                     for r in rolls
                 ],
             })
@@ -3027,7 +3071,7 @@ class WarehousePurchaseEdit(View):
                 touched_wp_ids.add(wp.pk)
                 StockMovement.objects.create(
                     product=wp, stock_item=None, movement_type="adjustment",
-                    quantity=-(roll.meters_remaining if roll.meters_remaining is not None else roll.meters),
+                    quantity=-(roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity),
                     reason="Purchase edit — stock item removed",
                     reference=roll.barcode, created_by=user,
                 )
@@ -3071,7 +3115,7 @@ class WarehousePurchaseEdit(View):
                             )
                             touched_wp_ids.add(wp.pk)
 
-                        surviving_meters = sum((r.meters for r in surviving), Decimal("0"))
+                        surviving_meters = sum((r.quantity for r in surviving), Decimal("0"))
                         new_meters = sum(
                             (_safe_decimal(t.get("qty")) or Decimal("0") for t in new_stock),
                             Decimal("0"),
@@ -3433,7 +3477,7 @@ _LABEL_PROMPT = (
     "This is a photo of a Turkish fabric roll label. Extract these "
     "fields and return ONLY a single JSON object — no commentary, "
     "no markdown fences:\n\n"
-    '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
+    '{"sku": "...", "name": "...", "quantity": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
     "Field rules:\n"
     "- sku: the product CODE. Usually an uppercase prefix + zeros + digits "
     "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9', 'K48083İ.G93'). It is "
@@ -3441,7 +3485,7 @@ _LABEL_PROMPT = (
     "- name: the product/fabric name as printed — typically a model "
     "name + colour (e.g. 'S-LINE 1106 EKRU', 'GREK TÜL'). Do NOT include "
     "the brand name (KARVEN, etc.).\n"
-    "- meters: roll length as a decimal number. Turkish labels write "
+    "- quantity: roll length as a decimal number. Turkish labels write "
     "'25,00 Metre' or '48,5 m' — interpret comma as decimal point, so "
     "'25,00' → 25.0, '48,5' → 48.5. Do not include the unit.\n"
     "- color: the colour/variant text if printed on its own line "
@@ -3529,12 +3573,12 @@ def _ocr_label_openai(image_file):
     end = text_out.rfind("}")
     if start == -1 or end == -1:
         return text_out, {"error": "OpenAI did not return JSON",
-                          "sku": None, "name": None, "meters": None}
+                          "sku": None, "name": None, "quantity": None}
     try:
         data = _json.loads(text_out[start:end + 1])
     except Exception:
         return text_out, {"error": "OpenAI returned malformed JSON",
-                          "sku": None, "name": None, "meters": None}
+                          "sku": None, "name": None, "quantity": None}
 
     sku = (data.get("sku") or None)
     if sku:
@@ -3542,7 +3586,7 @@ def _ocr_label_openai(image_file):
     name = (data.get("name") or None)
     if name:
         name = str(name).strip() or None
-    meters = data.get("meters")
+    meters = data.get("quantity")
     try:
         meters = float(meters) if meters is not None else None
     except (TypeError, ValueError):
@@ -3558,7 +3602,7 @@ def _ocr_label_openai(image_file):
     if coupon:
         coupon = str(coupon).strip() or None
 
-    return text_out, {"sku": sku, "name": name, "meters": meters,
+    return text_out, {"sku": sku, "name": name, "quantity": meters,
                       "barcode": barcode, "color": color, "coupon": coupon}
 
 
@@ -3609,7 +3653,7 @@ def _ocr_label_claude(image_file):
         "This is a photo of a Turkish fabric roll label. Extract these "
         "fields and return ONLY a single JSON object — no commentary, "
         "no markdown fences:\n\n"
-        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
+        '{"sku": "...", "name": "...", "quantity": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
         "Field rules:\n"
         "- sku: the product CODE. Usually an uppercase prefix + zeros + digits "
         "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9', 'K48083İ.G93'). It is "
@@ -3618,7 +3662,7 @@ def _ocr_label_claude(image_file):
         "- name: the product/fabric name as printed — typically a model "
         "name + colour (e.g. 'S-LINE 1106 EKRU', 'GREK TÜL'). Do NOT "
         "include the brand name (KARVEN, etc.) here.\n"
-        "- meters: roll length as a decimal number. Turkish labels write "
+        "- quantity: roll length as a decimal number. Turkish labels write "
         "'25,00 Metre' or '48,5 m' — interpret comma as decimal point, so "
         "'25,00' → 25.0, '48,5' → 48.5. Do not include the unit.\n"
         "- color: the colour/variant text if printed on its own line "
@@ -3676,11 +3720,11 @@ def _ocr_label_claude(image_file):
     start = json_str.find("{")
     end = json_str.rfind("}")
     if start == -1 or end == -1:
-        return text_out, {"error": "Claude did not return JSON", "sku": None, "name": None, "meters": None}
+        return text_out, {"error": "Claude did not return JSON", "sku": None, "name": None, "quantity": None}
     try:
         data = _json.loads(json_str[start:end + 1])
     except Exception:
-        return text_out, {"error": "Claude returned malformed JSON", "sku": None, "name": None, "meters": None}
+        return text_out, {"error": "Claude returned malformed JSON", "sku": None, "name": None, "quantity": None}
 
     sku = (data.get("sku") or None)
     if sku:
@@ -3688,7 +3732,7 @@ def _ocr_label_claude(image_file):
     name = (data.get("name") or None)
     if name:
         name = str(name).strip() or None
-    meters = data.get("meters")
+    meters = data.get("quantity")
     try:
         meters = float(meters) if meters is not None else None
     except (TypeError, ValueError):
@@ -3706,7 +3750,7 @@ def _ocr_label_claude(image_file):
     if coupon:
         coupon = str(coupon).strip() or None
 
-    return text_out, {"sku": sku, "name": name, "meters": meters,
+    return text_out, {"sku": sku, "name": name, "quantity": meters,
                       "barcode": barcode, "color": color, "coupon": coupon}
 
 
@@ -3749,12 +3793,12 @@ def _ocr_label_gemini(image_file):
         "what is printed in THIS image — do not invent, do not "
         "remember anything from previous images. Return ONLY a single "
         "JSON object — no commentary, no markdown fences:\n\n"
-        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
+        '{"sku": "...", "name": "...", "quantity": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
         "LABEL STRUCTURE (stock item → bottom):\n"
         "  1. BRAND   (e.g. KARVEN, DEMFIRAT)  ← IGNORE, never extract\n"
         "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
         "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
-        "  4. METERS  (length in metres)               → goes in 'meters'\n"
+        "  4. METERS  (length in metres)               → goes in 'quantity'\n"
         "  5. BARCODE (the code under the barcode bars) → goes in 'barcode'\n\n"
         "Field rules:\n"
         "- sku: the short product CODE on the second line (e.g. "
@@ -3770,7 +3814,7 @@ def _ocr_label_gemini(image_file):
         "(KARVEN/DEMFIRAT etc.) here — the brand is the FIRST "
         "line and must be skipped. Only return null if there really "
         "is no model line between the sku and the metres/barcode.\n"
-        "- meters: roll length as a decimal number. Turkish labels "
+        "- quantity: roll length as a decimal number. Turkish labels "
         "write '25,00 Metre' or '48,5 m' — interpret comma as decimal "
         "point ('25,00' → 25.0). No unit.\n"
         "- barcode: the code printed directly under the barcode strip. "
@@ -3837,11 +3881,11 @@ def _ocr_label_gemini(image_file):
     start = json_str.find("{")
     end = json_str.rfind("}")
     if start == -1 or end == -1:
-        return text_out, {"error": "Gemini did not return JSON", "sku": None, "name": None, "meters": None}
+        return text_out, {"error": "Gemini did not return JSON", "sku": None, "name": None, "quantity": None}
     try:
         data = _json.loads(json_str[start:end + 1])
     except Exception:
-        return text_out, {"error": "Gemini returned malformed JSON", "sku": None, "name": None, "meters": None}
+        return text_out, {"error": "Gemini returned malformed JSON", "sku": None, "name": None, "quantity": None}
 
     sku = (data.get("sku") or None)
     if sku:
@@ -3849,7 +3893,7 @@ def _ocr_label_gemini(image_file):
     name = (data.get("name") or None)
     if name:
         name = str(name).strip() or None
-    meters = data.get("meters")
+    meters = data.get("quantity")
     try:
         meters = float(meters) if meters is not None else None
     except (TypeError, ValueError):
@@ -3867,7 +3911,7 @@ def _ocr_label_gemini(image_file):
     if coupon:
         coupon = str(coupon).strip() or None
 
-    return text_out, {"sku": sku, "name": name, "meters": meters,
+    return text_out, {"sku": sku, "name": name, "quantity": meters,
                       "barcode": barcode, "color": color, "coupon": coupon}
 
 
@@ -3917,12 +3961,12 @@ def _ocr_label_xai(image_file):
         "what is printed in THIS image — do not invent, do not "
         "remember anything from previous images. Return ONLY a single "
         "JSON object — no commentary, no markdown fences:\n\n"
-        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
+        '{"sku": "...", "name": "...", "quantity": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
         "LABEL STRUCTURE (stock item → bottom):\n"
         "  1. BRAND   (e.g. KARVEN, DEMFIRAT)  ← IGNORE, never extract\n"
         "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
         "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
-        "  4. METERS  (length in metres)               → goes in 'meters'\n"
+        "  4. METERS  (length in metres)               → goes in 'quantity'\n"
         "  5. BARCODE (the code under the barcode bars) → goes in 'barcode'\n\n"
         "Field rules:\n"
         "- sku: the short product CODE printed on the second line "
@@ -3939,8 +3983,8 @@ def _ocr_label_xai(image_file):
         "(KARVEN/DEMFIRAT etc.) for this field — the brand "
         "is the FIRST line at the very top of the label and must be "
         "skipped. If there really is no model line between the sku "
-        "and the meters/barcode area, return null.\n"
-        "- meters: roll length as a decimal number. Turkish labels "
+        "and the quantity/barcode area, return null.\n"
+        "- quantity: roll length as a decimal number. Turkish labels "
         "write '25,00 Metre' or '48,5 m' — interpret comma as decimal "
         "point ('25,00' → 25.0). No unit.\n"
         "- barcode: the code printed directly under the barcode strip. "
@@ -4019,11 +4063,11 @@ def _ocr_label_xai(image_file):
     start = json_str.find("{")
     end = json_str.rfind("}")
     if start == -1 or end == -1:
-        return text_out, {"error": "xAI did not return JSON", "sku": None, "name": None, "meters": None}
+        return text_out, {"error": "xAI did not return JSON", "sku": None, "name": None, "quantity": None}
     try:
         data = _json.loads(json_str[start:end + 1])
     except Exception:
-        return text_out, {"error": "xAI returned malformed JSON", "sku": None, "name": None, "meters": None}
+        return text_out, {"error": "xAI returned malformed JSON", "sku": None, "name": None, "quantity": None}
 
     sku = (data.get("sku") or None)
     if sku:
@@ -4031,7 +4075,7 @@ def _ocr_label_xai(image_file):
     name = (data.get("name") or None)
     if name:
         name = str(name).strip() or None
-    meters = data.get("meters")
+    meters = data.get("quantity")
     try:
         meters = float(meters) if meters is not None else None
     except (TypeError, ValueError):
@@ -4050,7 +4094,7 @@ def _ocr_label_xai(image_file):
     if coupon:
         coupon = str(coupon).strip() or None
 
-    return text_out, {"sku": sku, "name": name, "meters": meters,
+    return text_out, {"sku": sku, "name": name, "quantity": meters,
                       "barcode": barcode, "color": color, "coupon": coupon}
 
 
@@ -4154,7 +4198,7 @@ def _ocr_label_tesseract(image_file):
                     break
 
     # Tesseract fallback doesn't try to extract barcode reliably.
-    parsed = {"sku": sku, "name": name, "meters": meters, "barcode": None}
+    parsed = {"sku": sku, "name": name, "quantity": meters, "barcode": None}
     return raw, parsed
 
 
@@ -4208,7 +4252,7 @@ def _ocr_label(image_file):
             return None
         print(
             f"[OCR] ✓ {name} OK — sku={parsed.get('sku')!r} "
-            f"meters={parsed.get('meters')!r} barcode={parsed.get('barcode')!r} "
+            f"quantity={parsed.get('quantity')!r} barcode={parsed.get('barcode')!r} "
             f"name={parsed.get('name')!r}",
             flush=True,
         )
@@ -4296,14 +4340,14 @@ def reverse_consumption_for_order(order, user=None):
                 continue
             # Return meters to the original roll, if it's still around.
             if roll and roll.product_id == wp.id:
-                curr = roll.meters_remaining if roll.meters_remaining is not None else Decimal("0")
-                roll.meters_remaining = curr + qty
+                curr = roll.quantity_remaining if roll.quantity_remaining is not None else Decimal("0")
+                roll.quantity_remaining = curr + qty
                 # Re-evaluate status.
-                if roll.meters_remaining >= (roll.meters or Decimal("0")):
+                if roll.quantity_remaining >= (roll.quantity or Decimal("0")):
                     roll.status = "in_stock"
                 else:
                     roll.status = "partial"
-                roll.save(update_fields=["meters_remaining", "status"])
+                roll.save(update_fields=["quantity_remaining", "status"])
             wp.quantity = (wp.quantity or Decimal("0")) + qty
             wp.save(update_fields=["quantity", "updated_at"])
 
@@ -4390,19 +4434,19 @@ def consume_for_order_items(order, user=None, reason_prefix="Order"):
                     if remaining_needed <= 0:
                         break
                     avail = (
-                        roll.meters_remaining
-                        if roll.meters_remaining is not None
-                        else roll.meters
+                        roll.quantity_remaining
+                        if roll.quantity_remaining is not None
+                        else roll.quantity
                     ) or Decimal("0")
                     if avail <= 0:
                         continue
                     take = min(avail, remaining_needed)
-                    roll.meters_remaining = avail - take
-                    if roll.meters_remaining <= 0:
+                    roll.quantity_remaining = avail - take
+                    if roll.quantity_remaining <= 0:
                         roll.status = "consumed"
-                    elif roll.meters_remaining < (roll.meters or Decimal("0")):
+                    elif roll.quantity_remaining < (roll.quantity or Decimal("0")):
                         roll.status = "partial"
-                    roll.save(update_fields=["meters_remaining", "status"])
+                    roll.save(update_fields=["quantity_remaining", "status"])
 
                     wp.quantity = (wp.quantity or Decimal("0")) - take
                     wp.save(update_fields=["quantity", "updated_at"])
@@ -4466,7 +4510,7 @@ def reserved_meters_for_products(product_ids):
     rows = (OrderStockReservation.objects
             .filter(consumed=False, warehouse_product_id__in=ids)
             .values("warehouse_product_id")
-            .annotate(s=Sum("meters")))
+            .annotate(s=Sum("quantity")))
     return {r["warehouse_product_id"]: (r["s"] or Decimal("0")) for r in rows}
 
 
@@ -4479,7 +4523,7 @@ def reserved_meters_subquery():
     sq = (OrderStockReservation.objects
           .filter(warehouse_product_id=OuterRef("pk"), consumed=False)
           .values("warehouse_product_id")
-          .annotate(s=Sum("meters"))
+          .annotate(s=Sum("quantity"))
           .values("s")[:1])
     return Coalesce(
         Subquery(sq, output_field=_DF(max_digits=18, decimal_places=2)),
@@ -4521,20 +4565,20 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
         for r in resv:
             roll = _rolls.get(r.stock_item_id)
             wp = _wps.get(r.warehouse_product_id)
-            take = Decimal(str(r.meters or 0))
+            take = Decimal(str(r.quantity or 0))
             if take <= 0 or roll is None or wp is None:
                 r.consumed = True
                 r.consumed_at = _tz.now()
                 r.save(update_fields=["consumed", "consumed_at"])
                 continue
-            avail = (roll.meters_remaining if roll.meters_remaining is not None else roll.meters) or Decimal("0")
+            avail = (roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity) or Decimal("0")
             actual = take if take <= avail else avail  # clamp — never negative
-            roll.meters_remaining = avail - actual
-            if roll.meters_remaining <= 0:
+            roll.quantity_remaining = avail - actual
+            if roll.quantity_remaining <= 0:
                 roll.status = "consumed"
-            elif roll.meters_remaining < (roll.meters or Decimal("0")):
+            elif roll.quantity_remaining < (roll.quantity or Decimal("0")):
                 roll.status = "partial"
-            roll.save(update_fields=["meters_remaining", "status"])
+            roll.save(update_fields=["quantity_remaining", "status"])
 
             wp.quantity = (wp.quantity or Decimal("0")) - actual
             wp.save(update_fields=["quantity", "updated_at"])
@@ -4561,10 +4605,10 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
                 )
             # Pin the reservation to what was ACTUALLY cut so an un-ship
             # restores exactly that amount (never inflating the roll).
-            r.meters = actual
+            r.quantity = actual
             r.consumed = True
             r.consumed_at = _tz.now()
-            r.save(update_fields=["meters", "consumed", "consumed_at"])
+            r.save(update_fields=["quantity", "consumed", "consumed_at"])
             results.append({"product": wp.id, "roll": roll.id, "taken": float(actual)})
     return results
 
@@ -4595,20 +4639,20 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
         for r in resv:
             roll = _rolls.get(r.stock_item_id)
             wp = _wps.get(r.warehouse_product_id)
-            qty = Decimal(str(r.meters or 0))
+            qty = Decimal(str(r.quantity or 0))
             if qty > 0 and roll is not None and wp is not None:
-                curr = roll.meters_remaining if roll.meters_remaining is not None else Decimal("0")
+                curr = roll.quantity_remaining if roll.quantity_remaining is not None else Decimal("0")
                 new_remaining = curr + qty
                 # Never restore a roll above its original length.
-                cap = roll.meters if roll.meters is not None else new_remaining
+                cap = roll.quantity if roll.quantity is not None else new_remaining
                 if new_remaining > cap:
                     new_remaining = cap
-                roll.meters_remaining = new_remaining
-                if roll.meters_remaining >= (roll.meters or Decimal("0")):
+                roll.quantity_remaining = new_remaining
+                if roll.quantity_remaining >= (roll.quantity or Decimal("0")):
                     roll.status = "in_stock"
                 else:
                     roll.status = "partial"
-                roll.save(update_fields=["meters_remaining", "status"])
+                roll.save(update_fields=["quantity_remaining", "status"])
                 wp.quantity = (wp.quantity or Decimal("0")) + qty
                 wp.save(update_fields=["quantity", "updated_at"])
                 StockMovement.objects.create(
@@ -4657,7 +4701,7 @@ def order_reservation_shortfalls(order):
         r["order_item_id"]: (r["s"] or Decimal("0"))
         for r in (OrderStockReservation.objects
                   .filter(order=order, consumed=False, order_item__isnull=False)
-                  .values("order_item_id").annotate(s=Sum("meters")))
+                  .values("order_item_id").annotate(s=Sum("quantity")))
     }
 
     variant_ids = {it.product_variant_id for it in items if it.product_variant_id}
@@ -4844,7 +4888,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 order.freeze_billable_quantities()
                 # A roll can have had less on it than was reserved by the
                 # time it's actually cut (consume_reservations_for_order
-                # clamps r.meters down to what was really available) — the
+                # clamps r.quantity down to what was really available) — the
                 # current account must reflect that final, physically-true amount,
                 # not whatever was scanned/reserved a moment earlier.
                 if order.current_account_id:
@@ -4963,7 +5007,7 @@ class WarehouseProductDetail(View):
         reserved_by_roll = {}
         reservations_by_roll = {}
         for _resv in _resv_rows:
-            reserved_by_roll[_resv.stock_item_id] = reserved_by_roll.get(_resv.stock_item_id, _Dec("0")) + (_resv.meters or _Dec("0"))
+            reserved_by_roll[_resv.stock_item_id] = reserved_by_roll.get(_resv.stock_item_id, _Dec("0")) + (_resv.quantity or _Dec("0"))
             reservations_by_roll.setdefault(_resv.stock_item_id, []).append(_resv)
         reserved_total = sum(reserved_by_roll.values(), _Dec("0"))
         # The Pricing card reads product.avg_cost / product.stock_value
@@ -4979,7 +5023,7 @@ class WarehouseProductDetail(View):
             # item itself cost. None where no cost was ever recorded — the
             # template shows a dash there, because an item nobody priced
             # is not an item worth nothing.
-            _left = r.meters_remaining if r.meters_remaining is not None else r.meters
+            _left = r.quantity_remaining if r.quantity_remaining is not None else r.quantity
             r.line_value = (
                 (_left or _Dec("0")) * r.unit_cost_base
                 if r.unit_cost_base is not None else None
@@ -5607,9 +5651,9 @@ class WarehouseRollDelete(View):
 
         reason = (request.POST.get("reason") or "").strip() or "Roll deleted"
         remaining = (
-            roll.meters_remaining
-            if roll.meters_remaining is not None
-            else (roll.meters or Decimal("0"))
+            roll.quantity_remaining
+            if roll.quantity_remaining is not None
+            else (roll.quantity or Decimal("0"))
         )
 
         # Decrement parent quantity for whatever was still on the roll.
@@ -5703,8 +5747,8 @@ class WarehouseRollBulkDelete(View):
         with transaction.atomic():
             qty = product.quantity or Decimal("0")
             for roll in rolls:
-                remaining = (roll.meters_remaining if roll.meters_remaining is not None
-                             else (roll.meters or Decimal("0")))
+                remaining = (roll.quantity_remaining if roll.quantity_remaining is not None
+                             else (roll.quantity or Decimal("0")))
                 if remaining and remaining > 0:
                     qty = max(Decimal("0"), qty - remaining)
                 StockMovement.objects.create(
@@ -5782,7 +5826,7 @@ class WarehouseRollEdit(View):
             roll_fields.append("is_second"); changes.append("is_second")
 
         # ── Meters (full length); keep any already-consumed amount ──
-        meters_raw = (request.POST.get("meters") or "").strip().replace(",", ".")
+        meters_raw = (request.POST.get("quantity") or "").strip().replace(",", ".")
         meters_changed = False
         if meters_raw:
             try:
@@ -5791,10 +5835,10 @@ class WarehouseRollEdit(View):
                 return JsonResponse({"success": False, "error": "Geçersiz metre değeri."}, status=400)
             if new_full <= 0:
                 return JsonResponse({"success": False, "error": "Metre pozitif olmalı."}, status=400)
-            old_full = roll.meters or Decimal("0")
+            old_full = roll.quantity or Decimal("0")
             consumed = Decimal("0")
-            if roll.meters_remaining is not None and old_full:
-                consumed = max(Decimal("0"), old_full - roll.meters_remaining)
+            if roll.quantity_remaining is not None and old_full:
+                consumed = max(Decimal("0"), old_full - roll.quantity_remaining)
 
             # A roll cannot have had more taken off it than it was ever
             # long. Shortening it below what has already gone out used to be
@@ -5815,11 +5859,11 @@ class WarehouseRollEdit(View):
                 }, status=400)
 
             if new_full != old_full:
-                roll.meters = new_full
-                roll.meters_remaining = max(Decimal("0"), new_full - consumed)
-                roll_fields.extend(["meters", "meters_remaining"])
+                roll.quantity = new_full
+                roll.quantity_remaining = max(Decimal("0"), new_full - consumed)
+                roll_fields.extend(["quantity", "quantity_remaining"])
                 meters_changed = True
-                changes.append("meters")
+                changes.append("quantity")
 
                 # Status follows the metres. Correcting a length can drive
                 # remaining to zero — or lift it back off zero — and leaving
@@ -5827,7 +5871,7 @@ class WarehouseRollEdit(View):
                 # "partial" with nothing on it: counted as live stock, listed
                 # on the product page, and pickable for packing. Same rule
                 # the stock-out and shipping paths apply.
-                rem = roll.meters_remaining or Decimal("0")
+                rem = roll.quantity_remaining or Decimal("0")
                 if rem <= 0:
                     roll.status = "consumed"
                 elif rem < new_full:
@@ -5843,7 +5887,7 @@ class WarehouseRollEdit(View):
         # (current stock = remaining meters, falling back to full meters).
         if meters_changed:
             total = product.stock_items.aggregate(
-                s=Coalesce(Sum(Coalesce(F("meters_remaining"), F("meters"))),
+                s=Coalesce(Sum(Coalesce(F("quantity_remaining"), F("quantity"))),
                            Decimal("0"),
                            output_field=DecimalField(max_digits=18, decimal_places=2)))["s"]
             old_qty = product.quantity or Decimal("0")
@@ -5869,8 +5913,8 @@ class WarehouseRollEdit(View):
             "roll": {
                 "id": roll.pk,
                 "barcode": roll.barcode,
-                "meters": float(roll.meters or 0),
-                "meters_remaining": float(roll.meters_remaining or 0) if roll.meters_remaining is not None else None,
+                "quantity": float(roll.quantity or 0),
+                "quantity_remaining": float(roll.quantity_remaining or 0) if roll.quantity_remaining is not None else None,
                 "lot_number": roll.lot_number,
                 "is_second": bool(roll.is_second),
             },
@@ -5911,19 +5955,19 @@ class WarehouseStockOut(View):
             roll = product.stock_items.filter(pk=stock_item_id).first()
             if not roll:
                 return JsonResponse({"success": False, "error": "Roll not found"}, status=404)
-            roll_rem = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+            roll_rem = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
             if amount > (roll_rem or Decimal("0")):
                 return JsonResponse({
                     "success": False,
                     "error": f"Only {roll_rem}m left on this roll",
                 }, status=400)
-            roll.meters_remaining = (roll_rem or Decimal("0")) - amount
+            roll.quantity_remaining = (roll_rem or Decimal("0")) - amount
             # Update status based on remaining.
-            if roll.meters_remaining <= Decimal("0"):
+            if roll.quantity_remaining <= Decimal("0"):
                 roll.status = "consumed"
-            elif roll.meters_remaining < (roll.meters or Decimal("0")):
+            elif roll.quantity_remaining < (roll.quantity or Decimal("0")):
                 roll.status = "partial"
-            roll.save(update_fields=["meters_remaining", "status"])
+            roll.save(update_fields=["quantity_remaining", "status"])
 
         # Drop the parent quantity.
         product.quantity = (product.quantity or Decimal("0")) - amount
@@ -6095,7 +6139,7 @@ class WarehouseRollScan(View):
         # ── Phase 2: commit — write the roll to DB ──────────────
         sku = (request.POST.get("sku") or "").strip()
         name = (request.POST.get("name") or "").strip()
-        meters_raw = (request.POST.get("meters") or "").strip().replace(",", ".")
+        meters_raw = (request.POST.get("quantity") or "").strip().replace(",", ".")
         try:
             meters = Decimal(meters_raw)
         except (InvalidOperation, TypeError):
@@ -6197,8 +6241,8 @@ class WarehouseRollScan(View):
         cdn_url, local_image = _store_roll_label_image(image, product, barcode)
         roll = WarehouseProductItem.objects.create(
             product=product,
-            meters=meters,
-            meters_remaining=meters,
+            quantity=meters,
+            quantity_remaining=meters,
             barcode=barcode[:64] if barcode else None,
             lot_number=(request.POST.get("lot_number") or "").strip() or None,
             scanned_by=request.user if request.user.is_authenticated else None,
@@ -6289,7 +6333,7 @@ class WarehouseRollScan(View):
             "success": True,
             "roll": {
                 "id": roll.pk,
-                "meters": float(roll.meters),
+                "quantity": float(roll.quantity),
                 "barcode": roll.barcode,
                 "lot_number": roll.lot_number,
                 "scanned_at": roll.scanned_at.strftime("%H:%M:%S"),

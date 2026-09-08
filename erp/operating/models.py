@@ -742,7 +742,7 @@ class Order(models.Model):
             r["order_item_id"]: (r["s"] or Decimal("0"))
             for r in (self.stock_reservations
                       .filter(order_item__isnull=False)
-                      .values("order_item_id").annotate(s=Sum("meters")))
+                      .values("order_item_id").annotate(s=Sum("quantity")))
         }
         tracked_map = self.classify_items_by_tracking(items, as_of=as_of)
 
@@ -822,7 +822,7 @@ class Order(models.Model):
                 "custom_height": _f(it.custom_height),
                 "custom_fabric_used_meters": _f(it.custom_fabric_used_meters),
                 "rolls": [
-                    {"barcode": (r.stock_item.barcode if r.stock_item_id else None), "meters": _f(r.meters)}
+                    {"barcode": (r.stock_item.barcode if r.stock_item_id else None), "quantity": _f(r.quantity)}
                     for r in it.stock_reservations.all()
                 ],
             })
@@ -1299,10 +1299,10 @@ class Warehouse(models.Model):
             product__warehouse_id__in=self.scope_ids(),
             status__in=("in_stock", "partial"),
             unit_cost_base__isnull=False,
-            meters_remaining__isnull=False,
+            quantity_remaining__isnull=False,
         ).aggregate(
             usd=Coalesce(
-                Sum(F("meters_remaining") * F("unit_cost_base"), output_field=_dec),
+                Sum(F("quantity_remaining") * F("unit_cost_base"), output_field=_dec),
                 Decimal("0"), output_field=_dec),
         )["usd"]
 
@@ -1332,6 +1332,28 @@ class WarehouseProduct(models.Model):
     barcode = models.CharField(max_length=64, blank=True, null=True)
     model = models.CharField(max_length=128, blank=True, null=True)
     quantity = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    # What this product is COUNTED IN. Everything on the shelf used to be
+    # fabric, so every screen said "m" and the stock-item columns were
+    # literally named `meters` — which made a box of 20 curtain sets read
+    # as "20m". The codes are the ones the goods-receipt form has always
+    # offered (see _PRODUCT_UNIT_MAP in views_warehouse); they were
+    # collected at intake and then thrown away.
+    #
+    # Defaults to metres: every product that existed before this field is
+    # fabric, so the default is not a guess.
+    UNIT_CHOICES = [
+        ("mt", "Metre"),
+        ("adet", "Adet"),
+        ("paket", "Paket"),
+        ("kg", "Kilogram"),
+    ]
+    UNIT_SHORT = {"mt": "m", "adet": "ad", "paket": "pkt", "kg": "kg"}
+
+    unit = models.CharField(
+        max_length=8, choices=UNIT_CHOICES, default="mt",
+        help_text="What this product is counted in",
+    )
 
     # Original purchase price as imported from Excel
     purchase_price = models.DecimalField(
@@ -1382,6 +1404,16 @@ class WarehouseProduct(models.Model):
     def __str__(self):
         return f"{self.name} ({self.sku or '-'}) @ {self.warehouse.name}"
 
+    @property
+    def unit_short(self):
+        """The unit as it is printed next to a number — "m", "ad", "pkt".
+
+        Templates render `{{ p.quantity }} {{ p.unit_short }}` instead of a
+        hardcoded "m". Falls back to the raw code so an unrecognised unit
+        shows itself rather than disappearing.
+        """
+        return self.UNIT_SHORT.get(self.unit, self.unit or "")
+
     # Live USD/TRY rate fetched lazily so the model file doesn't pull
     # in accounting at import time. Cached per call.
     @staticmethod
@@ -1418,14 +1450,14 @@ class WarehouseProduct(models.Model):
                   .filter(product=OuterRef("pk"),
                           status__in=("in_stock", "partial"),
                           unit_cost_base__isnull=False,
-                          meters_remaining__isnull=False)
+                          quantity_remaining__isnull=False)
                   .values("product"))
         value = Subquery(
-            priced.annotate(v=Sum(F("meters_remaining") * F("unit_cost_base"),
+            priced.annotate(v=Sum(F("quantity_remaining") * F("unit_cost_base"),
                                   output_field=_dec)).values("v")[:1],
             output_field=_dec)
         metres = Subquery(
-            priced.annotate(m=Sum("meters_remaining", output_field=_dec))
+            priced.annotate(m=Sum("quantity_remaining", output_field=_dec))
                   .values("m")[:1],
             output_field=_dec)
         return value, metres
@@ -1519,13 +1551,19 @@ class WarehouseProductItem(models.Model):
         related_name="stock_items",
         on_delete=models.CASCADE,
     )
-    meters = models.DecimalField(
+    # How much of the product this stock item is, in the parent's `unit`.
+    # Metres for a roll of fabric, sets for a box of ready-made curtains,
+    # kilos for a bale. These were named `meters`/`quantity_remaining` back
+    # when the warehouse held nothing but fabric; the arithmetic never
+    # cared, but every screen said "m" and there was no way to hold
+    # anything counted differently. Read `product.unit` for what they mean.
+    quantity = models.DecimalField(
         max_digits=10, decimal_places=2,
-        help_text="Initial length of this roll in meters",
+        help_text="How much arrived, in the product's unit of measure",
     )
-    meters_remaining = models.DecimalField(
+    quantity_remaining = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text="Length still on the roll (drops as stock-outs happen)",
+        help_text="How much is left (drops as stock-outs happen)",
     )
     # The barcode printed on the label — each roll has a UNIQUE barcode
     # so we can scan it later for stock-out / order picking. Unique across
@@ -1610,7 +1648,8 @@ class WarehouseProductItem(models.Model):
         ]
 
     def __str__(self):
-        return f"Roll #{self.pk} · {self.meters}m · {self.product.sku or self.product.name}"
+        return (f"Stock item #{self.pk} · {self.quantity} {self.product.unit_short}"
+                f" · {self.product.sku or self.product.name}")
 
     def label_image_url(self):
         """Where this roll's label photo can actually be fetched, or None.
@@ -1715,7 +1754,9 @@ class StockMovement(models.Model):
 
     def __str__(self):
         sign = "+" if self.movement_type == "in" else ("-" if self.movement_type == "out" else "±")
-        return f"{sign}{self.quantity}m · {self.product.sku or self.product.name} · {self.created_at:%Y-%m-%d}"
+        return (f"{sign}{self.quantity} {self.product.unit_short}"
+                f" · {self.product.sku or self.product.name}"
+                f" · {self.created_at:%Y-%m-%d}")
 
 
 class OrderStockReservation(models.Model):
@@ -1725,7 +1766,7 @@ class OrderStockReservation(models.Model):
     flow. Packing is one entry point among three, not where holds begin:
     an order can be fully reserved and never see a packing list.
 
-    It does NOT touch physical stock: the roll's meters_remaining and
+    It does NOT touch physical stock: the roll's quantity_remaining and
     the WarehouseProduct.quantity stay exactly as they are. The scanned
     metres are only *reserved* (shown as "Rezerv" on the warehouse
     pages). Physical deduction happens ONLY when the order is shipped
@@ -1754,9 +1795,9 @@ class OrderStockReservation(models.Model):
         WarehouseProduct, related_name="reservations",
         on_delete=models.CASCADE,
     )
-    meters = models.DecimalField(
+    quantity = models.DecimalField(
         max_digits=10, decimal_places=2,
-        help_text="Metres reserved (cut) from this roll for the order.",
+        help_text="How much is held for the order, in the product's unit.",
     )
     # True once the reservation has become a real stock-out at ship
     # time. Guards against double-deduction (idempotent shipping).
@@ -1785,7 +1826,8 @@ class OrderStockReservation(models.Model):
         ]
 
     def __str__(self):
-        return f"Reserve {self.meters}m · item #{self.stock_item_id} · order #{self.order_id}"
+        return (f"Reserve {self.quantity} {self.warehouse_product.unit_short}"
+                f" · item #{self.stock_item_id} · order #{self.order_id}")
 
 
 class OrderChange(models.Model):

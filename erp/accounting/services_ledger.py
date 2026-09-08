@@ -445,13 +445,13 @@ def _inventory_value(book):
     live = (WarehouseProductItem.objects
             .filter(product__warehouse__accounting_book=book,
                     status__in=("in_stock", "partial"))
-            .exclude(meters_remaining=None))
+            .exclude(quantity_remaining=None))
 
     unit_cost = Coalesce(F("unit_cost_base"),
                          F("purchase_invoice_item__unit_price"),
                          F("product__cost_usd"),
                          output_field=money)
-    value = ExpressionWrapper(F("meters_remaining") * unit_cost,
+    value = ExpressionWrapper(F("quantity_remaining") * unit_cost,
                               output_field=money)
     total = live.aggregate(v=Sum(value))["v"] or ZERO
 
@@ -460,5 +460,5 @@ def _inventory_value(book):
     return (
         Decimal(total).quantize(Decimal("0.01")),
         unvalued.count(),
-        unvalued.aggregate(m=Sum("meters_remaining"))["m"] or ZERO,
+        unvalued.aggregate(m=Sum("quantity_remaining"))["m"] or ZERO,
     )

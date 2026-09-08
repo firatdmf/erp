@@ -146,7 +146,7 @@
           {% if r.variant != "-" %}<span class="pk-roll-variant">{{ r.variant }}</span>{% endif %}
           <span class="pk-roll-type">{{ r.product_type }}</span>
           <code class="pk-roll-bc">{{ r.barcode }}</code>
-          <span class="pk-roll-m">{{ r.meters|floatformat:2 }} m</span>
+          <span class="pk-roll-m">{{ r.quantity|floatformat:2 }} m</span>
         </div>
         {% empty %}
         <div class="pk-empty">{% trans "No rolls in this package yet." %}</div>

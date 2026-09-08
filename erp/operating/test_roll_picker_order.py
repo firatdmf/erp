@@ -50,7 +50,7 @@ class RollPicker(TestCase):
 
     def _top(self, wp, barcode, scanned=None):
         roll = WarehouseProductItem.objects.create(
-            product=wp, meters=Decimal("20"), meters_remaining=Decimal("20"),
+            product=wp, quantity=Decimal("20"), quantity_remaining=Decimal("20"),
             barcode=barcode, status="in_stock")
         if scanned is not None:
             WarehouseProductItem.objects.filter(pk=roll.pk).update(

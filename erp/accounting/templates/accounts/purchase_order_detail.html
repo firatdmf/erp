@@ -176,7 +176,7 @@
       {% for r in it.warehouse_stock_items.all %}
       <div class="po-roll">
         <code>{{ r.barcode|default:"—" }}</code>
-        <span class="m">{{ r.meters|floatformat:2 }} m</span>
+        <span class="m">{{ r.quantity|floatformat:2 }} m</span>
         {% if r.product.warehouse_id %}<span class="wh">{{ r.product.warehouse.name }}</span>{% endif %}
       </div>
       {% endfor %}

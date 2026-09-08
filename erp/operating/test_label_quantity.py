@@ -13,7 +13,7 @@ from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
 class LabelShowsRemainingMetersTest(TestCase):
-    """A roll that's been cut carries its leftover in meters_remaining;
+    """A roll that's been cut carries its leftover in quantity_remaining;
     `meters` stays the length it arrived at. The label printed the arrival
     length, so KAR0001468 kept reprinting 18.50 after being cut down to
     12.90 — the sticker contradicted the shelf it was stuck to.
@@ -46,27 +46,27 @@ class LabelShowsRemainingMetersTest(TestCase):
 
     def test_cut_roll_prints_what_is_left(self):
         roll = WarehouseProductItem.objects.create(
-            product=self.wp, meters=Decimal("18.50"),
-            meters_remaining=Decimal("12.90"), status="partial",
+            product=self.wp, quantity=Decimal("18.50"),
+            quantity_remaining=Decimal("12.90"), status="partial",
             barcode="KAR0001468")
         drawn = self._drawn_strings(roll)
-        self.assertIn("12.90", drawn)
-        self.assertNotIn("18.50", drawn)
+        self.assertIn("12.90 m", drawn)
+        self.assertNotIn("18.50 m", drawn)
 
     def test_uncut_roll_still_prints_its_full_length(self):
-        # meters_remaining is null until the first cut — the label has to
+        # quantity_remaining is null until the first cut — the label has to
         # fall back to meters there rather than printing 0.00.
         roll = WarehouseProductItem.objects.create(
-            product=self.wp, meters=Decimal("18.50"), barcode="KAR0001469")
-        self.assertIn("18.50", self._drawn_strings(roll))
+            product=self.wp, quantity=Decimal("18.50"), barcode="KAR0001469")
+        self.assertIn("18.50 m", self._drawn_strings(roll))
 
     def test_fully_consumed_roll_prints_zero(self):
         # A consumed roll only prints when asked for by pk; it should say
         # it's empty rather than advertise the length it once had.
         roll = WarehouseProductItem.objects.create(
-            product=self.wp, meters=Decimal("18.50"),
-            meters_remaining=Decimal("0.00"), status="consumed",
+            product=self.wp, quantity=Decimal("18.50"),
+            quantity_remaining=Decimal("0.00"), status="consumed",
             barcode="KAR0001470")
         drawn = self._drawn_strings(roll)
-        self.assertIn("0.00", drawn)
-        self.assertNotIn("18.50", drawn)
+        self.assertIn("0.00 m", drawn)
+        self.assertNotIn("18.50 m", drawn)

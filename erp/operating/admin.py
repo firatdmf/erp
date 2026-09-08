@@ -78,7 +78,7 @@ class OrderStockReservationAdmin(admin.ModelAdmin):
     """Which rolls are spoken for by which orders. `consumed=False` is a
     live hold (nothing deducted yet); True means it shipped and became a
     StockMovement(out)."""
-    list_display = ["created_at", "order", "stock_item", "meters",
+    list_display = ["created_at", "order", "stock_item", "quantity",
                     "warehouse_product", "consumed", "consumed_at", "created_by"]
     list_filter = ["consumed", "created_at"]
     search_fields = ["stock_item__barcode", "order__order_number",

@@ -1,0 +1,188 @@
+"""What a warehouse counts its stock in, and where that unit shows up.
+
+Every quantity in the warehouse used to be metres — not by choice but by
+default: the columns were called `meters`, and every screen printed "m"
+after the number. That was harmless while the shelves held nothing but
+fabric, and became wrong the moment a pallet of ready-made curtain sets
+arrived, because a box of 20 sets is not 20 metres of anything.
+
+`WarehouseProduct.unit` says what the numbers mean. These tests pin the
+places that have to read it rather than assume:
+
+* the product rows and the stock-item rows under them
+* the warehouse header total, which must NOT claim a unit when the
+  warehouse holds more than one
+* the printed label
+* a move between warehouses, which has to carry the unit with the goods
+
+Run with:
+    python manage.py test operating.test_stock_unit
+"""
+import re
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from accounting.models import Book, CurrencyCategory
+
+from .models import Warehouse, WarehouseProduct, WarehouseProductItem
+
+
+def _text(html):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+
+
+class StockUnitIsShownNotAssumed(TestCase):
+    def setUp(self):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
+        self.shop = Warehouse.objects.create(
+            name="Ready-made Shop", accounting_book=self.book)
+
+        self.curtains = WarehouseProduct.objects.create(
+            warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
+            quantity=Decimal("20"), unit="paket")
+        WarehouseProductItem.objects.create(
+            product=self.curtains, quantity=Decimal("20"),
+            quantity_remaining=Decimal("20"), barcode="BOX-12",
+            lot_number="12", status="in_stock",
+            unit_cost_base=Decimal("15.55"))
+
+        user = get_user_model().objects.create_user("shopkeeper", password="pw")
+        user.member.books.add(self.book)
+        user.member.default_book = self.book
+        user.member.save()
+        self.client.force_login(user)
+
+    def _page(self, warehouse=None):
+        resp = self.client.get(reverse(
+            "operating:warehouse_detail", args=[(warehouse or self.shop).pk]))
+        self.assertEqual(resp.status_code, 200)
+        return _text(resp.content.decode())
+
+    def test_a_product_row_is_counted_in_its_own_unit(self):
+        self.assertIn("20.00 pkt", self._page())
+
+    def test_it_does_not_call_curtain_sets_metres(self):
+        self.assertNotIn("20.00 m ", self._page())
+
+    def test_the_header_total_carries_the_unit_when_there_is_only_one(self):
+        self.assertRegex(self._page(), r"20\s*pkt")
+
+    def test_a_mixed_warehouse_claims_no_unit_for_its_total(self):
+        """Metres of fabric and boxes of curtains do not add up to anything,
+        so the total drops the unit rather than picking one of them. The
+        per-product rows still carry their own."""
+        WarehouseProduct.objects.create(
+            warehouse=self.shop, name="seta grey", sku="SETA-1",
+            quantity=Decimal("300"), unit="mt")
+        page = self._page()
+        self.assertNotRegex(page, r"320\s*(pkt|m)\b")
+        self.assertIn("20.00 pkt", page)
+        self.assertIn("300.00 m", page)
+
+    def test_the_default_is_metres_so_existing_fabric_is_untouched(self):
+        """Every product that existed before the field was added is fabric.
+        The default is a statement about the data, not a guess, and a
+        product created without saying otherwise still reads as metres."""
+        fabric = WarehouseProduct.objects.create(
+            warehouse=self.shop, name="grek tul", sku="GT-1",
+            quantity=Decimal("48.5"))
+        self.assertEqual(fabric.unit, "mt")
+        self.assertEqual(fabric.unit_short, "m")
+
+    def test_an_unrecognised_unit_shows_itself_rather_than_vanishing(self):
+        odd = WarehouseProduct.objects.create(
+            warehouse=self.shop, name="odd", sku="ODD-1",
+            quantity=Decimal("1"), unit="yards")
+        self.assertEqual(odd.unit_short, "yards")
+
+
+class TheLabelSaysWhatItIsCounting(TestCase):
+    """The sticker on the box prints a bare number under "QUANTITY". That
+    read as metres to anyone who had only ever seen a roll tag, so the unit
+    now goes on it too."""
+
+    def setUp(self):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
+        self.shop = Warehouse.objects.create(
+            name="Ready-made Shop", accounting_book=self.book)
+        self.wp = WarehouseProduct.objects.create(
+            warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
+            quantity=Decimal("20"), unit="paket")
+
+        user = get_user_model().objects.create_user("printer", password="pw")
+        user.member.books.add(self.book)
+        user.member.default_book = self.book
+        user.member.save()
+        self.client.force_login(user)
+
+        # reportlab flate-compresses page streams by default, which would
+        # hide the drawn strings from a byte search. Off for the test only.
+        import reportlab.rl_config as rl_config
+        self._compression = rl_config.pageCompression
+        rl_config.pageCompression = 0
+        self.addCleanup(setattr, rl_config, "pageCompression", self._compression)
+
+    def _drawn_strings(self, roll):
+        url = reverse("operating:warehouse_product_label", kwargs={
+            "warehouse_pk": self.shop.pk, "product_pk": self.wp.pk})
+        resp = self.client.get(url, {"roll": roll.pk})
+        self.assertEqual(resp.status_code, 200)
+        return [s.decode("latin-1")
+                for s in re.findall(rb"\((.*?)\)\s*Tj", resp.content)]
+
+    def test_it_prints_packs_not_metres(self):
+        roll = WarehouseProductItem.objects.create(
+            product=self.wp, quantity=Decimal("20"),
+            quantity_remaining=Decimal("20"), barcode="BOX-12")
+        drawn = self._drawn_strings(roll)
+        self.assertIn("20.00 pkt", drawn)
+        self.assertNotIn("20.00 m", drawn)
+
+
+class MovingStockCarriesTheUnit(TestCase):
+    """A move creates the destination row from scratch when the SKU is not
+    already on that shelf. It used to build it without a unit, so it took
+    the model default — and a box of curtain sets moved shelf to shelf came
+    out the other side measured in metres."""
+
+    def setUp(self):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
+        self.source = Warehouse.objects.create(
+            name="Shop A", accounting_book=self.book)
+        self.target = Warehouse.objects.create(
+            name="Shop B", accounting_book=self.book)
+        self.wp = WarehouseProduct.objects.create(
+            warehouse=self.source, name="Peony 84in", sku="RN1357.RM8",
+            quantity=Decimal("20"), unit="paket")
+        self.roll = WarehouseProductItem.objects.create(
+            product=self.wp, quantity=Decimal("20"),
+            quantity_remaining=Decimal("20"), barcode="BOX-12",
+            status="in_stock")
+
+        user = get_user_model().objects.create_user("mover", password="pw")
+        user.member.books.add(self.book)
+        user.member.default_book = self.book
+        user.member.save()
+        user.is_staff = user.is_superuser = True
+        user.save()
+        self.client.force_login(user)
+
+    def test_the_destination_row_is_counted_the_same_way(self):
+        resp = self.client.post(reverse(
+            "operating:warehouse_roll_move_here",
+            args=[self.target.pk, self.roll.pk]))
+        self.assertIn(resp.status_code, (200, 302))
+
+        moved = WarehouseProduct.objects.get(
+            warehouse=self.target, sku="RN1357.RM8")
+        self.assertEqual(moved.unit, "paket")
+        self.assertEqual(moved.unit_short, "pkt")

@@ -1865,10 +1865,10 @@
     const row = document.createElement('div');
     row.className = 'np-etop' + (top.locked ? ' locked' : '');
     row.dataset.rollId = top.roll_id;
-    const meters = parseFloat(top.meters);
+    const meters = parseFloat(top.quantity);
     row.innerHTML =
       '<code>' + (top.barcode || '—') + '</code>' +
-      '<span>' + (isNaN(meters) ? top.meters : meters.toFixed(2)) + ' ' + unitShort() + '</span>' +
+      '<span>' + (isNaN(meters) ? top.quantity : meters.toFixed(2)) + ' ' + unitShort() + '</span>' +
       (top.locked
         ? NP_LOCK
         : '<button type="button" class="np-mini-x" title="{% trans "Remove" %}" onclick="this.closest(\'.np-etop\').remove(); npSummaryUpdate();">' + NP_TRASH + '</button>');

@@ -420,7 +420,7 @@
             {% endif %}
           </td>
           <td class="qty {{ m.movement_type }}">
-            {% if m.quantity == 0 %}—{% else %}{% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m{% endif %}
+            {% if m.quantity == 0 %}—{% else %}{% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} {{ m.product.unit_short }}{% endif %}
           </td>
           <td class="user-cell">
             {% if m.created_by %}{{ m.created_by.username }}{% else %}<span style="color:#C5CCD3;">{% trans "system" %}</span>{% endif %}

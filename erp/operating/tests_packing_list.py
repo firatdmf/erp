@@ -57,11 +57,11 @@ class PackingListColumns(TestCase):
                 wp = WarehouseProduct.objects.create(
                     warehouse=wh, name=product.title, sku=product.sku, quantity=50)
                 roll = WarehouseProductItem.objects.create(
-                    product=wp, meters=Decimal("50.00"),
-                    meters_remaining=Decimal("50.00"), barcode=f"BC{pack_no}{i}")
+                    product=wp, quantity=Decimal("50.00"),
+                    quantity_remaining=Decimal("50.00"), barcode=f"BC{pack_no}{i}")
                 OrderStockReservation.objects.create(
                     order=self.order, order_item=item, stock_item=roll,
-                    warehouse_product=wp, meters=Decimal("32.45"), pack=pack)
+                    warehouse_product=wp, quantity=Decimal("32.45"), pack=pack)
 
     def test_rows_carry_the_product_type(self):
         pack = self.order.packs.get(pack_number=1)

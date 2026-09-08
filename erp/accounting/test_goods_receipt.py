@@ -58,7 +58,7 @@ class GoodsReceiptPageTest(TestCase):
                 quantity=Decimal("50.00"),
             )
             WarehouseProductItem.objects.create(
-                product=wp, meters=Decimal("50.00"), barcode="KZL000001",
+                product=wp, quantity=Decimal("50.00"), barcode="KZL000001",
                 purchase_invoice_item=item,
             )
         return inv

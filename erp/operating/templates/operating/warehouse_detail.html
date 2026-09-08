@@ -1294,7 +1294,7 @@
         </span>
         <span class="od-dot"></span>
         <span>
-          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:0|intcomma }} m {% trans "in stock" %}
+          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:0|intcomma }} {{ total_unit_short }} {% trans "in stock" %}
         </span>
         {% if warehouse.created_at %}
           <span class="od-dot"></span>
@@ -1625,7 +1625,7 @@
             {% if m.quantity != 0 %}
             <span style="flex-shrink:0; font:800 12px var(--font-sans, sans-serif); font-variant-numeric:tabular-nums; white-space:nowrap;
               {% if m.movement_type == 'in' %}color:#0E6E4A;{% elif m.movement_type == 'out' %}color:#DC2626;{% else %}color:#6B7280;{% endif %}">
-              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m
+              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} {{ m.product.unit_short }}
             </span>
             {% endif %}
           </div>
@@ -1659,7 +1659,7 @@
             <div class="lbl">{% trans "Rolls" %}</div>
           </div>
           <div class="od-stat">
-            <div class="val">{{ total_quantity|floatformat:0|intcomma }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> m</span></div>
+            <div class="val">{{ total_quantity|floatformat:0|intcomma }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> {{ total_unit_short }}</span></div>
             <div class="lbl">{% trans "Total stock" %}</div>
           </div>
           <div class="od-stat full">
@@ -2909,7 +2909,7 @@
     document.getElementById('rsConfirm').hidden = false;
     document.getElementById('rsSku').value = parsed.sku || '';
     document.getElementById('rsName').value = parsed.name || '';
-    document.getElementById('rsMeters').value = parsed.meters || '';
+    document.getElementById('rsMeters').value = parsed.quantity || '';
     // Barcode: PREFER the live barcode decoded by the camera scanner
     // (accurate) over the AI's reading (the AI sometimes misreads it).
     // Fall back to the AI value if the live scanner caught nothing.
@@ -2961,7 +2961,7 @@
     }
     // Auto-focus meters if it came back null, else SKU.
     setTimeout(function () {
-      (parsed.meters ? document.getElementById('rsSku') : document.getElementById('rsMeters')).focus();
+      (parsed.quantity ? document.getElementById('rsSku') : document.getElementById('rsMeters')).focus();
     }, 50);
   }
 
@@ -3057,7 +3057,7 @@
     fd.append('commit', 'true');
     fd.append('sku', sku);
     fd.append('name', name);
-    fd.append('meters', meters);
+    fd.append('quantity', meters);
     if (barcode) fd.append('barcode', barcode);
     if (lot)     fd.append('lot_number', lot);
     if (price)   fd.append('purchase_price', price);
@@ -3086,7 +3086,7 @@
         rsLastSku = dupKey;  // composite SKU+barcode key
         rsLastSkuAt = Date.now();
         rsSession.count += 1;
-        rsSession.meters += parseFloat(meters);
+        rsSession.quantity += parseFloat(meters);
         updateRecentList(data);
         if (data.catalog_warning) {
           alert('{% trans "Saved to warehouse, but catalog sync warning" %}:\n' + data.catalog_warning);
@@ -3113,7 +3113,7 @@
         '</span>' +
         (bc ? '<span class="rs-recent-bc"><i class="fa fa-barcode"></i>' + rsEscapeHtml(bc) + '</span>' : '') +
       '</span>' +
-      '<span class="rs-recent-meters">' + parseFloat(it.meters || 0).toFixed(2) + ' m</span>' +
+      '<span class="rs-recent-meters">' + parseFloat(it.quantity || 0).toFixed(2) + ' m</span>' +
       '<button type="button" class="rs-recent-edit" title="{% trans "Edit" %}" ' +
         'onclick="openRsEdit(this.closest(\'.rs-recent-row\'))"><i class="fa fa-pen"></i></button>';
   }
@@ -3129,14 +3129,14 @@
       name: data.product.name || '', sku: data.product.sku || '',
       productBarcode: data.product.barcode || '',
       rollBarcode: (data.roll && data.roll.barcode) || '',
-      meters: data.roll.meters, lot: (data.roll.lot_number || ''),
+      meters: data.roll.quantity, lot: (data.roll.lot_number || ''),
       mainProduct: data.product.main_product || ''
     };
     rsRenderRecentRow(row);
     list.prepend(row);
     document.getElementById('rsTotalCount').textContent =
       rsSession.count + ' ' + (rsSession.count === 1 ? 'roll' : 'rolls') +
-      ' · ' + rsSession.meters.toFixed(2) + ' m';
+      ' · ' + rsSession.quantity.toFixed(2) + ' m';
   }
 
   // ── Edit a just-added item from the recent list ──
@@ -3155,7 +3155,7 @@
     document.getElementById('rseMain').value = it.mainProduct || '';
     rseMainHide();
     document.getElementById('rseRollBc').value = it.rollBarcode || '';
-    document.getElementById('rseMeters').value = it.meters || '';
+    document.getElementById('rseMeters').value = it.quantity || '';
     document.getElementById('rseLot').value = it.lot || '';
     document.getElementById('rsEditOverlay').classList.add('show');
   }
@@ -3188,14 +3188,14 @@
         if (pd.catalog_warning) alert('{% trans "Catalog note" %}:\n' + pd.catalog_warning);
         var rfd = new FormData();
         rfd.append('csrfmiddlewaretoken', csrftoken);
-        rfd.append('barcode', rbc); rfd.append('meters', meters); rfd.append('lot_number', lot);
+        rfd.append('barcode', rbc); rfd.append('quantity', meters); rfd.append('lot_number', lot);
         return fetch(rsRollEditUrl(it.productId, it.rollId), { method: 'POST', body: rfd, headers: hdr, credentials: 'same-origin' }).then(function (r) { return r.json(); });
       })
       .then(function (rd) {
         if (rd && !rd.success) throw new Error(rd.error || '{% trans "Roll update failed" %}');
         it.name = name; it.sku = sku; it.productBarcode = pbc;
         it.rollBarcode = (rd && rd.roll && rd.roll.barcode !== undefined) ? (rd.roll.barcode || '') : rbc;
-        it.meters = (rd && rd.roll && rd.roll.meters !== undefined) ? rd.roll.meters : meters;
+        it.quantity = (rd && rd.roll && rd.roll.quantity !== undefined) ? rd.roll.quantity : meters;
         it.lot = lot;
         if (main) it.mainProduct = main;
         rsRenderRecentRow(rsEditRow);
@@ -3482,7 +3482,7 @@
         ? '<a href="' + e.url + '" style="color:#1E40AF; text-decoration:underline;">' + blEsc(e.label) + '</a>'
         : blEsc(e.label);
       var bits = [];
-      if (e.meters) bits.push(Number(e.meters).toFixed(2) + ' m');
+      if (e.quantity) bits.push(Number(e.quantity).toFixed(2) + ' m');
       if (e.date) bits.push(blEsc(e.date));
       if (e.line) bits.push(blEsc(e.line));
       return '<div style="font-weight:500; margin-top:3px;">→ ' + who +
@@ -3492,7 +3492,7 @@
     return '<div style="color:#1E40AF; background:#EFF6FF; border:1px solid #BFDBFE;' +
            ' border-radius:8px; padding:8px 10px; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
              '<i class="fa fa-hand"></i> {% trans "Reserved for an order" %} · ' +
-             '<b>' + Number(h.meters).toFixed(2) + ' m</b> {% trans "held" %} ' +
+             '<b>' + Number(h.quantity).toFixed(2) + ' m</b> {% trans "held" %} ' +
              '<span style="font-weight:500;">({% trans "not yet shipped" %})</span>' +
              rows +
            '</div>';
@@ -3525,7 +3525,7 @@
         if (e.by) what += ' · ' + blEsc(e.by);
       }
       var bits = [];
-      if (e.meters) bits.push(Number(e.meters).toFixed(2) + ' m');
+      if (e.quantity) bits.push(Number(e.quantity).toFixed(2) + ' m');
       if (e.date) bits.push(blEsc(e.date));
       // The order line this roll was cut for — one order can eat several
       // rolls, so the order number alone doesn't say what this one became.
@@ -3555,9 +3555,9 @@
       var tiles = '';
       // HERO — the scanned stock item's meters, front and centre.
       if (d.roll) {
-        var rm = (d.roll.meters || 0).toFixed(2);
-        var rem = (d.roll.meters_remaining !== null && d.roll.meters_remaining !== undefined)
-                  ? Number(d.roll.meters_remaining).toFixed(2) : null;
+        var rm = (d.roll.quantity || 0).toFixed(2);
+        var rem = (d.roll.quantity_remaining !== null && d.roll.quantity_remaining !== undefined)
+                  ? Number(d.roll.quantity_remaining).toFixed(2) : null;
         var sub = '';
         if (rem !== null && rem !== rm) sub += '{% trans "remaining" %}: <b>' + rem + ' m</b>';
         if (d.roll.lot_number) sub += (sub ? ' · ' : '') + 'Lot: ' + blEsc(d.roll.lot_number);
@@ -3597,8 +3597,8 @@
         '</div>';
     } else if (d && d.found_elsewhere) {
       var ep = d.product, er = d.roll, ew = d.other_warehouse;
-      var erem = (er.meters_remaining !== null && er.meters_remaining !== undefined)
-                 ? Number(er.meters_remaining).toFixed(2) : Number(er.meters || 0).toFixed(2);
+      var erem = (er.quantity_remaining !== null && er.quantity_remaining !== undefined)
+                 ? Number(er.quantity_remaining).toFixed(2) : Number(er.quantity || 0).toFixed(2);
       r.innerHTML =
         '<div class="bl-rc elsewhere">' +
           '<span class="bl-status elsewhere"><i class="fa fa-warehouse"></i> {% trans "In a different warehouse" %}</span>' +

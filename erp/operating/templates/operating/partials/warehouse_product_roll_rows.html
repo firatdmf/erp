@@ -31,10 +31,10 @@ them into the same grid squeezed both.{% endcomment %}
         </div>
 
         <div class="wh-roll-len">
-          <span class="wh-roll-m">{% if r.meters_remaining is not None %}{{ r.meters_remaining|floatformat:2 }}{% else %}{{ r.meters|floatformat:2 }}{% endif %} m</span>
-          {% if r.meters and r.meters_remaining is not None and r.meters_remaining < r.meters %}
-            <span class="wh-roll-of">{% trans "of" %} {{ r.meters|floatformat:2 }} m</span>
-            <span class="wh-roll-bar"><span style="width:{% widthratio r.meters_remaining r.meters 100 %}%;"></span></span>
+          <span class="wh-roll-m">{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} {{ product.unit_short }}</span>
+          {% if r.quantity and r.quantity_remaining is not None and r.quantity_remaining < r.quantity %}
+            <span class="wh-roll-of">{% trans "of" %} {{ r.quantity|floatformat:2 }} {{ product.unit_short }}</span>
+            <span class="wh-roll-bar"><span style="width:{% widthratio r.quantity_remaining r.quantity 100 %}%;"></span></span>
           {% endif %}
         </div>
 
@@ -55,11 +55,11 @@ them into the same grid squeezed both.{% endcomment %}
           {% if r.reserved_m %}
             <span class="wh-roll-resv">
               <i class="fa fa-lock"></i>
-              {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ r.reserved_m|floatformat:2 }} m
+              {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ r.reserved_m|floatformat:2 }} {{ product.unit_short }}
             </span>
             {% for resv in r.reservation_list %}
               <a href="{% url 'operating:order_detail' resv.order_id %}" target="_blank" rel="noopener" class="wh-roll-order">
-                {{ resv.order.order_number|default:resv.order_id }} ({{ resv.meters|floatformat:2 }} m)
+                {{ resv.order.order_number|default:resv.order_id }} ({{ resv.quantity|floatformat:2 }} m)
               </a>
             {% endfor %}
           {% endif %}

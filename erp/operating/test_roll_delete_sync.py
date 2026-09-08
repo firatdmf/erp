@@ -37,7 +37,7 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
             warehouse=self.warehouse, name="MARLETTOO", sku="N1464T.G54",
             quantity=Decimal("33.66"), catalog_variant=self.variant)
         self.stock_item = WarehouseProductItem.objects.create(
-            product=self.wp, meters=Decimal("33.66"), barcode="2000043130007")
+            product=self.wp, quantity=Decimal("33.66"), barcode="2000043130007")
 
     def _delete(self, roll):
         return self.client.post(

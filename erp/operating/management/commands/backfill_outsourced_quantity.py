@@ -114,7 +114,7 @@ class Command(BaseCommand):
                 r["order_item_id"]: (r["s"] or Decimal("0"))
                 for r in (order.stock_reservations
                           .filter(order_item__isnull=False)
-                          .values("order_item_id").annotate(s=Sum("meters")))
+                          .values("order_item_id").annotate(s=Sum("quantity")))
             }
             for it in line_items:
                 if it.pk in handled or not tracked.get(it.pk):

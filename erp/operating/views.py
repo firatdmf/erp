@@ -403,14 +403,14 @@ class OrderDetail(DetailView):
         for it in items_sorted:
             it.is_tracked = bool(tracked_map.get(it.pk, False))
             it.item_reservations = by_item.get(it.pk, [])
-            it.scanned_meters = sum((r.meters or _D("0") for r in it.item_reservations), _D("0"))
+            it.scanned_meters = sum((r.quantity or _D("0") for r in it.item_reservations), _D("0"))
             it.scanned_count = len(it.item_reservations)
             it.variant_label = _order_item_variant_label(it)
         # Every item-less reservation, pack or no pack — in this layout
         # nothing else renders them, so filtering pack'd ones out (as the
         # pack screen does) would make them invisible here.
         ctx["unassigned_reservations"] = [r for r in reservations if not r.order_item_id]
-        ctx["total_scanned_meters"] = sum((r.meters or _D("0") for r in reservations), _D("0"))
+        ctx["total_scanned_meters"] = sum((r.quantity or _D("0") for r in reservations), _D("0"))
         ctx["total_scanned_count"] = len(reservations)
         ctx["reservation_count"] = sum(1 for r in reservations if not r.consumed)
         ctx["has_cargo_info"] = bool((self.object.carrier or "").strip() and (self.object.tracking_number or "").strip())
@@ -894,14 +894,14 @@ def _roll_available_meters(roll, exclude_reservation_id=None, exclude_order_id=N
     """
     from .models import OrderStockReservation
     from django.db.models import Sum
-    phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+    phys = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
     phys = phys or _PDecimal("0")
     qs = OrderStockReservation.objects.filter(stock_item=roll, consumed=False)
     if exclude_reservation_id is not None:
         qs = qs.exclude(pk=exclude_reservation_id)
     if exclude_order_id is not None:
         qs = qs.exclude(order_id=exclude_order_id)
-    other = qs.aggregate(s=Sum("meters"))["s"] or _PDecimal("0")
+    other = qs.aggregate(s=Sum("quantity"))["s"] or _PDecimal("0")
     avail = phys - other
     return avail if avail > 0 else _PDecimal("0")
 
@@ -919,7 +919,7 @@ def _roll_unavailable_response(roll, exclude_order_id=None):
     reservations are different problems for the staff scanning it, so
     the reserved case names the holding order(s)."""
     from .models import OrderStockReservation
-    phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+    phys = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
     phys = phys or _PDecimal("0")
     if phys > 0:
         refs = []
@@ -1019,7 +1019,7 @@ def _create_roll_reservation(order, order_item, roll, req_meters, user):
             meters = avail
         r = OrderStockReservation.objects.create(
             order=order, order_item=order_item, stock_item=locked,
-            warehouse_product=locked.product, meters=meters,
+            warehouse_product=locked.product, quantity=meters,
             created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
         )
     return r, capped, None
@@ -1099,7 +1099,7 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
             continue
         key = bc.lower()
         submitted_keys.add(key)
-        raw_m = roll_data.get("meters")
+        raw_m = roll_data.get("quantity")
         try:
             req_m = _PDecimal(str(raw_m)) if raw_m else None
         except Exception:
@@ -1108,12 +1108,12 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
         held = existing.get(key)
         if held is not None:
             # Kept — apply a metres change (scissors) if any.
-            if req_m is not None and req_m > 0 and abs(held.meters - req_m) > _PDecimal("0.004"):
+            if req_m is not None and req_m > 0 and abs(held.quantity - req_m) > _PDecimal("0.004"):
                 avail = _roll_available_meters(held.stock_item, exclude_reservation_id=held.pk)
                 new_m = req_m if req_m <= avail else avail
                 if new_m > 0:
-                    held.meters = new_m
-                    held.save(update_fields=["meters"])
+                    held.quantity = new_m
+                    held.save(update_fields=["quantity"])
             continue
 
         roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
@@ -1141,9 +1141,9 @@ def _reservation_payload(r):
         "product_name": (wp.name if wp else ""),
         "sku": (wp.sku if wp else ""),
         "warehouse": (wp.warehouse.name if (wp and wp.warehouse_id) else ""),
-        "meters": float(r.meters or 0),
-        "roll_meters": (float(r.stock_item.meters or 0) if r.stock_item else None),
-        "roll_remaining": (float(r.stock_item.meters_remaining) if (r.stock_item and r.stock_item.meters_remaining is not None) else None),
+        "quantity": float(r.quantity or 0),
+        "roll_meters": (float(r.stock_item.quantity or 0) if r.stock_item else None),
+        "roll_remaining": (float(r.stock_item.quantity_remaining) if (r.stock_item and r.stock_item.quantity_remaining is not None) else None),
         "consumed": r.consumed,
         "order_item_id": r.order_item_id,
         "pack_id": r.pack_id,
@@ -1172,7 +1172,7 @@ def _annotate_pack_contents(packs, reservations, untracked_items):
     for r in reservations:
         if r.pack_id:
             rolls[r.pack_id] += 1
-            meters[r.pack_id] += r.meters or Decimal("0")
+            meters[r.pack_id] += r.quantity or Decimal("0")
     for it in untracked_items:
         if it.pack_id:
             extras[it.pack_id] += 1
@@ -1386,7 +1386,7 @@ def order_pack_reserve_add(request, pk):
     roll_pick, matched_item = pick
 
     # Parse the requested metres (validation errors before we lock).
-    raw = (request.POST.get("meters") or "").strip()
+    raw = (request.POST.get("quantity") or "").strip()
     req_meters = None
     if raw:
         try:
@@ -1430,7 +1430,7 @@ def order_pack_reserve_update(request, pk):
     r = OrderStockReservation.objects.filter(pk=rid, order=order, consumed=False).first()
     if r is None:
         return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
-    raw = (request.POST.get("meters") or "").strip()
+    raw = (request.POST.get("quantity") or "").strip()
     try:
         meters = _PDecimal(raw)
     except Exception:
@@ -1441,8 +1441,8 @@ def order_pack_reserve_update(request, pk):
     capped = meters > avail
     if capped:
         meters = avail
-    r.meters = meters
-    r.save(update_fields=["meters"])
+    r.quantity = meters
+    r.save(update_fields=["quantity"])
     if order.current_account_id:
         from accounting.services_accounts import post_order_movement
         post_order_movement(order)
@@ -1722,11 +1722,11 @@ def order_create_roll_list(request):
     holds = OrderStockReservation.objects.filter(stock_item__in=rolls, consumed=False)
     if editing is not None:
         holds = holds.exclude(order_id=editing)
-    reserved = dict(holds.values_list("stock_item_id").annotate(s=Sum("meters")))
+    reserved = dict(holds.values_list("stock_item_id").annotate(s=Sum("quantity")))
 
     out = []
     for roll in rolls:
-        phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+        phys = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
         avail = (phys or _PDecimal("0")) - reserved.get(roll.pk, _PDecimal("0"))
         if avail <= 0:
             continue
@@ -2486,7 +2486,7 @@ class OrderCreate(View):
                             if rerr:
                                 failed_barcodes.append(bc)
                                 continue
-                            raw_m = roll_data.get("meters")
+                            raw_m = roll_data.get("quantity")
                             try:
                                 req_m = _PDecimal(str(raw_m)) if raw_m else None
                             except Exception:
@@ -2736,10 +2736,10 @@ class OrderEdit(UpdateView):
                         "warehouse": (r.stock_item.product.warehouse.name
                                      if (r.stock_item and r.stock_item.product and r.stock_item.product.warehouse_id)
                                      else ""),
-                        "meters": float(r.meters or 0),
+                        "quantity": float(r.quantity or 0),
                         "available": float(
                             _roll_available_meters(r.stock_item, exclude_reservation_id=r.pk)
-                            if r.stock_item else (r.meters or 0)
+                            if r.stock_item else (r.quantity or 0)
                         ),
                     }
                     for r in it.stock_reservations.all()
@@ -3337,7 +3337,7 @@ def _pack_roll_rows(pack):
             "variant": _variant_label(variant),
             "product_type": _product_type_label(product),
             "barcode": r.stock_item.barcode if r.stock_item_id else "-",
-            "meters": r.meters,
+            "quantity": r.quantity,
         })
     return rows
 
@@ -3530,10 +3530,10 @@ def export_packing_list_excel(request, pk):
 
         for r in rows:
             item_no += 1
-            total_meters += Decimal(r["meters"] or 0)
+            total_meters += Decimal(r["quantity"] or 0)
             values = [pack.pack_number, item_no, r["title"], r["variant"],
                       r["product_type"], r["sku"], r["barcode"],
-                      float(r["meters"] or 0)]
+                      float(r["quantity"] or 0)]
             for col_index, value in enumerate(values, start=1):
                 cell = ws.cell(row=row, column=col_index, value=value)
                 cell.border = grid
@@ -3785,7 +3785,7 @@ def product_autocomplete(request):
     reserved_by_wp = {}
     for wp_id, meters in (OrderStockReservation.objects
                           .filter(warehouse_product__in=[w.pk for w in wh_rows], consumed=False)
-                          .values_list("warehouse_product_id", "meters")):
+                          .values_list("warehouse_product_id", "quantity")):
         reserved_by_wp[wp_id] = reserved_by_wp.get(wp_id, _D("0")) + (meters or _D("0"))
 
     wh_groups = {}          # variant_id -> {"wp": first wp, "stocks": [(wh, qty)]}
@@ -4292,7 +4292,7 @@ def order_packing_list_pdf(request, pk):
         'variant': "Varyant" if is_tr else "Variant",
         'product_type': "\u00dcr\u00fcn Tipi" if is_tr else "Product Type",
         'barcode': "Barkod" if is_tr else "Barcode",
-        'meters': "Metre" if is_tr else "Metres",
+        'quantity': "Metre" if is_tr else "Metres",
         'total_packages': "Toplam Paket" if is_tr else "Total Packages",
         'total_items': "Toplam Kalem" if is_tr else "Total Items",
         'total_meters': "Toplam Metre" if is_tr else "Total Metres",
@@ -4398,7 +4398,7 @@ def order_packing_list_pdf(request, pk):
         Paragraph(labels['variant'], th_style),
         Paragraph(labels['product_type'], th_style),
         Paragraph(labels['barcode'], th_style),
-        Paragraph(labels['meters'], th_num_style),
+        Paragraph(labels['quantity'], th_num_style),
     ]]
     # (first_row, last_row) per package, so the pack column can be merged
     # down across every item that shares it.
@@ -4418,8 +4418,8 @@ def order_packing_list_pdf(request, pk):
             ])
         for row in rows:
             item_no += 1
-            if row['meters'] is not None:
-                total_meters += row['meters']
+            if row['quantity'] is not None:
+                total_meters += row['quantity']
             data.append([
                 Paragraph(str(pack.pack_number), ctr_style),
                 Paragraph(str(item_no), cell_style),
@@ -4429,7 +4429,7 @@ def order_packing_list_pdf(request, pk):
                 Paragraph(row['variant'], cell_style),
                 Paragraph(row['product_type'], cell_style),
                 Paragraph(str(row['barcode']), cell_style),
-                Paragraph(f"{row['meters']:.2f} m" if row['meters'] is not None else "-",
+                Paragraph(f"{row['quantity']:.2f} m" if row['quantity'] is not None else "-",
                           num_style),
             ])
         spans.append((first, len(data) - 1))
@@ -4524,7 +4524,7 @@ def pack_pdf(request, pack_pk):
         'order': "Sipariş" if is_tr else "Order",
         'contents': "İÇERİK" if is_tr else "CONTENTS",
         'product': "Ürün" if is_tr else "Product",
-        'meters': "Metre" if is_tr else "Metres",
+        'quantity': "Metre" if is_tr else "Metres",
     }
     
     font = _ensure_pdf_fonts() or "Helvetica"
@@ -4596,13 +4596,13 @@ def pack_pdf(request, pack_pk):
     
     items_data = [[
         Paragraph(f"<b>{labels['product']}</b>", normal_style),
-        Paragraph(f"<b>{labels['meters']}</b>", normal_style)
+        Paragraph(f"<b>{labels['quantity']}</b>", normal_style)
     ]]
 
     for row in _pack_roll_rows(pack):
         items_data.append([
             Paragraph(row['title'], normal_style),
-            Paragraph(f"{row['meters']:.2f} m" if row['meters'] is not None else "-", normal_style),
+            Paragraph(f"{row['quantity']:.2f} m" if row['quantity'] is not None else "-", normal_style),
         ])
 
     tbl = Table(items_data, colWidths=[65 * mm, 24 * mm])

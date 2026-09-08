@@ -703,16 +703,16 @@
               </td>
               <td>
                 <div class="roll-meters">
-                  {% if r.meters_remaining is not None %}{{ r.meters_remaining|floatformat:2 }}{% else %}{{ r.meters|floatformat:2 }}{% endif %} m
+                  {% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} m
                   <span class="roll-inline-status roll-status {{ r.status }}" style="display:none;">
                     {% if r.status == 'in_stock' %}<i class="fa fa-circle-check"></i>{% trans "In stock" %}
                     {% elif r.status == 'partial' %}<i class="fa fa-circle-half-stroke"></i>{% trans "Partial" %}
                     {% else %}<i class="fa fa-circle-xmark"></i>{% trans "Consumed" %}{% endif %}
                   </span>
                 </div>
-                {% if r.meters and r.meters_remaining is not None %}
-                  <div class="roll-bar"><span style="width:{% widthratio r.meters_remaining r.meters 100 %}%;"></span></div>
-                  <div style="font-size:10.5px; color:var(--gray-500); margin-top:2px;">{% trans "of" %} {{ r.meters|floatformat:2 }} m</div>
+                {% if r.quantity and r.quantity_remaining is not None %}
+                  <div class="roll-bar"><span style="width:{% widthratio r.quantity_remaining r.quantity 100 %}%;"></span></div>
+                  <div style="font-size:10.5px; color:var(--gray-500); margin-top:2px;">{% trans "of" %} {{ r.quantity|floatformat:2 }} m</div>
                 {% endif %}
                 {% if r.reserved_m %}
                   <div style="font-size:10.5px;color:#B45309;font-weight:700;margin-top:3px;"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ r.reserved_m|floatformat:2 }} m</div>
@@ -722,7 +722,7 @@
                         <i class="fa fa-arrow-up-right-from-square" style="font-size:8px;"></i>
                         {{ resv.order.order_number|default:resv.order_id }}
                       </a>
-                      <span style="color:var(--gray-500);">({{ resv.meters|floatformat:2 }} m)</span>
+                      <span style="color:var(--gray-500);">({{ resv.quantity|floatformat:2 }} m)</span>
                     </div>
                   {% endfor %}
                 {% endif %}
@@ -771,8 +771,8 @@
                           title="{% trans 'Edit this roll' %}"
                           data-roll-id="{{ r.pk }}"
                           data-barcode="{{ r.barcode|default:'' }}"
-                          data-meters="{% if r.meters is not None %}{{ r.meters|stringformat:'.2f' }}{% endif %}"
-                          data-remaining="{% if r.meters_remaining is not None %}{{ r.meters_remaining|stringformat:'.2f' }}{% else %}{{ r.meters|default_if_none:0|stringformat:'.2f' }}{% endif %}"
+                          data-quantity="{% if r.quantity is not None %}{{ r.quantity|stringformat:'.2f' }}{% endif %}"
+                          data-remaining="{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|stringformat:'.2f' }}{% else %}{{ r.quantity|default_if_none:0|stringformat:'.2f' }}{% endif %}"
                           data-lot="{{ r.lot_number|default:'' }}"
                           data-is-second="{% if r.is_second %}1{% else %}0{% endif %}"
                           onclick="openRollEdit(this)">
@@ -783,7 +783,7 @@
                           title="{% trans 'Delete this roll' %}"
                           data-roll-id="{{ r.pk }}"
                           data-roll-label="{% if r.barcode %}{{ r.barcode }}{% else %}#{{ r.pk }}{% endif %}"
-                          data-remaining="{% if r.meters_remaining is not None %}{{ r.meters_remaining }}{% else %}{{ r.meters|default:0 }}{% endif %}"
+                          data-remaining="{% if r.quantity_remaining is not None %}{{ r.quantity_remaining }}{% else %}{{ r.quantity|default:0 }}{% endif %}"
                           onclick="openRollDelete(this)">
                     <i class="fa fa-trash"></i>
                   </button>
@@ -951,7 +951,7 @@
           {% for r in rolls %}
             {% if r.status != 'consumed' %}
               <option value="{{ r.pk }}">
-                #{{ r.pk }} · {% if r.barcode %}{{ r.barcode }} · {% endif %}{% if r.meters_remaining is not None %}{{ r.meters_remaining|floatformat:2 }}{% else %}{{ r.meters|floatformat:2 }}{% endif %} m
+                #{{ r.pk }} · {% if r.barcode %}{{ r.barcode }} · {% endif %}{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} m
               </option>
             {% endif %}
           {% endfor %}
@@ -1246,15 +1246,15 @@
   function openRollEdit(btn) {
     _reRollId = btn.dataset.rollId;
     document.getElementById('reBarcode').value = btn.dataset.barcode || '';
-    document.getElementById('reMeters').value  = btn.dataset.meters || '';
+    document.getElementById('reMeters').value  = btn.dataset.quantity || '';
     document.getElementById('reLot').value     = btn.dataset.lot || '';
     document.getElementById('reIsSecond').checked = btn.dataset.isSecond === '1';
 
     // The floor is the metres already OUT, not the metres left: a roll cannot
     // have had more cut from it than it was ever long, so shortening it below
     // what shipped is what gets refused.
-    _reStoredTotal = parseFloat(btn.dataset.meters || '0') || 0;
-    const left = parseFloat(btn.dataset.remaining || btn.dataset.meters || '0') || 0;
+    _reStoredTotal = parseFloat(btn.dataset.quantity || '0') || 0;
+    const left = parseFloat(btn.dataset.remaining || btn.dataset.quantity || '0') || 0;
     _reOut = Math.max(0, Math.round((_reStoredTotal - left) * 100) / 100);
     document.getElementById('reMeters').min = _reOut > 0 ? _reOut.toFixed(2) : '0.01';
 
@@ -1275,7 +1275,7 @@
     const url = rollEditUrlPattern.replace('/0/', '/' + _reRollId + '/');
     const fd = new FormData();
     fd.append('barcode', document.getElementById('reBarcode').value || '');
-    fd.append('meters', document.getElementById('reMeters').value || '');
+    fd.append('quantity', document.getElementById('reMeters').value || '');
     fd.append('lot_number', document.getElementById('reLot').value || '');
     if (document.getElementById('reIsSecond').checked) fd.append('is_second', '1');
     fetch(url, {

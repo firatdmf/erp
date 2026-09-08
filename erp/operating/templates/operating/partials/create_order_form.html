@@ -440,7 +440,7 @@
         itemIndex++;
         var stableIndex = itemIndex;
         var rolls = (it.rolls || []).map(function (r) {
-          return { reservation_id: r.reservation_id || null, barcode: r.barcode || '', warehouse: r.warehouse || '', meters: parseFloat(r.meters) || 0, available: parseFloat(r.available) || 0 };
+          return { reservation_id: r.reservation_id || null, barcode: r.barcode || '', warehouse: r.warehouse || '', meters: parseFloat(r.quantity) || 0, available: parseFloat(r.available) || 0 };
         });
         // Out-of-warehouse metres come straight off the saved line
         // (OrderItem.outsourced_quantity). Legacy lines saved before that
@@ -449,7 +449,7 @@
         // implicitly. Either way the box shows the real figure instead of
         // opening empty and looking like the quantity was lost (and the
         // first roll pick then silently overwrote it — syncQtyFromRolls).
-        var reserved = rolls.reduce(function (s, r) { return s + r.meters; }, 0);
+        var reserved = rolls.reduce(function (s, r) { return s + r.quantity; }, 0);
         var qty = parseFloat(it.quantity) || 0;
         var manual = it.outsourced == null
           ? (qty - reserved)
@@ -731,7 +731,7 @@
     var all = (item.existingRolls || []).concat(item.rolls || []);
     var manual = parseFloat(item.manualMeters) || 0;
     if (force || all.length || manual > 0) {
-      var rollTotal = all.reduce(function (s, r) { return s + (parseFloat(r.meters) || 0); }, 0);
+      var rollTotal = all.reduce(function (s, r) { return s + (parseFloat(r.quantity) || 0); }, 0);
       item.quantity = rollTotal + manual;
     }
   }
@@ -792,7 +792,7 @@
   // state: 'existing' (already reserved, locked) | 'picked' (this
   // session, click to remove) | 'available' (not picked, click to add).
   function rollRowHtml(i, r, state, ri) {
-    var meters = (r.meters != null ? r.meters : r.available);
+    var meters = (r.quantity != null ? r.quantity : r.available);
     var isFull = Math.abs(meters - r.available) < 0.005;
     var locked = state === 'existing';
     var picked = state === 'picked';
@@ -1026,7 +1026,7 @@
     // number sits mid-sentence in Turkish, so it can't be concatenated
     // onto a translated fragment and still read right in both.
     if (m > cap) { m = cap; showToast('{% trans "At most %(m)s m can be entered" %}'.replace('%(m)s', cap), 'warning'); }
-    item.rolls[ri].meters = m;
+    item.rolls[ri].quantity = m;
     syncQtyFromRolls(i, true);
     renderProducts();
   };
@@ -1430,7 +1430,7 @@
         custom_mounting_type: it.custom_mounting_type || null,
         custom_wing_type: it.custom_wing_type || null,
         custom_fabric_used_meters: it.custom_fabric_used_meters || null,
-        rolls: (it.rolls || []).map(function (r) { return { barcode: r.barcode, meters: r.meters }; })
+        rolls: (it.rolls || []).map(function (r) { return { barcode: r.barcode, meters: r.quantity }; })
       };
       if (it.existing_item_id) payload.item_id = it.existing_item_id;
       return payload;

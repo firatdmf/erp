@@ -125,7 +125,7 @@ class BackfillFromSkuCost(TestCase):
             warehouse=self.wh, name="seta", sku=sku, quantity=Decimal("0"),
             cost_usd=cost)
         return WarehouseProductItem.objects.create(
-            product=wp, meters=Decimal("50"), meters_remaining=Decimal("50"),
+            product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode=f"BC-{sku}", status="in_stock")
 
     def test_it_stamps_the_skus_cost(self):
@@ -180,8 +180,8 @@ class ShownOnThePage(TestCase):
 
     def _top(self, cost):
         return WarehouseProductItem.objects.create(
-            product=self.wp, meters=Decimal("19.50"),
-            meters_remaining=Decimal("19.50"), barcode="BC-1",
+            product=self.wp, quantity=Decimal("19.50"),
+            quantity_remaining=Decimal("19.50"), barcode="BC-1",
             status="in_stock", unit_cost_base=cost)
 
     def _page(self):
@@ -252,7 +252,7 @@ class PricingCardIsWeighted(TestCase):
 
     def _top(self, metres, cost, barcode):
         return WarehouseProductItem.objects.create(
-            product=self.wp, meters=metres, meters_remaining=metres,
+            product=self.wp, quantity=metres, quantity_remaining=metres,
             barcode=barcode, status="in_stock", unit_cost_base=cost)
 
     def _page(self):
@@ -320,7 +320,7 @@ class DerivedNotStored(TestCase):
 
     def _top(self, metres, cost, barcode):
         return WarehouseProductItem.objects.create(
-            product=self.wp, meters=metres, meters_remaining=metres,
+            product=self.wp, quantity=metres, quantity_remaining=metres,
             barcode=barcode, status="in_stock", unit_cost_base=cost)
 
     def _annotated(self):
@@ -340,7 +340,7 @@ class DerivedNotStored(TestCase):
         # Cut the cheap stock item down the way a stock-out would, touching
         # nothing else — no save on the product, no recompute anywhere.
         WarehouseProductItem.objects.filter(pk=a.pk).update(
-            meters_remaining=Decimal("0"), status="consumed")
+            quantity_remaining=Decimal("0"), status="consumed")
         self.assertEqual(round(self._annotated().avg_cost, 4),
                          Decimal("5.0000"))
         self.assertEqual(round(self._annotated().stock_value, 2),

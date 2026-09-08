@@ -643,7 +643,7 @@
       {% if m.quantity != 0 %}
       <span style="flex-shrink:0; font:800 12.5px var(--font-sans, sans-serif); font-variant-numeric:tabular-nums; white-space:nowrap;
         {% if m.movement_type == 'in' %}color:#0E6E4A;{% elif m.movement_type == 'out' %}color:#DC2626;{% else %}color:#6B7280;{% endif %}">
-        {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m
+        {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} {{ m.product.unit_short }}
       </span>
       {% endif %}
       <span style="flex-shrink:0; font:500 11px var(--font-sans, sans-serif); color:#A0A8B0; white-space:nowrap;">{{ m.created_at|date:"d M · H:i" }}</span>

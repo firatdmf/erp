@@ -49,11 +49,11 @@ class PackHeaderTotals(TestCase):
 
     def _reserve(self, barcode, roll_meters, reserved, pack):
         roll = WarehouseProductItem.objects.create(
-            product=self.wp, meters=roll_meters, meters_remaining=roll_meters,
+            product=self.wp, quantity=roll_meters, quantity_remaining=roll_meters,
             barcode=barcode)
         return OrderStockReservation.objects.create(
             order=self.order, order_item=self.item, stock_item=roll,
-            warehouse_product=self.wp, meters=reserved, pack=pack)
+            warehouse_product=self.wp, quantity=reserved, pack=pack)
 
     def _packs(self):
         resp = self.client.get(reverse("operating:order_pack_scan",
@@ -198,8 +198,8 @@ class ScanningStraightIntoAPackage(TestCase):
         self.item = OrderItem.objects.create(order=self.order, product=product,
                                              quantity=Decimal("100.00"), price=10)
         self.stock_item = WarehouseProductItem.objects.create(
-            product=self.wp, meters=Decimal("40.00"),
-            meters_remaining=Decimal("40.00"), barcode="SCAN-1")
+            product=self.wp, quantity=Decimal("40.00"),
+            quantity_remaining=Decimal("40.00"), barcode="SCAN-1")
         self.client.force_login(User.objects.create_superuser("p3", "p3@a.b", "pw"))
         self.url = reverse("operating:order_pack_reserve_add", kwargs={"pk": self.order.pk})
 

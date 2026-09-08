@@ -90,7 +90,7 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
             warehouse=self.warehouse, name="PETEK FONLUK KUMAŞ 94",
             sku="PETEK.94.310", quantity=Decimal("30"), catalog_variant=self.variant)
         self.stock_item = WarehouseProductItem.objects.create(
-            product=self.wp, meters=Decimal("30"), barcode="PTK-1")
+            product=self.wp, quantity=Decimal("30"), barcode="PTK-1")
         self.order = Order.objects.create()
 
     def _stock_shown(self):
@@ -105,14 +105,14 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
     def test_reserved_metres_are_not_offered(self):
         self.OrderStockReservation.objects.create(
             order=self.order, stock_item=self.stock_item, warehouse_product=self.wp,
-            meters=Decimal("30"), consumed=False)
+            quantity=Decimal("30"), consumed=False)
         self.assertIn("0", self._stock_shown())
         self.assertNotIn("30", self._stock_shown())
 
     def test_a_partial_reservation_leaves_the_remainder(self):
         self.OrderStockReservation.objects.create(
             order=self.order, stock_item=self.stock_item, warehouse_product=self.wp,
-            meters=Decimal("12"), consumed=False)
+            quantity=Decimal("12"), consumed=False)
         self.assertIn("18", self._stock_shown())
 
 

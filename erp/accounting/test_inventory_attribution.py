@@ -34,7 +34,7 @@ class InventoryAttribution(TestCase):
         product = WarehouseProduct.objects.create(
             warehouse=warehouse, name="seta grey", cost_usd=cost)
         return WarehouseProductItem.objects.create(
-            product=product, meters=metres, meters_remaining=metres,
+            product=product, quantity=metres, quantity_remaining=metres,
             status=status)
 
     def test_uninvoiced_stock_still_counts(self):

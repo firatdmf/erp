@@ -5,8 +5,8 @@ the package it was sorted into. All editing happens on the separate
 "Düzenleme ve Paketleme" screen (order_pack_scan).
 {% endcomment %}<span class="od-top-pill{% if r.consumed %} consumed{% endif %}">
   <span class="bc">{{ r.stock_item.barcode|default:'—' }}</span>
-  <span class="m">{{ r.meters|floatformat:"-2" }} m</span>
-  {% if not r.consumed and r.meters < r.stock_item.meters_remaining|default:r.stock_item.meters %}<span class="tag">{% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %}</span>{% endif %}
+  <span class="m">{{ r.quantity|floatformat:"-2" }} m</span>
+  {% if not r.consumed and r.quantity < r.stock_item.quantity_remaining|default:r.stock_item.quantity %}<span class="tag">{% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %}</span>{% endif %}
   {% if r.consumed %}<span class="tag cut">{% if LANGUAGE_CODE|slice:":2" == "tr" %}kesildi{% else %}cut{% endif %}</span>{% endif %}
   {% if r.pack_id %}<span class="tag pack"><i class="fa fa-box"></i> #{{ r.pack.pack_number }}</span>{% endif %}
 </span>

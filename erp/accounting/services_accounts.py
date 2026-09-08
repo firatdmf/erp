@@ -411,8 +411,8 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
        "product": marketing.Product | None,
        "variant": marketing.ProductVariant | None,
        "description": str, "unit": str, "unit_price": Decimal,
-       "quantity": Decimal,                 # recomputed from roll.meters
-                                             # (NOT meters_remaining) across
+       "quantity": Decimal,                 # recomputed from roll.quantity
+                                             # (NOT quantity_remaining) across
                                              # this line's surviving + new stock items
        "new_roll_ids": [int, ...]}          # rolls to backfill onto this item
 

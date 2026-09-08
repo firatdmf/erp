@@ -591,17 +591,17 @@ class InvoiceDetail(View):
             purchase_rolls = list(it.warehouse_stock_items.all())
             if purchase_rolls:
                 # Each roll here IS the physical stock item this PO line put
-                # into stock — its own .meters is exactly that line's
+                # into stock — its own .quantity is exactly that line's
                 # contribution, safe to show as-is.
                 it.display_rolls = [
-                    {"barcode": r.barcode, "meters": r.meters} for r in purchase_rolls
+                    {"barcode": r.barcode, "quantity": r.quantity} for r in purchase_rolls
                 ]
             elif it.order_item_id:
                 # A roll can be shared across order lines (partial
-                # cuts) — the reservation's own .meters is what THIS
+                # cuts) — the reservation's own .quantity is what THIS
                 # line actually used, not the roll's full size.
                 it.display_rolls = [
-                    {"barcode": r.stock_item.barcode, "meters": r.meters}
+                    {"barcode": r.stock_item.barcode, "quantity": r.quantity}
                     for r in it.order_item.stock_reservations.all() if r.consumed
                 ]
             else:

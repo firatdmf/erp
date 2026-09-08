@@ -48,10 +48,10 @@ class PurchaseLineLabelsTest(TestCase):
             quantity=Decimal("55.00"))
         self.stock_items = [
             WarehouseProductItem.objects.create(
-                product=self.product, meters=Decimal("30.00"),
+                product=self.product, quantity=Decimal("30.00"),
                 barcode="KRV0000001", purchase_invoice_item=self.item),
             WarehouseProductItem.objects.create(
-                product=self.product, meters=Decimal("25.00"),
+                product=self.product, quantity=Decimal("25.00"),
                 barcode="KRV0000002", purchase_invoice_item=self.item),
         ]
 
@@ -78,15 +78,15 @@ class PurchaseLineLabelsTest(TestCase):
         drawn = self._drawn(resp)
         self.assertIn("KRV0000001", drawn)
         self.assertIn("KRV0000002", drawn)
-        self.assertIn("30.00", drawn)
-        self.assertIn("25.00", drawn)
+        self.assertIn("30.00 m", drawn)
+        self.assertIn("25.00 m", drawn)
 
     def test_rolls_of_other_lines_stay_out(self):
         other_item = InvoiceItem.objects.create(
             invoice=self.invoice, line_no=2, description="K24644 G09",
             quantity=Decimal("12.000"), unit="mt", unit_price=Decimal("3.50"))
         WarehouseProductItem.objects.create(
-            product=self.product, meters=Decimal("12.00"),
+            product=self.product, quantity=Decimal("12.00"),
             barcode="KRV0000003", purchase_invoice_item=other_item)
 
         drawn = self._drawn(self.client.get(self._url()))
@@ -101,7 +101,7 @@ class PurchaseLineLabelsTest(TestCase):
             warehouse=self.wh, name="K24644 G11", sku="K24644.G11",
             quantity=Decimal("8.00"))
         WarehouseProductItem.objects.create(
-            product=other_product, meters=Decimal("8.00"),
+            product=other_product, quantity=Decimal("8.00"),
             barcode="KRV0000004", purchase_invoice_item=self.item)
 
         drawn = self._drawn(self.client.get(self._url()))

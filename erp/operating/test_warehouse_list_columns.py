@@ -59,8 +59,8 @@ class UnitCostIsTheWeightedAverage(TestCase):
 
     def _top(self, metres, cost, code):
         return WarehouseProductItem.objects.create(
-            product=self.wp, meters=Decimal(metres),
-            meters_remaining=Decimal(metres), barcode=f"BC-{code}",
+            product=self.wp, quantity=Decimal(metres),
+            quantity_remaining=Decimal(metres), barcode=f"BC-{code}",
             status="in_stock",
             unit_cost_base=Decimal(cost) if cost is not None else None)
 
@@ -135,7 +135,7 @@ class CombinedWarehouseSaysWhichShelf(TestCase):
             warehouse=warehouse, name=name, sku=sku,
             quantity=Decimal("50"), cost_usd=Decimal("4.00"))
         WarehouseProductItem.objects.create(
-            product=wp, meters=Decimal("50"), meters_remaining=Decimal("50"),
+            product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode=f"BC-{sku}", status="in_stock",
             unit_cost_base=Decimal("4.0000"))
         return wp

@@ -137,7 +137,7 @@ class ReadymadeStockImport(TestCase):
         self._apply()
         for wp in WarehouseProduct.objects.all():
             self.assertEqual(wp.unit, "paket")
-            self.assertEqual(wp.unit_short, "pkt")
+            self.assertEqual(wp.unit_short, "pack")
 
     # ── boxes ──────────────────────────────────────────────────────────
     def test_each_row_becomes_a_stock_item_in_its_own_box(self):
@@ -255,3 +255,66 @@ class ReadymadeStockImport(TestCase):
         self.assertEqual(
             sum(m.quantity for m in movements),
             sum(i.quantity for i in WarehouseProductItem.objects.all()))
+
+
+class TheUnplaceableRowsAreWrittenOnTheWarehouse(TestCase):
+    """39 real sets sit in real boxes that the sheet cannot place, because
+    the length column was smudged. Guessing would put stock on the shelf
+    that is not there; a terminal report is something nobody reads twice.
+    So they go on the warehouse's own page, where whoever can open the box
+    will see them."""
+
+    @classmethod
+    def setUpTestData(cls):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        Book.objects.create(name="Ergene Fabric", base_currency=usd)
+        category = ProductCategory.objects.create(name="ready-made_curtain")
+        peony = Product.objects.create(
+            title="Peony", sku="RN1357", category=category)
+        ProductVariant.objects.create(product=peony, variant_sku="RN1357.RM8")
+
+    def setUp(self):
+        self._dir = TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.spec = Path(self._dir.name) / "spec.xlsx"
+        self.stock = Path(self._dir.name) / "stock.xlsx"
+        _write_spec(self.spec)
+        _write_stock(self.stock)
+
+    def _apply(self):
+        out = StringIO()
+        call_command("import_readymade_stock", "--stock", str(self.stock),
+                     "--spec", str(self.spec), "--apply", stdout=out, stderr=out)
+        return out.getvalue()
+
+    def _note(self):
+        return Warehouse.objects.get(name="Ready-made Shop").description
+
+    def test_the_note_names_the_box_and_the_count(self):
+        self._apply()
+        note = self._note()
+        self.assertIn("BOXES THAT NEED A RECOUNT", note)
+        self.assertIn("Box 16", note)
+        self.assertIn("3 sets", note)
+
+    def test_the_note_says_why_they_were_left_out(self):
+        self._apply()
+        self.assertIn("length column could not be read", self._note())
+
+    def test_running_twice_does_not_stack_two_copies_of_it(self):
+        self._apply()
+        self._apply()
+        self.assertEqual(self._note().count("BOXES THAT NEED A RECOUNT"), 1)
+
+    def test_it_does_not_eat_anything_typed_above_it(self):
+        """The description is an editable field. Whatever a person wrote in
+        it has to survive the next import."""
+        self._apply()
+        wh = Warehouse.objects.get(name="Ready-made Shop")
+        wh.description = "Shelf 3, back wall.\n\n" + wh.description
+        wh.save(update_fields=["description"])
+        self._apply()
+        note = self._note()
+        self.assertIn("Shelf 3, back wall.", note)
+        self.assertEqual(note.count("BOXES THAT NEED A RECOUNT"), 1)

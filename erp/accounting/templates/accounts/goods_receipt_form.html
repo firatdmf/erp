@@ -793,7 +793,7 @@
 
   function unitShort() {
     const u = (document.getElementById('npUnit') || {}).value || 'mt';
-    return ({ mt: 'm', adet: 'ad', kg: 'kg', paket: 'pkt' })[u] || u;
+    return ({ mt: 'm', adet: 'pcs', kg: 'kg', paket: 'pack' })[u] || u;
   }
   function slug(s) {
     return (s || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/gi, '').slice(0, 10);

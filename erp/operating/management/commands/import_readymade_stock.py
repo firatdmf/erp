@@ -71,6 +71,33 @@ PRICE_CURRENCY = "USD"
 # Tags every row this command writes, so a run can be traced or undone.
 IMPORT_REFERENCE = "READYMADE-STOCK-IMPORT"
 
+# The rows this command cannot place get written into the warehouse's own
+# description, which the detail page renders and the warehouse form lets
+# anyone edit. A report that only exists in a terminal is a report nobody
+# reads; this one is on the page next to the stock it is about.
+#
+# Everything from the marker down is rewritten on each run, so a recount
+# that fixes the sheet shrinks the list instead of appending a second copy.
+# Anything typed ABOVE the marker is left alone.
+NOTE_MARKER = "── BOXES THAT NEED A RECOUNT ──"
+
+# Markers this note has been written under before. The block is found by
+# its heading, so renaming the heading orphans the old one — it stops
+# matching and survives as "text the user typed", which is exactly what
+# happened the first time this was translated. Every past heading has to
+# stay listed here for the rewrite to find and replace its own work.
+LEGACY_NOTE_MARKERS = ["── SAYIM GEREKEN KUTULAR ──"]
+
+# The count sheet's colour words, for display. These rows have no length,
+# so their Karven colourway cannot be resolved — the sheet's own word is
+# all there is to go on.
+COLOUR_EN = {
+    "BEYAZ": "white",
+    "KREM": "cream",
+    "D BEYAZ": "off-white",
+    "TURKUAZ": "turquoise",
+}
+
 # Sheet column positions in GÜNCEL (0-based), after the index column.
 C_BOX, C_DESIGN, C_LENGTH, C_COLOUR, C_HEADER, C_SETS, C_PRICE = 1, 2, 3, 4, 5, 6, 7
 
@@ -220,7 +247,7 @@ class Command(BaseCommand):
         warehouse, created = Warehouse.objects.get_or_create(
             name=WAREHOUSE_NAME,
             defaults={"accounting_book": book, "kind": "normal",
-                      "description": "Hazır perde deposu"},
+                      "description": "Ready-made curtain stock"},
         )
         if not created and warehouse.accounting_book_id != book.pk:
             raise CommandError(
@@ -359,7 +386,7 @@ class Command(BaseCommand):
                 if row["price"]:
                     stats["value"] += row["sets"] * row["price"]
 
-            WarehouseProductItem.objects.bulk_create(fresh, batch_size=500)
+            WarehouseProductItem.objects.bulk_create(fresh, batch_size=500)  # noqa: E501
             stats["items"] += len(fresh)
 
             # Quantity is restated from what stands on the shelf rather than
@@ -373,9 +400,59 @@ class Command(BaseCommand):
                 StockMovement.objects.create(
                     product=wp, movement_type="in",
                     quantity=sum((f.quantity for f in fresh), Decimal("0")),
-                    reason="Hazır perde stok girişi",
+                    reason="Ready-made curtain stock intake",
                     reference=IMPORT_REFERENCE)
+
+        self._write_recount_note(warehouse, stats["skipped"])
         return stats
+
+    def _write_recount_note(self, warehouse, skipped):
+        """Put the rows that could not be placed on the warehouse page.
+
+        These are real sets sitting in real boxes — they are simply not
+        countable from the sheet, because the length column was smudged.
+        Guessing 84in or 95in would put stock on the shelf that is not
+        there; leaving them only in a terminal report means nobody ever
+        looks again. So they go where the person who can open the box
+        will see them.
+        """
+        head = warehouse.description or ""
+        for marker in [NOTE_MARKER, *LEGACY_NOTE_MARKERS]:
+            head = head.split(marker)[0]
+        head = head.rstrip()
+        if not skipped:
+            warehouse.description = head or None
+            warehouse.save(update_fields=["description", "updated_at"])
+            return
+
+        by_box = collections.defaultdict(list)
+        for row, _why in skipped:
+            by_box[row["box"]].append(row)
+        total = sum(r["sets"] for r, _ in skipped)
+
+        lines = [
+            head,
+            "",
+            NOTE_MARKER,
+            f"{_sets(total)} across {len(skipped)} lines were NOT added "
+            f"to stock.",
+            "The length column could not be read on the count sheet — "
+            "84in or 95in is unknown, and was not guessed at.",
+            "Open the boxes, measure, then add them by hand.",
+            "",
+        ]
+        for box in sorted(by_box, key=lambda b: (b is None, b)):
+            rows = by_box[box]
+            label = f"Box {box}" if box is not None else "No box number"
+            lines.append(f"{label} — {_sets(sum(r['sets'] for r in rows))}")
+            for r in rows:
+                header = "rod pocket" if r["header"] == "R" else "grommet"
+                colour = COLOUR_EN.get(r["colour"], r["colour"].lower())
+                lines.append(
+                    f"    design {r['design']} · {colour} · {header} · "
+                    f"{_sets(r['sets'])}  (sheet row {r['line']})")
+        warehouse.description = "\n".join(lines).strip()
+        warehouse.save(update_fields=["description", "updated_at"])
 
     def _undo(self):
         warehouse = Warehouse.objects.filter(name=WAREHOUSE_NAME).first()
@@ -430,6 +507,11 @@ class Command(BaseCommand):
         w(f"  empty products      {s['products']:>7}")
         w(self.style.SUCCESS("\nRemoved.") if applied else
           self.style.WARNING("\nDry run — nothing removed."))
+
+
+def _sets(n):
+    """"1 set" / "20 sets" — the note is read by a person holding a box."""
+    return f"{n:.0f} set" + ("" if n == 1 else "s")
 
 
 def _sum_remaining():

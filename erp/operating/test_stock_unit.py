@@ -64,13 +64,13 @@ class StockUnitIsShownNotAssumed(TestCase):
         return _text(resp.content.decode())
 
     def test_a_product_row_is_counted_in_its_own_unit(self):
-        self.assertIn("20.00 pkt", self._page())
+        self.assertIn("20.00 pack", self._page())
 
     def test_it_does_not_call_curtain_sets_metres(self):
         self.assertNotIn("20.00 m ", self._page())
 
     def test_the_header_total_carries_the_unit_when_there_is_only_one(self):
-        self.assertRegex(self._page(), r"20\s*pkt")
+        self.assertRegex(self._page(), r"20\s*pack")
 
     def test_a_mixed_warehouse_claims_no_unit_for_its_total(self):
         """Metres of fabric and boxes of curtains do not add up to anything,
@@ -80,8 +80,8 @@ class StockUnitIsShownNotAssumed(TestCase):
             warehouse=self.shop, name="seta grey", sku="SETA-1",
             quantity=Decimal("300"), unit="mt")
         page = self._page()
-        self.assertNotRegex(page, r"320\s*(pkt|m)\b")
-        self.assertIn("20.00 pkt", page)
+        self.assertNotRegex(page, r"320\s*(pack|m)\b")
+        self.assertIn("20.00 pack", page)
         self.assertIn("300.00 m", page)
 
     def test_the_default_is_metres_so_existing_fabric_is_untouched(self):
@@ -142,7 +142,7 @@ class TheLabelSaysWhatItIsCounting(TestCase):
             product=self.wp, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), barcode="BOX-12")
         drawn = self._drawn_strings(roll)
-        self.assertIn("20.00 pkt", drawn)
+        self.assertIn("20.00 pack", drawn)
         self.assertNotIn("20.00 m", drawn)
 
 
@@ -185,4 +185,4 @@ class MovingStockCarriesTheUnit(TestCase):
         moved = WarehouseProduct.objects.get(
             warehouse=self.target, sku="RN1357.RM8")
         self.assertEqual(moved.unit, "paket")
-        self.assertEqual(moved.unit_short, "pkt")
+        self.assertEqual(moved.unit_short, "pack")

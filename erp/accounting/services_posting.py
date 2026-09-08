@@ -58,6 +58,30 @@ CONTRA_BY_TYPE = {
 }
 
 
+# Events that move CASH rather than a current account. The cash journal
+# names its source by model, and each of these has a contra the same way a
+# movement type does.
+#
+# `payment` is deliberately absent, and that absence is the whole reason
+# posting is keyed on the event rather than the row: a Payment writes BOTH
+# a current-account movement and a cash entry, and its movement already
+# carries the cash leg. Posting the cash row too would book the same
+# payment twice, and each entry would balance on its own, so nothing would
+# catch it.
+#
+# A transfer and a currency exchange are absent for a different reason:
+# both of their legs are cash, so neither is a contra for the other and
+# they need an entry shaped by hand.
+CASH_CONTRA_BY_SOURCE = {
+    "equitycapital":  "3000",   # owners put money in
+    "equityrevenue":  "4900",   # income that arrived as cash, not on account
+    "equityexpense":  "5100",   # operating cost paid out
+    "equitydivident": "3300",   # owners took money out
+}
+
+CASH_CONTROL = "1000"
+
+
 class NoRuleFor(ValidationError):
     """Raised for a movement type with no contra account decided yet."""
 
@@ -160,3 +184,144 @@ def reclassify_payables(book, *, date, reference=""):
         reference=reference,
     )
     return entry, count
+
+
+def lines_for_cash_entry(entry, model_name):
+    """The two lines a cash-journal row implies, balanced.
+
+    Sign again lives in one place: is_amount_positive says whether cash
+    came in, so the cash leg is a debit then and a credit otherwise, and
+    the contra takes the opposite side.
+    """
+    if model_name not in CASH_CONTRA_BY_SOURCE:
+        raise NoRuleFor(
+            f"No posting rule for cash source {model_name!r}. A payment is "
+            f"posted through its current-account movement; a transfer and an "
+            f"exchange move cash on both legs and need an entry of their own."
+        )
+    contra = CASH_CONTRA_BY_SOURCE[model_name]
+    amount = Decimal(entry.amount_in_base_currency or 0)
+    if amount == ZERO:
+        return []
+    # The cash row carries no description of its own; the thing that
+    # created it does.
+    source = entry.content_type.get_object_for_this_type(pk=entry.content_pk)
+    memo = (getattr(source, "description", "") or model_name)
+    if entry.is_amount_positive:
+        return [debit(CASH_CONTROL, amount, cash_account=entry.cash_account, memo=memo),
+                credit(contra, amount, memo=memo)]
+    return [credit(CASH_CONTROL, amount, cash_account=entry.cash_account, memo=memo),
+            debit(contra, amount, memo=memo)]
+
+
+@transaction.atomic
+def post_cash_entry(entry, *, reference=""):
+    """Post one cash-journal row, or nothing. Returns the entry or None."""
+    from django.contrib.contenttypes.models import ContentType
+
+    model_name = ContentType.objects.get(pk=entry.content_type_id).model
+    lines = lines_for_cash_entry(entry, model_name)
+    if not lines:
+        return None
+    source = entry.content_type.get_object_for_this_type(pk=entry.content_pk)
+    return post_entry(
+        book=entry.book,
+        date=entry.date,
+        description=(getattr(source, "description", "") or model_name),
+        lines=lines,
+        source=source,
+        reference=reference,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Closing the books
+#
+# Revenue, expenses and dividends are TEMPORARY accounts: each collects one
+# period's worth and is then emptied into Retained Earnings, which is the
+# permanent record of what the business has kept. Nothing emptied them, so
+# they would have gone on accumulating — by the end of a second year 4000
+# would hold two years of sales and 3300 two years of distributions, with
+# nothing on the page able to say which year either belonged to.
+#
+# The balance sheet stays correct either way, because it folds revenue less
+# expenses into equity as the period's result. It is the period figures
+# that rot: "profit this year" quietly becomes profit since the beginning
+# of time.
+# ---------------------------------------------------------------------------
+RETAINED_EARNINGS = "3200"
+
+# Dividends is an equity account that behaves like a temporary one: it is a
+# distribution of profit rather than a permanent part of capital, so it
+# closes too.
+TEMPORARY_EQUITY = ("3300",)
+
+
+def _temporary_balances(book, date_to):
+    """{code: net debit} for every account a close should empty.
+
+    Net debit rather than the sign-adjusted balance on purpose: closing an
+    account means posting the opposite of what sits in it, and debits minus
+    credits says that directly, without having to know whether the account
+    is debit- or credit-normal.
+    """
+    from django.db.models import Sum
+
+    from .models_ledger import ChartAccount, JournalLine
+
+    lines = JournalLine.objects.filter(entry__book=book)
+    if date_to:
+        lines = lines.filter(entry__date__lte=date_to)
+    rows = (lines.values("account__code", "account__type")
+            .annotate(d=Sum("debit"), c=Sum("credit")))
+    out = {}
+    for r in rows:
+        code, type_ = r["account__code"], r["account__type"]
+        temporary = (type_ in (ChartAccount.REVENUE, ChartAccount.EXPENSE)
+                     or code in TEMPORARY_EQUITY)
+        if not temporary:
+            continue
+        net = (r["d"] or ZERO) - (r["c"] or ZERO)
+        if net != ZERO:
+            out[code] = net
+    return out
+
+
+@transaction.atomic
+def close_period(book, *, date_to, description=None, reference="", member=None):
+    """Empty the temporary accounts into Retained Earnings.
+
+    Returns (entry, balances), or (None, {}) when there is nothing to
+    close — the answer both for a period in which nothing traded and for a
+    second run over one already closed.
+
+    Re-running needs no record of what was closed before: the entry zeroes
+    each account, so a later run only ever sees what has accumulated since.
+
+    Equity does not move. What the balance sheet counted as the period's
+    result becomes part of Retained Earnings instead, which is the same
+    number in a different place.
+    """
+    balances = _temporary_balances(book, date_to)
+    if not balances:
+        return None, {}
+
+    lines, plug = [], ZERO
+    for code, net in sorted(balances.items()):
+        plug += net
+        if net > ZERO:                      # a debit balance — credit it away
+            lines.append(credit(code, net, memo="Closing entry"))
+        else:
+            lines.append(debit(code, -net, memo="Closing entry"))
+
+    if plug > ZERO:                         # net debit: the period lost money
+        lines.append(debit(RETAINED_EARNINGS, plug, memo="Result for the period"))
+    else:
+        lines.append(credit(RETAINED_EARNINGS, -plug, memo="Result for the period"))
+
+    entry = post_entry(
+        book=book, date=date_to,
+        description=description or f"Close period through {date_to}",
+        lines=lines, reference=reference, member=member,
+    )
+    return entry, balances

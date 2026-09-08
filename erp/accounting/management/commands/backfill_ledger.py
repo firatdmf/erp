@@ -29,7 +29,8 @@ from accounting.models_accounts import CurrentAccountMovement
 from accounting.models_ledger import JournalEntry
 from accounting.services_ledger import (balance_sheet, ensure_chart,
                                         subsidiary_equation)
-from accounting.services_posting import (NoRuleFor, post_movement,
+from accounting.services_posting import (CASH_CONTRA_BY_SOURCE, NoRuleFor,
+                                         post_movement,
                                          post_opening_inventory,
                                          reclassify_payables)
 
@@ -97,6 +98,25 @@ class Command(BaseCommand):
                 already = set(
                     JournalEntry.objects.filter(book=book, reference=ref)
                     .values_list("description", flat=True))
+                # Cash rows whose source is not a Payment: a Payment's cash
+                # leg already rides on its current-account movement above.
+                from accounting.models import CashTransactionEntry
+                from accounting.services_posting import post_cash_entry
+                cash_done = set(
+                    JournalEntry.objects.filter(book=book, reference=ref)
+                    .exclude(source_type=ct).values_list("source_id", flat=True))
+                cash_posted = 0
+                for ce in CashTransactionEntry.objects.filter(book=book):
+                    name = ContentType.objects.get(pk=ce.content_type_id).model
+                    if name not in CASH_CONTRA_BY_SOURCE:
+                        continue
+                    if ce.content_pk in cash_done:
+                        continue
+                    if post_cash_entry(ce, reference=ref):
+                        cash_posted += 1
+                if cash_posted:
+                    w(f"  posted {cash_posted} cash event(s)")
+
                 inv = reclass = None
                 unvalued_n, unvalued_qty, reclass_n = 0, 0, 0
                 if "Opening inventory" not in already:

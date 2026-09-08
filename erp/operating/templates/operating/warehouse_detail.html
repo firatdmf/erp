@@ -2437,7 +2437,7 @@
   let rsStream = null;
   let rsLastSku = null;
   let rsLastSkuAt = 0;
-  let rsSession = { count: 0, meters: 0 };
+  let rsSession = { count: 0, quantity: 0 };
   // Hold the most recent OCR/parse result so saveRoll() can post raw text too.
   let rsPending = null;
   // Selected existing main product id from the catalog autocomplete ('' = free text).
@@ -3129,7 +3129,7 @@
       name: data.product.name || '', sku: data.product.sku || '',
       productBarcode: data.product.barcode || '',
       rollBarcode: (data.roll && data.roll.barcode) || '',
-      meters: data.roll.quantity, lot: (data.roll.lot_number || ''),
+      quantity: data.roll.quantity, lot: (data.roll.lot_number || ''),
       mainProduct: data.product.main_product || ''
     };
     rsRenderRecentRow(row);

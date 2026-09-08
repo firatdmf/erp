@@ -1864,7 +1864,7 @@
     if (!box) return;
     const row = document.createElement('div');
     row.className = 'np-etop' + (top.locked ? ' locked' : '');
-    row.dataset.rollId = top.roll_id;
+    row.dataset.rollId = top.stock_item_id;
     const meters = parseFloat(top.quantity);
     row.innerHTML =
       '<code>' + (top.barcode || '—') + '</code>' +
@@ -1982,7 +1982,7 @@
           invoice_item_id: parseInt(vEl.dataset.itemId, 10),
           warehouse_product_id: vEl.dataset.wpId ? parseInt(vEl.dataset.wpId, 10) : null,
           kept_roll_ids: keptRollIds,
-          new_tops: newTops,
+          new_stock: newTops,
         };
         const priceRow = vEl.querySelector('.np-price-row');
         const priceEl = vEl.querySelector('.np-v-price');

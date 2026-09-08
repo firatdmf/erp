@@ -440,7 +440,7 @@
         itemIndex++;
         var stableIndex = itemIndex;
         var rolls = (it.rolls || []).map(function (r) {
-          return { reservation_id: r.reservation_id || null, barcode: r.barcode || '', warehouse: r.warehouse || '', meters: parseFloat(r.quantity) || 0, available: parseFloat(r.available) || 0 };
+          return { reservation_id: r.reservation_id || null, barcode: r.barcode || '', warehouse: r.warehouse || '', quantity: parseFloat(r.quantity) || 0, available: parseFloat(r.available) || 0 };
         });
         // Out-of-warehouse metres come straight off the saved line
         // (OrderItem.outsourced_quantity). Legacy lines saved before that
@@ -988,7 +988,7 @@
       if (!item.rolls) item.rolls = [];
       item.rolls.push({
         reservation_id: known.reservation_id, barcode: known.barcode,
-        warehouse: known.warehouse, available: known.available, meters: known.available,
+        warehouse: known.warehouse, available: known.available, quantity: known.available,
       });
       if (inputEl) inputEl.value = '';
       syncQtyFromRolls(i, true);
@@ -1002,7 +1002,7 @@
         if (!item.rolls) item.rolls = [];
         // Default to the WHOLE stock item — the scissors icon reveals a field
         // to cut less; leaving it alone keeps the full amount.
-        item.rolls.push({ barcode: barcode, roll_id: d.roll_id, available: d.available, warehouse: d.warehouse, meters: d.available });
+        item.rolls.push({ barcode: barcode, roll_id: d.roll_id, available: d.available, warehouse: d.warehouse, quantity: d.available });
         if (inputEl) inputEl.value = '';
         syncQtyFromRolls(i, true);
         renderProducts();
@@ -1430,7 +1430,7 @@
         custom_mounting_type: it.custom_mounting_type || null,
         custom_wing_type: it.custom_wing_type || null,
         custom_fabric_used_meters: it.custom_fabric_used_meters || null,
-        rolls: (it.rolls || []).map(function (r) { return { barcode: r.barcode, meters: r.quantity }; })
+        rolls: (it.rolls || []).map(function (r) { return { barcode: r.barcode, quantity: r.quantity }; })
       };
       if (it.existing_item_id) payload.item_id = it.existing_item_id;
       return payload;

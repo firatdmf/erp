@@ -101,6 +101,12 @@
       data-mode="{% if order %}edit{% else %}create{% endif %}"
       data-order-id="{% if order %}{{ order.pk }}{% endif %}">
   {% csrf_token %}
+  {% comment %}The book this form was opened in. Every line that names no
+  book of its own is filed here, and it is checked against the member's
+  assignments server-side, so it can only ever pick among books the
+  person already has.{% endcomment %}
+  <input type="hidden" name="book"
+         value="{% if order %}{{ order.current_account.book_id|default:'' }}{% else %}{{ current_book.pk|default:'' }}{% endif %}">
   {% if order %}
     {# Hydration payload for edit mode — read by the script below. #}
     {{ order_items_payload|json_script:"existing-order-items" }}
@@ -272,11 +278,37 @@
         <input type="text" id="co-product-search" class="form-input" placeholder="Name, SKU or variant SKU..."
           hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
           {% comment %}Which book's shelves to search. The server checks it
-          against the member's assignments, so this only narrows.{% endcomment %}
-          hx-vals='{"book": "{% if order %}{{ order.current_account.book_id|default:'' }}{% else %}{{ current_book.pk|default:'' }}{% endif %}"}'
+          against the member's assignments, so this only narrows. Evaluated
+          per keystroke (js:) rather than baked in, because the "other
+          books" toggle changes the answer while the form is open.{% endcomment %}
+          hx-vals='js:{book: CO_BOOK_ID || "", cross_book: coCrossBook ? "1" : ""}'
           hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
       </div>
       <div id="co-product-results" class="co-autocomplete-results"></div>
+
+      {% comment %}Opt in to the other books. CREATE only: an edit has a
+      book already — its account is billed and its holds are on that
+      book's shelves — so there is nothing here for a second book to
+      become. A cross-book request is made once, at create.{% endcomment %}
+      {% if not order %}
+      {% comment %}Opt in to the other books. Stock belongs to the book that
+      owns its warehouse, so this does not put two businesses' goods on one
+      order — it lets you pick them in one pass, and the save writes one
+      order per book, each billing its own current account.{% endcomment %}
+      <label id="co-cross-book-row"
+             style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;
+                    border:1px dashed #CBD5E1;border-radius:7px;font-size:11.5px;
+                    color:#475569;cursor:pointer;">
+        <input type="checkbox" id="co-cross-book" style="margin:0;flex-shrink:0;"
+               onchange="coToggleCrossBook(this.checked)">
+        <span>
+          <strong>{% trans "Show stock from my other books" %}</strong><br>
+          <span style="color:#94A3B8;">
+            {% trans "Lines are grouped by book and saved as one order per book — each billing its own current account." %}
+          </span>
+        </span>
+      </label>
+      {% endif %}
 
       {% comment %}Global "barkodla top ekle" — scan/type a roll barcode
       with NO product selected: the endpoint resolves the top's product
@@ -310,7 +342,7 @@
       <div id="co-roll-cam-overlay" style="display:none; position:relative; margin-top:10px; border-radius:12px; overflow:hidden; background:#000; height:280px;">
         <video id="co-roll-cam-video" playsinline muted autoplay style="width:100%; height:100%; object-fit:cover; display:block; background:#000;"></video>
         <div style="position:absolute; left:8%; right:8%; top:50%; transform:translateY(-50%); height:34%; border:2px solid rgba(255,255,255,.8); border-radius:12px; box-shadow:0 0 0 100vmax rgba(0,0,0,.2); pointer-events:none;"></div>
-        <div id="co-roll-cam-hit" style="position:absolute; left:50%; top:10px; transform:translateX(-50%); color:#fff; background:rgba(0,0,0,.6); padding:5px 12px; border-radius:16px; font:600 12px var(--font-sans,sans-serif); max-width:88%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{% trans "Barkodu çerçeveye getirin" %}</div>
+        <div id="co-roll-cam-hit" style="position:absolute; left:50%; top:10px; transform:translateX(-50%); color:#fff; background:rgba(0,0,0,.6); padding:5px 12px; border-radius:16px; font:600 12px var(--font-sans,sans-serif); max-width:88%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{% trans "Bring the barcode into the frame" %}</div>
         <button type="button" onclick="coCloseRollCamera()" style="position:absolute; left:50%; bottom:12px; transform:translateX(-50%); background:#EF4444; color:#fff; border:0; border-radius:20px; padding:8px 16px; font:700 12.5px var(--font-sans,sans-serif); cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
           <i class="fas fa-xmark"></i>{% trans "Durdur" %}
         </button>
@@ -336,10 +368,17 @@
         </label>
       </div>
       <div id="co-deposit-row" class="form-group" style="display:none; padding:10px 12px; background:#F0FDFA; border:1px solid #CCFBF1; border-radius:8px;">
-        <label>{% trans "Deposit amount" %}</label>
-        <input type="number" id="co-deposit-amount" name="deposit_amount" class="form-input"
-               value="" min="0" step="0.01" placeholder="0.00"
-               style="background:#FFF;">
+        {% comment %}One box while the basket is one book's worth. Once it
+        spans two, this is replaced by a box per book: a collection is a
+        payment into ONE business's ledger, so a single figure could not
+        be posted without inventing a split nobody asked for.{% endcomment %}
+        <div id="co-deposit-single">
+          <label>{% trans "Deposit amount" %}</label>
+          <input type="number" id="co-deposit-amount" name="deposit_amount" class="form-input"
+                 value="" min="0" step="0.01" placeholder="0.00"
+                 style="background:#FFF;">
+        </div>
+        <div id="co-deposit-per-book" style="display:none;"></div>
         <div style="font-size:11.5px; color:#0F766E; margin-top:4px;">
           <i class="fas fa-info-circle"></i>
           {% trans "This amount will be posted as a collection on the customer's cari right after the order is created." %}
@@ -635,7 +674,35 @@
   const CO_ORDER_ID = {% if order %}{{ order.pk }}{% else %}null{% endif %};
   function coOrderParam() { return CO_ORDER_ID ? ('&order=' + CO_ORDER_ID) : ''; }
 
-  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
+  // The book this form was opened in. Every untagged line falls to it,
+  // and the save is told which one it was.
+  const CO_BOOK_ID = {% if order %}{{ order.current_account.book_id|default:"null" }}{% else %}{{ current_book.pk|default:"null" }}{% endif %};
+
+  // Off by default: an order almost always draws on one book, and
+  // showing every shelf by default would make picking the wrong
+  // business's stock a one-click mistake on the common case. Turned on,
+  // the pickers widen to every book the member is assigned, each row
+  // badged — and the SAVE then splits the basket into one order per book
+  // so nothing is billed to a business that did not supply it.
+  var coCrossBook = false;
+  function coCrossBookParam() { return coCrossBook ? '&cross_book=1' : ''; }
+
+  window.coToggleCrossBook = function (on) {
+    coCrossBook = !!on;
+    // Lines already picked keep their book; only what the pickers OFFER
+    // changes. Re-fetch each card's roll list so a card can gain (or
+    // lose) nothing it was not entitled to — the per-card book filter in
+    // fetchAvailableRolls still applies.
+    orderItems.forEach(function (it) {
+      it.rollsLoading = true;
+      fetchAvailableRolls(it.index, it.sku);
+    });
+    renderProducts();
+    var res = document.getElementById('co-product-results');
+    if (res) res.innerHTML = '';
+  };
+
+  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost, bookId, bookName) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
     // Stock is informational only — out-of-stock / low-stock products
     // can still be added (back-order). Catalog stock is deducted only
@@ -661,6 +728,13 @@
       is_custom_curtain: false, custom_width:'', custom_height:'',
       custom_pleat_type:'', custom_pleat_density:'', custom_mounting_type:'',
       custom_wing_type:'', custom_fabric_used_meters:'',
+      // Which book's shelf this line was picked off. Carried from the
+      // search row to the save, which splits the basket into one order
+      // per book. Null on a catalog-only pick (nothing on any shelf) and
+      // on every line of an ordinary single-book order — the server then
+      // files it under the book the form was opened in.
+      book_id: (bookId === undefined || bookId === null || bookId === 'null') ? null : Number(bookId),
+      book_name: bookName || '',
       rolls: [], existingRolls: [], availableRolls: [], rollsLoading: true,
       manualMeters: 0, manualNote: '', showManualEntry: false
     });
@@ -705,12 +779,26 @@
   // stable index, not array position — items can shift/be removed while
   // this is in flight). Re-renders when it resolves.
   function fetchAvailableRolls(stableIndex, sku) {
-    fetch(ROLL_LIST_URL + '?sku=' + encodeURIComponent(sku) + coOrderParam())
+    fetch(ROLL_LIST_URL + '?sku=' + encodeURIComponent(sku) + coOrderParam() + coCrossBookParam())
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var item = orderItems.find(function (it) { return it.index === stableIndex; });
         if (!item) return;
-        item.availableRolls = (d && d.ok && d.rolls) ? d.rolls : [];
+        var rolls = (d && d.ok && d.rolls) ? d.rolls : [];
+        // The same SKU can stand on shelves in two books once the search
+        // is allowed past one. This CARD is one book's line, so it offers
+        // that book's stock only — otherwise a click could reserve the
+        // other business's roll onto this order without saying so.
+        if (item.book_id) {
+          rolls = rolls.filter(function (r) { return !r.book_id || r.book_id === item.book_id; });
+        } else if (rolls.length && rolls[0].book_id) {
+          // Untagged line (a catalog-only pick): the first shelf its
+          // stock actually turned up on decides which book it is.
+          item.book_id = rolls[0].book_id;
+          item.book_name = rolls[0].book || '';
+          rolls = rolls.filter(function (r) { return r.book_id === item.book_id; });
+        }
+        item.availableRolls = rolls;
         item.rollsLoading = false;
         renderProducts();
       })
@@ -736,8 +824,112 @@
     }
   }
 
+  // The distinct books the basket currently draws on, in the order the
+  // headings will appear. One entry (or none) means an ordinary order.
+  function coBooksInPlay() {
+    const seen = [];
+    orderItems.forEach(function (it) {
+      const key = it.book_id || 0;
+      if (!seen.some(function (b) { return b.key === key; })) {
+        seen.push({ key: key, name: it.book_name || '' });
+      }
+    });
+    return seen;
+  }
+
+  // Sort the cards so every book's lines sit together. Called before each
+  // render rather than on insert, so a line that learns its book late
+  // (a catalog pick whose stock turned up on a shelf) still lands in the
+  // right run. Stable within a book, so "newest first" survives.
+  function coGroupItemsByBook() {
+    if (coBooksInPlay().length < 2) return;
+    const order = [];
+    orderItems.forEach(function (it) {
+      const key = it.book_id || 0;
+      if (order.indexOf(key) === -1) order.push(key);
+    });
+    orderItems.sort(function (a, b) {
+      return order.indexOf(a.book_id || 0) - order.indexOf(b.book_id || 0);
+    });
+  }
+
+  function coBookHeadingHtml(item) {
+    const name = item.book_name || '{% trans "This book" %}';
+    const total = orderItems.reduce(function (s, it) {
+      return ((it.book_id || 0) === (item.book_id || 0))
+        ? s + (Number(it.quantity) || 0) * (Number(it.price) || 0) : s;
+    }, 0);
+    const n = orderItems.filter(function (it) {
+      return (it.book_id || 0) === (item.book_id || 0);
+    }).length;
+    return '<div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px;' +
+      'padding:7px 10px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:7px;">' +
+      '<i class="fas fa-book" style="color:#0F766E;font-size:12px;"></i>' +
+      '<strong style="font-size:11.5px;color:#0F766E;letter-spacing:.02em;">' + esc(name) + '</strong>' +
+      '<span style="font-size:10.5px;color:#5B8C86;">' + n + ' {% trans "lines" %}</span>' +
+      '<span style="margin-left:auto;font-weight:800;font-size:12px;color:#0F766E;">$' +
+        total.toFixed(2) + '</span>' +
+    '</div>';
+  }
+
+  // On a single-book basket the badge is noise — every card would wear
+  // the same one. It earns its place only once the order will split.
+  function coBookBadgeHtml(item, bookRun) {
+    if (!bookRun || bookRun.length < 2 || !item.book_name) return '';
+    return '<span style="margin-left:6px;font-weight:700;font-size:9.5px;color:#0F766E;' +
+      'background:#D1FAE5;padding:2px 6px;border-radius:5px;white-space:nowrap;">' +
+      esc(item.book_name) + '</span>';
+  }
+
+  // Deposit boxes follow the basket: one plain box while it is one
+  // book's worth, one box per book the moment it spans two. The per-book
+  // inputs are named deposit_amount_<book id>, which is what the save
+  // reads first — so the plain box can never double-post onto a split.
+  function coRenderDepositBoxes() {
+    const single = document.getElementById('co-deposit-single');
+    const perBook = document.getElementById('co-deposit-per-book');
+    if (!single || !perBook) return;
+    const books = coBooksInPlay().filter(function (b) { return b.key; });
+    if (books.length < 2) {
+      single.style.display = '';
+      perBook.style.display = 'none';
+      perBook.innerHTML = '';
+      return;
+    }
+    single.style.display = 'none';
+    // Clear the single box so a figure typed before the split can't ride
+    // along as a fallback for a book the user never entered one for.
+    const amt = document.getElementById('co-deposit-amount');
+    if (amt) amt.value = '';
+    perBook.style.display = '';
+    // Preserve what is already typed across re-renders — this runs on
+    // every product change, and the deposit step may be open.
+    const prior = {};
+    perBook.querySelectorAll('input[data-book-key]').forEach(function (n) {
+      prior[n.dataset.bookKey] = n.value;
+    });
+    perBook.innerHTML = books.map(function (b) {
+      const total = orderItems.reduce(function (s, it) {
+        return (it.book_id || 0) === b.key
+          ? s + (Number(it.quantity) || 0) * (Number(it.price) || 0) : s;
+      }, 0);
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+        '<span style="flex:1;min-width:0;font-size:11.5px;font-weight:700;color:#0F766E;' +
+          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(b.name) + '</span>' +
+        '<span style="font-size:11px;color:#5B8C86;white-space:nowrap;">' +
+          '{% trans "of" %} $' + total.toFixed(2) + '</span>' +
+        '<input type="number" class="form-input" style="width:110px;flex:0 0 auto;background:#FFF;" ' +
+          'name="deposit_amount_' + b.key + '" data-book-key="' + b.key + '" ' +
+          'min="0" step="0.01" placeholder="0.00" value="' +
+          escAttr(prior[b.key] || '') + '">' +
+      '</div>';
+    }).join('');
+  }
+
   function renderProducts(opts) {
     opts = opts || {};
+    coGroupItemsByBook();
+    coRenderDepositBoxes();
     const el = document.getElementById('co-products-list');
     if (!orderItems.length) { el.innerHTML = '<div class="co-empty">{% trans "No products added yet" %}</div>'; return; }
 
@@ -750,13 +942,36 @@
       rollScroll[n.dataset.rollListI] = n.scrollTop;
     });
 
+    // Cards carry their array index, so the list stays one flat run of
+    // them and the book headings are inserted BETWEEN. Grouping by
+    // rebuilding a nested array would renumber every card and break
+    // every onclick="coUpd(i,...)" already written into the markup.
+    const bookRun = coBooksInPlay();
+    let lastBookKey = null;
+    // The newest card, by stable index rather than array position:
+    // grouping by book moves cards around, so position 0 is no longer
+    // reliably the one just added.
+    const newestIdx = opts.highlightFirst
+      ? orderItems.reduce(function (m, it) { return Math.max(m, it.index || 0); }, 0)
+      : null;
+
     el.innerHTML = orderItems.map((item, i) => {
-      // First (i===0) is the newest item — flash it briefly when
-      // selectProduct passed highlightFirst.
-      const justAdded = (opts.highlightFirst && i === 0) ? ' co-just-added' : '';
-      return `<div class="co-product-card${justAdded}">
+      // Flash the just-added card briefly when selectProduct asked.
+      const justAdded = (newestIdx && item.index === newestIdx) ? ' co-just-added' : '';
+      // A heading each time the book changes, but only once more than
+      // one book is actually in the basket: on the ordinary order every
+      // card would sit under the same heading, which says nothing.
+      let heading = '';
+      if (bookRun.length > 1) {
+        const key = item.book_id || 0;
+        if (key !== lastBookKey) {
+          lastBookKey = key;
+          heading = coBookHeadingHtml(item);
+        }
+      }
+      return heading + `<div class="co-product-card${justAdded}">
         <div class="co-product-head">
-          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span></div>
+          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${coBookBadgeHtml(item, bookRun)}</div>
           <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
         </div>
         <div class="co-row">
@@ -943,7 +1158,9 @@
         var skuL = (d.sku || '').toLowerCase();
         var idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         if (idx === -1) {
-          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost);
+          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost,
+                          (d.roll && d.roll.book_id) || null,
+                          (d.roll && d.roll.book) || '');
           idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         }
         if (idx === -1) { showToast('Ürün eklenemedi', 'error'); return; }
@@ -999,10 +1216,23 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) { showToast(d.error || 'Barkod doğrulanamadı', 'error'); return; }
+        // A line belongs to ONE book: its stock ships off one business's
+        // shelf and bills that business's account. An untagged card
+        // adopts the scanned shelf's book; a tagged one refuses a scan
+        // from anywhere else rather than quietly mixing the two.
+        if (d.book_id) {
+          if (item.book_id && item.book_id !== d.book_id) {
+            showToast(
+              '{% trans "Bu top başka bir deftere ait" %}: ' + (d.book || '') +
+              ' — {% trans "o defter için ayrı bir satır ekleyin" %}', 'error');
+            return;
+          }
+          if (!item.book_id) { item.book_id = d.book_id; item.book_name = d.book || ''; }
+        }
         if (!item.rolls) item.rolls = [];
         // Default to the WHOLE stock item — the scissors icon reveals a field
         // to cut less; leaving it alone keeps the full amount.
-        item.rolls.push({ barcode: barcode, roll_id: d.roll_id, available: d.available, warehouse: d.warehouse, quantity: d.available });
+        item.rolls.push({ barcode: barcode, stock_item_id: d.stock_item_id, available: d.available, warehouse: d.warehouse, quantity: d.available });
         if (inputEl) inputEl.value = '';
         syncQtyFromRolls(i, true);
         renderProducts();
@@ -1110,6 +1340,12 @@
   (function () {
     var zx = null, zxLoading = null, camStream = null, camRaf = null, camRunning = false, lastDecode = 0;
     var camTargetIndex = null, camDebounce = { val: '', t: 0 }, roiCanvas = null, audioCtx = null;
+    // Why a reader that reads nothing says nothing: every failure in the
+    // decode path used to be swallowed by an empty .catch, so a camera
+    // that opened and never beeped looked identical whether the wasm
+    // never loaded, the video never delivered a frame, or the decoder
+    // threw on every one. These three carry that answer to the chip.
+    var camFrames = 0, camDecodeErr = '', camOpenedAt = 0;
     var ZXW_OPTS = { tryHarder: true, tryRotate: true, tryDownscale: true, maxNumberOfSymbols: 1,
       formats: ['Code128', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code39', 'Code93', 'ITF', 'Codabar', 'QRCode'] };
     var RS_BAD_LENS = /ultra|wide|tele|depth|truedepth|infrared/i;
@@ -1168,9 +1404,21 @@
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Kamera desteklenmiyor.', 'error'); return; }
       camTargetIndex = i;
       if (camEl) { camEl.style.display = 'block'; camEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      camFrames = 0; camDecodeErr = '';
+      camOpenedAt = (window.performance && performance.now) ? performance.now() : Date.now();
+      // Back to the prompt — otherwise a reopen starts under the last
+      // scan's code, or the last error, and reads as a live result.
+      if (hitEl) hitEl.textContent = '{% trans "Bring the barcode into the frame" %}';
       getRearStream().then(function (stream) {
         camStream = stream; video.srcObject = stream; camRunning = true; lastDecode = 0;
-        loadZxw().then(function () { camLoop(); }).catch(function () { showToast('Tarayıcı yüklenemedi.', 'error'); });
+        // autoplay alone is not enough on a <video> whose container was
+        // display:none until this click — Safari in particular leaves it
+        // at readyState 0, and camLoop then waits for a frame forever.
+        try { var pl = video.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (e) {}
+        loadZxw().then(function () { camLoop(); }).catch(function (err) {
+          console.error('[roll-camera] zxing load failed', err);
+          showToast('{% trans "Scanner failed to load" %}: ' + ((err && err.message) || err), 'error');
+        });
       }).catch(function (err) { showToast('Kamera: ' + (err && err.message || err), 'error'); window.coCloseRollCamera(); });
     };
     window.coCloseRollCamera = function () {
@@ -1195,7 +1443,18 @@
     function camLoop() {
       if (!camRunning) return;
       var now = (window.performance && performance.now) ? performance.now() : Date.now();
-      if (!zx || !video.videoWidth || video.readyState < 2 || (now - lastDecode) < 120) { camRaf = requestAnimationFrame(camLoop); return; }
+      if (!zx || !video.videoWidth || video.readyState < 2 || (now - lastDecode) < 120) {
+        // Five seconds of waiting with no frame is not "hold it steadier",
+        // it is a camera that never started. Say so instead of leaving
+        // "Barkodu çerçeveye getirin" up over a picture nobody is reading.
+        if (hitEl && camOpenedAt && (now - camOpenedAt) > 5000 && !camFrames) {
+          hitEl.textContent = !zx
+            ? '{% trans "Scanner did not load — check the connection" %}'
+            : '{% trans "No picture is coming from the camera" %}';
+        }
+        camRaf = requestAnimationFrame(camLoop); return;
+      }
+      camFrames++;
       lastDecode = now;
       try {
         var c = roi(), vw = video.videoWidth, vh = video.videoHeight;
@@ -1206,7 +1465,16 @@
         cx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
         var img = cx.getImageData(0, 0, outW, outH);
         zx(img, ZXW_OPTS).then(function (res) { if (camRunning && res && res.length && res[0].text) onDecode(res[0].text); })
-          .catch(function () {}).finally(function () { if (camRunning) camRaf = requestAnimationFrame(camLoop); });
+          .catch(function (err) {
+            // Once, not once per frame — this fires 8×/second.
+            var msg = (err && err.message) || String(err);
+            if (msg !== camDecodeErr) {
+              camDecodeErr = msg;
+              console.error('[roll-camera] decode failed', err);
+              if (hitEl) hitEl.textContent = '{% trans "Reader error" %}: ' + msg;
+            }
+          })
+          .finally(function () { if (camRunning) camRaf = requestAnimationFrame(camLoop); });
       } catch (e) { if (camRunning) camRaf = requestAnimationFrame(camLoop); }
     }
   })();
@@ -1430,6 +1698,11 @@
         custom_mounting_type: it.custom_mounting_type || null,
         custom_wing_type: it.custom_wing_type || null,
         custom_fabric_used_meters: it.custom_fabric_used_meters || null,
+        // The book whose shelf this line came from. The server splits the
+        // basket on it — one order per book — and checks it against the
+        // member's own assignments, so it can only ever name a shelf the
+        // person was already allowed to see.
+        book: it.book_id || null,
         rolls: (it.rolls || []).map(function (r) { return { barcode: r.barcode, quantity: r.quantity }; })
       };
       if (it.existing_item_id) payload.item_id = it.existing_item_id;

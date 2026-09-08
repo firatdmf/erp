@@ -1,4 +1,5 @@
 import traceback
+from uuid import uuid4
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import JsonResponse
 from django.views import View
@@ -1351,6 +1352,13 @@ def order_pack_reserve_add(request, pk):
                 "product_name": (wp.name if wp else ""),
                 "sku": (wp.sku if wp else ""),
                 "warehouse": (wp.warehouse.name if (wp and wp.warehouse_id) else ""),
+                # Which book's shelf — the card tags its line with this so
+                # the save can route the line to that book's order.
+                "book_id": (wp.warehouse.accounting_book_id
+                            if (wp and wp.warehouse_id) else None),
+                "book": (wp.warehouse.accounting_book.name
+                         if (wp and wp.warehouse_id
+                             and wp.warehouse.accounting_book_id) else ""),
                 "available": float(_roll_available_meters(roll_pick)),
             },
         })
@@ -1558,12 +1566,123 @@ def order_create_barcode_check(request):
     avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
         return _roll_unavailable_response(roll, exclude_order_id=editing)
+    wh = roll.product.warehouse if (roll.product and roll.product.warehouse_id) else None
     return JsonResponse({
         "ok": True,
         "stock_item_id": roll.pk,
         "available": float(avail),
-        "warehouse": (roll.product.warehouse.name if (roll.product and roll.product.warehouse_id) else ""),
+        "warehouse": (wh.name if wh else ""),
+        # The shelf's book. A card that has not been tagged yet adopts
+        # it; one that has refuses a scan from anywhere else, because a
+        # single line cannot be half one book's stock and half another's.
+        "book_id": (wh.accounting_book_id if wh else None),
+        "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
     })
+
+
+def _reject_foreign_book_lines(order, items):
+    """Refuse an edit payload whose lines claim a book other than the
+    order's own.
+
+    Splitting happens at CREATE, where nothing has been billed yet. By
+    the time an order is being edited it has a current account posted
+    against it and holds on one book's shelves, so a line from elsewhere
+    has no honest home: adding it here would put a second business's
+    goods on the first one's invoice.
+    """
+    book_id = getattr(getattr(order, "current_account", None), "book_id", None)
+    if book_id is None:
+        return
+    for line in items or []:
+        raw = line.get("book")
+        if raw in (None, "", 0):
+            continue
+        try:
+            if int(raw) != int(book_id):
+                raise ValueError(
+                    "That line belongs to a different book. Create a "
+                    "separate order for it rather than adding it here."
+                )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(str(exc)) from None
+
+
+def _split_items_by_book(items, request, member):
+    """Group submitted order lines by the book whose shelf each came from.
+
+    The picker tags a line with its book only once the form has been let
+    past its own; an ordinary single-book order sends no tags at all and
+    everything falls to the book being worked in. Returns
+    [(book, [line, ...]), ...] ordered by book name — always at least one
+    pair, because an order with no lines is a real, saveable thing and it
+    still belongs somewhere.
+
+    Raises ValueError naming a book the member is not assigned to: the
+    tag arrives from the browser, so it can claim anything, and a line
+    accepted on that word would reserve stock off a shelf its creator was
+    never allowed to see.
+    """
+    from accounting.services_accounts import member_books, get_default_book
+
+    allowed = {b.pk: b for b in member_books(member)}
+
+    # The book the form was opened in, which is where an untagged line
+    # belongs. Narrowed the same way every other book parameter is: the
+    # browser may pick among the member's books, never past them.
+    asked = (request.POST.get("book") or "").strip()
+    working = allowed.get(int(asked)) if asked.isdigit() else None
+    if working is None:
+        working = get_default_book(member)
+
+    grouped = {}
+    for line in items:
+        raw = line.get("book")
+        if raw in (None, "", 0):
+            book = working
+        else:
+            try:
+                book = allowed.get(int(raw))
+            except (TypeError, ValueError):
+                book = None
+            if book is None:
+                raise ValueError(
+                    "That line was picked from a book you are not assigned to."
+                )
+        grouped.setdefault(book.pk, (book, []))[1].append(line)
+
+    if not grouped:
+        return [(working, [])]
+    return sorted(grouped.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
+
+
+def _deposit_amount_for_book(request, book):
+    """The deposit collected against ONE book's half of an order.
+
+    A split order shows a deposit box per book, posted as
+    `deposit_amount_<book id>`; a single-book order has the one plain
+    `deposit_amount` box it always had. Reading the per-book field first
+    means the plain one can never double-post onto a split.
+    """
+    raw = request.POST.get(f"deposit_amount_{book.pk}")
+    if raw is None:
+        raw = request.POST.get("deposit_amount")
+    try:
+        return float(raw or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _split_summary_message(created):
+    """Tell the user their one basket became several orders, and which
+    book each went to — otherwise the redirect lands on one order and the
+    rest are invisible until somebody goes looking for them."""
+    parts = ", ".join(
+        f"{book.name}: #{order.pk}" for order, book, _stayed in created
+    )
+    return (
+        f"Bu talep {len(created)} deftere bölündü — her defter kendi "
+        f"siparişini ve kendi cari hesabını aldı ({parts})."
+    )
 
 
 def _books_in_scope(request):
@@ -1576,10 +1695,18 @@ def _books_in_scope(request):
 
     Stock belongs to the book that owns its warehouse. Offering a line
     from another book's shelf promises a different business's asset and
-    bills it to this book's current account.
+    bills it to this book's current account — which is why the form asks
+    for one book by default, and why `cross_book=1` (the "also show other
+    books" toggle) does not lift that rule so much as change who settles
+    it: the picker may then show every shelf the member is assigned, and
+    the SAVE splits the basket into one order per book so each still
+    bills its own account. Widening the view was never the danger; one
+    order spanning two businesses was.
     """
     from accounting.services_accounts import member_books
     allowed = member_books(getattr(request.user, "member", None))
+    if (request.GET.get("cross_book") or "").strip() in {"1", "true", "on"}:
+        return allowed
     asked = (request.GET.get("book") or "").strip()
     if asked.isdigit():
         allowed = allowed.filter(pk=int(asked))
@@ -1656,6 +1783,11 @@ def order_create_barcode_resolve(request):
             "barcode": roll.barcode or "",
             "available": float(avail),
             "warehouse": (wp.warehouse.name if wp.warehouse_id else ""),
+            # The shelf's book, so a line minted straight from a scan is
+            # tagged like one picked out of the browsable list.
+            "book_id": (wp.warehouse.accounting_book_id if wp.warehouse_id else None),
+            "book": (wp.warehouse.accounting_book.name
+                     if (wp.warehouse_id and wp.warehouse.accounting_book_id) else ""),
         },
     })
 
@@ -1698,7 +1830,8 @@ def order_create_roll_list(request):
         output_field=DecimalField(max_digits=18, decimal_places=6))
     rolls = (
         WarehouseProductItem.objects
-        .select_related("product", "product__warehouse")
+        .select_related("product", "product__warehouse",
+                        "product__warehouse__accounting_book")
         .filter(status__in=["in_stock", "partial"])
         # Its two siblings — the product search and order_create_barcode_check
         # — narrow to the working book; this one never did, so it offered
@@ -1730,10 +1863,16 @@ def order_create_roll_list(request):
         avail = (phys or _PDecimal("0")) - reserved.get(roll.pk, _PDecimal("0"))
         if avail <= 0:
             continue
+        # Which book owns the shelf. The form badges the row with it and
+        # sends it back on the line, so the save knows which order this
+        # roll belongs to without re-deriving it from the barcode.
+        wh = roll.product.warehouse if (roll.product and roll.product.warehouse_id) else None
         out.append({
             "id": roll.pk,
             "barcode": roll.barcode or "",
-            "warehouse": (roll.product.warehouse.name if (roll.product and roll.product.warehouse_id) else ""),
+            "warehouse": (wh.name if wh else ""),
+            "book_id": (wh.accounting_book_id if wh else None),
+            "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
             "available": float(avail),
         })
     return JsonResponse({"ok": True, "rolls": out})
@@ -2383,131 +2522,42 @@ class OrderCreate(View):
         member = getattr(request.user, "member", None)
         failed_barcodes = []
 
+        # Stock belongs to the book that owns its warehouse, so one
+        # customer wanting goods off two books' shelves is not one order:
+        # it would promise a second business's asset and bill it to the
+        # first book's current account. Split the lines by the book each
+        # was picked from and give every book its own order — its own
+        # current account, its own reservations, its own deposit — tied
+        # back together by a shared split_group.
+        try:
+            groups = _split_items_by_book(product_json_input or [], request, member)
+        except ValueError as _e:
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": str(_e)})
+            messages.error(request, str(_e))
+            return render(request, "operating/create_order.html", {"form": form})
+
         if form.is_valid():
             try:
+                # Only a real split gets a group id. Stamping every
+                # single-book order with one would make "is this part of
+                # something bigger?" un-askable.
+                split_group = uuid4() if len(groups) > 1 else None
+                created = []
                 with transaction.atomic():
-                    order = form.save(commit=False)
-
-                    # Customer — order kind is derived from WHICH customer
-                    # was picked, not a separate radio: a CRM contact/
-                    # company means a normal (B2B) order, the "retail"
-                    # pseudo-customer means a Perakende walk-in sale.
-                    order.is_retail_order = (customer_type == "retail")
-                    if customer_type == "contact" and customer_pk:
-                        try:
-                            order.contact = Contact.objects.get(pk=customer_pk)
-                        except Contact.DoesNotExist:
-                            pass
-                    elif customer_type == "company" and customer_pk:
-                        try:
-                            order.company = Company.objects.get(pk=customer_pk)
-                        except Company.DoesNotExist:
-                            pass
-                    elif customer_type == "retail":
-                        rname = request.POST.get("retail_customer_name", "").strip()
-                        rphone = request.POST.get("retail_customer_phone", "").strip()
-                        raddress = request.POST.get("retail_customer_address", "").strip()
-                        if rname or rphone or raddress:
-                            order.is_guest_order = True
-                            order.guest_first_name = rname
-                            order.guest_phone = rphone
-                            order.delivery_address = raddress
-
-                    # Notification opt-in — staff ticked "Send customer
-                    # emails for this order" in the create sidebar.
-                    order.notify_customer = bool(request.POST.get("notify_customer"))
-
-                    # Payment method / amount-paid fields removed from
-                    # the form — deposit is handled separately below as
-                    # a proper current account collection. We leave the fields on
-                    # the model alone (they stay NULL for new orders).
-
-                    # Delivery Address — CRM/B2B orders only (retail's
-                    # simplified name/phone/address is handled above).
-                    if customer_type != "retail":
-                        order.delivery_address_title = request.POST.get("delivery_address_title", "")
-                        order.delivery_address = request.POST.get("delivery_address", "")
-                        order.delivery_city = request.POST.get("delivery_city", "")
-                        order.delivery_country = request.POST.get("delivery_country", "")
-                        order.delivery_phone = request.POST.get("delivery_phone", "")
-
-                    order.save()
-
-                    # Order Items
-                    for item_data in product_json_input:
-                        sku = item_data["product"]["sku"]
-                        is_variant = item_data["product"]["variant"]
-                        is_custom = item_data.get("is_custom_curtain", False)
-
-                        if is_variant:
-                            variant = get_object_or_404(ProductVariant, variant_sku=sku)
-                            product = variant.product
-                        else:
-                            product = get_object_or_404(Product, sku=sku)
-                            variant = None
-
-                        order_item = OrderItem.objects.create(
-                            order=order,
-                            product=product,
-                            product_variant=variant,
-                            description=item_data.get("description", ""),
-                            quantity=item_data.get("quantity", 1),
-                            outsourced_quantity=_outsourced_qty(item_data),
-                            price=item_data.get("price", 0),
-                            is_custom_curtain=is_custom,
+                    for book, book_items in groups:
+                        _o, _stayed = self._create_one_order(
+                            request,
+                            book=book,
+                            items=book_items,
+                            notes=form.cleaned_data.get("notes") or "",
+                            customer_type=customer_type,
+                            customer_pk=customer_pk,
+                            split_group=split_group,
+                            member=member,
+                            failed_barcodes=failed_barcodes,
                         )
-
-                        # Custom curtain fields
-                        if is_custom:
-                            order_item.custom_width = item_data.get("custom_width") or None
-                            order_item.custom_height = item_data.get("custom_height") or None
-                            order_item.custom_pleat_type = item_data.get("custom_pleat_type") or None
-                            order_item.custom_pleat_density = item_data.get("custom_pleat_density") or None
-                            order_item.custom_mounting_type = item_data.get("custom_mounting_type") or None
-                            order_item.custom_wing_type = item_data.get("custom_wing_type") or None
-                            order_item.custom_fabric_used_meters = item_data.get("custom_fabric_used_meters") or None
-                            order_item.save()
-
-                        # Roll (stock item) reservations — entered right on this
-                        # product card instead of a later packing-scan
-                        # visit, for ANY order (not just Perakende). Each
-                        # already passed the live order_create_barcode_check
-                        # or was picked from the browsable roll list while
-                        # building the line; re-validated here for real,
-                        # against the just-created order_item. A bad/raced
-                        # barcode is skipped (never fails the whole order)
-                        # and surfaced as a warning below.
-                        for roll_data in (item_data.get("rolls") or []):
-                            bc = (roll_data.get("barcode") or "").strip()
-                            if not bc:
-                                continue
-                            target_sku = variant.variant_sku if variant else (product.sku or "")
-                            roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
-                            if rerr:
-                                failed_barcodes.append(bc)
-                                continue
-                            raw_m = roll_data.get("quantity")
-                            try:
-                                req_m = _PDecimal(str(raw_m)) if raw_m else None
-                            except Exception:
-                                req_m = None
-                            _r, _capped, rerr = _create_roll_reservation(order, order_item, roll, req_m, request.user)
-                            if rerr:
-                                failed_barcodes.append(bc)
-
-                    # Generate QR code
-                    generate_machine_qr_for_order(order)
-
-                    # Orders with rolls reserved right on the create form
-                    # skip the manual "Paketleniyor" scan step. The funnel's
-                    # packaging gate requires FULL metre coverage; when the
-                    # picked rolls don't cover the ordered quantities the
-                    # order simply stays "Açık" and we tell the user below.
-                    order_stayed_open = False
-                    if order.stock_reservations.filter(consumed=False).exists():
-                        from .views_warehouse import apply_order_status_change
-                        _adv_ok, _adv_code = apply_order_status_change(order, "packaging", user=member)
-                        order_stayed_open = (not _adv_ok and _adv_code == "insufficient_reservation")
+                        created.append((_o, book, _stayed))
 
                 # ── NO warehouse stock-out at create ──────────────────
                 # New orders start "Açık" (Open) and reserve/deduct
@@ -2523,104 +2573,262 @@ class OrderCreate(View):
                         "Sipariş oluşturuldu ama şu barkodlar için rezervasyon yapılamadı, "
                         "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
                     )
-                if order_stayed_open:
-                    from .views_warehouse import reservation_shortfall_message
-                    messages.warning(
-                        request,
-                        "Sipariş oluşturuldu ama Açık durumda kaldı: "
-                        + reservation_shortfall_message(order),
-                    )
-
-                # ── Freeze a point-in-time copy of the order as first
-                # created — the "İlk Oluşturulan" tab on the detail page
-                # always shows this, even after later edits change the
-                # live items. Best-effort: a snapshot hiccup must never
-                # fail order creation.
-                try:
-                    order.original_snapshot = order.build_snapshot()
-                    order.save(update_fields=["original_snapshot"])
-                except Exception:
-                    pass
-
-                # ── Auto-link to a CurrentAccount + log the sales-order
-                # movement so the customer's ledger reflects this
-                # order immediately — retail included: Perakende orders
-                # post their sale to the shared retail current account right at
-                # create (the auto COLLECTION + defter mirror still
-                # happen at completion via apply_order_status_change;
-                # post_order_movement there is idempotent so nothing
-                # double-posts on ship).
-                try:
-                    from accounting.services_accounts import (
-                        get_or_create_current_account_for_order, post_order_movement,
-                        get_or_create_retail_current_account,
-                    )
-                    if order.is_retail_order:
-                        current_account = get_or_create_retail_current_account(member=member)
-                    else:
-                        current_account = get_or_create_current_account_for_order(order, member=member)
-                    if current_account and order.current_account_id != current_account.pk:
-                        order.current_account = current_account
-                        order.save(update_fields=["current_account"])
-                    post_order_movement(order, member=member)
-                except Exception as _e:
-                    messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
-
-                # ── Deposit (collection) — post against the current account if the
-                # user ticked "Deposit received" and entered an amount.
-                # Creates + confirms a Payment so it lands in the current account
-                # ledger as a deduction.
-                deposit_flag = (request.POST.get("deposit_received") or "").strip()
-                try:
-                    deposit_amount = float(request.POST.get("deposit_amount") or 0)
-                except (ValueError, TypeError):
-                    deposit_amount = 0
-                if deposit_flag and deposit_amount > 0 and order.current_account_id:
-                    try:
-                        from decimal import Decimal
-                        from datetime import date
-                        from accounting.models import Payment
-                        from accounting.views_payment import _next_payment_number
-                        from accounting.services_accounts import _resolve_currency
-
-                        # The deposit belongs in the SAME book as the
-                        # account it is collected against — never a
-                        # guessed one. Guessing here meant a deposit
-                        # taken by an Ergene member on a Laleli order
-                        # created a Payment in Ergene whose current account lived
-                        # in Laleli.
-                        book = order.current_account.book
-                        currency = _resolve_currency(order)
-                        pay = Payment.objects.create(
-                            current_account=order.current_account, book=book,
-                            number=_next_payment_number(book, "collection"),
-                            type="collection", method="cash", status="draft",
-                            date=date.today(),
-                            amount=Decimal(str(deposit_amount)),
-                            currency=currency,
-                            description=f"Deposit for Order #{order.pk}",
-                            notes=f"ORD-{order.pk}",
-                            created_by=member,
+                for order, _book, stayed_open in created:
+                    if stayed_open:
+                        from .views_warehouse import reservation_shortfall_message
+                        messages.warning(
+                            request,
+                            "Sipariş oluşturuldu ama Açık durumda kaldı: "
+                            + reservation_shortfall_message(order),
                         )
-                        pay.confirm(user=request.user if request.user.is_authenticated else None)
-                    except Exception as _e:
-                        messages.warning(request, f"Order saved but deposit posting failed: {_e}")
 
-                # ── Customer notification email ───────────────────────
-                # Best-effort — never blocks the order save. Sends only
-                # when notify_customer is True (staff opt-in) AND the
-                # order has a usable customer email.
-                try:
-                    if order.notify_customer:
-                        from .order_notifications import send_order_event_email
-                        send_order_event_email(order, "created", attach_pdf=True)
-                except Exception as _e:
-                    messages.warning(request, f"Order saved but confirmation email failed: {_e}")
+                for order, book, _stayed in created:
+                    self._finalise_order(request, order, book=book, member=member)
 
-                return redirect("operating:order_detail", pk=order.pk)
+                if len(created) > 1:
+                    messages.success(
+                        request,
+                        _split_summary_message(created),
+                    )
+                return redirect("operating:order_detail", pk=created[0][0].pk)
             except Exception as e:
                 messages.error(request, f"Order creation failed: {e}")
                 return render(request, "operating/create_order.html", {"form": form})
+
+    def _create_one_order(self, request, *, book, items, notes, customer_type,
+                          customer_pk, split_group, member, failed_barcodes):
+        """Create ONE order, holding only the lines picked off `book`'s
+        shelves. Returns (order, stayed_open).
+
+        Everything here was the body of post() when an order could only
+        ever belong to one book. It still only ever belongs to one — that
+        is the whole point — so the split calls this once per book rather
+        than teaching any of it to straddle two.
+        """
+        order = Order(notes=notes)
+
+        # Customer — order kind is derived from WHICH customer
+        # was picked, not a separate radio: a CRM contact/
+        # company means a normal (B2B) order, the "retail"
+        # pseudo-customer means a Perakende walk-in sale.
+        order.is_retail_order = (customer_type == "retail")
+        if customer_type == "contact" and customer_pk:
+            try:
+                order.contact = Contact.objects.get(pk=customer_pk)
+            except Contact.DoesNotExist:
+                pass
+        elif customer_type == "company" and customer_pk:
+            try:
+                order.company = Company.objects.get(pk=customer_pk)
+            except Company.DoesNotExist:
+                pass
+        elif customer_type == "retail":
+            rname = request.POST.get("retail_customer_name", "").strip()
+            rphone = request.POST.get("retail_customer_phone", "").strip()
+            raddress = request.POST.get("retail_customer_address", "").strip()
+            if rname or rphone or raddress:
+                order.is_guest_order = True
+                order.guest_first_name = rname
+                order.guest_phone = rphone
+                order.delivery_address = raddress
+
+        # Notification opt-in — staff ticked "Send customer
+        # emails for this order" in the create sidebar.
+        order.notify_customer = bool(request.POST.get("notify_customer"))
+
+        # Payment method / amount-paid fields removed from
+        # the form — deposit is handled separately below as
+        # a proper current account collection. We leave the fields on
+        # the model alone (they stay NULL for new orders).
+
+        # Delivery Address — CRM/B2B orders only (retail's
+        # simplified name/phone/address is handled above).
+        if customer_type != "retail":
+            order.delivery_address_title = request.POST.get("delivery_address_title", "")
+            order.delivery_address = request.POST.get("delivery_address", "")
+            order.delivery_city = request.POST.get("delivery_city", "")
+            order.delivery_country = request.POST.get("delivery_country", "")
+            order.delivery_phone = request.POST.get("delivery_phone", "")
+
+        order.split_group = split_group
+        order.save()
+
+        # Order Items
+        for item_data in items:
+            sku = item_data["product"]["sku"]
+            is_variant = item_data["product"]["variant"]
+            is_custom = item_data.get("is_custom_curtain", False)
+
+            if is_variant:
+                variant = get_object_or_404(ProductVariant, variant_sku=sku)
+                product = variant.product
+            else:
+                product = get_object_or_404(Product, sku=sku)
+                variant = None
+
+            order_item = OrderItem.objects.create(
+                order=order,
+                product=product,
+                product_variant=variant,
+                description=item_data.get("description", ""),
+                quantity=item_data.get("quantity", 1),
+                outsourced_quantity=_outsourced_qty(item_data),
+                price=item_data.get("price", 0),
+                is_custom_curtain=is_custom,
+            )
+
+            # Custom curtain fields
+            if is_custom:
+                order_item.custom_width = item_data.get("custom_width") or None
+                order_item.custom_height = item_data.get("custom_height") or None
+                order_item.custom_pleat_type = item_data.get("custom_pleat_type") or None
+                order_item.custom_pleat_density = item_data.get("custom_pleat_density") or None
+                order_item.custom_mounting_type = item_data.get("custom_mounting_type") or None
+                order_item.custom_wing_type = item_data.get("custom_wing_type") or None
+                order_item.custom_fabric_used_meters = item_data.get("custom_fabric_used_meters") or None
+                order_item.save()
+
+            # Roll (stock item) reservations — entered right on this
+            # product card instead of a later packing-scan
+            # visit, for ANY order (not just Perakende). Each
+            # already passed the live order_create_barcode_check
+            # or was picked from the browsable roll list while
+            # building the line; re-validated here for real,
+            # against the just-created order_item. A bad/raced
+            # barcode is skipped (never fails the whole order)
+            # and surfaced as a warning below.
+            for roll_data in (item_data.get("rolls") or []):
+                bc = (roll_data.get("barcode") or "").strip()
+                if not bc:
+                    continue
+                target_sku = variant.variant_sku if variant else (product.sku or "")
+                # Scoped to THIS order's book. The line was tagged with
+                # the shelf it was picked from, so a barcode that has
+                # wandered to another book's shelf since is refused here
+                # rather than quietly reserving a stranger's stock.
+                roll, rerr = _lookup_roll_by_barcode_for_sku(
+                    bc, target_sku, books=[book])
+                if rerr:
+                    failed_barcodes.append(bc)
+                    continue
+                raw_m = roll_data.get("quantity")
+                try:
+                    req_m = _PDecimal(str(raw_m)) if raw_m else None
+                except Exception:
+                    req_m = None
+                _r, _capped, rerr = _create_roll_reservation(order, order_item, roll, req_m, request.user)
+                if rerr:
+                    failed_barcodes.append(bc)
+
+        # Generate QR code
+        generate_machine_qr_for_order(order)
+
+        # Orders with rolls reserved right on the create form
+        # skip the manual "Paketleniyor" scan step. The funnel's
+        # packaging gate requires FULL metre coverage; when the
+        # picked rolls don't cover the ordered quantities the
+        # order simply stays "Açık" and we tell the user below.
+        order_stayed_open = False
+        if order.stock_reservations.filter(consumed=False).exists():
+            from .views_warehouse import apply_order_status_change
+            _adv_ok, _adv_code = apply_order_status_change(order, "packaging", user=member)
+            order_stayed_open = (not _adv_ok and _adv_code == "insufficient_reservation")
+
+        return order, order_stayed_open
+
+    def _finalise_order(self, request, order, *, book, member):
+        """Snapshot, current-account link and deposit for one saved order.
+
+        Runs OUTSIDE the creating transaction, exactly as it always has:
+        a ledger hiccup warns and leaves the order standing rather than
+        rolling back goods the customer has already been promised.
+        """
+        # ── Freeze a point-in-time copy of the order as first
+        # created — the "İlk Oluşturulan" tab on the detail page
+        # always shows this, even after later edits change the
+        # live items. Best-effort: a snapshot hiccup must never
+        # fail order creation.
+        try:
+            order.original_snapshot = order.build_snapshot()
+            order.save(update_fields=["original_snapshot"])
+        except Exception:
+            pass
+
+        # ── Auto-link to a CurrentAccount + log the sales-order
+        # movement so the customer's ledger reflects this
+        # order immediately — retail included: Perakende orders
+        # post their sale to the shared retail current account right at
+        # create (the auto COLLECTION + defter mirror still
+        # happen at completion via apply_order_status_change;
+        # post_order_movement there is idempotent so nothing
+        # double-posts on ship).
+        try:
+            from accounting.services_accounts import (
+                get_or_create_current_account_for_order, post_order_movement,
+                get_or_create_retail_current_account,
+            )
+            if order.is_retail_order:
+                current_account = get_or_create_retail_current_account(
+                    member=member, book=book)
+            else:
+                current_account = get_or_create_current_account_for_order(
+                    order, member=member, book=book)
+            if current_account and order.current_account_id != current_account.pk:
+                order.current_account = current_account
+                order.save(update_fields=["current_account"])
+            post_order_movement(order, member=member)
+        except Exception as _e:
+            messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
+
+        # ── Deposit (collection) — post against the current account if the
+        # user ticked "Deposit received" and entered an amount.
+        # Creates + confirms a Payment so it lands in the current account
+        # ledger as a deduction.
+        deposit_flag = (request.POST.get("deposit_received") or "").strip()
+        deposit_amount = _deposit_amount_for_book(request, book)
+        if deposit_flag and deposit_amount > 0 and order.current_account_id:
+            try:
+                from decimal import Decimal
+                from datetime import date
+                from accounting.models import Payment
+                from accounting.views_payment import _next_payment_number
+                from accounting.services_accounts import _resolve_currency
+
+                # The deposit belongs in the SAME book as the
+                # account it is collected against — never a
+                # guessed one. Guessing here meant a deposit
+                # taken by an Ergene member on a Laleli order
+                # created a Payment in Ergene whose current account lived
+                # in Laleli. A split order takes this further: each
+                # book's half collects its own deposit, because one
+                # payment cannot land in two businesses' books.
+                pay_book = order.current_account.book
+                currency = _resolve_currency(order)
+                pay = Payment.objects.create(
+                    current_account=order.current_account, book=pay_book,
+                    number=_next_payment_number(pay_book, "collection"),
+                    type="collection", method="cash", status="draft",
+                    date=date.today(),
+                    amount=Decimal(str(deposit_amount)),
+                    currency=currency,
+                    description=f"Deposit for Order #{order.pk}",
+                    notes=f"ORD-{order.pk}",
+                    created_by=member,
+                )
+                pay.confirm(user=request.user if request.user.is_authenticated else None)
+            except Exception as _e:
+                messages.warning(request, f"Order saved but deposit posting failed: {_e}")
+
+        # ── Customer notification email ───────────────────────
+        # Best-effort — never blocks the order save. Sends only
+        # when notify_customer is True (staff opt-in) AND the
+        # order has a usable customer email.
+        try:
+            if order.notify_customer:
+                from .order_notifications import send_order_event_email
+                send_order_event_email(order, "created", attach_pdf=True)
+        except Exception as _e:
+            messages.warning(request, f"Order saved but confirmation email failed: {_e}")
 
 
 class OrderEdit(UpdateView):
@@ -2901,6 +3109,19 @@ class OrderEdit(UpdateView):
                         #     "price": 3,
                         #     "item_id": 8
                         #   }]
+
+                        # An EDIT never splits. A saved order already has
+                        # its book — its current account is billed, its
+                        # movement posted, its reservations held on that
+                        # book's shelves — so a line tagged with a
+                        # different book cannot simply be added to it.
+                        # The create form is where a request becomes one
+                        # order per book; here the tag is refused outright
+                        # rather than quietly billed to the wrong
+                        # business. (The toggle that produces such a tag
+                        # is not rendered in edit mode; this is the guard
+                        # for a payload that arrives some other way.)
+                        _reject_foreign_book_lines(self.object, product_json_input)
 
                         # Unticked stock items go back to the pool BEFORE any line
                         # reserves, so a stock item moved between lines in one save
@@ -3764,6 +3985,9 @@ def product_autocomplete(request):
     # `book` is what the form is working in; it is still checked against
     # the member's assignments, because it arrives from the browser.
     allowed = _books_in_scope(request)
+    # Whether the form asked to see past its own book. Only changes what
+    # the ROW says here — the save is what keeps the books apart.
+    cross_book = (request.GET.get("cross_book") or "").strip() in {"1", "true", "on"}
 
     wh_rows = (
         WarehouseProduct.objects
@@ -3772,7 +3996,8 @@ def product_autocomplete(request):
         .filter(_fq("name") | _fq("sku")
                 | _fq("catalog_variant__variant_sku")
                 | _fq("catalog_variant__product__title"))
-        .select_related("warehouse", "catalog_variant__product__category")
+        .select_related("warehouse", "warehouse__accounting_book",
+                        "catalog_variant__product__category")
         .prefetch_related("catalog_variant__product_variant_attribute_values"
                           "__product_variant_attribute")
         .order_by("name")[:60]
@@ -3788,12 +4013,23 @@ def product_autocomplete(request):
                           .values_list("warehouse_product_id", "quantity")):
         reserved_by_wp[wp_id] = reserved_by_wp.get(wp_id, _D("0")) + (meters or _D("0"))
 
-    wh_groups = {}          # variant_id -> {"wp": first wp, "stocks": [(wh, qty)]}
+    # Grouped by variant AND book. One variant can stand on shelves in two
+    # different books — the same fabric held by two businesses — and those
+    # are not one sellable thing: they bill different current accounts and
+    # ship off different shelves. Collapsing them into a single row would
+    # make the pick unable to say which book it meant. In the ordinary
+    # single-book search every row has the same book, so this groups
+    # exactly as it always did.
+    wh_groups = {}          # (variant_id, book_id) -> {"wp", "book", "stocks"}
     for wp in wh_rows:
-        g = wh_groups.setdefault(wp.catalog_variant_id, {"wp": wp, "stocks": []})
+        wh = wp.warehouse
+        book = wh.accounting_book if (wh and wh.accounting_book_id) else None
+        g = wh_groups.setdefault(
+            (wp.catalog_variant_id, getattr(book, "pk", None)),
+            {"wp": wp, "book": book, "stocks": []})
         free = (wp.quantity or _D("0")) - reserved_by_wp.get(wp.pk, _D("0"))
-        g["stocks"].append((wp.warehouse.name, free))
-    wh_variant_ids = set(wh_groups.keys())
+        g["stocks"].append((wh.name if wh else "", free))
+    wh_variant_ids = {vid for vid, _bid in wh_groups.keys()}
 
     # ── 2) Catalog-only fallback (nothing already shown as warehouse) ─
     products = (
@@ -3890,6 +4126,16 @@ def product_autocomplete(request):
             for wh, q in stocks[:3]
         )
 
+    def book_cell(book):
+        """Which book's shelf this row stands on. Drawn only when the
+        search was allowed past one book — on an ordinary single-book
+        search every row would carry the same badge, which tells the
+        reader nothing and crowds the row."""
+        if not (cross_book and book):
+            return ""
+        return (f"<span class='pa-stock pa-stock--book'>"
+                f"{escape((book.name or '')[:18])}</span>")
+
     def row(sku, title, qualifier, price, is_cost, meta,
             js_args, extra_class=""):
         """The ONE row skeleton. Every result — warehouse or catalog —
@@ -3963,11 +4209,19 @@ def product_autocomplete(request):
         total = sum((q or 0) for _wh, q in group["stocks"])
         title_js = js_str(f"{base_title} — {qualifier}" if qualifier else base_title)
         cat_js = js_str(parent.category.name if parent.category else "")
+        # The book travels with the pick. The line the form mints carries
+        # it from here all the way to the save, which routes the line to
+        # that book's order — so what the user saw on the row is what
+        # gets billed, with nothing re-derived along the way.
+        book = group.get("book")
+        book_id = getattr(book, "pk", None) or "null"
+        book_name_js = js_str(getattr(book, "name", "") or "")
         js_args = (f"'{escape(js_str(sku))}',true,'{title_js}',{price},'{cat_js}',"
                    f"{float(total):g},{'true' if allow_oversell else 'false'},"
-                   f"{'true' if is_cost else 'false'}")
+                   f"{'true' if is_cost else 'false'},"
+                   f"{book_id},'{book_name_js}'")
         return row(sku, base_title, qualifier, price, is_cost,
-                   warehouse_cells(group["stocks"]), js_args)
+                   book_cell(book) + warehouse_cells(group["stocks"]), js_args)
 
     def note(text, cls):
         return (f"<li class='{cls}' onmousedown='event.preventDefault()'>"

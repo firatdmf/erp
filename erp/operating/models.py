@@ -500,6 +500,16 @@ class Order(models.Model):
     billed_line_quantities = models.JSONField(null=True, blank=True)
     billed_quantities_frozen_at = models.DateTimeField(null=True, blank=True)
 
+    # One customer request, split across books. Stock belongs to the book
+    # that owns its warehouse, so a client who wants goods off two books'
+    # shelves cannot be served by one order: that would promise a second
+    # business's asset and bill it to the first book's current account.
+    # They get one order per book instead — each billing its own current
+    # account, each reserving only its own stock — and this id is what
+    # says the two are the same request rather than a coincidence.
+    # NULL on the ordinary single-book order, which is nearly all of them.
+    split_group = models.UUIDField(null=True, blank=True, db_index=True)
+
     # Current-account link — auto-populated on save() for manual orders
     # so current account pages can list this order's movements and so we don't
     # double-create a current account for the same customer. Web orders skip this.
@@ -511,6 +521,21 @@ class Order(models.Model):
         related_name="orders",
         help_text="Linked current account (auto-resolved from contact/company)"
     )
+
+    @property
+    def split_siblings(self):
+        """The OTHER orders this one was split from, in book order.
+
+        Empty for the ordinary order, so a caller can iterate it
+        unconditionally without first asking whether this was a split.
+        """
+        if not self.split_group:
+            return Order.objects.none()
+        return (Order.objects
+                .filter(split_group=self.split_group)
+                .exclude(pk=self.pk)
+                .select_related("current_account__book")
+                .order_by("current_account__book__name", "pk"))
 
     def total_value(self):
         """Sum of the line amounts. subtotal() has already rounded each
@@ -1342,13 +1367,18 @@ class WarehouseProduct(models.Model):
     #
     # Defaults to metres: every product that existed before this field is
     # fabric, so the default is not a guess.
+    # The stored CODES are the ones the goods-receipt form has always
+    # submitted and _PRODUCT_UNIT_MAP reads, so they stay as they are.
+    # What a person SEES is English, through gettext — so Turkish comes
+    # from the .po file rather than from a second string hardcoded here.
     UNIT_CHOICES = [
-        ("mt", "Metre"),
-        ("adet", "Adet"),
-        ("paket", "Paket"),
-        ("kg", "Kilogram"),
+        ("mt", _("Metre")),
+        ("adet", _("Piece")),
+        ("paket", _("Pack")),
+        ("kg", _("Kilogram")),
     ]
-    UNIT_SHORT = {"mt": "m", "adet": "ad", "paket": "pkt", "kg": "kg"}
+    UNIT_SHORT = {"mt": _("m"), "adet": _("pcs"),
+                  "paket": _("pack"), "kg": _("kg")}
 
     unit = models.CharField(
         max_length=8, choices=UNIT_CHOICES, default="mt",
@@ -1412,7 +1442,10 @@ class WarehouseProduct(models.Model):
         hardcoded "m". Falls back to the raw code so an unrecognised unit
         shows itself rather than disappearing.
         """
-        return self.UNIT_SHORT.get(self.unit, self.unit or "")
+        # str() forces the lazy translation at ACCESS time, so it picks up
+        # the language active on this request — and so callers comparing it,
+        # or dropping it into JSON, get a plain string rather than a proxy.
+        return str(self.UNIT_SHORT.get(self.unit, self.unit or ""))
 
     # Live USD/TRY rate fetched lazily so the model file doesn't pull
     # in accounting at import time. Cached per call.

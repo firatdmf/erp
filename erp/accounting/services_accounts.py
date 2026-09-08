@@ -204,7 +204,7 @@ def _resolve_currency(order=None) -> CurrencyCategory:
 # ---------------------------------------------------------------------------
 # Current account resolution
 # ---------------------------------------------------------------------------
-def get_or_create_current_account_for_order(order, *, member=None) -> CurrentAccount | None:
+def get_or_create_current_account_for_order(order, *, member=None, book=None) -> CurrentAccount | None:
     """Find (or create) the current account for an order's customer.
 
     Resolution priority (per user spec):
@@ -216,6 +216,11 @@ def get_or_create_current_account_for_order(order, *, member=None) -> CurrentAcc
     The CurrentAccount unique-constraints (one current account per book+entity)
     guarantee idempotency: calling this multiple times for the same
     customer reuses the existing row.
+
+    Pass `book` when the caller knows which one this order belongs to —
+    an order split across books does, and each half must bill the account
+    in ITS OWN book. Left off, the member's default book decides, which
+    is right for the ordinary single-book order and wrong for a split.
     """
     contact = getattr(order, "contact", None)
     company = getattr(order, "company", None) or (
@@ -223,10 +228,10 @@ def get_or_create_current_account_for_order(order, *, member=None) -> CurrentAcc
     )
 
     if company:
-        return get_or_create_current_account_for_company(company, member=member)
+        return get_or_create_current_account_for_company(company, member=member, book=book)
 
     if contact:
-        return get_or_create_current_account_for_contact(contact, member=member)
+        return get_or_create_current_account_for_contact(contact, member=member, book=book)
 
     return None
 
@@ -941,9 +946,13 @@ RETAIL_CURRENT_ACCOUNT_CODE = "PERAKENDE"
 _RETAIL_AUTO_DESC = "Retail automatic collection"
 
 
-def get_or_create_retail_current_account(member=None) -> CurrentAccount:
-    """The single shared current account all retail orders post to."""
-    book = get_default_book(member)
+def get_or_create_retail_current_account(member=None, book=None) -> CurrentAccount:
+    """The shared current account retail orders post to — one per book,
+    since a book is a business and the counter takings of two businesses
+    are not one pile of money. `book` names it explicitly for a caller
+    that knows (a split order does); otherwise the member's default
+    book decides, as it always has."""
+    book = book or get_default_book(member)
     current_account = CurrentAccount.objects.filter(book=book, code=RETAIL_CURRENT_ACCOUNT_CODE).first()
     if current_account:
         return current_account

@@ -66,15 +66,12 @@ INVOICE_RESTORE_PASSWORD = config("INVOICE_RESTORE_PASSWORD", default="demfiratk
 
 ALLOWED_HOSTS = [
     ".vercel.app",
-    "erp.demfirat.com",
     "demfirat.com",
     "127.0.0.1",
     "localhost",
-    "app.nejum.com",
     "www.nejum.com",
     "demfirat.nejum.com",
     "erp-production-52e2.up.railway.app",
-    "erp-2hs3.onrender.com",
     '192.168.1.106',
     '48c4e0a19cf1.ngrok-free.app',
 ]
@@ -85,7 +82,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.nejum.com",
     "https://*.vercel.app",
     "https://*.up.railway.app",   # any Railway-hosted service URL
-    "https://*.onrender.com",     # Render fallback
     "https://48c4e0a19cf1.ngrok-free.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",

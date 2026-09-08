@@ -9058,3 +9058,18 @@ msgstr "Raftaki stoğun miktara göre ağırlıklı ortalama birim maliyeti"
 #: operating/templates/operating/partials/warehouse_product_rows.html
 msgid "Weighted-average unit cost across the variants of this product"
 msgstr "Bu ürünün varyantları genelinde ağırlıklı ortalama birim maliyet"
+
+msgid "Scanner did not load — check the connection"
+msgstr "Tarayıcı yüklenmedi — bağlantıyı kontrol edin"
+
+msgid "No picture is coming from the camera"
+msgstr "Kameradan görüntü gelmiyor"
+
+msgid "Reader error"
+msgstr "Okuyucu hatası"
+
+msgid "Bring the barcode into the frame"
+msgstr "Barkodu çerçeveye getirin"
+
+msgid "Scanner failed to load"
+msgstr "Tarayıcı yüklenemedi"

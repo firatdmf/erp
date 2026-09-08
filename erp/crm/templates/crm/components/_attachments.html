@@ -1,0 +1,38 @@
+{% load i18n %}
+{% comment %}The file rows only — the upload box and the group header live
+in the detail page, so an upload can swap just this list back in.{% endcomment %}
+{% for f in attachments %}
+  <div class="od-file" id="attachment-{{ f.id }}">
+    <span class="od-file-ico">
+      {% if f.is_image %}<i class="fa fa-file-image"></i>
+      {% elif f.extension == 'PDF' %}<i class="fa fa-file-pdf"></i>
+      {% elif f.extension in 'XLSX,XLS,CSV' %}<i class="fa fa-file-excel"></i>
+      {% elif f.extension in 'DOC,DOCX' %}<i class="fa fa-file-word"></i>
+      {% else %}<i class="fa fa-file"></i>{% endif %}
+    </span>
+    <div class="od-file-body">
+      <a class="od-file-name" href="{{ f.href }}" target="_blank" rel="noopener">{{ f.name }}</a>
+      <div class="od-file-meta">
+        <span>{{ f.pretty_size }}</span>
+        <span class="od-dot"></span>
+        <span>{{ f.uploaded_at|date:"M d, Y" }}</span>
+        {% if f.uploaded_by %}
+          <span class="od-dot"></span>
+          <span>{{ f.uploaded_by.get_full_name|default:f.uploaded_by.username }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="od-file-actions">
+      <a class="od-icon-btn" href="{{ f.href }}" target="_blank" rel="noopener"
+         title="{% trans 'Download' %}"><i class="fa fa-download"></i></a>
+      <button type="button" class="od-icon-btn del" title="{% trans 'Delete' %}"
+              onclick="deleteAttachment({{ f.id }})">
+        <i class="fa fa-trash"></i>
+      </button>
+    </div>
+  </div>
+{% empty %}
+  <p class="od-empty-mute empty-state" style="padding: 4px 2px;">
+    {% trans "No files attached yet." %}
+  </p>
+{% endfor %}

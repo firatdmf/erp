@@ -2,9 +2,13 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views import View, generic
-from .models import Contact, Company, Note, CompanyFollowUp, Supplier
+from .models import (
+    Attachment, Contact, Company, Note, CompanyFollowUp, Supplier,
+    content_type_for, validate_attachment_size, validate_attachment_type,
+)
+from django.core.exceptions import ValidationError
 from todo.models import Task
 from erp.search_utils import unaccent_icontains
 from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm, SupplierForm
@@ -444,6 +448,10 @@ class ContactDetail(generic.DetailView):
         # Filter tasks by current user's member
         current_member = self.request.user.member if hasattr(self.request.user, 'member') else None
         context["tasks"] = Task.objects.filter(contact=contact, member=current_member)
+        # The Attached items card shows only the open ones, and needs a
+        # count for its group header — filtering in the template cannot
+        # produce that number.
+        context["open_tasks"] = context["tasks"].filter(completed=False)
         initial_task_data = {
             "contact": contact.pk,
         }
@@ -1731,3 +1739,212 @@ def supplier_search_contacts(request):
     return JsonResponse({"results": results})
 
 
+
+
+# ── CRM attachments ───────────────────────────────────────────
+# Files hung off a contact, company or supplier. One set of views
+# serves all three: the record kind travels in the URL, so the
+# Attached items card on every detail page talks to the same
+# endpoints.
+ATTACHMENT_OWNERS = {
+    "contact": Contact,
+    "company": Company,
+    "supplier": Supplier,
+}
+
+
+def _attachment_owner(kind, pk):
+    """Resolve `kind`/`pk` to the record the files hang off."""
+    model = ATTACHMENT_OWNERS.get(kind)
+    if model is None:
+        raise Http404("Unknown record type for attachments")
+    return get_object_or_404(model, pk=pk)
+
+
+def _render_attachment_list(request, kind, owner, errors=()):
+    """The file rows, plus any per-file complaint as an HTMX trigger.
+
+    The card swaps this straight in, so a rejected file has nowhere to
+    put a Django message — it would surface on some later page load
+    instead. The header lets the page say it now.
+    """
+    from django.template.loader import render_to_string
+    import json as _json
+
+    files = Attachment.objects.filter(**{kind: owner}).select_related("uploaded_by")
+    response = HttpResponse(render_to_string(
+        "crm/components/_attachments.html",
+        {"attachments": files, "owner_kind": kind, "owner": owner},
+        request=request,
+    ))
+    if errors:
+        response["HX-Trigger"] = _json.dumps({"attachmentError": " ".join(errors)})
+    return response
+
+
+# Every record's files sit in one folder of the storage zone, the way
+# media/orders/<pk>/ already does — so a contact's paperwork can be
+# found, or cleaned out, in one place.
+CRM_ATTACHMENT_CDN_FOLDER = "Marketing/crm"
+
+
+# Types the download view will render in the browser. Everything else —
+# SVG included — is handed over as a download instead.
+INLINE_CONTENT_TYPES = frozenset({
+    "application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
+})
+
+
+class AttachmentStorageError(Exception):
+    """The file could not be put somewhere it will survive."""
+
+
+def _store_attachment(upload, kind, owner):
+    """Put an uploaded file where it will survive, and say where.
+
+    Returns `(storage_path, local_file)`, exactly one of which is set.
+
+    Bunny, or nothing: MEDIA_ROOT is a container path with no volume
+    mounted, so a file written there looks saved and is gone on the next
+    deploy. A failed upload raises instead — an error the user sees and
+    retries in seconds beats a file that quietly disappears in a week.
+
+    The local disk is used only where it is the intent: a dev box with
+    USE_BUNNY_CDN off. In production that same setting means the storage
+    is misconfigured, so the upload is refused rather than written to a
+    doomed path.
+    """
+    from django.conf import settings as _dj_settings
+
+    if not getattr(_dj_settings, "USE_BUNNY_CDN", False):
+        if not _dj_settings.DEBUG:
+            raise AttachmentStorageError(
+                "File storage is not configured on this server, so the "
+                "upload was refused rather than saved somewhere it would "
+                "be lost. Ask an administrator to check USE_BUNNY_CDN.")
+        return "", upload   # dev box: the local disk is the intent
+
+    from marketing.utils.bunny_storage import upload_to_bunny
+    from django.utils.crypto import get_random_string
+    import re as _re
+
+    # A random prefix, so two uploads of "contract.pdf" onto the same
+    # record do not overwrite one another.
+    safe = _re.sub(r"[^A-Za-z0-9._-]", "-", upload.name)[-80:].strip("-._")
+    path = (f"{CRM_ATTACHMENT_CDN_FOLDER}/{kind}/{owner.pk}/"
+            f"{get_random_string(8)}_{safe}")
+    try:
+        upload_to_bunny(
+            upload, path, content_type=getattr(upload, "content_type", None))
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception(
+            "Bunny upload failed for a CRM attachment")
+        raise AttachmentStorageError(
+            "Upload failed — the file was not saved. Please try again.") from exc
+    return path, None
+
+
+@login_required
+def upload_attachments(request, kind, pk):
+    """Attach one or more files to a CRM record.
+
+    Returns the refreshed file list so the card can swap it straight in.
+    A file that is rejected or fails to store is reported by name; the
+    ones that made it are kept, because their bytes are already safe.
+    """
+    owner = _attachment_owner(kind, pk)
+    if request.method != "POST":
+        return _render_attachment_list(request, kind, owner)
+
+    uploads = request.FILES.getlist("files") or request.FILES.getlist("file")
+    skipped = []
+    for upload in uploads:
+        try:
+            validate_attachment_size(upload)
+            validate_attachment_type(upload)
+        except ValidationError as exc:
+            skipped.append(f"{upload.name}: {exc.messages[0]}")
+            continue
+        try:
+            path, local = _store_attachment(upload, kind, owner)
+        except AttachmentStorageError as exc:
+            skipped.append(f"{upload.name}: {exc}")
+            continue
+        Attachment.objects.create(
+            **{kind: owner},
+            name=upload.name[:255],
+            path=path,
+            file=local,
+            size=upload.size or 0,
+            content_type=content_type_for(
+                upload.name, getattr(upload, "content_type", "")),
+            uploaded_by=request.user if request.user.is_authenticated else None,
+        )
+    return _render_attachment_list(request, kind, owner, errors=skipped)
+
+
+@login_required
+def download_attachment(request, pk):
+    """Serve an attachment to a signed-in user.
+
+    The bytes come back out of the Storage API with the account key, so
+    the file is never fetched through the public pull zone and its CDN
+    address never appears in a page. Anyone without a session gets the
+    login screen instead of the document.
+    """
+    from django.http import FileResponse, StreamingHttpResponse
+
+    attachment = get_object_or_404(Attachment, pk=pk)
+    # A short allowlist, not "any image": an SVG is a document that can
+    # carry script, and rendering one here would run it on our own origin
+    # as the signed-in user. Everything outside this list downloads.
+    inline = attachment.content_type in INLINE_CONTENT_TYPES
+    disposition = "inline" if inline else "attachment"
+    filename = attachment.name.replace('"', "")
+
+    if attachment.path:
+        from marketing.utils.bunny_storage import download_from_bunny
+        try:
+            upstream = download_from_bunny(attachment.path)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Could not read attachment %s back from Bunny", attachment.pk)
+            raise Http404("This file could not be read from storage")
+        response = StreamingHttpResponse(
+            upstream.iter_content(chunk_size=64 * 1024),
+            content_type=attachment.content_type or "application/octet-stream",
+        )
+        if attachment.size:
+            response["Content-Length"] = attachment.size
+    elif attachment.file:
+        response = FileResponse(
+            attachment.file.open("rb"),
+            content_type=attachment.content_type or "application/octet-stream",
+        )
+    else:
+        raise Http404("This attachment has no file behind it")
+
+    response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
+    # Never let a shared cache hold a document behind a login.
+    response["Cache-Control"] = "private, max-age=0, no-store"
+    # And never let the browser decide a text file is really HTML.
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@login_required
+def delete_attachment(request, pk):
+    """Drop an attachment. The bytes go with it, via the delete signal."""
+    attachment = get_object_or_404(Attachment, pk=pk)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    attachment.delete()
+    return HttpResponse(status=200)
+
+
+@login_required
+def attachments_partial(request, kind, pk):
+    """The file list on its own — used to refresh the card over HTMX."""
+    return _render_attachment_list(request, kind, _attachment_owner(kind, pk))

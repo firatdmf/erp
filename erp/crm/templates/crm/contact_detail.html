@@ -110,7 +110,9 @@
   /* GRID */
   .od-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: flex-start; }
   .od-left, .od-right { display: flex; flex-direction: column; gap: 16px; }
-  .od-right { position: sticky; top: 16px; }
+  /* Not sticky: the right column now carries the order and ledger lists,
+     so pinning it would put its lower half out of reach. */
+  .od-right { position: static; }
 
   /* CARDS */
   .od-card {
@@ -162,6 +164,104 @@
 
   /* ATTACH SECTION */
   .od-attach-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ATTACHED ITEMS CARD (grouped, collapsible) */
+  .od-section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin: 8px 4px 4px;
+  }
+  .od-section-head .od-section-title { margin: 0; }
+  .od-attach-menu { position: relative; }
+  .od-caret { font-size: 10px; }
+  .od-attach-dropdown {
+    position: absolute; right: 0; top: calc(100% + 6px); min-width: 190px;
+    background: white; border: 1px solid #E2E8EE; border-radius: 11px;
+    box-shadow: 0 14px 34px rgba(15,23,31,0.14); padding: 6px; z-index: 40;
+  }
+  .od-attach-dropdown button {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 8px 10px; border: 0; background: transparent; border-radius: 8px;
+    font: 600 12.5px var(--font-sans); color: var(--gray-700);
+    cursor: pointer; text-align: left;
+  }
+  .od-attach-dropdown button i { color: var(--nejum-teal-600); width: 13px; }
+  .od-attach-dropdown button:hover { background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+
+  .od-attached-card { padding: 0; overflow: hidden; }
+  .od-attached-card .od-attach-panel { margin: 14px 16px 0; }
+  .od-attach-group + .od-attach-group { border-top: 1px solid #E2E8EE; }
+  .od-group-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px; cursor: pointer; user-select: none;
+  }
+  .od-group-head:hover { background: #F8FAFC; }
+  .od-group-ico {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .od-group-ico.green { background: #DCFCE7; color: #166534; }
+  .od-group-ico.blue { background: #DBEAFE; color: #1D4ED8; }
+  .od-group-ico.amber { background: #FEF3C7; color: #92400E; }
+  .od-group-name { font: 700 13px var(--font-sans); color: var(--ink); }
+  .od-group-count { font: 500 12px var(--font-sans); color: var(--gray-500); }
+  .od-group-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .od-group-chev { margin-left: auto; color: var(--gray-400); font-size: 12px; transition: transform 140ms; }
+  .od-group-actions ~ .od-group-chev { margin-left: 10px; }
+  .od-group-body { padding: 0 16px 16px; }
+  .od-attach-group.collapsed .od-group-body { display: none; }
+  .od-attach-group.collapsed .od-group-chev { transform: rotate(-90deg); }
+
+  /* FILES */
+  .od-file-drop {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 18px 14px; margin-bottom: 12px; cursor: pointer;
+    border: 1.5px dashed #D3DBE4; border-radius: 12px; background: #F8FAFC;
+    text-align: center; transition: all 140ms; position: relative;
+  }
+  .od-file-drop:hover, .od-file-drop.over {
+    border-color: var(--nejum-teal-500); background: var(--nejum-teal-50);
+  }
+  .od-file-drop > i { color: var(--nejum-teal-600); font-size: 16px; margin-bottom: 2px; }
+  .od-file-drop-t { font: 600 12.5px var(--font-sans); color: var(--gray-700); }
+  .od-file-drop-s { font: 500 11px var(--font-sans); color: var(--gray-400); }
+  .od-file-drop-busy {
+    display: none; font: 600 12px var(--font-sans); color: var(--nejum-teal-700);
+    margin-top: 4px;
+  }
+  .od-file-drop.htmx-request .od-file-drop-busy { display: block; }
+  .od-file-list { display: flex; flex-direction: column; gap: 8px; }
+  .od-file {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; background: white;
+    border: 1px solid #E2E8EE; border-radius: 10px; transition: all 140ms;
+  }
+  .od-file:hover { border-color: #C5CCD3; box-shadow: 0 2px 6px rgba(15,23,31,0.05); }
+  .od-file-ico {
+    width: 30px; height: 30px; border-radius: 8px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #F1F5F9; color: var(--gray-600); font-size: 13px;
+  }
+  .od-file-body { flex: 1; min-width: 0; }
+  .od-file-name {
+    display: block; font: 600 13px var(--font-sans); color: var(--ink);
+    text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .od-file-name:hover { color: var(--nejum-teal-700); text-decoration: underline; }
+  .od-file-meta {
+    display: flex; align-items: center; gap: 7px; margin-top: 2px;
+    font: 500 11px var(--font-sans); color: var(--gray-500);
+  }
+  .od-file-actions { display: flex; gap: 4px; flex: none; }
+  .od-file-actions .od-icon-btn { text-decoration: none; }
+
+  /* Order/ledger rows sit in the narrow right column: stack the status
+     pill under the id instead of squeezing four columns into 360px. */
+  .od-card-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: -2px 0 12px; }
+  .od-card-tools .od-print-orders { margin-left: 0; }
+  .od-right .od-order-row { grid-template-columns: 1fr auto; gap: 6px 10px; padding: 11px 12px; }
+  .od-right .od-order-row > .ord-status { grid-column: 1 / -1; justify-self: start; }
+  .od-right .od-order-chev { display: none; }
   .od-attach-panel {
     margin-top: 14px; padding: 14px 16px;
     background: #F8FAFC; border: 1px solid #E2E8EE; border-radius: 12px;
@@ -328,8 +428,12 @@
   /* NOTES HISTORY OVERRIDES (history.css renders here) */
   #notesSection { display: contents; }
 
-  /* ALWAYS-OPEN NOTE COMPOSER */
-  .od-note-composer { padding: 14px; }
+  /* HISTORY CARD: always-open note composer + entries in one card */
+  .od-history-card { padding: 0; overflow: hidden; }
+  .od-history-card .detail-card { background: transparent; border: 0; border-radius: 0; }
+  .od-history-card .card-header { display: none; }
+  .od-history-card .notes-list { padding: 14px 16px 16px; }
+  .od-note-composer { padding: 16px 16px 14px; border-bottom: 1px solid #E2E8EE; }
   .od-note-form { display: flex; flex-direction: column; gap: 12px; }
   .od-note-input {
     width: 100%; box-sizing: border-box; min-height: 84px; max-height: 320px;
@@ -478,163 +582,29 @@
       {# ============== LEFT ============== #}
       <div class="od-left">
 
-        <!-- TASKS -->
-        <section class="od-card">
-          <div class="od-card-h">
-            <i class="fa fa-check-circle card-ico"></i>
-            <h3>{% trans "Tasks" %}</h3>
+        <!-- ATTACHED ITEMS -->
+        <div class="od-section-head">
+          <div class="od-section-title">
+            <i class="fa fa-paperclip"></i>
+            <h3>{% trans "Attached items" %}</h3>
           </div>
-          <div id="tasksList" class="od-task-list">
-            {% for task in tasks|dictsortreversed:'due_date' %}
-              {% if not task.completed %}
-                <div class="od-task" id="task-{{ task.id }}">
-                  <div class="task-content" id="task-content-{{ task.id }}" style="flex:1; min-width:0;">
-                    <div class="od-task-body">
-                      <h3 class="od-task-name task-name">{{ task.name }}</h3>
-                      {% if task.description %}
-                        <p class="od-task-desc task-description">{{ task.description }}</p>
-                      {% endif %}
-                      <div class="od-task-meta task-meta">
-                        <span class="pill due task-due"><i class="fa fa-calendar"></i>{{ task.due_date|date:"M d, Y" }}</span>
-                        {% if task.due_date|days_since %}
-                          <span class="pill overdue task-overdue">{{ task.due_date|days_since }}</span>
-                        {% endif %}
-                        {% if task.member %}
-                          <span class="pill task-member"><i class="fa fa-user"></i>{{ task.member }}</span>
-                        {% endif %}
-                      </div>
-                    </div>
-                  </div>
-                  <div class="od-task-actions task-actions">
-                    <button type="button" class="od-icon-btn ok btn-icon-minimal" title="{% trans 'Complete' %}"
-                            onclick="confirmDelete('complete_task', {{ task.id }})">
-                      <i class="fa fa-check"></i>
-                    </button>
-                    <button type="button" class="od-icon-btn btn-icon-minimal" title="{% trans 'Edit' %}"
-                            onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"Y-m-d" }}')">
-                      <i class="fa fa-edit"></i>
-                    </button>
-                    <button type="button" class="od-icon-btn del btn-icon-minimal" title="{% trans 'Delete' %}"
-                            onclick="confirmDelete('delete_task', {{ task.id }})">
-                      <i class="fa fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              {% endif %}
-            {% empty %}
-              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "No tasks available." %}</p>
-            {% endfor %}
-          </div>
-        </section>
-
-        <!-- ORDER HISTORY -->
-        <section class="od-card">
-          <div class="od-card-h">
-            <i class="fa fa-shopping-bag card-ico"></i>
-            <h3>{% trans "Order history" %}</h3>
-            <span class="od-card-sub">{{ orders|length }} {% blocktrans count counter=orders|length %}order{% plural %}orders{% endblocktrans %}</span>
-            {% if orders %}
-            <button type="button" id="printOrdersBtn" class="od-print-orders" disabled
-                    onclick="printSelectedOrders()"
-                    data-label-idle="{% trans 'Print selected' %}"
-                    data-label-picked="{% trans 'Print' %}">
-              <i class="fa fa-print"></i>
-              <span id="printOrdersLabel">{% trans "Print selected" %}</span>
+          <div class="od-attach-menu">
+            <button type="button" class="ord-btn ghost sm" id="attachMenuBtn" onclick="toggleAttachMenu(event)">
+              <i class="fa fa-plus"></i>{% trans "Attach an item" %}
+              <i class="fa fa-chevron-down od-caret"></i>
             </button>
-            <button type="button" id="excelOrdersBtn" class="od-print-orders" disabled
-                    onclick="excelSelectedOrders()"
-                    title="{% trans 'Download the selected orders as a spreadsheet' %}">
-              <i class="fa fa-file-excel"></i>
-              <span>{% trans "Excel" %}</span>
-            </button>
-            {% endif %}
+            <div class="od-attach-dropdown" id="attachMenu" hidden>
+              <button type="button" onclick="openAttachSection('task')">
+                <i class="fa fa-check-circle"></i>{% trans "Task" %}
+              </button>
+              <button type="button" onclick="openAttachSection('file')">
+                <i class="fa fa-paperclip"></i>{% trans "File" %}
+              </button>
+            </div>
           </div>
-          <div class="od-order-list">
-            {% for o in orders %}
-              <div class="od-order-pick">
-                <input type="checkbox" class="od-order-check" value="{{ o.pk }}"
-                       onchange="syncPrintSelection()"
-                       aria-label="{% trans 'Print this order' %} {{ o.order_number|default:o.pk }}">
-                <a class="od-order-row" href="{% url 'operating:order_detail' o.pk %}">
-                <div class="od-order-id">
-                  <div class="od-order-num">{{ o.order_number|default:o.pk }}</div>
-                  <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
-                </div>
-                {% with disp_status=o.order_status %}
-                <span class="ord-status {{ disp_status }}">
-                  <span class="ord-status-dot"></span>
-                  {% comment %} The customer-facing order_status, matching
-                     order_list and order_detail — including their relabel of
-                     "shipped" as Completed. This used to render the production
-                     STATUS_CHOICES label instead, because ORDER_STATUS_CHOICES
-                     was once hardcoded Turkish; it goes through gettext_lazy
-                     now, so the .po file supplies the translation. Reading
-                     `status` here meant an order set to Shipped still showed
-                     "Pending" whenever its items had not been moved on. {% endcomment %}
-                  {% if disp_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ o.get_order_status_display }}{% endif %}
-                </span>
-                {% endwith %}
-                <div class="od-order-total">
-                  {% if o.paid_amount %}
-                    {{ o.paid_amount }} <span>{{ o.paid_currency|default:"" }}</span>
-                  {% elif o.original_price %}
-                    {{ o.original_price }} <span>{{ o.original_currency|default:"" }}</span>
-                  {% else %}
-                    <span class="od-empty-mute">—</span>
-                  {% endif %}
-                </div>
-                <i class="fa fa-chevron-right od-order-chev"></i>
-                </a>
-              </div>
-            {% empty %}
-              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
-                {% trans "No orders yet for this contact." %}
-              </p>
-            {% endfor %}
-          </div>
-        </section>
+        </div>
 
-        <!-- LEDGER ACCOUNTS (all books) -->
-        <section class="od-card">
-          <div class="od-card-h">
-            <i class="fa fa-book card-ico"></i>
-            <h3>{% trans "Ledger accounts" %}</h3>
-            <span class="od-card-sub">{{ current_account_accounts|length }} {% blocktrans count counter=cari_accounts|length %}book{% plural %}books{% endblocktrans %}</span>
-          </div>
-          <div class="od-order-list">
-            {% for a in current_account_accounts %}
-              <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
-                <div class="od-order-id">
-                  <div class="od-order-num">{{ a.book.name }}</div>
-                  <div class="od-order-date">{{ a.code }}</div>
-                </div>
-                <span class="ord-status {% if a.cached_balance > 0 %}pending{% elif a.cached_balance < 0 %}cancelled{% else %}completed{% endif %}">
-                  <span class="ord-status-dot"></span>{{ a.balance_label }}
-                </span>
-                <div class="od-order-total">
-                  {{ a.cached_balance|floatformat:2 }} <span>{{ a.display_currency_symbol }}</span>
-                </div>
-                <i class="fa fa-chevron-right od-order-chev"></i>
-              </a>
-            {% empty %}
-              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
-                {% trans "No ledger account in any book yet." %}
-              </p>
-            {% endfor %}
-          </div>
-        </section>
-
-        <!-- ATTACH AN ITEM -->
-        <section class="od-card attach-card">
-          <div class="od-card-h">
-            <i class="fa fa-paperclip card-ico"></i>
-            <h3>{% trans "Attach an item" %}</h3>
-          </div>
-          <div class="od-attach-bar attach-options">
-            <button type="button" class="ord-btn ghost sm attach-option-btn" onclick="toggleAttachSection('task')">
-              <i class="fa fa-check-circle"></i>{% trans "Task" %}
-            </button>
-          </div>
+        <section class="od-card od-attached-card attach-card">
 
           <!-- Task Attach Panel -->
           <div id="attachTaskSection" class="od-attach-panel attach-form-section" style="display: none;">
@@ -646,7 +616,7 @@
             </div>
             <form hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_task" hx-target="#tasksList"
                   hx-swap="innerHTML" class="attach-form"
-                  hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); }">
+                  hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); syncAttachedCounts(); }">
               {% csrf_token %}
               {{ task_form.as_p }}
               <div class="form-actions">
@@ -656,6 +626,97 @@
               </div>
             </form>
           </div>
+
+          <!-- Group: upcoming tasks -->
+          <div class="od-attach-group">
+            <div class="od-group-head" role="button" tabindex="0" aria-expanded="true"
+                 onclick="toggleAttachGroup(this)"
+                 onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAttachGroup(this); }">
+              <span class="od-group-ico green"><i class="fa fa-check-circle"></i></span>
+              <span class="od-group-name">{% trans "Upcoming tasks" %}</span>
+              <span class="od-group-count" id="grpTaskCount">({{ open_tasks|length }})</span>
+              <i class="fa fa-chevron-down od-group-chev"></i>
+            </div>
+            <div class="od-group-body">
+              <div id="tasksList" class="od-task-list">
+                {% for task in open_tasks|dictsortreversed:'due_date' %}
+                  <div class="od-task" id="task-{{ task.id }}">
+                    <div class="task-content" id="task-content-{{ task.id }}" style="flex:1; min-width:0;">
+                      <div class="od-task-body">
+                        <h3 class="od-task-name task-name">{{ task.name }}</h3>
+                        {% if task.description %}
+                          <p class="od-task-desc task-description">{{ task.description }}</p>
+                        {% endif %}
+                        <div class="od-task-meta task-meta">
+                          <span class="pill due task-due"><i class="fa fa-calendar"></i>{{ task.due_date|date:"M d, Y" }}</span>
+                          {% if task.due_date|days_since %}
+                            <span class="pill overdue task-overdue">{{ task.due_date|days_since }}</span>
+                          {% endif %}
+                          {% if task.member %}
+                            <span class="pill task-member"><i class="fa fa-user"></i>{{ task.member }}</span>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="od-task-actions task-actions">
+                      <button type="button" class="od-icon-btn ok btn-icon-minimal" title="{% trans 'Complete' %}"
+                              onclick="confirmDelete('complete_task', {{ task.id }})">
+                        <i class="fa fa-check"></i>
+                      </button>
+                      <button type="button" class="od-icon-btn btn-icon-minimal" title="{% trans 'Edit' %}"
+                              onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"Y-m-d" }}')">
+                        <i class="fa fa-edit"></i>
+                      </button>
+                      <button type="button" class="od-icon-btn del btn-icon-minimal" title="{% trans 'Delete' %}"
+                              onclick="confirmDelete('delete_task', {{ task.id }})">
+                        <i class="fa fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                {% empty %}
+                  <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "No tasks available." %}</p>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Group: files — collapsed until asked for, so the drop zone
+               does not take up the card on every visit -->
+          <div class="od-attach-group collapsed">
+            <div class="od-group-head" role="button" tabindex="0" aria-expanded="false"
+                 onclick="toggleAttachGroup(this)"
+                 onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAttachGroup(this); }">
+              <span class="od-group-ico blue"><i class="fa fa-paperclip"></i></span>
+              <span class="od-group-name">{% trans "Files" %}</span>
+              <span class="od-group-count" id="grpFileCount">({{ contact.attachments.count }})</span>
+              <i class="fa fa-chevron-down od-group-chev"></i>
+            </div>
+            <div class="od-group-body">
+              <form id="attachUploadForm" class="od-file-drop"
+                    hx-post="{% url 'crm:upload_attachments' 'contact' contact.id %}"
+                    hx-encoding="multipart/form-data"
+                    hx-target="#attachmentsList" hx-swap="innerHTML"
+                    hx-trigger="change from:#attachFileInput"
+                    hx-on::after-request="this.reset(); syncAttachedCounts(); expandAttachGroup('attachmentsList');"
+                    ondragover="event.preventDefault(); this.classList.add('over');"
+                    ondragleave="this.classList.remove('over');"
+                    ondrop="dropAttachments(event, this);"
+                    onclick="document.getElementById('attachFileInput').click();">
+                {% csrf_token %}
+                <input type="file" name="files" id="attachFileInput" multiple hidden>
+                <i class="fa fa-cloud-upload-alt"></i>
+                <span class="od-file-drop-t">{% trans "Drop files here, or click to choose" %}</span>
+                <span class="od-file-drop-s">{% trans "Up to 25 MB per file · programs and scripts are not accepted" %}</span>
+                <span class="od-file-drop-busy htmx-indicator">
+                  <i class="fa fa-spinner fa-spin"></i> {% trans "Uploading…" %}
+                </span>
+              </form>
+              <div id="attachmentsList" class="od-file-list">
+                {% include "crm/components/_attachments.html" with attachments=contact.attachments.all %}
+              </div>
+            </div>
+          </div>
+
         </section>
 
         <!-- NOTES HISTORY -->
@@ -663,28 +724,30 @@
           <i class="fa fa-history"></i>
           <h3>{% trans "History" %}</h3>
         </div>
-        <section class="od-card od-note-composer">
-          <form id="noteComposerForm" class="od-note-form"
-                hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_note"
-                hx-swap="none"
-                hx-on::after-request="if(event.detail.successful) { noteComposerSaved(); }">
-            {% csrf_token %}
-            <textarea name="content" id="noteComposerInput" class="od-note-input" rows="3"
-                      placeholder="{% blocktrans with name=contact.name|capfirst %}Enter a note about {{ name }}{% endblocktrans %}"
-                      oninput="syncNoteComposer(this)"
-                      onkeydown="if((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (this.value.trim()) this.form.requestSubmit(); }"></textarea>
-            <div class="od-note-actions">
-              <button type="submit" class="ord-btn primary" id="noteComposerSubmit" disabled>
-                <i class="fa fa-check"></i>{% trans "Save note" %}
-              </button>
-              <span class="od-note-hint">{% trans "Ctrl + Enter to save" %}</span>
-            </div>
-          </form>
-        </section>
+        <section class="od-card od-history-card">
+          <div class="od-note-composer">
+            <form id="noteComposerForm" class="od-note-form"
+                  hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_note"
+                  hx-swap="none"
+                  hx-on::after-request="if(event.detail.successful) { noteComposerSaved(); }">
+              {% csrf_token %}
+              <textarea name="content" id="noteComposerInput" class="od-note-input" rows="3"
+                        placeholder="{% blocktrans with name=contact.name|capfirst %}Enter a note about {{ name }}{% endblocktrans %}"
+                        oninput="syncNoteComposer(this)"
+                        onkeydown="if((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (this.value.trim()) this.form.requestSubmit(); }"></textarea>
+              <div class="od-note-actions">
+                <button type="submit" class="ord-btn primary" id="noteComposerSubmit" disabled>
+                  <i class="fa fa-check"></i>{% trans "Save note" %}
+                </button>
+                <span class="od-note-hint">{% trans "Ctrl + Enter to save" %}</span>
+              </div>
+            </form>
+          </div>
 
-        <div id="notesSection">
-          {% history_component company=None contact=contact csrf_token=csrf_token note_form=note_form current_url=request.path %}
-        </div>
+          <div id="notesSection">
+            {% history_component company=None contact=contact csrf_token=csrf_token note_form=note_form current_url=request.path %}
+          </div>
+        </section>
       </div>
 
       {# ============== RIGHT ============== #}
@@ -759,6 +822,109 @@
             {% if not contact.email and not contact.phone and not contact.job_title and not contact.company and not contact.address %}
               <div class="od-empty-mute" style="padding: 4px 0;">{% trans "No additional information." %}</div>
             {% endif %}
+          </div>
+        </section>
+
+        <!-- ORDER HISTORY -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-shopping-bag card-ico"></i>
+            <h3>{% trans "Order history" %}</h3>
+            <span class="od-card-sub">{{ orders|length }} {% blocktrans count counter=orders|length %}order{% plural %}orders{% endblocktrans %}</span>
+          </div>
+          {% if orders %}
+            <div class="od-card-tools">
+              <button type="button" id="printOrdersBtn" class="od-print-orders" disabled
+                      onclick="printSelectedOrders()"
+                      data-label-idle="{% trans 'Print selected' %}"
+                      data-label-picked="{% trans 'Print' %}">
+                <i class="fa fa-print"></i>
+                <span id="printOrdersLabel">{% trans "Print selected" %}</span>
+              </button>
+              <button type="button" id="excelOrdersBtn" class="od-print-orders" disabled
+                      onclick="excelSelectedOrders()"
+                      data-label-idle="{% trans 'Excel' %}"
+                      data-label-picked="{% trans 'Excel' %}"
+                      title="{% trans 'Download the selected orders as a spreadsheet' %}">
+                <i class="fa fa-file-excel"></i>
+                <span id="excelOrdersLabel">{% trans "Excel" %}</span>
+              </button>
+            </div>
+          {% endif %}
+
+          <div class="od-order-list">
+            {% for o in orders %}
+              <div class="od-order-pick">
+                <input type="checkbox" class="od-order-check" value="{{ o.pk }}"
+                       onchange="syncPrintSelection()"
+                       aria-label="{% trans 'Print this order' %} {{ o.order_number|default:o.pk }}">
+                <a class="od-order-row" href="{% url 'operating:order_detail' o.pk %}">
+                <div class="od-order-id">
+                  <div class="od-order-num">{{ o.order_number|default:o.pk }}</div>
+                  <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
+                </div>
+                {% with disp_status=o.order_status %}
+                <span class="ord-status {{ disp_status }}">
+                  <span class="ord-status-dot"></span>
+                  {% comment %} The customer-facing order_status, matching
+                     order_list and order_detail — including their relabel of
+                     "shipped" as Completed. This used to render the production
+                     STATUS_CHOICES label instead, because ORDER_STATUS_CHOICES
+                     was once hardcoded Turkish; it goes through gettext_lazy
+                     now, so the .po file supplies the translation. Reading
+                     `status` here meant an order set to Shipped still showed
+                     "Pending" whenever its items had not been moved on. {% endcomment %}
+                  {% if disp_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ o.get_order_status_display }}{% endif %}
+                </span>
+                {% endwith %}
+                <div class="od-order-total">
+                  {% if o.paid_amount %}
+                    {{ o.paid_amount }} <span>{{ o.paid_currency|default:"" }}</span>
+                  {% elif o.original_price %}
+                    {{ o.original_price }} <span>{{ o.original_currency|default:"" }}</span>
+                  {% else %}
+                    <span class="od-empty-mute">—</span>
+                  {% endif %}
+                </div>
+                <i class="fa fa-chevron-right od-order-chev"></i>
+                </a>
+              </div>
+            {% empty %}
+              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
+                {% trans "No orders yet for this contact." %}
+              </p>
+            {% endfor %}
+          </div>
+        </section>
+
+        <!-- LEDGER ACCOUNTS (all books) -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-book card-ico"></i>
+            <h3>{% trans "Ledger accounts" %}</h3>
+            <span class="od-card-sub">{{ current_account_accounts|length }} {% blocktrans count counter=current_account_accounts|length %}book{% plural %}books{% endblocktrans %}</span>
+          </div>
+
+          <div class="od-order-list">
+            {% for a in current_account_accounts %}
+              <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
+                <div class="od-order-id">
+                  <div class="od-order-num">{{ a.book.name }}</div>
+                  <div class="od-order-date">{{ a.code }}</div>
+                </div>
+                <span class="ord-status {% if a.cached_balance > 0 %}pending{% elif a.cached_balance < 0 %}cancelled{% else %}completed{% endif %}">
+                  <span class="ord-status-dot"></span>{{ a.balance_label }}
+                </span>
+                <div class="od-order-total">
+                  {{ a.cached_balance|floatformat:2 }} <span>{{ a.display_currency_symbol }}</span>
+                </div>
+                <i class="fa fa-chevron-right od-order-chev"></i>
+              </a>
+            {% empty %}
+              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
+                {% trans "No ledger account in any book yet." %}
+              </p>
+            {% endfor %}
           </div>
         </section>
       </div>
@@ -983,9 +1149,95 @@
     input.focus();
   }
 
+  // Attached items: "Attach an item" dropdown
+  function toggleAttachMenu(event) {
+    event.stopPropagation();
+    const menu = document.getElementById('attachMenu');
+    menu.hidden = !menu.hidden;
+  }
+
+  function openAttachSection(type) {
+    document.getElementById('attachMenu').hidden = true;
+    if (type === 'file') {
+      // The Files group starts collapsed, so open it first — otherwise the
+      // file the user is about to pick would arrive somewhere they cannot
+      // see, and only the count beside the header would move.
+      expandAttachGroup('attachmentsList');
+      document.getElementById('attachFileInput').click();
+      return;
+    }
+    const section = document.getElementById('attachTaskSection');
+    if (section) {
+      section.style.display = 'block';
+      section.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+  }
+
+  // Dropped files are handed to the hidden input, so the upload goes out
+  // through the same HTMX form as a click-to-choose upload.
+  function dropAttachments(event, form) {
+    event.preventDefault();
+    form.classList.remove('over');
+    const input = document.getElementById('attachFileInput');
+    input.files = event.dataTransfer.files;
+    if (input.files.length) input.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+
+  // A file the server refused (too large) comes back as an HX-Trigger on
+  // the swapped list, since a Django message would only surface later.
+  document.body.addEventListener('attachmentError', function (e) {
+    alert(e.detail.value);
+  });
+
+  function deleteAttachment(id) {
+    const row = document.getElementById(`attachment-${id}`);
+    fetch(`/crm/attachments/${id}/delete/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest'}
+    }).then(res => {
+      if (!res.ok || !row) return;
+      row.style.transition = 'all 0.25s ease';
+      row.style.opacity = '0';
+      row.style.transform = 'translateX(-16px)';
+      setTimeout(() => { row.remove(); syncAttachedCounts(); }, 250);
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    const menu = document.getElementById('attachMenu');
+    if (menu && !menu.hidden && !e.target.closest('.od-attach-menu')) {
+      menu.hidden = true;
+    }
+  });
+
+  // Attached items: collapsible groups
+  function toggleAttachGroup(head) {
+    const group = head.closest('.od-attach-group');
+    const collapsed = group.classList.toggle('collapsed');
+    head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+
+  // Open the group a given list belongs to, if it is closed.
+  function expandAttachGroup(id) {
+    const el = document.getElementById(id);
+    const group = el && el.closest('.od-attach-group');
+    if (!group || !group.classList.contains('collapsed')) return;
+    group.classList.remove('collapsed');
+    const head = group.querySelector('.od-group-head');
+    if (head) head.setAttribute('aria-expanded', 'true');
+  }
+
+  // The task list is swapped in by HTMX and pruned by the delete/complete
+  // handlers, so its group count has to be recomputed from the DOM.
+  function syncAttachedCounts() {
+    const tasks = document.getElementById('grpTaskCount');
+    if (tasks) tasks.textContent = '(' + document.querySelectorAll('#tasksList .od-task').length + ')';
+    const files = document.getElementById('grpFileCount');
+    if (files) files.textContent = '(' + document.querySelectorAll('#attachmentsList .od-file').length + ')';
+  }
+
   function toggleAttachSection(type) {
     const sections = {
-      'note': 'attachNoteSection',
       'task': 'attachTaskSection'
     };
 
@@ -1114,7 +1366,7 @@
             taskEl.style.transition = 'all 0.3s ease';
             taskEl.style.opacity = '0';
             taskEl.style.transform = 'translateX(-20px)';
-            setTimeout(() => taskEl.remove(), 300);
+            setTimeout(() => { taskEl.remove(); syncAttachedCounts(); }, 300);
           }
         } else if (action === 'complete_task' && data.success) {
           const taskEl = document.getElementById(`task-${id}`);
@@ -1122,7 +1374,7 @@
             taskEl.style.transition = 'all 0.3s ease';
             taskEl.style.opacity = '0';
             taskEl.style.transform = 'translateX(-20px)';
-            setTimeout(() => taskEl.remove(), 300);
+            setTimeout(() => { taskEl.remove(); syncAttachedCounts(); }, 300);
           }
 
           const notesList = document.querySelector('.notes-list');
@@ -1336,6 +1588,12 @@
     // apostrophe would otherwise close the JS string it sits in.
     document.getElementById('printOrdersLabel').textContent =
       n ? btn.dataset.labelPicked + ' (' + n + ')' : btn.dataset.labelIdle;
+    // Excel exports the same selection, so it carries the same count.
+    const xlsLabel = document.getElementById('excelOrdersLabel');
+    if (xls && xlsLabel) {
+      xlsLabel.textContent =
+        n ? xls.dataset.labelPicked + ' (' + n + ')' : xls.dataset.labelIdle;
+    }
   }
 
   function pickedOrderIds() {

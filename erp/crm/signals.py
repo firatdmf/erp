@@ -1,6 +1,6 @@
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
-from .models import Company, CompanyFollowUp
+from .models import Attachment, Company, CompanyFollowUp
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,3 +37,32 @@ def stop_followup_on_status_change(sender, instance, **kwargs):
                     pass
         except Company.DoesNotExist:
             pass
+
+
+@receiver(post_delete, sender=Attachment)
+def remove_attachment_bytes(sender, instance, **kwargs):
+    """Take the file with the row.
+
+    On the signal rather than in the delete view because most
+    attachments will not die by that route: deleting a contact cascades
+    its rows away, and without this the documents would sit in the
+    storage zone forever, belonging to a record that no longer exists.
+
+    A storage error is logged, not raised — the row is already gone by
+    the time this runs, and refusing to finish the delete would leave
+    the database in a worse state than an orphaned file does.
+    """
+    if instance.path:
+        try:
+            from marketing.utils.bunny_storage import delete_from_bunny
+            delete_from_bunny(instance.path)
+        except Exception:
+            logger.exception(
+                "Could not remove attachment %s (%s) from Bunny",
+                instance.pk, instance.path)
+    elif instance.file:
+        try:
+            instance.file.delete(save=False)
+        except Exception:
+            logger.exception(
+                "Could not remove the local copy of attachment %s", instance.pk)

@@ -201,3 +201,32 @@ def purge_bunny_cache(cdn_file_url):
         return False
 
 
+
+
+def download_from_bunny(path, stream=True):
+    """Read a file back out of the Storage Zone.
+
+    The Storage API needs the AccessKey, so this never goes through the
+    public pull zone — which is what lets a file be served to a logged-in
+    user without its CDN URL ever existing anywhere.
+
+    Args:
+        path: Storage path of the file (e.g. 'Marketing/crm/contact/147/x.pdf')
+        stream: keep the body unread so the caller can pipe it straight out
+
+    Returns:
+        requests.Response, already checked for a 2xx status
+
+    Raises:
+        Exception if the file is missing or the read fails
+    """
+    config = get_bunny_config()
+    storage_url = get_storage_url(config)
+    url = f"{storage_url}/{config['storage_zone']}/{path.lstrip('/')}"
+
+    response = requests.get(
+        url, headers={"AccessKey": config['api_key']}, stream=stream, timeout=30)
+    if response.status_code != 200:
+        raise Exception(
+            f"Bunny download failed ({response.status_code}) for {path}")
+    return response

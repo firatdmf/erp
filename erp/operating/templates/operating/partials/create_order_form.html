@@ -105,8 +105,14 @@
   book of its own is filed here, and it is checked against the member's
   assignments server-side, so it can only ever pick among books the
   person already has.{% endcomment %}
-  <input type="hidden" name="book"
+  <input type="hidden" name="book" id="co-book-input"
          value="{% if order %}{{ order.current_account.book_id|default:'' }}{% else %}{{ current_book.pk|default:'' }}{% endif %}">
+  {% comment %}Read by the product search through hx-include, and written by
+  the "other books" toggle. It lives in the DOM rather than in a js: hx-vals
+  expression because the form's script is wrapped in an IIFE: htmx evaluates
+  hx-vals with Function(), whose body only sees globals, so a variable
+  declared in there is a ReferenceError that aborts the request.{% endcomment %}
+  <input type="hidden" name="cross_book" id="co-cross-book-input" value="">
   {% if order %}
     {# Hydration payload for edit mode — read by the script below. #}
     {{ order_items_payload|json_script:"existing-order-items" }}
@@ -278,10 +284,11 @@
         <input type="text" id="co-product-search" class="form-input" placeholder="Name, SKU or variant SKU..."
           hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
           {% comment %}Which book's shelves to search. The server checks it
-          against the member's assignments, so this only narrows. Evaluated
-          per keystroke (js:) rather than baked in, because the "other
-          books" toggle changes the answer while the form is open.{% endcomment %}
-          hx-vals='js:{book: CO_BOOK_ID || "", cross_book: coCrossBook ? "1" : ""}'
+          against the member's assignments, so this only narrows. Pulled from
+          the two hidden inputs on every keystroke rather than baked in,
+          because the "other books" toggle changes the answer while the form
+          is open.{% endcomment %}
+          hx-include="#co-book-input, #co-cross-book-input"
           hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
       </div>
       <div id="co-product-results" class="co-autocomplete-results"></div>
@@ -674,10 +681,6 @@
   const CO_ORDER_ID = {% if order %}{{ order.pk }}{% else %}null{% endif %};
   function coOrderParam() { return CO_ORDER_ID ? ('&order=' + CO_ORDER_ID) : ''; }
 
-  // The book this form was opened in. Every untagged line falls to it,
-  // and the save is told which one it was.
-  const CO_BOOK_ID = {% if order %}{{ order.current_account.book_id|default:"null" }}{% else %}{{ current_book.pk|default:"null" }}{% endif %};
-
   // Off by default: an order almost always draws on one book, and
   // showing every shelf by default would make picking the wrong
   // business's stock a one-click mistake on the common case. Turned on,
@@ -689,6 +692,10 @@
 
   window.coToggleCrossBook = function (on) {
     coCrossBook = !!on;
+    // The search reads this off the DOM, so the toggle has to write it
+    // there — the roll-list fetches below read the variable directly.
+    var xb = document.getElementById('co-cross-book-input');
+    if (xb) xb.value = coCrossBook ? '1' : '';
     // Lines already picked keep their book; only what the pickers OFFER
     // changes. Re-fetch each card's roll list so a card can gain (or
     // lose) nothing it was not entitled to — the per-card book filter in

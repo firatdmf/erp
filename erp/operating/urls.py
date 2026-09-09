@@ -58,6 +58,15 @@ urlpatterns = [
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/<int:roll_pk>/edit/", views_warehouse.WarehouseRollEdit.as_view(), name="warehouse_roll_edit"),
     path("warehouses/<int:warehouse_pk>/movements/", views_warehouse.WarehouseMovements.as_view(), name="warehouse_movements"),
     path("orders/create/", views.create_web_order, name="create_web_order"),
+    # Creating an order is a PAGE, like editing one. Book-scoped, because
+    # every line that names no book of its own is filed under the book the
+    # form was opened in — and a URL naming no book falls back to the
+    # member's default, which is not necessarily the list they came from.
+    path("books/<int:book_id>/orders/create/",
+         book_scoped(views.OrderCreate.as_view()), name="create_order_page"),
+    # The form POSTs here, and carries its book in a hidden field, so this
+    # one needs no book of its own. Still serves the sidebar partial to an
+    # HX-Request, for anything still opening the drawer.
     path("orders/create", views.OrderCreate.as_view(), name="create_order"),
     path("orders/edit/<int:pk>/", book_guarded(views.OrderEdit.as_view(), Order, "current_account.book"), name="edit_order"),
     path("orders/web/<int:pk>/status/", views.WebOrderStatusEdit.as_view(), name="web_order_status"),

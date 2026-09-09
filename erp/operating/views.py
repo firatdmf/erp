@@ -2712,27 +2712,16 @@ class OrderPrintCombined(LoginRequiredMixin, View):
 
 
 class OrderCreate(View):
+    # The page an order is created on, and the endpoint the form posts to.
+    # A GET is a page unless it comes from htmx, which still gets the bare
+    # partial so the drawer keeps working wherever it is still opened.
+    page_template = "operating/create_order_page.html"
+
     def get(self, request):
         form = OrderForm()
         if request.headers.get("HX-Request"):
-            # Return partial for sidebar
-            # We need to manually construct formset if needed, but OrderForm usually handles basics?
-            # Wait, create_order.html uses {{ formset.management_form }}.
-            # OrderCreate view currently DOES NOT pass a formset in GET context (see original code).
-            # Original code: creates OrderForm(), passes {"form": form}.
-            # But template references {{ formset.management_form }}. This implies formset might be missing or empty?
-            # Let's check post method: commented out # order_item_formset = OrderItemFormSet(request.POST)
-            # It seems the formset is handled via JS building JSON, so management_form might be unused or expected to be manually added?
-            # In create_order.html, {{ formset.management_form }} is used.
-            # If I don't pass 'formset', {{ formset.management_form }} renders nothing (if variable missing).
-            # So I will just pass form.
             return render(request, "operating/partials/create_order_form.html", {"form": form})
-            
-        return render(
-            request,
-            "operating/create_order.html",
-            {"form": form},
-        )
+        return render(request, self.page_template, {"form": form})
 
     def post(self, request):
         form = OrderForm(request.POST)
@@ -2752,7 +2741,7 @@ class OrderCreate(View):
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 return JsonResponse({"ok": False, "error": str(msg)})
             messages.error(request, msg)
-            return render(request, "operating/create_order.html", {"form": form})
+            return render(request, self.page_template, {"form": form})
 
         product_json_input = request.POST.get("product_json_input")
         if product_json_input:
@@ -2760,7 +2749,7 @@ class OrderCreate(View):
                 product_json_input = json.loads(product_json_input)
             except json.JSONDecodeError:
                 messages.error(request, "Invalid product data format.")
-                return render(request, "operating/create_order.html", {"form": form})
+                return render(request, self.page_template, {"form": form})
 
         # Stock validation removed — orders can be placed for products
         # that exceed current stock (back-order). Catalog stock isn't
@@ -2784,7 +2773,7 @@ class OrderCreate(View):
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 return JsonResponse({"ok": False, "error": str(_e)})
             messages.error(request, str(_e))
-            return render(request, "operating/create_order.html", {"form": form})
+            return render(request, self.page_template, {"form": form})
 
         if form.is_valid():
             try:
@@ -2842,7 +2831,7 @@ class OrderCreate(View):
                 return redirect("operating:order_detail", pk=created[0][0].pk)
             except Exception as e:
                 messages.error(request, f"Order creation failed: {e}")
-                return render(request, "operating/create_order.html", {"form": form})
+                return render(request, self.page_template, {"form": form})
 
     def _create_one_order(self, request, *, book, items, notes, customer_type,
                           customer_pk, split_group, member, failed_barcodes):

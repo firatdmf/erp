@@ -496,7 +496,7 @@
               <span class="favorites-item-label">{% trans "Order list" %}</span>
             </a>
 {% if not is_sales_rep %}
-            <a href="#" class="favorites-item" onclick="openOrderSidebar(); return false;">
+            <a class="favorites-item" href="{% if current_book %}{% url 'operating:create_order_page' current_book.pk %}{% else %}{% url 'operating:order_list' %}{% endif %}">
               <span class="favorites-item-icon"><i class="fas fa-cart-plus"></i></span>
               <span class="favorites-item-label">{% trans "Create order" %}</span>
             </a>
@@ -594,7 +594,7 @@
                 </a>
               </li>
               <li>
-                <a href="#" onclick="openOrderSidebar(); return false;">
+                <a href="{% if current_book %}{% url 'operating:create_order_page' current_book.pk %}{% else %}{% url 'operating:order_list' %}{% endif %}">
                   <i class="fas fa-shopping-cart" aria-hidden="true"></i>
                   <span>Order</span>
                 </a>
@@ -1004,7 +1004,7 @@
             <h3>{% trans "Orders" %}</h3>
             <ul>
               <li>
-                <a href="#" onclick="openOrderSidebar(); return false;">
+                <a href="{% if current_book %}{% url 'operating:create_order_page' current_book.pk %}{% else %}{% url 'operating:order_list' %}{% endif %}">
                   <i class="fas fa-plus-circle" aria-hidden="true"></i>
                   <span>Create Order</span>
                 </a>

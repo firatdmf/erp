@@ -383,7 +383,7 @@
     <div class="ord-head-r">
       <button type="button" class="ord-btn ghost"><i class="fa fa-download"></i>{% trans "Export" %}</button>
       <button type="button" class="ord-btn ghost"><i class="fa fa-filter"></i>{% trans "Filter" %}</button>
-      <button type="button" onclick="openOrderSidebar(); return false;" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "New order" %}</button>
+      <a href="{% url 'operating:create_order_page' current_book.pk %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "New order" %}</a>
     </div>
   </div>
 
@@ -537,7 +537,7 @@
       <div class="ico"><i class="fa fa-shopping-cart"></i></div>
       <h3>{% trans "No orders yet" %}</h3>
       <p>{% trans "Create your first order to get started" %}</p>
-      <button type="button" onclick="openOrderSidebar(); return false;" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "Create order" %}</button>
+      <a href="{% url 'operating:create_order_page' current_book.pk %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "Create order" %}</a>
     </div>
     {% endif %}
   </div>

@@ -139,6 +139,14 @@ class ReadymadeStockImport(TestCase):
             self.assertEqual(wp.unit, "paket")
             self.assertEqual(wp.unit_short, "pack")
 
+    def test_the_sets_are_packed_in_boxes(self):
+        """Counted in packs, packed in boxes — two separate facts, and the
+        import states both rather than inferring one."""
+        self._apply()
+        for wp in WarehouseProduct.objects.all():
+            self.assertEqual(wp.pack_type, "box")
+            self.assertEqual(wp.item_noun_plural, "boxes")
+
     # ── boxes ──────────────────────────────────────────────────────────
     def test_each_row_becomes_a_stock_item_in_its_own_box(self):
         self._apply()

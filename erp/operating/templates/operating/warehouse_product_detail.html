@@ -617,33 +617,33 @@
   <div class="od-stats">
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-warehouse"></i>{% trans "Current stock" %}</div>
-      <div class="od-stat-value">{{ product.quantity|default:0|floatformat:2 }}<span class="unit">m</span></div>
+      <div class="od-stat-value">{{ product.quantity|default:0|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-lock" style="color:#B45309;"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv stok{% else %}Reserved{% endif %}</div>
-      <div class="od-stat-value" style="color:#B45309;">{{ reserved_total|default:0|floatformat:2 }}<span class="unit">m</span></div>
+      <div class="od-stat-value" style="color:#B45309;">{{ reserved_total|default:0|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     <div class="od-stat">
-      <div class="od-stat-label"><i class="fa fa-layer-group"></i>{% trans "Active rolls" %}</div>
+      <div class="od-stat-label"><i class="fa fa-layer-group"></i>{% blocktrans with n=product.item_noun_plural %}Active {{ n }}{% endblocktrans %}</div>
       <div class="od-stat-value">{{ active_rolls_count }}<span class="unit">/ {{ rolls_count }}</span></div>
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-arrow-down" style="color:#0E6E4A;"></i>{% trans "Stock in (total)" %}</div>
-      <div class="od-stat-value" style="color:#0E6E4A;">{{ in_total|floatformat:2 }}<span class="unit">m</span></div>
+      <div class="od-stat-value" style="color:#0E6E4A;">{{ in_total|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-arrow-up" style="color:#DC2626;"></i>{% trans "Stock out (total)" %}</div>
-      <div class="od-stat-value" style="color:#DC2626;">{{ out_total|floatformat:2 }}<span class="unit">m</span></div>
+      <div class="od-stat-value" style="color:#DC2626;">{{ out_total|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     {% comment %}Deleting a roll is a CORRECTION, not a sale, so it is never
     counted as stock out — which left in/out unable to explain the current
     stock. This is the difference, so the row adds up again.{% endcomment %}
     {% if adjust_total %}
     <div class="od-stat">
-      <div class="od-stat-label" title="{% trans 'Deleted rolls, transfers and other corrections — not sales' %}">
+      <div class="od-stat-label" title="{% blocktrans with n=product.item_noun_plural %}Deleted {{ n }}, transfers and other corrections — not sales{% endblocktrans %}">
         <i class="fa fa-sliders" style="color:#B45309;"></i>{% trans "Corrections" %}
       </div>
-      <div class="od-stat-value" style="color:#B45309;">{{ adjust_total|floatformat:2 }}<span class="unit">m</span></div>
+      <div class="od-stat-value" style="color:#B45309;">{{ adjust_total|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     {% endif %}
   </div>
@@ -657,8 +657,8 @@
       <section class="od-card">
         <div class="od-card-h">
           <i class="fa fa-layer-group"></i>
-          <h3>{% trans "Rolls" %}</h3>
-          <span class="od-card-sub">{{ rolls_count }} {% blocktrans count counter=rolls_count %}roll{% plural %}rolls{% endblocktrans %}</span>
+          <h3>{{ product.item_noun_plural|capfirst }}</h3>
+          <span class="od-card-sub">{{ rolls_count }} {% if rolls_count == 1 %}{{ product.item_noun }}{% else %}{{ product.item_noun_plural }}{% endif %}</span>
         </div>
         {% if rolls %}
         {% get_current_language as LANGUAGE_CODE %}
@@ -678,7 +678,7 @@
             <tr>
               <th>#</th>
               <th>{% trans "Barcode" %}</th>
-              <th>{% trans "Length" %}</th>
+              <th>{{ product.quantity_label }}</th>
               <th>{% trans "Cost" %}</th>
               <th>{% trans "Status" %}</th>
               <th>{% trans "Scanned" %}</th>
@@ -690,20 +690,20 @@
             <tr id="roll-row-{{ r.pk }}">
               <td><b>{{ r.pk }}</b></td>
               <td>
-                <input type="checkbox" class="roll-cb" value="{{ r.pk }}" onchange="rollPickChanged()" aria-label="{% trans 'Select roll' %}">
+                <input type="checkbox" class="roll-cb" value="{{ r.pk }}" onchange="rollPickChanged()" aria-label="{% blocktrans with n=product.item_noun %}Select {{ n }}{% endblocktrans %}">
                 {% if r.barcode %}
                   <span class="roll-barcode">{{ r.barcode }}</span>
                 {% else %}
                   <span style="color:#C5CCD3;">—</span>
                 {% endif %}
                 {% if r.is_second %}
-                  <span class="roll-2nd-badge" data-tip="{% trans 'Factory second — imperfect roll, not first quality.' %}">2nd</span>
+                  <span class="roll-2nd-badge" data-tip="{% blocktrans with n=product.item_noun %}Factory second — imperfect {{ n }}, not first quality.{% endblocktrans %}">2nd</span>
                 {% endif %}
                 {% if r.lot_number %}<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">Lot: {{ r.lot_number }}</div>{% endif %}
               </td>
               <td>
                 <div class="roll-meters">
-                  {% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} m
+                  {% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} {{ product.unit_short }}
                   <span class="roll-inline-status roll-status {{ r.status }}" style="display:none;">
                     {% if r.status == 'in_stock' %}<i class="fa fa-circle-check"></i>{% trans "In stock" %}
                     {% elif r.status == 'partial' %}<i class="fa fa-circle-half-stroke"></i>{% trans "Partial" %}
@@ -712,17 +712,17 @@
                 </div>
                 {% if r.quantity and r.quantity_remaining is not None %}
                   <div class="roll-bar"><span style="width:{% widthratio r.quantity_remaining r.quantity 100 %}%;"></span></div>
-                  <div style="font-size:10.5px; color:var(--gray-500); margin-top:2px;">{% trans "of" %} {{ r.quantity|floatformat:2 }} m</div>
+                  <div style="font-size:10.5px; color:var(--gray-500); margin-top:2px;">{% trans "of" %} {{ r.quantity|floatformat:2 }} {{ product.unit_short }}</div>
                 {% endif %}
                 {% if r.reserved_m %}
-                  <div style="font-size:10.5px;color:#B45309;font-weight:700;margin-top:3px;"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ r.reserved_m|floatformat:2 }} m</div>
+                  <div style="font-size:10.5px;color:#B45309;font-weight:700;margin-top:3px;"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ r.reserved_m|floatformat:2 }} {{ product.unit_short }}</div>
                   {% for resv in r.reservation_list %}
                     <div style="font-size:10px;margin-top:1px;">
                       <a href="{% url 'operating:order_detail' resv.order_id %}" target="_blank" rel="noopener" style="color:#92400E;text-decoration:underline;">
                         <i class="fa fa-arrow-up-right-from-square" style="font-size:8px;"></i>
                         {{ resv.order.order_number|default:resv.order_id }}
                       </a>
-                      <span style="color:var(--gray-500);">({{ resv.quantity|floatformat:2 }} m)</span>
+                      <span style="color:var(--gray-500);">({{ resv.quantity|floatformat:2 }} {{ product.unit_short }})</span>
                     </div>
                   {% endfor %}
                 {% endif %}
@@ -738,7 +738,7 @@
                     <div style="font-size:10.5px;color:var(--gray-500);margin-top:2px;">{{ cost_sign }}{{ r.line_value|money }}</div>
                   {% endif %}
                 {% else %}
-                  <span style="color:#C5CCD3;" title="{% trans 'No cost recorded for this roll.' %}">—</span>
+                  <span style="color:#C5CCD3;" title="{% blocktrans with n=product.item_noun %}No cost recorded for this {{ n }}.{% endblocktrans %}">—</span>
                 {% endif %}
               </td>
               <td>
@@ -757,7 +757,7 @@
                   <a class="roll-delete-btn" style="color:var(--gray-600);"
                      href="{% url 'operating:warehouse_roll_photo' warehouse.pk r.pk %}"
                      target="_blank" rel="noopener"
-                     title="{% trans 'Label photo taken when this roll was scanned' %}">
+                     title="{% blocktrans with n=product.item_noun %}Label photo taken when this {{ n }} was scanned{% endblocktrans %}">
                     <i class="fa fa-camera"></i>
                   </a>
                   {% endif %}
@@ -768,7 +768,7 @@
                   </a>
                   <button type="button"
                           class="roll-delete-btn" style="color:var(--nejum-teal-700);"
-                          title="{% trans 'Edit this roll' %}"
+                          title="{% blocktrans with n=product.item_noun %}Edit this {{ n }}{% endblocktrans %}"
                           data-roll-id="{{ r.pk }}"
                           data-barcode="{{ r.barcode|default:'' }}"
                           data-quantity="{% if r.quantity is not None %}{{ r.quantity|stringformat:'.2f' }}{% endif %}"
@@ -780,7 +780,7 @@
                   </button>
                   <button type="button"
                           class="roll-delete-btn"
-                          title="{% trans 'Delete this roll' %}"
+                          title="{% blocktrans with n=product.item_noun %}Delete this {{ n }}{% endblocktrans %}"
                           data-roll-id="{{ r.pk }}"
                           data-roll-label="{% if r.barcode %}{{ r.barcode }}{% else %}#{{ r.pk }}{% endif %}"
                           data-remaining="{% if r.quantity_remaining is not None %}{{ r.quantity_remaining }}{% else %}{{ r.quantity|default:0 }}{% endif %}"
@@ -796,7 +796,7 @@
         {% else %}
         <div class="od-empty">
           <i class="fa fa-layer-group"></i>
-          {% trans "No rolls scanned for this product yet." %}
+          {% blocktrans with n=product.item_noun_plural %}No {{ n }} recorded for this product yet.{% endblocktrans %}
         </div>
         {% endif %}
       </section>
@@ -839,7 +839,7 @@
               </div>
             </div>
             <div class="mv-qty {{ m.movement_type }}">
-              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m
+              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} {{ product.unit_short }}
             </div>
           </div>
           {% endfor %}
@@ -941,7 +941,7 @@
     <form id="soForm" onsubmit="submitStockOut(event); return false;">
       {% csrf_token %}
       <div class="so-fld">
-        <label>{% trans "Amount (meters)" %} *</label>
+        <label>{% blocktrans with u=product.unit_short %}Amount ({{ u }}){% endblocktrans %} *</label>
         <input class="so-input" type="number" step="0.01" name="amount" id="soAmount" required>
       </div>
       <div class="so-fld">
@@ -951,7 +951,7 @@
           {% for r in rolls %}
             {% if r.status != 'consumed' %}
               <option value="{{ r.pk }}">
-                #{{ r.pk }} · {% if r.barcode %}{{ r.barcode }} · {% endif %}{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} m
+                #{{ r.pk }} · {% if r.barcode %}{{ r.barcode }} · {% endif %}{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} {{ product.unit_short }}
               </option>
             {% endif %}
           {% endfor %}
@@ -1064,6 +1064,12 @@
   const _isTR = "{% get_current_language as LC %}{{ LC|slice:':2' }}" === "tr";
 
   // ── Bulk stock item selection ───────────────────────────────────────
+  // What this product is counted in, rendered from the server so it is
+  // already translated. The markup this file builds in JavaScript had "m"
+  // written into it, which read as metres over a box of curtain sets.
+  const PROD_UNIT = "{{ product.unit_short|escapejs }}";
+  function pUnit(n) { return n + ' ' + PROD_UNIT; }
+
   function rollPickChanged() {
     const all = document.querySelectorAll('.roll-cb');
     const sel = document.querySelectorAll('.roll-cb:checked');
@@ -1103,7 +1109,7 @@
     document.getElementById('rdRollInfo').innerHTML =
       '<span class="mono">' + label + '</span> · ' +
       '<span style="color:var(--gray-500);font-weight:500;">' +
-      remaining.toFixed(2) + ' m {% trans "remaining" %}</span>';
+      pUnit(remaining.toFixed(2)) + ' {% trans "remaining" %}</span>';
     document.getElementById('rdReason').value = '';
     document.getElementById('rdOverlay').classList.add('show');
   }
@@ -1224,20 +1230,20 @@
       // eye two things to reconcile while Save is shut anyway.
       hint.innerHTML = bar +
         '<div style="color:#C0392B;font-weight:600;">' +
-          '{% trans "Cannot be below" %} <b>' + floor.toFixed(2) + ' m</b>' +
+          '{% trans "Cannot be below" %} <b>' + pUnit(floor.toFixed(2)) + '</b>' +
           (_reOut > 0 ? ' — {% trans "that much has already gone out of this roll" %}' : '') +
         '</div>';
     } else if (_reOut > 0) {
       hint.innerHTML = bar +
-        '<span style="color:' + colour + ';"><b>' + _reOut.toFixed(2) + ' m</b> {% trans "used" %}</span>' +
-        ' · <b>' + left.toFixed(2) + ' m</b> {% trans "left" %}' +
+        '<span style="color:' + colour + ';"><b>' + pUnit(_reOut.toFixed(2)) + '</b> {% trans "used" %}</span>' +
+        ' · <b>' + pUnit(left.toFixed(2)) + '</b> {% trans "left" %}' +
         '<div style="margin-top:3px;color:var(--gray-500);">' +
           '{% trans "Full length, not the remainder" %} · {% trans "min" %} ' +
-          '<b>' + _reOut.toFixed(2) + ' m</b>' +
+          '<b>' + pUnit(_reOut.toFixed(2)) + '</b>' +
         '</div>';
     } else {
       hint.innerHTML = bar +
-        '<b>' + total.toFixed(2) + ' m</b> · {% trans "none used" %}' +
+        '<b>' + pUnit(total.toFixed(2)) + '</b> · {% trans "none used" %}' +
         '<div style="margin-top:3px;color:var(--gray-500);">' +
           '{% trans "Full length, not the remainder" %}</div>';
     }

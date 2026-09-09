@@ -1288,6 +1288,7 @@ class WarehouseDetail(View):
                 # last code, which is wrong but visible — better than the
                 # hardcoded "m" that stood here before.
                 unit=Max("unit"),
+                pack_type=Max("pack_type"),
                 total_qty=Coalesce(Sum("quantity"), Decimal("0"),
                                    output_field=DecimalField(max_digits=18, decimal_places=2)),
                 total_usd=Coalesce(Sum("stock_value"), Decimal("0"),
@@ -1374,10 +1375,10 @@ class WarehouseDetail(View):
                 "total_qty": g["total_qty"],
                 "unit_short": str(WarehouseProduct.UNIT_SHORT.get(
                     g.get("unit"), g.get("unit") or "")),
-                "item_noun": str(WarehouseProduct.ITEM_NOUN.get(
-                    g.get("unit"), ("item", "items"))[0]),
-                "item_noun_plural": str(WarehouseProduct.ITEM_NOUN.get(
-                    g.get("unit"), ("item", "items"))[1]),
+                "item_noun": str(WarehouseProduct.PACK_NOUN.get(
+                    g.get("pack_type"), ("item", "items"))[0]),
+                "item_noun_plural": str(WarehouseProduct.PACK_NOUN.get(
+                    g.get("pack_type"), ("item", "items"))[1]),
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "avg_cost_usd": g["avg_cost"],
@@ -1492,6 +1493,14 @@ def _warehouse_unit_short(scope_ids):
     return str(WarehouseProduct.UNIT_SHORT.get(unit, unit))
 
 
+def _warehouse_sole_pack(scope_ids):
+    """The one way a warehouse's stock is packed, or None if it varies."""
+    packs = set(WarehouseProduct.objects
+                .filter(warehouse_id__in=scope_ids)
+                .values_list("pack_type", flat=True).distinct())
+    return packs.pop() if len(packs) == 1 else None
+
+
 def _warehouse_item_words(scope_ids):
     """What to call ONE stock item on this warehouse's header, and which
     icon to draw beside it.
@@ -1503,13 +1512,13 @@ def _warehouse_item_words(scope_ids):
     fabric-only.
     """
     from django.utils.translation import gettext as _t
-    unit = _warehouse_sole_unit(scope_ids)
-    singular, plural = WarehouseProduct.ITEM_NOUN.get(
-        unit, (_t("item"), _t("items")))
+    pack = _warehouse_sole_pack(scope_ids)
+    singular, plural = WarehouseProduct.PACK_NOUN.get(
+        pack, (_t("item"), _t("items")))
     return {
         "item_noun": str(singular),
         "item_noun_plural": str(plural),
-        "item_icon": WarehouseProduct.ITEM_ICON.get(unit, "fa-layer-group"),
+        "item_icon": WarehouseProduct.PACK_ICON.get(pack, "fa-layer-group"),
     }
 
 
@@ -1916,7 +1925,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
                 # to shelf are still counted the same way, and a destination
                 # row that fell back to metres would relabel a box of
                 # curtain sets the moment it was moved.
-                unit=source_wp.unit,
+                unit=source_wp.unit, pack_type=source_wp.pack_type,
                 purchase_price=source_wp.purchase_price,
                 purchase_currency=source_wp.purchase_currency,
                 cost_usd=source_wp.cost_usd, cost_try=source_wp.cost_try,
@@ -2467,6 +2476,9 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     # units/mt/kg, so adet and paket both collapse to "units"); the
     # warehouse keeps the distinction the form actually collected.
     wh_unit = unit if unit in dict(WarehouseProduct.UNIT_CHOICES) else "mt"
+    # A starting point for how it is packed, not a rule — `pack_type` is
+    # its own field and can be corrected without touching the unit.
+    wh_pack = WarehouseProduct.PACK_FOR_UNIT.get(wh_unit, "roll")
     usd_try = _get_usd_try_rate() or Decimal("1")
 
     try:
@@ -2611,7 +2623,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                             purchase_price=(price if (price and price > 0) else None),
                             purchase_currency=currency,
                             cost_usd=cost_usd, cost_try=cost_try,
-                            unit=wh_unit,
+                            unit=wh_unit, pack_type=wh_pack,
                         )
                     elif price and price > 0:
                         wp.purchase_price = price

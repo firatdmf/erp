@@ -1420,25 +1420,56 @@ class WarehouseProduct(models.Model):
     UNIT_SHORT = {"mt": _("m"), "adet": _("pcs"),
                   "paket": _("pack"), "kg": _("kg")}
 
-    # What ONE stock item of this product is CALLED. A stock item is a
-    # physical lot that arrived together and is picked from together —
-    # for fabric that is a roll, for ready-made curtains it is a box.
-    # Every warehouse screen said "roll" because fabric was all there
-    # was, so a box holding 20 curtain sets was listed as a roll.
-    ITEM_NOUN = {
-        "mt": (_("roll"), _("rolls")),
-        "kg": (_("bale"), _("bales")),
-        "adet": (_("box"), _("boxes")),
-        "paket": (_("box"), _("boxes")),
+    # How this product is PACKED — what one stock item physically is. A
+    # stock item is a lot that arrived together and is picked from
+    # together: a roll of cloth, a box of curtain sets, a bale of waste.
+    #
+    # Separate from `unit` on purpose. The two are related but not the
+    # same question, and deriving one from the other is only right until
+    # it isn't: metres can arrive on a bolt as easily as a roll, and
+    # pieces can come in a bag as easily as a box. What a thing is
+    # measured in and what it is packed in are two facts, so they are two
+    # fields.
+    PACK_CHOICES = [
+        ("roll", _("Roll")),
+        ("box", _("Box")),
+        ("bale", _("Bale")),
+        ("bag", _("Bag")),
+        ("bundle", _("Bundle")),
+        ("pallet", _("Pallet")),
+    ]
+    PACK_NOUN = {
+        "roll": (_("roll"), _("rolls")),
+        "box": (_("box"), _("boxes")),
+        "bale": (_("bale"), _("bales")),
+        "bag": (_("bag"), _("bags")),
+        "bundle": (_("bundle"), _("bundles")),
+        "pallet": (_("pallet"), _("pallets")),
     }
     # Font Awesome class to match. A scroll for a roll of cloth, a carton
     # for a box — the icon was doing as much of the telling as the word.
-    ITEM_ICON = {"mt": "fa-scroll", "kg": "fa-scroll",
-                 "adet": "fa-box", "paket": "fa-box"}
+    PACK_ICON = {"roll": "fa-scroll", "box": "fa-box", "bale": "fa-cubes-stacked",
+                 "bag": "fa-sack-xmark", "bundle": "fa-boxes-stacked",
+                 "pallet": "fa-pallet"}
+
+    # The pack a unit arrives in when nobody has said otherwise. Used to
+    # seed existing rows in the migration and to pick a sensible default
+    # for a newly-received product; it is a starting point, not a rule,
+    # and the field can be changed independently afterwards.
+    PACK_FOR_UNIT = {"mt": "roll", "kg": "bale", "adet": "box", "paket": "box"}
+
+    # What the quantity COLUMN is headed. Metres of cloth are a length and
+    # kilos are a weight; a count of curtain sets is neither, and reading
+    # "Length: 20" over a box of them is simply wrong.
+    QUANTITY_LABEL = {"mt": _("Length"), "kg": _("Weight")}
 
     unit = models.CharField(
         max_length=8, choices=UNIT_CHOICES, default="mt",
         help_text="What this product is counted in",
+    )
+    pack_type = models.CharField(
+        max_length=12, choices=PACK_CHOICES, default="roll",
+        help_text="What one stock item of this product physically is",
     )
 
     # Original purchase price as imported from Excel
@@ -1506,15 +1537,24 @@ class WarehouseProduct(models.Model):
     @property
     def item_noun(self):
         """"roll" / "box" — one stock item of this product, singular."""
-        return str(self.ITEM_NOUN.get(self.unit, (_("item"), _("items")))[0])
+        return str(self.PACK_NOUN.get(
+            self.pack_type, (_("item"), _("items")))[0])
 
     @property
     def item_noun_plural(self):
-        return str(self.ITEM_NOUN.get(self.unit, (_("item"), _("items")))[1])
+        return str(self.PACK_NOUN.get(
+            self.pack_type, (_("item"), _("items")))[1])
 
     @property
     def item_icon(self):
-        return self.ITEM_ICON.get(self.unit, "fa-layer-group")
+        return self.PACK_ICON.get(self.pack_type, "fa-layer-group")
+
+    @property
+    def quantity_label(self):
+        """Column heading for this product's quantity — "Length" for cloth,
+        "Weight" for anything sold by the kilo, "Quantity" for things that
+        are counted."""
+        return str(self.QUANTITY_LABEL.get(self.unit, _("Quantity")))
 
     # Live USD/TRY rate fetched lazily so the model file doesn't pull
     # in accounting at import time. Cached per call.

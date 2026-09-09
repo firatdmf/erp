@@ -61,8 +61,12 @@ DEFAULT_SPEC = Path.home() / "Desktop" / "KarvenReadyMadeStock.xlsx"
 WAREHOUSE_NAME = "Ready-made Shop"
 BOOK_NAME = "Ergene Fabric"
 
-# Sold as packaged sets, one EAN per set — not by the metre.
+# Sold as packaged sets, one EAN per set — not by the metre. The sets
+# then travel in cartons, which is what one stock item here is: the two
+# are separate facts and the command states both rather than letting one
+# be inferred from the other.
 UNIT = "paket"
+PACK_TYPE = "box"
 
 # The sheet's prices run $12.40-$26.50 a set, the same scale as the Karven
 # spec's own price column, which is dollars.
@@ -346,6 +350,7 @@ class Command(BaseCommand):
                     "name": variant.full_name or variant.variant_sku,
                     "quantity": Decimal("0"),
                     "unit": UNIT,
+                    "pack_type": PACK_TYPE,
                 },
             )
             stats["products"] += 1
@@ -354,6 +359,7 @@ class Command(BaseCommand):
             wp.barcode = barcode or wp.barcode
             wp.catalog_variant = variant
             wp.unit = UNIT
+            wp.pack_type = PACK_TYPE
             if price:
                 wp.purchase_price = price
                 wp.purchase_currency = PRICE_CURRENCY

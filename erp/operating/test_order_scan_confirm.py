@@ -23,6 +23,7 @@ import re
 from django.test import SimpleTestCase
 
 FORM = "operating/templates/operating/partials/create_order_form.html"
+BASE_CSS = "erp/static/erp/css/base.css"
 
 
 def read_form():
@@ -112,3 +113,52 @@ class EveryExitCarriesAVerdict(SimpleTestCase):
         glob = body_of(form,
                        "window.coScanAddByBarcode = function (barcode, fromCamera)")
         self.assertIn("return fetch(", glob)
+
+
+class TheScannerIsAPopup(SimpleTestCase):
+    """The reader opens as a modal, the same one the warehouse page's
+    "Find by barcode" uses. Inline, it was a 280px strip competing for
+    the little height the create sidebar has left."""
+
+    def test_it_is_an_overlay_with_a_way_out(self):
+        form = read_form()
+        self.assertIn('class="co-cam-overlay" id="co-roll-cam-overlay"', form)
+        self.assertIn("co-cam-shell", form)
+        self.assertIn("co-cam-close", form)
+        # The old inline strip is gone, not merely hidden.
+        self.assertNotIn("height:280px", form)
+
+    def test_it_sits_above_the_create_sidebar(self):
+        """The form is loaded INTO .sidebar-overlay. A popup that does
+        not out-stack it opens behind the sidebar, where the camera runs
+        and nothing is visible — so this reads both numbers rather than
+        trusting one."""
+        with open(BASE_CSS, encoding="utf-8") as fh:
+            base = fh.read()
+        sidebar = re.search(r"\.sidebar-overlay\s*\{[^}]*?z-index:\s*(\d+)", base, re.S)
+        self.assertIsNotNone(sidebar, "could not read .sidebar-overlay's z-index")
+        popup = re.search(r"\.co-cam-overlay\{[^}]*?z-index:(\d+)", read_form(), re.S)
+        self.assertIsNotNone(popup, "could not read .co-cam-overlay's z-index")
+        self.assertGreater(int(popup.group(1)), int(sidebar.group(1)))
+
+    def test_opening_and_closing_toggle_the_same_class(self):
+        form = read_form()
+        opened = body_of(form, "window.coOpenRollCamera = function (i)")
+        closed = body_of(form, "window.coCloseRollCamera = function ()")
+        self.assertIn("camEl.classList.add('show')", opened)
+        self.assertIn("camEl.classList.remove('show')", closed)
+
+    def test_closing_gives_back_the_scroll_it_took(self):
+        """Not `overflow = ''`: the create sidebar has already hidden the
+        body's scrollbar, and clearing it here would let the page behind
+        a still-open sidebar scroll."""
+        form = read_form()
+        opened = body_of(form, "window.coOpenRollCamera = function (i)")
+        closed = body_of(form, "window.coCloseRollCamera = function ()")
+        self.assertIn("camPrevOverflow = document.body.style.overflow", opened)
+        self.assertIn("document.body.style.overflow = camPrevOverflow", closed)
+
+    def test_escape_closes_it(self):
+        self.assertRegex(
+            read_form(),
+            r"e\.key === 'Escape'[\s\S]{0,200}coCloseRollCamera\(\)")

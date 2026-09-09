@@ -94,6 +94,51 @@
 .co-toast.show{opacity:1;transform:translateY(0)}
 .co-toast-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
 .co-toast-warning{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+
+/* ── Barcode scanner popup ───────────────────────────────────────
+   Same modal the warehouse page's "Find by barcode" uses, so the two
+   readers are one thing to learn. It sits ABOVE the create sidebar
+   (.sidebar-overlay is z-index 10000) — inside it, an inline panel
+   was competing for the little height the sidebar has left. */
+.co-cam-overlay{position:fixed;inset:0;z-index:10050;display:none;align-items:center;justify-content:center;
+  background:rgba(6,10,18,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:16px;}
+.co-cam-overlay.show{display:flex;}
+.co-cam-shell{width:100%;max-width:460px;background:linear-gradient(180deg,#101826 0%,#0B1220 100%);
+  border:1px solid rgba(94,234,212,.10);border-radius:20px;overflow:hidden;
+  box-shadow:0 24px 70px rgba(0,0,0,.6);display:flex;flex-direction:column;max-height:94vh;}
+.co-cam-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
+  border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;}
+.co-cam-title{color:#fff;font:700 14.5px var(--font-sans,sans-serif);display:inline-flex;align-items:center;gap:10px;}
+.co-cam-title i{color:#2DD4BF;}
+.co-cam-close{background:rgba(255,255,255,.08);border:none;color:#fff;width:34px;height:34px;
+  border-radius:10px;cursor:pointer;font-size:15px;transition:background .14s;}
+.co-cam-close:hover{background:rgba(255,255,255,.16);}
+.co-cam-view{position:relative;background:#000;aspect-ratio:3/4;max-height:56vh;overflow:hidden;}
+.co-cam-view video{width:100%;height:100%;object-fit:cover;display:block;background:#000;}
+.co-cam-guide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;pointer-events:none;}
+.co-cam-frame{position:relative;width:82%;height:30%;border-radius:16px;box-shadow:0 0 0 2000px rgba(4,10,18,.42);}
+.co-cam-frame .c{position:absolute;width:28px;height:28px;border:3px solid #2DD4BF;
+  filter:drop-shadow(0 0 6px rgba(45,212,191,.55));}
+.co-cam-frame .c1{top:-2px;left:-2px;border-right:none;border-bottom:none;border-top-left-radius:14px;}
+.co-cam-frame .c2{top:-2px;right:-2px;border-left:none;border-bottom:none;border-top-right-radius:14px;}
+.co-cam-frame .c3{bottom:-2px;left:-2px;border-right:none;border-top:none;border-bottom-left-radius:14px;}
+.co-cam-frame .c4{bottom:-2px;right:-2px;border-left:none;border-top:none;border-bottom-right-radius:14px;}
+.co-cam-laser{position:absolute;left:7%;right:7%;top:14%;height:2px;border-radius:2px;
+  background:linear-gradient(90deg,transparent,#2DD4BF 30%,#5EEAD4 50%,#2DD4BF 70%,transparent);
+  box-shadow:0 0 14px 2px rgba(45,212,191,.65);animation:coCamLaser 2.2s ease-in-out infinite;}
+@keyframes coCamLaser{0%,100%{top:12%}50%{top:84%}}
+/* Doubles as the status line: the decode loop writes the live code, and
+   a reader that never starts writes why, in the same place. */
+.co-cam-hint{margin-top:16px;display:inline-flex;align-items:center;gap:8px;color:#fff;
+  font:600 12.5px var(--font-sans,sans-serif);background:rgba(4,10,18,.62);
+  border:1px solid rgba(255,255,255,.12);padding:6px 14px;border-radius:999px;
+  max-width:86%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.co-cam-hint::before{content:'';width:7px;height:7px;border-radius:50%;background:#2DD4BF;
+  flex-shrink:0;animation:coCamPulse 1.4s ease-in-out infinite;}
+@keyframes coCamPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+.co-cam-result{padding:18px;color:#fff;overflow-y:auto;text-align:center;}
+@media (max-width:520px){ .co-cam-shell{max-width:100%;} }
 </style>
 
 <form method="post" id="createOrderForm"
@@ -343,24 +388,39 @@
       <div id="co-products-list"></div>
       <input type="hidden" id="product_json_input" name="product_json_input">
 
-      <!-- Shared roll-barcode camera overlay — one instance reused by
-           every product card's camera icon (never re-rendered by
-           renderProducts(), so an active stream survives card updates). -->
-      <div id="co-roll-cam-overlay" style="display:none; position:relative; margin-top:10px; border-radius:12px; overflow:hidden; background:#000; height:280px;">
-        <div id="co-roll-cam-stage" style="position:absolute; inset:0;">
-          <video id="co-roll-cam-video" playsinline muted autoplay style="width:100%; height:100%; object-fit:cover; display:block; background:#000;"></video>
-          <div style="position:absolute; left:8%; right:8%; top:50%; transform:translateY(-50%); height:34%; border:2px solid rgba(255,255,255,.8); border-radius:12px; box-shadow:0 0 0 100vmax rgba(0,0,0,.2); pointer-events:none;"></div>
-          <div id="co-roll-cam-hit" style="position:absolute; left:50%; top:10px; transform:translateX(-50%); color:#fff; background:rgba(0,0,0,.6); padding:5px 12px; border-radius:16px; font:600 12px var(--font-sans,sans-serif); max-width:88%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{% trans "Bring the barcode into the frame" %}</div>
-          <button type="button" onclick="coCloseRollCamera()" style="position:absolute; left:50%; bottom:12px; transform:translateX(-50%); background:#EF4444; color:#fff; border:0; border-radius:20px; padding:8px 16px; font:700 12.5px var(--font-sans,sans-serif); cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
-            <i class="fas fa-xmark"></i>{% trans "Durdur" %}
-          </button>
+      <!-- Shared roll-barcode scanner — one instance reused by the
+           global bar and by every product card's camera icon (never
+           re-rendered by renderProducts(), so an active stream survives
+           card updates). A popup rather than a panel in the flow: the
+           create sidebar has little height to spare, and the reader
+           wants the whole screen while it is being aimed. -->
+      <div class="co-cam-overlay" id="co-roll-cam-overlay" role="dialog" aria-modal="true">
+        <div class="co-cam-shell">
+          <div class="co-cam-head">
+            <div class="co-cam-title"><i class="fas fa-barcode"></i>{% trans "Scan barcode" %}</div>
+            <button type="button" class="co-cam-close" onclick="coCloseRollCamera()" title="{% trans 'Close' %}">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div id="co-roll-cam-stage">
+            <div class="co-cam-view">
+              <video id="co-roll-cam-video" playsinline muted autoplay></video>
+              <div class="co-cam-guide">
+                <div class="co-cam-frame">
+                  <span class="c c1"></span><span class="c c2"></span><span class="c c3"></span><span class="c c4"></span>
+                  <div class="co-cam-laser"></div>
+                </div>
+                <div class="co-cam-hint" id="co-roll-cam-hit">{% trans "Bring the barcode into the frame" %}</div>
+              </div>
+            </div>
+          </div>
+          {% comment %}Where a read waits to be confirmed. The reader fires on
+          whatever crosses the frame, so a decode is a question, not an
+          instruction: the loop stops, this panel says what the code IS, and
+          nothing joins the order until it is confirmed. Same shape as the
+          warehouse's "Find by barcode". Written by the script below.{% endcomment %}
+          <div id="co-roll-cam-confirm" class="co-cam-result" style="display:none;"></div>
         </div>
-        {% comment %}Where a read waits to be confirmed. The reader fires on
-        whatever crosses the frame, so a decode is a question, not an
-        instruction: the loop stops, this panel says what the code IS, and
-        nothing joins the order until it is confirmed. Same shape as the
-        warehouse's "Find by barcode". Written by the script below.{% endcomment %}
-        <div id="co-roll-cam-confirm" style="display:none; position:absolute; inset:0; overflow-y:auto; padding:14px; box-sizing:border-box; background:linear-gradient(180deg,#101826 0%,#0B1220 100%); color:#fff; text-align:center;"></div>
       </div>
     </div>
   </div>
@@ -1435,7 +1495,7 @@
     // The STREAM stays live while it waits. "Scan again" then picks up
     // instantly instead of asking the browser for the camera a second
     // time, which is the slow part and, on iOS, the part that prompts.
-    var camPending = '';
+    var camPending = '', camPrevOverflow = '';
 
     function camPause() {
       camRunning = false;
@@ -1617,7 +1677,13 @@
     window.coOpenRollCamera = function (i) {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Kamera desteklenmiyor.', 'error'); return; }
       camTargetIndex = i;
-      if (camEl) { camEl.style.display = 'block'; camEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      if (camEl) camEl.classList.add('show');
+      // The create sidebar has already hidden the body's scrollbar when
+      // the form is opened from there. Remember what it was rather than
+      // assuming: clearing it on close would let the page behind the
+      // still-open sidebar scroll again.
+      camPrevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
       // A reopen starts on the camera, never on the last read's panel.
       camPending = '';
       camDebounce = { val: '', t: 0 };
@@ -1646,9 +1712,26 @@
       if (camRaf) { cancelAnimationFrame(camRaf); camRaf = null; }
       if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
       if (video) video.srcObject = null;
-      if (camEl) camEl.style.display = 'none';
+      if (camEl) camEl.classList.remove('show');
+      document.body.style.overflow = camPrevOverflow;
       camTargetIndex = null;
     };
+
+    // Escape closes it, like every other modal on the site. Bound to the
+    // document because focus is usually on nothing in particular — the
+    // popup is aimed, not typed into.
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && camEl && camEl.classList.contains('show')) {
+        e.preventDefault();
+        window.coCloseRollCamera();
+      }
+    });
+    // A click on the backdrop closes; one inside the card does not.
+    if (camEl) {
+      camEl.addEventListener('click', function (e) {
+        if (e.target === camEl) window.coCloseRollCamera();
+      });
+    }
     function onDecode(code) {
       var now = (window.performance && performance.now) ? performance.now() : Date.now();
       code = (code || '').toString().trim();

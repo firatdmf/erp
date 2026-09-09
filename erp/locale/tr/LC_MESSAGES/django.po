@@ -9109,3 +9109,6 @@ msgstr "O satır artık yok"
 
 msgid "The product this camera was opened for is no longer on the order."
 msgstr "Bu kameranın açıldığı ürün siparişte artık yok."
+
+msgid "Scan barcode"
+msgstr "Barkod okut"

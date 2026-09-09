@@ -51,9 +51,14 @@ class CrossBookOrderSplit(TestCase):
         self.client.force_login(self.user)
 
     def _stock(self, book, sku, title, barcode):
-        product = Product.objects.create(title=title, sku=sku.split(".")[0])
-        variant = ProductVariant.objects.create(product=product, variant_sku=sku)
-        wh = Warehouse.objects.create(name=f"{book.name} depo", accounting_book=book)
+        """Idempotent in the catalog, so the SAME product can be stood on a
+        second book's shelf — which is the case this whole feature is for."""
+        product, _ = Product.objects.get_or_create(
+            sku=sku.split(".")[0], defaults={"title": title})
+        variant, _ = ProductVariant.objects.get_or_create(
+            product=product, variant_sku=sku)
+        wh, _ = Warehouse.objects.get_or_create(
+            name=f"{book.name} depo", defaults={"accounting_book": book})
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name=title, sku=sku, quantity=Decimal("50"),
             catalog_variant=variant)
@@ -67,8 +72,8 @@ class CrossBookOrderSplit(TestCase):
             "product": {"sku": sku, "variant": True},
             "description": "", "quantity": qty, "outsourced": 0, "price": price,
             "is_custom_curtain": False,
-            "book": book.pk if book else None,
-            "rolls": [{"barcode": barcode, "quantity": qty}],
+            "rolls": [{"barcode": barcode, "quantity": qty,
+                       "book": book.pk if book else None}],
         }
 
     def _post(self, lines, **extra):
@@ -128,6 +133,58 @@ class CrossBookOrderSplit(TestCase):
             self.assertEqual(
                 res.stock_item.product.warehouse.accounting_book_id,
                 res.order.current_account.book_id)
+
+    # ── one card, two shelves ───────────────────────────────────────
+    def test_one_card_holding_two_books_stock_is_cut_at_save(self):
+        """A product is one card wherever it is held, so a line's stock
+        items can stand in two books. The line is then two lines — the
+        metres picked off each book's shelves, each going to that book's
+        order — and the user never had to know that in advance."""
+        shared = self._stock(self.ergene, LALELI_SKU, "Krep", "L-0002")
+        self._post([{
+            "item_no": 1,
+            "product": {"sku": LALELI_SKU, "variant": True},
+            "description": "", "quantity": 80, "outsourced": 0, "price": 2,
+            "is_custom_curtain": False,
+            "rolls": [
+                {"barcode": "L-0001", "quantity": 50, "book": self.laleli.pk},
+                {"barcode": "L-0002", "quantity": 30, "book": self.ergene.pk},
+            ],
+        }])
+        self.assertEqual(Order.objects.count(), 2)
+        by_book = {o.current_account.book.name: o for o in Order.objects.all()}
+        self.assertEqual(
+            by_book["Laleli Fabric"].items.get().quantity, Decimal("50.00"))
+        self.assertEqual(
+            by_book["Ergene Fabric"].items.get().quantity, Decimal("30.00"))
+        # Each half reserved off its own shelf.
+        for res in OrderStockReservation.objects.all():
+            self.assertEqual(
+                res.stock_item.product.warehouse.accounting_book_id,
+                res.order.current_account.book_id)
+
+    def test_outsourced_metres_are_billed_once(self):
+        """They have no shelf to read, so they sit with the book being
+        worked in. Splitting them over both would invent a division
+        nobody entered; repeating them would bill them twice."""
+        self._stock(self.ergene, LALELI_SKU, "Krep", "L-0003")
+        self._post([{
+            "item_no": 1,
+            "product": {"sku": LALELI_SKU, "variant": True},
+            "description": "", "quantity": 90, "outsourced": 10, "price": 2,
+            "is_custom_curtain": False,
+            "rolls": [
+                {"barcode": "L-0001", "quantity": 50, "book": self.laleli.pk},
+                {"barcode": "L-0003", "quantity": 30, "book": self.ergene.pk},
+            ],
+        }])
+        by_book = {o.current_account.book.name: o for o in Order.objects.all()}
+        laleli_item = by_book["Laleli Fabric"].items.get()
+        ergene_item = by_book["Ergene Fabric"].items.get()
+        self.assertEqual(laleli_item.outsourced_quantity, Decimal("10.00"))
+        self.assertEqual(ergene_item.outsourced_quantity, Decimal("0.00"))
+        self.assertEqual(laleli_item.quantity, Decimal("60.00"))  # 50 picked + 10
+        self.assertEqual(ergene_item.quantity, Decimal("30.00"))
 
     # ── the ordinary order is untouched ─────────────────────────────
     def test_one_book_still_makes_exactly_one_order(self):
@@ -227,27 +284,37 @@ class CrossBookOrderSplit(TestCase):
         self.assertEqual(Order.objects.count(), 2)
 
 
-class EditNeverSplits(TestCase):
-    """A saved order has its book: its current account is billed, its
-    movement posted, its holds on that book's shelves. Editing is not
-    where a request becomes two orders — create is — so a line claiming
-    another book has no honest home here and is refused rather than
-    quietly billed to the wrong business."""
+class EditSplitsTheSameWay(TestCase):
+    """Editing an order behaves exactly like creating one.
+
+    An order still belongs to ONE book — its account is billed there and
+    its holds are on that book's shelves — so a line from another book
+    cannot join it. It is still a line the customer asked for, though, so
+    it goes to that book's order instead of being refused: the order this
+    one was already split with, or a new one joined to it.
+
+    This replaces a guard that refused such a line outright. That was
+    right while an edit could not split; it is not the behaviour asked
+    for, which is that both forms work the same way.
+    """
 
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def setUp(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
-        CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
         self.laleli = Book.objects.create(name="Laleli Fabric")
         self.ergene = Book.objects.create(name="Ergene Fabric")
         self.customer = Contact.objects.create(name="Oleg Motuzenko")
         self.account = CurrentAccount.objects.create(
             book=self.laleli, code="C-1", name="Oleg", type="customer",
-            contact=self.customer,
-            default_currency=CurrencyCategory.objects.get(code="USD"))
+            contact=self.customer, default_currency=usd)
         self.order = Order.objects.create(
             order_number="DK0000900", current_account=self.account,
             contact=self.customer)
+
+        self.l_item = self._stock(self.laleli, LALELI_SKU, "Krep", "L-0001")
+        self.e_item = self._stock(self.ergene, ERGENE_SKU, "Tul", "E-0001")
 
         User = get_user_model()
         user = User.objects.create_superuser("editor2", "e2@t.com", "pw")
@@ -256,21 +323,109 @@ class EditNeverSplits(TestCase):
         user.member.save()
         self.client.force_login(user)
 
-    def test_the_toggle_is_not_offered_while_editing(self):
+    def _stock(self, book, sku, title, barcode):
+        parent, _ = Product.objects.get_or_create(
+            sku=sku.split(".")[0], defaults={"title": title})
+        variant, _ = ProductVariant.objects.get_or_create(
+            product=parent, variant_sku=sku)
+        wh, _ = Warehouse.objects.get_or_create(
+            name=f"{book.name} depo", defaults={"accounting_book": book})
+        wp = WarehouseProduct.objects.create(
+            warehouse=wh, name=title, sku=sku, quantity=Decimal("50"),
+            catalog_variant=variant)
+        return WarehouseProductItem.objects.create(
+            product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
+            barcode=barcode, status="in_stock")
+
+    def _line(self, sku, book, barcode, qty=50, price=2):
+        return {
+            "item_no": 1,
+            "product": {"sku": sku, "variant": True},
+            "description": "", "quantity": qty, "outsourced": 0, "price": price,
+            "is_custom_curtain": False,
+            "rolls": [{"barcode": barcode, "quantity": qty,
+                       "book": book.pk if book else None}],
+        }
+
+    def _save(self, lines):
+        return self.client.post(
+            reverse("operating:edit_order", kwargs={"pk": self.order.pk}),
+            {
+                "customer_type": "contact",
+                "customer_pk": self.customer.pk,
+                "book": self.laleli.pk,
+                "notes": "",
+                "product_json_input": json.dumps(lines),
+                "deleted_items": "[]",
+            },
+        )
+
+    def test_the_toggle_is_offered_while_editing(self):
         resp = self.client.get(
             reverse("operating:edit_order", kwargs={"pk": self.order.pk}))
-        self.assertNotContains(resp, 'id="co-cross-book"')
+        self.assertContains(resp, 'id="co-cross-book"')
 
-    def test_a_line_from_another_book_is_refused(self):
-        from operating.views import _reject_foreign_book_lines
-        with self.assertRaises(ValueError):
-            _reject_foreign_book_lines(
-                self.order, [{"book": self.ergene.pk, "quantity": 1}])
+    def test_another_book_s_line_goes_to_that_book_s_order(self):
+        self._save([self._line(LALELI_SKU, self.laleli, "L-0001"),
+                    self._line(ERGENE_SKU, self.ergene, "E-0001")])
+        self.assertEqual(Order.objects.count(), 2)
+        sibling = Order.objects.exclude(pk=self.order.pk).get()
+        self.assertEqual(sibling.current_account.book_id, self.ergene.pk)
+        self.assertEqual(sibling.current_account.contact_id, self.customer.pk)
+        # ...and the edited order kept only its own.
+        self.assertEqual(
+            [i.product_variant.variant_sku for i in self.order.items.all()],
+            [LALELI_SKU])
 
-    def test_the_order_s_own_book_and_untagged_lines_pass(self):
-        from operating.views import _reject_foreign_book_lines
-        _reject_foreign_book_lines(self.order, [
-            {"book": self.laleli.pk, "quantity": 1},
-            {"book": None, "quantity": 1},
-            {"quantity": 1},
-        ])
+    def test_the_two_are_joined(self):
+        self._save([self._line(LALELI_SKU, self.laleli, "L-0001"),
+                    self._line(ERGENE_SKU, self.ergene, "E-0001")])
+        self.order.refresh_from_db()
+        sibling = Order.objects.exclude(pk=self.order.pk).get()
+        self.assertIsNotNone(self.order.split_group)
+        self.assertEqual(self.order.split_group, sibling.split_group)
+        self.assertEqual([o.pk for o in self.order.split_siblings], [sibling.pk])
+
+    def test_the_spun_off_line_reserves_off_its_own_shelf(self):
+        self._save([self._line(LALELI_SKU, self.laleli, "L-0001"),
+                    self._line(ERGENE_SKU, self.ergene, "E-0001")])
+        for res in OrderStockReservation.objects.all():
+            self.assertEqual(
+                res.stock_item.product.warehouse.accounting_book_id,
+                res.order.current_account.book_id)
+
+    def test_editing_twice_adds_to_the_same_sibling(self):
+        """Not a trail of one-line orders: the second edit finds the
+        order this one was already split with."""
+        self._save([self._line(LALELI_SKU, self.laleli, "L-0001"),
+                    self._line(ERGENE_SKU, self.ergene, "E-0001")])
+        first = Order.objects.exclude(pk=self.order.pk).get()
+        second_barcode = self._stock(
+            self.ergene, "K24777.C03", "Tul B", "E-0002")
+        self._save([self._line(LALELI_SKU, self.laleli, "L-0001"),
+                    self._line("K24777.C03", self.ergene, "E-0002")])
+        self.assertEqual(Order.objects.count(), 2)
+        self.assertEqual(Order.objects.exclude(pk=self.order.pk).get().pk, first.pk)
+
+    def test_an_ordinary_edit_creates_nothing(self):
+        self._save([self._line(LALELI_SKU, self.laleli, "L-0001")])
+        self.assertEqual(Order.objects.count(), 1)
+        self.order.refresh_from_db()
+        self.assertIsNone(self.order.split_group)
+
+    def test_untagged_lines_stay_where_they_are(self):
+        """Every line of every order saved before any of this existed
+        carries no book at all."""
+        self._save([self._line(LALELI_SKU, None, "L-0001")])
+        self.assertEqual(Order.objects.count(), 1)
+
+    def test_a_book_the_member_is_not_assigned_is_still_refused(self):
+        User = get_user_model()
+        clerk = User.objects.create_user("clerk3", "c3@t.com", "pw")
+        clerk.member.books.add(self.laleli)
+        clerk.member.default_book = self.laleli
+        clerk.member.save()
+        self.client.force_login(clerk)
+        stranger = Book.objects.create(name="Somebody Else Fabric")
+        self._save([self._line(LALELI_SKU, stranger, "L-0001")])
+        self.assertEqual(Order.objects.count(), 1)

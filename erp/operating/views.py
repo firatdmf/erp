@@ -1062,7 +1062,8 @@ def _order_edit_release_unticked(order, items_payload):
             r.delete()
 
 
-def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcodes):
+def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcodes,
+                              books=None):
     """RECONCILE an order line's roll reservations against the edit
     form's submitted selection — `rolls_data` is the line's FINAL desired
     set of stock_items, exactly as ticked in the sidebar (saved rolls hydrate
@@ -1081,7 +1082,11 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
     OrderEdit.form_valid's transaction. For a freshly-created line there
     are no existing reservations, so this degrades to plain adding.
     Appends any barcode that couldn't be reserved to `failed_barcodes`
-    (never raises — a bad/raced barcode shouldn't fail the whole save)."""
+    (never raises — a bad/raced barcode shouldn't fail the whole save).
+
+    `books` confines the lookup to those books' shelves, for a caller
+    filling an order whose book is already settled — a line routed to its
+    own book's order must reserve there and nowhere else."""
     rolls_data = rolls_data or []
     variant = order_item.product_variant
     product = order_item.product
@@ -1117,7 +1122,7 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
                     held.save(update_fields=["quantity"])
             continue
 
-        roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
+        roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku, books=books)
         if rerr:
             failed_barcodes.append(bc)
             continue
@@ -1584,31 +1589,151 @@ def order_create_barcode_check(request):
     })
 
 
-def _reject_foreign_book_lines(order, items):
-    """Refuse an edit payload whose lines claim a book other than the
-    order's own.
+def _take_foreign_book_lines(order, items, member):
+    """Split an edit payload into this order's own lines and the ones
+    belonging to other books.
 
-    Splitting happens at CREATE, where nothing has been billed yet. By
-    the time an order is being edited it has a current account posted
-    against it and holds on one book's shelves, so a line from elsewhere
-    has no honest home: adding it here would put a second business's
-    goods on the first one's invoice.
+    An order belongs to ONE book — its account is billed there and its
+    holds are on that book's shelves — so a line from elsewhere can never
+    join it. That is a fact about the order, not a reason to refuse the
+    line: the customer wants it either way. It goes to that book's order
+    instead, exactly as it would have at create.
+
+    Returns (own_lines, [(book, lines), ...]) with the foreign groups in
+    book order. Untagged lines are this order's own, which is every line
+    of every order placed before any of this existed.
+
+    Raises ValueError for a book the member is not assigned: the tag
+    comes from the browser and can claim anything.
     """
+    from accounting.services_accounts import member_books
+
     book_id = getattr(getattr(order, "current_account", None), "book_id", None)
-    if book_id is None:
-        return
+    allowed = {b.pk: b for b in member_books(member)}
+
+    # This order's own book is the "working" one, so the part of a line
+    # that stays here keeps its item_id and its outsourced metres, and
+    # only genuinely foreign stock is carried off.
+    own_book = None
+    if book_id is not None:
+        own_book = allowed.get(book_id)
+    if own_book is None:
+        # A book the member cannot see, or none at all: nothing to
+        # compare against, so nothing is foreign and the order is left
+        # exactly as it was.
+        return list(items or []), []
+
+    own, foreign = [], {}
     for line in items or []:
-        raw = line.get("book")
-        if raw in (None, "", 0):
-            continue
-        try:
-            if int(raw) != int(book_id):
-                raise ValueError(
-                    "That line belongs to a different book. Create a "
-                    "separate order for it rather than adding it here."
-                )
-        except (TypeError, ValueError) as exc:
-            raise ValueError(str(exc)) from None
+        for book, part in _line_parts_by_book(line, allowed, own_book):
+            if book.pk == own_book.pk:
+                own.append(part)
+            else:
+                foreign.setdefault(book.pk, (book, []))[1].append(part)
+
+    ordered = sorted(foreign.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
+    return own, ordered
+
+
+def _sibling_order_for_book(order, book, member):
+    """The order that `order`'s book-`book` lines belong in — the one it
+    was already split with, or a new one joined to it.
+
+    Reused rather than re-created, so editing the same order twice adds to
+    the sibling instead of leaving a trail of one-line orders behind. The
+    customer, the delivery details and the notes come from the order being
+    edited, because it is the same request: only the shelf differs.
+    """
+    from uuid import uuid4
+
+    if order.split_group:
+        existing = (Order.objects
+                    .filter(split_group=order.split_group,
+                            current_account__book=book)
+                    .exclude(pk=order.pk)
+                    .order_by("pk")
+                    .first())
+        if existing is not None:
+            return existing, False
+    else:
+        order.split_group = uuid4()
+        order.save(update_fields=["split_group"])
+
+    sibling = Order.objects.create(
+        contact=order.contact,
+        company=order.company,
+        is_retail_order=order.is_retail_order,
+        is_guest_order=order.is_guest_order,
+        guest_first_name=order.guest_first_name,
+        guest_phone=order.guest_phone,
+        notes=order.notes,
+        notify_customer=order.notify_customer,
+        delivery_address_title=order.delivery_address_title,
+        delivery_address=order.delivery_address,
+        delivery_city=order.delivery_city,
+        delivery_country=order.delivery_country,
+        delivery_phone=order.delivery_phone,
+        split_group=order.split_group,
+    )
+    return sibling, True
+
+
+def _append_lines_to_order(target, book, lines, user, failed_barcodes):
+    """Add lines to an order that did not have them, reserving only off
+    `book`'s shelves.
+
+    These are always NEW lines: a line already saved on some order carries
+    that order's book, so it can never arrive here as somebody else's.
+    """
+    for item_data in lines:
+        sku = item_data["product"]["sku"]
+        if item_data["product"].get("variant"):
+            variant = get_object_or_404(ProductVariant, variant_sku=sku)
+            product = variant.product
+        else:
+            product = get_object_or_404(Product, sku=sku)
+            variant = None
+
+        order_item = OrderItem.objects.create(
+            order=target,
+            product=product,
+            product_variant=variant,
+            description=item_data.get("description", ""),
+            quantity=item_data.get("quantity", 1),
+            outsourced_quantity=_outsourced_qty(item_data),
+            price=item_data.get("price", 0),
+            is_custom_curtain=item_data.get("is_custom_curtain", False),
+        )
+        _order_edit_reserve_rolls(
+            target, order_item, item_data.get("rolls") or [],
+            user, failed_barcodes, books=[book],
+        )
+
+
+def _settle_sibling(request, sibling, book, member):
+    """Give a spun-off order the account, movement and QR a created order
+    gets. Best-effort on the ledger, like every other posting path here: a
+    sync hiccup warns rather than losing goods already promised."""
+    from accounting.services_accounts import (
+        get_or_create_current_account_for_order, post_order_movement,
+        get_or_create_retail_current_account,
+    )
+    try:
+        if sibling.is_retail_order:
+            account = get_or_create_retail_current_account(member=member, book=book)
+        else:
+            account = get_or_create_current_account_for_order(
+                sibling, member=member, book=book)
+        if account and sibling.current_account_id != account.pk:
+            sibling.current_account = account
+            sibling.save(update_fields=["current_account"])
+        post_order_movement(sibling, member=member)
+    except Exception as _e:
+        messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
+    try:
+        generate_machine_qr_for_order(sibling)
+    except Exception:
+        pass
 
 
 def _other_book_holding(code, request, member=None):
@@ -1644,22 +1769,13 @@ def _wrong_book_error(book, request):
     """The message a scan gets when the roll is real but stands in another
     of the member's books.
 
-    What to DO about it differs by where the scan came from, so the
-    message does too. On the create form the answer is the "other books"
-    toggle: turn it on and the basket may hold both, because the save
-    splits it into an order per book. On an existing order there is no
-    such answer — its account is billed and its holds are on one book's
-    shelves — so the only honest advice is a separate order.
-
-    Telling an edit page to flip a toggle it does not have, or a create
-    form to go and start another order it does not need, is worse than
-    saying nothing: it sends the reader looking for something that is not
-    there.
+    One message for both forms, because they now do the same thing: tick
+    the toggle and the basket may hold both books, since the save sends
+    each line to that book's own order. It briefly said something else
+    while editing — that no such order was possible — which was true only
+    for as long as an edit refused to split.
     """
     from django.utils.translation import gettext as _
-    if _editing_order_id(request) is not None:
-        return _("That barcode is on %(book)s's shelf. This order belongs to "
-                 "one book — create a separate order for it.") % {"book": book.name}
     return _("That barcode is on %(book)s's shelf. Tick “Show stock from my "
              "other books” to add it — the order is split by book when "
              "you save.") % {"book": book.name}
@@ -1694,7 +1810,34 @@ def _split_items_by_book(items, request, member):
 
     grouped = {}
     for line in items:
-        raw = line.get("book")
+        for book, part in _line_parts_by_book(line, allowed, working):
+            grouped.setdefault(book.pk, (book, []))[1].append(part)
+
+    if not grouped:
+        return [(working, [])]
+    return sorted(grouped.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
+
+
+def _line_parts_by_book(line, allowed, working):
+    """One submitted line, cut into the books its stock actually came from.
+
+    A card is one product and may hold stock off several shelves, so the
+    book is a fact about each ROLL rather than about the line. A line whose
+    rolls stand in two books is two lines: the quantity of each is the
+    metres picked off that book's shelves, and each goes to that book's
+    order. A line with no rolls at all — outsourced metres, a back-order,
+    a custom curtain — has no shelf to read, so it belongs to the book
+    being worked in.
+
+    The outsourced metres ride on ONE part, the working book's where it is
+    among them, else the first. Splitting them proportionally would invent
+    a division nobody entered, and putting them on every part would bill
+    them more than once.
+    """
+    rolls = line.get("rolls") or []
+    by_book = {}
+    for roll in rolls:
+        raw = roll.get("book")
         if raw in (None, "", 0):
             book = working
         else:
@@ -1706,11 +1849,55 @@ def _split_items_by_book(items, request, member):
                 raise ValueError(
                     "That line was picked from a book you are not assigned to."
                 )
-        grouped.setdefault(book.pk, (book, []))[1].append(line)
+        by_book.setdefault(book.pk, (book, []))[1].append(roll)
 
-    if not grouped:
-        return [(working, [])]
-    return sorted(grouped.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
+    outsourced = _outsourced_qty(line) or _PDecimal("0")
+
+    if not by_book:
+        # Nothing picked: the line is whatever was typed, in this book.
+        return [(working, line)]
+
+    ordered = sorted(by_book.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
+    carries_outsourced = next(
+        (i for i, (b, _r) in enumerate(ordered) if b.pk == working.pk), 0)
+
+    parts = []
+    for i, (book, book_rolls) in enumerate(ordered):
+        part = dict(line)
+        part["rolls"] = book_rolls
+        picked = sum(
+            (_safe_line_decimal(r.get("quantity")) for r in book_rolls),
+            _PDecimal("0"))
+        mine = outsourced if i == carries_outsourced else _PDecimal("0")
+        part["quantity"] = float(picked + mine)
+        part["outsourced"] = float(mine)
+        # Only one part may keep the id of the line it came from, or the
+        # same OrderItem would be claimed by two orders.
+        if i != carries_outsourced:
+            part.pop("item_id", None)
+        parts.append((book, part))
+    return parts
+
+
+def _safe_line_decimal(raw):
+    try:
+        return _PDecimal(str(raw or 0))
+    except Exception:
+        return _PDecimal("0")
+
+
+def _spun_off_message(spun_off):
+    """Say where the other books' lines went. The save redirects to the
+    order that was being edited, so without this the rest are invisible —
+    the user would be left believing the lines had simply vanished."""
+    parts = ", ".join(
+        f"{book.name}: #{order.pk}" + ("" if is_new else " (mevcut)")
+        for order, book, is_new in spun_off
+    )
+    return (
+        "Diğer defterlere ait satırlar kendi siparişlerine taşındı "
+        f"({parts})."
+    )
 
 
 def _deposit_amount_for_book(request, book):
@@ -3007,6 +3194,17 @@ class OrderEdit(UpdateView):
                                      if (r.stock_item and r.stock_item.product and r.stock_item.product.warehouse_id)
                                      else ""),
                         "quantity": float(r.quantity or 0),
+                        # The shelf's book, so a saved stock item carries the
+                        # same fact a freshly picked one does and the card
+                        # can say where each barcode is from.
+                        "book_id": (r.stock_item.product.warehouse.accounting_book_id
+                                    if (r.stock_item and r.stock_item.product
+                                        and r.stock_item.product.warehouse_id) else None),
+                        "book": (r.stock_item.product.warehouse.accounting_book.name
+                                 if (r.stock_item and r.stock_item.product
+                                     and r.stock_item.product.warehouse_id
+                                     and r.stock_item.product.warehouse.accounting_book_id)
+                                 else ""),
                         "available": float(
                             _roll_available_meters(r.stock_item, exclude_reservation_id=r.pk)
                             if r.stock_item else (r.quantity or 0)
@@ -3145,6 +3343,12 @@ class OrderEdit(UpdateView):
 
                 # Update existing items and add new ones
                 failed_barcodes = []
+                # Defined before the branch below: an edit that submits no
+                # items at all — emptying an order is a real, saveable
+                # state — still reaches the routing step further down, and
+                # a name bound only inside the branch would not be there.
+                edit_member = getattr(self.request.user, "member", None)
+                foreign_groups = []
                 if product_json_input:
                     try:
                         product_json_input = json.loads(product_json_input)
@@ -3172,18 +3376,15 @@ class OrderEdit(UpdateView):
                         #     "item_id": 8
                         #   }]
 
-                        # An EDIT never splits. A saved order already has
-                        # its book — its current account is billed, its
-                        # movement posted, its reservations held on that
-                        # book's shelves — so a line tagged with a
-                        # different book cannot simply be added to it.
-                        # The create form is where a request becomes one
-                        # order per book; here the tag is refused outright
-                        # rather than quietly billed to the wrong
-                        # business. (The toggle that produces such a tag
-                        # is not rendered in edit mode; this is the guard
-                        # for a payload that arrives some other way.)
-                        _reject_foreign_book_lines(self.object, product_json_input)
+                        # An order belongs to one book, so a line from
+                        # another cannot join THIS one — but it is still a
+                        # line the customer asked for, so it goes to that
+                        # book's order instead of being refused. Taken out
+                        # here, before anything below counts the payload as
+                        # this order's own; added to their own orders once
+                        # this one is finished, further down.
+                        product_json_input, foreign_groups = _take_foreign_book_lines(
+                            self.object, product_json_input, edit_member)
 
                         # Unticked stock items go back to the pool BEFORE any line
                         # reserves, so a stock item moved between lines in one save
@@ -3260,11 +3461,30 @@ class OrderEdit(UpdateView):
                     except json.JSONDecodeError:
                         messages.error(self.request, "Invalid product data format.")
                         return self.form_invalid(form)
+                # ── Lines belonging to another book ──────────────────
+                # Each goes to that book's order: the one this was already
+                # split with, or a new one joined to it by split_group. Done
+                # after this order's own lines so a stock item moved from
+                # here to there has already let go of its hold.
+                spun_off = []
+                for _book, _lines in (foreign_groups or []):
+                    sibling, is_new = _sibling_order_for_book(
+                        self.object, _book, edit_member)
+                    _append_lines_to_order(
+                        sibling, _book, _lines, self.request.user, failed_barcodes)
+                    _settle_sibling(self.request, sibling, _book, edit_member)
+                    spun_off.append((sibling, _book, is_new))
+
                 if failed_barcodes:
                     messages.warning(
                         self.request,
                         "Sipariş güncellendi ama şu barkodlar için rezervasyon yapılamadı, "
                         "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
+                    )
+                if spun_off:
+                    messages.success(
+                        self.request,
+                        _spun_off_message(spun_off),
                     )
                 self.object.save()
 
@@ -4075,23 +4295,26 @@ def product_autocomplete(request):
                           .values_list("warehouse_product_id", "quantity")):
         reserved_by_wp[wp_id] = reserved_by_wp.get(wp_id, _D("0")) + (meters or _D("0"))
 
-    # Grouped by variant AND book. One variant can stand on shelves in two
-    # different books — the same fabric held by two businesses — and those
-    # are not one sellable thing: they bill different current accounts and
-    # ship off different shelves. Collapsing them into a single row would
-    # make the pick unable to say which book it meant. In the ordinary
-    # single-book search every row has the same book, so this groups
-    # exactly as it always did.
-    wh_groups = {}          # (variant_id, book_id) -> {"wp", "book", "stocks"}
+    # One row per variant, however many shelves hold it — a product is one
+    # product, and two rows offering the same fabric only make the reader
+    # choose between things they cannot tell apart. The shelves come with
+    # it, and the stock item list on the card names the shelf (and, across
+    # books, the book) of every barcode.
+    #
+    # This used to group by (variant, book) so a pick could say which book
+    # it meant. The book is a fact about the ROLL, not about the product,
+    # and reading it off the rolls says it exactly once, where it is true.
+    wh_groups = {}          # variant_id -> {"wp", "books", "stocks"}
     for wp in wh_rows:
         wh = wp.warehouse
         book = wh.accounting_book if (wh and wh.accounting_book_id) else None
         g = wh_groups.setdefault(
-            (wp.catalog_variant_id, getattr(book, "pk", None)),
-            {"wp": wp, "book": book, "stocks": []})
+            wp.catalog_variant_id, {"wp": wp, "books": {}, "stocks": []})
+        if book is not None:
+            g["books"][book.pk] = book.name
         free = (wp.quantity or _D("0")) - reserved_by_wp.get(wp.pk, _D("0"))
         g["stocks"].append((wh.name if wh else "", free))
-    wh_variant_ids = {vid for vid, _bid in wh_groups.keys()}
+    wh_variant_ids = set(wh_groups.keys())
 
     # ── 2) Catalog-only fallback (nothing already shown as warehouse) ─
     products = (
@@ -4188,15 +4411,18 @@ def product_autocomplete(request):
             for wh, q in stocks[:3]
         )
 
-    def book_cell(book):
-        """Which book's shelf this row stands on. Drawn only when the
-        search was allowed past one book — on an ordinary single-book
-        search every row would carry the same badge, which tells the
-        reader nothing and crowds the row."""
-        if not (cross_book and book):
+    def book_cell(books):
+        """Which books hold this product. Drawn only when the search was
+        allowed past one — on an ordinary single-book search every row
+        would carry the same badge, which tells the reader nothing and
+        crowds the row. A product held by two businesses shows both,
+        because that is the useful thing to know before opening it."""
+        if not (cross_book and books):
             return ""
-        return (f"<span class='pa-stock pa-stock--book'>"
-                f"{escape((book.name or '')[:18])}</span>")
+        return "".join(
+            f"<span class='pa-stock pa-stock--book'>{escape((n or '')[:18])}</span>"
+            for n in sorted(books.values())
+        )
 
     def row(sku, title, qualifier, price, is_cost, meta,
             js_args, extra_class=""):
@@ -4271,19 +4497,15 @@ def product_autocomplete(request):
         total = sum((q or 0) for _wh, q in group["stocks"])
         title_js = js_str(f"{base_title} — {qualifier}" if qualifier else base_title)
         cat_js = js_str(parent.category.name if parent.category else "")
-        # The book travels with the pick. The line the form mints carries
-        # it from here all the way to the save, which routes the line to
-        # that book's order — so what the user saw on the row is what
-        # gets billed, with nothing re-derived along the way.
-        book = group.get("book")
-        book_id = getattr(book, "pk", None) or "null"
-        book_name_js = js_str(getattr(book, "name", "") or "")
+        # No book travels with the pick. A card can hold stock off several
+        # shelves — that is what makes it one card — so the book is read
+        # off each roll as it is ticked, and the save groups the line by
+        # what was actually picked rather than by what the row guessed.
         js_args = (f"'{escape(js_str(sku))}',true,'{title_js}',{price},'{cat_js}',"
                    f"{float(total):g},{'true' if allow_oversell else 'false'},"
-                   f"{'true' if is_cost else 'false'},"
-                   f"{book_id},'{book_name_js}'")
+                   f"{'true' if is_cost else 'false'}")
         return row(sku, base_title, qualifier, price, is_cost,
-                   book_cell(book) + warehouse_cells(group["stocks"]), js_args)
+                   book_cell(group["books"]) + warehouse_cells(group["stocks"]), js_args)
 
     def note(text, cls):
         return (f"<li class='{cls}' onmousedown='event.preventDefault()'>"

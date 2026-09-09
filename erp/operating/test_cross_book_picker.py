@@ -91,20 +91,31 @@ class CrossBookPicker(TestCase):
         self.assertEqual(by_bc["E-0001"]["book_id"], self.ergene.pk)
 
     # ── the search ──────────────────────────────────────────────────
-    def test_the_search_offers_one_row_per_book(self):
-        """One variant on two books' shelves is not one sellable thing:
-        the rows bill different accounts and ship off different shelves,
-        so collapsing them would make the pick unable to say which."""
+    def test_one_variant_is_one_row_however_many_shelves_hold_it(self):
+        """A product is one product. Two rows offering the same fabric
+        only make the reader choose between things they cannot tell
+        apart — the shelves come WITH the row, and the stock item list
+        names the book of every barcode."""
         resp = self.client.get(
             reverse("operating:product_autocomplete"),
             {"product": "Krep", "book": self.laleli.pk, "cross_book": "1"})
         body = resp.content.decode()
+        self.assertEqual(body.count("selectProduct("), 1, body)
+        # Both books are named on that one row, because knowing a product
+        # is held by two businesses is the useful thing before opening it.
         self.assertIn("Laleli Fabric", body)
         self.assertIn("Ergene Fabric", body)
-        # Both books' ids reach selectProduct, so the picked line knows
-        # which shelf it came off.
-        self.assertIn(f",{self.laleli.pk},'Laleli Fabric'", body)
-        self.assertIn(f",{self.ergene.pk},'Ergene Fabric'", body)
+
+    def test_the_pick_carries_no_book(self):
+        """The book belongs to each stock item, not to the product. A row
+        that guessed one would put the whole line in that book however the
+        stock items were actually ticked."""
+        resp = self.client.get(
+            reverse("operating:product_autocomplete"),
+            {"product": "Krep", "book": self.laleli.pk, "cross_book": "1"})
+        body = resp.content.decode()
+        self.assertNotIn(f",{self.ergene.pk},'Ergene Fabric')", body)
+        self.assertNotIn(f",{self.laleli.pk},'Laleli Fabric')", body)
 
     def test_the_search_stays_narrow_without_the_toggle(self):
         resp = self.client.get(

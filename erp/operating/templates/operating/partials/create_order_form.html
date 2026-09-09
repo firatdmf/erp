@@ -338,15 +338,16 @@
       </div>
       <div id="co-product-results" class="co-autocomplete-results"></div>
 
-      {% comment %}Opt in to the other books. CREATE only: an edit has a
-      book already — its account is billed and its holds are on that
-      book's shelves — so there is nothing here for a second book to
-      become. A cross-book request is made once, at create.{% endcomment %}
-      {% if not order %}
       {% comment %}Opt in to the other books. Stock belongs to the book that
       owns its warehouse, so this does not put two businesses' goods on one
       order — it lets you pick them in one pass, and the save writes one
-      order per book, each billing its own current account.{% endcomment %}
+      order per book, each billing its own current account.
+
+      Offered while EDITING too, and meaning the same thing: this order
+      keeps its own book's lines, and anything from another book goes to
+      that book's order — the one this was already split with, or a new
+      one. What changes is where a line lands, never which book an order
+      belongs to.{% endcomment %}
       <label id="co-cross-book-row"
              style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;
                     border:1px dashed #CBD5E1;border-radius:7px;font-size:11.5px;
@@ -360,7 +361,6 @@
           </span>
         </span>
       </label>
-      {% endif %}
 
       {% comment %}Add a stock item by barcode with NO product selected:
       the endpoint resolves the item's product and the form adds the line
@@ -566,7 +566,9 @@
         itemIndex++;
         var stableIndex = itemIndex;
         var rolls = (it.rolls || []).map(function (r) {
-          return { reservation_id: r.reservation_id || null, barcode: r.barcode || '', warehouse: r.warehouse || '', quantity: parseFloat(r.quantity) || 0, available: parseFloat(r.available) || 0 };
+          return { reservation_id: r.reservation_id || null, barcode: r.barcode || '',
+                   warehouse: r.warehouse || '', book_id: r.book_id || null, book: r.book || '',
+                   quantity: parseFloat(r.quantity) || 0, available: parseFloat(r.available) || 0 };
         });
         // Out-of-warehouse metres come straight off the saved line
         // (OrderItem.outsourced_quantity). Legacy lines saved before that
@@ -781,8 +783,7 @@
   // The working book is read off the hidden input rather than a variable,
   // so this cannot drift from what the product search sends through
   // hx-include; they are the same value read the same way.
-  function coScopeParams(item) {
-    if (item && item.book_id) return '&book=' + encodeURIComponent(item.book_id);
+  function coScopeParams() {
     var el = document.getElementById('co-book-input');
     var v = el ? (el.value || '').trim() : '';
     // cross_book widens past `book` server-side, so the two are never
@@ -809,7 +810,7 @@
     if (res) res.innerHTML = '';
   };
 
-  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost, bookId, bookName) {
+  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
     // Stock is informational only — out-of-stock / low-stock products
     // can still be added (back-order). Catalog stock is deducted only
@@ -835,13 +836,9 @@
       is_custom_curtain: false, custom_width:'', custom_height:'',
       custom_pleat_type:'', custom_pleat_density:'', custom_mounting_type:'',
       custom_wing_type:'', custom_fabric_used_meters:'',
-      // Which book's shelf this line was picked off. Carried from the
-      // search row to the save, which splits the basket into one order
-      // per book. Null on a catalog-only pick (nothing on any shelf) and
-      // on every line of an ordinary single-book order — the server then
-      // files it under the book the form was opened in.
-      book_id: (bookId === undefined || bookId === null || bookId === 'null') ? null : Number(bookId),
-      book_name: bookName || '',
+      // No book on the card. A product is one product wherever it is
+      // held; the book belongs to each stock item picked below, and the
+      // save cuts the line along those lines.
       rolls: [], existingRolls: [], availableRolls: [], rollsLoading: true,
       manualMeters: 0, manualNote: '', showManualEntry: false
     });
@@ -890,26 +887,16 @@
     // up here rather than in the .then(), which runs after the URL has
     // already been built.
     var pending = orderItems.find(function (it) { return it.index === stableIndex; });
-    fetch(ROLL_LIST_URL + '?sku=' + encodeURIComponent(sku) + coOrderParam() + coScopeParams(pending))
+    fetch(ROLL_LIST_URL + '?sku=' + encodeURIComponent(sku) + coOrderParam() + coScopeParams())
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var item = orderItems.find(function (it) { return it.index === stableIndex; });
         if (!item) return;
-        var rolls = (d && d.ok && d.rolls) ? d.rolls : [];
-        // The same SKU can stand on shelves in two books once the search
-        // is allowed past one. This CARD is one book's line, so it offers
-        // that book's stock only — otherwise a click could reserve the
-        // other business's roll onto this order without saying so.
-        if (item.book_id) {
-          rolls = rolls.filter(function (r) { return !r.book_id || r.book_id === item.book_id; });
-        } else if (rolls.length && rolls[0].book_id) {
-          // Untagged line (a catalog-only pick): the first shelf its
-          // stock actually turned up on decides which book it is.
-          item.book_id = rolls[0].book_id;
-          item.book_name = rolls[0].book || '';
-          rolls = rolls.filter(function (r) { return r.book_id === item.book_id; });
-        }
-        item.availableRolls = rolls;
+        // Every shelf the search reached, whichever book owns it. A card
+        // is one PRODUCT, and the book is a fact about each roll — the
+        // rows say which, and the save groups the line by what was
+        // actually ticked.
+        item.availableRolls = (d && d.ok && d.rolls) ? d.rolls : [];
         item.rollsLoading = false;
         renderProducts();
       })
@@ -935,61 +922,60 @@
     }
   }
 
-  // The distinct books the basket currently draws on, in the order the
-  // headings will appear. One entry (or none) means an ordinary order.
+  // The books this basket actually draws on, read off the STOCK ITEMS
+  // rather than the cards. A card is one product and may hold rolls from
+  // several shelves, so it has no single book of its own; each roll does,
+  // and the save groups the line the same way.
   function coBooksInPlay() {
     const seen = [];
     orderItems.forEach(function (it) {
-      const key = it.book_id || 0;
-      if (!seen.some(function (b) { return b.key === key; })) {
-        seen.push({ key: key, name: it.book_name || '' });
-      }
+      (it.rolls || []).concat(it.existingRolls || []).forEach(function (r) {
+        if (!r.book_id) return;
+        if (!seen.some(function (b) { return b.key === r.book_id; })) {
+          seen.push({ key: r.book_id, name: r.book || '' });
+        }
+      });
     });
     return seen;
   }
 
-  // Sort the cards so every book's lines sit together. Called before each
-  // render rather than on insert, so a line that learns its book late
-  // (a catalog pick whose stock turned up on a shelf) still lands in the
-  // right run. Stable within a book, so "newest first" survives.
-  function coGroupItemsByBook() {
-    if (coBooksInPlay().length < 2) return;
-    const order = [];
+  // What each book's share of the order comes to — the metres picked off
+  // its shelves at the line's own price. Outsourced metres have no shelf
+  // to read, so they sit with the book the form is working in, which is
+  // where the save puts them too.
+  function coBookTotals() {
+    const totals = {};
+    const workingEl = document.getElementById('co-book-input');
+    const workingKey = workingEl ? Number(workingEl.value || 0) : 0;
     orderItems.forEach(function (it) {
-      const key = it.book_id || 0;
-      if (order.indexOf(key) === -1) order.push(key);
+      const price = Number(it.price) || 0;
+      (it.rolls || []).concat(it.existingRolls || []).forEach(function (r) {
+        if (!r.book_id) return;
+        totals[r.book_id] = (totals[r.book_id] || 0) + (Number(r.quantity) || 0) * price;
+      });
+      const manual = Number(it.manualMeters) || 0;
+      if (manual > 0 && workingKey) {
+        totals[workingKey] = (totals[workingKey] || 0) + manual * price;
+      }
     });
-    orderItems.sort(function (a, b) {
-      return order.indexOf(a.book_id || 0) - order.indexOf(b.book_id || 0);
-    });
+    return totals;
   }
 
-  function coBookHeadingHtml(item) {
-    const name = item.book_name || '{% trans "This book" %}';
-    const total = orderItems.reduce(function (s, it) {
-      return ((it.book_id || 0) === (item.book_id || 0))
-        ? s + (Number(it.quantity) || 0) * (Number(it.price) || 0) : s;
-    }, 0);
-    const n = orderItems.filter(function (it) {
-      return (it.book_id || 0) === (item.book_id || 0);
-    }).length;
-    return '<div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px;' +
-      'padding:7px 10px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:7px;">' +
-      '<i class="fas fa-book" style="color:#0F766E;font-size:12px;"></i>' +
-      '<strong style="font-size:11.5px;color:#0F766E;letter-spacing:.02em;">' + esc(name) + '</strong>' +
-      '<span style="font-size:10.5px;color:#5B8C86;">' + n + ' {% trans "lines" %}</span>' +
-      '<span style="margin-left:auto;font-weight:800;font-size:12px;color:#0F766E;">$' +
-        total.toFixed(2) + '</span>' +
-    '</div>';
-  }
-
-  // On a single-book basket the badge is noise — every card would wear
-  // the same one. It earns its place only once the order will split.
-  function coBookBadgeHtml(item, bookRun) {
-    if (!bookRun || bookRun.length < 2 || !item.book_name) return '';
-    return '<span style="margin-left:6px;font-weight:700;font-size:9.5px;color:#0F766E;' +
-      'background:#D1FAE5;padding:2px 6px;border-radius:5px;white-space:nowrap;">' +
-      esc(item.book_name) + '</span>';
+  // Which books a single card's stock items come from — drawn on the card
+  // once the basket spans more than one, so a line that will be cut in
+  // two says so before the save does it.
+  function coCardBooksHtml(item, bookRun) {
+    if (!bookRun || bookRun.length < 2) return '';
+    const names = [];
+    (item.rolls || []).concat(item.existingRolls || []).forEach(function (r) {
+      if (r.book && names.indexOf(r.book) === -1) names.push(r.book);
+    });
+    if (!names.length) return '';
+    return names.map(function (n) {
+      return '<span style="margin-left:6px;font-weight:700;font-size:9.5px;color:#0F766E;' +
+        'background:#D1FAE5;padding:2px 6px;border-radius:5px;white-space:nowrap;">' +
+        esc(n) + '</span>';
+    }).join('');
   }
 
   // Deposit boxes follow the basket: one plain box while it is one
@@ -1000,7 +986,7 @@
     const single = document.getElementById('co-deposit-single');
     const perBook = document.getElementById('co-deposit-per-book');
     if (!single || !perBook) return;
-    const books = coBooksInPlay().filter(function (b) { return b.key; });
+    const books = coBooksInPlay();
     if (books.length < 2) {
       single.style.display = '';
       perBook.style.display = 'none';
@@ -1019,11 +1005,9 @@
     perBook.querySelectorAll('input[data-book-key]').forEach(function (n) {
       prior[n.dataset.bookKey] = n.value;
     });
+    const totals = coBookTotals();
     perBook.innerHTML = books.map(function (b) {
-      const total = orderItems.reduce(function (s, it) {
-        return (it.book_id || 0) === b.key
-          ? s + (Number(it.quantity) || 0) * (Number(it.price) || 0) : s;
-      }, 0);
+      const total = totals[b.key] || 0;
       return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
         '<span style="flex:1;min-width:0;font-size:11.5px;font-weight:700;color:#0F766E;' +
           'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(b.name) + '</span>' +
@@ -1039,7 +1023,6 @@
 
   function renderProducts(opts) {
     opts = opts || {};
-    coGroupItemsByBook();
     coRenderDepositBoxes();
     const el = document.getElementById('co-products-list');
     if (!orderItems.length) { el.innerHTML = '<div class="co-empty">{% trans "No products added yet" %}</div>'; return; }
@@ -1053,15 +1036,10 @@
       rollScroll[n.dataset.rollListI] = n.scrollTop;
     });
 
-    // Cards carry their array index, so the list stays one flat run of
-    // them and the book headings are inserted BETWEEN. Grouping by
-    // rebuilding a nested array would renumber every card and break
-    // every onclick="coUpd(i,...)" already written into the markup.
+    // Cards are no longer grouped or reordered by book: one card is one
+    // product, and its stock items may stand in more than one. The books a
+    // card draws on are named on the card itself instead.
     const bookRun = coBooksInPlay();
-    let lastBookKey = null;
-    // The newest card, by stable index rather than array position:
-    // grouping by book moves cards around, so position 0 is no longer
-    // reliably the one just added.
     const newestIdx = opts.highlightFirst
       ? orderItems.reduce(function (m, it) { return Math.max(m, it.index || 0); }, 0)
       : null;
@@ -1069,20 +1047,9 @@
     el.innerHTML = orderItems.map((item, i) => {
       // Flash the just-added card briefly when selectProduct asked.
       const justAdded = (newestIdx && item.index === newestIdx) ? ' co-just-added' : '';
-      // A heading each time the book changes, but only once more than
-      // one book is actually in the basket: on the ordinary order every
-      // card would sit under the same heading, which says nothing.
-      let heading = '';
-      if (bookRun.length > 1) {
-        const key = item.book_id || 0;
-        if (key !== lastBookKey) {
-          lastBookKey = key;
-          heading = coBookHeadingHtml(item);
-        }
-      }
-      return heading + `<div class="co-product-card${justAdded}">
+      return `<div class="co-product-card${justAdded}">
         <div class="co-product-head">
-          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${coBookBadgeHtml(item, bookRun)}</div>
+          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${coCardBooksHtml(item, bookRun)}</div>
           <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
         </div>
         <div class="co-row">
@@ -1152,9 +1119,24 @@
     return '<div class="co-roll-row"' + toggleAttrs + ' style="display:flex;align-items:center;gap:8px;padding:8px 9px;margin-top:6px;font-size:12px;background:' + bg + ';border:1px solid ' + border + ';border-radius:7px;' + (locked ? '' : 'cursor:pointer;') + '">' +
       tickHtml +
       '<code style="background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;">' + esc(r.barcode || '—') + '</code>' +
-      '<span style="color:#6b7280;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.warehouse || '') + '</span>' +
+      // Where this one is from. The warehouse always; the book too once
+      // the card draws on more than one, because that is the moment the
+      // shelf name stops being enough to tell them apart — and the moment
+      // the line is going to be cut along exactly this seam.
+      '<span style="color:#6b7280;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        esc(r.warehouse || '') + coRollBookHtml(r) + '</span>' +
       meterHtml + scissorsBtn +
     '</div>';
+  }
+
+  // The book a stock item stands in, shown on its row only when the
+  // basket spans more than one — otherwise every row would repeat the
+  // same word and say nothing.
+  function coRollBookHtml(r) {
+    if (!r.book || coBooksInPlay().length < 2) return '';
+    return ' <span style="font-weight:700;font-size:9.5px;color:#0F766E;' +
+      'background:#D1FAE5;padding:1px 5px;border-radius:4px;white-space:nowrap;">' +
+      esc(r.book) + '</span>';
   }
 
   function rollSectionHtml(item, i) {
@@ -1275,9 +1257,7 @@
         var skuL = (d.sku || '').toLowerCase();
         var idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         if (idx === -1) {
-          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost,
-                          (d.roll && d.roll.book_id) || null,
-                          (d.roll && d.roll.book) || '');
+          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost);
           idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         }
         if (idx === -1) { showToast('{% trans "The product could not be added" %}', 'error'); return false; }
@@ -1411,27 +1391,17 @@
       renderProducts();
       return Promise.resolve(true);
     }
-    return fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams(item))
+    return fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams())
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) { showToast(d.error || '{% trans "Barcode could not be verified" %}', 'error'); return false; }
-        // A line belongs to ONE book: its stock ships off one business's
-        // shelf and bills that business's account. An untagged card
-        // adopts the scanned shelf's book; a tagged one refuses a scan
-        // from anywhere else rather than quietly mixing the two.
-        if (d.book_id) {
-          if (item.book_id && item.book_id !== d.book_id) {
-            showToast(
-              '{% trans "This stock item belongs to another book" %}: ' + (d.book || '') +
-              ' — {% trans "add a separate line for that book" %}', 'error');
-            return false;
-          }
-          if (!item.book_id) { item.book_id = d.book_id; item.book_name = d.book || ''; }
-        }
         if (!item.rolls) item.rolls = [];
         // Default to the WHOLE stock item — the scissors icon reveals a field
         // to cut less; leaving it alone keeps the full amount.
-        item.rolls.push({ barcode: barcode, stock_item_id: d.stock_item_id, available: d.available, warehouse: d.warehouse, quantity: d.available });
+        item.rolls.push({ barcode: barcode, stock_item_id: d.stock_item_id,
+                          available: d.available, warehouse: d.warehouse,
+                          book_id: d.book_id || null, book: d.book || '',
+                          quantity: d.available });
         if (inputEl) inputEl.value = '';
         syncQtyFromRolls(i, true);
         renderProducts();
@@ -1718,7 +1688,7 @@
       var url = (camTargetIndex === 'global')
         ? '{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(code) + coOrderParam() + coScopeParams()
         : '{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(code) +
-          '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams(item);
+          '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams();
       fetch(url)
         .then(function (r) { return r.json(); })
         .then(function (d) {
@@ -2121,12 +2091,13 @@
         custom_mounting_type: it.custom_mounting_type || null,
         custom_wing_type: it.custom_wing_type || null,
         custom_fabric_used_meters: it.custom_fabric_used_meters || null,
-        // The book whose shelf this line came from. The server splits the
-        // basket on it — one order per book — and checks it against the
-        // member's own assignments, so it can only ever name a shelf the
-        // person was already allowed to see.
-        book: it.book_id || null,
-        rolls: (it.rolls || []).map(function (r) { return { barcode: r.barcode, quantity: r.quantity }; })
+        // Each stock item names the book whose shelf it stands on. The
+        // save groups the line by those books — one order per book — and
+        // checks each against the member's own assignments, so a roll can
+        // only ever name a shelf the person was already allowed to see.
+        rolls: (it.rolls || []).map(function (r) {
+          return { barcode: r.barcode, quantity: r.quantity, book: r.book_id || null };
+        })
       };
       if (it.existing_item_id) payload.item_id = it.existing_item_id;
       return payload;

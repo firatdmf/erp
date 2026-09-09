@@ -96,4 +96,12 @@ class RollPayloadKey(TestCase):
         self.assertNotIn("meters: d.available", form)
         self.assertIn("quantity: known.available", form)
         self.assertIn("quantity: d.available", form)
-        self.assertIn("{ barcode: r.barcode, quantity: r.quantity }", form)
+        # The submitted roll names its metres `quantity` too. Matched on
+        # the pair rather than one exact line: the payload has since grown
+        # the roll's book alongside it, and this test is about the NAME,
+        # not about what else travels with it.
+        import re
+        submitted = re.search(r"rolls: \(it\.rolls \|\| \[\]\)\.map\((.{0,220})", form, re.S)
+        self.assertIsNotNone(submitted, "the submitted rolls map moved")
+        self.assertIn("quantity: r.quantity", submitted.group(1))
+        self.assertNotIn("meters: r.quantity", submitted.group(1))

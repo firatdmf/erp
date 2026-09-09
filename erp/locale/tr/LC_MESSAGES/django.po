@@ -9073,3 +9073,39 @@ msgstr "Barkodu çerçeveye getirin"
 
 msgid "Scanner failed to load"
 msgstr "Tarayıcı yüklenemedi"
+
+msgid "Barcode read"
+msgstr "Barkod okundu"
+
+msgid "Add to order"
+msgstr "Siparişe ekle"
+
+msgid "Already on this order"
+msgstr "Bu siparişte zaten var"
+
+msgid "This stock item is on a line already — nothing to add."
+msgstr "Bu stok kalemi bir satırda zaten duruyor — eklenecek bir şey yok."
+
+msgid "Cannot be added"
+msgstr "Eklenemez"
+
+msgid "Could not be added"
+msgstr "Eklenemedi"
+
+msgid "Added to the order"
+msgstr "Siparişe eklendi"
+
+msgid "Barcode could not be checked"
+msgstr "Barkod kontrol edilemedi"
+
+msgid "Check the connection and try again."
+msgstr "Bağlantıyı kontrol edip tekrar deneyin."
+
+msgid "Available"
+msgstr "Uygun"
+
+msgid "That line is gone"
+msgstr "O satır artık yok"
+
+msgid "The product this camera was opened for is no longer on the order."
+msgstr "Bu kameranın açıldığı ürün siparişte artık yok."

@@ -94,8 +94,10 @@ class EveryExitCarriesAVerdict(SimpleTestCase):
 
     def test_the_add_functions_never_return_nothing(self):
         form = read_form()
-        for signature in ("window.coAddRoll = function (i, barcodeOverride)",
-                          "window.coScanAddByBarcode = function (barcode, fromCamera)"):
+        # Named without their parameter lists: what matters is the exit
+        # values, and pinning the arguments made this fail on a rename.
+        for signature in ("window.coAddRoll = function (",
+                          "window.coScanAddByBarcode = function ("):
             body = body_of(form, signature)
             bare = re.findall(r"\breturn\s*;", body)
             self.assertEqual(
@@ -106,12 +108,11 @@ class EveryExitCarriesAVerdict(SimpleTestCase):
 
     def test_they_hand_back_a_promise_the_panel_can_read(self):
         form = read_form()
-        add = body_of(form, "window.coAddRoll = function (i, barcodeOverride)")
+        add = body_of(form, "window.coAddRoll = function (")
         self.assertIn("return Promise.resolve(true)", add)
         self.assertIn("return Promise.resolve(false)", add)
         self.assertIn("return fetch(", add)
-        glob = body_of(form,
-                       "window.coScanAddByBarcode = function (barcode, fromCamera)")
+        glob = body_of(form, "window.coScanAddByBarcode = function (")
         self.assertIn("return fetch(", glob)
 
 

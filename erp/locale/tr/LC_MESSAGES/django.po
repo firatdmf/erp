@@ -9112,3 +9112,87 @@ msgstr "Bu kameranın açıldığı ürün siparişte artık yok."
 
 msgid "Scan barcode"
 msgstr "Barkod okut"
+
+msgid "Enter customer details"
+msgstr "Müşteri bilgilerini gir"
+
+msgid "no product needed — it finds the product itself"
+msgstr "ürün seçmeden — ürünü otomatik bulur"
+
+msgid "Scan or type a roll barcode"
+msgstr "Top barkodu okutun veya yazın"
+
+msgid "Scan or type a barcode"
+msgstr "Barkod okutun veya yazın"
+
+msgid "Scan with the camera"
+msgstr "Kamerayla okut"
+
+msgid "Purchase cost"
+msgstr "Alış fiyatı"
+
+msgid "part"
+msgstr "kısmi"
+
+msgid "Cut part of it"
+msgstr "Kısmi kes"
+
+msgid "click to pick"
+msgstr "seçmek için tıklayın"
+
+msgid "This stock item belongs to another book"
+msgstr "Bu top başka bir deftere ait"
+
+msgid "add a separate line for that book"
+msgstr "o defter için ayrı bir satır ekleyin"
+
+msgid "A name is required"
+msgstr "İsim gerekli"
+
+msgid "Could not be created"
+msgstr "Oluşturulamadı"
+
+msgid "Barcode not found"
+msgstr "Barkod bulunamadı"
+
+msgid "The product could not be added"
+msgstr "Ürün eklenemedi"
+
+msgid "Barcode could not be verified"
+msgstr "Barkod doğrulanamadı"
+
+msgid "This barcode has already been added"
+msgstr "Bu barkod zaten eklendi"
+
+msgid "The camera is not supported"
+msgstr "Kamera desteklenmiyor."
+
+msgid "Camera"
+msgstr "Kamera"
+
+msgid "No stock item has been picked for %(name)s yet"
+msgstr "%(name)s için henüz top seçilmedi"
+
+msgid "Retail Sale (Walk-in)"
+msgstr "Perakende Satışı (Mağaza İçi)"
+
+msgid "Retail Sale"
+msgstr "Perakende Satışı"
+
+msgid "Pick a customer before saving the order"
+msgstr "Siparişi kaydetmeden önce müşteri seçin"
+
+msgid "This amount will be posted as a collection on the customer's current account right after the order is created."
+msgstr "Bu tutar, sipariş oluşturulduktan hemen sonra müşterinin cari hesabına tahsilat olarak işlenecek."
+
+msgid "Scan, type, or paste a list of barcodes"
+msgstr "Barkod okutun, yazın veya bir liste yapıştırın"
+
+msgid "added"
+msgstr "eklendi"
+
+msgid "skipped"
+msgstr "atlandı"
+
+msgid "Adding"
+msgstr "Ekleniyor"

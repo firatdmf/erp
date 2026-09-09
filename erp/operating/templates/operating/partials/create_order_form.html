@@ -255,7 +255,7 @@
         <!-- Perakende quick-pick — anonymous walk-in / counter sale. -->
         <div id="co-retail-pick" style="margin-top:10px;">
           <button type="button" class="co-type-btn" style="flex-direction:row;justify-content:center;gap:8px;" onclick="coSelectRetail()">
-            <i class="fas fa-cash-register"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende Satışı (Mağaza İçi){% else %}Retail Sale (Walk-in){% endif %}
+            <i class="fas fa-cash-register"></i> {% trans "Retail Sale (Walk-in)" %}
           </button>
         </div>
       </div>
@@ -270,8 +270,8 @@
       <div id="co-retail-customer-toggle" style="display:none;">
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; margin-bottom:12px;">
           <input type="checkbox" id="co-retail-has-customer" onchange="coRetailCustomerToggle(this.checked)">
-          {% trans "Müşteri bilgilerini gir" %}
-          <span style="font-weight:500; color:var(--text-secondary); font-size:12px;">({% trans "opsiyonel" %})</span>
+          {% trans "Enter customer details" %}
+          <span style="font-weight:500; color:var(--text-secondary); font-size:12px;">({% trans "optional" %})</span>
         </label>
       </div>
 
@@ -362,27 +362,39 @@
       </label>
       {% endif %}
 
-      {% comment %}Global "barkodla top ekle" — scan/type a roll barcode
-      with NO product selected: the endpoint resolves the top's product
-      and the form adds the line + ticks that top automatically.{% endcomment %}
+      {% comment %}Add a stock item by barcode with NO product selected:
+      the endpoint resolves the item's product and the form adds the line
+      + ticks that item automatically. Takes a whole LIST as well as one
+      code — a column copied out of Excel arrives as one barcode per
+      line, so the field is a textarea: pasting newlines into an <input>
+      gets them stripped, and "KZL001\nKZL002" would silently become one
+      unfindable code. Enter still submits, so a hardware scanner (which
+      sends Enter after each read) behaves exactly as before; Shift+Enter
+      adds a line by hand.{% endcomment %}
       <div class="form-group" style="margin-top:2px;">
         <label style="display:flex;align-items:center;gap:6px;">
           <i class="fas fa-barcode" style="color:#0F766E;"></i>
           {% trans "Add roll by barcode" %}
-          <span style="font-weight:500;color:#94A3B8;font-size:10.5px;">({% trans "ürün seçmeden — ürünü otomatik bulur" %})</span>
+          <span style="font-weight:500;color:#94A3B8;font-size:10.5px;">({% trans "no product needed — it finds the product itself" %})</span>
         </label>
         <div style="display:flex;gap:6px;">
           <div style="position:relative;flex:1;">
-            <input type="text" id="co-global-bc" class="form-input" style="padding-right:34px;"
-                   placeholder="{% trans 'Top barkodu okutun veya yazın' %}" autocomplete="off"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault(); coScanAdd();}">
-            <button type="button" onclick="coOpenRollCamera('global')" title="{% trans 'Kamerayla okut' %}"
+            <textarea id="co-global-bc" class="form-input" rows="1" style="padding-right:34px;resize:vertical;min-height:38px;max-height:190px;line-height:1.4;"
+                      placeholder="{% trans 'Scan, type, or paste a list of barcodes' %}" autocomplete="off"
+                      oninput="coScanGrow(this)"
+                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault(); coScanAdd();}"></textarea>
+            <button type="button" onclick="coOpenRollCamera('global')" title="{% trans 'Scan with the camera' %}"
                     style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:0;color:#0F766E;cursor:pointer;padding:6px;font-size:15px;line-height:1;">
               <i class="fas fa-camera"></i>
             </button>
           </div>
-          <button type="button" class="ord-btn" style="white-space:nowrap;" onclick="coScanAdd()">{% trans "Ekle" %}</button>
+          <button type="button" class="ord-btn" style="white-space:nowrap;align-self:flex-start;" onclick="coScanAdd()">{% trans "Add" %}</button>
         </div>
+        {% comment %}What a pasted list did. One code keeps the old plain
+        toast; a batch reports here, because the codes that did NOT go on
+        are the point and a toast takes them away before they can be read
+        or copied.{% endcomment %}
+        <div id="co-bulk-result" style="display:none;margin-top:6px;padding:8px 10px;border-radius:7px;font:600 11.5px var(--font-sans,sans-serif);"></div>
       </div>
 
       <div id="co-products-list"></div>
@@ -456,7 +468,7 @@
         <div id="co-deposit-per-book" style="display:none;"></div>
         <div style="font-size:11.5px; color:#0F766E; margin-top:4px;">
           <i class="fas fa-info-circle"></i>
-          {% trans "This amount will be posted as a collection on the customer's cari right after the order is created." %}
+          {% trans "This amount will be posted as a collection on the customer's current account right after the order is created." %}
         </div>
       </div>
 
@@ -660,7 +672,7 @@
     document.getElementById('customer-type').value = 'retail';
     document.getElementById('customer-pk').value = '';
     document.getElementById('co-customer-picker').style.display = 'none';
-    var label = '{% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende Satışı{% else %}Retail Sale{% endif %}';
+    var label = '{% trans "Retail Sale" %}';
     var selected = document.getElementById('co-customer-selected');
     selected.style.display = 'inline-flex';
     selected.innerHTML =
@@ -709,7 +721,7 @@
   window.coCreateCustomer = function () {
     var nameEl = document.getElementById('co-nc-name');
     var name = (nameEl.value || '').trim();
-    if (!name) { showToast('İsim gerekli', 'error'); return; }
+    if (!name) { showToast('{% trans "A name is required" %}', 'error'); return; }
     var kind = document.getElementById('co-nc-kind').value || 'contact';
     var phone = document.getElementById('co-nc-phone').value || '';
     var email = document.getElementById('co-nc-email').value || '';
@@ -724,11 +736,11 @@
     fetch('{% url "crm:quick_create_customer" %}', { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.ok) { showToast(d.error || 'Oluşturulamadı', 'error'); return; }
+        if (!d.ok) { showToast(d.error || '{% trans "Could not be created" %}', 'error'); return; }
         coApplyCustomerSelection(d.type || 'contact', d.id, d.name);
         window.coCancelCreateCustomer();
       })
-      .catch(function () { showToast('Oluşturulamadı', 'error'); });
+      .catch(function () { showToast('{% trans "Could not be created" %}', 'error'); });
   };
 
   window.coCancelCreateCustomer = function () {
@@ -883,7 +895,7 @@
       });
   }
 
-  // `force` = the user just changed the stock items or the depo dışı metres, so
+  // `force` = the user just changed the stock items or the outsourced metres, so
   // the sum IS the quantity even when it drops to zero. Without it,
   // clearing the last stock item / the metres box left the previous quantity
   // behind. The unforced call is hydration only: a legacy item with no
@@ -1050,7 +1062,7 @@
           <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
         </div>
         <div class="co-row">
-          <div class="form-group"><label>{% trans "Unit Price" %}${item.is_cost_price ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Alış fiyatı" %}</span>` : ''}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
+          <div class="form-group"><label>{% trans "Unit Price" %}${item.is_cost_price ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">$${(item.quantity*item.price).toFixed(2)}</div></div>
         </div>
         ${rollSectionHtml(item, i)}
@@ -1100,14 +1112,14 @@
     if (picked) {
       meterHtml = r._editing
         ? '<input type="number" class="form-input" style="width:70px;flex:0 0 auto;" value="' + meters + '" min="0.01" step="0.01" max="' + r.available + '" onclick="event.stopPropagation();" onchange="coRollMeters(' + i + ',' + ri + ',this.value)" autofocus> <span style="font-size:11px;color:#6b7280;">m</span>'
-        : '<span style="font-weight:700;color:#0F766E;white-space:nowrap;">' + (+meters).toFixed(2) + ' m' + (isFull ? '' : ' <span style="font-weight:600;color:#B45309;">({% trans "kısmi" %})</span>') + '</span>';
+        : '<span style="font-weight:700;color:#0F766E;white-space:nowrap;">' + (+meters).toFixed(2) + ' m' + (isFull ? '' : ' <span style="font-weight:600;color:#B45309;">({% trans "part" %})</span>') + '</span>';
     } else if (locked) {
       meterHtml = '<span style="font-weight:700;color:#64748B;white-space:nowrap;">' + (+meters).toFixed(2) + ' m</span>';
     } else {
       meterHtml = '<span style="font-weight:600;color:#0F766E;white-space:nowrap;">' + (+r.available).toFixed(2) + ' m</span>';
     }
     var scissorsBtn = picked
-      ? '<button type="button" onclick="event.stopPropagation(); coToggleRollCut(' + i + ',' + ri + ')" title="{% trans "Kısmi kes" %}" style="background:none;border:0;color:#B45309;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"><i class="fas fa-scissors"></i></button>'
+      ? '<button type="button" onclick="event.stopPropagation(); coToggleRollCut(' + i + ',' + ri + ')" title="{% trans "Cut part of it" %}" style="background:none;border:0;color:#B45309;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"><i class="fas fa-scissors"></i></button>'
       : '';
     // No "saved" tag: an already-saved roll unticks and re-cuts exactly
     // like a freshly picked one, so the distinction never changes what
@@ -1145,19 +1157,19 @@
     });
     // Nothing in the warehouse for this product at all — skip the
     // barcode/camera scaffolding (there'd be nothing valid to scan)
-    // and point at the separate "Depo dışı" section below instead.
+    // and point at the separate outsourced section below instead.
     var noStockAtAll = !item.rollsLoading && !existing.length && !picked.length && !candidates.length;
 
     var searchBlock = noStockAtAll ? '' :
       '<div style="position:relative;display:flex;gap:6px;margin-top:6px;">' +
         '<div style="position:relative;flex:1;">' +
-          '<input type="text" id="co-roll-bc-' + i + '" class="form-input co-roll-barcode-input" style="padding-right:34px;" placeholder="{% trans "Barkod okutun veya yazın" %}" ' +
+          '<input type="text" id="co-roll-bc-' + i + '" class="form-input co-roll-barcode-input" style="padding-right:34px;" placeholder="{% trans "Scan or type a barcode" %}" ' +
             'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); coAddRoll(' + i + ');}">' +
-          '<button type="button" onclick="coOpenRollCamera(' + i + ')" title="{% trans "Kamerayla okut" %}" ' +
+          '<button type="button" onclick="coOpenRollCamera(' + i + ')" title="{% trans "Scan with the camera" %}" ' +
             'style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:0;color:#0F766E;cursor:pointer;padding:6px;font-size:15px;line-height:1;">' +
             '<i class="fas fa-camera"></i></button>' +
         '</div>' +
-        '<button type="button" class="ord-btn" style="white-space:nowrap;" onclick="coAddRoll(' + i + ')">{% trans "Ekle" %}</button>' +
+        '<button type="button" class="ord-btn" style="white-space:nowrap;" onclick="coAddRoll(' + i + ')">{% trans "Add" %}</button>' +
       '</div>';
 
     var rowsHtml = '';
@@ -1180,7 +1192,7 @@
     return '<div class="co-roll-section" style="margin-top:10px;padding:10px;background:#F8FAFC;border:1px solid #E2E8EE;border-radius:8px;">' +
       '<label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:11px;color:#0F766E;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;">' +
         '<i class="fas fa-layer-group"></i> {% trans "Rolls" %}' +
-        '<span style="font-weight:500;color:#94A3B8;text-transform:none;letter-spacing:0;font-size:10.5px;">({% trans "seçmek için tıklayın" %})</span>' +
+        '<span style="font-weight:500;color:#94A3B8;text-transform:none;letter-spacing:0;font-size:10.5px;">({% trans "click to pick" %})</span>' +
         '<span class="co-roll-count-badge" style="margin-left:auto;font-weight:800;font-size:10.5px;letter-spacing:0;text-transform:none;color:' + (selectedCount ? '#0F766E' : '#94A3B8') + ';background:' + (selectedCount ? '#D1FAE5' : '#F1F5F9') + ';padding:2px 8px;border-radius:999px;">' +
           selectedCount + ' {% trans "rolls" %}' +
         '</span>' +
@@ -1190,7 +1202,7 @@
     '</div>';
   }
 
-  // "Depo dışı ilave miktar" (extra quantity outside the warehouse) — a
+  // Extra quantity sourced outside the warehouse — a
   // plain meters entry with no roll/barcode behind it, for stock that'll
   // be sourced elsewhere (or a product with no warehouse stock items at all).
   // Kept as its OWN section, separate from the stock items checklist, so it
@@ -1224,15 +1236,18 @@
   //    add/reuse the order line, then run the normal pick flow so the
   //    scanned stock item lands ticked on the right card. ──
   // Returns a promise for whether the stock item joined the order. The
-  // camera's confirm panel needs the answer to say what happened; the
-  // typed paths ignore it and read the toast like they always did.
-  window.coScanAddByBarcode = function (barcode, fromCamera) {
+  // camera's confirm panel and the pasted-list batch both need the answer
+  // to say what happened; the single typed code ignores it and reads the
+  // toast like it always did. `noRefocus` is for those two callers: the
+  // refocus is what opens the keyboard on a phone, over the panel the
+  // operator is meant to read, and it is pointless between batch codes.
+  window.coScanAddByBarcode = function (barcode, noRefocus) {
     barcode = (barcode || '').trim();
     if (!barcode) return Promise.resolve(false);
     return fetch('{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(barcode) + coOrderParam())
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.ok) { showToast(d.error || 'Barkod bulunamadı', 'error'); return false; }
+        if (!d.ok) { showToast(d.error || '{% trans "Barcode not found" %}', 'error'); return false; }
         var skuL = (d.sku || '').toLowerCase();
         var idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         if (idx === -1) {
@@ -1241,19 +1256,98 @@
                           (d.roll && d.roll.book) || '');
           idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         }
-        if (idx === -1) { showToast('Ürün eklenemedi', 'error'); return false; }
+        if (idx === -1) { showToast('{% trans "The product could not be added" %}', 'error'); return false; }
         var added = coAddRoll(idx, barcode);
         var el = document.getElementById('co-global-bc');
-        // Refocus only for the typed path: on a phone this is what opens
-        // the keyboard, and from the camera it would cover the panel.
-        if (el) { el.value = ''; if (!fromCamera) el.focus(); }
+        if (el) { el.value = ''; if (!noRefocus) el.focus(); }
         return added;
       })
-      .catch(function () { showToast('Barkod kontrol edilemedi', 'error'); return false; });
+      .catch(function () { showToast('{% trans "Barcode could not be checked" %}', 'error'); return false; });
   };
+  // Grow the box to what has been pasted into it, up to the CSS cap.
+  window.coScanGrow = function (el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 190) + 'px';
+  };
+
+  function coBulkResult(html, tone) {
+    var box = document.getElementById('co-bulk-result');
+    if (!box) return;
+    if (!html) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    var c = tone === 'bad'  ? ['#FEF2F2', '#FECACA', '#991B1B']
+          : tone === 'warn' ? ['#FFFBEB', '#FDE68A', '#92400E']
+          :                   ['#F0FDF4', '#BBF7D0', '#166534'];
+    box.style.background = c[0];
+    box.style.border = '1px solid ' + c[1];
+    box.style.color = c[2];
+    box.style.display = 'block';
+    box.innerHTML = html;
+  }
+
+  // A pasted column, one code per line. Excel gives newlines; a scanner
+  // gives one code and an Enter; someone typing might use spaces or
+  // commas. All of it splits the same way.
+  function coScanCodes(raw) {
+    return (raw || '').split(/[\s,;]+/)
+      .map(function (c) { return c.trim(); })
+      .filter(function (c) { return c.length > 0; });
+  }
+
+  // Strictly one at a time. Each code can create a line and mutate
+  // orderItems, and two in flight for the same new SKU would both find
+  // no line yet and add the product twice.
+  function coAddBarcodeList(codes) {
+    var added = [], failed = [];
+    // Every failure reason already exists — as the toast the single-code
+    // path shows. Take those instead of firing twenty of them, and hand
+    // the screen back before anything else can toast.
+    var why = '';
+    coToastSink = function (msg) { why = msg; };
+    function finish() {
+      coToastSink = null;
+      var el = document.getElementById('co-global-bc');
+      if (el) { el.value = ''; coScanGrow(el); el.focus(); }
+      var head = '<b>' + added.length + '</b> {% trans "added" %}';
+      if (!failed.length) { coBulkResult(head, 'ok'); return; }
+      coBulkResult(
+        head + ' · <b>' + failed.length + '</b> {% trans "skipped" %}' +
+        '<div style="margin-top:5px;font-weight:500;line-height:1.5;">' +
+        failed.map(function (f) {
+          return '<code style="background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;">' +
+                 esc(f.code) + '</code> — ' + esc(f.why);
+        }).join('<br>') + '</div>',
+        added.length ? 'warn' : 'bad');
+    }
+    function step(i) {
+      if (i >= codes.length) { finish(); return; }
+      coBulkResult('<i class="fas fa-spinner fa-spin"></i> ' +
+                   '{% trans "Adding" %} ' + (i + 1) + ' / ' + codes.length + '…', 'ok');
+      why = '';
+      return Promise.resolve(window.coScanAddByBarcode(codes[i], true))
+        .then(function (ok) {
+          (ok ? added : failed).push({ code: codes[i], why: why || '{% trans "Could not be added" %}' });
+          return step(i + 1);
+        })
+        .catch(function () {
+          failed.push({ code: codes[i], why: '{% trans "Could not be added" %}' });
+          return step(i + 1);
+        });
+    }
+    // The sink must never outlive the batch: left installed, it would
+    // silence every message on the form from here on. finish() clears it
+    // on the ordinary path; this covers a throw before the chain starts.
+    try { step(0); } catch (e) { coToastSink = null; throw e; }
+  }
+
   window.coScanAdd = function () {
     var el = document.getElementById('co-global-bc');
-    coScanAddByBarcode(el ? el.value : '');
+    var codes = coScanCodes(el ? el.value : '');
+    if (!codes.length) return;
+    coBulkResult('');
+    // One code keeps the old behaviour exactly, toast and all.
+    if (codes.length === 1) { coScanAddByBarcode(codes[0]); return; }
+    coAddBarcodeList(codes);
   };
 
   window.coAddRoll = function (i, barcodeOverride) {
@@ -1273,7 +1367,7 @@
       });
     });
     if (clash) {
-      showToast('Bu barkod zaten eklendi', 'warning');
+      showToast('{% trans "This barcode has already been added" %}', 'warning');
       return Promise.resolve(false);
     }
     // A stock item we unticked a moment ago is still reserved to US until the
@@ -1296,7 +1390,7 @@
     return fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku) + coOrderParam())
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d.ok) { showToast(d.error || 'Barkod doğrulanamadı', 'error'); return false; }
+        if (!d.ok) { showToast(d.error || '{% trans "Barcode could not be verified" %}', 'error'); return false; }
         // A line belongs to ONE book: its stock ships off one business's
         // shelf and bills that business's account. An untagged card
         // adopts the scanned shelf's book; a tagged one refuses a scan
@@ -1304,8 +1398,8 @@
         if (d.book_id) {
           if (item.book_id && item.book_id !== d.book_id) {
             showToast(
-              '{% trans "Bu top başka bir deftere ait" %}: ' + (d.book || '') +
-              ' — {% trans "o defter için ayrı bir satır ekleyin" %}', 'error');
+              '{% trans "This stock item belongs to another book" %}: ' + (d.book || '') +
+              ' — {% trans "add a separate line for that book" %}', 'error');
             return false;
           }
           if (!item.book_id) { item.book_id = d.book_id; item.book_name = d.book || ''; }
@@ -1319,7 +1413,7 @@
         renderProducts();
         return true;
       })
-      .catch(function () { showToast('Barkod kontrol edilemedi', 'error'); return false; });
+      .catch(function () { showToast('{% trans "Barcode could not be checked" %}', 'error'); return false; });
   };
 
   window.coToggleRollCut = function (i, ri) {
@@ -1675,7 +1769,7 @@
     };
 
     window.coOpenRollCamera = function (i) {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Kamera desteklenmiyor.', 'error'); return; }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('{% trans "The camera is not supported" %}', 'error'); return; }
       camTargetIndex = i;
       if (camEl) camEl.classList.add('show');
       // The create sidebar has already hidden the body's scrollbar when
@@ -1703,7 +1797,7 @@
           console.error('[roll-camera] zxing load failed', err);
           showToast('{% trans "Scanner failed to load" %}: ' + ((err && err.message) || err), 'error');
         });
-      }).catch(function (err) { showToast('Kamera: ' + (err && err.message || err), 'error'); window.coCloseRollCamera(); });
+      }).catch(function (err) { showToast('{% trans "Camera" %}: ' + (err && err.message || err), 'error'); window.coCloseRollCamera(); });
     };
     window.coCloseRollCamera = function () {
       camRunning = false;
@@ -1750,7 +1844,7 @@
       if (!zx || !video.videoWidth || video.readyState < 2 || (now - lastDecode) < 120) {
         // Five seconds of waiting with no frame is not "hold it steadier",
         // it is a camera that never started. Say so instead of leaving
-        // "Barkodu çerçeveye getirin" up over a picture nobody is reading.
+        // the aiming prompt up over a picture nobody is reading.
         if (hitEl && camOpenedAt && (now - camOpenedAt) > 5000 && !camFrames) {
           hitEl.textContent = !zx
             ? '{% trans "Scanner did not load — check the connection" %}'
@@ -1948,7 +2042,7 @@
     var custPk = (document.getElementById('customer-pk').value || '').trim();
     if (this.dataset.mode !== 'edit'
         && !(custType === 'retail' || ((custType === 'contact' || custType === 'company') && custPk))) {
-      showToast({% if LANGUAGE_CODE|slice:":2" == "tr" %}'Siparişi kaydetmeden önce müşteri seçin'{% else %}'Pick a customer before saving the order'{% endif %}, 'error');
+      showToast('{% trans "Pick a customer before saving the order" %}', 'error');
       coToggle(3);
       var custSearch = document.getElementById('co-customer-search');
       if (custSearch) custSearch.focus();
@@ -1965,7 +2059,8 @@
       return !it.is_custom_curtain && (parseFloat(it.quantity) || 0) <= 0;
     });
     if (emptyLine) {
-      showToast('"' + emptyLine.title + '" için henüz top seçilmedi', 'error');
+      showToast('{% trans "No stock item has been picked for %(name)s yet" %}'
+                  .replace('%(name)s', '"' + emptyLine.title + '"'), 'error');
       return;
     }
     // Over-stock lines are allowed — they're back-orders. The amber
@@ -1975,7 +2070,7 @@
     // mode) so the backend updates them instead of creating dupes.
     // New items (no existing_item_id) get added as fresh OrderItems.
     document.getElementById('product_json_input').value = JSON.stringify(orderItems.map(function(it){
-      // The depo dışı METRES are already carried by the line's quantity
+      // The outsourced METRES are already carried by the line's quantity
       // (quantity − reserved stock items), so they're re-derived on the next
       // edit and never written into the description. Only the optional
       // free-text note has nowhere else to live — appended once, and
@@ -2076,7 +2171,13 @@
   });
 
   function esc(s) { if (!s) return ''; const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+  // While a pasted list is being worked through, whoever set this takes
+  // the messages instead of the screen: twenty codes would otherwise
+  // stack twenty toasts, each gone before the next arrived, and the
+  // reasons are exactly what the batch needs to report at the end.
+  var coToastSink = null;
   function showToast(msg, type) {
+    if (coToastSink) { coToastSink(msg, type); return; }
     const t=document.createElement('div'); t.className='co-toast co-toast-'+type; t.textContent=msg;
     document.body.appendChild(t); setTimeout(()=>t.classList.add('show'),10);
     setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},2500);

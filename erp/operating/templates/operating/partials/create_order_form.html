@@ -781,8 +781,17 @@
     var hasCustomer = (type === 'retail')
       || ((type === 'contact' || type === 'company') && !!pk);
     if (step === 2) return hasCustomer;
-    // Step 3 wants a line to deposit against. Any line will do — whether
-    // its stock items add up is the save's business, not the gate's.
+    // Step 3 wants a line to deposit against, on a NEW order — any line
+    // will do, since whether its stock items add up is the save's
+    // business and not the gate's.
+    //
+    // An order that already exists is exempt. Emptying one is a state
+    // this project allows, and the gate was then locking its notes away:
+    // somebody who came to correct a note found the section shut because
+    // of lines they had deliberately removed. Nothing is being guided
+    // into place on an edit — the order is already made — so the gate has
+    // no work to do there beyond the customer.
+    if (CO_ORDER_ID) return hasCustomer;
     return hasCustomer && orderItems.length > 0;
   }
 

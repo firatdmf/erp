@@ -155,6 +155,20 @@ class EditingIsNotAWizard(TestCase):
         user.member.save()
         self.client.force_login(user)
 
+    def test_notes_stay_reachable_on_an_order_with_no_lines(self):
+        """Emptying an order is a state this project allows. The gate was
+        then locking its notes away — somebody who came to correct a note
+        found the section shut because of lines they had removed on
+        purpose. Nothing is being guided into place on an edit."""
+        form = read_form()
+        ready = form[form.index("function coStepReady"):][:1200]
+        self.assertIn("if (CO_ORDER_ID) return hasCustomer;", ready)
+
+    def test_a_new_order_still_wants_a_line_before_the_deposit(self):
+        form = read_form()
+        ready = form[form.index("function coStepReady"):][:1200]
+        self.assertIn("orderItems.length > 0", ready)
+
     def test_the_edit_form_unlocks_from_what_it_was_given(self):
         html = self.client.get(
             reverse("operating:edit_order", kwargs={"pk": self.order.pk})

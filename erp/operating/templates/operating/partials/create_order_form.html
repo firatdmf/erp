@@ -770,6 +770,26 @@
   var coCrossBook = false;
   function coCrossBookParam() { return coCrossBook ? '&cross_book=1' : ''; }
 
+  // The shelves a picker request may reach.
+  //
+  // A card that already knows its book PINS the request to that book and
+  // is never widened: one line's stock ships off one business's shelf, so
+  // a scan into it can only mean that book's roll. Everything else — the
+  // global scanner, a card with no book yet — takes the form's working
+  // book, widened only when the "other books" toggle is on.
+  //
+  // The working book is read off the hidden input rather than a variable,
+  // so this cannot drift from what the product search sends through
+  // hx-include; they are the same value read the same way.
+  function coScopeParams(item) {
+    if (item && item.book_id) return '&book=' + encodeURIComponent(item.book_id);
+    var el = document.getElementById('co-book-input');
+    var v = el ? (el.value || '').trim() : '';
+    // cross_book widens past `book` server-side, so the two are never
+    // both meaningful — send the toggle only when nothing is pinned.
+    return (v ? ('&book=' + encodeURIComponent(v)) : '') + coCrossBookParam();
+  }
+
   window.coToggleCrossBook = function (on) {
     coCrossBook = !!on;
     // The search reads this off the DOM, so the toggle has to write it
@@ -866,7 +886,11 @@
   // stable index, not array position — items can shift/be removed while
   // this is in flight). Re-renders when it resolves.
   function fetchAvailableRolls(stableIndex, sku) {
-    fetch(ROLL_LIST_URL + '?sku=' + encodeURIComponent(sku) + coOrderParam() + coCrossBookParam())
+    // Scope the request to the card's own book where it has one. Looked
+    // up here rather than in the .then(), which runs after the URL has
+    // already been built.
+    var pending = orderItems.find(function (it) { return it.index === stableIndex; });
+    fetch(ROLL_LIST_URL + '?sku=' + encodeURIComponent(sku) + coOrderParam() + coScopeParams(pending))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var item = orderItems.find(function (it) { return it.index === stableIndex; });
@@ -1244,7 +1268,7 @@
   window.coScanAddByBarcode = function (barcode, noRefocus) {
     barcode = (barcode || '').trim();
     if (!barcode) return Promise.resolve(false);
-    return fetch('{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(barcode) + coOrderParam())
+    return fetch('{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(barcode) + coOrderParam() + coScopeParams())
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) { showToast(d.error || '{% trans "Barcode not found" %}', 'error'); return false; }
@@ -1387,7 +1411,7 @@
       renderProducts();
       return Promise.resolve(true);
     }
-    return fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku) + coOrderParam())
+    return fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams(item))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) { showToast(d.error || '{% trans "Barcode could not be verified" %}', 'error'); return false; }
@@ -1692,9 +1716,9 @@
       camPanel('<div style="padding:22px 0;color:#CBD5E1;font:600 12.5px var(--font-sans,sans-serif);">' +
                '<i class="fas fa-spinner fa-spin"></i> ' + esc(code) + '</div>');
       var url = (camTargetIndex === 'global')
-        ? '{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(code) + coOrderParam()
+        ? '{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(code) + coOrderParam() + coScopeParams()
         : '{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(code) +
-          '&sku=' + encodeURIComponent(item.sku) + coOrderParam();
+          '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams(item);
       fetch(url)
         .then(function (r) { return r.json(); })
         .then(function (d) {

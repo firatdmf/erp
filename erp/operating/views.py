@@ -1559,6 +1559,10 @@ def order_create_barcode_check(request):
     roll, err = _lookup_roll_by_barcode_for_sku(
         code, sku, books=_books_in_scope(request))
     if err == "not_found":
+        other = _other_book_holding(code, request)
+        if other is not None:
+            return JsonResponse({"ok": False, "kind": "wrong_book",
+                                 "error": _wrong_book_error(other)}, status=404)
         return JsonResponse({"ok": False, "kind": "not_found", "error": "Bu barkodla bir stock item bulunamadı."}, status=404)
     if err == "wrong_product":
         return JsonResponse({"ok": False, "kind": "wrong_product", "error": "Bu stock item bu ürüne ait değil."}, status=409)
@@ -1605,6 +1609,43 @@ def _reject_foreign_book_lines(order, items):
                 )
         except (TypeError, ValueError) as exc:
             raise ValueError(str(exc)) from None
+
+
+def _other_book_holding(code, request, member=None):
+    """The member's OWN book, other than the ones this request may reach,
+    that holds this barcode — or None.
+
+    A scan narrowed to one book reports "no such barcode", which is true
+    of that shelf and useless to the person holding the roll: it exists,
+    it is simply another business's. Naming the book turns a dead end
+    into an instruction, without widening what the scan may actually
+    reserve.
+    """
+    from accounting.services_accounts import member_books
+    from .models import WarehouseProductItem
+
+    in_scope = {b.pk for b in _books_in_scope(request)}
+    mine = {b.pk: b for b in member_books(
+        member if member is not None else getattr(request.user, "member", None))}
+    elsewhere = [pk for pk in mine if pk not in in_scope]
+    if not elsewhere:
+        return None
+    roll = (WarehouseProductItem.objects
+            .select_related("product__warehouse__accounting_book")
+            .filter(barcode__iexact=code,
+                    product__warehouse__accounting_book__in=elsewhere)
+            .first())
+    if roll is None:
+        return None
+    return roll.product.warehouse.accounting_book
+
+
+def _wrong_book_error(book):
+    """The message a scan gets when the roll is real but stands in another
+    of the member's books."""
+    from django.utils.translation import gettext as _
+    return _("That barcode is on %(book)s's shelf. An order belongs to one "
+             "book — create a separate order for it.") % {"book": book.name}
 
 
 def _split_items_by_book(items, request, member):
@@ -1733,6 +1774,10 @@ def order_create_barcode_resolve(request):
             .filter(product__warehouse__accounting_book__in=_books_in_scope(request))
             .first())
     if roll is None:
+        other = _other_book_holding(code, request)
+        if other is not None:
+            return JsonResponse({"ok": False, "kind": "wrong_book",
+                                 "error": _wrong_book_error(other)}, status=404)
         return JsonResponse({"ok": False, "error": "Bu barkodla bir stock item bulunamadı."}, status=404)
     editing = _editing_order_id(request)
     avail = _roll_available_meters(roll, exclude_order_id=editing)

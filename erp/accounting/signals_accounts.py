@@ -3,7 +3,8 @@ Signals for the accounting current account ledger.
 
 Two responsibilities:
 
-1. Auto-assign CARI-XXX code when a CurrentAccount is being created without one.
+1. Auto-assign the book's next account code when a CurrentAccount is
+   being created without one.
 2. Mirror collection/payment CurrentAccountMovements into Payment rows, so a movement
    entered anywhere still appears on the payments list.
 
@@ -26,7 +27,7 @@ from .models import CurrentAccount, CurrentAccountMovement, CurrentAccountSettin
 
 
 # ---------------------------------------------------------------------------
-# 1. Auto-generate CARI-XXX code
+# 1. Auto-generate the account code from the book's own prefix and counter
 # ---------------------------------------------------------------------------
 @receiver(pre_save, sender=CurrentAccount)
 def assign_current_account_code(sender, instance, **kwargs):

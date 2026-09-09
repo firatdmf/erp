@@ -6303,8 +6303,8 @@ msgstr "e-Arşiv / fatura başlıkları için"
 msgid "Account code stays the same."
 msgstr "Cari kodu değişmez."
 
-msgid "Account code is generated automatically (CARI-001…)."
-msgstr "Cari kodu otomatik atanır (CARI-001…)."
+msgid "Account code is generated automatically (ACC-001…)."
+msgstr "Cari kodu otomatik atanır (ACC-001…)."
 
 msgid "Inactive accounts are hidden from default filters."
 msgstr "Pasif cariler varsayılan filtrede gizlenir."

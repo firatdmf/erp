@@ -141,7 +141,7 @@ class CurrentAccount(models.Model):
 
     book = models.ForeignKey("accounting.Book", on_delete=models.CASCADE, related_name="current_account_accounts")
 
-    code = models.CharField(max_length=20, help_text="e.g., CARI-001")
+    code = models.CharField(max_length=20, help_text="e.g., ACC-001")
     name = models.CharField(max_length=200)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="customer")
 
@@ -511,7 +511,11 @@ class CurrentAccountSettings(models.Model):
     next_invoice_seq = models.PositiveIntegerField(default=1)
     next_payment_seq = models.PositiveIntegerField(default=1)
 
-    current_account_code_prefix  = models.CharField(max_length=10, default="CARI")
+    # ACC, not CARI: the Turkish term was dropped from the interface, and a
+    # book created today should not start minting codes in it. Per-book, so
+    # a book already running another prefix keeps it — and the codes it has
+    # already issued are never rewritten.
+    current_account_code_prefix  = models.CharField(max_length=10, default="ACC")
     current_account_code_padding = models.PositiveSmallIntegerField(default=3)
 
     default_tax_rate          = models.DecimalField(max_digits=5, decimal_places=2,

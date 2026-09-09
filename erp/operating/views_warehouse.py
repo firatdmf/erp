@@ -2297,7 +2297,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     if current_account_obj is None:
         raise IntakeError(
             {"success": False,
-             "error": "Cari hesap seçin — alım faturası bu hesaba işlenir."},
+             "error": str(_lz("Pick a current account — the purchase invoice is posted to it."))},
             status=400)
     account_name = current_account_obj.name
 

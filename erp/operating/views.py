@@ -2778,7 +2778,7 @@ class OrderCreate(View):
                 order.save(update_fields=["current_account"])
             post_order_movement(order, member=member)
         except Exception as _e:
-            messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
+            messages.warning(request, f"Order saved but current account sync had an issue: {_e}")
 
         # ── Deposit (collection) — post against the current account if the
         # user ticked "Deposit received" and entered an amount.
@@ -3227,7 +3227,7 @@ class OrderEdit(UpdateView):
                         self.object.save(update_fields=["current_account"])
                     post_order_movement(self.object, member=member)
                 except Exception as _e:
-                    messages.warning(self.request, f"Order updated but cari sync had an issue: {_e}")
+                    messages.warning(self.request, f"Order updated but current account sync had an issue: {_e}")
 
                 messages.success(self.request, "Order updated successfully.")
                 if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":

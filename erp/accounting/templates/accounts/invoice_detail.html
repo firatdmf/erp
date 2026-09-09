@@ -508,7 +508,7 @@
         <a href="{% url 'accounts:invoice_edit' invoice.pk %}" class="iv-btn ghost"
            {% if invoice.type == 'purchase' %}
              {# Server-side redirects to the warehouse-sidebar edit flow either way — no confirm needed here. #}
-           {% elif invoice.status != 'draft' %}onclick="return confirm('{% trans 'This invoice is already issued. Editing will sync the cari ledger. Continue?' %}');"{% endif %}>
+           {% elif invoice.status != 'draft' %}onclick="return confirm('{% trans 'This invoice is already issued. Editing will sync the current account ledger. Continue?' %}');"{% endif %}>
           <i data-lucide="edit-3"></i>{% trans "Edit" %}
         </a>
       {% endif %}
@@ -778,11 +778,11 @@
     </div>
     <p style="margin:0 0 6px; font:400 13px var(--font-sans); color:var(--gray-700); line-height:1.55;">
       {% if invoice.type == 'purchase' %}
-        {% trans "This permanently removes the physical stock this purchase brought in and reverses the cari debt. This cannot be undone." %}
+        {% trans "This permanently removes the physical stock this purchase brought in and reverses the current account debt. This cannot be undone." %}
       {% elif invoice.order_id %}
-        {% trans "Bu fatura iptal edilirse bağlı SİPARİŞ DE İPTAL OLUR: stoklar depoya geri döner ve cari hareketi silinir. Bu işlem geri alınamaz." %}
+        {% trans "Cancelling this invoice CANCELS THE LINKED ORDER TOO: the stock returns to the warehouse and the current account movement is deleted. This cannot be undone." %}
       {% else %}
-        {% trans "Fatura iptal edilsin mi? Cari hareketi silinir. Bu işlem geri alınamaz." %}
+        {% trans "Cancel this invoice? The current account movement is deleted. This cannot be undone." %}
       {% endif %}
     </p>
     {% if invoice.order_id %}

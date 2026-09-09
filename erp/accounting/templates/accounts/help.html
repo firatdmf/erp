@@ -256,7 +256,7 @@
 
       <h3>{% trans "Movement → Balance" %}</h3>
       <p>{% trans "Balance is not a stored field, it is the sum of movements:" %}</p>
-      <pre><code>Balance = SUM(CurrentAccountMovement.amount) WHERE cari = X</code></pre>
+      <pre><code>Balance = SUM(CurrentAccountMovement.amount) WHERE current_account = X</code></pre>
       <p>{% blocktrans %}That's why when you delete / change a movement, the balance auto-corrects. <strong>The cancel action does not delete the original row</strong>, it writes a reverse movement (audit-safe).{% endblocktrans %}</p>
 
       <h3>{% trans "Status flows" %}</h3>

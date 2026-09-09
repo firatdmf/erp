@@ -407,7 +407,9 @@ class PurchaseOrderSave(View):
             current_account = CurrentAccount.objects.filter(pk=int(data["current_account_id"])).first()
         if current_account is None:
             return JsonResponse(
-                {"success": False, "error": "Cari hesap seçin — alım bu hesaba işlenir."}, status=400)
+                {"success": False,
+                 "error": _("Pick a current account — the purchase is posted to it.")},
+                status=400)
 
         lines = plan_lines(data)
         if not lines:

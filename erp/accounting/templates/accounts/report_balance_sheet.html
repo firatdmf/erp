@@ -181,7 +181,7 @@ somewhere else; showing only the subsidiary side is what we had before.
         <tr class="section"><td colspan="2">{% trans "Assets" %}</td></tr>
         <tr><td>{% trans "Cash and bank" %} <span class="muted">({% trans "cash journal" %})</span></td>
             <td class="num">{{ subs.cash|floatformat:2|intcomma }}</td></tr>
-        <tr><td>{% trans "Accounts receivable" %} <span class="muted">({% trans "cari accounts" %})</span></td>
+        <tr><td>{% trans "Accounts receivable" %} <span class="muted">({% trans "current accounts" %})</span></td>
             <td class="num">{{ subs.receivable|floatformat:2|intcomma }}</td></tr>
         <tr>
           <td>{% trans "Inventory" %}
@@ -201,7 +201,7 @@ somewhere else; showing only the subsidiary side is what we had before.
             <td class="num">{{ subs.assets|floatformat:2|intcomma }}</td></tr>
 
         <tr class="section"><td colspan="2">{% trans "Liabilities" %}</td></tr>
-        <tr><td>{% trans "Accounts payable" %} <span class="muted">({% trans "cari accounts" %})</span></td>
+        <tr><td>{% trans "Accounts payable" %} <span class="muted">({% trans "current accounts" %})</span></td>
             <td class="num">{{ subs.payable|floatformat:2|intcomma }}</td></tr>
         <tr class="total"><td>{% trans "Total liabilities" %}</td>
             <td class="num">{{ subs.liabilities|floatformat:2|intcomma }}</td></tr>
@@ -247,7 +247,7 @@ somewhere else; showing only the subsidiary side is what we had before.
   </div>
 
   <details class="bs-detail">
-    <summary>{% trans "Cari movements by type — none of these posts a contra entry" %}</summary>
+    <summary>{% trans "Current account movements by type — none of these posts a contra entry" %}</summary>
     <div class="bs-card" style="margin-top:8px;">
       <table class="bs-tbl">
         {% for r in subs.movement_types %}

@@ -9196,3 +9196,27 @@ msgstr "atlandı"
 
 msgid "Adding"
 msgstr "Ekleniyor"
+
+msgid "current accounts"
+msgstr "cari hesaplar"
+
+msgid "Current account movements by type — none of these posts a contra entry"
+msgstr "Türe göre cari hareketleri — bunların hiçbiri karşı kayıt oluşturmaz"
+
+msgid "This invoice is already issued. Editing will sync the current account ledger. Continue?"
+msgstr "Bu fatura zaten kesilmiş. Düzenleme cari defterini de günceller. Devam edilsin mi?"
+
+msgid "This permanently removes the physical stock this purchase brought in and reverses the current account debt. This cannot be undone."
+msgstr "Bu işlem, bu alımla giren fiziksel stoğu kalıcı olarak siler ve cari borcu geri alır. Bu işlem geri alınamaz."
+
+msgid "Cancelling this invoice CANCELS THE LINKED ORDER TOO: the stock returns to the warehouse and the current account movement is deleted. This cannot be undone."
+msgstr "Bu fatura iptal edilirse bağlı SİPARİŞ DE İPTAL OLUR: stoklar depoya geri döner ve cari hareketi silinir. Bu işlem geri alınamaz."
+
+msgid "Cancel this invoice? The current account movement is deleted. This cannot be undone."
+msgstr "Fatura iptal edilsin mi? Cari hareketi silinir. Bu işlem geri alınamaz."
+
+msgid "Pick a current account — the purchase is posted to it."
+msgstr "Cari hesap seçin — alım bu hesaba işlenir."
+
+msgid "Pick a current account — the purchase invoice is posted to it."
+msgstr "Cari hesap seçin — alım faturası bu hesaba işlenir."

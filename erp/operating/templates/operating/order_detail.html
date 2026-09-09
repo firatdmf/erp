@@ -876,7 +876,7 @@
             {% if order.order_status == 'pending' %}{% trans "Pending" %}
             {% elif order.order_status == 'confirmed' %}{% trans "Confirmed" %}
             {% elif order.order_status == 'preparing' %}{% trans "Preparing" %}
-            {% elif order.order_status == 'shipped' %}{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tamamlandı{% else %}Completed{% endif %}
+            {% elif order.order_status == 'shipped' %}{% trans "Completed" %}
             {% elif order.order_status == 'in_transit' %}{% trans "In transit" %}
             {% elif order.order_status == 'out_for_delivery' %}{% trans "Out for delivery" %}
             {% elif order.order_status == 'delivered' %}{% trans "Delivered" %}
@@ -933,11 +933,11 @@
       <div id="ophWrap" class="oph-wrap no-print" style="display:inline-flex;align-items:center;gap:8px;">
         <input id="ophInput" class="od-input oph-input" type="text" maxlength="120"
                title="{% trans 'Top-left title shown on the printed PDF (blank = brand)' %}"
-               placeholder="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}PDF başlığı (varsayılan: {{ brand_line|default:'Nejum' }}){% else %}PDF header (default: {{ brand_line|default:'Nejum' }}){% endif %}"
+               placeholder="{% blocktrans with brand=brand_line|default:'Nejum' %}PDF header (default: {{ brand }}){% endblocktrans %}"
                value="{{ order.print_header|default:'' }}"
                onkeydown="if(event.key==='Enter'){event.preventDefault();saveOrderPrintHeader(this.nextElementSibling);}">
         <button type="button" class="ord-btn ghost" onclick="saveOrderPrintHeader(this)">
-          <i class="fa fa-check"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Kaydet{% else %}Save{% endif %}
+          <i class="fa fa-check"></i>{% trans "Save" %}
         </button>
       </div>
       <a href="{% url 'operating:order_print' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
@@ -953,10 +953,10 @@
       {% endif %}
       {% if not shipped and not is_terminal %}
         <a href="{% url 'operating:edit_order' order.pk %}" class="ord-btn ghost">
-          <i class="fa fa-pen"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Düzenle{% else %}Edit{% endif %}
+          <i class="fa fa-pen"></i>{% trans "Edit" %}
         </a>
         <a href="{% url 'operating:order_pack_scan' order.pk %}" class="ord-btn primary">
-          <i class="fa fa-barcode"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketle (Top Okut){% else %}Pack (Scan rolls){% endif %}
+          <i class="fa fa-barcode"></i>{% trans "Pack (Scan rolls)" %}
         </a>
       {% endif %}
     </div>
@@ -989,7 +989,7 @@
                 <span class="od-stage {% if s.filled %}filled{% endif %}" style="cursor:default;">
                   <span class="od-stage-n">{{ forloop.counter }}</span>
                   <span class="od-stage-l">
-                    {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketleniyor{% else %}Packing{% endif %}
+                    {% trans "Packing" %}
                   </span>
                 </span>
                 {% else %}
@@ -998,7 +998,7 @@
                    style="text-decoration:none;">
                   <span class="od-stage-n">{{ forloop.counter }}</span>
                   <span class="od-stage-l">
-                    {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketleniyor{% else %}Packing{% endif %}
+                    {% trans "Packing" %}
                     {% if reservation_count %}<span class="od-stage-badge">{{ reservation_count }}</span>{% endif %}
                   </span>
                 </a>
@@ -1008,14 +1008,14 @@
                         class="od-stage {% if s.filled %}filled{% endif %} {% if order.order_status == 'shipped' %}now{% endif %}"
                         data-status="shipped">
                   <span class="od-stage-n">{{ forloop.counter }}</span>
-                  <span class="od-stage-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tamamlandı{% else %}Completed{% endif %}</span>
+                  <span class="od-stage-l">{% trans "Completed" %}</span>
                 </button>
               {% else %}
                 <button type="button"
                         class="od-stage {% if s.filled %}filled{% endif %} {% if order.order_status == s.key %}now{% endif %}"
                         data-status="{{ s.key }}">
                   <span class="od-stage-n">{{ forloop.counter }}</span>
-                  <span class="od-stage-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Açık{% else %}Open{% endif %}</span>
+                  <span class="od-stage-l">{% trans "Open" %}</span>
                 </button>
               {% endif %}
               {% if not forloop.last %}<span class="od-stage-arrow {% if s.filled %}filled{% endif %}">→</span>{% endif %}
@@ -1025,21 +1025,19 @@
           <div class="od-ship">
             <div class="od-ship-hint" style="font-size:12px;color:#64748B;margin-bottom:8px;">
               <i class="fa fa-circle-info"></i>
-              {% if LANGUAGE_CODE|slice:":2" == "tr" %}
-                <b>Siparişi Tamamla</b> denene kadar stok düşmez. Kargo bilgileri opsiyoneldir — girilirse kaydedilir, girilmese de sipariş tamamlanabilir.
-              {% else %}
-                No stock is deducted until <b>Complete order</b> is pressed. Cargo info is optional — saved if entered, but the order can complete without it.
-              {% endif %}
+              
+                {% trans "No stock is deducted until <b>Complete order</b> is pressed. Cargo info is optional — saved if entered, but the order can complete without it." %}
+              
             </div>
             {% if order.is_retail_order %}
             <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#0F766E;margin-bottom:10px;cursor:pointer;">
               <input type="checkbox" id="od-has-cargo" {% if order.carrier or order.tracking_number %}checked{% endif %}>
-              {% trans "Bu siparişte kargo var" %}
+              {% trans "This order is shipped by carrier" %}
             </label>
             {% endif %}
             <div class="od-ship-grid" id="od-ship-grid" {% if order.is_retail_order and not order.carrier and not order.tracking_number %}style="display:none;"{% endif %}>
               <label class="od-ship-f">
-                <span class="od-ship-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Kargo şirketi{% else %}Carrier{% endif %}</span>
+                <span class="od-ship-l">{% trans "Carrier" %}</span>
                 <select name="carrier">
                   <option value="">{% trans "— Select —" %}</option>
                   {% for code, label in carrier_choices %}
@@ -1048,29 +1046,29 @@
                 </select>
               </label>
               <label class="od-ship-f">
-                <span class="od-ship-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Takip numarası{% else %}Tracking number{% endif %}</span>
+                <span class="od-ship-l">{% trans "Tracking number" %}</span>
                 <input type="text" name="tracking_number" value="{{ order.tracking_number|default:'' }}"
                        placeholder="{% trans 'e.g. 1234567890' %}">
               </label>
             </div>
             <div class="od-ship-actions">
               <span class="od-ship-meta">
-                {% if order.shipped_at %}<i class="fa fa-check-circle"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tamamlandı{% else %}Completed{% endif %}: {{ order.shipped_at|date:"d M Y · H:i" }}{% endif %}
+                {% if order.shipped_at %}<i class="fa fa-check-circle"></i> {% trans "Completed" %}: {{ order.shipped_at|date:"d M Y · H:i" }}{% endif %}
                 {% if order.delivered_at %} · <i class="fa fa-check-circle"></i> {% trans "Delivered" %}: {{ order.delivered_at|date:"d M Y · H:i" }}{% endif %}
               </span>
               <div style="display:flex; gap:8px;">
-                <button type="submit" class="ord-btn ghost" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Sadece kargo bilgisini kaydet{% else %}Save cargo info only{% endif %}">
+                <button type="submit" class="ord-btn ghost" title="{% trans "Save cargo info only" %}">
                   <i class="fa fa-save"></i> {% trans "Save" %}
                 </button>
                 {% if order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
                 <button type="button" id="od-complete-btn" class="ord-btn primary" data-status="shipped">
-                  <i class="fa fa-truck-fast"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişi Tamamla{% else %}Complete order{% endif %}
+                  <i class="fa fa-truck-fast"></i> {% trans "Complete order" %}
                 </button>
                 {% else %}
                 <button type="button" id="od-revert-btn" class="ord-btn ghost"
                         style="border-color:#F5D78B; background:#FFFBEB; color:#8B5A00;"
-                        title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Stok iadesiyle birlikte siparişi düzeltilebilir hale geri açar{% else %}Re-opens the order for corrections, restoring stock{% endif %}">
-                  <i class="fa fa-rotate-left"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Geri Aç &amp; Düzelt{% else %}Re-open &amp; Fix{% endif %}
+                        title="{% trans "Re-opens the order for corrections, restoring stock" %}">
+                  <i class="fa fa-rotate-left"></i> {% trans "Re-open &amp; Fix" %}
                 </button>
                 {% endif %}
               </div>
@@ -1081,7 +1079,7 @@
         {% if order.order_status == 'cancelled' %}
         <div class="od-cancelled-note">
           <i class="fa fa-ban"></i>
-          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu sipariş iptal edildi ve tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun.{% else %}This order was cancelled and can't be reopened. Create a new order if needed.{% endif %}
+          {% trans "This order was cancelled and can't be reopened. Create a new order if needed." %}
         </div>
         {% else %}
         <details class="od-more-status">
@@ -1114,20 +1112,20 @@
           {% if not shipped and not is_terminal %}
           <div style="display:flex; gap:6px;">
             <a href="{% url 'operating:edit_order' order.pk %}" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
-              <i class="fa fa-pen"></i> <span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Düzenle{% else %}Edit{% endif %}</span>
+              <i class="fa fa-pen"></i> <span>{% trans "Edit" %}</span>
             </a>
             <a href="{% url 'operating:order_pack_scan' order.pk %}" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
-              <i class="fa fa-barcode"></i> <span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketle{% else %}Pack{% endif %}</span>
+              <i class="fa fa-barcode"></i> <span>{% trans "Pack" %}</span>
             </a>
           </div>
           {% elif is_terminal %}
           <span class="ord-btn ghost" style="font-size:12px; padding:6px 10px; opacity:0.6; cursor:default;"
-                title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}İptal edilmiş sipariş düzenlenemez ve paketlenemez{% else %}A cancelled order can't be edited or packed{% endif %}">
+                title="{% trans "A cancelled order can't be edited or packed" %}">
             <i class="fa fa-lock"></i> <span>{% trans "Locked" %}</span>
           </span>
           {% else %}
           <span class="ord-btn ghost" style="font-size:12px; padding:6px 10px; opacity:0.6; cursor:default;"
-                title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Tamamlanan siparişlerde ürünler düzenlenemez — önce 'Geri Aç & Düzelt' ile siparişi geri açın{% else %}Completed orders can't be edited — use 'Re-open & Fix' first{% endif %}">
+                title="{% trans "Completed orders can't be edited — use 'Re-open & Fix' first" %}">
             <i class="fa fa-lock"></i> <span>{% trans "Locked" %}</span>
           </span>
           {% endif %}
@@ -1193,10 +1191,10 @@
                       {% if item.scanned_count %}
                       <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2" }} m</span>
                       {% else %}
-                      <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top okutulmadı{% else %}no tops{% endif %}</span>
+                      <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% trans "no tops" %}</span>
                       {% endif %}
                     {% else %}
-                      <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}depo takipsiz{% else %}not tracked{% endif %}{% if item.pack_id %} · {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paket{% else %}Pack{% endif %} #{{ item.pack.pack_number }}{% endif %}</span>
+                      <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% trans "not tracked" %}{% if item.pack_id %} · {% trans "Pack" %} #{{ item.pack.pack_number }}{% endif %}</span>
                     {% endif %}
                   </div>
                 </div>
@@ -1253,7 +1251,7 @@
         <div class="od-unassigned" id="od-unassigned">
           <div class="od-unassigned-h">
             <i class="fa fa-triangle-exclamation"></i>
-            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Atanmamış toplar <small>— artık siparişteki bir kalemle eşleşmiyor, faturalanmaz</small>{% else %}Unassigned tops <small>— no longer match an order line, not billed</small>{% endif %}
+            {% trans "Unassigned tops <small>— no longer match an order line, not billed</small>" %}
           </div>
           <div data-tops-list="">
             {% for r in unassigned_reservations %}
@@ -1343,12 +1341,12 @@
                       border:1px dashed #FDE68A; border-radius:8px; color:#92400E; align-items:flex-start;">
             <span style="display:inline-flex; align-items:center; gap:6px;">
               <i class="fa fa-triangle-exclamation" style="font-size:10px; opacity:.7;"></i>
-              {% if LANGUAGE_CODE|slice:":2" == "tr" %}Okutulmamış miktar{% else %}Not yet scanned{% endif %}
+              {% trans "Not yet scanned" %}
             </span>
             <span style="text-align:right;">
               <span style="font-weight:700;">${{ scan_shortfall|floatformat:2 }}</span>
               <span style="display:block; font-weight:500; font-size:10.5px; opacity:.85;">
-                {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tamamı yine de faturalanır{% else %}Billed in full regardless{% endif %}
+                {% trans "Billed in full regardless" %}
               </span>
               {% for it, ordered, got in scan_shortfall_rows %}
               <span style="display:block; font-weight:500; font-size:10.5px; opacity:.75;">
@@ -1360,8 +1358,8 @@
           {% endif %}
           {% if total_scanned_count %}
           <div class="od-tot-row" style="color:#005354;">
-            <span><i class="fa fa-layer-group" style="font-size:10px; opacity:.7;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Toplam okutulan{% else %}Total scanned{% endif %}</span>
-            <span style="font-weight:700;">{{ total_scanned_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}tops{% endif %} · {{ total_scanned_meters|floatformat:"-2" }} m</span>
+            <span><i class="fa fa-layer-group" style="font-size:10px; opacity:.7;"></i> {% trans "Total scanned" %}</span>
+            <span style="font-weight:700;">{{ total_scanned_count }} {% trans "tops" %} · {{ total_scanned_meters|floatformat:"-2" }} m</span>
           </div>
           {% endif %}
           {% with tc=order.total_cost gp=order.gross_profit gm=order.gross_margin_pct %}
@@ -1754,10 +1752,10 @@
     const carrierSel  = statusForm.querySelector('[name="carrier"]');
     const trackingInp = statusForm.querySelector('[name="tracking_number"]');
     const SHIPPED = ['shipped', 'in_transit', 'out_for_delivery', 'delivered'];
-    const NEED_CARGO_MSG = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Siparişi tamamlamak için kargo şirketi ve takip numarası girin.'{% else %}'Enter carrier and tracking number to complete the order.'{% endif %};
-    const CONFIRM_SHIP = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Sipariş tamamlanacak ve paketlemede rezerve edilen toplar stoktan düşülecek. Onaylıyor musunuz?'{% else %}'The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?'{% endif %};
+    const NEED_CARGO_MSG = '{% trans "Enter carrier and tracking number to complete the order." %}';
+    const CONFIRM_SHIP = '{% trans "The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?" %}';
 
-    // Retail-only: "Bu siparişte kargo var" toggles the carrier/tracking
+    // Retail-only: the "shipped by carrier" tick toggles the carrier/tracking
     // fields; unchecked lets the order complete cargo-free (in-person /
     // walk-in sale) via the skip_cargo flag read server-side.
     const hasCargoChk = document.getElementById('od-has-cargo');
@@ -1767,7 +1765,7 @@
         shipGridEl.style.display = this.checked ? '' : 'none';
       });
     }
-    const CONFIRM_SHIP_NO_CARGO = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Kargo bilgisi girilmeden sipariş tamamlanacak ve rezerve edilen toplar stoktan düşülecek.'{% else %}'The order will complete WITHOUT cargo info and the reserved rolls will be deducted from stock.'{% endif %};
+    const CONFIRM_SHIP_NO_CARGO = '{% trans "The order will complete WITHOUT cargo info and the reserved rolls will be deducted from stock." %}';
     // Line-by-line recap appended to the complete-confirm so a mistyped
     // quantity/price gets one last human look before stock + money post.
     // Server-rendered snapshot as FALLBACK only — the live recap is
@@ -1776,8 +1774,8 @@
     // show the pre-edit numbers.
     const ORDER_SUMMARY_FALLBACK =
       {% for item in order_items_sorted %}'• {{ item.product.title|default:item.description|escapejs }}{% if item.product_variant %} ({{ item.product_variant.variant_sku|escapejs }}){% endif %} — {{ item.quantity|floatformat:2 }} × ${{ item.price|floatformat:2 }}\n' +
-      {% endfor %}'{% if LANGUAGE_CODE|slice:":2" == "tr" %}Toplam{% else %}Total{% endif %}: ${{ order.total_value|floatformat:2 }}';
-    const SUMMARY_TOTAL_LABEL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Toplam'{% else %}'Total'{% endif %};
+      {% endfor %}'{% trans "Total" %}: ${{ order.total_value|floatformat:2 }}';
+    const SUMMARY_TOTAL_LABEL = '{% trans "Total" %}';
     function buildOrderSummary() {
       try {
         const rows = document.querySelectorAll('#od-items-tbody tr[data-item-row]');
@@ -1798,7 +1796,7 @@
         return lines.join('\n');
       } catch (e) { return ORDER_SUMMARY_FALLBACK; }
     }
-    const CONFIRM_TAIL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'\n\nOnaylıyor musunuz?'{% else %}'\n\nContinue?'{% endif %};
+    const CONFIRM_TAIL = '\n\n' + '{% trans "Continue?" %}';
     function setSkipCargo(v) {
       let inp = document.getElementById('od-skip-cargo-input');
       if (!inp) {
@@ -1840,9 +1838,14 @@
     if (revertBtn) {
       revertBtn.addEventListener('click', function (e) {
         e.preventDefault();
-        const msg = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Sipariş geri açılacak:\n\n• Kesilen metreler aynı toplara iade edilir\n• Otomatik tahsilat iptal edilir (elle girilen kapora kalır)\n• Perakende defterindeki kayıt kaldırılır\n• Sipariş yeniden düzenlenebilir olur\n\nDüzeltmeleri yaptıktan sonra "Siparişi Tamamla" ile tekrar kapatın. Devam edilsin mi?'{% else %}'The order will be re-opened:\n\n• Cut metres return to their rolls\n• The auto collection is cancelled (manual deposits stay)\n• The retail ledger entry is removed\n• The order becomes editable again\n\nComplete it again after fixing. Continue?'{% endif %};
+        const msg = '{% trans "The order will be re-opened:" %}\n\n'
+          + '\u2022 {% trans "Cut metres return to their rolls" %}\n'
+          + '\u2022 {% trans "The auto collection is cancelled (manual deposits stay)" %}\n'
+          + '\u2022 {% trans "The retail ledger entry is removed" %}\n'
+          + '\u2022 {% trans "The order becomes editable again" %}\n\n'
+          + '{% trans "Complete it again after fixing. Continue?" %}';
         if (!confirm(msg)) return;
-        const reason = prompt({% if LANGUAGE_CODE|slice:":2" == "tr" %}'Geri açma sebebi (opsiyonel — değişiklik geçmişine yazılır):'{% else %}'Reason for re-opening (optional — logged to change history):'{% endif %}, '');
+        const reason = prompt('{% trans "Reason for re-opening (optional — logged to change history):" %}', '');
         if (reason === null) return;  // cancel on the prompt aborts too
         let inp = document.getElementById('od-revert-reason-input');
         if (!inp) {
@@ -2398,8 +2401,8 @@
     }
     window.__odUpdateActiveItemsCount = updateActiveItemsCount;
 
-    const EDIT_LABEL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Düzenle ve Paketle'{% else %}'Edit & Pack'{% endif %};
-    const CLOSE_LABEL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Kapat'{% else %}'Close'{% endif %};
+    const EDIT_LABEL = '{% trans "Edit & Pack" %}';
+    const CLOSE_LABEL = '{% trans "Close" %}';
     function exitEditMode() {
       if (card && card.classList.contains('editing')) {
         card.classList.remove('editing');
@@ -2476,7 +2479,7 @@
         // purchase cost instead; flag it so staff confirm/adjust before
         // adding, same warning shown in the create/edit-order sidebar.
         const costNote = costBool
-          ? ' <span style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;" title="{% trans "No sale price on file — showing purchase cost instead. Confirm or adjust before adding." %}">{% trans "Alış fiyatı" %}</span>'
+          ? ' <span style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;" title="{% trans "No sale price on file — showing purchase cost instead. Confirm or adjust before adding." %}">{% trans "Purchase cost" %}</span>'
           : '';
         addPick.innerHTML = '<i class="fa fa-check-circle"></i> ' +
           (title || '') + ' <code style="color:#6b7280;">' + (sku || '') + '</code>' + costNote;
@@ -2618,7 +2621,8 @@
       const topsRow = tbody.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
       const scannedCount = topsRow ? topsRow.querySelectorAll('.od-top-row[data-id]').length : 0;
       if (!id.startsWith('new-') && scannedCount > 0) {
-        const msg = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Bu üründe ' + scannedCount + ' okutulmuş top var. Ürünü kaldırırsanız toplar "Atanmamış" durumuna düşer ve FATURALANMAZ. Devam edilsin mi?'{% else %}'This line has ' + scannedCount + ' scanned tops. Removing it leaves them "Unassigned" and NOT billed. Continue?'{% endif %};
+        const msg = '{% trans 'This line has %(n)s scanned tops. Removing it leaves them "Unassigned" and NOT billed. Continue?' %}'
+          .replace('%(n)s', scannedCount);
         if (!confirm(msg)) return;
       }
 

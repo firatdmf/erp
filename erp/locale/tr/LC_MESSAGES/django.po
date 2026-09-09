@@ -9226,3 +9226,97 @@ msgstr "Bu barkod %(book)s rafında. Bir sipariş tek bir deftere aittir — bun
 
 msgid "That barcode is on %(book)s's shelf. Tick “Show stock from my other books” to add it — the order is split by book when you save."
 msgstr "Bu barkod %(book)s rafında. Eklemek için “Diğer defterlerimdeki stoğu göster”i işaretleyin — kaydettiğinizde sipariş deftere göre bölünür."
+
+msgid "Pack (Scan rolls)"
+msgstr "Paketle (Top Okut)"
+
+msgid "No stock is deducted until <b>Complete order</b> is pressed. Cargo info is optional — saved if entered, but the order can complete without it."
+msgstr "<b>Siparişi Tamamla</b> denene kadar stok düşmez. Kargo bilgileri opsiyoneldir — girilirse kaydedilir, girilmese de sipariş tamamlanabilir."
+
+msgid "Save cargo info only"
+msgstr "Sadece kargo bilgisini kaydet"
+
+msgid "Complete order"
+msgstr "Siparişi Tamamla"
+
+msgid "Re-opens the order for corrections, restoring stock"
+msgstr "Stok iadesiyle birlikte siparişi düzeltilebilir hale geri açar"
+
+msgid "Re-open &amp; Fix"
+msgstr "Geri Aç &amp; Düzelt"
+
+msgid "This order was cancelled and can't be reopened. Create a new order if needed."
+msgstr "Bu sipariş iptal edildi ve tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun."
+
+msgid "Pack"
+msgstr "Paketle"
+
+msgid "A cancelled order can't be edited or packed"
+msgstr "İptal edilmiş sipariş düzenlenemez ve paketlenemez"
+
+msgid "Completed orders can't be edited — use 'Re-open & Fix' first"
+msgstr "Tamamlanan siparişlerde ürünler düzenlenemez — önce 'Geri Aç & Düzelt' ile siparişi geri açın"
+
+msgid "no tops"
+msgstr "top okutulmadı"
+
+msgid "not tracked"
+msgstr "depo takipsiz"
+
+msgid "Unassigned tops <small>— no longer match an order line, not billed</small>"
+msgstr "Atanmamış toplar <small>— artık siparişteki bir kalemle eşleşmiyor, faturalanmaz</small>"
+
+msgid "Not yet scanned"
+msgstr "Okutulmamış miktar"
+
+msgid "Billed in full regardless"
+msgstr "Tamamı yine de faturalanır"
+
+msgid "Total scanned"
+msgstr "Toplam okutulan"
+
+msgid "Enter carrier and tracking number to complete the order."
+msgstr "Siparişi tamamlamak için kargo şirketi ve takip numarası girin."
+
+msgid "The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?"
+msgstr "Sipariş tamamlanacak ve paketlemede rezerve edilen toplar stoktan düşülecek. Onaylıyor musunuz?"
+
+msgid "The order will complete WITHOUT cargo info and the reserved rolls will be deducted from stock."
+msgstr "Kargo bilgisi girilmeden sipariş tamamlanacak ve rezerve edilen toplar stoktan düşülecek."
+
+msgid "Reason for re-opening (optional — logged to change history):"
+msgstr "Geri açma sebebi (opsiyonel — değişiklik geçmişine yazılır):"
+
+msgid "Edit & Pack"
+msgstr "Düzenle ve Paketle"
+
+msgid "Continue?"
+msgstr "Onaylıyor musunuz?"
+
+msgid "The order will be re-opened:"
+msgstr "Sipariş geri açılacak:"
+
+msgid "Cut metres return to their rolls"
+msgstr "Kesilen metreler aynı toplara iade edilir"
+
+msgid "The auto collection is cancelled (manual deposits stay)"
+msgstr "Otomatik tahsilat iptal edilir (elle girilen kapora kalır)"
+
+msgid "The retail ledger entry is removed"
+msgstr "Perakende defterindeki kayıt kaldırılır"
+
+msgid "The order becomes editable again"
+msgstr "Sipariş yeniden düzenlenebilir olur"
+
+msgid "Complete it again after fixing. Continue?"
+msgstr "Düzeltmeleri yaptıktan sonra \"Siparişi Tamamla\" ile tekrar kapatın. Devam edilsin mi?"
+
+msgid "This line has %(n)s scanned tops. Removing it leaves them \"Unassigned\" and NOT billed. Continue?"
+msgstr "Bu üründe %(n)s okutulmuş top var. Ürünü kaldırırsanız toplar \"Atanmamış\" durumuna düşer ve FATURALANMAZ. Devam edilsin mi?"
+
+msgid "This order is shipped by carrier"
+msgstr "Bu siparişte kargo var"
+
+#, python-format
+msgid "PDF header (default: %(brand)s)"
+msgstr "PDF başlığı (varsayılan: %(brand)s)"

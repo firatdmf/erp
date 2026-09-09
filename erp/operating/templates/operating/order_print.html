@@ -188,12 +188,20 @@
     <tr>
       <td>
         <div class="brand">{{ brand_line|default:"Nejum ERP" }}</div>
-        {% comment %}Only when this sheet IS one order. A combined print
-        covers many, and each already carries its own number on the group
-        row above its lines — a single number up here would name one of
-        them and appear to speak for all.{% endcomment %}
-        {% if not combined %}<div class="num">{{ order.order_number|default:order.pk }}</div>{% endif %}
-        <div class="doc-type">{% if combined %}{% trans "Orders" %}{% else %}{% trans "Order" %}{% endif %}</div>
+        {% comment %}One line, naming the document: "Order #297". A
+        combined print covers many orders — each already named on the
+        group row above its own lines — so it keeps the bare kicker
+        instead, rather than putting one order's number in a masthead
+        that appears to speak for all of them.
+
+        The # belongs to the id. An order_number, once orders carry one,
+        is already a formatted reference and reads wrong behind a hash
+        ("Order #DK0000297").{% endcomment %}
+        {% if combined %}
+          <div class="doc-type">{% trans "Orders" %}</div>
+        {% else %}
+          <div class="num">{% trans "Order" %} {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</div>
+        {% endif %}
       </td>
       <td align="right">
         <div class="date">{% if combined %}{% if combined_from and combined_to and combined_from != combined_to %}{{ combined_from|date:"d M Y" }} – {{ combined_to|date:"d M Y" }}{% else %}{{ combined_to|date:"d M Y" }}{% endif %}{% else %}{{ order.order_date|date:"d M Y" }}{% endif %}</div>

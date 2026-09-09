@@ -187,19 +187,35 @@ class BrandHeader(TestCase):
         self.assertIsNotNone(brand_rule, "the brand headline rule is gone")
         self.assertIn("#944F05", brand_rule.group(0))
 
-    def test_the_order_number_prints_under_the_brand(self):
-        """In the header block, and after the brand line — the sheet has
-        to say which order it is without being read to the bottom."""
+    def _header(self, order):
         printed = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": self.order.pk})
+            reverse("operating:order_print", kwargs={"pk": order.pk})
         ).content.decode()
         header = re.search(r'<table class="hdr".*?</table>', printed, re.S)
         self.assertIsNotNone(header, "the print header is gone")
-        header = header.group(0)
-        self.assertIn("DK0000270", header)
+        return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", header.group(0))).strip()
+
+    def test_the_sheet_names_itself_under_the_brand(self):
+        """"Order DK0000270", not a bare number floating under a kicker —
+        the line has to read as a sentence on a document handed over."""
+        header = self._header(self.order)
+        self.assertIn("Order DK0000270", header)
         self.assertLess(
-            header.index(self.LOCKUP), header.index("DK0000270"),
-            "the order number should come after the brand headline")
+            header.index(self.LOCKUP), header.index("Order DK0000270"),
+            "the order line should come after the brand headline")
+
+    def test_an_order_with_no_number_of_its_own_is_named_by_id(self):
+        """Every order in the database is in this state today: order_number
+        is null, so the id is the only reference there is. It takes a # —
+        that is what marks it as an id rather than a reference someone
+        assigned."""
+        bare = Order.objects.create()
+        self.assertIn(f"Order #{bare.pk}", self._header(bare))
+
+    def test_a_real_order_number_is_not_given_a_hash(self):
+        """"Order #DK0000270" reads as a mistake: the hash belongs to a
+        raw id, and an assigned reference is already formatted."""
+        self.assertNotIn("#DK0000270", self._header(self.order))
 
     def test_editing_the_book_changes_every_document(self):
         """The point of moving this onto the book: one edit, and the

@@ -10,7 +10,15 @@
       "Bash(cd \"/c/Users/enes3/erp/erp\" && grep -n \"order_pack_scan\" operating/templates/operating/order_packing_list.html)",
       "Bash(cd \"/c/Users/enes3/erp/erp\" && grep -n \"get_current_language\\\\|LANGUAGE_CODE\" operating/templates/operating/order_packing_list.html | head -5)",
       "Bash(cd \"/c/Users/enes3/erp/erp\" && head -5 operating/templates/operating/order_packing_list.html && grep -n \"i18n\\\\|USE_I18N\" erp/settings.py | head -3 && grep -n \"django.template.context_processors.i18n\" erp/settings.py)",
-      "Bash(python manage.py shell -c ' *)"
+      "Bash(python manage.py shell -c ' *)",
+      "Bash(python manage.py migrate*)",
+      "Bash(python3 manage.py migrate*)"
+    ]
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Running `manage.py migrate` (optionally naming an app and target migration, e.g. `migrate crm 0020`) from the erp/ directory of this project is approved, including against the production Railway database that erp/.env points at — this project's migrations are applied by hand because the Railway deploy has no release command. This covers the `migrate` command only: other management commands that write to the production database, and raw SQL, are not covered."
     ]
   }
 }

@@ -343,6 +343,9 @@ class OrderNumberSequence(models.Model):
     prefix  = models.CharField(max_length=10, default="ORD")
     padding = models.PositiveSmallIntegerField(default=6)
     next_seq = models.PositiveIntegerField(default=1)
+    # The year this sequence last issued in; see take(). Null on a counter
+    # that has issued nothing, which simply starts.
+    seq_year = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Order number sequence"
@@ -365,20 +368,25 @@ class OrderNumberSequence(models.Model):
         reference is recognisable as one of the same family rather than as
         the one series that reads differently.
 
-        The year is stamped, not counted: the sequence runs straight on
-        across the turn of the year, exactly as the collection and invoice
-        counters do. Resetting it would make ORD-2027-000001 the second
-        order to carry that tail.
+        The sequence restarts when the year turns, as the collection and
+        invoice counters do, so an order's tail counts that year's orders
+        rather than every order ever taken. Numbers already issued keep the
+        year they were issued under, so nothing collides: ORD-2027-000001
+        is free however far 2026 got.
         """
         from django.db import transaction
         from django.utils import timezone
         with transaction.atomic():
             row, _ = cls.objects.get_or_create(pk=1)
             locked = cls.objects.select_for_update().get(pk=row.pk)
-            number = (f"{locked.prefix}-{timezone.now().year}-"
+            year = timezone.now().year
+            if locked.seq_year != year:
+                locked.next_seq = 1
+                locked.seq_year = year
+            number = (f"{locked.prefix}-{year}-"
                       f"{str(locked.next_seq).zfill(locked.padding)}")
             locked.next_seq += 1
-            locked.save(update_fields=["next_seq"])
+            locked.save(update_fields=["next_seq", "seq_year"])
             return number
 
 
@@ -1407,18 +1415,18 @@ class WarehouseProduct(models.Model):
     #
     # Defaults to metres: every product that existed before this field is
     # fabric, so the default is not a guess.
-    # The stored CODES are the ones the goods-receipt form has always
-    # submitted and _PRODUCT_UNIT_MAP reads, so they stay as they are.
-    # What a person SEES is English, through gettext — so Turkish comes
-    # from the .po file rather than from a second string hardcoded here.
+    # Codes AND labels are English. They used to be "adet" and "paket",
+    # because that is what the goods-receipt form had always submitted —
+    # which made the stored value, the form option and every lookup key
+    # Turkish. Turkish belongs in the .po catalogue, not in the data.
     UNIT_CHOICES = [
         ("mt", _("Metre")),
-        ("adet", _("Piece")),
-        ("paket", _("Pack")),
+        ("piece", _("Piece")),
+        ("pack", _("Pack")),
         ("kg", _("Kilogram")),
     ]
-    UNIT_SHORT = {"mt": _("m"), "adet": _("pcs"),
-                  "paket": _("pack"), "kg": _("kg")}
+    UNIT_SHORT = {"mt": _("m"), "piece": _("pcs"),
+                  "pack": _("pack"), "kg": _("kg")}
 
     # How this product is PACKED — what one stock item physically is. A
     # stock item is a lot that arrived together and is picked from
@@ -1456,7 +1464,7 @@ class WarehouseProduct(models.Model):
     # seed existing rows in the migration and to pick a sensible default
     # for a newly-received product; it is a starting point, not a rule,
     # and the field can be changed independently afterwards.
-    PACK_FOR_UNIT = {"mt": "roll", "kg": "bale", "adet": "box", "paket": "box"}
+    PACK_FOR_UNIT = {"mt": "roll", "kg": "bale", "piece": "box", "pack": "box"}
 
     # What the quantity COLUMN is headed. Metres of cloth are a length and
     # kilos are a weight; a count of curtain sets is neither, and reading

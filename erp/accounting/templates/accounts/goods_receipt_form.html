@@ -513,9 +513,9 @@
           <select id="npUnit" class="np-select" onchange="npRelabelUnits(); npSummaryUpdate();"
                   {% if edit_invoice %}disabled{% endif %}>
             <option value="mt">{% trans "Meter (m)" %}</option>
-            <option value="adet">{% trans "Piece (pcs)" %}</option>
+            <option value="piece">{% trans "Piece (pcs)" %}</option>
             <option value="kg">kg</option>
-            <option value="paket">{% trans "Package" %}</option>
+            <option value="pack">{% trans "Package" %}</option>
           </select>
         </div>
       </div>
@@ -793,7 +793,7 @@
 
   function unitShort() {
     const u = (document.getElementById('npUnit') || {}).value || 'mt';
-    return ({ mt: 'm', adet: 'pcs', kg: 'kg', paket: 'pack' })[u] || u;
+    return ({ mt: 'm', piece: 'pcs', kg: 'kg', pack: 'pack' })[u] || u;
   }
   function slug(s) {
     return (s || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/gi, '').slice(0, 10);

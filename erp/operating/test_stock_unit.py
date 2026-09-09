@@ -44,7 +44,7 @@ class StockUnitIsShownNotAssumed(TestCase):
 
         self.curtains = WarehouseProduct.objects.create(
             warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
-            quantity=Decimal("20"), unit="paket", pack_type="box")
+            quantity=Decimal("20"), unit="pack", pack_type="box")
         WarehouseProductItem.objects.create(
             product=self.curtains, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), barcode="BOX-12",
@@ -114,7 +114,7 @@ class TheLabelSaysWhatItIsCounting(TestCase):
             name="Ready-made Shop", accounting_book=self.book)
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
-            quantity=Decimal("20"), unit="paket", pack_type="box")
+            quantity=Decimal("20"), unit="pack", pack_type="box")
 
         user = get_user_model().objects.create_user("printer", password="pw")
         user.member.books.add(self.book)
@@ -162,7 +162,7 @@ class MovingStockCarriesTheUnit(TestCase):
             name="Shop B", accounting_book=self.book)
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.source, name="Peony 84in", sku="RN1357.RM8",
-            quantity=Decimal("20"), unit="paket", pack_type="box")
+            quantity=Decimal("20"), unit="pack", pack_type="box")
         self.roll = WarehouseProductItem.objects.create(
             product=self.wp, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), barcode="BOX-12",
@@ -184,7 +184,7 @@ class MovingStockCarriesTheUnit(TestCase):
 
         moved = WarehouseProduct.objects.get(
             warehouse=self.target, sku="RN1357.RM8")
-        self.assertEqual(moved.unit, "paket")
+        self.assertEqual(moved.unit, "pack")
         self.assertEqual(moved.unit_short, "pack")
 
 
@@ -209,7 +209,7 @@ class OneStockItemIsCalledWhatItIs(TestCase):
 
         self.curtains = WarehouseProduct.objects.create(
             warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
-            quantity=Decimal("20"), unit="paket", pack_type="box")
+            quantity=Decimal("20"), unit="pack", pack_type="box")
         WarehouseProductItem.objects.create(
             product=self.curtains, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), lot_number="12",
@@ -308,7 +308,7 @@ class TheProductPageSpeaksTheProductsLanguage(TestCase):
 
         self.curtains = WarehouseProduct.objects.create(
             warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
-            quantity=Decimal("20"), unit="paket", pack_type="box")
+            quantity=Decimal("20"), unit="pack", pack_type="box")
         WarehouseProductItem.objects.create(
             product=self.curtains, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), lot_number="12",

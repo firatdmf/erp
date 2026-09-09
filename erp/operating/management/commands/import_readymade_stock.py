@@ -65,7 +65,7 @@ BOOK_NAME = "Ergene Fabric"
 # then travel in cartons, which is what one stock item here is: the two
 # are separate facts and the command states both rather than letting one
 # be inferred from the other.
-UNIT = "paket"
+UNIT = "pack"
 PACK_TYPE = "box"
 
 # The sheet's prices run $12.40-$26.50 a set, the same scale as the Karven

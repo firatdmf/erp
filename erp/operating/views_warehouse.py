@@ -568,7 +568,8 @@ def _default_fabric_category():
 
 # Manual-add unit → a valid marketing.Product.unit_of_measurement choice
 # (the model only allows units/mt/kg; the real per-roll quantity is generic).
-_PRODUCT_UNIT_MAP = {"mt": "mt", "kg": "kg", "adet": "units", "paket": "units", "units": "units"}
+_PRODUCT_UNIT_MAP = {"mt": "mt", "kg": "kg", "piece": "units",
+                     "pack": "units", "units": "units"}
 
 
 def _product_sku_minter(prefix):
@@ -2473,7 +2474,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
     # What the WAREHOUSE row is counted in. `prod_unit` above is the
     # catalog's flattened version (marketing.Product allows only
-    # units/mt/kg, so adet and paket both collapse to "units"); the
+    # units/mt/kg, so piece and pack both collapse to "units"); the
     # warehouse keeps the distinction the form actually collected.
     wh_unit = unit if unit in dict(WarehouseProduct.UNIT_CHOICES) else "mt"
     # A starting point for how it is packed, not a rule — `pack_type` is
@@ -2774,7 +2775,7 @@ class WarehouseManualAdd(View):
       {
         "current_account_id": 163,                   # REQUIRED → barcode prefix + alım
         "barcode_prefix": "KZL",          # optional explicit override
-        "unit": "mt",                     # mt | adet | kg | paket | ...
+        "unit": "mt",                     # mt | piece | kg | pack | ...
         "products": [
           {
             "main_product": {"mode": "new"|"existing", "id": 12,

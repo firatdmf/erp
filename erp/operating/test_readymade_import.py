@@ -136,7 +136,7 @@ class ReadymadeStockImport(TestCase):
     def test_the_shop_counts_in_packs_not_metres(self):
         self._apply()
         for wp in WarehouseProduct.objects.all():
-            self.assertEqual(wp.unit, "paket")
+            self.assertEqual(wp.unit, "pack")
             self.assertEqual(wp.unit_short, "pack")
 
     def test_the_sets_are_packed_in_boxes(self):

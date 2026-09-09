@@ -1988,12 +1988,18 @@ class MakeInTransfer(View):
 
     template_name = "accounting/make_in_transfer.html"
     MODES = ("cash", "current_account")
+    # The page called the second mode "cari" for a while, and a POST
+    # naming it fell through to cash mode — which answered a virman with
+    # "this field is required" on two cash accounts nobody was asked for.
+    # Kept so older links and open tabs still land on the right form.
+    MODE_ALIASES = {"cari": "current_account"}
 
     def get_book(self):
         return get_object_or_404(Book, pk=self.kwargs.get("pk"))
 
     def _mode(self, source):
         mode = source.get("mode") or "cash"
+        mode = self.MODE_ALIASES.get(mode, mode)
         return mode if mode in self.MODES else "cash"
 
     def render_page(self, book, mode, cash_form=None, current_account_form=None):

@@ -224,7 +224,7 @@
           </span>
         </label>
         <label>
-          <input type="radio" name="tf-mode" value="cari" {% if mode == 'current_account' %}checked{% endif %}>
+          <input type="radio" name="tf-mode" value="current_account" {% if mode == 'current_account' %}checked{% endif %}>
           <span class="lbl-w">
             <b>{% trans "Between current accounts" %}</b>
             <span>{% trans "A balance moves from one account to another. No cash goes anywhere — only who owes it changes." %}</span>
@@ -333,12 +333,12 @@
   </form>
 
   {# ------------------------------------------------------------------ #}
-  {# Cari → cari                                                        #}
+  {# Current account → current account                                 #}
   {# ------------------------------------------------------------------ #}
-  <form method="post" id="tfCurrentAccountForm" class="tf-pane" data-mode="cari"
+  <form method="post" id="tfCurrentAccountForm" class="tf-pane" data-mode="current_account"
         {% if mode != 'current_account' %}style="display:none;"{% endif %}>
     {% csrf_token %}
-    <input type="hidden" name="mode" value="cari">
+    <input type="hidden" name="mode" value="current_account">
     {{ current_account_form.book }}
 
     <div class="tf-grid">
@@ -444,7 +444,7 @@
               <span class="ico"><i data-lucide="calculator"></i></span>
               <h3>{% trans "After this move" %}</h3>
             </div>
-            <div class="tf-sum" data-summary="cari">
+            <div class="tf-sum" data-summary="current_account">
               <div class="tf-sum-empty">{% trans "Pick both accounts and an amount to see where they land." %}</div>
             </div>
             <div class="tf-actions">
@@ -863,9 +863,9 @@
     // Both cash accounts must share a currency, so the arithmetic always holds.
     wire(panes.cash, 'from_cash_account', 'to_cash_account', function () { return 1; });
   }
-  if (panes.cari) {
-    var currentRate = setUpRateOverride(panes.cari);
-    fxRender = wire(panes.cari, 'from_current_account', 'to_current_account', currentRate);
+  if (panes.current_account) {
+    var currentRate = setUpRateOverride(panes.current_account);
+    fxRender = wire(panes.current_account, 'from_current_account', 'to_current_account', currentRate);
   }
 })();
 </script>

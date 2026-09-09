@@ -1,6 +1,7 @@
 # to run this test, use the command:
 # python manage.py test accounting.test_current_account_transfer
 
+import re
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -18,6 +19,7 @@ from accounting.models import (
     CurrencyCategory,
     InTransfer,
 )
+from accounting.views import MakeInTransfer
 
 
 class TransferTestBase(TestCase):
@@ -189,6 +191,35 @@ class TransferPageModeTest(TransferTestBase):
         queryset = response.context["current_account_form"].fields["from_current_account"].queryset
         self.assertIn(self.a, queryset)
         self.assertNotIn(self.elsewhere, queryset)
+
+    def test_the_page_posts_a_mode_the_view_answers(self):
+        """The tests posted "current_account" while the page posted "cari",
+        which the view did not recognise and served as cash mode — so every
+        virman came back asking for two cash accounts. Read the token out of
+        the rendered page rather than restating it here."""
+        page = self.client.get(self.url() + "?mode=current_account")
+        posted = re.findall(
+            r'<input type="hidden" name="mode" value="([^"]+)"',
+            page.content.decode(),
+        )
+        self.assertIn("current_account", posted)
+        for token in posted:
+            self.assertIn(token, MakeInTransfer.MODES)
+
+    def test_the_old_cari_token_still_reaches_the_current_account_form(self):
+        response = self.client.post(self.url(), {
+            "mode": "cari",
+            "book": self.book.pk,
+            "date": "2026-02-01",
+            "from_current_account": self.a.pk,
+            "to_current_account": self.b.pk,
+            "amount": "400.00",
+            "currency": self.usd.pk,
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(CurrentAccountTransfer.objects.count(), 1)
+        self.assertEqual(InTransfer.objects.count(), 0)
 
     def test_posting_current_account_mode_moves_the_balance(self):
         response = self.client.post(self.url(), {

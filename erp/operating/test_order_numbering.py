@@ -57,21 +57,19 @@ class ANewOrderIsNumbered(TestCase):
         order = Order.objects.create(order_number="DK0000270")
         self.assertEqual(order.order_number, "DK0000270")
 
-    def test_the_year_is_stamped_not_counted(self):
-        """The sequence runs straight on across the turn of the year, as
-        the collection and invoice counters do. Resetting it would make
-        ORD-2027-000001 the second order to carry that tail."""
+    def test_the_run_restarts_when_the_year_turns(self):
+        """The tail counts THIS year's orders, as it does for collections
+        and invoices — see accounting.test_annual_number_reset, which
+        holds the rule for all of them."""
         Order.objects.create()
-        before = OrderNumberSequence.objects.get(pk=1).next_seq
+        Order.objects.create()
         # Worked out BEFORE the patch: inside it, timezone.now() is the
         # mock, and .replace() on a MagicMock returns another MagicMock.
         in_2031 = timezone.now().replace(year=2031)
         # take() directly, not through an Order: patching timezone.now
         # globally would also reach the auto_now_add on created_at.
         with patch("django.utils.timezone.now", return_value=in_2031):
-            later = OrderNumberSequence.take()
-        self.assertTrue(later.startswith("ORD-2031-"))
-        self.assertEqual(int(later.split("-")[2]), before)
+            self.assertEqual(OrderNumberSequence.take(), "ORD-2031-000001")
 
 
 class OlderOrdersAreLeftAlone(TestCase):

@@ -115,9 +115,14 @@ def _next_payment_number(book, ptype):
     with transaction.atomic():
         locked = CurrentAccountSettings.objects.select_for_update().get(pk=settings_obj.pk)
         year = timezone.now().year
+        # A new year opens a new run — COL and PAY share this counter, so
+        # they restart together and the two series stay in step.
+        if locked.payment_seq_year != year:
+            locked.next_payment_seq = 1
+            locked.payment_seq_year = year
         number = f"{prefix}-{year}-{str(locked.next_payment_seq).zfill(6)}"
         locked.next_payment_seq += 1
-        locked.save(update_fields=["next_payment_seq"])
+        locked.save(update_fields=["next_payment_seq", "payment_seq_year"])
     return number
 
 

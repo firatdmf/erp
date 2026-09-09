@@ -511,6 +511,24 @@ class CurrentAccountSettings(models.Model):
     next_invoice_seq = models.PositiveIntegerField(default=1)
     next_payment_seq = models.PositiveIntegerField(default=1)
 
+    # The year each sequence last issued in. A document number carries the
+    # year (INV-2026-000108), and the sequence restarts when the year
+    # turns, so these say whether the number about to be issued belongs to
+    # the run in progress or opens a new one.
+    #
+    # Null means "never issued under this rule". A book that has issued
+    # nothing simply starts, and the migration stamps the CURRENT year on
+    # the books that have — without it, the first document after the
+    # deploy would read the null as a new year and restart a sequence
+    # that is at 109, straight into a number already on a customer's
+    # invoice.
+    #
+    # There is deliberately no year on the current-account counter: an
+    # account code is ACC-088, with no year in it, so restarting it would
+    # hand out a code the book already has.
+    invoice_seq_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    payment_seq_year = models.PositiveSmallIntegerField(null=True, blank=True)
+
     # ACC, not CARI: the Turkish term was dropped from the interface, and a
     # book created today should not start minting codes in it. Per-book, so
     # a book already running another prefix keeps it — and the codes it has
@@ -564,6 +582,12 @@ class CurrentAccountSettings(models.Model):
         with transaction.atomic():
             locked = CurrentAccountSettings.objects.select_for_update().get(pk=self.pk)
             year = timezone.now().year
+            # A new year opens a new run. Numbers already issued keep the
+            # year they were issued under, so nothing collides: INV-2027-
+            # 000001 is free however far 2026 got.
+            if locked.invoice_seq_year != year:
+                locked.next_invoice_seq = 1
+                locked.invoice_seq_year = year
             seq = locked.next_invoice_seq
             prefix = getattr(_s, "BRAND_INVOICE_PREFIX", "").strip()
             if prefix:
@@ -573,7 +597,7 @@ class CurrentAccountSettings(models.Model):
                 # Legacy fallback so old fixtures / tests keep working.
                 number = f"{series}-{year}-{str(seq).zfill(6)}"
             locked.next_invoice_seq += 1
-            locked.save(update_fields=["next_invoice_seq"])
+            locked.save(update_fields=["next_invoice_seq", "invoice_seq_year"])
             return number
 
     @classmethod

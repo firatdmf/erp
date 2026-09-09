@@ -341,7 +341,7 @@ class OrderNumberSequence(models.Model):
     """
 
     prefix  = models.CharField(max_length=10, default="ORD")
-    padding = models.PositiveSmallIntegerField(default=4)
+    padding = models.PositiveSmallIntegerField(default=6)
     next_seq = models.PositiveIntegerField(default=1)
 
     class Meta:
@@ -349,16 +349,34 @@ class OrderNumberSequence(models.Model):
         verbose_name_plural = "Order number sequence"
 
     def __str__(self):
-        return f"{self.prefix}-{str(self.next_seq).zfill(self.padding)} next"
+        return f"{self.peek()} next"
+
+    def peek(self):
+        from django.utils import timezone
+        return (f"{self.prefix}-{timezone.now().year}-"
+                f"{str(self.next_seq).zfill(self.padding)}")
 
     @classmethod
     def take(cls):
-        """The next order number, consumed. Never returns the same twice."""
+        """The next order number, consumed. Never returns the same twice.
+
+        Shaped like every other document this business issues —
+        COL-2026-000101, INV-2026-000108, PUR-2026-000105 — so an order
+        reference is recognisable as one of the same family rather than as
+        the one series that reads differently.
+
+        The year is stamped, not counted: the sequence runs straight on
+        across the turn of the year, exactly as the collection and invoice
+        counters do. Resetting it would make ORD-2027-000001 the second
+        order to carry that tail.
+        """
         from django.db import transaction
+        from django.utils import timezone
         with transaction.atomic():
             row, _ = cls.objects.get_or_create(pk=1)
             locked = cls.objects.select_for_update().get(pk=row.pk)
-            number = f"{locked.prefix}-{str(locked.next_seq).zfill(locked.padding)}"
+            number = (f"{locked.prefix}-{timezone.now().year}-"
+                      f"{str(locked.next_seq).zfill(locked.padding)}")
             locked.next_seq += 1
             locked.save(update_fields=["next_seq"])
             return number
@@ -481,7 +499,7 @@ class Order(models.Model):
         unique=True,
         null=True,
         blank=True,
-        help_text="Customer-facing order reference, e.g. ORD-0001"
+        help_text="Customer-facing order reference, e.g. ORD-2026-000001"
     )
     order_status = models.CharField(
         max_length=32,

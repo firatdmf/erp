@@ -205,12 +205,14 @@ class BrandHeader(TestCase):
             "the order line should come after the brand headline")
 
     def test_an_order_with_no_number_of_its_own_is_named_by_id(self):
-        """Every order in the database is in this state today: order_number
-        is null, so the id is the only reference there is. It takes a # —
-        that is what marks it as an id rather than a reference someone
-        assigned."""
-        bare = Order.objects.create()
-        self.assertIn(f"Order #{bare.pk}", self._header(bare))
+        """The orders that predate ORD- numbering: they were never given
+        one and are not being given one now, so the id is the only
+        reference they have. It takes a # — that is what marks it as an id
+        rather than a reference someone assigned."""
+        legacy = Order.objects.create()
+        Order.objects.filter(pk=legacy.pk).update(order_number=None)
+        legacy.refresh_from_db()
+        self.assertIn(f"Order #{legacy.pk}", self._header(legacy))
 
     def test_a_real_order_number_is_not_given_a_hash(self):
         """"Order #DK0000270" reads as a mistake: the hash belongs to a

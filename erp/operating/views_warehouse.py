@@ -5133,7 +5133,7 @@ _ORDER_REASON_PREFIXES = ("Order ship", "Order un-ship", "Order edit")
 # OrderNumberSequence, and DK0000001 for the web orders the old generator
 # reached. Movements already carry both, so both have to be recognised —
 # dropping DK would unlink the history it is written into.
-_ORDER_REF_RE = r"^(ORD-\d+|DK\d{7,})$"
+_ORDER_REF_RE = r"^(ORD-\d{4}-\d+|DK\d{7,})$"
 
 
 def _reversed_pair_ids(qs):

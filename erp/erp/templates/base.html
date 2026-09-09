@@ -1174,6 +1174,22 @@
             <input type="date" name="due_date" id="id_due_date" class="form-input" value="{{ today }}">
           </div>
 
+          <!-- Attach an item section -->
+          <div class="attach-section">
+            <div class="attach-header">
+              <i class="fas fa-paperclip"></i>
+              <span>{% trans "Attach to" %}</span>
+            </div>
+            <div id="taskAttachChips" class="attach-chips"></div>
+            <input type="text" id="id_task_attach_search" class="form-input"
+              placeholder="{% trans 'Search companies and contacts...' %}"
+              hx-get="{% url 'crm:task_attach_search' %}" hx-trigger="keyup changed delay:300ms"
+              hx-target="#taskAttachResults" hx-params="q" name="q" autocomplete="off">
+            <div id="taskAttachResults" class="search-results"></div>
+            <input type="hidden" name="company" id="id_company" value="">
+            <input type="hidden" name="contact" id="id_contact" value="">
+          </div>
+
           <div class="form-group">
             <label for="id_priority">{% trans "Priority" %}</label>
             <select name="priority" id="id_priority" class="form-input">
@@ -1288,58 +1304,6 @@
               font-size: 0.7rem;
             }
           </style>
-
-          <!-- Attach an item section -->
-          <div class="attach-section">
-            <div class="attach-header">
-              <i class="fas fa-paperclip"></i>
-              <span>Attach to</span>
-            </div>
-            <div class="attach-buttons">
-              <button type="button" class="attach-btn" onclick="toggleAttachment('taskCompany')">
-                <i class="fas fa-building"></i> Company
-              </button>
-              <button type="button" class="attach-btn" onclick="toggleAttachment('taskContact')">
-                <i class="fas fa-user"></i> Contact
-              </button>
-            </div>
-          </div>
-
-          <!-- Company attachment -->
-          <div id="taskCompanySection" class="attachment-section" style="display: none;">
-            <div class="attachment-header">
-              <span><i class="fas fa-building"></i> Attach to company</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('taskCompany', {clear: true})">
-                Remove
-              </button>
-            </div>
-            <div class="form-group">
-              <label for="id_task_company_search">{% trans "Search company" %}</label>
-              <input type="text" id="id_task_company_search" class="form-input" placeholder="Type company name..."
-                hx-get="{% url 'crm:company_search' %}" hx-trigger="keyup changed delay:300ms"
-                hx-target="#taskCompanyResults" hx-params="*" name="company_name" autocomplete="off">
-              <div id="taskCompanyResults" class="search-results"></div>
-            </div>
-            <input type="hidden" name="company" id="id_company" value="">
-          </div>
-
-          <!-- Contact attachment -->
-          <div id="taskContactSection" class="attachment-section" style="display: none;">
-            <div class="attachment-header">
-              <span><i class="fas fa-user"></i> Attach to contact</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('taskContact', {clear: true})">
-                Remove
-              </button>
-            </div>
-            <div class="form-group">
-              <label for="id_task_contact_search">{% trans "Search contact" %}</label>
-              <input type="text" id="id_task_contact_search" class="form-input" placeholder="Type contact name..."
-                hx-post="{% url 'crm:search_contacts_only' %}" hx-trigger="keyup changed delay:300ms"
-                hx-target="#taskContactResults" hx-params="*" name="searchInput" autocomplete="off">
-              <div id="taskContactResults" class="search-results"></div>
-            </div>
-            <input type="hidden" name="contact" id="id_contact" value="">
-          </div>
 
           <!-- Attachments (Temporarily Disabled by User Request)
           <div class="form-group" style="margin-top: 1rem;">
@@ -2424,12 +2388,13 @@
       selectedUsers = [];
       updateSelectedUsersUI();
 
-      // Hide all attachment sections
-      document.getElementById('taskCompanySection').style.display = 'none';
-      document.getElementById('taskContactSection').style.display = 'none';
-      // Clear hidden fields
-      document.getElementById('id_company').value = '';
-      document.getElementById('id_contact').value = '';
+      // Clear the attachments
+      clearTaskAttachment('company');
+      clearTaskAttachment('contact');
+      const attachSearch = document.getElementById('id_task_attach_search');
+      if (attachSearch) attachSearch.value = '';
+      const attachResults = document.getElementById('taskAttachResults');
+      if (attachResults) attachResults.innerHTML = '';
       resetFormTracking();
     }
 
@@ -3046,8 +3011,7 @@
        explicit `clear:true` arg) are the only path that wipes data. */
     const ATTACH_GROUPS = {
       mainContact: ['mainContactNote', 'mainContactTask'],
-      company:     ['companyContact', 'companyNote', 'companyTask'],
-      task:        ['taskCompany', 'taskContact']
+      company:     ['companyContact', 'companyNote', 'companyTask']
     };
     function _attachGroupFor(type) {
       for (const key in ATTACH_GROUPS) {
@@ -3064,9 +3028,7 @@
         'mainContactTask': 'mainContactTaskSection',
         'companyContact': 'companyContactSection',
         'companyNote': 'companyNoteSection',
-        'companyTask': 'companyTaskSection',
-        'taskCompany': 'taskCompanySection',
-        'taskContact': 'taskContactSection'
+        'companyTask': 'companyTaskSection'
       };
 
       const sectionId = sections[type];
@@ -3364,26 +3326,98 @@
         });
     }
 
-    // Company and Contact selection functions for task sidebar
+    // ── "Attach to": one search over companies and contacts ────────
+    // The two books used to have a tab and a search field each, so
+    // attaching meant knowing which book a name lived in before you
+    // could type it. One box now searches both; a result row carries
+    // the book it came from in data-type, and each book still holds at
+    // most one pick, because the task has one company and one contact.
+    const TASK_ATTACH_FIELDS = { company: 'id_company', contact: 'id_contact' };
+
+    function setTaskAttachment(type, pk, name) {
+      const field = document.getElementById(TASK_ATTACH_FIELDS[type] || '');
+      if (!field) return;
+      field.value = pk;
+      field.dataset.attachName = name || '';
+      renderTaskAttachChips();
+
+      const input = document.getElementById('id_task_attach_search');
+      if (input) input.value = '';
+      const results = document.getElementById('taskAttachResults');
+      if (results) results.innerHTML = '';
+    }
+
+    function clearTaskAttachment(type) {
+      const field = document.getElementById(TASK_ATTACH_FIELDS[type] || '');
+      if (!field) return;
+      field.value = '';
+      delete field.dataset.attachName;
+      renderTaskAttachChips();
+    }
+
+    // Built from the hidden fields rather than from its own state, so
+    // a form.reset() (which empties those) leaves nothing stale behind.
+    function renderTaskAttachChips() {
+      const box = document.getElementById('taskAttachChips');
+      if (!box) return;
+      box.innerHTML = '';
+
+      Object.keys(TASK_ATTACH_FIELDS).forEach(type => {
+        const field = document.getElementById(TASK_ATTACH_FIELDS[type]);
+        if (!field || !field.value) return;
+
+        const chip = document.createElement('span');
+        chip.className = 'attach-chip';
+
+        const icon = document.createElement('i');
+        icon.className = type === 'company' ? 'fas fa-building' : 'fas fa-user';
+        chip.appendChild(icon);
+        // textContent, not innerHTML: the name came off a data-attr the
+        // server escaped once already, and must not be parsed again.
+        chip.appendChild(document.createTextNode(field.dataset.attachName || field.value));
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'attach-chip-remove';
+        remove.setAttribute('aria-label', '{% trans "Remove attachment" %}');
+        remove.textContent = '\u00d7';
+        remove.addEventListener('click', () => clearTaskAttachment(type));
+        chip.appendChild(remove);
+
+        box.appendChild(chip);
+      });
+    }
+
+    // Delegated, because htmx replaces the rows on every keystroke.
+    (function () {
+      const results = document.getElementById('taskAttachResults');
+      if (!results) return;
+      results.addEventListener('click', function (event) {
+        const row = event.target.closest('.attach-result');
+        if (!row) return;
+        setTaskAttachment(row.dataset.type, row.dataset.pk, row.dataset.name);
+      });
+    })();
+
+    // Company selection from crm:company_search. The contact-create
+    // page has its own visible company field and must win here: it also
+    // renders the task sidebar, and when the sidebar was checked first
+    // a company picked on that page silently landed in the hidden task
+    // form instead of the field the person was typing into.
     function selectCompany(name, pk) {
-      // Check if we're in task sidebar or contact form
-      const taskCompanySearch = document.getElementById('id_task_company_search');
       const contactCompanyName = document.getElementById('company_name');
 
-      if (taskCompanySearch) {
-        taskCompanySearch.value = name;
-        document.getElementById('id_company').value = pk;
-        document.getElementById('taskCompanyResults').innerHTML = '';
-      } else if (contactCompanyName) {
+      if (contactCompanyName) {
         contactCompanyName.value = name;
-        document.getElementById('company-suggestions').innerHTML = '';
+        const suggestions = document.getElementById('company-suggestions');
+        if (suggestions) suggestions.innerHTML = '';
+      } else {
+        setTaskAttachment('company', pk, name);
       }
     }
 
     function selectContact(name, pk) {
-      document.getElementById('id_task_contact_search').value = name;
-      document.getElementById('id_contact').value = pk;
-      document.getElementById('taskContactResults').innerHTML = '';
+      setTaskAttachment('contact', pk, name);
     }
 
     // ── Backdrop dismiss: only for a click that BEGAN on the backdrop ──

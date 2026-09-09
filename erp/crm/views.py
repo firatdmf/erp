@@ -1183,6 +1183,63 @@ def company_search(request):
     return HttpResponse(html)
 
 
+@login_required
+def task_attach_search(request):
+    """One search over both books, for the task sidebar's "Attach to".
+
+    Company and contact used to be separate tabs with a field each, so
+    attaching meant knowing which book a name lived in before you could
+    type it. This searches both at once and labels every row with the
+    book it came from; the sidebar reads data-type off the row to decide
+    which hidden field the pick fills.
+    """
+    from django.utils.html import escape
+
+    query = (request.GET.get("q") or "").strip()
+    if not query:
+        return HttpResponse("")
+
+    companies = Company.objects.filter(unaccent_icontains(query, "name"))[:6]
+    contacts = Contact.objects.filter(
+        unaccent_icontains(query, "name")
+    ).select_related("company")[:6]
+
+    if not companies and not contacts:
+        return HttpResponse(
+            "<div class='search-no-results'>No matching company or contact found.</div>"
+        )
+
+    parts = ["<ul class='search-results-list'>"]
+    for company in companies:
+        parts.append(
+            "<li class='attach-result' data-type='company' "
+            f"data-pk='{company.pk}' data-name=\"{escape(company.name)}\" "
+            "style='cursor:pointer;'>"
+            f"<i class='fa fa-building'></i> {escape(company.name)}"
+            "<span class='attach-result-kind'>Company</span>"
+            "</li>"
+        )
+    for contact in contacts:
+        # A contact's company is what tells two people with the same
+        # name apart, so it rides along as the row's subtitle.
+        company_name = contact.company.name if contact.company else ""
+        subtitle = (
+            f"<span class='attach-result-sub'>{escape(company_name)}</span>"
+            if company_name
+            else ""
+        )
+        parts.append(
+            "<li class='attach-result' data-type='contact' "
+            f"data-pk='{contact.pk}' data-name=\"{escape(contact.name)}\" "
+            "style='cursor:pointer;'>"
+            f"<i class='fa fa-user'></i> {escape(contact.name)}{subtitle}"
+            "<span class='attach-result-kind'>Contact</span>"
+            "</li>"
+        )
+    parts.append("</ul>")
+    return HttpResponse("".join(parts))
+
+
 # returns a list of customers (contacts or clients) that match the query
 def customer_autocomplete(request):
     """Returns an inline list of contacts + companies matching the

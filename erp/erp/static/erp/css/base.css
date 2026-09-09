@@ -1351,6 +1351,70 @@ tbody td {
 
 .attach-btn:hover i { color: #64748b; }
 
+/* One search over both books: the row says which book it came from,
+   and a pick becomes a chip above the field. */
+.attach-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.attach-chips:empty {
+  margin-bottom: 0;
+}
+
+.attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  background-color: #e2e8f0;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.attach-chip i {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.attach-chip-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #64748b;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.attach-chip-remove:hover {
+  color: #ef4444;
+}
+
+.attach-result .attach-result-sub {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.attach-result .attach-result-sub::before {
+  content: "\2022";
+  margin: 0 0.35rem;
+}
+
+.attach-result .attach-result-kind {
+  margin-left: auto;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .attachment-section {
   margin-top: 1rem;
   padding: 1rem;

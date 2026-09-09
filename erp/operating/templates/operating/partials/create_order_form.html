@@ -3,6 +3,19 @@
 <style>
 .co-section-header{display:flex;align-items:center;gap:10px;padding:12px 0;cursor:pointer;user-select:none;font-weight:600;font-size:.875rem;color:var(--text-primary);border-bottom:1px solid var(--border-color)}
 .co-section-header:hover{color:#1e293b}
+/* A locked step reads as not-yet rather than broken: dimmed, its number
+   replaced by a padlock, and refusing the pointer. Its body is closed by
+   the same rule that locks it, so there is nothing to read past. */
+.co-section.co-locked > .co-section-header{opacity:.45;cursor:not-allowed}
+.co-section.co-locked > .co-section-header:hover{color:var(--text-primary)}
+.co-section.co-locked .co-section-num{font-size:0;position:relative}
+.co-section.co-locked .co-section-num::after{content:"\f023";font-family:"Font Awesome 5 Free";font-weight:900;font-size:10px}
+.co-section.co-locked .co-chev{visibility:hidden}
+/* The disclosure that stands in for a closed delivery address. Dashed,
+   like every other "add one of these" affordance on this form. */
+.co-disclosure{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:12px;background:none;border:1px dashed #CBD5E1;border-radius:7px;padding:9px 10px;color:#64748B;font-size:11.5px;font-weight:600;cursor:pointer}
+.co-disclosure:hover{border-color:#0F766E;color:#0F766E}
+.co-disclosure-close{margin-left:auto;background:none;border:0;color:#B91C1C;font-size:16px;line-height:1;cursor:pointer;padding:0 2px}
 .co-section-num{width:24px;height:24px;border-radius:50%;background:var(--border-color);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
 .co-section.active .co-section-num{background:#1e293b;color:#fff}
 .co-section-summary{margin-left:auto;font-weight:400;font-size:12px;color:var(--text-secondary)}
@@ -291,10 +304,27 @@
         </div>
       </div>
 
-      <!-- Delivery Address — CRM/B2B path only. -->
+      <!-- Delivery Address — CRM/B2B path only, and folded away until
+           asked for. Most orders are collected or shipped to an address
+           the customer's record already carries, so five empty fields
+           were the first thing between picking a customer and picking
+           what they are buying. The button is the whole disclosure; the
+           fields themselves are unchanged, so anything already filled in
+           still posts exactly as it did. -->
       <div id="co-delivery-fields">
+        <button type="button" id="co-delivery-add" class="co-disclosure"
+                onclick="coToggleDelivery(true)">
+          <i class="fas fa-plus"></i>
+          {% trans "Add a delivery address" %}
+        </button>
+        <div id="co-delivery-body" hidden>
         <div class="form-group" style="margin-top:12px;">
-          <label>{% trans "Delivery Address" %}</label>
+          <label style="display:flex;align-items:center;gap:8px;">
+            {% trans "Delivery Address" %}
+            <button type="button" class="co-disclosure-close"
+                    onclick="coToggleDelivery(false)"
+                    title="{% trans 'Remove delivery address' %}">&times;</button>
+          </label>
           <input type="text" name="delivery_address_title" class="form-input" placeholder="{% trans 'Address title (Home, Work...)' %}">
         </div>
         <div class="form-group">
@@ -311,12 +341,13 @@
         <div class="form-group">
           <input type="text" name="delivery_phone" class="form-input" placeholder="{% trans 'Phone' %}">
         </div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Step 2: Products (badge 2, ID stays co-step-2 so JS keeps working) -->
-  <div class="co-section active" id="co-step-2">
+  <div class="co-section" id="co-step-2">
     <div class="co-section-header" onclick="coToggle(2)">
       <div class="co-section-num">2</div>
       <span>{% trans "Products" %}</span>
@@ -627,7 +658,173 @@
     } catch (e) { /* ignore — render empty */ }
   }
 
-  window.coToggle = function(s) { document.getElementById('co-step-'+s).classList.toggle('active'); };
+  // ── Autocomplete dropdowns close when they stop being the answer ──
+  //
+  // Both searches drop their results into a container and left them
+  // there: the list stayed under the form after the field lost focus, and
+  // after it was emptied, sitting between the user and the section below
+  // it. htmx only ever fills the container, so something has to empty it.
+  //
+  // Closing on `blur` alone would race the click that picks a row: blur
+  // lands first and the row is gone before its click. The usual dodge —
+  // swallowing mousedown inside the list — is wrong here, because the
+  // list scrolls (max-height 260px), and swallowing mousedown takes its
+  // scrollbar with it. So the decision is made on where the pointer went
+  // down instead: inside the field or the list, nothing happens; anywhere
+  // else, close. The row's click still arrives afterwards.
+  //
+  // The "+ create new" panel is a sibling of the results, not part of
+  // them, so it is untouched — closing the list must not close a form
+  // somebody opened from it.
+  var CO_AUTOCOMPLETES = [
+    { input: 'co-product-search', results: 'co-product-results' },
+    { input: 'co-customer-search', results: 'co-customer-results' },
+  ];
+
+  function coCloseResults(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  }
+
+  (function coWireAutocompletes() {
+    CO_AUTOCOMPLETES.forEach(function (pair) {
+      var input = document.getElementById(pair.input);
+      var results = document.getElementById(pair.results);
+      if (!input || !results) return;
+
+      // Emptying the box says "never mind". htmx does ask the server,
+      // which answers with nothing, but only after its delay and only on
+      // a keystroke — this also covers a cut, a clear button, and a paste
+      // that replaces everything with nothing.
+      input.addEventListener('input', function () {
+        if (!(input.value || '').trim()) coCloseResults(pair.results);
+      });
+
+      input.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') { coCloseResults(pair.results); input.blur(); }
+      });
+
+      // Tabbing away. A click on a row moves focus to nothing focusable,
+      // so relatedTarget is null and this stays out of it — that case
+      // belongs to the pointer handler below.
+      input.addEventListener('focusout', function (ev) {
+        var to = ev.relatedTarget;
+        if (to && to !== input && !results.contains(to)) coCloseResults(pair.results);
+      });
+    });
+
+    // One listener for the page rather than one per field: whichever list
+    // is open, a pointer going down outside its own field and its own
+    // results closes it.
+    document.addEventListener('pointerdown', function (ev) {
+      CO_AUTOCOMPLETES.forEach(function (pair) {
+        var input = document.getElementById(pair.input);
+        var results = document.getElementById(pair.results);
+        if (!input || !results || !results.innerHTML) return;
+        if (ev.target === input || input.contains(ev.target)
+            || results.contains(ev.target)) return;
+        coCloseResults(pair.results);
+      });
+    });
+  })();
+
+  // ── Delivery address disclosure ─────────────────────────────────
+  // Clearing the fields on close is the point: the button says whether
+  // this order HAS a delivery address, so closing it has to mean the
+  // order does not have one. Leaving values behind would post an address
+  // the user believes they removed.
+  window.coToggleDelivery = function (open) {
+    var body = document.getElementById('co-delivery-body');
+    var add = document.getElementById('co-delivery-add');
+    if (!body || !add) return;
+    body.hidden = !open;
+    add.hidden = !!open;
+    if (!open) {
+      body.querySelectorAll('input, textarea').forEach(function (el) {
+        // Country is a default, not something the user typed; putting it
+        // back keeps the reopened form identical to a fresh one.
+        el.value = (el.name === 'delivery_country') ? 'Turkey' : '';
+      });
+    } else {
+      var first = body.querySelector('input, textarea');
+      if (first) first.focus();
+    }
+  };
+
+  // Open it for an order that already carries an address, so editing one
+  // never hides what is already there behind a button reading "add".
+  function coSyncDeliveryDisclosure() {
+    var body = document.getElementById('co-delivery-body');
+    if (!body) return;
+    var filled = Array.prototype.some.call(
+      body.querySelectorAll('input, textarea'),
+      function (el) {
+        return el.name !== 'delivery_country' && (el.value || '').trim() !== '';
+      });
+    if (filled) coToggleDelivery(true);
+  }
+
+  // ── Step gating ─────────────────────────────────────────────────
+  // A section opens only once the one before it has something in it.
+  // Not decoration: an order with no customer cannot be saved at all,
+  // and picking products for nobody is work the save then refuses. The
+  // gate says so before the work rather than after it.
+  //
+  // Read off live state rather than a "furthest step reached" counter,
+  // so clearing the customer closes what it should, and an edit — whose
+  // customer and lines arrive already filled — opens with everything
+  // unlocked and behaves like the plain form it always was.
+  function coStepReady(step) {
+    if (step <= 1) return true;
+    var type = (document.getElementById('customer-type') || {}).value || '';
+    var pk = (document.getElementById('customer-pk') || {}).value || '';
+    var hasCustomer = (type === 'retail')
+      || ((type === 'contact' || type === 'company') && !!pk);
+    if (step === 2) return hasCustomer;
+    // Step 3 wants a line to deposit against. Any line will do — whether
+    // its stock items add up is the save's business, not the gate's.
+    return hasCustomer && orderItems.length > 0;
+  }
+
+  // Section id ↔ the badge number the reader sees. The ids are historical
+  // (co-step-3 is badge 1), so the mapping lives here once instead of
+  // being re-guessed at every call site.
+  var CO_STEPS = [{ id: 3, n: 1 }, { id: 2, n: 2 }, { id: 4, n: 3 }];
+
+  function coStepHint(n) {
+    return n === 2
+      ? '{% trans "Pick a customer first" %}'
+      : '{% trans "Add a product first" %}';
+  }
+
+  function coRefreshSteps() {
+    CO_STEPS.forEach(function (step) {
+      var el = document.getElementById('co-step-' + step.id);
+      if (!el) return;
+      var ready = coStepReady(step.n);
+      el.classList.toggle('co-locked', !ready);
+      // A locked section is also a closed one — otherwise the gate would
+      // only stop the click, not the reading.
+      if (!ready) el.classList.remove('active');
+    });
+  }
+
+  window.coToggle = function (s) {
+    var step = CO_STEPS.filter(function (x) { return x.id === s; })[0];
+    var n = step ? step.n : 1;
+    if (!coStepReady(n)) { showToast(coStepHint(n), 'warning'); return; }
+    document.getElementById('co-step-' + s).classList.toggle('active');
+  };
+
+  // Opening the next section as soon as it becomes available is what
+  // makes the gate feel like a path rather than a wall — the click that
+  // completes one step lands you in the next.
+  function coAdvanceTo(n) {
+    var step = CO_STEPS.filter(function (x) { return x.n === n; })[0];
+    if (!step || !coStepReady(n)) return;
+    var el = document.getElementById('co-step-' + step.id);
+    if (el) el.classList.add('active');
+  }
 
   // Shared "selected" badge — applying a CRM contact/company pick (from
   // a search result or a freshly created contact) or the Perakende
@@ -652,6 +849,8 @@
     document.getElementById('co-retail-pick').style.display = 'none';
     var sum3 = document.getElementById('co-sum-3');
     if (sum3) sum3.textContent = name;
+    coRefreshSteps();
+    coAdvanceTo(2);
   }
 
   function coClearCustomerSelection() {
@@ -691,6 +890,8 @@
     var sum3 = document.getElementById('co-sum-3');
     if (sum3) sum3.textContent = label;
     renderProducts();
+    coRefreshSteps();
+    coAdvanceTo(2);
   };
 
   function coClearRetail() {
@@ -707,6 +908,7 @@
     var sum3 = document.getElementById('co-sum-3');
     if (sum3) sum3.textContent = '';
     renderProducts();
+    coRefreshSteps();
   }
 
   window.coRetailCustomerToggle = function (checked) {
@@ -1024,6 +1226,7 @@
   function renderProducts(opts) {
     opts = opts || {};
     coRenderDepositBoxes();
+    coRefreshSteps();
     const el = document.getElementById('co-products-list');
     if (!orderItems.length) { el.innerHTML = '<div class="co-empty">{% trans "No products added yet" %}</div>'; return; }
 
@@ -2230,6 +2433,15 @@
     // In edit mode the form already posts to /operating/orders/edit/<id>/
     // (set on the form action via the template), so the existing submit
     // handler works without changes.
+
+    // Settle the gate and the delivery disclosure once everything above
+    // has had its say. On a fresh form that closes Products and Deposit;
+    // on an edit the customer and lines are already in place, so it
+    // unlocks both and the form behaves as it always did.
+    coSyncDeliveryDisclosure();
+    coRefreshSteps();
+    coAdvanceTo(2);
+    coAdvanceTo(3);
   })();
 })();
 </script>

@@ -2712,16 +2712,52 @@ class OrderPrintCombined(LoginRequiredMixin, View):
 
 
 class OrderCreate(View):
-    # The page an order is created on, and the endpoint the form posts to.
-    # A GET is a page unless it comes from htmx, which still gets the bare
-    # partial so the drawer keeps working wherever it is still opened.
+    """The one place an order is created, wearing either of two faces.
+
+    A page (book in the URL) and a drawer (htmx, book in ?book=) render
+    the SAME partial from the SAME context. Neither knows anything the
+    other does not: whatever tells them which book they are in is settled
+    here, once, before either is rendered — so a third way in later needs
+    to supply the book and nothing else.
+
+    The book matters because every line that names no book of its own is
+    filed under it. Getting it from `request.book` alone worked for the
+    page and silently gave the drawer the member's default book instead
+    of the one they were looking at.
+    """
+
     page_template = "operating/create_order_page.html"
+    partial_template = "operating/partials/create_order_form.html"
 
     def get(self, request):
+        self._settle_book(request)
         form = OrderForm()
-        if request.headers.get("HX-Request"):
-            return render(request, "operating/partials/create_order_form.html", {"form": form})
-        return render(request, self.page_template, {"form": form})
+        template = (self.partial_template
+                    if request.headers.get("HX-Request") else self.page_template)
+        return render(request, template, {"form": form})
+
+    def _settle_book(self, request):
+        """Put the book this form is being opened in on the request, so the
+        `current_book` context processor — and through it the form's hidden
+        book field — answers the same for both faces.
+
+        `request.book` is already set when the URL named one (the page,
+        through book_scoped). A drawer has no URL of its own to name it, so
+        it sends ?book=; checked against the member's assignments, because
+        it arrives from the browser and may claim anything. Falling through
+        leaves current_book to its own default, which is the right answer
+        for a caller that genuinely has no book in mind.
+        """
+        if getattr(request, "book", None) is not None:
+            return
+        asked = (request.GET.get("book") or "").strip()
+        if not asked.isdigit():
+            return
+        from accounting.services_accounts import member_books
+        member = getattr(request.user, "member", None)
+        book = member_books(member).filter(pk=int(asked)).first()
+        if book is not None:
+            request.book = book
 
     def post(self, request):
         form = OrderForm(request.POST)

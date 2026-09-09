@@ -94,16 +94,65 @@ class CreateOrderIsAPage(TestCase):
         self.assertTemplateUsed(resp, "operating/partials/create_order_form.html")
         self.assertTemplateNotUsed(resp, "operating/create_order_page.html")
 
-    def test_nothing_opens_the_drawer_any_more(self):
-        """Every way in is a link to the page. A control left calling the
-        overlay would quietly keep the old behaviour — and the old book
-        bug with it.
+    # ── the drawer and the page are the same form ───────────────────
+    def test_the_drawer_is_filed_under_the_book_it_was_asked_for(self):
+        """A drawer has no URL of its own to name the book, so it sends
+        ?book=. Without it the form falls back to the member's default —
+        the bug the page fixed, which the drawer must not keep."""
+        resp = self.client.get(
+            reverse("operating:create_order"),
+            {"book": self.ergene.pk}, headers={"hx-request": "true"})
+        self.assertEqual(_book_input(resp.content.decode()), str(self.ergene.pk))
 
-        The drawer itself is left standing: the htmx route still serves
-        the partial, so this asserts nothing OPENS it rather than that it
-        has been torn out.
+    def test_the_two_faces_agree_about_the_book(self):
+        """The point of the pair: whichever way it was opened, the form
+        files its lines in the same place."""
+        page = self.client.get(self._url(self.ergene)).content.decode()
+        drawer = self.client.get(
+            reverse("operating:create_order"),
+            {"book": self.ergene.pk},
+            headers={"hx-request": "true"}).content.decode()
+        self.assertEqual(_book_input(page), _book_input(drawer))
+        self.assertEqual(_book_input(drawer), str(self.ergene.pk))
+
+    def test_the_drawer_cannot_be_told_to_use_someone_else_s_book(self):
+        """?book= arrives from the browser and may claim anything. A book
+        the member is not assigned is ignored rather than obeyed."""
+        stranger = Book.objects.create(name="Somebody Else Fabric")
+        resp = self.client.get(
+            reverse("operating:create_order"),
+            {"book": stranger.pk}, headers={"hx-request": "true"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotEqual(_book_input(resp.content.decode()), str(stranger.pk))
+
+    def test_the_drawer_is_the_same_size_as_every_other_drawer(self):
+        """It used to override .sidebar-modal into a full-screen
+        workspace, because the order form is denser than a contact or a
+        task. The page took that job, so the drawer inherits again —
+        which is what keeps it the same width as the contact and task
+        drawers when THOSE change, rather than matching them today and
+        drifting tomorrow.
         """
-        for path in ("operating/templates/operating/order_list.html",
-                     "erp/templates/base.html"):
-            with open(path, encoding="utf-8") as fh:
-                self.assertNotIn('onclick="openOrderSidebar', fh.read(), path)
+        with open("erp/templates/base.html", encoding="utf-8") as fh:
+            base = fh.read()
+        import re
+        # Only rules aimed at the PANEL (or the overlay itself). The form
+        # inside it may still say how wide its own content runs — that is
+        # the form's business, and does not make the drawer a different
+        # shape from its siblings.
+        panel = re.findall(
+            r"#orderSidebarOverlay(?:\s+\.sidebar-modal)?\s*\{[^}]*\}", base)
+        for rule in panel:
+            for prop in ("width", "height"):
+                self.assertNotIn(
+                    prop + ":", rule,
+                    "the order drawer is sizing itself again: " + rule[:140])
+
+    def test_the_drawer_opener_passes_the_book(self):
+        """Guards the client half: the opener has to send ?book=, or the
+        server has nothing to settle and quietly picks the default."""
+        with open("erp/templates/base.html", encoding="utf-8") as fh:
+            base = fh.read()
+        opener = base[base.index("function openOrderSidebar("):][:1200]
+        self.assertIn("?book=", opener)
+        self.assertIn("current_book.pk", opener)

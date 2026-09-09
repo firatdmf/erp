@@ -594,7 +594,7 @@
                 </a>
               </li>
               <li>
-                <a href="{% if current_book %}{% url 'operating:create_order_page' current_book.pk %}{% else %}{% url 'operating:order_list' %}{% endif %}">
+                <a href="#" onclick="openOrderSidebar(); return false;">
                   <i class="fas fa-shopping-cart" aria-hidden="true"></i>
                   <span>Order</span>
                 </a>
@@ -1004,7 +1004,7 @@
             <h3>{% trans "Orders" %}</h3>
             <ul>
               <li>
-                <a href="{% if current_book %}{% url 'operating:create_order_page' current_book.pk %}{% else %}{% url 'operating:order_list' %}{% endif %}">
+                <a href="#" onclick="openOrderSidebar(); return false;">
                   <i class="fas fa-plus-circle" aria-hidden="true"></i>
                   <span>Create Order</span>
                 </a>
@@ -3995,67 +3995,29 @@
   </div>
   </div>
 
-  <!-- Order Sidebar Modal — Create is a full-screen order-entry
-       workspace, laid out as a single wide column (not a sidebar,
-       not a left/right split); Edit stays half-screen on desktop,
-       full-screen on mobile. -->
-  <style>
-    #orderSidebarOverlay .sidebar-modal {
-      width: 100vw !important;
-      max-width: 100vw !important;
-      height: 100vh !important;
-      height: 100dvh !important; /* dynamic viewport height — avoids the mobile address-bar jump */
-      border-radius: 0 !important;
-      background: #FFFFFF;
-    }
-    #orderSidebarOverlay .sidebar-header {
-      padding-left: 40px !important;
-      padding-right: 40px !important;
-    }
-    #orderSidebarOverlay .sidebar-content {
-      padding: 22px 40px 40px !important;
-      box-sizing: border-box;
-    }
+  <!-- Order Sidebar Modal — a drawer like every other drawer.
 
-    /* ≥1024px: single wide column, full-bleed on the white background —
-       no side-by-side split, no wrapping "card" (no border/shadow/bg)
-       around the form, so it reads as a page, not a floating panel.
-       Order Type / Customer / Products / Deposit & Notes, the total
-       row and the footer all flow top-to-bottom in one track, same
-       order as the plain accordion. Products stays a normal
-       collapsible accordion section like the other three — same
-       width, same behavior, nothing special-cased. Below 1024px this
-       whole block doesn't apply and the untouched single-column
-       accordion (identical to mobile) is what renders. */
-    @media (min-width: 1024px) {
-      /* Leave the fixed 88px left nav (.nj-sidebar, z-index 70) visible
-         and usable — the backdrop + panel both start after it instead of
-         covering the whole viewport (.sidebar-overlay/.sidebar-modal
-         default to left:0/width:100vw, which otherwise darkens then
-         hides the nav under the panel). ".sidebar-modal" is anchored via
-         right:0, so shrinking its width alone leaves the gap on the left. */
-      #orderSidebarOverlay {
-        left: 88px;
-        width: calc(100vw - 88px);
-      }
-      #orderSidebarOverlay .sidebar-modal {
-        width: calc(100vw - 88px) !important;
-        max-width: calc(100vw - 88px) !important;
-      }
-      #orderSidebarOverlay #createOrderForm {
-        display: block; /* explicitly undo the old grid */
-        max-width: 1120px;
-        margin: 0 auto;
-      }
-      #orderSidebarOverlay #createOrderForm > .co-section {
-        margin-bottom: 22px; /* generous vertical rhythm between sections */
-      }
-      #orderSidebarOverlay #createOrderForm > #co-order-total-row {
-        margin-top: 8px;
-      }
-      #orderSidebarOverlay #createOrderForm > .sidebar-footer {
-        margin-top: 18px !important;
-      }
+       It used to override .sidebar-modal into a full-screen workspace,
+       because the order form is denser than a contact or a task and 500px
+       could not hold it. That reasoning moved out from under it when the
+       form got a page of its own: anyone who wants room opens the page,
+       and what is left for the drawer is the job the other drawers do —
+       add a thing without leaving what you were looking at.
+
+       So the overrides are gone rather than retuned. Inheriting means it
+       is the same width, the same slide, the same backdrop and the same
+       mobile behaviour as the contact and task drawers, and it stays that
+       way when those change; a copy set to the same number today would
+       only drift from them tomorrow. The form itself already fits a
+       narrow column — it is the one the 50vw edit sidebar used for a
+       long time. -->
+  <style>
+    /* The form's inner max-width is what a page needs, not a 500px
+       drawer: left alone it would keep a wide measure inside a narrow
+       panel. Nothing else is special-cased. */
+    #orderSidebarOverlay #createOrderForm {
+      display: block;
+      max-width: 100%;
     }
   </style>
   <div id="orderSidebarOverlay" class="sidebar-overlay" onclick="closeOrderSidebar()">
@@ -4682,7 +4644,17 @@
       }
 
       // Order Sidebar Functions
-      function openOrderSidebar() {
+      // The drawer's half of the create-order form. The page at
+      // /books/<id>/orders/create/ is the other half, and they render the
+      // same partial from the same context — the only thing either has to
+      // supply is which book it is being opened in.
+      //
+      // Which is the whole reason this passes ?book=. A drawer has no URL
+      // of its own to name the book, and without it the form falls back to
+      // the member's DEFAULT book: an order started from Ergene's page
+      // would be written into Laleli, silently. The value is still checked
+      // server-side against the member's own assignments.
+      function openOrderSidebar(bookId) {
         const overlay = document.getElementById('orderSidebarOverlay');
         const content = document.getElementById('orderSidebarContent');
         overlay.classList.add('active');
@@ -4691,8 +4663,13 @@
         // Always reload to get a fresh form
         content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
 
+        var url = '{% url "operating:create_order" %}';
+        var book = (bookId === undefined || bookId === null)
+          ? '{{ current_book.pk|default:"" }}' : bookId;
+        if (book) url += '?book=' + encodeURIComponent(book);
+
         // Use HTMX to load content
-        htmx.ajax('GET', '{% url "operating:create_order" %}', { target: '#orderSidebarContent', swap: 'innerHTML' });
+        htmx.ajax('GET', url, { target: '#orderSidebarContent', swap: 'innerHTML' });
       }
 
       function closeOrderSidebar() {

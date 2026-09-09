@@ -324,6 +324,46 @@ CARRIER_CHOICES = [
 
 
 # Create your models here.
+class OrderNumberSequence(models.Model):
+    """The single counter behind ORD-0001.
+
+    Global, unlike the invoice and account counters, which live per book on
+    CurrentAccountSettings. Two reasons it cannot follow them: Order.
+    order_number is unique across the whole table, so a per-book counter
+    would mint ORD-0001 in each book and the second insert would fail; and
+    an Order carries no book column of its own — it reaches its book through
+    a current account that is attached AFTER the row exists, so at the
+    moment a number is needed there is no book to ask.
+
+    One row. take() locks it, so two orders saved at the same instant get
+    two numbers rather than one number twice — which is what the previous
+    generator did, reading MAX and adding one outside any lock.
+    """
+
+    prefix  = models.CharField(max_length=10, default="ORD")
+    padding = models.PositiveSmallIntegerField(default=4)
+    next_seq = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        verbose_name = "Order number sequence"
+        verbose_name_plural = "Order number sequence"
+
+    def __str__(self):
+        return f"{self.prefix}-{str(self.next_seq).zfill(self.padding)} next"
+
+    @classmethod
+    def take(cls):
+        """The next order number, consumed. Never returns the same twice."""
+        from django.db import transaction
+        with transaction.atomic():
+            row, _ = cls.objects.get_or_create(pk=1)
+            locked = cls.objects.select_for_update().get(pk=row.pk)
+            number = f"{locked.prefix}-{str(locked.next_seq).zfill(locked.padding)}"
+            locked.next_seq += 1
+            locked.save(update_fields=["next_seq"])
+            return number
+
+
 class Order(models.Model):
     # Who raised this record. Stamped automatically on first save by
     # erp.ownership.stamp_creator, from the request-scoped user. NULL on
@@ -441,7 +481,7 @@ class Order(models.Model):
         unique=True,
         null=True,
         blank=True,
-        help_text="Müşteri sipariş numarası (DK0000001 formatında)"
+        help_text="Customer-facing order reference, e.g. ORD-0001"
     )
     order_status = models.CharField(
         max_length=32,
@@ -918,27 +958,7 @@ class Order(models.Model):
 
         self.save()
 
-    def generate_order_number(self):
-        """Generate order number in DK0000001 format"""
-        # Get the last order with an order_number
-        last_order = Order.objects.filter(
-            order_number__isnull=False
-        ).order_by('-id').first()
-        
-        if last_order and last_order.order_number:
-            # Extract the number part and increment
-            try:
-                last_num = int(last_order.order_number.replace('DK', ''))
-                new_num = last_num + 1
-            except ValueError:
-                new_num = 1
-        else:
-            new_num = 1
-        
-        return f"DK{str(new_num).zfill(7)}"
-
     def save(self, *args, **kwargs):
-        # Auto-generate order_number for web orders (if they don't have one)
         is_new = self.pk is None
 
         # Default the user-facing order date to today when creating a new
@@ -948,21 +968,23 @@ class Order(models.Model):
             from django.utils import timezone
             self.order_date = timezone.localdate()
 
-        # First save to get ID if new
-        if is_new:
-            super().save(*args, **kwargs)
-        
-        # Generate order_number for web orders that don't have one
-        if not self.order_number and self.web_client:
-            self.order_number = self.generate_order_number()
-            if is_new:
-                # Already saved above, just update the order_number
-                super().save(update_fields=['order_number'])
-                return
-        
-        # Normal save
-        if not is_new:
-            super().save(*args, **kwargs)
+        # A number for every NEW order, taken before the insert so the row
+        # is never briefly numberless and the unique constraint is settled
+        # in one statement.
+        #
+        # Only new ones. The orders that predate this stay null and go on
+        # being named by id ("Order #297") wherever they are printed —
+        # numbering them now would hand a customer a reference for an order
+        # they already hold paperwork for under another name.
+        #
+        # This used to run for web orders alone, off a MAX+1 read with no
+        # lock, in the DK0000001 shape. All three are gone: every order is
+        # numbered, the counter is locked, and the shape matches the
+        # invoices and account codes it sits beside.
+        if is_new and not self.order_number:
+            self.order_number = OrderNumberSequence.take()
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         if self.order_number:
@@ -1380,6 +1402,22 @@ class WarehouseProduct(models.Model):
     UNIT_SHORT = {"mt": _("m"), "adet": _("pcs"),
                   "paket": _("pack"), "kg": _("kg")}
 
+    # What ONE stock item of this product is CALLED. A stock item is a
+    # physical lot that arrived together and is picked from together —
+    # for fabric that is a roll, for ready-made curtains it is a box.
+    # Every warehouse screen said "roll" because fabric was all there
+    # was, so a box holding 20 curtain sets was listed as a roll.
+    ITEM_NOUN = {
+        "mt": (_("roll"), _("rolls")),
+        "kg": (_("bale"), _("bales")),
+        "adet": (_("box"), _("boxes")),
+        "paket": (_("box"), _("boxes")),
+    }
+    # Font Awesome class to match. A scroll for a roll of cloth, a carton
+    # for a box — the icon was doing as much of the telling as the word.
+    ITEM_ICON = {"mt": "fa-scroll", "kg": "fa-scroll",
+                 "adet": "fa-box", "paket": "fa-box"}
+
     unit = models.CharField(
         max_length=8, choices=UNIT_CHOICES, default="mt",
         help_text="What this product is counted in",
@@ -1446,6 +1484,19 @@ class WarehouseProduct(models.Model):
         # the language active on this request — and so callers comparing it,
         # or dropping it into JSON, get a plain string rather than a proxy.
         return str(self.UNIT_SHORT.get(self.unit, self.unit or ""))
+
+    @property
+    def item_noun(self):
+        """"roll" / "box" — one stock item of this product, singular."""
+        return str(self.ITEM_NOUN.get(self.unit, (_("item"), _("items")))[0])
+
+    @property
+    def item_noun_plural(self):
+        return str(self.ITEM_NOUN.get(self.unit, (_("item"), _("items")))[1])
+
+    @property
+    def item_icon(self):
+        return self.ITEM_ICON.get(self.unit, "fa-layer-group")
 
     # Live USD/TRY rate fetched lazily so the model file doesn't pull
     # in accounting at import time. Cached per call.

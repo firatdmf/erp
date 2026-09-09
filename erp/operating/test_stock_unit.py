@@ -186,3 +186,91 @@ class MovingStockCarriesTheUnit(TestCase):
             warehouse=self.target, sku="RN1357.RM8")
         self.assertEqual(moved.unit, "paket")
         self.assertEqual(moved.unit_short, "pack")
+
+
+class OneStockItemIsCalledWhatItIs(TestCase):
+    """A stock item is a physical lot that arrived together and is picked
+    from together. For fabric that is a roll; for ready-made curtains it is
+    a box, and `lot_number` literally holds the box number.
+
+    Every warehouse screen said "roll" — the word, the count and the
+    scroll icon — because fabric was all the shelves held. So the
+    Ready-made Shop listed a box of 20 curtain sets as a roll.
+    """
+
+    def setUp(self):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
+        self.shop = Warehouse.objects.create(
+            name="Ready-made Shop", accounting_book=self.book)
+        self.mill = Warehouse.objects.create(
+            name="Laleli Fabrika", accounting_book=self.book)
+
+        self.curtains = WarehouseProduct.objects.create(
+            warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
+            quantity=Decimal("20"), unit="paket")
+        WarehouseProductItem.objects.create(
+            product=self.curtains, quantity=Decimal("20"),
+            quantity_remaining=Decimal("20"), lot_number="12",
+            status="in_stock", unit_cost_base=Decimal("15.55"))
+
+        self.fabric = WarehouseProduct.objects.create(
+            warehouse=self.mill, name="seta grey", sku="SETA-1",
+            quantity=Decimal("300"))
+        WarehouseProductItem.objects.create(
+            product=self.fabric, quantity=Decimal("300"),
+            quantity_remaining=Decimal("300"), barcode="BC-1",
+            status="in_stock", unit_cost_base=Decimal("4"))
+
+        user = get_user_model().objects.create_user("keeper", password="pw")
+        user.member.books.add(self.book)
+        user.member.default_book = self.book
+        user.member.save()
+        self.client.force_login(user)
+
+    def _page(self, warehouse, **params):
+        resp = self.client.get(reverse(
+            "operating:warehouse_detail", args=[warehouse.pk]), params)
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode()
+
+    def test_the_shop_counts_boxes(self):
+        self.assertIn("1 box", _text(self._page(self.shop)))
+
+    def test_the_mill_still_counts_rolls(self):
+        self.assertIn("1 roll", _text(self._page(self.mill)))
+
+    def test_the_shop_never_says_roll(self):
+        self.assertNotRegex(_text(self._page(self.shop)), r"\d+ rolls?\b")
+
+    def test_the_header_icon_follows_the_goods(self):
+        """A scroll of cloth and a carton are different pictures, and the
+        icon was doing as much of the telling as the word."""
+        self.assertRegex(self._page(self.shop),
+                         r'<i class="fa fa-box"></i>\s*[\d,]+\s*box')
+        self.assertRegex(self._page(self.mill),
+                         r'<i class="fa fa-scroll"></i>\s*[\d,]+\s*roll')
+
+    def test_the_grouped_view_agrees_with_the_flat_one(self):
+        self.assertIn("1 box", _text(self._page(self.shop, view="grouped")))
+        self.assertIn("1 roll", _text(self._page(self.mill, view="grouped")))
+
+    def test_a_warehouse_holding_both_calls_them_items(self):
+        """Neither word is true of the whole shelf, so it says neither —
+        rather than calling a box of curtains a roll, which is what the
+        hardcoded label did."""
+        WarehouseProduct.objects.create(
+            warehouse=self.shop, name="grek tul", sku="GT-1",
+            quantity=Decimal("50"), unit="mt")
+        page = _text(self._page(self.shop))
+        self.assertRegex(page, r"\d+ items\b")
+        self.assertNotRegex(page, r"\d+ rolls?\b")
+
+    def test_the_noun_falls_back_rather_than_vanishing(self):
+        odd = WarehouseProduct.objects.create(
+            warehouse=self.shop, name="odd", sku="ODD-1",
+            quantity=Decimal("1"), unit="yards")
+        self.assertEqual(odd.item_noun, "item")
+        self.assertEqual(odd.item_noun_plural, "items")
+        self.assertEqual(odd.item_icon, "fa-layer-group")

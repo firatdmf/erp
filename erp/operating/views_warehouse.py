@@ -1372,8 +1372,12 @@ class WarehouseDetail(View):
                 "variant_count": g["variant_count"],
                 "roll_total": _roll_counts.get(g["base"], 0),
                 "total_qty": g["total_qty"],
-                "unit_short": WarehouseProduct.UNIT_SHORT.get(
-                    g.get("unit"), g.get("unit") or ""),
+                "unit_short": str(WarehouseProduct.UNIT_SHORT.get(
+                    g.get("unit"), g.get("unit") or "")),
+                "item_noun": str(WarehouseProduct.ITEM_NOUN.get(
+                    g.get("unit"), ("item", "items"))[0]),
+                "item_noun_plural": str(WarehouseProduct.ITEM_NOUN.get(
+                    g.get("unit"), ("item", "items"))[1]),
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "avg_cost_usd": g["avg_cost"],
@@ -1460,26 +1464,53 @@ class WarehouseDetail(View):
             # carry the units instead. Fabric-only warehouses, which is all
             # of them until Ready-made Shop, still read "12,345 m".
             'total_unit_short': _warehouse_unit_short(scope_ids),
+            **_warehouse_item_words(scope_ids),
             'combined_members': (list(warehouse.combined_sources.order_by('name'))
                                  if warehouse.is_combined else []),
         })
         return render(request, self.template_name, ctx)
 
 
-def _warehouse_unit_short(scope_ids):
-    """The single unit a warehouse counts in, short form, or "" if mixed.
+def _warehouse_sole_unit(scope_ids):
+    """The one unit a warehouse counts in, or None when it holds several.
 
     Reads the DISTINCT units actually present rather than assuming, so a
     warehouse that starts as fabric and later takes a pallet of curtains
-    stops claiming its total is in metres the moment that happens.
+    stops calling itself metres the moment that happens.
     """
     units = set(WarehouseProduct.objects
                 .filter(warehouse_id__in=scope_ids)
                 .values_list("unit", flat=True).distinct())
-    if len(units) != 1:
+    return units.pop() if len(units) == 1 else None
+
+
+def _warehouse_unit_short(scope_ids):
+    """Short unit for the header total, or "" if the warehouse is mixed."""
+    unit = _warehouse_sole_unit(scope_ids)
+    if unit is None:
         return ""
-    unit = units.pop()
-    return WarehouseProduct.UNIT_SHORT.get(unit, unit or "")
+    return str(WarehouseProduct.UNIT_SHORT.get(unit, unit))
+
+
+def _warehouse_item_words(scope_ids):
+    """What to call ONE stock item on this warehouse's header, and which
+    icon to draw beside it.
+
+    A warehouse holding only fabric counts rolls; the Ready-made Shop
+    counts boxes. A warehouse holding both cannot say either, so it falls
+    back to the neutral word rather than calling a box a roll — which is
+    what every warehouse page did before the shelves stopped being
+    fabric-only.
+    """
+    from django.utils.translation import gettext as _t
+    unit = _warehouse_sole_unit(scope_ids)
+    singular, plural = WarehouseProduct.ITEM_NOUN.get(
+        unit, (_t("item"), _t("items")))
+    return {
+        "item_noun": str(singular),
+        "item_noun_plural": str(plural),
+        "item_icon": WarehouseProduct.ITEM_ICON.get(unit, "fa-layer-group"),
+    }
 
 
 @login_required
@@ -1773,6 +1804,13 @@ def warehouse_barcode_lookup(request, pk):
             # Live stock_items, matching what the product page lists and what the
             # Excel export counts — a used-up roll is not stock on hand.
             "rolls_count": product.stock_items.exclude(status="consumed").count(),
+            # What this product is counted in and what one stock item of it
+            # is called, so the scan tile can say "3 boxes · 60 pack"
+            # instead of the hardcoded "3 top · 60 m" it said when every
+            # shelf held fabric.
+            "unit_short": product.unit_short,
+            "item_noun": product.item_noun,
+            "item_noun_plural": product.item_noun_plural,
             # Always the product's OWN warehouse — from a combined view the
             # match lives in a member, and the detail route 404s otherwise.
             "detail_url": reverse("operating:warehouse_product_detail",
@@ -5090,8 +5128,12 @@ class WarehouseProductDetail(View):
 # barcodes, a user may type "Ordered by X"), which would misclassify
 # intake/adjustment rows as orders.
 _ORDER_REASON_PREFIXES = ("Order ship", "Order un-ship", "Order edit")
-# Order numbers are DK + zfill(7) digits (models.generate_order_number).
-_ORDER_REF_RE = r"^DK\d{7,}$"
+# What an order reference looks like on a stock movement. Two shapes,
+# because the numbering changed: ORD-0001 for every order numbered by
+# OrderNumberSequence, and DK0000001 for the web orders the old generator
+# reached. Movements already carry both, so both have to be recognised —
+# dropping DK would unlink the history it is written into.
+_ORDER_REF_RE = r"^(ORD-\d+|DK\d{7,})$"
 
 
 def _reversed_pair_ids(qs):

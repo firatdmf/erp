@@ -12,7 +12,7 @@ them into the same grid squeezed both.{% endcomment %}
       <span class="wh-rolls-count">
         <i class="fa fa-layer-group"></i>
         {{ shown }}{% if truncated %} / {{ total }}{% endif %}
-        {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=shown %}roll{% plural %}rolls{% endblocktrans %}{% endif %}
+        {% if shown == 1 %}{{ product.item_noun }}{% else %}{{ product.item_noun_plural }}{% endif %}
       </span>
       <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}"
          class="wh-rolls-open">
@@ -42,7 +42,7 @@ them into the same grid squeezed both.{% endcomment %}
           {% if r.unit_cost_base is not None %}
             {{ cost_sign }}{{ r.unit_cost_base|money }}
           {% else %}
-            <span style="color:#C5CCD3;" title="{% trans 'No cost recorded for this roll.' %}">&mdash;</span>
+            <span style="color:#C5CCD3;" title="{% blocktrans with n=product.item_noun %}No cost recorded for this {{ n }}.{% endblocktrans %}">&mdash;</span>
           {% endif %}
         </div>
 
@@ -72,7 +72,7 @@ them into the same grid squeezed both.{% endcomment %}
         <div class="wh-roll-act">
           {% if r.has_label_image %}
           <a href="{% url 'operating:warehouse_roll_photo' product.warehouse_id r.pk %}"
-             target="_blank" rel="noopener" title="{% trans 'Label photo taken when this roll was scanned' %}">
+             target="_blank" rel="noopener" title="{% blocktrans with n=product.item_noun %}Label photo taken when this {{ n }} was scanned{% endblocktrans %}">
             <i class="fa fa-camera"></i>
           </a>
           {% endif %}
@@ -87,7 +87,7 @@ them into the same grid squeezed both.{% endcomment %}
 
     {% if truncated %}
     <div class="wh-rolls-more">
-      {% blocktrans %}Showing the newest {{ shown }} of {{ total }} rolls.{% endblocktrans %}
+      {% blocktrans with n=product.item_noun_plural %}Showing the newest {{ shown }} of {{ total }} {{ n }}.{% endblocktrans %}
       <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}">{% trans "See all" %}</a>
     </div>
     {% endif %}
@@ -95,7 +95,7 @@ them into the same grid squeezed both.{% endcomment %}
     {% else %}
     <div class="wh-rolls-empty">
       <i class="fa fa-barcode"></i>
-      {% trans "No rolls scanned for this product." %}
+      {% blocktrans with n=product.item_noun_plural %}No {{ n }} recorded for this product.{% endblocktrans %}
       <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}">{% trans "Open product" %}</a>
     </div>
     {% endif %}

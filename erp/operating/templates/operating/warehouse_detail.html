@@ -1289,8 +1289,8 @@
           <i class="fa fa-list-ul"></i>{{ variant_count|default:0|intcomma }} {% trans "variants" %}
         </span>
         <span class="od-dot"></span>
-        <span title="{% trans 'Rolls' %}">
-          <i class="fa fa-scroll"></i>{{ roll_count|default:0|intcomma }} {% trans "rolls" %}
+        <span title="{{ item_noun_plural|capfirst }}">
+          <i class="fa {{ item_icon }}"></i>{{ roll_count|default:0|intcomma }} {{ item_noun_plural }}
         </span>
         <span class="od-dot"></span>
         <span>
@@ -1656,7 +1656,7 @@
           </div>
           <div class="od-stat">
             <div class="val">{{ roll_count|default:0|intcomma }}</div>
-            <div class="lbl">{% trans "Rolls" %}</div>
+            <div class="lbl">{{ item_noun_plural|capfirst }}</div>
           </div>
           <div class="od-stat">
             <div class="val">{{ total_quantity|floatformat:0|intcomma }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> {{ total_unit_short }}</span></div>
@@ -2128,7 +2128,7 @@
         <div class="rs-recent">
           <div class="rs-recent-h">
             <span>{% trans "This session" %}</span>
-            <span class="rs-recent-count" id="rsTotalCount">0 {% trans "rolls" %} · 0 m</span>
+            <span class="rs-recent-count" id="rsTotalCount">0 {{ item_noun_plural }} · 0 {{ total_unit_short }}</span>
           </div>
           <div id="rsRecentList" class="rs-recent-list">
             <div class="rs-recent-empty">{% trans "No rolls yet." %}</div>
@@ -2293,6 +2293,25 @@
   time a row is opened and then kept in the DOM — re-opening it costs
   nothing, and a page of products never queries for rolls nobody asked to
   see.{% endcomment %}
+  // What THIS warehouse counts in, and what one stock item of it is
+  // called. Rendered from the server so the words are already translated
+  // and already correct for the shelf: the fabric warehouses say
+  // "roll · m", the Ready-made Shop says "box · pack". A warehouse
+  // holding both says "item" and drops the unit, because there is no one
+  // right answer and a wrong one reads as fact.
+  const WH_ITEM_NOUN = "{{ item_noun|escapejs }}";
+  const WH_ITEM_NOUN_PLURAL = "{{ item_noun_plural|escapejs }}";
+  const WH_UNIT = "{{ total_unit_short|escapejs }}";
+  function whUnit(n) {
+    return WH_UNIT ? (n + ' ' + WH_UNIT) : n;
+  }
+
+  // The stock-item noun comes from the server already translated, so it
+  // arrives lower-case; the tile labels beside it are Title Case.
+  function blCap(s) {
+    return (s || '').charAt(0).toUpperCase() + (s || '').slice(1);
+  }
+
   function toggleWhRolls(evt, rowEl, url) {
     // Let real navigation through: the SKU / catalog links, and any
     // ctrl/cmd/shift/middle-click anywhere on the row.
@@ -3113,7 +3132,7 @@
         '</span>' +
         (bc ? '<span class="rs-recent-bc"><i class="fa fa-barcode"></i>' + rsEscapeHtml(bc) + '</span>' : '') +
       '</span>' +
-      '<span class="rs-recent-meters">' + parseFloat(it.quantity || 0).toFixed(2) + ' m</span>' +
+      '<span class="rs-recent-meters">' + whUnit(parseFloat(it.quantity || 0).toFixed(2)) + '</span>' +
       '<button type="button" class="rs-recent-edit" title="{% trans "Edit" %}" ' +
         'onclick="openRsEdit(this.closest(\'.rs-recent-row\'))"><i class="fa fa-pen"></i></button>';
   }
@@ -3135,8 +3154,8 @@
     rsRenderRecentRow(row);
     list.prepend(row);
     document.getElementById('rsTotalCount').textContent =
-      rsSession.count + ' ' + (rsSession.count === 1 ? 'roll' : 'rolls') +
-      ' · ' + rsSession.quantity.toFixed(2) + ' m';
+      rsSession.count + ' ' + (rsSession.count === 1 ? WH_ITEM_NOUN : WH_ITEM_NOUN_PLURAL) +
+      ' · ' + whUnit(rsSession.quantity.toFixed(2));
   }
 
   // ── Edit a just-added item from the recent list ──
@@ -3482,7 +3501,7 @@
         ? '<a href="' + e.url + '" style="color:#1E40AF; text-decoration:underline;">' + blEsc(e.label) + '</a>'
         : blEsc(e.label);
       var bits = [];
-      if (e.quantity) bits.push(Number(e.quantity).toFixed(2) + ' m');
+      if (e.quantity) bits.push(whUnit(Number(e.quantity).toFixed(2)));
       if (e.date) bits.push(blEsc(e.date));
       if (e.line) bits.push(blEsc(e.line));
       return '<div style="font-weight:500; margin-top:3px;">→ ' + who +
@@ -3492,7 +3511,7 @@
     return '<div style="color:#1E40AF; background:#EFF6FF; border:1px solid #BFDBFE;' +
            ' border-radius:8px; padding:8px 10px; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
              '<i class="fa fa-hand"></i> {% trans "Reserved for an order" %} · ' +
-             '<b>' + Number(h.quantity).toFixed(2) + ' m</b> {% trans "held" %} ' +
+             '<b>' + whUnit(Number(h.quantity).toFixed(2)) + '</b> {% trans "held" %} ' +
              '<span style="font-weight:500;">({% trans "not yet shipped" %})</span>' +
              rows +
            '</div>';
@@ -3508,10 +3527,10 @@
     var head = u.consumed
       ? '{% trans "This roll has been used up" %}'
       : '{% trans "This roll is partly used" %}';
-    var sum = '<b>' + Number(u.used).toFixed(2) + ' m</b> {% trans "of" %} ' +
-              Number(u.total).toFixed(2) + ' m';
+    var sum = '<b>' + whUnit(Number(u.used).toFixed(2)) + '</b> {% trans "of" %} ' +
+              whUnit(Number(u.total).toFixed(2));
     if (!u.consumed) {
-      sum += ' · <b>' + Number(u.remaining).toFixed(2) + ' m</b> {% trans "left" %}';
+      sum += ' · <b>' + whUnit(Number(u.remaining).toFixed(2)) + '</b> {% trans "left" %}';
     }
 
     var rows = (u.entries || []).map(function (e) {
@@ -3525,7 +3544,7 @@
         if (e.by) what += ' · ' + blEsc(e.by);
       }
       var bits = [];
-      if (e.quantity) bits.push(Number(e.quantity).toFixed(2) + ' m');
+      if (e.quantity) bits.push(whUnit(Number(e.quantity).toFixed(2)));
       if (e.date) bits.push(blEsc(e.date));
       // The order line this roll was cut for — one order can eat several
       // rolls, so the order number alone doesn't say what this one became.
@@ -3559,7 +3578,7 @@
         var rem = (d.roll.quantity_remaining !== null && d.roll.quantity_remaining !== undefined)
                   ? Number(d.roll.quantity_remaining).toFixed(2) : null;
         var sub = '';
-        if (rem !== null && rem !== rm) sub += '{% trans "remaining" %}: <b>' + rem + ' m</b>';
+        if (rem !== null && rem !== rm) sub += '{% trans "remaining" %}: <b>' + whUnit(rem) + '</b>';
         if (d.roll.lot_number) sub += (sub ? ' · ' : '') + 'Lot: ' + blEsc(d.roll.lot_number);
         tiles +=
           '<div class="bl-tile hero">' +
@@ -3571,11 +3590,11 @@
       tiles +=
         '<div class="bl-tile">' +
           '<div class="t-label"><i class="fa fa-warehouse"></i> {% trans "Current stock" %}</div>' +
-          '<div class="t-value">' + (p.quantity || 0).toFixed(2) + '<span class="t-unit">m</span></div>' +
+          '<div class="t-value">' + (p.quantity || 0).toFixed(2) + '<span class="t-unit">' + (p.unit_short || 'm') + '</span></div>' +
         '</div>' +
         '<div class="bl-tile">' +
-          '<div class="t-label"><i class="fa fa-layer-group"></i> {% trans "Rolls" %}</div>' +
-          '<div class="t-value">' + (p.rolls_count || 0) + '<span class="t-unit">top</span></div>' +
+          '<div class="t-label"><i class="fa fa-layer-group"></i> ' + blCap(p.item_noun_plural || 'rolls') + '</div>' +
+          '<div class="t-value">' + (p.rolls_count || 0) + '<span class="t-unit">' + ((p.rolls_count == 1 ? p.item_noun : p.item_noun_plural) || 'rolls') + '</span></div>' +
         '</div>';
       var used = d.roll && d.roll.consumed;
       r.innerHTML =

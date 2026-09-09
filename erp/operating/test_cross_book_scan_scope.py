@@ -99,6 +99,42 @@ class ScanStaysInScope(TestCase):
         resp = self._check("E-0001", E_SKU, book=self.laleli.pk)
         self.assertEqual(resp.status_code, 404)
 
+    def test_the_create_form_is_told_about_the_toggle(self):
+        """The create form CAN hold both books — the save splits it — so
+        the answer here is the toggle, not another order. Telling someone
+        to start a second order they do not need sends them the long way
+        round a door that is already open."""
+        d = json.loads(self._resolve("E-0001", book=self.laleli.pk).content)
+        self.assertIn("Ergene Fabric", d["error"])
+        self.assertIn("other books", d["error"])
+        self.assertNotIn("separate order", d["error"])
+
+    def test_an_existing_order_is_told_to_start_a_separate_one(self):
+        """An edit has no such toggle and no such option: the account is
+        billed and the holds are on one book's shelves. A separate order
+        is the only honest advice."""
+        d = json.loads(self._resolve(
+            "E-0001", book=self.laleli.pk, order=99).content)
+        self.assertIn("Ergene Fabric", d["error"])
+        self.assertIn("separate order", d["error"])
+        self.assertNotIn("other books", d["error"])
+
+    def test_both_messages_are_translated(self):
+        """English is the source; Turkish comes from the catalogue. Asked
+        of the catalogue rather than of a response, the way this project's
+        other language test does — a live request picks its language from
+        middleware, which would answer a question nobody asked."""
+        from django.utils import translation
+        touched = [
+            "That barcode is on %(book)s's shelf. This order belongs to one "
+            "book — create a separate order for it.",
+            "That barcode is on %(book)s's shelf. Tick “Show stock from my "
+            "other books” to add it — the order is split by book when you save.",
+        ]
+        with translation.override("tr"):
+            missing = [t for t in touched if translation.gettext(t) == t]
+        self.assertEqual(missing, [], "no Turkish for: " + repr(missing))
+
     def test_it_names_the_book_instead_of_denying_the_barcode(self):
         """"No such barcode" is true of this shelf and useless to someone
         holding the roll. Name the book and the dead end becomes an
@@ -108,6 +144,7 @@ class ScanStaysInScope(TestCase):
             d = json.loads(resp.content)
             self.assertEqual(d.get("kind"), "wrong_book")
             self.assertIn("Ergene Fabric", d["error"])
+            self.assertNotIn("bulunamad", d["error"])
 
     # ── what must keep working ──────────────────────────────────────
     def test_the_working_book_still_scans(self):

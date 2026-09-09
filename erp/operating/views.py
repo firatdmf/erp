@@ -1562,7 +1562,7 @@ def order_create_barcode_check(request):
         other = _other_book_holding(code, request)
         if other is not None:
             return JsonResponse({"ok": False, "kind": "wrong_book",
-                                 "error": _wrong_book_error(other)}, status=404)
+                                 "error": _wrong_book_error(other, request)}, status=404)
         return JsonResponse({"ok": False, "kind": "not_found", "error": "Bu barkodla bir stock item bulunamadı."}, status=404)
     if err == "wrong_product":
         return JsonResponse({"ok": False, "kind": "wrong_product", "error": "Bu stock item bu ürüne ait değil."}, status=409)
@@ -1640,12 +1640,29 @@ def _other_book_holding(code, request, member=None):
     return roll.product.warehouse.accounting_book
 
 
-def _wrong_book_error(book):
+def _wrong_book_error(book, request):
     """The message a scan gets when the roll is real but stands in another
-    of the member's books."""
+    of the member's books.
+
+    What to DO about it differs by where the scan came from, so the
+    message does too. On the create form the answer is the "other books"
+    toggle: turn it on and the basket may hold both, because the save
+    splits it into an order per book. On an existing order there is no
+    such answer — its account is billed and its holds are on one book's
+    shelves — so the only honest advice is a separate order.
+
+    Telling an edit page to flip a toggle it does not have, or a create
+    form to go and start another order it does not need, is worse than
+    saying nothing: it sends the reader looking for something that is not
+    there.
+    """
     from django.utils.translation import gettext as _
-    return _("That barcode is on %(book)s's shelf. An order belongs to one "
-             "book — create a separate order for it.") % {"book": book.name}
+    if _editing_order_id(request) is not None:
+        return _("That barcode is on %(book)s's shelf. This order belongs to "
+                 "one book — create a separate order for it.") % {"book": book.name}
+    return _("That barcode is on %(book)s's shelf. Tick “Show stock from my "
+             "other books” to add it — the order is split by book when "
+             "you save.") % {"book": book.name}
 
 
 def _split_items_by_book(items, request, member):
@@ -1777,7 +1794,7 @@ def order_create_barcode_resolve(request):
         other = _other_book_holding(code, request)
         if other is not None:
             return JsonResponse({"ok": False, "kind": "wrong_book",
-                                 "error": _wrong_book_error(other)}, status=404)
+                                 "error": _wrong_book_error(other, request)}, status=404)
         return JsonResponse({"ok": False, "error": "Bu barkodla bir stock item bulunamadı."}, status=404)
     editing = _editing_order_id(request)
     avail = _roll_available_meters(roll, exclude_order_id=editing)

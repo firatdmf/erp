@@ -9220,3 +9220,9 @@ msgstr "Cari hesap seçin — alım bu hesaba işlenir."
 
 msgid "Pick a current account — the purchase invoice is posted to it."
 msgstr "Cari hesap seçin — alım faturası bu hesaba işlenir."
+
+msgid "That barcode is on %(book)s's shelf. This order belongs to one book — create a separate order for it."
+msgstr "Bu barkod %(book)s rafında. Bir sipariş tek bir deftere aittir — bunun için ayrı bir sipariş oluşturun."
+
+msgid "That barcode is on %(book)s's shelf. Tick “Show stock from my other books” to add it — the order is split by book when you save."
+msgstr "Bu barkod %(book)s rafında. Eklemek için “Diğer defterlerimdeki stoğu göster”i işaretleyin — kaydettiğinizde sipariş deftere göre bölünür."

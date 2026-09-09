@@ -187,6 +187,20 @@ class BrandHeader(TestCase):
         self.assertIsNotNone(brand_rule, "the brand headline rule is gone")
         self.assertIn("#944F05", brand_rule.group(0))
 
+    def test_the_order_number_prints_under_the_brand(self):
+        """In the header block, and after the brand line — the sheet has
+        to say which order it is without being read to the bottom."""
+        printed = self.client.get(
+            reverse("operating:order_print", kwargs={"pk": self.order.pk})
+        ).content.decode()
+        header = re.search(r'<table class="hdr".*?</table>', printed, re.S)
+        self.assertIsNotNone(header, "the print header is gone")
+        header = header.group(0)
+        self.assertIn("DK0000270", header)
+        self.assertLess(
+            header.index(self.LOCKUP), header.index("DK0000270"),
+            "the order number should come after the brand headline")
+
     def test_editing_the_book_changes_every_document(self):
         """The point of moving this onto the book: one edit, and the
         order print, its Excel and the packing list all follow."""

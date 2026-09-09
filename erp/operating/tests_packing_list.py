@@ -4,6 +4,7 @@ Lives outside tests.py because that module currently fails to import
 (a stale `from .models import Product` that no longer resolves), which
 would take these down with it.
 """
+import re
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -174,6 +175,17 @@ class BrandHeader(TestCase):
         self.order = Order.objects.create(order_number="DK0000270")
         self.client.force_login(
             User.objects.create_superuser("b", "b@b.com", "pw"))
+
+    def test_the_brand_headline_prints_in_the_brand_colour(self):
+        """#944F05 — the same colour the warehouse product sheet already
+        signs with. It is a brand decision, not a styling detail, so a
+        redesign of this stylesheet should have to say so out loud."""
+        printed = self.client.get(
+            reverse("operating:order_print", kwargs={"pk": self.order.pk})
+        ).content.decode()
+        brand_rule = re.search(r"\.hdr \.brand \{[^}]*\}", printed)
+        self.assertIsNotNone(brand_rule, "the brand headline rule is gone")
+        self.assertIn("#944F05", brand_rule.group(0))
 
     def test_editing_the_book_changes_every_document(self):
         """The point of moving this onto the book: one edit, and the

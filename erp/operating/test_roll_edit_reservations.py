@@ -129,6 +129,60 @@ class RollEditTrimsReservations(TestCase):
         self.assertEqual(moves.count(), 1)
         self.assertEqual(moves.first().quantity, Decimal("1.00"))
 
+    def test_the_order_is_told_why_its_figure_moved(self):
+        """The person who owns the order is not standing at the warehouse
+        page where this happened."""
+        order, res = self._order("DK0000305", Decimal("19.50"))
+        self.assertFalse(order.notes)
+
+        self._edit("18.50")
+
+        order.refresh_from_db()
+        self.assertIn("2000039337908", order.notes)
+        self.assertIn("19.50", order.notes)
+        self.assertIn("18.50", order.notes)
+        # The decision is named, not made for them.
+        self.assertIn("ordered quantity is unchanged", order.notes)
+
+    def test_the_note_is_appended_not_overwritten(self):
+        order, res = self._order("DK0000306", Decimal("19.50"))
+        order.notes = "Customer wants this before Friday."
+        order.save(update_fields=["notes"])
+
+        self._edit("18.50")
+
+        order.refresh_from_db()
+        self.assertIn("Customer wants this before Friday.", order.notes)
+        self.assertIn("Stock correction", order.notes)
+
+    def test_the_note_reaches_the_change_history(self):
+        """notes is audit-tracked, so one write lands in both places."""
+        from .models import OrderChange
+        order, res = self._order("DK0000307", Decimal("19.50"))
+
+        self._edit("18.50")
+
+        self.assertTrue(OrderChange.objects.filter(
+            order=order, field="notes").exists())
+
+    def test_a_hold_that_still_fits_writes_no_note(self):
+        order, res = self._order("DK0000308", Decimal("12.00"))
+
+        self._edit("18.50")
+
+        order.refresh_from_db()
+        self.assertFalse(order.notes)
+
+    def test_the_ordered_quantity_is_never_touched(self):
+        """A tape measure in the warehouse does not move an invoice."""
+        order, res = self._order("DK0000309", Decimal("19.50"))
+        item = order.items.first()
+
+        self._edit("18.50")
+
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, Decimal("19.50"))
+
     def test_shipped_metres_still_refuse_the_edit(self):
         """Unchanged: outgoing history is a fact, not a soft hold."""
         self.roll.quantity_remaining = Decimal("7.50")   # 12.00 already gone

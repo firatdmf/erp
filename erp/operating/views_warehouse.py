@@ -167,6 +167,16 @@ def _clamp_reservations_to_roll(roll, *, user=None):
     the order asked for a quantity, not for whatever the roll happens to
     carry.
 
+    The ORDERED quantity is never touched, only the hold. Those are
+    different things: what the customer asked for and agreed to pay is a
+    commercial fact, and a tape measure in the warehouse does not get to
+    move an invoice total on its own. Nor could it be inferred safely —
+    every order starts with nothing scanned, so a line auto-shrinking to
+    match its holds would collapse the moment it was written. What the
+    trim does instead is write onto the order what happened and why, so
+    whoever owns that order can decide: reduce the line, source the
+    shortfall elsewhere, or ship it short knowingly.
+
     Returns a list of {order, label, was, now} for the callers to report;
     empty when everything still fits."""
     from .models import OrderStockReservation
@@ -211,9 +221,36 @@ def _clamp_reservations_to_roll(roll, *, user=None):
             res.save(update_fields=["quantity"])
         else:
             res.delete()
+        _note_trim_on_order(res.order, roll, was, fits)
         adjusted.append(entry)
 
     return adjusted
+
+
+def _note_trim_on_order(order, roll, was, now):
+    """Write the trim onto the order's own notes.
+
+    The warehouse page is where this happens, and the person who owns the
+    order is not standing at it. Without a line here the order's reserved
+    figure simply drops one day, correct but unexplained, and the packing
+    screen's shortfall banner names an amount with no story behind it.
+
+    Notes is in audit's tracked fields, so saving it also lands a row in
+    the order's change history — one write, both places."""
+    from django.utils.timezone import localtime, now as _now
+
+    if order is None:
+        return
+    stamp = localtime(_now()).strftime("%d.%m.%Y %H:%M")
+    label = roll.barcode or f"#{roll.pk}"
+    line = (f"[{stamp}] Stock correction: roll {label} re-measured, so the "
+            f"amount held for this order fell {was:.2f} → {now:.2f} "
+            f"({was - now:.2f} less). The ordered quantity is unchanged — "
+            f"reduce the line, cover the shortfall from other stock, or "
+            f"ship it short.")
+    existing = (order.notes or "").rstrip()
+    order.notes = f"{existing}\n{line}" if existing else line
+    order.save(update_fields=["notes"])
 
 
 def _roll_usage_info(roll):

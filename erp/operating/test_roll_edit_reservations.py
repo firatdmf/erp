@@ -141,8 +141,8 @@ class RollEditTrimsReservations(TestCase):
         self.assertIn("2000039337908", order.notes)
         self.assertIn("19.50", order.notes)
         self.assertIn("18.50", order.notes)
-        # The decision is named, not made for them.
-        self.assertIn("ordered quantity is unchanged", order.notes)
+        # And what it did to the line's own quantity.
+        self.assertIn("Line quantity followed it down", order.notes)
 
     def test_the_note_is_appended_not_overwritten(self):
         order, res = self._order("DK0000306", Decimal("19.50"))
@@ -173,15 +173,53 @@ class RollEditTrimsReservations(TestCase):
         order.refresh_from_db()
         self.assertFalse(order.notes)
 
-    def test_the_ordered_quantity_is_never_touched(self):
-        """A tape measure in the warehouse does not move an invoice."""
+    def test_a_line_built_from_rolls_follows_them_down(self):
+        """There is no quantity box on the order form — the figure IS the
+        metres picked — so a shortened roll is arithmetic, not a decision."""
         order, res = self._order("DK0000309", Decimal("19.50"))
         item = order.items.first()
 
         self._edit("18.50")
 
         item.refresh_from_db()
-        self.assertEqual(item.quantity, Decimal("19.50"))
+        self.assertEqual(item.quantity, Decimal("18.50"))
+
+    def test_a_hand_typed_line_is_left_alone(self):
+        """The detail page's inline edit and untracked lines set quantity by
+        hand; that figure means something no roll can tell us."""
+        order, res = self._order("DK0000310", Decimal("19.50"))
+        item = order.items.first()
+        item.quantity = Decimal("25.00")          # typed, no longer its rolls
+        item.save(update_fields=["quantity"])
+
+        self._edit("18.50")
+
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, Decimal("25.00"))
+        order.refresh_from_db()
+        self.assertIn("entered by hand", order.notes)
+
+    def test_outsourced_metres_survive_the_sync(self):
+        """quantity = picked + outsourced; only the picked half moves."""
+        order, res = self._order("DK0000311", Decimal("19.50"))
+        item = order.items.first()
+        item.outsourced_quantity = Decimal("5.00")
+        item.quantity = Decimal("24.50")          # 19.50 picked + 5.00 outside
+        item.save(update_fields=["quantity", "outsourced_quantity"])
+
+        self._edit("18.50")
+
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, Decimal("23.50"))
+
+    def test_the_line_never_goes_below_zero(self):
+        order, res = self._order("DK0000312", Decimal("19.50"))
+        item = order.items.first()
+
+        self._edit("0.01")
+
+        item.refresh_from_db()
+        self.assertGreaterEqual(item.quantity, Decimal("0"))
 
     def test_shipped_metres_still_refuse_the_edit(self):
         """Unchanged: outgoing history is a fact, not a soft hold."""

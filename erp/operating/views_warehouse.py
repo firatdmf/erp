@@ -167,15 +167,19 @@ def _clamp_reservations_to_roll(roll, *, user=None):
     the order asked for a quantity, not for whatever the roll happens to
     carry.
 
-    The ORDERED quantity is never touched, only the hold. Those are
-    different things: what the customer asked for and agreed to pay is a
-    commercial fact, and a tape measure in the warehouse does not get to
-    move an invoice total on its own. Nor could it be inferred safely —
-    every order starts with nothing scanned, so a line auto-shrinking to
-    match its holds would collapse the moment it was written. What the
-    trim does instead is write onto the order what happened and why, so
-    whoever owns that order can decide: reduce the line, source the
-    shortfall elsewhere, or ship it short knowingly.
+    The order LINE follows the hold down when — and only when — its
+    quantity is still exactly the metres picked for it (see
+    _line_tracks_its_rolls). On the order form there is no quantity box:
+    the figure is the rolls plus whatever was typed as outsourced, so a
+    shortened roll leaves it stating a length nobody picked. A line whose
+    quantity was typed by hand is never moved.
+
+    Only the trim's own difference is applied, never a recompute from
+    scratch. That distinction matters: billing reads the ORDERED quantity
+    precisely so an order shipped without scanning still bills (see
+    Order.get_billable_line_quantities, and order #145, which billed
+    nothing under the old scanned-metres rule). A line with no holds has
+    nothing to trim and so is never reached from here.
 
     Returns a list of {order, label, was, now} for the callers to report;
     empty when everything still fits."""
@@ -216,24 +220,71 @@ def _clamp_reservations_to_roll(roll, *, user=None):
             reference=roll.barcode or f"Roll #{roll.pk}",
             created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
         )
+        # Decided BEFORE the write, while the reservations still hold the
+        # figures the line was built from.
+        line = res.order_item if _line_tracks_its_rolls(res.order_item) else None
+
         if fits > 0:
             res.quantity = fits
             res.save(update_fields=["quantity"])
         else:
             res.delete()
-        _note_trim_on_order(res.order, roll, was, fits)
+
+        if line is not None:
+            entry["line_was"] = float(line.quantity or 0)
+            line.quantity = max(Decimal("0"), (line.quantity or Decimal("0")) - (was - fits))
+            line.save(update_fields=["quantity"])
+            entry["line_now"] = float(line.quantity)
+
+        _note_trim_on_order(res.order, roll, was, fits, line=line)
         adjusted.append(entry)
 
     return adjusted
 
 
-def _note_trim_on_order(order, roll, was, now):
+def _line_tracks_its_rolls(item):
+    """Whether this order line's quantity is still simply what its rolls
+    plus its outsourced metres come to.
+
+    On the order form there is no quantity box at all: a line's quantity
+    IS the metres picked for it plus the "outsourced" figure typed for
+    stock coming from elsewhere (see OrderItem.outsourced_quantity, and
+    syncQtyFromRolls on the create/edit form, which the server re-derives
+    on save). For such a line a shortened roll is not a decision anybody
+    needs to take — the quantity was never independent of the rolls, so
+    leaving it behind just states a length that was never picked.
+
+    But quantity CAN be typed: an untracked line with no warehouse stock
+    behind it, the order detail page's inline quantity edit, and orders
+    arriving through the web API all set it by hand. Those must be left
+    exactly alone — the figure means something a roll cannot tell us.
+
+    So the test is the invariant itself rather than the kind of line:
+    only a quantity that still equals its own rolls is one we may move,
+    which also means a line that has already drifted is never dragged
+    further from wherever it should be."""
+    from django.db.models import Sum
+    from .models import OrderStockReservation
+
+    if item is None or item.quantity is None:
+        return False
+    scanned = (OrderStockReservation.objects
+               .filter(order_item=item)
+               .aggregate(s=Sum("quantity"))["s"]) or Decimal("0")
+    return item.quantity == scanned + (item.outsourced_quantity or Decimal("0"))
+
+
+def _note_trim_on_order(order, roll, was, now, *, line=None):
     """Write the trim onto the order's own notes.
 
     The warehouse page is where this happens, and the person who owns the
     order is not standing at it. Without a line here the order's reserved
     figure simply drops one day, correct but unexplained, and the packing
     screen's shortfall banner names an amount with no story behind it.
+
+    `line` is the order line whose quantity followed the rolls down, when
+    there was one — money moved, so the note says so rather than leaving
+    it to be noticed on the invoice.
 
     Notes is in audit's tracked fields, so saving it also lands a row in
     the order's change history — one write, both places."""
@@ -243,13 +294,19 @@ def _note_trim_on_order(order, roll, was, now):
         return
     stamp = localtime(_now()).strftime("%d.%m.%Y %H:%M")
     label = roll.barcode or f"#{roll.pk}"
-    line = (f"[{stamp}] Stock correction: roll {label} re-measured, so the "
+    text = (f"[{stamp}] Stock correction: roll {label} re-measured, so the "
             f"amount held for this order fell {was:.2f} → {now:.2f} "
-            f"({was - now:.2f} less). The ordered quantity is unchanged — "
-            f"reduce the line, cover the shortfall from other stock, or "
-            f"ship it short.")
+            f"({was - now:.2f} less).")
+    if line is not None:
+        text += (f" Line quantity followed it down to {line.quantity:.2f}, "
+                 f"since it is the metres picked for this order and nothing "
+                 f"was picked for the difference.")
+    else:
+        text += (" The line quantity was entered by hand rather than picked "
+                 "from rolls, so it has been left alone — reduce it, cover "
+                 "the shortfall from other stock, or ship it short.")
     existing = (order.notes or "").rstrip()
-    order.notes = f"{existing}\n{line}" if existing else line
+    order.notes = f"{existing}\n{text}" if existing else text
     order.save(update_fields=["notes"])
 
 

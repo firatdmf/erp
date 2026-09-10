@@ -4329,12 +4329,16 @@ def product_autocomplete(request):
     # This used to group by (variant, book) so a pick could say which book
     # it meant. The book is a fact about the ROLL, not about the product,
     # and reading it off the rolls says it exactly once, where it is true.
-    wh_groups = {}          # variant_id -> {"wp", "books", "stocks"}
+    wh_groups = {}          # variant_id -> {"wp", "wps", "books", "stocks"}
     for wp in wh_rows:
         wh = wp.warehouse
         book = wh.accounting_book if (wh and wh.accounting_book_id) else None
         g = wh_groups.setdefault(
-            wp.catalog_variant_id, {"wp": wp, "books": {}, "stocks": []})
+            wp.catalog_variant_id,
+            {"wp": wp, "wps": [], "books": {}, "stocks": []})
+        # Every shelf, because the cost shown falls back to what the stock
+        # actually cost and one variant can stand on several of them.
+        g["wps"].append(wp)
         if book is not None:
             g["books"][book.pk] = book.name
         free = (wp.quantity or _D("0")) - reserved_by_wp.get(wp.pk, _D("0"))
@@ -4381,24 +4385,67 @@ def product_autocomplete(request):
             parts.append(f"{name}: {value}" if (with_names and name) else value)
         return ", ".join(parts)
 
-    def resolve_price(product, variant=None):
-        """Selling price if one was ever set, else fall back to purchase
-        cost (flagged) — scan-synced catalog entries only ever get a
-        cost, never a sale price, so without this fallback the create/
-        edit-order search shows a bare $0 for almost every warehouse
-        product. Callers must label a cost-fallback as such; it is NOT
-        a computed sale price."""
+    def sale_price(product, variant=None):
+        """The SELLING price, or None. The variant's own if it has one,
+        else the parent's, which is where a fabric whose colours all sell
+        alike keeps the single number."""
         if variant:
-            sale = variant.variant_price or product.price
-            if sale:
-                return sale, False
-            cost = variant.variant_cost or product.cost
-            return (cost, True) if cost else (0, False)
-        sale = product.price
-        if sale:
-            return sale, False
-        cost = product.cost
-        return (cost, True) if cost else (0, False)
+            return variant.variant_price or product.price or None
+        return product.price or None
+
+    # The USD/TRY rate, fetched at most once for the whole search rather
+    # than per row. unit_cost_usd() would look it up again for every
+    # TRY-priced shelf, which on a 60-row page is 60 lookups for one
+    # number — the same reason _total_value_annotations inlines it.
+    _rate = {}
+
+    def usd_try_rate():
+        if "v" not in _rate:
+            _rate["v"] = WarehouseProduct._usd_try_rate()
+        return _rate["v"]
+
+    def shelf_cost_usd(wp):
+        """What one unit on THIS shelf cost, in USD, or None.
+
+        Mirrors WarehouseProduct.unit_cost_usd — stored cost_usd first,
+        then the purchase price converted from its own currency — but
+        against the rate above instead of fetching one per call.
+        """
+        if wp.cost_usd is not None:
+            return wp.cost_usd
+        if wp.purchase_price is None:
+            return None
+        cur = (wp.purchase_currency or "USD").upper()
+        if cur in ("USD", "EUR"):
+            # EUR ≈ USD, coarse but better than nothing; same allowance
+            # unit_cost_usd makes.
+            return wp.purchase_price
+        if cur == "TRY":
+            rate = usd_try_rate()
+            if rate and rate > 0:
+                return (wp.purchase_price / rate).quantize(_D("0.0001"))
+        return None
+
+    def warehouse_cost(group):
+        """What the stock on this row cost, or None if no shelf knows.
+
+        The HIGHEST of the shelves in scope when they disagree. A row is
+        one number and the stock behind it may have been bought at two
+        prices; of the two, the low one is the dangerous one to show,
+        because it is the figure that gets typed into an order and
+        quoted. Overstating cost loses a little margin, understating it
+        sells below cost — which is the mistake this whole flag exists to
+        prevent.
+        """
+        costs = [c for c in (shelf_cost_usd(wp) for wp in group["wps"])
+                 if c is not None]
+        if not costs:
+            return None
+        # To the cent, like every other money figure here. A shelf cost
+        # is stored to four places for valuation; a price someone is
+        # about to be quoted is not.
+        from decimal import ROUND_HALF_UP
+        return max(costs).quantize(_D("0.01"), rounding=ROUND_HALF_UP)
 
     def price_cell(price, is_cost):
         """A cost fallback says so ON the row. It used to be an amber
@@ -4474,13 +4521,13 @@ def product_autocomplete(request):
 
         if variant:
             sku = variant.variant_sku or ""
-            price, is_cost = resolve_price(product, variant)
+            price, is_cost = (sale_price(product, variant) or 0), False
             stock = variant.live_quantity
             qualifier = variant_values(variant, with_names=True)
             card_label = variant_values(variant)
         else:
             sku = product.sku or ""
-            price, is_cost = resolve_price(product)
+            price, is_cost = (sale_price(product) or 0), False
             stock = product.live_quantity
             qualifier = card_label = ""
 
@@ -4518,7 +4565,16 @@ def product_autocomplete(request):
 
         sku = variant.variant_sku or ""
         allow_oversell = bool(getattr(parent, "selling_while_out_of_stock", False))
-        price, is_cost = resolve_price(parent, variant)
+        # Sale price if the catalog has one; otherwise what this stock
+        # actually cost on the shelf. The catalog's own `cost` column is
+        # deliberately not consulted: it is a number nobody maintains,
+        # while the shelf's is stamped when the goods are received.
+        sale = sale_price(parent, variant)
+        if sale:
+            price, is_cost = sale, False
+        else:
+            shelf = warehouse_cost(group)
+            price, is_cost = (shelf, True) if shelf is not None else (0, False)
         total = sum((q or 0) for _wh, q in group["stocks"])
         title_js = js_str(f"{base_title} — {qualifier}" if qualifier else base_title)
         cat_js = js_str(parent.category.name if parent.category else "")

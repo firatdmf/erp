@@ -180,13 +180,38 @@ class WarehouseFirstCatalogOnDemandTest(TestCase):
 
     def test_a_cost_fallback_says_so_in_words(self):
         """Amber alone is invisible to anyone not hovering, and a rep
-        reading this list was quoting purchase cost as a sale price."""
+        reading this list was quoting purchase cost as a sale price.
+
+        The fallback now comes off the SHELF rather than the catalog, so
+        this asks a warehouse row for it — but the thing being defended
+        is unchanged: a cost shown where a price belongs has to say which
+        it is, in a word and not only in a colour.
+        """
+        self.stocked.price = None
+        self.stocked.save(update_fields=["price"])
+        WarehouseProduct.objects.filter(sku="ARDEN.G10").update(
+            cost_usd=Decimal("4.25"))
+        html = self._search()
+        self.assertIn("pa-price--cost", html)
+        self.assertIn("Cost", html)
+        self.assertIn("$4.25", html)
+
+    def test_a_product_on_no_shelf_offers_no_cost_at_all(self):
+        """Deliberate, and a change of behaviour: the catalog's own cost
+        column used to stand in here.
+
+        Nobody maintains that column — it is typed once and then the same
+        goods are bought again at another price — so it was a number the
+        list asserted and the business could not stand behind. A product
+        on no shelf has no purchase behind it to quote, and says nothing
+        rather than something stale.
+        """
         self.shelfless.price = None
         self.shelfless.cost = Decimal("4.25")
         self.shelfless.save()
         html = self._search("PERDE")
-        self.assertIn("pa-price--cost", html)
-        self.assertIn("Cost", html)
+        self.assertNotIn("pa-price--cost", html)
+        self.assertNotIn("4.25", html)
 
     def test_a_real_price_is_not_labelled_a_cost(self):
         html = self._search("PERDE")

@@ -775,6 +775,11 @@
                           data-remaining="{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|stringformat:'.2f' }}{% else %}{{ r.quantity|default_if_none:0|stringformat:'.2f' }}{% endif %}"
                           data-lot="{{ r.lot_number|default:'' }}"
                           data-is-second="{% if r.is_second %}1{% else %}0{% endif %}"
+                          {% comment %}Held metres and who holds them, so the edit box can
+                          warn BEFORE saving that shortening this roll will trim
+                          somebody's order down with it.{% endcomment %}
+                          data-reserved="{{ r.reserved_m|default_if_none:0|stringformat:'.2f' }}"
+                          data-reserved-orders="{% for resv in r.reservation_list %}{% if not forloop.first %}, {% endif %}{{ resv.order.order_number|default:resv.order_id }}{% endfor %}"
                           onclick="openRollEdit(this)">
                     <i class="fa fa-pen"></i>
                   </button>
@@ -1171,6 +1176,8 @@
   let _reRollId = null;
   let _reOut = 0;            // metres already gone — fixed while editing
   let _reStoredTotal = 0;    // the length on record, for an empty box
+  let _reReserved = 0;       // metres held for orders that have not shipped
+  let _reReservedFor = '';   // which orders hold them
 
   // Redrawn on every keystroke. Metres already out never move; what the typed
   // total changes is how much is LEFT, so the bar and the numbers follow the
@@ -1211,6 +1218,25 @@
       save.style.cursor = invalid ? 'not-allowed' : '';
     }
 
+    // A length that no longer covers what orders are holding. Not a
+    // refusal — the roll is the truth and the holds get trimmed to fit —
+    // but it must not happen behind the user's back, which is precisely
+    // how a roll cut to 18.50 left order #297 still showing 19.50.
+    const willTrim = !invalid && hasTyped && _reReserved > 0
+                     && (Math.round((total - _reOut) * 100) / 100) < _reReserved;
+    const trimNote = willTrim
+      ? '<div style="margin-top:5px;padding:6px 8px;border-radius:6px;background:#FEF3C7;' +
+        'border:1px solid #FCD34D;color:#92400E;font-weight:600;">' +
+          '<i class="fa fa-lock" style="font-size:9px;"></i> ' +
+          '<b>' + pUnit(_reReserved.toFixed(2)) + '</b> {% trans "is reserved" %}' +
+          (_reReservedFor ? ' — ' + _reReservedFor : '') +
+          '<div style="font-weight:500;margin-top:2px;">' +
+            '{% trans "Saving this length trims that hold down to" %} ' +
+            '<b>' + pUnit(Math.max(0, Math.round((total - _reOut) * 100) / 100).toFixed(2)) + '</b>.' +
+          '</div>' +
+        '</div>'
+      : '';
+
     const bar =
       '<div style="height:7px;border-radius:999px;background:#E5E7EB;overflow:hidden;margin:2px 0 5px;">' +
         // Fill to 100% only when a real number below the floor was typed —
@@ -1240,12 +1266,12 @@
         '<div style="margin-top:3px;color:var(--gray-500);">' +
           '{% trans "Full length, not the remainder" %} · {% trans "min" %} ' +
           '<b>' + pUnit(_reOut.toFixed(2)) + '</b>' +
-        '</div>';
+        '</div>' + trimNote;
     } else {
       hint.innerHTML = bar +
         '<b>' + pUnit(total.toFixed(2)) + '</b> · {% trans "none used" %}' +
         '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "Full length, not the remainder" %}</div>';
+          '{% trans "Full length, not the remainder" %}</div>' + trimNote;
     }
   }
 
@@ -1262,6 +1288,11 @@
     _reStoredTotal = parseFloat(btn.dataset.quantity || '0') || 0;
     const left = parseFloat(btn.dataset.remaining || btn.dataset.quantity || '0') || 0;
     _reOut = Math.max(0, Math.round((_reStoredTotal - left) * 100) / 100);
+    // Unlike _reOut this is NOT a floor — a hold is soft, so a shorter
+    // length is allowed and the hold gets trimmed to fit. It only has to
+    // be said out loud first.
+    _reReserved = parseFloat(btn.dataset.reserved || '0') || 0;
+    _reReservedFor = btn.dataset.reservedOrders || '';
     document.getElementById('reMeters').min = _reOut > 0 ? _reOut.toFixed(2) : '0.01';
 
     renderRollMetersHint();
@@ -1291,6 +1322,16 @@
       btn.disabled = false; btn.innerHTML = orig;
       renderRollMetersHint();   // re-assert the floor state
       if (!data.success) { alert(data.error || '{% trans "Failed" %}'); return; }
+      // An order's reserved figure moving is the user's business, and the
+      // page reload underneath would otherwise wash it away unseen.
+      const trimmed = data.reservations_trimmed || [];
+      if (trimmed.length) {
+        alert('{% trans "Reserved amounts were trimmed to fit this roll:" %}\n\n' +
+              trimmed.map(function(t){
+                return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) +
+                       ' → ' + pUnit(t.now.toFixed(2));
+              }).join('\n'));
+      }
       closeRE();
       window.location.reload();
     }).catch(() => {
@@ -1324,6 +1365,14 @@
         if (!data.success) {
           alert(data.error || '{% trans "Failed" %}');
           return;
+        }
+        const soTrimmed = data.reservations_trimmed || [];
+        if (soTrimmed.length) {
+          alert('{% trans "Reserved amounts were trimmed to fit this roll:" %}\n\n' +
+                soTrimmed.map(function(t){
+                  return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) +
+                         ' → ' + pUnit(t.now.toFixed(2));
+                }).join('\n'));
         }
         closeSO();
         window.location.reload();

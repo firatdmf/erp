@@ -146,6 +146,76 @@ def _roll_reservation_info(roll):
     return {"quantity": float(total), "entries": held}
 
 
+def _clamp_reservations_to_roll(roll, *, user=None):
+    """Shrink live holds on a roll that no longer fit on it, and say which
+    orders were touched.
+
+    A reservation stores its own snapshot of the metres held — it is not
+    derived from the roll — so shortening a roll (a re-measure, a manual
+    stock-out) used to leave holds claiming metres that are no longer
+    there. The order kept showing the old figure, and the warehouse
+    "Rezerv" roll-up kept those metres away from every other order,
+    until the discrepancy finally surfaced at ship time as a shortage
+    adjustment. The physical roll is the truth: a hold cannot exceed it.
+
+    Oldest hold first — whoever reserved it first keeps their claim, and
+    the shortfall lands on the most recent picker. A hold with nothing
+    left to it is deleted rather than kept at zero: an empty reservation
+    is a roll sitting on a packing list contributing nothing.
+
+    Only shrinks. A roll corrected UPWARDS does not grow the holds on it:
+    the order asked for a quantity, not for whatever the roll happens to
+    carry.
+
+    Returns a list of {order, label, was, now} for the callers to report;
+    empty when everything still fits."""
+    from .models import OrderStockReservation
+
+    remaining = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
+    remaining = remaining or Decimal("0")
+
+    holds = list(OrderStockReservation.objects
+                 .filter(stock_item=roll, consumed=False)
+                 .select_related("order", "warehouse_product")
+                 .order_by("created_at", "id"))
+    if not holds:
+        return []
+
+    adjusted = []
+    left = remaining
+    for res in holds:
+        was = res.quantity or Decimal("0")
+        fits = was if was <= left else (left if left > 0 else Decimal("0"))
+        left = left - fits
+        if fits == was:
+            continue
+        entry = {
+            "order": res.order_id,
+            "label": str(res.order) if res.order_id else f"#{res.order_id}",
+            "was": float(was),
+            "now": float(fits),
+        }
+        # The metres did not go anywhere — the roll was never that long.
+        # Logged as an adjustment so the order's reserved figure changing
+        # on its own has a visible cause on the roll's timeline.
+        StockMovement.objects.create(
+            product=res.warehouse_product, stock_item=roll,
+            movement_type="adjustment", quantity=(was - fits),
+            reason=(f"Reservation trimmed to fit the roll "
+                    f"({was:.2f}m → {fits:.2f}m) · {entry['label']}"),
+            reference=roll.barcode or f"Roll #{roll.pk}",
+            created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+        )
+        if fits > 0:
+            res.quantity = fits
+            res.save(update_fields=["quantity"])
+        else:
+            res.delete()
+        adjusted.append(entry)
+
+    return adjusted
+
+
 def _roll_usage_info(roll):
     """What has come off this roll, and where each cut went.
 
@@ -5967,6 +6037,11 @@ class WarehouseRollEdit(View):
         if roll_fields:
             roll.save(update_fields=list(set(roll_fields)))
 
+        # A shortened roll cannot keep holding the metres it no longer
+        # has. Without this the order goes on displaying the old reserved
+        # figure and the metres stay blocked for everyone else.
+        trimmed = _clamp_reservations_to_roll(roll, user=request.user) if meters_changed else []
+
         # Recompute the parent quantity authoritatively from its rolls
         # (current stock = remaining meters, falling back to full meters).
         if meters_changed:
@@ -6003,6 +6078,10 @@ class WarehouseRollEdit(View):
                 "is_second": bool(roll.is_second),
             },
             "product_quantity": float(product.quantity or 0),
+            # Named, not just counted: an order's reserved figure moving
+            # because of an edit made on the warehouse page is exactly the
+            # kind of change that needs to be told, not discovered.
+            "reservations_trimmed": trimmed,
         })
 
 
@@ -6034,6 +6113,7 @@ class WarehouseStockOut(View):
             }, status=400)
 
         roll = None
+        trimmed = []
         stock_item_id = request.POST.get("stock_item_id")
         if stock_item_id:
             roll = product.stock_items.filter(pk=stock_item_id).first()
@@ -6052,6 +6132,9 @@ class WarehouseStockOut(View):
             elif roll.quantity_remaining < (roll.quantity or Decimal("0")):
                 roll.status = "partial"
             roll.save(update_fields=["quantity_remaining", "status"])
+            # Same rule as the roll edit: metres taken off by hand cannot
+            # stay reserved for an order.
+            trimmed = _clamp_reservations_to_roll(roll, user=request.user)
 
         # Drop the parent quantity.
         product.quantity = (product.quantity or Decimal("0")) - amount
@@ -6075,6 +6158,7 @@ class WarehouseStockOut(View):
                 "rolls_count": product.stock_items.count(),
                 "active_rolls_count": product.stock_items.exclude(status="consumed").count(),
             },
+            "reservations_trimmed": trimmed,
         })
 
 

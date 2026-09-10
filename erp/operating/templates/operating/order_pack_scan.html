@@ -1363,10 +1363,17 @@
     if (stageEl) stageEl.hidden = false;
     scanPaused = false;
     camDebounce = {val:'', t:0};          // the same top may be re-read
-    if (scanManual){ scanManual.value=''; try{ scanManual.focus(); }catch(e){} }
+    // Cleared but deliberately NOT focused: on a phone, focusing the field
+    // throws the on-screen keyboard over the camera every time the packer
+    // taps "Scan again". The camera is the default; the keyboard comes up
+    // only when they actually tap the manual field.
+    if (scanManual){ scanManual.value=''; }
   }
   function showResult(html){
     if (!resultEl) return;
+    // A barcode typed by hand leaves the keyboard up; drop focus so the
+    // result card isn't read through half a screen of keys.
+    if (scanManual){ try{ scanManual.blur(); }catch(e){} }
     if (stageEl) stageEl.hidden = true;
     resultEl.innerHTML = html;
     resultEl.hidden = false;

@@ -71,6 +71,16 @@ class TheCostComesOffTheShelf(TestCase):
             barcode=f"B-{wp.pk}", status="in_stock")
         return wp
 
+    def _member_of(self, *books):
+        """A user assigned the books named, so the search may reach them."""
+        User = get_user_model()
+        u = User.objects.create_superuser(
+            f"seller{User.objects.count()}", "s2@t.com", "pw")
+        u.member.books.add(self.book, *books)
+        u.member.default_book = self.book
+        u.member.save()
+        return u
+
     def _search(self):
         return self.client.get(
             reverse("operating:product_autocomplete"),
@@ -92,14 +102,74 @@ class TheCostComesOffTheShelf(TestCase):
         self.assertIn("$6.50", row)
         self.assertNotIn("Cost", row)
 
-    def test_two_shelves_disagreeing_show_the_higher(self):
-        """A row is one number and the stock behind it may have been
-        bought at two prices. The low one is the dangerous one to show:
-        it is the figure that gets typed into an order and quoted, and
-        understating cost sells below it."""
+    def test_every_shelf_shows_its_own_cost(self):
+        """Shelves disagree because two businesses each bought the
+        fabric — 48 variants in this catalogue do. One number in the
+        corner has to pick a side and then says nothing about the other,
+        so each chip carries the cost of the metres beside it."""
         self._shelf("Laleli depo", cost_usd=Decimal("2.40"))
         self._shelf("Laleli depo 2", cost_usd=Decimal("3.10"))
-        self.assertIn("$3.10", row_for(self._search(), SKU))
+        row = row_for(self._search(), SKU)
+        self.assertIn("$2.40", row)
+        self.assertIn("$3.10", row)
+
+    def test_the_prefill_is_the_working_book_s_cost(self):
+        """The line is billed to one book and ships off that book's
+        shelf, so the other business's cost describes stock this line is
+        not going to move."""
+        other = Book.objects.create(name="Ergene Fabric")
+        self._shelf("Laleli depo", cost_usd=Decimal("2.40"))
+        wh = Warehouse.objects.create(name="Ergene depo", accounting_book=other)
+        wp = WarehouseProduct.objects.create(
+            warehouse=wh, name="Krep", sku=SKU, quantity=Decimal("50"),
+            catalog_variant=self.variant, cost_usd=Decimal("4.50"))
+        WarehouseProductItem.objects.create(
+            product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
+            barcode="B-E1", status="in_stock")
+        self.client.force_login(self._member_of(other))
+
+        # Working in Laleli: its own $2.40 wins, though $4.50 is higher.
+        body = self.client.get(
+            reverse("operating:product_autocomplete"),
+            {"product": "Krep", "book": self.book.pk, "cross_book": "1"}).content.decode()
+        self.assertTrue(row_for(body, SKU).rstrip().endswith("$2.40 Cost"),
+                        row_for(body, SKU))
+
+        # Working in Ergene: its own $4.50.
+        body = self.client.get(
+            reverse("operating:product_autocomplete"),
+            {"product": "Krep", "book": other.pk, "cross_book": "1"}).content.decode()
+        self.assertTrue(row_for(body, SKU).rstrip().endswith("$4.50 Cost"),
+                        row_for(body, SKU))
+
+    def test_it_falls_back_to_the_highest_when_this_book_holds_none(self):
+        """Safe direction for a figure about to be quoted: overstating
+        cost loses a little margin, understating sells below it."""
+        other = Book.objects.create(name="Ergene Fabric")
+        for name, cost in (("Ergene depo", "4.50"), ("Ergene depo 2", "5.20")):
+            wh = Warehouse.objects.create(name=name, accounting_book=other)
+            wp = WarehouseProduct.objects.create(
+                warehouse=wh, name="Krep", sku=SKU, quantity=Decimal("50"),
+                catalog_variant=self.variant, cost_usd=Decimal(cost))
+            WarehouseProductItem.objects.create(
+                product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
+                barcode=f"B-{wp.pk}", status="in_stock")
+        self.client.force_login(self._member_of(other))
+        body = self.client.get(
+            reverse("operating:product_autocomplete"),
+            {"product": "Krep", "book": self.book.pk, "cross_book": "1"}).content.decode()
+        self.assertTrue(row_for(body, SKU).rstrip().endswith("$5.20 Cost"),
+                        row_for(body, SKU))
+
+    def test_a_priced_row_does_not_advertise_its_cost(self):
+        """Costs ride the chips only where the row is quoting one, so an
+        ordinary row neither gains clutter nor starts showing margins."""
+        self._shelf("Laleli depo", cost_usd=Decimal("2.40"))
+        self.variant.variant_price = Decimal("6.50")
+        self.variant.save(update_fields=["variant_price"])
+        row = row_for(self._search(), SKU)
+        self.assertIn("$6.50", row)
+        self.assertNotIn("2.40", row)
 
     def test_a_shelf_priced_in_another_currency_is_converted(self):
         self._shelf("Laleli depo", purchase_price=Decimal("5.00"),

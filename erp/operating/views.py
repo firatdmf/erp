@@ -4292,6 +4292,10 @@ def product_autocomplete(request):
     # `book` is what the form is working in; it is still checked against
     # the member's assignments, because it arrives from the browser.
     allowed = _books_in_scope(request)
+    # The book the form is working in, when it named one. Decides which
+    # shelf's cost a row pre-fills with; see warehouse_cost.
+    _asked = (request.GET.get("book") or "").strip()
+    working_book_id = int(_asked) if _asked.isdigit() else None
     # Whether the form asked to see past its own book. Only changes what
     # the ROW says here — the save is what keeps the books apart.
     cross_book = (request.GET.get("cross_book") or "").strip() in {"1", "true", "on"}
@@ -4313,6 +4317,7 @@ def product_autocomplete(request):
     # reserved into another order are spoken for, and offering them here is
     # how a roll gets promised twice. One query for the whole result set.
     from decimal import Decimal as _D
+    from decimal import ROUND_HALF_UP as _ROUND_HALF_UP
     from .models import OrderStockReservation
     reserved_by_wp = {}
     for wp_id, meters in (OrderStockReservation.objects
@@ -4342,7 +4347,7 @@ def product_autocomplete(request):
         if book is not None:
             g["books"][book.pk] = book.name
         free = (wp.quantity or _D("0")) - reserved_by_wp.get(wp.pk, _D("0"))
-        g["stocks"].append((wh.name if wh else "", free))
+        g["stocks"].append((wh.name if wh else "", free, wp))
     wh_variant_ids = set(wh_groups.keys())
 
     # ── 2) Catalog-only fallback (nothing already shown as warehouse) ─
@@ -4427,25 +4432,37 @@ def product_autocomplete(request):
         return None
 
     def warehouse_cost(group):
-        """What the stock on this row cost, or None if no shelf knows.
+        """The one cost this row pre-fills an order line with, or None.
 
-        The HIGHEST of the shelves in scope when they disagree. A row is
-        one number and the stock behind it may have been bought at two
-        prices; of the two, the low one is the dangerous one to show,
-        because it is the figure that gets typed into an order and
-        quoted. Overstating cost loses a little margin, understating it
-        sells below cost — which is the mistake this whole flag exists to
-        prevent.
+        The WORKING BOOK's shelves decide it. Where shelves disagree they
+        almost always disagree across books — Laleli and Ergene each
+        bought the fabric, at their own price, 48 variants over — and an
+        order line is billed to one book and shipped off that book's
+        shelf. Quoting the other business's cost would describe stock
+        this line is not going to move.
+
+        Only when the working book holds none of it does this fall back
+        to the highest on offer, which is the safe direction for a figure
+        somebody is about to quote: overstating cost loses a little
+        margin, understating it sells below cost.
+
+        Every shelf's own cost is on its chip either way, so the number
+        picked here is a default and not the whole answer.
         """
-        costs = [c for c in (shelf_cost_usd(wp) for wp in group["wps"])
-                 if c is not None]
+        mine = [c for c in (shelf_cost_usd(wp) for wp in group["wps"]
+                            if working_book_id and wp.warehouse
+                            and wp.warehouse.accounting_book_id == working_book_id)
+                if c is not None]
+        rest = [c for c in (shelf_cost_usd(wp) for wp in group["wps"])
+                if c is not None]
+        costs = mine or rest
         if not costs:
             return None
         # To the cent, like every other money figure here. A shelf cost
         # is stored to four places for valuation; a price someone is
         # about to be quoted is not.
-        from decimal import ROUND_HALF_UP
-        return max(costs).quantize(_D("0.01"), rounding=ROUND_HALF_UP)
+        chosen = max(mine) if mine else max(rest)
+        return chosen.quantize(_D("0.01"), rounding=_ROUND_HALF_UP)
 
     def price_cell(price, is_cost):
         """A cost fallback says so ON the row. It used to be an amber
@@ -4474,14 +4491,26 @@ def product_autocomplete(request):
         return (f"<span class='pa-stock pa-stock--{state}'>"
                 f"{escape(_('Stock'))} {q:g}</span>")
 
-    def warehouse_cells(stocks):
-        """Warehouse stock — named shelves and metres. At most three;
-        the JS still receives the total."""
-        return "".join(
-            f"<span class='pa-stock pa-stock--wh'>"
-            f"{escape((wh or '')[:14])} {float(q or 0):g} m</span>"
-            for wh, q in stocks[:3]
-        )
+    def warehouse_cells(stocks, with_cost=False):
+        """Warehouse stock — named shelves and metres. At most three; the
+        JS still receives the total.
+
+        With `with_cost`, each shelf also carries what ITS stock cost.
+        The same fabric stands in Laleli and in Ergene at two prices —
+        two businesses that each bought it — and 48 variants here
+        disagree that way. One number in the corner has to pick a side
+        and then says nothing about the other; the chips can just show
+        both, beside the metres they belong to, and the reader decides.
+        """
+        out = []
+        for wh, q, wp in stocks[:3]:
+            cost = shelf_cost_usd(wp) if with_cost else None
+            money = (f"<small class='pa-stock-cost'>${cost.quantize(_D('0.01'), rounding=_ROUND_HALF_UP)}</small>"
+                     if cost is not None else "")
+            out.append(
+                f"<span class='pa-stock pa-stock--wh'>"
+                f"{escape((wh or '')[:14])} {float(q or 0):g} m{money}</span>")
+        return "".join(out)
 
     def book_cell(books):
         """Which books hold this product. Drawn only when the search was
@@ -4575,7 +4604,7 @@ def product_autocomplete(request):
         else:
             shelf = warehouse_cost(group)
             price, is_cost = (shelf, True) if shelf is not None else (0, False)
-        total = sum((q or 0) for _wh, q in group["stocks"])
+        total = sum((q or 0) for _wh, q, _wp in group["stocks"])
         title_js = js_str(f"{base_title} — {qualifier}" if qualifier else base_title)
         cat_js = js_str(parent.category.name if parent.category else "")
         # No book travels with the pick. A card can hold stock off several
@@ -4586,7 +4615,9 @@ def product_autocomplete(request):
                    f"{float(total):g},{'true' if allow_oversell else 'false'},"
                    f"{'true' if is_cost else 'false'}")
         return row(sku, base_title, qualifier, price, is_cost,
-                   book_cell(group["books"]) + warehouse_cells(group["stocks"]), js_args)
+                   book_cell(group["books"])
+                   + warehouse_cells(group["stocks"], with_cost=is_cost),
+                   js_args)
 
     def note(text, cls):
         return (f"<li class='{cls}' onmousedown='event.preventDefault()'>"

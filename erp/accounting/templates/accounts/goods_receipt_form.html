@@ -1917,6 +1917,26 @@
       return;
     }
 
+    // A shorter roll can't keep holding metres it no longer has, so the
+    // save trims those holds — oldest keeps its claim, the order the server
+    // trims in. That changes somebody's order, so name it before the save.
+    const cuts = [];
+    document.querySelectorAll('#npProducts .np-top').forEach(function (row) {
+      const q = row.querySelector('.np-top-qty');
+      let left = parseFloat(((q && q.value) || '').replace(',', '.'));
+      if (!row._npHolds || isNaN(left)) return;
+      row._npHolds.forEach(function (h) {
+        const fits = Math.round(Math.max(0, Math.min(h.qty, left)) * 100) / 100;
+        left = Math.round((left - fits) * 100) / 100;
+        if (fits < h.qty) cuts.push((h.label || '?') + ': ' + h.qty + ' → ' + fits);
+      });
+    });
+    if (cuts.length && !confirm(
+        '{% trans "Saving will reduce what these orders have reserved:" %}\n' +
+        cuts.join('\n') + '\n\n{% trans "Continue?" %}')) {
+      return;
+    }
+
     npBusy(btn, '{% trans "Saving…" %}');
     fetch(npWhUrl(NP_EDIT_TPL).replace('/0/edit/', '/' + NP_EDIT_INVOICE_ID + '/edit/'), {
       method: 'POST',
@@ -2297,7 +2317,9 @@
         row.dataset.stockItemId = t.stock_item_id;
         if (bc) bc.dataset.orig = t.barcode || '';
       }
-      if (t.locked) npLockTop(row);
+      if (t.out > 0) npLockTop(row, true);
+      else if (t.locked) npLockTop(row, false);
+      if (t.holds && t.holds.length) row._npHolds = t.holds;
       if (bc && t.barcode) { bc.value = t.barcode; npBarcodeInput(bc); }
     });
     if (!noVariant) npQueueVariantMatch(vEl);
@@ -2305,14 +2327,21 @@
 
   // A roll a customer order has reserved: its length and label can still be
   // corrected, but it can't come off the purchase, so the remove button
-  // gives way to a lock. The server holds the same line either way.
-  function npLockTop(row) {
+  // gives way to a lock. A roll metres have already gone out of is locked
+  // outright — that shipment or stock-out is its record now. The server
+  // holds the same lines either way.
+  function npLockTop(row, goneOut) {
     row.classList.add('locked');
+    if (goneOut) {
+      row.querySelectorAll('.np-top-qty, .np-top-bc').forEach(function (el) { el.disabled = true; });
+    }
     const x = row.querySelector('.np-mini-x');
     if (!x) return;
     const lock = document.createElement('span');
     lock.className = 'np-top-lock';
-    lock.title = '{% trans "Reserved for a customer order — it can be re-measured, not removed." %}';
+    lock.title = goneOut
+      ? '{% filter escapejs %}{% trans "Metres have already gone out of this roll — its length and barcode can't change, and it can't be removed." %}{% endfilter %}'
+      : '{% trans "Reserved for a customer order — it can be re-measured, not removed." %}';
     lock.innerHTML = NP_LOCK;
     x.replaceWith(lock);
   }

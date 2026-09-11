@@ -295,7 +295,7 @@ class ReceivedPurchaseEditTest(TestCase):
         self._variant(form)["tops"][0]["qty"] = "20"
         form["notes"] = "must not stick"
         r = self._save(form)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 422)     # a roll that went out is locked outright
         self.assertEqual(self._roll("KRV-A").quantity, Decimal("30.00"))
         self.assertEqual(self._invoice().notes, "first note")    # all or nothing
 

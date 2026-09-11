@@ -9357,5 +9357,17 @@ msgstr "Bir alım başka bir deftere ait bir depoya taşınamaz — toplar iki d
 msgid "This roll is reserved for an order, so it can't become a different variant. Fix that order first."
 msgstr "Bu top bir siparişe ayrılmış, bu yüzden başka bir varyanta dönüştürülemez. Önce o siparişi düzeltin."
 
+msgid "Metres have already gone out of these rolls, so their length and barcode can't change and they can't be removed. Correct the shipment or stock-out first."
+msgstr "Bu toplardan metre çıkışı yapılmış, bu yüzden uzunlukları ve barkodları değiştirilemez, silinemezler. Önce ilgili sevkiyatı veya stok çıkışını düzeltin."
+
+msgid "Metres have already gone out of this roll as the variant it is, so it can't become a different one."
+msgstr "Bu toptan bu varyant olarak metre çıkışı yapılmış, bu yüzden başka bir varyanta dönüştürülemez."
+
+msgid "Metres have already gone out of this roll — its length and barcode can't change, and it can't be removed."
+msgstr "Bu toptan metre çıkışı yapılmış — uzunluğu ve barkodu değiştirilemez, silinemez."
+
+msgid "Saving will reduce what these orders have reserved:"
+msgstr "Kaydetmek bu siparişlerin ayırdığı miktarları azaltacak:"
+
 msgid "The purchase invoice was created with a total of 0 — no price was entered. You can edit the invoice from the account page."
 msgstr "Alış faturası 0 tutarla oluşturuldu — fiyat girilmedi. Faturayı cari sayfasından düzenleyebilirsiniz."

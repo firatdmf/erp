@@ -314,6 +314,13 @@ class RollLengthError(ValueError):
     """A roll length that cannot be true — see _set_roll_length."""
 
 
+def _roll_metres_out(roll):
+    """Metres that have left this roll, shipped or taken off by hand."""
+    if roll.quantity_remaining is None or not roll.quantity:
+        return Decimal("0")
+    return max(Decimal("0"), roll.quantity - roll.quantity_remaining)
+
+
 def _set_roll_length(roll, new_full):
     """Correct a roll's full length in memory, keeping what has already come
     off it. Returns True when the length actually changed; the caller saves
@@ -325,9 +332,7 @@ def _set_roll_length(roll, new_full):
     if new_full is None or new_full <= 0:
         raise RollLengthError("Metre pozitif olmalı.")
     old_full = roll.quantity or Decimal("0")
-    consumed = Decimal("0")
-    if roll.quantity_remaining is not None and old_full:
-        consumed = max(Decimal("0"), old_full - roll.quantity_remaining)
+    consumed = _roll_metres_out(roll)
 
     # A roll cannot have had more taken off it than it was ever
     # long. Shortening it below what has already gone out used to be
@@ -3235,6 +3240,9 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
     Two things stay out of reach, because an order depends on them: a roll
     reserved for an order can't be removed, or turned into another variant.
+    A roll metres have already gone out of is further out of reach: its
+    length, barcode and variant are that shipment's or stock-out's record,
+    and it can't be removed either.
 
     Returns {"invoice", "warnings", "reservations_trimmed"}. Raises
     IntakeError, having written nothing.
@@ -3314,6 +3322,11 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
         # ── Every id the form names must be this purchase's own, once. ──
         named_items, named_rolls = set(), set()
+        # A roll metres have already left is part of that delivery's record:
+        # its length, its label and its being on this purchase at all. A
+        # shorter length is refused anyway (_set_roll_length), but a longer
+        # one quietly put back stock nobody has.
+        history_changed = []
         for card in resolved:
             rows = card["variants_in"] if card["has_variants"] else card["variants_in"][:1]
             for v in rows:
@@ -3334,14 +3347,30 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                             {"success": False,
                              "error": str(_lz("This purchase changed while you were editing it — reload the page."))},
                             status=409)
-                    if (_safe_decimal(t.get("qty")) or Decimal("0")) > 0:
+                    qty = _safe_decimal(t.get("qty")) or Decimal("0")
+                    if qty > 0:
                         named_rolls.add(roll_id)
+                    roll = rolls[roll_id]
+                    code = (t.get("barcode") or "").strip()
+                    if qty > 0 and _roll_metres_out(roll) > 0 and (
+                            qty != roll.quantity
+                            or (code and code.upper() != (roll.barcode or "").upper())):
+                        history_changed.append(roll)
 
         # ── Rolls the form no longer lists are removed — unless an order
         # holds them. Locked + checked INSIDE this transaction, so a
         # packer's concurrent scan can't slip a fresh hold onto a roll
         # between "check" and "delete". ──
         removed = [r for pk, r in rolls.items() if pk not in named_rolls]
+        history_changed += [r for r in removed if _roll_metres_out(r) > 0]
+        if history_changed:
+            raise IntakeError({
+                "success": False,
+                "error": str(_lz("Metres have already gone out of these rolls, so their length and "
+                                 "barcode can't change and they can't be removed. Correct the "
+                                 "shipment or stock-out first.")),
+                "blocked": [{"barcode": r.barcode} for r in history_changed],
+            }, status=422)
         blockers = [
             {"barcode": r.barcode,
              "order_ids": list(r.reservations.values_list("order_id", flat=True).distinct())}
@@ -3453,6 +3482,13 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                                                   "entry in either ledger.")),
                                  "cross_book": True},
                                 status=400)
+                        if not same_variant and _roll_metres_out(roll) > 0:
+                            raise IntakeError({
+                                "success": False,
+                                "error": str(_lz("Metres have already gone out of this roll as the "
+                                                 "variant it is, so it can't become a different one.")),
+                                "blocked": [{"barcode": roll.barcode}],
+                            }, status=422)
                         if not same_variant and roll.reservations.exists():
                             raise IntakeError({
                                 "success": False,
@@ -3623,6 +3659,13 @@ class WarehousePurchaseEdit(View):
                     .select_related("product", "product__catalog_variant__product")
                     .annotate(is_locked=Exists(
                         OrderStockReservation.objects.filter(stock_item=OuterRef("pk"))))
+                    # Oldest first, the order a shorter length trims them in
+                    # (_clamp_reservations_to_roll), so the page can name who
+                    # loses metres before the save rather than after.
+                    .prefetch_related(Prefetch(
+                        "reservations", to_attr="live_holds",
+                        queryset=(OrderStockReservation.objects.filter(consumed=False)
+                                  .select_related("order").order_by("created_at", "id"))))
                     .order_by("id"))
         items = list(
             invoice.items.select_related("product")
@@ -3661,7 +3704,10 @@ class WarehousePurchaseEdit(View):
                 "currency": invoice.currency.code,
                 "tops": [
                     {"stock_item_id": r.pk, "qty": _plain_decimal(r.quantity),
-                     "barcode": r.barcode or "", "locked": bool(r.is_locked)}
+                     "barcode": r.barcode or "", "locked": bool(r.is_locked),
+                     "out": float(_roll_metres_out(r)),
+                     "holds": [{"label": str(h.order) if h.order_id else "",
+                                "qty": float(h.quantity or 0)} for h in r.live_holds]}
                     for r in rolls
                 ],
             })

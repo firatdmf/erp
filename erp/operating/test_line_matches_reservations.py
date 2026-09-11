@@ -131,6 +131,47 @@ class LineMatchesItsReservations(TestCase):
         self.assertEqual(item.outsourced_quantity, Decimal("10.00"))
         self.assertEqual(item.quantity, Decimal("52.00"))   # 42 held + 10
 
+    def test_an_unchanged_line_reports_nothing(self):
+        """The save paths assign the raw JSON number to a Decimal field, so
+        quantity arrives here as a float. Decimal('96.20') != 96.2 in
+        Python, which made every ordinary line claim it had moved and
+        report "96.20 -> 96.20" at the user."""
+        from .views import _sync_line_to_reservations
+        self._post([self._line(qty=50, roll_qty=50)])
+        item = Order.objects.get().items.get()
+
+        item.quantity = 50.0                       # float, as a save leaves it
+        self.assertIsNone(_sync_line_to_reservations(item))
+
+        item.quantity = float(Decimal("50.00"))
+        self.assertIsNone(_sync_line_to_reservations(item))
+
+    def test_editing_an_order_warns_about_nothing(self):
+        """The whole-order case: re-saving an edit form that changed no
+        metres must not produce a single 'reduced' line."""
+        self._post([self._line(qty=50, roll_qty=50)])
+        order = Order.objects.get()
+
+        resp = self.client.post(
+            reverse("operating:edit_order", kwargs={"pk": order.pk}), {
+                "customer_type": "contact",
+                "customer_pk": self.customer.pk,
+                "book": self.book.pk,
+                "product_json_input": json.dumps([{
+                    "item_no": 1, "item_id": order.items.get().pk,
+                    "product": {"sku": SKU, "variant": True},
+                    "description": "", "quantity": 50, "outsourced": 0,
+                    "price": 2, "is_custom_curtain": False,
+                    "rolls": [{"barcode": "L-0001", "quantity": 50}],
+                }]),
+            })
+
+        notes = [str(m) for m in resp.wsgi_request._messages]
+        self.assertFalse(any("reduced to what is actually held" in n
+                             for n in notes), notes)
+        self.assertEqual(Order.objects.get().items.get().quantity,
+                         Decimal("50.00"))
+
     def test_a_line_with_no_rolls_keeps_its_typed_quantity(self):
         """An untracked product, a back-order or a legacy row. Reading it
         off reservations there would mean zeroing it."""

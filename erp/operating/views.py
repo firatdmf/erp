@@ -1060,13 +1060,26 @@ def _sync_line_to_reservations(order_item):
                .aggregate(s=Sum("quantity"))["s"]) or _PDecimal("0")
     if not scanned:
         return None
-    want = scanned + (order_item.outsourced_quantity or _PDecimal("0"))
-    was = order_item.quantity or _PDecimal("0")
+    want = _as_line_decimal(scanned + (order_item.outsourced_quantity or _PDecimal("0")))
+    # Not just `or 0`: the save paths assign the raw JSON number straight
+    # to this Decimal field, so quantity is often still a float here.
+    # Decimal('96.20') != 96.2 in Python, which made every ordinary line
+    # look like it had moved and reported "96.20 → 96.20" at the user.
+    was = _as_line_decimal(order_item.quantity)
     if was == want:
         return None
     order_item.quantity = want
     order_item.save(update_fields=["quantity"])
     return (was, want)
+
+
+def _as_line_decimal(value):
+    """A quantity as the database will hold it: Decimal, two places."""
+    if value is None:
+        return _PDecimal("0.00")
+    if not isinstance(value, _PDecimal):
+        value = _PDecimal(str(value))
+    return value.quantize(_PDecimal("0.01"))
 
 
 def _line_short_label(order_item, was, now):

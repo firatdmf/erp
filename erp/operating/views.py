@@ -1026,6 +1026,57 @@ def _create_roll_reservation(order, order_item, roll, req_meters, user):
     return r, capped, None
 
 
+def _sync_line_to_reservations(order_item):
+    """Pin a line's quantity to the rolls that were ACTUALLY reserved for it.
+
+    The browser computes a line's quantity from the rolls it believes are
+    free, and the server then reserves each one against what the database
+    really has at that instant. Those two numbers can disagree, and every
+    way they disagree is silent:
+
+      * a competing order took metres between the form loading and saving,
+        so _create_roll_reservation capped the hold to what was left;
+      * the roll was re-measured shorter in the same window;
+      * the barcode failed to resolve at all (moved to another book's
+        shelf, wrong product) and reserved nothing.
+
+    In each case the line kept the browser's figure and the order billed
+    metres no roll was holding. Reading the reservations back closes all
+    of them at once, because it stops trusting the submitted arithmetic
+    rather than trying to detect each way it can be wrong.
+
+    Only ever called for a line that HAS reservations. A line with none is
+    not an under-reserved line — it is an untracked product, a back-order
+    or a legacy row whose quantity was typed and means something no roll
+    can tell us. Zeroing those would be data loss, so they are left alone
+    and the order page's shortfall banner speaks for them instead.
+
+    Returns (was, now) when the figure moved, else None."""
+    from django.db.models import Sum
+    from .models import OrderStockReservation
+
+    scanned = (OrderStockReservation.objects
+               .filter(order_item=order_item)
+               .aggregate(s=Sum("quantity"))["s"]) or _PDecimal("0")
+    if not scanned:
+        return None
+    want = scanned + (order_item.outsourced_quantity or _PDecimal("0"))
+    was = order_item.quantity or _PDecimal("0")
+    if was == want:
+        return None
+    order_item.quantity = want
+    order_item.save(update_fields=["quantity"])
+    return (was, want)
+
+
+def _line_short_label(order_item, was, now):
+    """One line of the 'we reserved less than you picked' warning."""
+    prod = order_item.product
+    name = (getattr(prod, "title", None) or getattr(prod, "sku", None) or
+            f"#{order_item.pk}")
+    return f"{name}: {was:.2f} → {now:.2f}"
+
+
 def _order_edit_release_unticked(order, items_payload):
     """Release, across the WHOLE order, every unconsumed hold whose stock item
     was unticked in the submission — before any line reserves anything.
@@ -1063,7 +1114,7 @@ def _order_edit_release_unticked(order, items_payload):
 
 
 def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcodes,
-                              books=None):
+                              books=None, short_lines=None):
     """RECONCILE an order line's roll reservations against the edit
     form's submitted selection — `rolls_data` is the line's FINAL desired
     set of stock_items, exactly as ticked in the sidebar (saved rolls hydrate
@@ -1086,7 +1137,11 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
 
     `books` confines the lookup to those books' shelves, for a caller
     filling an order whose book is already settled — a line routed to its
-    own book's order must reserve there and nowhere else."""
+    own book's order must reserve there and nowhere else.
+
+    `short_lines` collects the lines whose quantity had to come down
+    because less was reservable than was picked, so the caller can say so
+    — see _sync_line_to_reservations."""
     rolls_data = rolls_data or []
     variant = order_item.product_variant
     product = order_item.product
@@ -1135,6 +1190,12 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
     for key, held in existing.items():
         if key not in submitted_keys:
             held.delete()
+
+    # Last, once this line's holds are final: make the quantity say what
+    # they actually add up to.
+    moved = _sync_line_to_reservations(order_item)
+    if moved and short_lines is not None:
+        short_lines.append(_line_short_label(order_item, moved[0], moved[1]))
 
 
 def _reservation_payload(r):
@@ -1678,7 +1739,8 @@ def _sibling_order_for_book(order, book, member):
     return sibling, True
 
 
-def _append_lines_to_order(target, book, lines, user, failed_barcodes):
+def _append_lines_to_order(target, book, lines, user, failed_barcodes,
+                           short_lines=None):
     """Add lines to an order that did not have them, reserving only off
     `book`'s shelves.
 
@@ -1706,7 +1768,7 @@ def _append_lines_to_order(target, book, lines, user, failed_barcodes):
         )
         _order_edit_reserve_rolls(
             target, order_item, item_data.get("rolls") or [],
-            user, failed_barcodes, books=[book],
+            user, failed_barcodes, books=[book], short_lines=short_lines,
         )
 
 
@@ -2795,6 +2857,9 @@ class OrderCreate(View):
 
         member = getattr(request.user, "member", None)
         failed_barcodes = []
+        # Lines whose quantity had to come down on save because less was
+        # still reservable than the form had picked.
+        short_lines = []
 
         # Stock belongs to the book that owns its warehouse, so one
         # customer wanting goods off two books' shelves is not one order:
@@ -2830,6 +2895,7 @@ class OrderCreate(View):
                             split_group=split_group,
                             member=member,
                             failed_barcodes=failed_barcodes,
+                            short_lines=short_lines,
                         )
                         created.append((_o, book, _stayed))
 
@@ -2846,6 +2912,17 @@ class OrderCreate(View):
                         request,
                         "Sipariş oluşturuldu ama şu barkodlar için rezervasyon yapılamadı, "
                         "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
+                    )
+                # Saying it is the whole point: the metres were quietly
+                # unavailable, and a line that silently bills less than
+                # was picked is the thing this guards against.
+                if short_lines:
+                    from django.utils.translation import gettext as _
+                    messages.warning(
+                        request,
+                        _("Less stock was still free than had been picked, so "
+                          "these lines were reduced to what is actually held: ")
+                        + ", ".join(short_lines),
                     )
                 for order, _book, stayed_open in created:
                     if stayed_open:
@@ -2870,7 +2947,8 @@ class OrderCreate(View):
                 return render(request, self.page_template, {"form": form})
 
     def _create_one_order(self, request, *, book, items, notes, customer_type,
-                          customer_pk, split_group, member, failed_barcodes):
+                          customer_pk, split_group, member, failed_barcodes,
+                          short_lines=None):
         """Create ONE order, holding only the lines picked off `book`'s
         shelves. Returns (order, stayed_open).
 
@@ -2993,6 +3071,13 @@ class OrderCreate(View):
                 _r, _capped, rerr = _create_roll_reservation(order, order_item, roll, req_m, request.user)
                 if rerr:
                     failed_barcodes.append(bc)
+
+            # Once this line's holds are final: the quantity says what
+            # they add up to, not what the form hoped they would.
+            _moved = _sync_line_to_reservations(order_item)
+            if _moved and short_lines is not None:
+                short_lines.append(
+                    _line_short_label(order_item, _moved[0], _moved[1]))
 
         # Generate QR code
         generate_machine_qr_for_order(order)
@@ -3368,6 +3453,7 @@ class OrderEdit(UpdateView):
 
                 # Update existing items and add new ones
                 failed_barcodes = []
+                short_lines = []
                 # Defined before the branch below: an edit that submits no
                 # items at all — emptying an order is a real, saveable
                 # state — still reaches the routing step further down, and
@@ -3433,6 +3519,7 @@ class OrderEdit(UpdateView):
                                     _order_edit_reserve_rolls(
                                         self.object, order_item, item_data.get("rolls") or [],
                                         self.request.user, failed_barcodes,
+                                        short_lines=short_lines,
                                     )
                                 except OrderItem.DoesNotExist:
                                     continue
@@ -3482,6 +3569,7 @@ class OrderEdit(UpdateView):
                                 _order_edit_reserve_rolls(
                                     self.object, order_item, item_data.get("rolls") or [],
                                     self.request.user, failed_barcodes,
+                                    short_lines=short_lines,
                                 )
                     except json.JSONDecodeError:
                         messages.error(self.request, "Invalid product data format.")
@@ -3496,7 +3584,8 @@ class OrderEdit(UpdateView):
                     sibling, is_new = _sibling_order_for_book(
                         self.object, _book, edit_member)
                     _append_lines_to_order(
-                        sibling, _book, _lines, self.request.user, failed_barcodes)
+                        sibling, _book, _lines, self.request.user, failed_barcodes,
+                        short_lines=short_lines)
                     _settle_sibling(self.request, sibling, _book, edit_member)
                     spun_off.append((sibling, _book, is_new))
 
@@ -3505,6 +3594,14 @@ class OrderEdit(UpdateView):
                         self.request,
                         "Sipariş güncellendi ama şu barkodlar için rezervasyon yapılamadı, "
                         "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
+                    )
+                if short_lines:
+                    from django.utils.translation import gettext as _
+                    messages.warning(
+                        self.request,
+                        _("Less stock was still free than had been picked, so "
+                          "these lines were reduced to what is actually held: ")
+                        + ", ".join(short_lines),
                     )
                 if spun_off:
                     messages.success(

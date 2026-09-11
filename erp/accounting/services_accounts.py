@@ -416,9 +416,9 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
        "product": marketing.Product | None, # optional on an existing line
        "variant": marketing.ProductVariant | None,
        "description": str, "unit": str, "unit_price": Decimal,
-       "quantity": Decimal,                 # recomputed from roll.quantity
-                                             # (NOT quantity_remaining) across
-                                             # this line's surviving + new stock items
+       "quantity": Decimal,                 # what the line bills — the caller
+                                             # moves it only by the roll changes
+                                             # the edit itself made
        "new_roll_ids": [int, ...]}          # rolls to backfill onto this item
 
     A line whose resulting quantity is 0 (every stock item removed, nothing added

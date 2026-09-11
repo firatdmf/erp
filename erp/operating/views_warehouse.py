@@ -3226,7 +3226,10 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                   main product moves its rolls onto that one; a new price
                   is what those rolls cost.
       a roll    — its length and barcode are corrected with the same rules
-                  as the roll edit, holds trimmed to fit.
+                  as the roll edit, holds trimmed to fit. Its line's
+                  quantity moves by the same metres, and by nothing else: a
+                  roll re-measured or cut on the warehouse page since
+                  doesn't change what the supplier billed.
       removed   — a roll no longer listed is deleted, a line with nothing
                   left goes with it.
 
@@ -3289,8 +3292,17 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         # landing somewhere new is what needs its catalog link, and a line
         # that never had rolls is not measured by them.
         line_wps_before = {}
+        # What each line's rolls measured BEFORE this edit. A line's
+        # quantity is what the supplier billed; it moves only by what this
+        # form changes about its rolls. Rebuilding it from their lengths
+        # quietly billed the supplier for whatever the warehouse had since
+        # re-measured or cut off — invoice 117 lost the 4 m cut for samples.
+        line_metres_before = {}
         for r in rolls.values():
             line_wps_before.setdefault(r.purchase_invoice_item_id, set()).add(r.product_id)
+            line_metres_before[r.purchase_invoice_item_id] = (
+                line_metres_before.get(r.purchase_invoice_item_id, Decimal("0"))
+                + (r.quantity or Decimal("0")))
 
         prefix = _intake_prefix(data, account.name)
         _intake_check_rates(products_in, account, data.get("rates"))
@@ -3526,10 +3538,15 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                     wp.save(update_fields=["name", "updated_at"])
                     renamed = True
 
-                quantity = sum(
+                metres_now = sum(
                     WarehouseProductItem.objects.filter(pk__in=line_roll_ids)
                     .values_list("quantity", flat=True),
                     Decimal("0"))
+                if item is None:
+                    quantity = metres_now
+                else:
+                    quantity = max(Decimal("0"), item.quantity + metres_now
+                                   - line_metres_before.get(item.pk, Decimal("0")))
                 update = {
                     "invoice_item_id": item.pk if item is not None else None,
                     "product": main_product, "variant": wp.catalog_variant,

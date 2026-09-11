@@ -13,11 +13,13 @@
   purchases list, with the warehouse itself picked here rather than implied
   by whichever warehouse page the sidebar happened to be opened from.
 
-  Same template serves both modes:
-    new  → blank, warehouse pickable
-    edit → pre-filled by JS from operating:warehouse_purchase_edit; identity
-           (account, unit, warehouse, product/variant rows) is locked and
-           only tops — plus the price of a fully-emptied line — are editable.
+  Same template, same form, in every mode:
+    new   → blank, warehouse pickable
+    order → a saved draft, rebuilt from its plan
+    edit  → a received purchase, rebuilt from operating:warehouse_purchase_edit
+            with the id of every line and roll it already has. Everything
+            stays editable; the server refuses only what an order depends on
+            (removing a reserved roll, or turning it into another variant).
 {% endcomment %}
 
 {% block title %}{% if edit_invoice %}{{ edit_invoice.number }} · {% trans "Edit goods receipt" %}{% elif order_invoice %}{{ order_invoice.number }} · {% trans "Purchase order" %}{% else %}{% trans "New purchase order" %}{% endif %} · Nejum ERP{% endblock %}
@@ -327,22 +329,15 @@
   .np-product-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
   .np-product-no { font: 800 12px var(--font-sans); color: var(--nejum-teal-700); letter-spacing: 0.04em; text-transform: uppercase; }
 
-  /* Edit mode: product/variant identity is read-only text (no picker) —
-     only tops (and, on a fully-emptied line, price) are editable. */
-  .np-edit-readonly { font: 700 13px var(--font-sans); color: #0F1419; }
-  .np-edit-readonly code {
-    font: 700 11px var(--font-mono); background: #F4F7FB; border-radius: 5px;
-    padding: 1px 6px; margin-right: 6px; color: var(--gray-700);
+  /* Editing a received purchase: a roll an order has reserved can still be
+     re-measured and relabelled, but not taken off — the lock sits where its
+     remove button would be. */
+  .np-top-lock {
+    width: 30px; height: 30px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; color: #B27500;
   }
-  .np-existing-tops { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0; }
-  .np-etop {
-    display: flex; align-items: center; gap: 7px; padding: 6px 10px;
-    background: #F8FAFC; border: 1px solid #E2E8EE; border-radius: 8px; font-size: 12px;
-  }
-  .np-etop code { font-family: var(--font-mono); background: white; border: 1px solid #E2E8EE; border-radius: 5px; padding: 1px 6px; }
-  .np-etop.locked { background: #FEF3C7; border-color: #FDE68A; }
-  .np-etop .lock-ico { color: #B27500; font-size: 11px; }
-  .np-etop .np-mini-x { width: 18px; height: 18px; }
+  .np-top-lock svg { width: 14px; height: 14px; }
+  .np-top.locked .np-top-qty, .np-top.locked .np-top-bc { background: #FFFBEB; border-color: #FDE68A; }
 
   .np-summary { font: 500 12px var(--font-sans); color: var(--gray-600); min-height: 16px; }
   .np-summary b { color: #0F1419; }
@@ -395,7 +390,7 @@
       <div class="gr-eyebrow">{% trans "Procurement" %}</div>
       {% if edit_invoice %}
         <h1 class="gr-title">{% trans "Goods receipt" %} <code>{{ edit_invoice.number }}</code></h1>
-        <div class="gr-sub">{% trans "Add or remove the physical rolls on this purchase. Rolls already reserved for a customer order are locked, and the account can't change here." %}</div>
+        <div class="gr-sub">{% trans "This purchase has been received, and all of it can still be corrected. Rolls reserved for a customer order can be re-measured, but not removed or moved to another variant." %}</div>
       {% elif order_invoice %}
         <h1 class="gr-title">{% trans "Purchase order" %} <code>{{ order_invoice.number }}</code></h1>
         <div class="gr-sub">{% trans "Nothing has reached the warehouse yet, so everything here is still editable. Confirming it receives the goods and posts what you owe the supplier." %}</div>
@@ -432,12 +427,11 @@
       </div>
 
       <div class="gr-meta">
-        <!-- Warehouse — the depot the stock is received into. Fixed once a
-             purchase exists (its rolls already live in one). -->
+        <!-- Warehouse — the depot the stock is received into. On a received
+             purchase, changing it moves the rolls there on save. -->
         <div class="np-field">
           <label>{% trans "Warehouse" %} <span style="color:#C0392B;">*</span></label>
-          <select id="npWarehouse" class="np-select" onchange="npWarehouseChanged(this)"
-                  {% if edit_invoice %}disabled{% endif %}>
+          <select id="npWarehouse" class="np-select" onchange="npWarehouseChanged(this)">
             {% if not selected_warehouse_id %}
               <option value="">{% trans "Select warehouse…" %}</option>
             {% endif %}
@@ -446,12 +440,12 @@
             {% endfor %}
           </select>
           <div class="np-hint">
-            {% if edit_invoice %}{% trans "Set at intake — a purchase can't move between warehouses." %}
+            {% if edit_invoice %}{% trans "Changing this moves the purchase's rolls there when you save." %}
             {% else %}{% trans "Changing this clears the products below." %}{% endif %}
           </div>
         </div>
 
-        <!-- Cari account → barcode prefix (whole batch — one delivery).
+        <!-- Current account → barcode prefix (whole batch — one delivery).
              REQUIRED: the alım invoice posts to whichever account is picked
              here, so intake without one is never valid. Type-to-search over
              the loaded accounts; no match offers an inline "create" so a
@@ -510,8 +504,7 @@
         <!-- Unit (generic: fabric=m, bedding=pcs, …) — whole batch -->
         <div class="np-field">
           <label>{% trans "Unit" %}</label>
-          <select id="npUnit" class="np-select" onchange="npRelabelUnits(); npSummaryUpdate();"
-                  {% if edit_invoice %}disabled{% endif %}>
+          <select id="npUnit" class="np-select" onchange="npRelabelUnits(); npSummaryUpdate();">
             <option value="mt">{% trans "Meter (m)" %}</option>
             <option value="piece">{% trans "Piece (pcs)" %}</option>
             <option value="kg">kg</option>
@@ -525,19 +518,14 @@
       <div class="gr-meta dates" style="margin-top:2px;">
         <div class="np-field">
           <label>{% trans "Order date" %}</label>
-          <input type="date" id="npOrderDate" class="np-input" value="{{ order_date }}"
-                 {% if edit_invoice %}disabled{% endif %}>
+          <input type="date" id="npOrderDate" class="np-input" value="{{ order_date }}">
         </div>
         <div class="np-field">
           <label>{% trans "Expected delivery" %}</label>
-          <input type="date" id="npDeliveryDate" class="np-input" value="{{ delivery_date }}"
-                 {% if edit_invoice %}disabled{% endif %}>
+          <input type="date" id="npDeliveryDate" class="np-input" value="{{ delivery_date }}">
         </div>
         <div class="np-field">
           <label>{% trans "Notes" %}</label>
-          {% comment %}Editable even after receiving — see WarehousePurchaseEdit.
-          The dates, account and warehouse beside it are not: they are posted to
-          the ledger or hold physical stock.{% endcomment %}
           <textarea id="npNotes" class="np-input np-notes"
                     placeholder="{% trans 'Shown on the printed order' %}">{% if order_invoice %}{{ order_invoice.notes }}{% elif edit_invoice %}{{ edit_invoice.notes }}{% endif %}</textarea>
         </div>
@@ -568,11 +556,8 @@
       </div>
 
       <div class="np-products" id="npProducts"></div>
-      {% comment %}Hidden outright while editing — an existing purchase's product
-      lines are fixed; only its rolls (and an emptied line's price) change.{% endcomment %}
       <button type="button" class="np-add-product" id="npAddProductBtn" onclick="npAddProduct()"
-              disabled
-              {% if edit_invoice %}style="display:none;"{% endif %}>
+              disabled>
         <i class="fa fa-plus"></i> {% trans "Add product" %}
       </button>
     </section>
@@ -729,6 +714,9 @@
   };
 
   window.npWarehouseChanged = function (sel) {
+    // A received purchase's lines are real stock that goes wherever the
+    // purchase goes — the save moves them, so there is nothing to clear.
+    if (GR_EDIT_ID) { sel._npPrev = sel.value; return; }
     const dirty = Array.prototype.some.call(
       document.querySelectorAll('#npProducts input'),
       function (i) { return (i.value || '').trim(); }
@@ -1249,7 +1237,14 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (vEl._npMatchToken !== reqToken) return;
-        if (d.exists) {
+        if (d.exists && vEl.dataset.itemId &&
+            npSkuKey(d.variant_sku || skuI.value) === npSkuKey(vEl.dataset.origSku)) {
+          // A received purchase's own line, still on its own variant: there
+          // is nothing to announce, and "will add stock" would be untrue.
+          badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = '';
+          skuI.classList.remove('bad');
+          skuI.dataset.matchLocked = '1';
+        } else if (d.exists) {
           badge.classList.add('show'); badge.classList.remove('new', 'bad');
           skuI.classList.remove('bad');
           badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "exists" %} — ' +
@@ -1443,6 +1438,13 @@
     el._npTakenBy = null;
     el._npChecked = null;
     clearTimeout(el._npBcTimer);
+    // A roll this purchase already has, still carrying its own code: that
+    // code is taken — by this roll — so asking the server would only ever
+    // report it as a clash with itself.
+    const own = el.dataset.orig || '';
+    if (value && own && value.toUpperCase() === own.toUpperCase()) {
+      npBcMark(el, null, ''); npBcSyncDupes(); return;
+    }
     if (!value) { npBcMark(el, null, ''); npBcSyncDupes(); return; }
     npBcMark(el, 'busy', '');
     npBcSyncDupes();
@@ -1848,64 +1850,13 @@
     }, 250);
   };
 
-  // ── Edit an existing purchase — this SAME page, pre-filled with its
-  // current lines/stock items. Deliberately ADDITIVE: npAddProduct/npAddVariant/
-  // npAddTop (above) are untouched and keep meaning "add something brand
-  // new" in both modes; existing/locked rows get their own renderer so the
-  // two concepts never share one code path with a runtime flag. ──────────
+  // ── Editing a received purchase ───────────────────────────────────
+  // The same form a draft order reopens into: the purchase comes back as
+  // that form's own payload, with the id of every line and roll it already
+  // has, and npLoadFromPlan rebuilds it. Everything on the page stays
+  // editable; the ids are how the save tells a correction from an addition.
+  let NP_EDIT_ROLLS = {};   // stock item id → barcode, as loaded
 
-  // One read-only chip per EXISTING stock item. Locked (already reserved into a
-  // customer order — even if not yet shipped/consumed) rows show a lock
-  // icon and can't be removed; unlocked ones keep a delete control that
-  // just drops the chip — nothing is sent to the server for a dropped
-  // roll_id, which is exactly what marks it "removed" in the diff.
-  window.npAddExistingTop = function (vEl, top) {
-    const box = vEl.querySelector('.np-existing-tops');
-    if (!box) return;
-    const row = document.createElement('div');
-    row.className = 'np-etop' + (top.locked ? ' locked' : '');
-    row.dataset.rollId = top.stock_item_id;
-    const meters = parseFloat(top.quantity);
-    row.innerHTML =
-      '<code>' + (top.barcode || '—') + '</code>' +
-      '<span>' + (isNaN(meters) ? top.quantity : meters.toFixed(2)) + ' ' + unitShort() + '</span>' +
-      (top.locked
-        ? NP_LOCK
-        : '<button type="button" class="np-mini-x" title="{% trans "Remove" %}" onclick="this.closest(\'.np-etop\').remove(); npSummaryUpdate();">' + NP_TRASH + '</button>');
-    box.appendChild(row);
-  };
-
-  function npBuildEditVariantEl(v) {
-    const el = document.createElement('div');
-    el.className = 'np-variant';
-    el.dataset.itemId = v.invoice_item_id;
-    el.dataset.wpId = v.warehouse_product_id || '';
-    const hasExisting = (v.tops || []).length > 0;
-    el.innerHTML =
-      '<div class="np-variant-head"><span class="np-edit-readonly">' +
-        (v.sku ? ('<code>' + v.sku + '</code>') : '') + (v.name || '') +
-      '</span></div>' +
-      (hasExisting ? '<div class="np-col"><label>{% trans "Rolls on this purchase" %}</label></div>' : '') +
-      '<div class="np-existing-tops"></div>' +
-      NP_TOPS_HEAD +
-      '<div class="np-tops"></div>' +
-      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add roll" %}</button>' +
-      '<div class="np-price-row" style="display:' + (hasExisting ? 'none' : 'block') + '; margin-top:9px;">' +
-        '<div class="np-col">' +
-          '<label>{% trans "Purchase price" %}</label>' +
-          '<div class="np-price-pair">' +
-            '<input class="np-input np-v-price" type="number" inputmode="decimal" min="0" step="0.01" oninput="npSummaryUpdate()" value="' +
-              (v.unit_price || '') + '">' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    (v.tops || []).forEach(function (t) { window.npAddExistingTop(el, t); });
-    return el;
-  }
-
-  // Fetches the purchase's current lines/stock items and fills #npProducts with
-  // them read-only (identity) + editable (stock items, and price only on a line
-  // with zero surviving original stock items) instead of a blank intake.
   window.npLoadForEdit = function (invoiceId) {
     NP_EDIT_INVOICE_ID = invoiceId;
     npLoading = true;
@@ -1915,109 +1866,58 @@
       .then(function (d) {
         if (!d || !d.success) {
           npLoading = false;
-          alert((d && d.error) || '{% trans "Alım yüklenemedi." %}');
+          alert((d && d.error) || '{% trans "The purchase could not be loaded." %}');
           return;
         }
-        const wrap = document.getElementById('npProducts');
-        wrap.innerHTML = '';
-
+        // The picker lists the default book's active accounts; the one this
+        // purchase is posted to may not be among them, and a select can't
+        // hold a value it has no option for.
         const sel = document.getElementById('npSupplier');
-        if (sel) {
-          if (d.current_account_id) sel.value = String(d.current_account_id);
-          sel.disabled = true;
-          npSupCancelNew();
-          npSupSyncFromSelect();   // chip renders locked — account can't change mid-edit
+        if (sel && d.current_account_id &&
+            !sel.querySelector('option[value="' + d.current_account_id + '"]')) {
+          const opt = document.createElement('option');
+          opt.value = String(d.current_account_id);
+          opt.textContent = d.current_account_name || '';
+          opt.setAttribute('data-prefix', d.current_account_prefix || '');
+          opt.setAttribute('data-currency', d.currency || '');
+          sel.appendChild(opt);
         }
-        // Show the unit the purchase was received in, not the "mt" default —
-        // its existing stock items are labelled with it.
-        const unitSel = document.getElementById('npUnit');
-        const firstUnit = (((d.products || [])[0] || {}).variants || [])[0];
-        if (unitSel && firstUnit && firstUnit.unit) {
-          const has = Array.prototype.some.call(unitSel.options, function (o) { return o.value === firstUnit.unit; });
-          if (has) unitSel.value = firstUnit.unit;
-        }
-        const addProductBtn = document.getElementById('npAddProductBtn');
-        if (addProductBtn) addProductBtn.style.display = 'none';
-
-        (d.products || []).forEach(function (group) {
-          const card = document.createElement('div');
-          card.className = 'np-product-card np-edit-card';
-          card.innerHTML =
-            '<div class="np-product-head"><span class="np-edit-readonly">' + (group.product_title || '') + '</span></div>' +
-            '<div class="np-variants-wrap"><div class="np-variants"></div></div>';
-          const variantsBox = card.querySelector('.np-variants');
-          (group.variants || []).forEach(function (v) { variantsBox.appendChild(npBuildEditVariantEl(v)); });
-          wrap.appendChild(card);
+        NP_EDIT_ROLLS = {};
+        (d.products || []).forEach(function (p) {
+          (p.variants || []).forEach(function (v) {
+            (v.tops || []).forEach(function (t) { NP_EDIT_ROLLS[t.stock_item_id] = t.barcode; });
+          });
         });
-
-        npRelabelUnits();
-        npLoading = false;
-        npSummaryUpdate();
-        if (window.lucide) lucide.createIcons();
+        npLoadFromPlan(d);
       }).catch(function () {
         npLoading = false;
-        alert('{% trans "Ağ hatası." %}');
+        alert('{% trans "Network error." %}');
       });
   };
 
-  function npCollectEditPayload() {
-    const products = [];
-    document.querySelectorAll('#npProducts .np-edit-card').forEach(function (card) {
-      const variants = [];
-      card.querySelectorAll('.np-variants .np-variant').forEach(function (vEl) {
-        const keptRollIds = [];
-        vEl.querySelectorAll('.np-existing-tops .np-etop').forEach(function (row) {
-          keptRollIds.push(parseInt(row.dataset.rollId, 10));
-        });
-        const newTops = [];
-        vEl.querySelectorAll('.np-tops .np-top').forEach(function (row) {
-          const q = row.querySelector('.np-top-qty');
-          const b = row.querySelector('.np-top-bc');
-          const val = parseFloat(((q && q.value) || '').replace(',', '.'));
-          if (!isNaN(val) && val > 0) {
-            newTops.push({ qty: val, barcode: ((b && b.value) || '').trim() });
-          }
-        });
-        const variant = {
-          invoice_item_id: parseInt(vEl.dataset.itemId, 10),
-          warehouse_product_id: vEl.dataset.wpId ? parseInt(vEl.dataset.wpId, 10) : null,
-          kept_roll_ids: keptRollIds,
-          new_stock: newTops,
-        };
-        const priceRow = vEl.querySelector('.np-price-row');
-        const priceEl = vEl.querySelector('.np-v-price');
-        if (priceEl && priceRow && priceRow.style.display !== 'none' && priceEl.value) {
-          variant.price = priceEl.value;
-        }
-        variants.push(variant);
-      });
-      products.push({ main_product: { mode: 'existing' }, variants: variants });
-    });
-    return products;
-  }
-
   function npSaveEdit() {
     const btn = document.getElementById('npSaveBtn');
-    // Same barcode gate as a fresh intake — stock items added during an edit go
-    // through the identical uniqueness rules.
-    npBcSyncDupes();
-    const badEdit = npBcRows().filter(function (el) {
-      return el.classList.contains('bad') && (el.value || '').trim();
+    const payload = npOrderPayload();
+    if (!payload) return;
+
+    // A roll left off the form is deleted — real stock, gone. Removing one
+    // is a click on a small bin (or switching a product's variant mode), so
+    // it is named before it happens rather than discovered afterwards.
+    const kept = {};
+    payload.products.forEach(function (p) {
+      p.variants.forEach(function (v) {
+        v.tops.forEach(function (t) { if (t.stock_item_id) kept[t.stock_item_id] = true; });
+      });
     });
-    if (badEdit.length) {
-      alert('{% trans "Fix the marked barcodes first" %}: ' +
-            badEdit.map(function (el) { return (el.value || '').trim(); }).join(', '));
-      badEdit[0].focus();
+    const dropped = Object.keys(NP_EDIT_ROLLS).filter(function (id) { return !kept[id]; });
+    if (dropped.length && !confirm(
+        '{% trans "These rolls will be deleted from stock:" %}\n' +
+        dropped.map(function (id) { return NP_EDIT_ROLLS[id] || ('#' + id); }).join(', ') +
+        '\n\n{% trans "Continue?" %}')) {
       return;
     }
-    const payload = {
-      unit: (document.getElementById('npUnit') || {}).value || 'mt',
-      notes: (document.getElementById('npNotes') || {}).value || '',
-      products: npCollectEditPayload(),
-    };
-    btn.disabled = true;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Kaydediliyor…" %}';
+
+    npBusy(btn, '{% trans "Saving…" %}');
     fetch(npWhUrl(NP_EDIT_TPL).replace('/0/edit/', '/' + NP_EDIT_INVOICE_ID + '/edit/'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
@@ -2025,18 +1925,26 @@
     }).then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.success) {
+          (d.warnings || []).forEach(function (w) { console.warn('catalog:', w); });
+          // A shortened roll gives back metres an order was holding. That
+          // order changed because of this save, so say which one.
+          const trimmed = d.reservations_trimmed || [];
+          if (trimmed.length) {
+            alert('{% trans "Reserved quantities were reduced to fit the corrected rolls:" %}\n' +
+                  trimmed.map(function (t) { return t.label + ': ' + t.was + ' → ' + t.now; }).join('\n'));
+          }
           window.location.href = NP_PURCHASE_DETAIL_TPL.replace('/0/', '/' + NP_EDIT_INVOICE_ID + '/');
         } else {
-          let msg = (d && d.error) || '{% trans "Kaydedilemedi." %}';
+          let msg = (d && d.error) || '{% trans "Could not save." %}';
           if (d && d.blocked && d.blocked.length) {
             msg += '\n' + d.blocked.map(function (b) { return b.barcode; }).join(', ');
           }
           alert(msg);
-          btn.disabled = false; btn.innerHTML = orig;
+          npUnbusy(btn);
         }
       }).catch(function () {
-        alert('{% trans "Ağ hatası." %}');
-        btn.disabled = false; btn.innerHTML = orig;
+        alert('{% trans "Network error." %}');
+        npUnbusy(btn);
       });
   }
 
@@ -2057,6 +1965,13 @@
       return;
     }
 
+    // Rows and rolls that already exist on a received purchase carry their
+    // ids (see npFillVariant); undefined keys drop out of the JSON, so a new
+    // row posts exactly what it always did.
+    function npIdOf(el, key) {
+      const raw = el && el.dataset[key];
+      return raw ? parseInt(raw, 10) : undefined;
+    }
     function npCollectTops(scope) {
       const tops = [];
       scope.querySelectorAll('.np-top').forEach(function (row) {
@@ -2064,7 +1979,8 @@
         const b = row.querySelector('.np-top-bc');
         const val = parseFloat(((q && q.value) || '').replace(',', '.'));
         if (!isNaN(val) && val > 0) {
-          tops.push({ qty: val, barcode: ((b && b.value) || '').trim() });
+          tops.push({ qty: val, barcode: ((b && b.value) || '').trim(),
+                      stock_item_id: npIdOf(row, 'stockItemId') });
         }
       });
       return tops;
@@ -2124,7 +2040,8 @@
           const tops = npCollectTops(v);
           if (name || sku || tops.length) variants.push({
             name: name, sku: sku, tops: tops,
-            price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD'
+            price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
+            invoice_item_id: npIdOf(v, 'itemId')
           });
         });
         if (!variants.length) { alert(label + ': {% trans "Add at least one variant with a roll." %}'); return; }
@@ -2134,7 +2051,8 @@
         if (!tops.length) { alert(label + ': {% trans "Enter at least one quantity." %}'); return; }
         const priceEl = block.querySelector('.np-nv-price');
         const curEl = block.querySelector('.np-v-cur');
-        variants.push({ name: '', sku: '', tops: tops, price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD' });
+        variants.push({ name: '', sku: '', tops: tops, price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
+                        invoice_item_id: npIdOf(block.querySelector('.np-variant'), 'itemId') });
       }
 
       const catSel = card.querySelector('.np-main-cat');
@@ -2349,6 +2267,12 @@
 
   function npFillVariant(vEl, v, noVariant) {
     if (!vEl) return;
+    // Set only when rebuilding a received purchase — it is what tells the
+    // save this row is a line the purchase already has.
+    if (v.invoice_item_id) {
+      vEl.dataset.itemId = v.invoice_item_id;
+      vEl.dataset.origSku = v.sku || '';
+    }
     if (!noVariant) {
       const nameI = vEl.querySelector('.np-v-name');
       const skuI = vEl.querySelector('.np-v-sku');
@@ -2369,9 +2293,28 @@
       if (!row) return;
       row.querySelector('.np-top-qty').value = t.qty != null ? t.qty : '';
       const bc = row.querySelector('.np-top-bc');
+      if (t.stock_item_id) {
+        row.dataset.stockItemId = t.stock_item_id;
+        if (bc) bc.dataset.orig = t.barcode || '';
+      }
+      if (t.locked) npLockTop(row);
       if (bc && t.barcode) { bc.value = t.barcode; npBarcodeInput(bc); }
     });
     if (!noVariant) npQueueVariantMatch(vEl);
+  }
+
+  // A roll a customer order has reserved: its length and label can still be
+  // corrected, but it can't come off the purchase, so the remove button
+  // gives way to a lock. The server holds the same line either way.
+  function npLockTop(row) {
+    row.classList.add('locked');
+    const x = row.querySelector('.np-mini-x');
+    if (!x) return;
+    const lock = document.createElement('span');
+    lock.className = 'np-top-lock';
+    lock.title = '{% trans "Reserved for a customer order — it can be re-measured, not removed." %}';
+    lock.innerHTML = NP_LOCK;
+    x.replaceWith(lock);
   }
 
   // ── Boot ─────────────────────────────────────────────────────────

@@ -1,29 +1,26 @@
 """The goods-receipt EDIT form and its view have to agree on key names.
 
-test_purchase_order_flow's `_current_diff` hand-writes the edit payload
-using the VIEW's key names, so it stayed green while the template sent
-something else entirely. Commit 8c614c10 ("Let stock remember what it
-cost, and call it stock") renamed the view's side — `roll_id` became
-`stock_item_id` on the way out, `new_tops` became `new_stock` on the way
-in — and the template kept both old names. Saving an edited receipt then
-posted `kept_roll_ids: [null]` (parseInt("undefined") → NaN → JSON null)
-and died on `int(None)`, while any newly added stock sat in a `new_tops`
-key nothing read.
+A received purchase is reloaded into the form as the form's own payload,
+with `invoice_item_id` on every line and `stock_item_id` on every roll it
+already has, and the save reads those same two keys back to tell a
+correction from an addition. They broke apart once before: commit 8c614c10
+renamed the view's side (`roll_id` → `stock_item_id`) while the template
+kept the old name, and saving an edited receipt posted nulls and died.
 
-These tests build the payload the way npCollectEditPayload does, off the
-keys the view really serves, so the two halves can't drift apart again.
+A roll the form posts WITHOUT its id is not an error the view can catch —
+it is a new roll, so a mismatch would silently duplicate stock and delete
+the original. Hence these checks on both halves.
 
 Run with:
     python manage.py test accounting.test_goods_receipt_edit_payload
 """
 import json
-from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from accounting.models import Book, CurrencyCategory, Invoice
+from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from operating.models import WarehouseProductItem, Warehouse
 
@@ -70,64 +67,35 @@ class GoodsReceiptEditPayload(TestCase):
             self._edit_url(),
             headers={"x-requested-with": "XMLHttpRequest"}).json()
 
-    def _template_payload(self, hydrated, new_stock=()):
-        """Exactly what npCollectEditPayload builds: the id it reads off
-        each existing chip is whatever npAddExistingTop put in the
-        dataset, so this reads the SAME key the template does."""
-        return [{
-            "main_product": {"mode": "existing"},
-            "variants": [{
-                "invoice_item_id": v["invoice_item_id"],
-                "warehouse_product_id": v["warehouse_product_id"],
-                "kept_roll_ids": [t["stock_item_id"] for t in v["tops"]],
-                "new_stock": list(new_stock),
-            } for v in group["variants"]],
-        } for group in hydrated["products"]]
+    def test_the_hydration_names_the_ids_the_form_reads(self):
+        variant = self._hydrate()["products"][0]["variants"][0]
+        self.assertIsNotNone(variant.get("invoice_item_id"))
+        self.assertIsNotNone(variant["tops"][0].get("stock_item_id"))
 
-    def test_the_hydration_names_the_id_the_form_reads(self):
-        """npAddExistingTop stores top.stock_item_id — if the view ever
-        stops serving that key, every chip's dataset id goes undefined
-        and the save posts nulls."""
-        top = self._hydrate()["products"][0]["variants"][0]["tops"][0]
-        self.assertIn("stock_item_id", top)
-        self.assertIsNotNone(top["stock_item_id"])
-
-    def test_the_form_can_save_an_untouched_receipt(self):
-        payload = self._template_payload(self._hydrate())
+    def test_the_hydration_posts_back_as_is(self):
+        """npLoadFromPlan → npCollect round-trips the payload untouched, so
+        posting what the view served must keep every roll it already had."""
+        d = self._hydrate()
+        roll_ids = set(WarehouseProductItem.objects.values_list("pk", flat=True))
         resp = self.client.post(
             self._edit_url(),
-            data=json.dumps({"unit": "mt", "notes": "arrived damaged",
-                             "products": payload}),
+            data=json.dumps({"warehouse_id": self.wh.pk,
+                             "current_account_id": d["current_account_id"],
+                             "unit": d["unit"], "notes": "arrived damaged",
+                             "products": d["products"]}),
             content_type="application/json")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(
-            Invoice.objects.get(pk=self.invoice_id).notes, "arrived damaged")
-        # Every stock item was named as kept, so none was removed.
-        self.assertEqual(WarehouseProductItem.objects.count(), 1)
+            set(WarehouseProductItem.objects.values_list("pk", flat=True)), roll_ids)
 
-    def test_stock_added_during_an_edit_actually_lands(self):
-        """The container key has to be the one the view reads, or the
-        new stock is dropped without a word."""
-        payload = self._template_payload(
-            self._hydrate(), new_stock=[{"qty": 12, "barcode": ""}])
-        resp = self.client.post(
-            self._edit_url(),
-            data=json.dumps({"unit": "mt", "notes": "plus one roll",
-                             "products": payload}),
-            content_type="application/json")
-        self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(WarehouseProductItem.objects.count(), 2)
-        self.assertEqual(
-            sorted(r.quantity for r in WarehouseProductItem.objects.all()),
-            [Decimal("12.00"), Decimal("30.00")])
-
-    def test_the_template_posts_those_same_two_keys(self):
-        """Guards the client half — the view is only ever reached with
-        the names npCollectEditPayload writes."""
+    def test_the_template_reads_and_posts_those_same_keys(self):
         with open("accounting/templates/accounts/goods_receipt_form.html",
                   encoding="utf-8") as fh:
             form = fh.read()
-        self.assertIn("row.dataset.rollId = top.stock_item_id;", form)
-        self.assertIn("new_stock: newTops,", form)
+        # npFillVariant stores them off the hydration...
+        self.assertIn("vEl.dataset.itemId = v.invoice_item_id;", form)
+        self.assertIn("row.dataset.stockItemId = t.stock_item_id;", form)
+        # ...and npCollect posts them back under the view's names.
+        self.assertIn("stock_item_id: npIdOf(row, 'stockItemId')", form)
+        self.assertIn("invoice_item_id: npIdOf(v, 'itemId')", form)
         self.assertNotIn("top.roll_id", form)
-        self.assertNotIn("new_tops:", form)

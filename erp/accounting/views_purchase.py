@@ -239,8 +239,8 @@ class GoodsReceipt(View):
         # warehouses and hold no stock of their own — intake into one is
         # blocked everywhere else too, so they aren't offered here.
         warehouses = list(Warehouse.objects.exclude(kind="combined").order_by("name"))
-        invoice = None          # an ISSUED purchase: rolls exist, identity locked
-        order = None            # a DRAFT order: nothing received yet, fully editable
+        invoice = None          # a RECEIVED purchase: edited against the rolls it has
+        order = None            # a DRAFT order: nothing received yet, just a plan
         selected_id = None
         # The scoped route (books/<id>/purchases/new/) names a book; the
         # edit route addresses a document instead, and picks its book up
@@ -294,6 +294,7 @@ class GoodsReceipt(View):
                 # Nothing to choose between — don't make it a decision.
                 selected_id = warehouses[0].pk
 
+        doc = order or invoice
         return render(request, self.template_name, {
             "warehouses": warehouses,
             "selected_warehouse_id": selected_id,
@@ -302,9 +303,9 @@ class GoodsReceipt(View):
             "intake_plan": (order.intake_plan or {}) if order else None,
             "can_confirm": can_confirm_purchase(request.user),
             "today": date.today().isoformat(),
-            "order_date": (order.date.isoformat() if order else date.today().isoformat()),
-            "delivery_date": (order.delivery_date.isoformat()
-                              if order and order.delivery_date else ""),
+            "order_date": (doc.date.isoformat() if doc else date.today().isoformat()),
+            "delivery_date": (doc.delivery_date.isoformat()
+                              if doc and doc.delivery_date else ""),
             "back_url": back_url,
             "accounts": _account_choices(),
             "product_categories": _product_category_choices(),

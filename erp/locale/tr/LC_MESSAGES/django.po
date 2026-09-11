@@ -9320,3 +9320,42 @@ msgstr "Bu siparişte kargo var"
 #, python-format
 msgid "PDF header (default: %(brand)s)"
 msgstr "PDF başlığı (varsayılan: %(brand)s)"
+
+msgid "This purchase has been received, and all of it can still be corrected. Rolls reserved for a customer order can be re-measured, but not removed or moved to another variant."
+msgstr "Bu alım teslim alındı ve tamamı hâlâ düzeltilebilir. Bir müşteri siparişine ayrılmış toplar yeniden ölçülebilir, ancak silinemez veya başka bir varyanta taşınamaz."
+
+msgid "Changing this moves the purchase's rolls there when you save."
+msgstr "Değiştirirseniz, kaydettiğinizde bu alımın topları oraya taşınır."
+
+msgid "Reserved for a customer order — it can be re-measured, not removed."
+msgstr "Bir müşteri siparişine ayrılmış — yeniden ölçülebilir, silinemez."
+
+msgid "The purchase could not be loaded."
+msgstr "Alım yüklenemedi."
+
+msgid "These rolls will be deleted from stock:"
+msgstr "Bu toplar stoktan silinecek:"
+
+msgid "Reserved quantities were reduced to fit the corrected rolls:"
+msgstr "Ayrılan miktarlar, düzeltilen toplara sığacak şekilde azaltıldı:"
+
+msgid "A roll's barcode can't be removed"
+msgstr "Bir topun barkodu silinemez"
+
+msgid "This purchase is still an order — save it as an order instead."
+msgstr "Bu alım hâlâ bir sipariş — sipariş olarak kaydedin."
+
+msgid "Payments are allocated to this purchase, so it can't move to another account. Take the allocations off first."
+msgstr "Bu alıma ödeme eşleştirilmiş, bu yüzden başka bir cari hesaba taşınamaz. Önce eşleştirmeleri kaldırın."
+
+msgid "This purchase changed while you were editing it — reload the page."
+msgstr "Siz düzenlerken bu alım değişti — sayfayı yenileyin."
+
+msgid "A purchase can't move to a warehouse that belongs to another book — the rolls would change owner with no entry in either ledger."
+msgstr "Bir alım başka bir deftere ait bir depoya taşınamaz — toplar iki defterde de kayıt olmadan sahip değiştirmiş olur."
+
+msgid "This roll is reserved for an order, so it can't become a different variant. Fix that order first."
+msgstr "Bu top bir siparişe ayrılmış, bu yüzden başka bir varyanta dönüştürülemez. Önce o siparişi düzeltin."
+
+msgid "The purchase invoice was created with a total of 0 — no price was entered. You can edit the invoice from the account page."
+msgstr "Alış faturası 0 tutarla oluşturuldu — fiyat girilmedi. Faturayı cari sayfasından düzenleyebilirsiniz."

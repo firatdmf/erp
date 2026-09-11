@@ -28,7 +28,7 @@ class GoodsReceiptPageTest(TestCase):
         self.book = Book.objects.create(name="Demfirat")
         self.user.member.books.add(self.book)
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-001", name="Kızılırmak", type="supplier",
+            book=self.book, code="TST-001", name="Kızılırmak", type="supplier",
             default_currency=self.usd,
         )
 
@@ -92,9 +92,10 @@ class GoodsReceiptPageTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context["selected_warehouse_id"], self.store.pk)
         self.assertContains(r, inv.number)
-        # Identity is fixed once stock exists — the warehouse can't change.
+        # Still pickable once stock exists: saving another warehouse moves
+        # the rolls there (see accounting.test_received_purchase_edit).
         self.assertIsNotNone(r.context["edit_invoice"])
-        self.assertRegex(r.content.decode(), r'id="npWarehouse"[^>]*disabled')
+        self.assertNotRegex(r.content.decode(), r'id="npWarehouse"[^>]*disabled')
 
     def test_edit_is_refused_when_the_stock_links_are_gone(self):
         inv = self._purchase(warehouse=None)

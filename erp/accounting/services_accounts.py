@@ -413,7 +413,7 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
 
     `line_updates` — one dict per surviving/new purchase line:
       {"invoice_item_id": <id> | None,      # None → brand-new line
-       "product": marketing.Product | None,
+       "product": marketing.Product | None, # optional on an existing line
        "variant": marketing.ProductVariant | None,
        "description": str, "unit": str, "unit_price": Decimal,
        "quantity": Decimal,                 # recomputed from roll.quantity
@@ -446,6 +446,12 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
                 item.delete()
                 continue
             item.quantity = qty
+            # Only when the caller says: a line whose rolls moved to another
+            # variant is a line of that variant now.
+            if "product" in line:
+                item.product = line["product"]
+            if "variant" in line:
+                item.variant = line["variant"]
             if line.get("unit_price") is not None:
                 item.unit_price = line["unit_price"]
             if line.get("unit"):

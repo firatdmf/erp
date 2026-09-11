@@ -310,6 +310,108 @@ def _note_trim_on_order(order, roll, was, now, *, line=None):
     order.save(update_fields=["notes"])
 
 
+class RollLengthError(ValueError):
+    """A roll length that cannot be true — see _set_roll_length."""
+
+
+def _set_roll_length(roll, new_full):
+    """Correct a roll's full length in memory, keeping what has already come
+    off it. Returns True when the length actually changed; the caller saves
+    quantity, quantity_remaining and status, then trims the holds with
+    _clamp_reservations_to_roll.
+
+    Shared by the roll edit on the warehouse page and the purchase edit, so a
+    length corrected from either place obeys the same two rules."""
+    if new_full is None or new_full <= 0:
+        raise RollLengthError("Metre pozitif olmalı.")
+    old_full = roll.quantity or Decimal("0")
+    consumed = Decimal("0")
+    if roll.quantity_remaining is not None and old_full:
+        consumed = max(Decimal("0"), old_full - roll.quantity_remaining)
+
+    # A roll cannot have had more taken off it than it was ever
+    # long. Shortening it below what has already gone out used to be
+    # accepted: the remainder clamped to zero so stock stayed right,
+    # while the roll's own history claimed more metres shipped than
+    # ever existed — a contradiction no report can resolve later.
+    #
+    # If those two numbers disagree it is the OUTGOING record that is
+    # wrong, not the length, so the fix belongs on the shipment or
+    # stock-out. Refuse and name the figure to correct against.
+    # Equal is fine: that is a roll used up exactly.
+    if new_full < consumed:
+        raise RollLengthError(
+            f"Bu toptan {consumed:.2f} m çıkış yapılmış — "
+            f"uzunluk bundan kısa olamaz. Önce ilgili "
+            f"sevkiyatı veya stok çıkışını düzeltin.")
+
+    if new_full == old_full:
+        return False
+    roll.quantity = new_full
+    roll.quantity_remaining = max(Decimal("0"), new_full - consumed)
+
+    # Status follows the metres. Correcting a length can drive
+    # remaining to zero — or lift it back off zero — and leaving
+    # the old status behind is what left roll #3195 flagged
+    # "partial" with nothing on it: counted as live stock, listed
+    # on the product page, and pickable for packing. Same rule
+    # the stock-out and shipping paths apply.
+    rem = roll.quantity_remaining or Decimal("0")
+    if rem <= 0:
+        roll.status = "consumed"
+    elif rem < new_full:
+        roll.status = "partial"
+    else:
+        roll.status = "in_stock"
+    return True
+
+
+def _recount_wp(wp):
+    """wp.quantity = what is left on its rolls, falling back to full length
+    for a roll that never had a remainder recorded."""
+    total = Decimal("0")
+    for r in wp.stock_items.all():
+        rem = r.quantity_remaining if r.quantity_remaining is not None else (r.quantity or Decimal("0"))
+        total += rem or Decimal("0")
+    wp.quantity = total
+    wp.save(update_fields=["quantity", "updated_at"])
+
+
+def _move_roll(roll, target_wp, *, user=None, reason_out, reason_in):
+    """Re-point ONE roll at another WarehouseProduct, with a paired
+    StockMovement(adjustment) on each side so the move shows in both
+    histories. Does not recount or re-sync either product — the caller does
+    that once it has moved everything it is going to.
+
+    Any live hold on the roll travels WITH it. OrderStockReservation
+    denormalises the warehouse product purely so the list/detail pages
+    can roll up reserved metres, so leaving it pointed at the source
+    would strand the reservation in the warehouse the stock item just left —
+    and would later cut the metres out of that warehouse's quantity
+    when the order ships. Consumed rows stay put: they record where the
+    stock actually went out from, which is history and did not move."""
+    from .models import OrderStockReservation
+
+    source_wp = roll.product
+    meters = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
+    meters = meters or Decimal("0")
+    StockMovement.objects.create(
+        product=source_wp, stock_item=None, movement_type="adjustment",
+        quantity=-meters, reason=reason_out,
+        reference=roll.barcode, created_by=user,
+    )
+    roll.product = target_wp
+    roll.save(update_fields=["product"])
+    OrderStockReservation.objects.filter(stock_item=roll, consumed=False).update(
+        warehouse_product=target_wp)
+    StockMovement.objects.create(
+        product=target_wp, stock_item=roll, movement_type="adjustment",
+        quantity=meters, reason=reason_in,
+        reference=roll.barcode, created_by=user,
+    )
+    return meters
+
+
 def _roll_usage_info(roll):
     """What has come off this roll, and where each cut went.
 
@@ -577,7 +679,7 @@ def _account_choices():
     used to pick a Supplier and resolve its current account through the supplier FK,
     but the accounts carrying the real balances were imported from KARVEN
     with no Supplier row at all — so picking "MARKISS" in this panel minted
-    a brand-new supplier + cari and posted the alım there, while the money
+    a brand-new supplier + current account and posted the purchase there, while the money
     staff actually track sat on the untouched imported account. Choosing
     the account directly removes that whole class of drift: what you pick
     is what gets credited.
@@ -2020,7 +2122,6 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     quantity + re-syncs the catalog for both the source and target product.
     """
     from django.db import transaction
-    from .models import OrderStockReservation
 
     if request.method != "POST":
         return JsonResponse({"success": False, "error": "POST required."}, status=405)
@@ -2097,41 +2198,14 @@ def warehouse_roll_move_here(request, pk, roll_pk):
                 catalog_variant=source_wp.catalog_variant,
             )
 
-        meters = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
-        meters = meters or Decimal("0")
-
-        StockMovement.objects.create(
-            product=source_wp, stock_item=None, movement_type="adjustment",
-            quantity=-meters,
-            reason=f"Transferred to {target_warehouse.name}",
-            reference=roll.barcode, created_by=user,
-        )
-        source_warehouse_name = source_wp.warehouse.name
-        roll.product = target_wp
-        roll.save(update_fields=["product"])
-        # Any live hold on this stock item travels WITH it. OrderStockReservation
-        # denormalises the warehouse product purely so the list/detail pages
-        # can roll up reserved metres, so leaving it pointed at the source
-        # would strand the reservation in the warehouse the stock item just left —
-        # and would later cut the metres out of that warehouse's quantity
-        # when the order ships. Consumed rows stay put: they record where the
-        # stock actually went out from, which is history and did not move.
-        OrderStockReservation.objects.filter(stock_item=roll, consumed=False).update(
-            warehouse_product=target_wp)
-        StockMovement.objects.create(
-            product=target_wp, stock_item=roll, movement_type="adjustment",
-            quantity=meters,
-            reason=f"Transferred from {source_warehouse_name}",
-            reference=roll.barcode, created_by=user,
+        meters = _move_roll(
+            roll, target_wp, user=user,
+            reason_out=f"Transferred to {target_warehouse.name}",
+            reason_in=f"Transferred from {source_wp.warehouse.name}",
         )
 
         for wp in (source_wp, target_wp):
-            total = Decimal("0")
-            for r in wp.stock_items.all():
-                rem = r.quantity_remaining if r.quantity_remaining is not None else (r.quantity or Decimal("0"))
-                total += rem or Decimal("0")
-            wp.quantity = total
-            wp.save(update_fields=["quantity", "updated_at"])
+            _recount_wp(wp)
             _resync_wp_catalog(wp)
 
     return JsonResponse({
@@ -2465,82 +2539,74 @@ class IntakeError(Exception):
         super().__init__(self.payload.get("error", ""))
 
 
-def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
-    """Receive a delivery into `warehouse`: create the products, variants and
-    physical stock items described by `data`, then post the purchase invoice.
+def _int_or_none(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
-    `data` is the goods-receipt payload (see WarehouseManualAdd for its
-    shape). Raises IntakeError on any validation failure, having written
-    nothing.
 
-    `invoice` — an existing DRAFT purchase order being confirmed. Its lines
-    are refilled from what actually arrived and it is issued, instead of a
-    new invoice being minted. Callers passing this MUST wrap the call in a
-    transaction: with an invoice in play the bookkeeping step stops being
-    best-effort, so an aborted confirm leaves neither stock nor a posting.
+def _intake_account(data):
+    """The current account a receipt posts to. REQUIRED.
 
-    Returns {"created": [...], "warnings": [...], "prefix": str,
-             "purchase": {...}|None}.
-    """
-    import re as _re_sku
-    from django.db import transaction, IntegrityError
-    from .catalog_sync import (
-        translate_color, sync_roll_to_catalog, CatalogSyncConflict,
-    )
-    from marketing.models import Product as _Prod
-
-    unit = (data.get("unit") or "mt").strip()[:20] or "mt"
-    products_in = data.get("products")
-    if not isinstance(products_in, list) or not products_in:
-        raise IntakeError({"success": False, "error": "En az bir ürün ekleyin."}, status=400)
-
-    # ── Cari account → barcode prefix + purchase (alım) posting below ──
-    # REQUIRED. Goods arriving are goods we owe for, so an intake with
-    # no account to post against is always a mistake — it used to be
-    # allowed, and silently added stock while the alım never happened.
+    Goods arriving are goods we owe for, so an intake with no account to
+    post against is always a mistake — it used to be allowed, and silently
+    added stock while the alım never happened."""
     from accounting.models_accounts import CurrentAccount
-    current_account_obj = None
-    current_account_id = data.get("current_account_id")
-    if current_account_id not in (None, ""):
-        try:
-            current_account_obj = CurrentAccount.objects.filter(pk=int(current_account_id)).first()
-        except (TypeError, ValueError):
-            current_account_obj = None
+    current_account_id = _int_or_none(data.get("current_account_id"))
+    current_account_obj = (CurrentAccount.objects.filter(pk=current_account_id).first()
+                           if current_account_id is not None else None)
     if current_account_obj is None:
         raise IntakeError(
             {"success": False,
              "error": str(_lz("Pick a current account — the purchase invoice is posted to it."))},
             status=400)
-    account_name = current_account_obj.name
+    return current_account_obj
 
+
+def _intake_prefix(data, account_name):
+    """The barcode/SKU prefix a receipt mints with: the one the form sent,
+    else the account's consonants, else the house code."""
     prefix = (data.get("barcode_prefix") or "").strip().upper()
     if not prefix:
         prefix = _consonant_prefix(account_name) if account_name else _fallback_prefix()
-    prefix = (prefix[:6] or _fallback_prefix())
+    return prefix[:6] or _fallback_prefix()
 
-    # ── Rates, before any stock is written ──
-    # A line priced in another currency needs one to reach the alım. Finding
-    # that out after the rolls are in leaves stock standing against no
-    # invoice at all, so it is checked here with the rest of pass 1 rather
-    # than at the bookkeeping step, where the failure is only a warning.
+
+def _intake_check_rates(products_in, current_account_obj, rates):
+    """Refuse, before any stock is written, a line priced in a currency the
+    alım has no rate for.
+
+    Finding that out after the rolls are in leaves stock standing against no
+    invoice at all, so it is checked with the rest of pass 1 rather than at
+    the bookkeeping step, where the failure is only a warning."""
     from accounting.services_accounts import (
         convert_lines_to_currency, invoice_currency_for, MixedCurrencyError,
     )
-    _billing_code = invoice_currency_for(current_account_obj)
-    _priced = [
+    priced = [
         {"unit_price": Decimal("1"), "currency": (v.get("currency") or "USD")}
         for p_in in products_in
         for v in (p_in.get("variants") or [])
     ]
     try:
-        convert_lines_to_currency(_priced, _billing_code,
-                                  rates=data.get("rates"), on_date=None)
+        convert_lines_to_currency(priced, invoice_currency_for(current_account_obj),
+                                  rates=rates, on_date=None)
     except MixedCurrencyError as exc:
         raise IntakeError({"success": False, "error": str(exc)}, status=400)
 
-    # ── Pass 1: resolve + validate EVERY product before writing anything,
-    # so a mistake on product #3 never leaves #1/#2 half-saved. ──
-    from marketing.models import ProductCategory as _PCat
+
+def _intake_resolve_products(products_in, prefix, *, own_product_ids=()):
+    """Pass 1: resolve + validate EVERY product before writing anything, so
+    a mistake on product #3 never leaves #1/#2 half-saved.
+
+    `own_product_ids` — main products a purchase being edited already
+    carries. They are accepted as "existing" even when they are not the
+    hidden catalog products intake normally picks from, because refusing a
+    purchase its own product would make it uneditable."""
+    from django.db.models import Q
+    from marketing.models import Product as _Prod, ProductCategory as _PCat
+    import re as _re_sku
+
     fabric_cat = _default_fabric_category()
     resolved = []
     for i, p_in in enumerate(products_in, start=1):
@@ -2559,7 +2625,9 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
         mode = (mp.get("mode") or "new").strip()
         main_product = None
         if mode == "existing" and str(mp.get("id") or "").isdigit():
-            main_product = _Prod.objects.filter(pk=int(mp["id"]), featured=False).first()
+            main_product = (_Prod.objects
+                            .filter(Q(featured=False) | Q(pk__in=list(own_product_ids)))
+                            .filter(pk=int(mp["id"])).first())
         base_name = (mp.get("name") or "").strip()
         if main_product is not None:
             base_name = main_product.title
@@ -2601,35 +2669,299 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
             "has_variants": has_variants,
             "variants_in": variants_in, "category": category,
         })
+    return resolved
 
-    # ── Hand-typed top barcodes: validate the WHOLE batch up front ──
-    # A duplicate barcode makes the roll unscannable (lookup returns
-    # whichever row it hits first), so this is a hard refusal, not a
-    # warning — and it happens in pass 1, before a single roll exists,
-    # so a bad code on product #3 can't leave #1/#2 written.
+
+def _intake_typed_barcodes(products_in, *, current_barcodes=None):
+    """Validate every hand-typed roll barcode in the batch, up front.
+
+    A duplicate barcode makes the roll unscannable (lookup returns
+    whichever row it hits first), so this is a hard refusal, not a
+    warning — and it happens in pass 1, before a single roll exists,
+    so a bad code on product #3 can't leave #1/#2 written.
+
+    `current_barcodes` — {roll id: barcode} for the rolls a purchase being
+    edited already has. A row naming one of those keeps its own code without
+    that counting as taken, may not have it emptied (picking cannot scan a
+    roll with no label), and a changed code is checked against everything
+    else. A code freed by a roll this same edit removes is still treated as
+    taken, which is the safe direction to be wrong in.
+
+    Returns the codes, so the minter can steer clear of them."""
+    current_barcodes = current_barcodes or {}
     manual_codes = []
-    seen_codes = {}
-    for i, p_in in enumerate(products_in, start=1):
+    seen_codes = set()
+    for p_in in products_in:
         for v_in in (p_in.get("variants") or []):
             for t in (v_in.get("tops") or []):
-                code = (t.get("barcode") or "").strip()
-                if not code:
-                    continue
                 if _safe_decimal(t.get("qty")) in (None, Decimal("0")):
                     continue          # blank row — not being created
+                roll_id = _int_or_none(t.get("stock_item_id"))
+                own = roll_id is not None and roll_id in current_barcodes
+                code = (t.get("barcode") or "").strip()
+                if not code:
+                    if own and current_barcodes[roll_id]:
+                        raise IntakeError(
+                            {"success": False,
+                             "error": str(_lz("A roll's barcode can't be removed")) +
+                                      f": “{current_barcodes[roll_id]}”."},
+                            status=400)
+                    continue
                 key = code.upper()
                 if key in seen_codes:
                     raise IntakeError(
                         {"success": False,
                          "error": f"“{code}” barkodu bu listede birden fazla kez girildi."},
                         status=400)
-                if _barcode_taken(code):
+                unchanged = own and (current_barcodes[roll_id] or "").upper() == key
+                if not unchanged and _barcode_taken(
+                        code, exclude_roll_ids=((roll_id,) if own else ())):
                     raise IntakeError(
                         {"success": False,
                          "error": f"“{code}” barkodu zaten kullanılıyor."},
                         status=400)
-                seen_codes[key] = i
+                seen_codes.add(key)
                 manual_codes.append(code)
+    return manual_codes
+
+
+def _intake_main_product(item, prefix, prod_unit):
+    """The main product one resolved card lands under — created now if the
+    card asked for a new one."""
+    from django.db import transaction, IntegrityError
+    from marketing.models import Product as _Prod
+
+    main_product = item["main_product"]
+    base_name = item["base_name"]
+    desired_sku = item["desired_sku"]
+    category = item["category"]
+
+    # NEW main product → the typed SKU if there was one, else an
+    # AUTO, globally-unique code = supplier prefix + number (e.g.
+    # KZL004): try the previewed one first, then mint, with an
+    # IntegrityError retry so a concurrent request can't win the
+    # DB-unique Product.sku race. Either way we pre-create WITH the
+    # sku and pass existing_base_product below, so sync_roll_to_catalog
+    # never re-derives or nulls it.
+    if main_product is None:
+        def _mint_main(sku):
+            return _Prod.objects.create(
+                title=base_name, sku=sku, featured=False,
+                unit_of_measurement=prod_unit,
+                category=category,
+            )
+        if desired_sku and not item["sku_is_auto"]:
+            # A code the user typed — never substituted. It was
+            # checked as free in pass 1, so an IntegrityError here
+            # means a concurrent request took it: say so.
+            try:
+                with transaction.atomic():   # savepoint
+                    main_product = _mint_main(desired_sku)
+            except IntegrityError:
+                raise RuntimeError(
+                    f"“{desired_sku}” SKU'su bu sırada başka bir ürüne "
+                    f"verildi — tekrar deneyin.")
+        else:
+            sku_mint = _product_sku_minter(prefix)
+            for _attempt in range(8):
+                if _attempt == 0 and desired_sku and not _Prod.objects.filter(sku__iexact=desired_sku).exists():
+                    candidate = desired_sku
+                else:
+                    candidate = sku_mint()
+                try:
+                    with transaction.atomic():   # savepoint
+                        main_product = _mint_main(candidate)
+                    break
+                except IntegrityError:
+                    main_product = None
+                    continue
+            if main_product is None:
+                raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
+    elif not main_product.category_id and category:
+        # Existing main product with no type yet — backfill it so
+        # its invoices stop showing a blank "Ürün Tipi" column.
+        main_product.category = category
+        main_product.save(update_fields=["category"])
+    return main_product
+
+
+def _intake_variants(item, main_product):
+    """The variant rows a resolved card really carries.
+
+    No-variant ("simple product") mode collapses to ONE implicit variant
+    that IS the product (no colour/model, sku = main sku)."""
+    variants_in = item["variants_in"]
+    if item["has_variants"]:
+        return variants_in
+    src = variants_in[0] if variants_in else {}
+    return [{**src, "name": "", "sku": main_product.sku or "",
+             "tops": src.get("tops") or []}]
+
+
+def _purchase_price(v):
+    """(price, currency) as a variant row states them."""
+    price = _safe_decimal(v.get("price"))
+    currency = (v.get("currency") or "USD").strip().upper()
+    if currency not in ("USD", "TRY", "EUR"):
+        currency = "USD"
+    return price, currency
+
+
+def _purchase_costs(price, currency, usd_try):
+    """Purchase price (alış fiyatı) → unit cost in USD/TRY, so the
+    warehouse value rollup reflects it."""
+    cost_usd = cost_try = None
+    if price is not None and price > 0:
+        if currency == "USD":
+            cost_usd = price
+            cost_try = (price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
+        elif currency == "TRY":
+            cost_try = price
+            if usd_try and usd_try > 0:
+                cost_usd = (price / usd_try).quantize(Decimal("0.0001"))
+        elif currency == "EUR":
+            cost_usd = price   # coarse EUR≈USD for the rollup
+    return cost_usd, cost_try
+
+
+def _take_purchase_price(wp, price, currency, cost_usd, cost_try):
+    """Make `price` the product's last-purchase price."""
+    wp.purchase_price = price
+    wp.purchase_currency = currency
+    wp.cost_usd = cost_usd
+    wp.cost_try = cost_try
+    wp.save(update_fields=["purchase_price", "purchase_currency",
+                           "cost_usd", "cost_try", "updated_at"])
+
+
+def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
+                       wh_unit, wh_pack, usd_try, take_price=True):
+    """Find or create the WarehouseProduct ONE variant row lands in, and
+    work out everything else the row means: its SKU (deduplicated within the
+    product, and globally when auto), its colour/model attribute, its price
+    and cost. Mutates `seen_skus`.
+
+    `take_price` — intake makes every batch's price the product's
+    last-purchase price. A purchase edit decides that for itself.
+
+    Returns a dict: wp, created, sku, name, wp_name, attr_name, attr_value,
+    price, currency, cost_usd, cost_try."""
+    from .catalog_sync import translate_color
+
+    v_name = (v.get("name") or "").strip()
+    typed_sku = (v.get("sku") or "").strip()[:SKU_MAX_LENGTH]
+    v_sku = typed_sku
+    if not v_sku:
+        # AUTO variant SKU rooted on the (minted) main product SKU.
+        root = (main_product.sku or base_name or "SKU").strip()
+        suffix = _slug_token(v_name) or str(idx)
+        v_sku = f"{root}-{suffix}"[:SKU_MAX_LENGTH]
+
+    def _bump(s, n):
+        tail = str(n)
+        return f"{s[:max(1, SKU_MAX_LENGTH - len(tail))]}{tail}"
+
+    base_v = v_sku
+    dup = 1
+    if typed_sku:
+        # Respect a typed SKU; only avoid clashing within THIS product
+        # (a global clash surfaces as a CatalogSyncConflict warning).
+        while v_sku in seen_skus:
+            dup += 1
+            v_sku = _bump(base_v, dup)
+    else:
+        # AUTO SKU: keep it unique product-wide AND globally.
+        while v_sku in seen_skus or _variant_sku_exists(v_sku):
+            dup += 1
+            v_sku = _bump(base_v, dup)
+    seen_skus.add(v_sku)
+
+    # Colour vs model attribute, derived from the variant name.
+    eng = translate_color(v_name) if v_name else None
+    attr_name = ("color" if eng else ("model" if v_name else None))
+    attr_value = (eng or v_name) or None
+
+    price, currency = _purchase_price(v)
+    cost_usd, cost_try = _purchase_costs(price, currency, usd_try)
+
+    wp_name = (f"{base_name} {v_name}".strip()) or v_sku
+    # Reuse an existing same-SKU product in this warehouse rather
+    # than creating a duplicate row (same SKU = same variant).
+    wp = (WarehouseProduct.objects
+          .filter(warehouse=warehouse, sku__iexact=v_sku).first())
+    created = wp is None
+    if created:
+        wp = WarehouseProduct.objects.create(
+            warehouse=warehouse, name=wp_name, sku=v_sku,
+            quantity=Decimal("0"),
+            purchase_price=(price if (price and price > 0) else None),
+            purchase_currency=currency,
+            cost_usd=cost_usd, cost_try=cost_try,
+            unit=wh_unit, pack_type=wh_pack,
+        )
+    elif take_price and price and price > 0:
+        _take_purchase_price(wp, price, currency, cost_usd, cost_try)
+
+    return {
+        "wp": wp, "created": created, "sku": v_sku, "name": v_name,
+        "wp_name": wp_name, "attr_name": attr_name, "attr_value": attr_value,
+        "price": price, "currency": currency,
+        "cost_usd": cost_usd, "cost_try": cost_try,
+    }
+
+
+def _intake_catalog_link(wp, target, main_product, base_name, first_barcode, warnings):
+    """Mirror a variant row onto the catalog and link its WarehouseProduct
+    to the variant. A clash is a warning, never a failed receipt."""
+    from .catalog_sync import sync_roll_to_catalog, CatalogSyncConflict
+    try:
+        _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
+            base_name=base_name,
+            attribute_name=target["attr_name"],
+            attribute_value=target["attr_value"],
+            variant_sku=target["sku"], variant_barcode=first_barcode,
+            cost=target["cost_usd"],
+            existing_base_product=main_product,
+        )
+    except CatalogSyncConflict as exc:
+        warnings.append(f"{target['sku']}: {exc}")
+        return None
+    wp.catalog_variant = cat_variant
+    wp.save(update_fields=["catalog_variant"])
+    return cat_variant
+
+
+def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
+    """Receive a delivery into `warehouse`: create the products, variants and
+    physical stock items described by `data`, then post the purchase invoice.
+
+    `data` is the goods-receipt payload (see WarehouseManualAdd for its
+    shape). Raises IntakeError on any validation failure, having written
+    nothing.
+
+    `invoice` — an existing DRAFT purchase order being confirmed. Its lines
+    are refilled from what actually arrived and it is issued, instead of a
+    new invoice being minted. Callers passing this MUST wrap the call in a
+    transaction: with an invoice in play the bookkeeping step stops being
+    best-effort, so an aborted confirm leaves neither stock nor a posting.
+
+    Returns {"created": [...], "warnings": [...], "prefix": str,
+             "purchase": {...}|None}.
+    """
+    from django.db import transaction
+
+    unit = (data.get("unit") or "mt").strip()[:20] or "mt"
+    products_in = data.get("products")
+    if not isinstance(products_in, list) or not products_in:
+        raise IntakeError({"success": False, "error": "En az bir ürün ekleyin."}, status=400)
+
+    # ── Current account → barcode prefix + purchase posting below ──
+    current_account_obj = _intake_account(data)
+    account_name = current_account_obj.name
+    prefix = _intake_prefix(data, account_name)
+    _intake_check_rates(products_in, current_account_obj, data.get("rates"))
+    resolved = _intake_resolve_products(products_in, prefix)
+    manual_codes = _intake_typed_barcodes(products_in)
 
     created_list = []
     warnings = []
@@ -2649,154 +2981,26 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     try:
         with transaction.atomic():
             for item in resolved:
-                main_product = item["main_product"]
+                main_product = _intake_main_product(item, prefix, prod_unit)
                 base_name = item["base_name"]
-                desired_sku = item["desired_sku"]
-                has_variants = item["has_variants"]
-                variants_in = item["variants_in"]
-                category = item["category"]
-
-                created = {"main_product": None, "variants": 0, "tops": 0,
+                created = {"main_product": {
+                               "id": main_product.id, "title": main_product.title,
+                               "sku": main_product.sku,
+                           },
+                           "variants": 0, "tops": 0,
                            "barcodes": [], "variant_skus": []}
 
-                # NEW main product → the typed SKU if there was one, else an
-                # AUTO, globally-unique code = supplier prefix + number (e.g.
-                # KZL004): try the previewed one first, then mint, with an
-                # IntegrityError retry so a concurrent request can't win the
-                # DB-unique Product.sku race. Either way we pre-create WITH the
-                # sku and pass existing_base_product below, so sync_roll_to_catalog
-                # never re-derives or nulls it.
-                if main_product is None:
-                    def _mint_main(sku):
-                        return _Prod.objects.create(
-                            title=base_name, sku=sku, featured=False,
-                            unit_of_measurement=prod_unit,
-                            category=category,
-                        )
-                    if desired_sku and not item["sku_is_auto"]:
-                        # A code the user typed — never substituted. It was
-                        # checked as free in pass 1, so an IntegrityError here
-                        # means a concurrent request took it: say so.
-                        try:
-                            with transaction.atomic():   # savepoint
-                                main_product = _mint_main(desired_sku)
-                        except IntegrityError:
-                            raise RuntimeError(
-                                f"“{desired_sku}” SKU'su bu sırada başka bir ürüne "
-                                f"verildi — tekrar deneyin.")
-                    else:
-                        sku_mint = _product_sku_minter(prefix)
-                        for _attempt in range(8):
-                            if _attempt == 0 and desired_sku and not _Prod.objects.filter(sku__iexact=desired_sku).exists():
-                                candidate = desired_sku
-                            else:
-                                candidate = sku_mint()
-                            try:
-                                with transaction.atomic():   # savepoint
-                                    main_product = _mint_main(candidate)
-                                break
-                            except IntegrityError:
-                                main_product = None
-                                continue
-                        if main_product is None:
-                            raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
-                elif not main_product.category_id and category:
-                    # Existing main product with no type yet — backfill it so
-                    # its invoices stop showing a blank "Ürün Tipi" column.
-                    main_product.category = category
-                    main_product.save(update_fields=["category"])
-                created["main_product"] = {
-                    "id": main_product.id, "title": main_product.title,
-                    "sku": main_product.sku,
-                }
-
-                # No-variant ("simple product") mode → collapse to ONE implicit
-                # variant that IS the product (no colour/model, sku = main sku).
-                if not has_variants:
-                    src = variants_in[0] if variants_in else {}
-                    variants_in = [{
-                        "name": "", "sku": main_product.sku or "",
-                        "tops": src.get("tops") or [],
-                        "price": src.get("price"), "currency": src.get("currency"),
-                    }]
-
                 seen_skus = set()
-                for idx, v in enumerate(variants_in, start=1):
-                    v_name = (v.get("name") or "").strip()
-                    typed_sku = (v.get("sku") or "").strip()[:SKU_MAX_LENGTH]
-                    v_sku = typed_sku
+                for idx, v in enumerate(_intake_variants(item, main_product), start=1):
                     stock_items = v.get("tops") or []
-                    if not v_name and not v_sku and not stock_items:
+                    if (not (v.get("name") or "").strip()
+                            and not (v.get("sku") or "").strip() and not stock_items):
                         continue
-                    if not v_sku:
-                        # AUTO variant SKU rooted on the (minted) main product SKU.
-                        root = (main_product.sku or base_name or "SKU").strip()
-                        suffix = _slug_token(v_name) or str(idx)
-                        v_sku = f"{root}-{suffix}"[:SKU_MAX_LENGTH]
-
-                    def _bump(s, n):
-                        tail = str(n)
-                        return f"{s[:max(1, SKU_MAX_LENGTH - len(tail))]}{tail}"
-
-                    base_v = v_sku
-                    dup = 1
-                    if typed_sku:
-                        # Respect a typed SKU; only avoid clashing within THIS product
-                        # (a global clash surfaces as a CatalogSyncConflict warning).
-                        while v_sku in seen_skus:
-                            dup += 1
-                            v_sku = _bump(base_v, dup)
-                    else:
-                        # AUTO SKU: keep it unique product-wide AND globally.
-                        while v_sku in seen_skus or _variant_sku_exists(v_sku):
-                            dup += 1
-                            v_sku = _bump(base_v, dup)
-                    seen_skus.add(v_sku)
-
-                    # Colour vs model attribute, derived from the variant name.
-                    eng = translate_color(v_name) if v_name else None
-                    attr_name = ("color" if eng else ("model" if v_name else None))
-                    attr_value = (eng or v_name) or None
-
-                    # Purchase price (alış fiyatı) → unit cost in USD/TRY so the
-                    # warehouse value rollup reflects it.
-                    price = _safe_decimal(v.get("price"))
-                    currency = (v.get("currency") or "USD").strip().upper()
-                    if currency not in ("USD", "TRY", "EUR"):
-                        currency = "USD"
-                    cost_usd = cost_try = None
-                    if price is not None and price > 0:
-                        if currency == "USD":
-                            cost_usd = price
-                            cost_try = (price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
-                        elif currency == "TRY":
-                            cost_try = price
-                            if usd_try and usd_try > 0:
-                                cost_usd = (price / usd_try).quantize(Decimal("0.0001"))
-                        elif currency == "EUR":
-                            cost_usd = price   # coarse EUR≈USD for the rollup
-
-                    wp_name = (f"{base_name} {v_name}".strip()) or v_sku
-                    # Reuse an existing same-SKU product in this warehouse rather
-                    # than creating a duplicate row (same SKU = same variant).
-                    wp = (WarehouseProduct.objects
-                          .filter(warehouse=warehouse, sku__iexact=v_sku).first())
-                    if wp is None:
-                        wp = WarehouseProduct.objects.create(
-                            warehouse=warehouse, name=wp_name, sku=v_sku,
-                            quantity=Decimal("0"),
-                            purchase_price=(price if (price and price > 0) else None),
-                            purchase_currency=currency,
-                            cost_usd=cost_usd, cost_try=cost_try,
-                            unit=wh_unit, pack_type=wh_pack,
-                        )
-                    elif price and price > 0:
-                        wp.purchase_price = price
-                        wp.purchase_currency = currency
-                        wp.cost_usd = cost_usd
-                        wp.cost_try = cost_try
-                        wp.save(update_fields=["purchase_price", "purchase_currency",
-                                               "cost_usd", "cost_try", "updated_at"])
+                    target = _intake_variant_wp(
+                        warehouse, main_product, base_name, v, idx, seen_skus,
+                        wh_unit=wh_unit, wh_pack=wh_pack, usd_try=usd_try,
+                    )
+                    wp = target["wp"]
 
                     added_qty, new_roll_ids = _add_stock_to_variant(
                         wp, stock_items, mint, user, notes_supplier=account_name,
@@ -2812,43 +3016,32 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                         first_barcode = new_barcodes[0] if new_barcodes else None
                         created["barcodes"].extend(new_barcodes)
                     created["tops"] += len(new_roll_ids)
-                    total = wp.quantity
 
-                    cat_variant_obj = None
-                    try:
-                        _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
-                            base_name=base_name,
-                            attribute_name=attr_name,
-                            attribute_value=attr_value,
-                            variant_sku=v_sku, variant_barcode=first_barcode,
-                            cost=cost_usd,
-                            existing_base_product=main_product,
-                        )
-                        wp.catalog_variant = cat_variant
-                        wp.save(update_fields=["catalog_variant"])
-                        cat_variant_obj = cat_variant
-                    except CatalogSyncConflict as exc:
-                        warnings.append(f"{v_sku}: {exc}")
+                    cat_variant_obj = _intake_catalog_link(
+                        wp, target, main_product, base_name, first_barcode, warnings)
                     created["variants"] += 1
-                    created["variant_skus"].append(v_sku)
+                    created["variant_skus"].append(target["sku"])
 
                     # Purchase-invoice line — only for stock actually added
                     # in THIS request (added_qty), never the product's full
                     # roll total, so re-adding to an existing SKU doesn't
                     # re-bill previous intakes.
                     if added_qty > 0:
+                        price = target["price"]
                         purchase_lines.append({
-                            "description": wp_name,
+                            "description": target["wp_name"],
                             "quantity": added_qty,
                             "unit": unit,
                             "unit_price": price if (price and price > 0) else Decimal("0"),
-                            "currency": currency,
+                            "currency": target["currency"],
                             "product": main_product,
                             "variant": cat_variant_obj,
                             "stock_item_ids": new_roll_ids,
                         })
 
                 created_list.append(created)
+    except IntakeError:
+        raise
     except Exception as exc:
         import traceback
         traceback.print_exc()
@@ -2899,10 +3092,12 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                         purchase_invoice_item=item
                     )
             if not any(l["unit_price"] > 0 for l in purchase_lines):
-                warnings.append(
-                    "Alış faturası 0 tutarla oluşturuldu — fiyat girilmedi. "
-                    "Faturayı cari sayfasından düzenleyebilirsiniz."
-                )
+                from django.utils.translation import gettext as _t
+                warnings.append(_t(
+                    "The purchase invoice was created with a total of 0 — no "
+                    "price was entered. You can edit the invoice from the "
+                    "account page."
+                ))
         except Exception as exc:
             if invoice is not None:
                 # Confirming an order: the caller wraps this in a transaction,
@@ -2988,97 +3183,410 @@ class WarehouseManualAdd(View):
 
 
 
-def _resolve_variant_wp(warehouse, main_product, base_name, v_in, prefix, seen_skus):
-    """Resolve-or-create the WarehouseProduct for ONE brand-new variant row
-    added while editing an existing purchase — mirrors WarehouseManualAdd's
-    own per-variant setup (SKU dedup, purchase price/currency, colour/model
-    attribute detection) exactly, so a variant added mid-edit behaves
-    identically to one added at original intake. Mutates `seen_skus`.
+def _plain_decimal(value):
+    """A Decimal as the form should show it: "30", "3.5" — not "30.00" or
+    "3.500000"."""
+    if value is None:
+        return ""
+    text = format(Decimal(value).normalize(), "f")
+    return text
 
-    Returns (wp, v_sku, attr_name, attr_value, price, currency, wp_name).
+
+def _purchase_variant_label(wp, title):
+    """What the goods-receipt form calls a line's variant: the warehouse
+    name with the main product's title taken off the front."""
+    name = wp.name or ""
+    if title and name.startswith(title):
+        return name[len(title):].strip()
+    return name
+
+
+def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None):
+    """Apply the goods-receipt form to a purchase that has ALREADY been
+    received — all of it, the same form a draft order is edited with.
+
+    `data` is that form's payload (see WarehouseManualAdd), where a variant
+    row that is already a line of this purchase carries `invoice_item_id`
+    and a roll that already exists carries `stock_item_id`. Anything
+    without an id is new and is received exactly the way intake receives
+    it. `warehouse` is the one the purchase should now be in.
+
+    What the purchase says is corrected in place, never rebuilt: rolls keep
+    their rows (and so their labels, photos, history and holds), lines keep
+    theirs, and the posted debt keeps its movement. Specifically:
+
+      account   — the debt moves with it, and so does the invoice if the
+                  account keeps its books elsewhere (renumbered there, since
+                  numbers run per book). Refused once payments are
+                  allocated to the purchase: they belong to the old account.
+      warehouse — the rolls move there, as a warehouse-to-warehouse move
+                  would move them. Used-up rolls stay where they went out
+                  from. Never across books, same as that move.
+      a line    — renaming it renames its variant; a different variant or
+                  main product moves its rolls onto that one; a new price
+                  is what those rolls cost.
+      a roll    — its length and barcode are corrected with the same rules
+                  as the roll edit, holds trimmed to fit.
+      removed   — a roll no longer listed is deleted, a line with nothing
+                  left goes with it.
+
+    Two things stay out of reach, because an order depends on them: a roll
+    reserved for an order can't be removed, or turned into another variant.
+
+    Returns {"invoice", "warnings", "reservations_trimmed"}. Raises
+    IntakeError, having written nothing.
     """
-    from .catalog_sync import translate_color
+    from datetime import timedelta
+    from django.db import transaction
+    from accounting.models_accounts import CurrentAccountSettings, Invoice
+    from accounting.services_accounts import (
+        MixedCurrencyError, _currency_by_code, convert_lines_to_currency,
+        invoice_currency_for, mark_as_supplier, sync_purchase_invoice_items,
+    )
+    from accounting.views_purchase import _parse_date
 
-    v_name = (v_in.get("name") or "").strip()
-    typed_sku = (v_in.get("sku") or "").strip()[:SKU_MAX_LENGTH]
-    v_sku = typed_sku
-    if not v_sku:
-        root = (main_product.sku or base_name or "SKU").strip()
-        suffix = _slug_token(v_name) or str(len(seen_skus) + 1)
-        v_sku = f"{root}-{suffix}"[:SKU_MAX_LENGTH]
+    products_in = data.get("products")
+    if not isinstance(products_in, list) or not products_in:
+        raise IntakeError({"success": False, "error": "En az bir ürün olmalı."}, status=400)
 
-    def _bump(s, n):
-        tail = str(n)
-        return f"{s[:max(1, SKU_MAX_LENGTH - len(tail))]}{tail}"
+    unit = (data.get("unit") or "mt").strip()[:20] or "mt"
+    prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
+    wh_unit = unit if unit in dict(WarehouseProduct.UNIT_CHOICES) else "mt"
+    wh_pack = WarehouseProduct.PACK_FOR_UNIT.get(wh_unit, "roll")
 
-    base_v = v_sku
-    dup = 1
-    if typed_sku:
-        while v_sku in seen_skus:
-            dup += 1
-            v_sku = _bump(base_v, dup)
-    else:
-        while v_sku in seen_skus or _variant_sku_exists(v_sku):
-            dup += 1
-            v_sku = _bump(base_v, dup)
-    seen_skus.add(v_sku)
+    with transaction.atomic():
+        invoice = (Invoice.objects.select_for_update()
+                   .filter(pk=invoice_pk, type="purchase").first())
+        if invoice is None:
+            raise IntakeError({"success": False, "error": "Alım bulunamadı."}, status=404)
+        if invoice.status == "cancelled":
+            raise IntakeError({"success": False, "error": "İptal edilmiş alım düzenlenemez."}, status=400)
+        if invoice.status == "draft":
+            raise IntakeError(
+                {"success": False,
+                 "error": str(_lz("This purchase is still an order — save it as an order instead."))},
+                status=400)
 
-    eng = translate_color(v_name) if v_name else None
-    attr_name = ("color" if eng else ("model" if v_name else None))
-    attr_value = (eng or v_name) or None
+        old_account = invoice.current_account
+        account = _intake_account(data)
+        account_changed = account.pk != old_account.pk
+        if account_changed and invoice.allocations.exists():
+            raise IntakeError(
+                {"success": False,
+                 "error": str(_lz("Payments are allocated to this purchase, so it can't move to "
+                                  "another account. Take the allocations off first."))},
+                status=400)
 
-    price = _safe_decimal(v_in.get("price"))
-    currency = (v_in.get("currency") or "USD").strip().upper()
-    if currency not in ("USD", "TRY", "EUR"):
-        currency = "USD"
-    usd_try = _get_usd_try_rate() or Decimal("1")
-    cost_usd = cost_try = None
-    if price is not None and price > 0:
-        if currency == "USD":
-            cost_usd = price
-            cost_try = (price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
-        elif currency == "TRY":
-            cost_try = price
-            if usd_try and usd_try > 0:
-                cost_usd = (price / usd_try).quantize(Decimal("0.0001"))
-        elif currency == "EUR":
-            cost_usd = price
+        rolls = {
+            r.pk: r for r in (WarehouseProductItem.objects
+                              .select_for_update(of=("self",))
+                              .filter(purchase_invoice_item__invoice=invoice)
+                              .select_related("product", "product__warehouse"))
+        }
+        items = {it.pk: it for it in invoice.items.all()}
+        old_unit = next((it.unit for it in items.values()), unit)
+        # Which products each line's rolls sat on BEFORE this edit — a line
+        # landing somewhere new is what needs its catalog link, and a line
+        # that never had rolls is not measured by them.
+        line_wps_before = {}
+        for r in rolls.values():
+            line_wps_before.setdefault(r.purchase_invoice_item_id, set()).add(r.product_id)
 
-    wp_name = (f"{base_name} {v_name}".strip()) or v_sku
-    wp = WarehouseProduct.objects.filter(warehouse=warehouse, sku__iexact=v_sku).first()
-    if wp is None:
-        wp = WarehouseProduct.objects.create(
-            warehouse=warehouse, name=wp_name, sku=v_sku, quantity=Decimal("0"),
-            purchase_price=(price if (price and price > 0) else None),
-            purchase_currency=currency, cost_usd=cost_usd, cost_try=cost_try,
-        )
-    elif price and price > 0:
-        wp.purchase_price = price
-        wp.purchase_currency = currency
-        wp.cost_usd = cost_usd
-        wp.cost_try = cost_try
-        wp.save(update_fields=["purchase_price", "purchase_currency",
-                               "cost_usd", "cost_try", "updated_at"])
+        prefix = _intake_prefix(data, account.name)
+        _intake_check_rates(products_in, account, data.get("rates"))
+        resolved = _intake_resolve_products(
+            products_in, prefix,
+            own_product_ids={it.product_id for it in items.values() if it.product_id})
+        manual_codes = _intake_typed_barcodes(
+            products_in, current_barcodes={pk: r.barcode for pk, r in rolls.items()})
 
-    return wp, v_sku, attr_name, attr_value, price, currency, wp_name
+        # ── Every id the form names must be this purchase's own, once. ──
+        named_items, named_rolls = set(), set()
+        for card in resolved:
+            rows = card["variants_in"] if card["has_variants"] else card["variants_in"][:1]
+            for v in rows:
+                if v.get("invoice_item_id") not in (None, ""):
+                    item_id = _int_or_none(v.get("invoice_item_id"))
+                    if item_id not in items or item_id in named_items:
+                        raise IntakeError(
+                            {"success": False,
+                             "error": str(_lz("This purchase changed while you were editing it — reload the page."))},
+                            status=409)
+                    named_items.add(item_id)
+                for t in (v.get("tops") or []):
+                    if t.get("stock_item_id") in (None, ""):
+                        continue
+                    roll_id = _int_or_none(t.get("stock_item_id"))
+                    if roll_id not in rolls or roll_id in named_rolls:
+                        raise IntakeError(
+                            {"success": False,
+                             "error": str(_lz("This purchase changed while you were editing it — reload the page."))},
+                            status=409)
+                    if (_safe_decimal(t.get("qty")) or Decimal("0")) > 0:
+                        named_rolls.add(roll_id)
+
+        # ── Rolls the form no longer lists are removed — unless an order
+        # holds them. Locked + checked INSIDE this transaction, so a
+        # packer's concurrent scan can't slip a fresh hold onto a roll
+        # between "check" and "delete". ──
+        removed = [r for pk, r in rolls.items() if pk not in named_rolls]
+        blockers = [
+            {"barcode": r.barcode,
+             "order_ids": list(r.reservations.values_list("order_id", flat=True).distinct())}
+            for r in removed if r.reservations.exists()
+        ]
+        if blockers:
+            raise IntakeError({
+                "success": False,
+                "error": "Bazı toplar başka bir siparişte kullanılmış, silinemedi. "
+                         "Önce o siparişi düzeltin.",
+                "blocked": blockers,
+            }, status=422)
+
+        touched = {}      # wp.pk → wp: recounted and re-synced at the end
+        for roll in removed:
+            touched[roll.product_id] = roll.product
+            StockMovement.objects.create(
+                product=roll.product, stock_item=None, movement_type="adjustment",
+                quantity=-(roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity),
+                reason="Purchase edit — stock item removed",
+                reference=roll.barcode, created_by=user,
+            )
+            roll.delete()
+
+        # ── The document itself ──
+        billing = invoice_currency_for(account)
+        order_date = _parse_date(data.get("date")) or invoice.date
+        date_changed = order_date != invoice.date
+        invoice.current_account = account
+        if account_changed and account.book_id != invoice.book_id:
+            # Numbers run per book, so the one it had could already belong
+            # to a document over there.
+            invoice.book = account.book
+            invoice.number = (CurrentAccountSettings.for_book(account.book)
+                              .next_invoice_number(series=invoice.series or "PUR"))
+        if account_changed or date_changed:
+            invoice.due_date = order_date + timedelta(days=account.payment_term_days or 30)
+        invoice.date = order_date
+        if "delivery_date" in data:
+            invoice.delivery_date = _parse_date(data.get("delivery_date"))
+        if "notes" in data:
+            invoice.notes = (data.get("notes") or "")[:2000]
+        invoice.currency = _currency_by_code(billing)
+        invoice.intake_warehouse = warehouse
+        # Still the record of what was received — now as corrected.
+        invoice.intake_plan = data
+        invoice.save()
+
+        # ── The lines ──
+        usd_try = _get_usd_try_rate() or Decimal("1")
+        warnings, trimmed, line_updates = [], [], []
+        line_wps = {}
+        for card in resolved:
+            main_product = _intake_main_product(card, prefix, prod_unit)
+            base_name = card["base_name"]
+            seen_skus = set()
+            for idx, v in enumerate(_intake_variants(card, main_product), start=1):
+                tops = [t for t in (v.get("tops") or [])
+                        if (_safe_decimal(t.get("qty")) or Decimal("0")) > 0]
+                item = items.get(_int_or_none(v.get("invoice_item_id")))
+                if (item is None and not (v.get("name") or "").strip()
+                        and not (v.get("sku") or "").strip() and not tops):
+                    continue
+
+                price, currency = _purchase_price(v)
+                try:
+                    billed = convert_lines_to_currency(
+                        [{"description": "", "unit_price": price if (price and price > 0) else Decimal("0"),
+                          "currency": currency}],
+                        billing, rates=data.get("rates"), on_date=None)[0]
+                except MixedCurrencyError as exc:
+                    raise IntakeError({"success": False, "error": str(exc)}, status=400)
+
+                if item is not None and not tops:
+                    # Nothing on it now. A line whose rolls were all taken
+                    # off goes with them; one that never had rolls isn't
+                    # measured by them, so only what is written on it changes.
+                    had_rolls = bool(line_wps_before.get(item.pk))
+                    line_updates.append({
+                        "invoice_item_id": item.pk,
+                        "quantity": Decimal("0") if had_rolls else item.quantity,
+                        "unit": unit, "unit_price": billed["unit_price"],
+                    })
+                    continue
+
+                target = _intake_variant_wp(
+                    warehouse, main_product, base_name, v, idx, seen_skus,
+                    wh_unit=wh_unit, wh_pack=wh_pack, usd_try=usd_try, take_price=False,
+                )
+                wp = target["wp"]
+                touched[wp.pk] = wp
+                landed_here = item is None or wp.pk not in line_wps_before.get(item.pk, set())
+
+                line_roll_ids = []
+                for t in tops:
+                    if t.get("stock_item_id") in (None, ""):
+                        continue
+                    roll = rolls[_int_or_none(t.get("stock_item_id"))]
+                    line_roll_ids.append(roll.pk)
+
+                    if roll.product_id != wp.pk:
+                        source = roll.product
+                        same_variant = (source.sku or "").upper() == (wp.sku or "").upper()
+                        if source.warehouse.accounting_book_id != warehouse.accounting_book_id:
+                            raise IntakeError(
+                                {"success": False,
+                                 "error": str(_lz("A purchase can't move to a warehouse that belongs to "
+                                                  "another book — the rolls would change owner with no "
+                                                  "entry in either ledger.")),
+                                 "cross_book": True},
+                                status=400)
+                        if not same_variant and roll.reservations.exists():
+                            raise IntakeError({
+                                "success": False,
+                                "error": str(_lz("This roll is reserved for an order, so it can't become "
+                                                 "a different variant. Fix that order first.")),
+                                "blocked": [{
+                                    "barcode": roll.barcode,
+                                    "order_ids": list(roll.reservations
+                                                      .values_list("order_id", flat=True).distinct()),
+                                }],
+                            }, status=422)
+                        # A used-up roll records where its stock went out
+                        # from; a warehouse correction doesn't rewrite that.
+                        if not (same_variant and roll.status == "consumed"):
+                            touched[source.pk] = source
+                            if same_variant:
+                                reasons = (f"Transferred to {warehouse.name}",
+                                           f"Transferred from {source.warehouse.name}")
+                            else:
+                                reasons = (f"Purchase {invoice.display_number} corrected — now {wp.sku}",
+                                           f"Purchase {invoice.display_number} corrected — was {source.sku}")
+                            _move_roll(roll, wp, user=user,
+                                       reason_out=reasons[0], reason_in=reasons[1])
+
+                    fields = []
+                    old_full = roll.quantity or Decimal("0")
+                    try:
+                        length_changed = _set_roll_length(roll, _safe_decimal(t.get("qty")))
+                    except RollLengthError as exc:
+                        raise IntakeError(
+                            {"success": False, "error": f"{roll.barcode or roll.pk}: {exc}"},
+                            status=400)
+                    if length_changed:
+                        fields += ["quantity", "quantity_remaining", "status"]
+                    code = (t.get("barcode") or "").strip()
+                    if code and code.upper() != (roll.barcode or "").upper():
+                        roll.barcode = code
+                        fields.append("barcode")
+                    if fields:
+                        roll.save(update_fields=fields)
+                    if length_changed:
+                        touched[roll.product_id] = roll.product
+                        StockMovement.objects.create(
+                            product=roll.product, stock_item=roll, movement_type="adjustment",
+                            quantity=(roll.quantity - old_full),
+                            reason=(f"Roll length corrected on purchase {invoice.display_number} "
+                                    f"({old_full:.2f} → {roll.quantity:.2f})"),
+                            reference=roll.barcode or f"Roll #{roll.pk}", created_by=user,
+                        )
+                        trimmed.extend(_clamp_reservations_to_roll(roll, user=user))
+
+                new_tops = [t for t in tops if t.get("stock_item_id") in (None, "")]
+                if new_tops:
+                    mint = _barcode_minter(_barcode_prefix_from_existing(wp, prefix),
+                                           reserved=manual_codes)
+                    _added, new_roll_ids = _add_stock_to_variant(
+                        wp, new_tops, mint, user, notes_supplier=account.name,
+                        unit_cost=target["cost_usd"],
+                    )
+                    line_roll_ids += new_roll_ids
+
+                if landed_here:
+                    first_barcode = (WarehouseProductItem.objects.filter(pk__in=line_roll_ids)
+                                     .order_by("id").values_list("barcode", flat=True).first())
+                    _intake_catalog_link(wp, target, main_product, base_name, first_barcode, warnings)
+
+                price_changed = item is None or billed["unit_price"] != item.unit_price
+                if price_changed and price and price > 0 and line_roll_ids:
+                    # What these rolls cost is what this purchase says they
+                    # cost — a corrected price is the one that was paid.
+                    WarehouseProductItem.objects.filter(pk__in=line_roll_ids).update(
+                        unit_cost_base=target["cost_usd"])
+                    # The product's last-purchase price follows too, unless a
+                    # later delivery has already moved it on.
+                    if not wp.stock_items.filter(pk__gt=max(line_roll_ids)).exists():
+                        _take_purchase_price(wp, price, currency,
+                                             target["cost_usd"], target["cost_try"])
+
+                renamed = False
+                if (not landed_here and not target["created"]
+                        and target["name"] != _purchase_variant_label(wp, main_product.title)):
+                    wp.name = target["wp_name"]
+                    wp.save(update_fields=["name", "updated_at"])
+                    renamed = True
+
+                quantity = sum(
+                    WarehouseProductItem.objects.filter(pk__in=line_roll_ids)
+                    .values_list("quantity", flat=True),
+                    Decimal("0"))
+                update = {
+                    "invoice_item_id": item.pk if item is not None else None,
+                    "product": main_product, "variant": wp.catalog_variant,
+                    "unit": unit, "unit_price": billed["unit_price"],
+                    "quantity": quantity, "new_roll_ids": line_roll_ids,
+                }
+                if landed_here or price_changed or renamed:
+                    # billed carries the conversion note when there was one.
+                    update["description"] = target["wp_name"] + billed["description"]
+                line_updates.append(update)
+                line_wps[wp.pk] = wp
+
+        sync_purchase_invoice_items(invoice, line_updates, member=member)
+        # A line the form dropped altogether: its rolls went above.
+        kept_items = {u["invoice_item_id"] for u in line_updates if u["invoice_item_id"]}
+        for it in items.values():
+            if it.pk not in kept_items:
+                it.delete()
+
+        if unit != old_unit:
+            # The lines say the new unit already. A product's own unit only
+            # follows where every roll it holds came in on this purchase —
+            # relabelling stock another delivery brought is not this edit's
+            # to do.
+            for wp in line_wps.values():
+                if not wp.stock_items.exclude(purchase_invoice_item__invoice=invoice).exists():
+                    wp.unit, wp.pack_type = wh_unit, wh_pack
+                    wp.save(update_fields=["unit", "pack_type", "updated_at"])
+
+        for wp in touched.values():
+            _recount_wp(wp)
+            _resync_wp_catalog(wp)
+
+        invoice.refresh_from_db()
+        invoice.recompute_payment(save=True)
+        movement = invoice.posted_movement
+        if movement is not None and (movement.current_account_id != invoice.current_account_id
+                                     or movement.book_id != invoice.book_id):
+            movement.current_account = invoice.current_account
+            movement.book = invoice.book
+        invoice.resync_posted_movement(user=user)
+        if account_changed:
+            old_account.recompute_balance(save=True)
+            mark_as_supplier(account)
+
+    return {"invoice": invoice, "warnings": warnings, "reservations_trimmed": trimmed}
 
 
 @method_decorator(login_required, name='dispatch')
 class WarehousePurchaseEdit(View):
-    """Edit an existing purchase (Invoice(type="purchase")) from the SAME
-    goods-receipt form used to receive stock (accounts:goods_receipt_edit),
-    pre-filled with its existing lines/stock items. Stock items (WarehouseProductItem) that are already
-    reserved into a customer order (OrderStockReservation, however
-    unconsumed) can never be removed here — that's a hard, permanent
-    invariant used elsewhere in the app too.
+    """Edit a RECEIVED purchase (Invoice(type="purchase")) from the same
+    goods-receipt form a draft order is edited with
+    (accounts:goods_receipt_edit).
 
-    GET  → JSON describing the purchase's current products/variants/stock items
-           for the goods-receipt page to render (see `get`).
-    POST → applies the diff: removes unreserved stock items the client dropped,
-           adds any new stock items/lines, and syncs the purchase invoice + the
-           supplier's current account balance to match. All-or-nothing: if ANY
-           targeted-for-removal roll turns out to be reserved, the WHOLE
-           request is rejected before anything is written.
+    GET  → the purchase as that form's payload, with the id of every line
+           and roll it already has, for the page to rebuild itself from.
+    POST → perform_purchase_edit. All-or-nothing.
     """
 
     def get(self, request, pk, invoice_id):
@@ -3088,19 +3596,19 @@ class WarehousePurchaseEdit(View):
 
         get_object_or_404(Warehouse, pk=pk)
         invoice = get_object_or_404(
-            Invoice.objects.select_related("current_account__supplier", "currency"),
+            Invoice.objects.select_related("current_account", "currency"),
             pk=invoice_id, type="purchase",
         )
         if invoice.status == "cancelled":
             return JsonResponse({"success": False, "error": "İptal edilmiş alım düzenlenemez."}, status=400)
 
         rolls_qs = (WarehouseProductItem.objects
-                    .select_related("product")
+                    .select_related("product", "product__catalog_variant__product")
                     .annotate(is_locked=Exists(
                         OrderStockReservation.objects.filter(stock_item=OuterRef("pk"))))
                     .order_by("id"))
         items = list(
-            invoice.items.select_related("product", "variant")
+            invoice.items.select_related("product")
             .prefetch_related(Prefetch("warehouse_stock_items", queryset=rolls_qs))
             .order_by("line_no")
         )
@@ -3110,52 +3618,61 @@ class WarehousePurchaseEdit(View):
         for it in items:
             rolls = list(it.warehouse_stock_items.all())
             wp = rolls[0].product if rolls else None
-            title = it.product.title if it.product_id else it.description
-            key = it.product_id or f"item{it.pk}"
+            # A line saved before it had a product still has a variant that
+            # does — without it the card would come back as a NEW product,
+            # and saving would mint one.
+            product = it.product or (wp.catalog_variant.product
+                                     if wp is not None and wp.catalog_variant_id else None)
+            key = product.pk if product else f"item{it.pk}"
             if key not in groups:
-                groups[key] = {"product_id": it.product_id, "product_title": title, "variants": []}
+                groups[key] = {
+                    "main_product": ({"mode": "existing", "id": product.pk,
+                                      "title": product.title, "sku": product.sku or ""}
+                                     if product else
+                                     {"mode": "new", "name": it.description, "sku": ""}),
+                    "category_id": product.category_id if product else None,
+                    "has_variants": True,
+                    "variants": [],
+                }
                 order.append(key)
-            if wp is not None:
-                name = wp.name[len(title):].strip() if wp.name.startswith(title) else wp.name
-                sku, wp_id = wp.sku, wp.pk
-            else:
-                name, sku, wp_id = it.description, None, None
+            title = product.title if product else it.description
             groups[key]["variants"].append({
                 "invoice_item_id": it.pk,
-                "warehouse_product_id": wp_id,
-                "sku": sku,
-                "name": name,
-                "unit": it.unit,
-                "unit_price": str(it.unit_price),
+                "name": _purchase_variant_label(wp, title) if wp is not None else it.description,
+                "sku": (wp.sku or "") if wp is not None else "",
+                "price": _plain_decimal(it.unit_price),
                 "currency": invoice.currency.code,
-                "quantity": str(it.quantity),
                 "tops": [
-                    {"stock_item_id": r.pk, "barcode": r.barcode,
-                     "quantity": str(r.quantity), "locked": bool(r.is_locked)}
+                    {"stock_item_id": r.pk, "qty": _plain_decimal(r.quantity),
+                     "barcode": r.barcode or "", "locked": bool(r.is_locked)}
                     for r in rolls
                 ],
             })
+
+        for group in groups.values():
+            # A simple product is ONE variant that is the product itself.
+            variants, main = group["variants"], group["main_product"]
+            if (len(variants) == 1 and main.get("sku") and not variants[0]["name"]
+                    and variants[0]["sku"].upper() == main["sku"].upper()):
+                group["has_variants"] = False
 
         return JsonResponse({
             "success": True,
             "invoice_id": invoice.pk,
             "number": invoice.display_number,
-            # The account itself — the panel's picker is keyed on current accounts now,
-            # and reading through current account.supplier returned nothing for the
-            # imported accounts, leaving the field blank mid-edit.
+            # The account itself — the panel's picker is keyed on current
+            # accounts, and may not list this one (another book, or since
+            # deactivated), so its name and prefix come along.
             "current_account_id": invoice.current_account_id,
             "current_account_name": invoice.current_account.name,
+            "current_account_prefix": _consonant_prefix(invoice.current_account.name),
             "currency": invoice.currency.code,
+            "unit": items[0].unit if items else "mt",
             "products": [groups[k] for k in order],
         })
 
     def post(self, request, pk, invoice_id):
-        from django.db import transaction, IntegrityError
-        from accounting.models import Invoice
-        from accounting.services_accounts import sync_purchase_invoice_items
         from accounting.views_purchase import can_confirm_purchase
-        from .models import OrderStockReservation
-        from marketing.models import Product as _Prod
 
         # Editing a received purchase adds and removes real stock items and moves
         # what we owe — same permission as receiving one.
@@ -3174,254 +3691,30 @@ class WarehousePurchaseEdit(View):
         except (ValueError, UnicodeDecodeError):
             return JsonResponse({"success": False, "error": "Geçersiz veri."}, status=400)
 
-        products_in = data.get("products")
-        if not isinstance(products_in, list) or not products_in:
-            return JsonResponse({"success": False, "error": "En az bir ürün olmalı."}, status=400)
-
         user = request.user if request.user.is_authenticated else None
-
-        with transaction.atomic():
-            # NB: lock the invoice row alone — the current account is read (not
-            # locked) separately, which is fine: it's not what concurrent
-            # requests race on here, the rolls are (locked individually
-            # below).
-            invoice = get_object_or_404(
-                Invoice.objects.select_for_update(),
-                pk=invoice_id, type="purchase",
+        try:
+            result = perform_purchase_edit(
+                invoice_id, warehouse, data,
+                user=user, member=getattr(request.user, "member", None),
             )
-            if invoice.status == "cancelled":
-                return JsonResponse({"success": False, "error": "İptal edilmiş alım düzenlenemez."}, status=400)
+        except IntakeError as exc:
+            return JsonResponse(exc.payload, status=exc.status)
+        except Exception as exc:
+            # Rolled back with the transaction; said in JSON, as intake says
+            # it, because the page can only report what it can parse.
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({"success": False, "error": f"Kayıt hatası: {exc}"}, status=500)
 
-            # Notes are just words about the delivery — nothing physical or
-            # financial hangs off them, so unlike the account, the warehouse
-            # and the product lines they stay editable after receiving.
-            if "notes" in data:
-                notes = (data.get("notes") or "")[:2000]
-                if notes != (invoice.notes or ""):
-                    invoice.notes = notes
-                    invoice.save(update_fields=["notes", "updated_at"])
-
-            # Name the stock items' notes/prefix after the ACCOUNT the alım sits
-            # on — current account.supplier is empty for every imported account, which
-            # made added stock items fall back to a generic prefix mid-edit.
-            supplier_name = invoice.current_account.name
-            fallback_prefix = _consonant_prefix(supplier_name)
-
-            # ── Hand-typed barcodes on stock items being ADDED to this alım. Same
-            # hard refusal as intake, checked before anything is written.
-            # Rolls already on this invoice are excluded from the clash
-            # test only where they're being kept — a code freed by a stock item
-            # this same edit removes is still treated as taken, which is
-            # the safe direction to be wrong in.
-            edit_seen = {}
-            edit_manual = []
-            for p in products_in:
-                for v in (p.get("variants") or []):
-                    for t in (v.get("new_stock") or []):
-                        code = (t.get("barcode") or "").strip()
-                        if not code:
-                            continue
-                        if (_safe_decimal(t.get("qty")) or Decimal("0")) <= 0:
-                            continue
-                        key = code.upper()
-                        if key in edit_seen:
-                            return JsonResponse(
-                                {"success": False,
-                                 "error": f"“{code}” barkodu bu listede birden fazla kez girildi."},
-                                status=400)
-                        if _barcode_taken(code):
-                            return JsonResponse(
-                                {"success": False,
-                                 "error": f"“{code}” barkodu zaten kullanılıyor."},
-                                status=400)
-                        edit_seen[key] = True
-                        edit_manual.append(code)
-
-            # ── Every existing stock item not re-submitted as "kept" is being
-            # removed. Lock + re-check each one for a live reservation
-            # INSIDE this same transaction — never validate in a separate
-            # pass — so a packer's concurrent scan can't slip a fresh
-            # reservation onto a roll between "check" and "delete".
-            kept_ids = set()
-            for p in products_in:
-                for v in (p.get("variants") or []):
-                    if v.get("invoice_item_id"):
-                        kept_ids.update(int(x) for x in (v.get("kept_roll_ids") or []))
-
-            existing_roll_ids = set(
-                WarehouseProductItem.objects
-                .filter(purchase_invoice_item__invoice=invoice)
-                .values_list("pk", flat=True)
-            )
-            removal_candidates = existing_roll_ids - kept_ids
-
-            blockers = []
-            removable_rolls = []
-            for rid in removal_candidates:
-                roll = (WarehouseProductItem.objects.select_for_update()
-                        .filter(pk=rid).select_related("product").first())
-                if roll is None:
-                    continue
-                if roll.reservations.exists():
-                    orders = list(
-                        roll.reservations.select_related("order")
-                        .values_list("order__id", flat=True).distinct()
-                    )
-                    blockers.append({"barcode": roll.barcode, "order_ids": orders})
-                else:
-                    removable_rolls.append(roll)
-
-            if blockers:
-                return JsonResponse({
-                    "success": False,
-                    "error": "Bazı toplar başka bir siparişte kullanılmış, silinemedi. "
-                             "Önce o siparişi düzeltin.",
-                    "blocked": blockers,
-                }, status=422)
-
-            # ── Apply: remove the (now confirmed safe) dropped stock items. ──
-            touched_wp_ids = set()
-            for roll in removable_rolls:
-                wp = roll.product
-                touched_wp_ids.add(wp.pk)
-                StockMovement.objects.create(
-                    product=wp, stock_item=None, movement_type="adjustment",
-                    quantity=-(roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity),
-                    reason="Purchase edit — stock item removed",
-                    reference=roll.barcode, created_by=user,
-                )
-                roll.delete()
-
-            # ── Add new stock items (existing lines) / new lines (brand-new
-            # variants), building the diff sync_purchase_invoice_items needs.
-            line_updates = []
-            for p in products_in:
-                main = p.get("main_product") or {}
-                variants_in = p.get("variants") or []
-                main_product = None
-                if str(main.get("id") or "").isdigit():
-                    main_product = _Prod.objects.filter(pk=int(main["id"])).first()
-                base_name = main.get("name") or (main_product.title if main_product else "")
-                seen_skus = set()
-
-                for v in variants_in:
-                    item_id = v.get("invoice_item_id")
-                    if item_id:
-                        # EXISTING line — product/variant identity is locked;
-                        # only its stock items (and, only if it has zero surviving
-                        # stock_items, its price) can change here.
-                        item = invoice.items.filter(pk=item_id).first()
-                        if item is None:
-                            continue
-                        kept_here = [int(x) for x in (v.get("kept_roll_ids") or [])]
-                        surviving = list(WarehouseProductItem.objects.filter(pk__in=kept_here))
-                        wp = surviving[0].product if surviving else None
-                        if wp is None:
-                            wp_id = v.get("warehouse_product_id")
-                            wp = WarehouseProduct.objects.filter(pk=wp_id).first() if wp_id else None
-
-                        new_stock = v.get("new_stock") or []
-                        new_roll_ids = []
-                        if wp is not None and new_stock:
-                            line_prefix = _barcode_prefix_from_existing(wp, fallback_prefix)
-                            line_mint = _barcode_minter(line_prefix, reserved=edit_manual)
-                            _added, new_roll_ids = _add_stock_to_variant(
-                                wp, new_stock, line_mint, user, notes_supplier=supplier_name,
-                            )
-                            touched_wp_ids.add(wp.pk)
-
-                        surviving_meters = sum((r.quantity for r in surviving), Decimal("0"))
-                        new_meters = sum(
-                            (_safe_decimal(t.get("qty")) or Decimal("0") for t in new_stock),
-                            Decimal("0"),
-                        )
-                        update = {
-                            "invoice_item_id": item_id,
-                            "quantity": surviving_meters + new_meters,
-                            "new_roll_ids": new_roll_ids,
-                        }
-                        if not surviving:
-                            # No original stock items left on this line — price/
-                            # currency can be revised (see plan: locked
-                            # otherwise, to avoid silently rewriting the
-                            # recorded cost of goods that are still on hand).
-                            price = _safe_decimal(v.get("price"))
-                            if price is not None and price > 0:
-                                update["unit_price"] = price
-                        line_updates.append(update)
-                    else:
-                        # BRAND-NEW line — full create-mode shape.
-                        stock_items = v.get("tops") or []
-                        if not stock_items or main_product is None and not base_name:
-                            continue
-                        if main_product is None:
-                            sku_mint = _product_sku_minter(fallback_prefix)
-                            for _attempt in range(8):
-                                candidate = sku_mint()
-                                try:
-                                    with transaction.atomic():
-                                        main_product = _Prod.objects.create(
-                                            title=base_name, sku=candidate, featured=False,
-                                            unit_of_measurement=_PRODUCT_UNIT_MAP.get(
-                                                (data.get("unit") or "mt"), "units"),
-                                        )
-                                    break
-                                except IntegrityError:
-                                    main_product = None
-                                    continue
-                            if main_product is None:
-                                return JsonResponse(
-                                    {"success": False, "error": "Benzersiz ürün SKU üretilemedi, tekrar deneyin."},
-                                    status=500,
-                                )
-
-                        wp, v_sku, attr_name, attr_value, price, currency, wp_name = (
-                            _resolve_variant_wp(warehouse, main_product, base_name, v,
-                                                fallback_prefix, seen_skus)
-                        )
-                        line_mint = _barcode_minter(fallback_prefix, reserved=edit_manual)
-                        added_qty, new_roll_ids = _add_stock_to_variant(
-                            wp, stock_items, line_mint, user, notes_supplier=supplier_name,
-                        )
-                        touched_wp_ids.add(wp.pk)
-                        try:
-                            from .catalog_sync import sync_roll_to_catalog, CatalogSyncConflict
-                            first_barcode = (WarehouseProductItem.objects
-                                             .filter(pk__in=new_roll_ids).order_by("id")
-                                             .values_list("barcode", flat=True).first())
-                            _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
-                                base_name=base_name, attribute_name=attr_name,
-                                attribute_value=attr_value, variant_sku=v_sku,
-                                variant_barcode=first_barcode,
-                                cost=(price if currency == "USD" else None),
-                                existing_base_product=main_product,
-                            )
-                            wp.catalog_variant = cat_variant
-                            wp.save(update_fields=["catalog_variant"])
-                        except CatalogSyncConflict:
-                            pass
-
-                        line_updates.append({
-                            "invoice_item_id": None,
-                            "product": main_product, "variant": wp.catalog_variant,
-                            "description": wp_name, "unit": (data.get("unit") or "mt"),
-                            "unit_price": (price if (price and price > 0) else Decimal("0")),
-                            "quantity": added_qty, "new_roll_ids": new_roll_ids,
-                        })
-
-            for wp_id in touched_wp_ids:
-                wp = WarehouseProduct.objects.filter(pk=wp_id).first()
-                if wp:
-                    _resync_wp_catalog(wp)
-
-            sync_purchase_invoice_items(invoice, line_updates, member=getattr(user, "member", None))
-            invoice.refresh_from_db()
-            invoice.resync_posted_movement(user=user)
-
+        invoice = result["invoice"]
         return JsonResponse({
             "success": True,
             "invoice_id": invoice.pk,
             "total": float(invoice.total or 0),
+            "warnings": result["warnings"],
+            # Named, not counted: an order's reserved figure moving because a
+            # purchase was corrected is exactly what has to be told.
+            "reservations_trimmed": result["reservations_trimmed"],
         })
 
 
@@ -5167,7 +5460,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 for _inv in order.invoices.exclude(status="cancelled"):
                     _inv.cancel(user=user, reason=f"Order #{order.pk} cancelled")
             # Retail money leg — completion posts the sale + auto
-            # collection to the shared "Perakende Satışları" cari and
+            # collection to the shared "Perakende Satışları" account and
             # mirrors it into the Perakende defter; un-ship reverses
             # all of it. Inside the SAME transaction so status, stock
             # and money can never diverge.
@@ -6076,57 +6369,19 @@ class WarehouseRollEdit(View):
         # ── Meters (full length); keep any already-consumed amount ──
         meters_raw = (request.POST.get("quantity") or "").strip().replace(",", ".")
         meters_changed = False
+        old_full = new_full = roll.quantity or Decimal("0")
         if meters_raw:
             try:
                 new_full = Decimal(meters_raw)
             except (InvalidOperation, TypeError):
                 return JsonResponse({"success": False, "error": "Geçersiz metre değeri."}, status=400)
-            if new_full <= 0:
-                return JsonResponse({"success": False, "error": "Metre pozitif olmalı."}, status=400)
-            old_full = roll.quantity or Decimal("0")
-            consumed = Decimal("0")
-            if roll.quantity_remaining is not None and old_full:
-                consumed = max(Decimal("0"), old_full - roll.quantity_remaining)
-
-            # A roll cannot have had more taken off it than it was ever
-            # long. Shortening it below what has already gone out used to be
-            # accepted: the remainder clamped to zero so stock stayed right,
-            # while the roll's own history claimed more metres shipped than
-            # ever existed — a contradiction no report can resolve later.
-            #
-            # If those two numbers disagree it is the OUTGOING record that is
-            # wrong, not the length, so the fix belongs on the shipment or
-            # stock-out. Refuse and name the figure to correct against.
-            # Equal is fine: that is a roll used up exactly.
-            if new_full < consumed:
-                return JsonResponse({
-                    "success": False,
-                    "error": (f"Bu toptan {consumed:.2f} m çıkış yapılmış — "
-                              f"uzunluk bundan kısa olamaz. Önce ilgili "
-                              f"sevkiyatı veya stok çıkışını düzeltin."),
-                }, status=400)
-
-            if new_full != old_full:
-                roll.quantity = new_full
-                roll.quantity_remaining = max(Decimal("0"), new_full - consumed)
-                roll_fields.extend(["quantity", "quantity_remaining"])
-                meters_changed = True
+            try:
+                meters_changed = _set_roll_length(roll, new_full)
+            except RollLengthError as exc:
+                return JsonResponse({"success": False, "error": str(exc)}, status=400)
+            if meters_changed:
+                roll_fields.extend(["quantity", "quantity_remaining", "status"])
                 changes.append("quantity")
-
-                # Status follows the metres. Correcting a length can drive
-                # remaining to zero — or lift it back off zero — and leaving
-                # the old status behind is what left roll #3195 flagged
-                # "partial" with nothing on it: counted as live stock, listed
-                # on the product page, and pickable for packing. Same rule
-                # the stock-out and shipping paths apply.
-                rem = roll.quantity_remaining or Decimal("0")
-                if rem <= 0:
-                    roll.status = "consumed"
-                elif rem < new_full:
-                    roll.status = "partial"
-                else:
-                    roll.status = "in_stock"
-                roll_fields.append("status")
 
         if roll_fields:
             roll.save(update_fields=list(set(roll_fields)))

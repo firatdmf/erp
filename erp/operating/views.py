@@ -1074,12 +1074,24 @@ def _sync_line_to_reservations(order_item):
 
 
 def _as_line_decimal(value):
-    """A quantity as the database will hold it: Decimal, two places."""
+    """A line figure as the database will hold it: Decimal, two places.
+
+    Used both when reading a quantity back and when writing one in from
+    the submitted JSON, because a float assigned to a DecimalField stays
+    a float on the instance — and Decimal('66.40') != 66.4 in Python.
+    That mismatch is what made the audit log record 223 quantity/price
+    "changes" from one number to the same number.
+
+    Never raises: it sits on the order-save path, where a junk figure
+    should not be the thing that loses the whole order."""
     if value is None:
         return _PDecimal("0.00")
-    if not isinstance(value, _PDecimal):
-        value = _PDecimal(str(value))
-    return value.quantize(_PDecimal("0.01"))
+    try:
+        if not isinstance(value, _PDecimal):
+            value = _PDecimal(str(value))
+        return value.quantize(_PDecimal("0.01"))
+    except Exception:
+        return _PDecimal("0.00")
 
 
 def _line_short_label(order_item, was, now):
@@ -1774,9 +1786,9 @@ def _append_lines_to_order(target, book, lines, user, failed_barcodes,
             product=product,
             product_variant=variant,
             description=item_data.get("description", ""),
-            quantity=item_data.get("quantity", 1),
+            quantity=_as_line_decimal(item_data.get("quantity", 1)),
             outsourced_quantity=_outsourced_qty(item_data),
-            price=item_data.get("price", 0),
+            price=_as_line_decimal(item_data.get("price", 0)),
             is_custom_curtain=item_data.get("is_custom_curtain", False),
         )
         _order_edit_reserve_rolls(
@@ -3036,9 +3048,9 @@ class OrderCreate(View):
                 product=product,
                 product_variant=variant,
                 description=item_data.get("description", ""),
-                quantity=item_data.get("quantity", 1),
+                quantity=_as_line_decimal(item_data.get("quantity", 1)),
                 outsourced_quantity=_outsourced_qty(item_data),
-                price=item_data.get("price", 0),
+                price=_as_line_decimal(item_data.get("price", 0)),
                 is_custom_curtain=is_custom,
             )
 
@@ -3525,9 +3537,9 @@ class OrderEdit(UpdateView):
                                     order_item.description = item_data.get(
                                         "description", ""
                                     )
-                                    order_item.quantity = item_data.get("quantity", 1)
+                                    order_item.quantity = _as_line_decimal(item_data.get("quantity", 1))
                                     order_item.outsourced_quantity = _outsourced_qty(item_data)
-                                    order_item.price = item_data.get("price", 0)
+                                    order_item.price = _as_line_decimal(item_data.get("price", 0))
                                     order_item.save()
                                     _order_edit_reserve_rolls(
                                         self.object, order_item, item_data.get("rolls") or [],
@@ -3547,9 +3559,9 @@ class OrderEdit(UpdateView):
                                         product=product,
                                         product_variant=None,
                                         description=item_data.get("description", ""),
-                                        quantity=item_data.get("quantity", 1),
+                                        quantity=_as_line_decimal(item_data.get("quantity", 1)),
                                         outsourced_quantity=_outsourced_qty(item_data),
-                                        price=item_data.get("price", 0),
+                                        price=_as_line_decimal(item_data.get("price", 0)),
                                     )
                                 elif item_data["product"]["variant"] == True:
                                     variant = get_object_or_404(
@@ -3561,9 +3573,9 @@ class OrderEdit(UpdateView):
                                         product=variant.product,
                                         product_variant=variant,
                                         description=item_data.get("description", ""),
-                                        quantity=item_data.get("quantity", 1),
+                                        quantity=_as_line_decimal(item_data.get("quantity", 1)),
                                         outsourced_quantity=_outsourced_qty(item_data),
-                                        price=item_data.get("price", 0),
+                                        price=_as_line_decimal(item_data.get("price", 0)),
                                     )
                                 # add the qr code to the order item
                                 try:
@@ -5653,8 +5665,8 @@ def create_web_order(request):
                         order=order,
                         product=product,
                         product_variant=variant,
-                        quantity=item_data.get('quantity', 1),
-                        price=item_data.get('price', 0),
+                        quantity=_as_line_decimal(item_data.get('quantity', 1)),
+                        price=_as_line_decimal(item_data.get('price', 0)),
                         description=item_data.get('description', ''),
                         # Custom Curtain Fields
                         is_custom_curtain=is_custom,

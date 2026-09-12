@@ -9,8 +9,9 @@ first, Turkish-fold alphanumeric-only comparison as fallback):
      under an auto-created hidden product while a REAL product owns the
      base code as its SKU (warehouse "K12767.G93" vs web product
      "Florenza" whose sku is "K12767"), the variant is MOVED under the
-     real product — variant id preserved, so existing order lines keep
-     pointing at it.
+     real product — variant id preserved, and every order and invoice line
+     on that variant has its product repointed too, so a line never names
+     one product while its variant lives under another.
   2. Else a Product owns the base code as its SKU → create the variant
      under it (variant_featured=False so it never leaks onto the site).
   3. Else fall back to a hidden product matched by title, creating one
@@ -44,7 +45,8 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
     skus=[...] restricts to those warehouse SKUs (import hook); None = all.
     """
     from django.db import transaction as _tx
-    from operating.models import WarehouseProduct
+    from accounting.models_accounts import InvoiceItem
+    from operating.models import OrderItem, WarehouseProduct
     from marketing.models import (
         Product, ProductVariant, ProductVariantAttribute,
         ProductVariantAttributeValue,
@@ -150,9 +152,24 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                         else:
                             maybe_empty_product_ids.add(variant.product_id)
                             summary["variants_moved"] += 1
+                            # Order and invoice lines name the product AND the
+                            # variant. Moving only the variant left seven lines
+                            # crediting the product it had just left — sales
+                            # grouped by product landed on an empty husk, and
+                            # the husk could never be deleted because the
+                            # lines still held it. They move with the variant.
+                            # .update() on purpose: only product_id changes, so
+                            # nothing should re-post to invoices or accounts.
+                            lines = (OrderItem.objects.filter(product_variant=variant)
+                                     .exclude(product=target))
+                            inv_lines = (InvoiceItem.objects.filter(variant=variant)
+                                         .exclude(product=target))
                             summary["actions"].append(
-                                f"MOVE {variant.variant_sku}: '{variant.product.title}' -> '{target.title}'")
+                                f"MOVE {variant.variant_sku}: '{variant.product.title}' -> '{target.title}'"
+                                f" (+{lines.count()} order, {inv_lines.count()} invoice lines)")
                             if apply:
+                                lines.update(product=target)
+                                inv_lines.update(product=target)
                                 variant.product = target
                                 variant.save(update_fields=["product"])
                     # Cost only — never touch a pre-existing variant's stock

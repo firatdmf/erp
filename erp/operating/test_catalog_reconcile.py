@@ -145,3 +145,71 @@ class OneBadSkuDoesNotSinkTheRunTest(TestCase):
         self.assertEqual(s["products_created"], 1)
         self.assertEqual(s["variants_created"], 2)
         self.assertEqual(s["relinked_wps"], 2)
+
+
+class MovedVariantTakesItsLinesTest(TestCase):
+    """An order or invoice line names a product AND a variant. The reconciler
+    used to move the variant under its right parent and leave the lines
+    behind, so a line said "GREK TAŞLI VE İNCİ EKRU" while its variant
+    HKN00011 lived under "GREK". Sales grouped by product landed on an empty
+    husk, and the husk could never be cleaned up because the lines held it.
+    Seven production lines ended up that way.
+    """
+
+    def setUp(self):
+        from accounting.models import CurrencyCategory, CurrentAccount, Invoice, InvoiceItem
+        from operating.models import Order, OrderItem
+
+        self.book = Book.objects.get_or_create(name="Laleli Fabric")[0]
+        self.warehouse = Warehouse.objects.create(name="Laleli", accounting_book=self.book)
+        # The real parent owns the base code; the variant sits under a husk.
+        self.real = Product.objects.create(title="GREK", sku="HKN", featured=False)
+        self.husk = Product.objects.create(title="GREK TAŞLI VE İNCİ EKRU", featured=False)
+        self.variant = ProductVariant.objects.create(product=self.husk, variant_sku="HKN.G01")
+        WarehouseProduct.objects.create(
+            warehouse=self.warehouse, name="GREK", sku="HKN.G01",
+            quantity=Decimal("10.00"), catalog_variant=self.variant)
+
+        order = Order.objects.create()
+        self.line = OrderItem.objects.create(
+            order=order, product=self.husk, product_variant=self.variant,
+            quantity=Decimal("3"), price=Decimal("7.50"))
+        usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        account = CurrentAccount.objects.create(
+            book=self.book, code="C-1", name="ACME", default_currency=usd)
+        invoice = Invoice.objects.create(
+            current_account=account, book=self.book, number="INV-1", type="sales",
+            status="draft", date="2026-09-12", due_date="2026-10-12", currency=usd)
+        self.inv_line = InvoiceItem.objects.create(
+            invoice=invoice, description="GREK", product=self.husk, variant=self.variant,
+            quantity=Decimal("3.000"), unit_price=Decimal("7.50"), tax_rate=0)
+
+    def test_the_lines_follow_the_variant(self):
+        s = reconcile_all_warehouse_links(apply=True)
+        self.assertEqual(s["variants_moved"], 1)
+        self.line.refresh_from_db()
+        self.inv_line.refresh_from_db()
+        self.assertEqual(self.line.product_id, self.real.pk)
+        self.assertEqual(self.inv_line.product_id, self.real.pk)
+
+    def test_nothing_on_the_line_but_the_product_changes(self):
+        reconcile_all_warehouse_links(apply=True)
+        self.line.refresh_from_db()
+        self.inv_line.refresh_from_db()
+        self.assertEqual((self.line.quantity, self.line.price, self.line.product_variant_id),
+                         (Decimal("3.00"), Decimal("7.50"), self.variant.pk))
+        self.assertEqual((self.inv_line.quantity, self.inv_line.unit_price),
+                         (Decimal("3.000"), Decimal("7.500000")))
+
+    def test_the_emptied_husk_can_now_be_removed(self):
+        """OrderItem.product is PROTECT, so while a line held the husk the
+        cleanup silently skipped it. With the lines moved, it goes."""
+        s = reconcile_all_warehouse_links(apply=True)
+        self.assertFalse(Product.objects.filter(pk=self.husk.pk).exists())
+        self.assertEqual(s["products_deleted"], 1)
+
+    def test_the_dry_run_moves_nothing_but_says_so(self):
+        s = reconcile_all_warehouse_links(apply=False)
+        self.line.refresh_from_db()
+        self.assertEqual(self.line.product_id, self.husk.pk)
+        self.assertIn("+1 order, 1 invoice lines", " ".join(s["actions"]))

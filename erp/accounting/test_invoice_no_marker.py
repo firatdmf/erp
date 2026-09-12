@@ -34,7 +34,7 @@ class InvoiceMarkerBase(TestCase):
             code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-001", name="ACME",
+            book=self.book, code="TST-001", name="ACME",
             default_currency=self.usd)
         self.product = Product.objects.create(title="STAR BLACKOUT")
         self.order = Order.objects.create()

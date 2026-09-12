@@ -84,6 +84,41 @@ def book_guarded(view, model, book_path="book"):
     return wrapper
 
 
+def book_guarded_for_sales_rep(view, model, book_path="book"):
+    """`book_guarded`, but only for the sales-rep role.
+
+    The packing screen is reached by every warehouse hand and every
+    manager, and it names an order by id alone. Guarding it outright —
+    the way order_detail and edit_order are guarded — is the tidier rule
+    and probably the right one eventually, but it cannot be done here
+    without changing what everybody else sees: an order carries its book
+    through its CURRENT ACCOUNT, and `create_web_order` files a storefront
+    order without one, so a blanket guard would 404 the packing screen
+    for every web order that ever arrives. (Prod has none today, which is
+    the only reason that is not already a live bug on order_detail.)
+
+    So the guard is applied where the exposure is actually new. The
+    sales-rep role reaches these routes for the first time in
+    erp.roles.WRITE_PATTERNS, and her book assignment is the only thing
+    that says which orders are hers to pack; without this she could scan
+    rolls onto another book's order by walking sequential ids. Everyone
+    else passes through exactly as before.
+
+    Narrow on purpose, and worth revisiting as one rule once a web order
+    is given a current account.
+    """
+    guarded = book_guarded(view, model, book_path)
+
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        from erp.roles import is_sales_rep
+
+        if is_sales_rep(getattr(request, "user", None)):
+            return guarded(request, *args, **kwargs)
+        return view(request, *args, **kwargs)
+    return wrapper
+
+
 def current_book(request):
     """Context processor: the book the page is about.
 

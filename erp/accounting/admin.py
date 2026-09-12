@@ -89,6 +89,14 @@ class CurrentAccountAdmin(admin.ModelAdmin):
     readonly_fields = ("cached_balance", "last_movement_at",
                        "created_at", "updated_at")
 
+    def get_readonly_fields(self, request, obj=None):
+        # Fixed once the account has movements or invoices — the model
+        # refuses the change anyway; this says so before the save does.
+        fields = super().get_readonly_fields(request, obj)
+        if obj is not None and obj.currency_is_locked:
+            fields = tuple(fields) + ("default_currency",)
+        return fields
+
 
 @admin.register(CurrentAccountMovement)
 class CurrentAccountMovementAdmin(admin.ModelAdmin):

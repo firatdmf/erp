@@ -373,7 +373,7 @@ def subsidiary_equation(book):
     current_account_net = sum((r["amount"] for r in movement_types), ZERO)
 
     causes = [
-        {"label": "Cari ledger — movements with no contra anywhere",
+        {"label": "Current account ledger — movements with no contra anywhere",
          # The current account-funded equity rows DO have both legs, so they are not
          # part of the problem and must not be counted as if they were.
          "amount": current_account_net - equity_from_current_account},

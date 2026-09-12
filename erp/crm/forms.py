@@ -9,7 +9,6 @@ from django.urls import reverse
 from django.forms import ModelForm
 from django import forms
 from collections import OrderedDict
-from django.utils.translation import gettext_lazy as _lz
 
 class ContactCreateForm(ModelForm):
 
@@ -58,10 +57,6 @@ class ContactCreateForm(ModelForm):
     task_member = forms.IntegerField(
         required=False,
         widget=forms.HiddenInput(attrs={"id": "task_member_id"})
-    )
-
-    create_current_account = forms.BooleanField(
-        required=False, initial=True, label=_lz("Open a current account")
     )
 
     # Multi-item payloads from the Add-Contact sidebar (JSON arrays).
@@ -334,10 +329,6 @@ class CompanyForm(ModelForm):
     )
     task_description = forms.CharField(
         widget=forms.Textarea, label="Task Description", required=False
-    )
-
-    create_current_account = forms.BooleanField(
-        required=False, initial=True, label=_lz("Open a current account")
     )
 
     def __init__(self, *args, **kwargs):

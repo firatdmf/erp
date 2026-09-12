@@ -26,7 +26,7 @@ class OrderListSearchIndexTest(TestCase):
             code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-078", name="PERAKENDE",
+            book=self.book, code="TST-078", name="PERAKENDE",
             type="customer", default_currency=self.usd)
         self.product = Product.objects.create(
             title="Bamboo Plise", sku="TTEMPILISE", featured=False)
@@ -68,7 +68,7 @@ class OrderListSearchIndexTest(TestCase):
         and the code both have to be in the haystack."""
         index = self._index()
         self.assertIn("PERAKENDE", index)
-        self.assertIn("CARI-078", index)
+        self.assertIn("TST-078", index)
 
     def test_a_named_customer_is_searchable(self):
         from crm.models import Contact

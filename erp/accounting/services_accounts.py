@@ -7,7 +7,7 @@ The big picture:
   current account (the user explicitly asked for this).
 - Web orders skip this entirely (they go through create_web_order
   which is not wired to call into here).
-- Each call site is responsible for invoking ensure_cari_for_order +
+- Each call site is responsible for invoking get_or_create_current_account_for_order +
   post_order_movement once on creation; subsequent edits update or
   re-create the movement.
 """
@@ -20,11 +20,12 @@ from django.conf import settings
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Sum
 
 from accounting.models import Book, CurrencyCategory
 
 from .models import CurrentAccount, CurrentAccountMovement, CurrentAccountSettings
+from .models_accounts import _base_currency_symbol
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +310,7 @@ def _currency_by_code(code) -> CurrencyCategory:
 def create_purchase_invoice_for_intake(current_account, lines, *, member=None, user=None,
                                        invoice_date=None, invoice=None):
     """Turn a warehouse stock intake into an issued PURCHASE invoice
-    (alış faturası) on the given cari account.
+    on the given current account.
 
     Takes the current account DIRECTLY rather than a crm.Supplier: the intake panel
     now picks the account staff actually keep the balance on, and most of
@@ -1117,3 +1118,65 @@ def conversion_facts(obj):
     if amount is not None:
         base_amount = (Decimal(amount) * Decimal(str(rate))).quantize(Decimal("0.01"))
     return facts(rate, base_amount, False)
+
+
+# ---------------------------------------------------------------------------
+# One customer, several books — the combined statement.
+# ---------------------------------------------------------------------------
+def combined_statement(accounts):
+    """Several of one customer's accounts read as a single statement.
+
+    A customer holds at most one account per book, and which book an
+    order shipped from is our arrangement rather than theirs: Tatyana
+    Varşova holds one account in Laleli and another, under a different
+    code, in Ergene, is owed money by one and owes money to the other,
+    and has never been told either code.
+    Asked what she owes, the two statements answer 756.70 and -529.66 and
+    neither is the number. This merges them into the one that is.
+
+    Summing across books is sound because `amount_base` is normalised to
+    settings.BASE_CURRENCY_CODE — one currency for the whole deployment,
+    not the per-book `Book.base_currency` — so every row is already in the
+    same money. See CurrentAccountMovement.save.
+
+    Rows come back oldest-first with a running balance, because that is
+    the only order in which a running balance can be computed: each row's
+    figure is everything before it plus itself. Reading order is the
+    caller's choice, made after the walk.
+
+    `.live()` is the same rule CurrentAccount.recompute_balance sums by,
+    so a combined statement closes on the sum of the accounts' balances by
+    construction rather than by argument.
+    """
+    accounts = list(accounts)
+    movements = (
+        CurrentAccountMovement.objects.live()
+        .filter(current_account__in=accounts)
+        .select_related("currency", "current_account")
+        .order_by("date", "id")
+    )
+
+    rows = []
+    running = Decimal("0.00")
+    debit = Decimal("0.00")
+    credit = Decimal("0.00")
+    for mv in movements:
+        running += mv.amount_base
+        rows.append({"mv": mv, "balance_after": running})
+        # Debit and credit are the BASE figures, like the balance beside
+        # them: a statement that added a TRY debit to a USD one would
+        # foot to a number that is not money. The row still prints the
+        # amount it was entered in.
+        if mv.amount_base > 0:
+            debit += mv.amount_base
+        else:
+            credit += abs(mv.amount_base)
+
+    return {
+        "accounts": accounts,
+        "rows": rows,
+        "debit_total": debit,
+        "credit_total": credit,
+        "closing": running,
+        "currency_symbol": _base_currency_symbol(),
+    }

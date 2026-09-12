@@ -116,7 +116,7 @@ class InvoiceIssuer(TestCase):
         currency = (CurrencyCategory.objects.filter(code="USD").first()
                     or CurrencyCategory.objects.create(code="USD", name="USD"))
         current_account = CurrentAccount.objects.create(book=self.book, name="Acme",
-                                          code="CARI-001",
+                                          code="TST-001",
                                           default_currency=currency)
         self.invoice = Invoice.objects.create(
             book=self.book, current_account=current_account, currency=currency, number="1",

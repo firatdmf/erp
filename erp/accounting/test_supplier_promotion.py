@@ -26,7 +26,7 @@ class MarkAsSupplierTest(TestCase):
     def _current_account(self, type_):
         self.n += 1
         return CurrentAccount.objects.create(
-            book=self.book, code=f"CARI-{self.n:03d}", name=f"Account {self.n}",
+            book=self.book, code=f"TST-{self.n:03d}", name=f"Account {self.n}",
             type=type_, default_currency=self.usd,
         )
 
@@ -79,7 +79,7 @@ class PurchaseInvoicePromotesTheAccountTest(TestCase):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-900", name="Kızılırmak",
+            book=self.book, code="TST-900", name="Kızılırmak",
             type="customer", default_currency=self.usd,
         )
 

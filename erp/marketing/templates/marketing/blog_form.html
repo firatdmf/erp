@@ -827,7 +827,7 @@
         const files = Array.from(input.files);
         const htmlFile = files.find(f => /\.html?$/i.test(f.name));
         if (!htmlFile) {
-            alert('{% trans "Seçilen dosya(lar) arasında bir .html dosyası bulunamadı." %}');
+            alert('{% trans "No .html file among the files you picked." %}');
             return;
         }
         const imgExtRe = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
@@ -835,7 +835,7 @@
             (imgExtRe.test(f.name) || /^image\//.test(f.type || '')));
 
         const statusEl = document.getElementById('htmlUploadStatus_' + lang);
-        if (statusEl) statusEl.textContent = '{% trans "Yükleniyor…" %} (' + imageFiles.length + ' {% trans "görsel" %})';
+        if (statusEl) statusEl.textContent = '{% trans "Uploading…" %} (' + imageFiles.length + ' {% trans "images" %})';
 
         const formData = new FormData();
         formData.append('html_file', htmlFile, htmlFile.webkitRelativePath || htmlFile.name);
@@ -853,21 +853,21 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert('{% trans "Yüklenemedi" %}: ' + (data.error || ''));
+                alert('{% trans "Upload failed" %}: ' + (data.error || ''));
                 if (statusEl) statusEl.textContent = '';
                 return;
             }
             const textarea = document.getElementById('id_content_' + lang);
             if (textarea) {
-                if (textarea.value.trim() && !confirm('{% trans "Mevcut içeriğin üzerine yazılsın mı?" %}')) {
+                if (textarea.value.trim() && !confirm('{% trans "Overwrite the content that is already there?" %}')) {
                     if (statusEl) statusEl.textContent = '';
                     return;
                 }
                 textarea.value = data.html;
             }
-            let msg = '✅ ' + data.images_uploaded + '/' + data.images_total + ' {% trans "görsel yüklendi" %}';
+            let msg = '✅ ' + data.images_uploaded + '/' + data.images_total + ' {% trans "images uploaded" %}';
             if (data.warnings && data.warnings.length) {
-                msg += ' — ' + data.warnings.length + ' {% trans "uyarı" %}';
+                msg += ' — ' + data.warnings.length + ' {% trans "warnings" %}';
                 console.warn('HTML upload warnings:', data.warnings);
             }
             if (statusEl) statusEl.textContent = msg;

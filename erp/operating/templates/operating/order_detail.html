@@ -1540,7 +1540,7 @@
       {% include "operating/partials/_customer_card.html" with cust_card_mode='view' %}
 
       {% if order.current_account %}
-      <!-- CURRENT ACCOUNT (CARI) — internal ledger snapshot -->
+      <!-- CURRENT ACCOUNT — internal ledger snapshot -->
       <section class="od-card">
         <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
           <h3>{% trans "Current account" %}</h3>
@@ -1575,10 +1575,10 @@
             <div style="font:700 14px var(--font-sans); color:#0F1419; margin-top:2px;">{{ order.current_account.name }}</div>
           </div>
           <div style="text-align:right;">
-            <div id="od-cari-label" style="font:600 10.5px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
+            <div id="od-current-account-label" style="font:600 10.5px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
               {{ order.current_account.balance_label }}
             </div>
-            <div id="od-cari-balance" style="font:800 16px var(--font-sans); color:{% if order.current_account.cached_balance > 0 %}#B45309{% elif order.current_account.cached_balance < 0 %}#147F74{% else %}#374151{% endif %}; font-variant-numeric:tabular-nums; margin-top:2px;">
+            <div id="od-current-account-balance" style="font:800 16px var(--font-sans); color:{% if order.current_account.cached_balance > 0 %}#B45309{% elif order.current_account.cached_balance < 0 %}#147F74{% else %}#374151{% endif %}; font-variant-numeric:tabular-nums; margin-top:2px;">
               {{ order.current_account.display_currency_symbol }}{{ order.current_account.absolute_balance|floatformat:2 }}
             </div>
           </div>
@@ -1591,7 +1591,7 @@
           </div>
           <div style="display:flex; flex-direction:column; gap:6px;">
             {% for mv in current_account_recent_movements %}
-            <div {% if mv.source_id == order.pk and mv.movement_type == 'order_sale' %}id="od-cari-order-mv"{% endif %}
+            <div {% if mv.source_id == order.pk and mv.movement_type == 'order_sale' %}id="od-current-account-order-mv"{% endif %}
                  style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#FFF; border:1px solid #EEF1F5; border-radius:8px; font-size:12px;">
               <div style="min-width:0; flex:1;">
                 <div style="font-weight:600; color:#0F1419;">{{ mv.get_movement_type_display }}</div>
@@ -1599,7 +1599,7 @@
                   {{ mv.date|date:"d M Y" }}{% if mv.reference %} · {{ mv.reference }}{% endif %}
                 </div>
               </div>
-              <div data-cari-mv-amount style="font-weight:700; font-variant-numeric:tabular-nums; color:{% if mv.amount >= 0 %}#B45309{% else %}#147F74{% endif %}; flex-shrink:0; margin-left:8px;">
+              <div data-current-account-mv-amount style="font-weight:700; font-variant-numeric:tabular-nums; color:{% if mv.amount >= 0 %}#B45309{% else %}#147F74{% endif %}; flex-shrink:0; margin-left:8px;">
                 {% if mv.amount >= 0 %}+{% endif %}{{ mv.currency.symbol }}{{ mv.amount|floatformat:2 }}
               </div>
             </div>
@@ -2009,13 +2009,13 @@
       });
     }
 
-    // Refresh the right-sidebar cari card from the snapshot the server
+    // Refresh the right-sidebar current account card from the snapshot the server
     // returns after each mutating action. Keeps balance in sync without
     // a page reload.
     function applyCurrentAccountSnapshot(snap) {
       if (!snap) return;
-      const balEl   = document.getElementById('od-cari-balance');
-      const labelEl = document.getElementById('od-cari-label');
+      const balEl   = document.getElementById('od-current-account-balance');
+      const labelEl = document.getElementById('od-current-account-label');
       if (balEl) {
         const sym = snap.currency_symbol || '';
         balEl.textContent = sym + Number(snap.absolute_balance).toFixed(2);
@@ -2023,9 +2023,9 @@
       }
       if (labelEl && snap.balance_label) labelEl.textContent = snap.balance_label;
       // Update this order's row inside "Recent movements" if it's visible.
-      const mvRow = document.getElementById('od-cari-order-mv');
+      const mvRow = document.getElementById('od-current-account-order-mv');
       if (mvRow && snap.mv_amount !== null && snap.mv_amount !== undefined) {
-        const amtEl = mvRow.querySelector('[data-cari-mv-amount]');
+        const amtEl = mvRow.querySelector('[data-current-account-mv-amount]');
         if (amtEl) {
           const sign = snap.mv_amount >= 0 ? '+' : '';
           amtEl.textContent = sign + (snap.mv_symbol || '') + Number(snap.mv_amount).toFixed(2);
@@ -2192,7 +2192,7 @@
             const r = await postUpdate({ action: 'remove_item', item_id: id });
             if (!(r && r.ok)) throw new Error(r && r.error || 'Remove failed');
             if (r.order_total !== undefined) latestTotal = r.order_total;
-            if (r.cari) applyCurrentAccountSnapshot(r.cari);
+            if (r.current_account) applyCurrentAccountSnapshot(r.current_account);
             if (r.profit) applyProfitSnapshot(r.profit);
           }
           const delTops = document.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
@@ -2260,7 +2260,7 @@
           }
 
           if (r.order_total !== undefined) latestTotal = r.order_total;
-          if (r.cari) applyCurrentAccountSnapshot(r.cari);
+          if (r.current_account) applyCurrentAccountSnapshot(r.current_account);
           if (r.profit) applyProfitSnapshot(r.profit);
         }
 
@@ -2285,7 +2285,7 @@
               if (sub) sub.innerHTML = '<b>$' + Number(r.subtotal).toFixed(2) + '</b>';
             }
             if (r.order_total !== undefined) latestTotal = r.order_total;
-            if (r.cari) applyCurrentAccountSnapshot(r.cari);
+            if (r.current_account) applyCurrentAccountSnapshot(r.current_account);
             if (r.profit) applyProfitSnapshot(r.profit);
             updateRowStock(el.getAttribute('data-item-id'), r.stock, r.max_qty, r.allow_oversell);
           }
@@ -2617,7 +2617,7 @@
 
       // Removing a line with scanned stock items orphans its reservations —
       // they stay reserved (scanning is permanent) but drop out of the
-      // cari billing. Make that an informed choice, not an accident.
+      // current account billing. Make that an informed choice, not an accident.
       const topsRow = tbody.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
       const scannedCount = topsRow ? topsRow.querySelectorAll('.od-top-row[data-id]').length : 0;
       if (!id.startsWith('new-') && scannedCount > 0) {

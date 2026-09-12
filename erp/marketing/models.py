@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from django.core.validators import MinValueValidator
 from django.db import models
 import os
 import time
@@ -260,9 +263,18 @@ class Product(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     # Set price of the product for online sale. (If the product has a variant this should be null maybe)
-    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # Never below zero (zero is a real, free item). The validator gives the
+    # form a message on the field; the CheckConstraints in Meta are what hold
+    # for the bulk_update and sync paths that never call full_clean().
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
     # Product cost for profit calculation
-    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    cost = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
 
     # ── Per-product OVERRIDES of the product group's defaults ──
     # Null = inherit from category; the effective_* properties below resolve
@@ -305,7 +317,7 @@ class Product(models.Model):
         null=True,
     )
 
-    # Who we buy this from — the CARI ACCOUNT, not a crm.Supplier. The two
+    # Who we buy this from — the CURRENT ACCOUNT, not a crm.Supplier. The two
     # were separate namespaces: the balances staff actually keep live on
     # accounts (most imported from KARVEN with no Supplier row), so a
     # product tagged with a Supplier pointed at a record that frequently
@@ -333,6 +345,18 @@ class Product(models.Model):
         on_delete=models.SET_NULL,
         related_name="primary_for_products",
     )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(price__gte=0) | models.Q(price__isnull=True),
+                name="marketing_product_price_not_negative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(cost__gte=0) | models.Q(cost__isnull=True),
+                name="marketing_product_cost_not_negative",
+            ),
+        ]
 
     def __str__(self):
         if self.sku:
@@ -409,6 +433,16 @@ class Product(models.Model):
 class ProductVariant(models.Model):
     class Meta:
         verbose_name_plural = "Product Variants"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(variant_price__gte=0) | models.Q(variant_price__isnull=True),
+                name="marketing_productvariant_price_not_negative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(variant_cost__gte=0) | models.Q(variant_cost__isnull=True),
+                name="marketing_productvariant_cost_not_negative",
+            ),
+        ]
 
     product = models.ForeignKey(
         Product,
@@ -433,12 +467,14 @@ class ProductVariant(models.Model):
     variant_minimum_inventory_level = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
-    # Set price of the product for online sale.
+    # Set price of the product for online sale. Same floor as Product.price.
     variant_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
     )
     variant_cost = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
     )
 
     # If true, the product will be displayed on marketing channels (website etc)
@@ -1100,7 +1136,35 @@ class BlogPost(models.Model):
     
     def __str__(self):
         return self.title_en or self.title_tr or self.slug
-    
+
+    # Only the _en fields are required, so a post may carry any subset of
+    # the four translations. These read the active language and fall back
+    # through the rest rather than showing an admin page a blank title.
+    LANGUAGES = ("en", "tr", "ru", "pl")
+
+    def localized(self, field):
+        """`field` in the active language, else the first one filled in."""
+        from django.utils.translation import get_language
+
+        active = (get_language() or "en").lower().split("-")[0]
+        for code in (active, *self.LANGUAGES):
+            value = getattr(self, f"{field}_{code}", "")
+            if value:
+                return value
+        return ""
+
+    @property
+    def title(self):
+        return self.localized("title") or self.slug
+
+    @property
+    def excerpt(self):
+        return self.localized("excerpt")
+
+    @property
+    def category(self):
+        return self.localized("category")
+
     def delete(self, *args, **kwargs):
         """Delete cover and hero images from CDN when deleting the post"""
         from .views import smart_delete

@@ -722,7 +722,7 @@
 
       {# ============================== CURRENT ACCOUNT ============================== #}
       <li class="nav-item" id="currentAccountButton">
-        <a href="#cari" class="nav-link">
+        <a href="#current-account" class="nav-link">
           <i class="fa-solid fa-id-card-clip fa-2x" aria-hidden="true"></i>
           <span class="link-text">{% trans "Accounts" context "sidebar" %}</span>
         </a>
@@ -1395,17 +1395,6 @@
             </select>
           </div>
 
-          <!-- Cari Account Option -->
-          <div class="email-followup-option">
-            <div class="email-checkbox-wrapper">
-              <input type="checkbox" name="create_cari" id="company_create_cari" class="email-checkbox" checked>
-              <label for="company_create_cari" class="email-checkbox-label">
-                <span class="email-checkbox-title">💳 {% trans "Open a current account" %}</span>
-                <span class="email-checkbox-description">{% trans "A current account is automatically created for this record." %}</span>
-              </label>
-            </div>
-          </div>
-
           <!-- Email Follow-up Option -->
           <div class="email-followup-option">
             <div class="email-checkbox-wrapper">
@@ -1568,17 +1557,6 @@
             <textarea name="address" id="id_main_contact_address" class="form-textarea" rows="2"></textarea>
           </div>
 
-          <!-- Cari Account Option -->
-          <div class="email-followup-option">
-            <div class="email-checkbox-wrapper">
-              <input type="checkbox" name="create_cari" id="main_contact_create_cari" class="email-checkbox" checked>
-              <label for="main_contact_create_cari" class="email-checkbox-label">
-                <span class="email-checkbox-title">💳 {% trans "Open a current account" %}</span>
-                <span class="email-checkbox-description">{% trans "A current account is automatically created for this record." %}</span>
-              </label>
-            </div>
-          </div>
-
           <!-- Attach an item section -->
           <div class="attach-section">
             <div class="attach-header">
@@ -1726,17 +1704,6 @@
           <div class="form-group">
             <label for="id_contact_address">{% trans "Address" %}</label>
             <textarea name="address" id="id_contact_address" class="form-textarea" rows="2"></textarea>
-          </div>
-
-          <!-- Cari Account Option -->
-          <div class="email-followup-option">
-            <div class="email-checkbox-wrapper">
-              <input type="checkbox" name="create_cari" id="nested_contact_create_cari" class="email-checkbox" checked>
-              <label for="nested_contact_create_cari" class="email-checkbox-label">
-                <span class="email-checkbox-title">💳 {% trans "Open a current account" %}</span>
-                <span class="email-checkbox-description">{% trans "A current account is automatically created for this record." %}</span>
-              </label>
-            </div>
           </div>
 
           <div class="sidebar-footer">

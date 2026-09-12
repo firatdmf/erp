@@ -32,7 +32,7 @@ class LedgerRateTestBase(TestCase):
         self.try_ = CurrencyCategory.objects.create(code="TRY", name="Turkish Lira", symbol="₺")
         self.book = Book.objects.create(name="Laleli Fabric")
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-078", name="RANA UYGUR",
+            book=self.book, code="TST-078", name="RANA UYGUR",
             default_currency=self.try_,
         )
 

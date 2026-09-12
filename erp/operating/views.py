@@ -1816,7 +1816,7 @@ def _settle_sibling(request, sibling, book, member):
             sibling.save(update_fields=["current_account"])
         post_order_movement(sibling, member=member)
     except Exception as _e:
-        messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
+        messages.warning(request, f"Order saved, but its current account could not be updated: {_e}")
     try:
         generate_machine_qr_for_order(sibling)
     except Exception:
@@ -2008,13 +2008,14 @@ def _split_summary_message(created):
     """Tell the user their one basket became several orders, and which
     book each went to — otherwise the redirect lands on one order and the
     rest are invisible until somebody goes looking for them."""
+    from django.utils.translation import gettext as _
     parts = ", ".join(
         f"{book.name}: #{order.pk}" for order, book, _stayed in created
     )
-    return (
-        f"Bu talep {len(created)} deftere bölündü — her defter kendi "
-        f"siparişini ve kendi cari hesabını aldı ({parts})."
-    )
+    return _(
+        "This request was split across %(count)s books — each book got its "
+        "own order and its own current account (%(parts)s)."
+    ) % {"count": len(created), "parts": parts}
 
 
 def _books_in_scope(request):
@@ -4288,10 +4289,12 @@ def delete_order(request, pk):
     # retail) crash on the defter entry's RESTRICT FK. Force the proper
     # path: re-open first (which reverses everything), then delete.
     if order.order_status in _SHIPPED_CLASS:
+        from django.utils.translation import gettext as _
         messages.error(
             request,
-            "Tamamlanmış/gönderilmiş sipariş silinemez — stok ve cari kayıtları bozulur. "
-            "Önce sipariş detayındaki 'Geri Aç & Düzelt' ile geri açın, sonra silin.",
+            _("A completed or shipped order cannot be deleted — its stock and "
+              "current account records would break. Reopen it first with "
+              "'Re-open & Fix' on the order page, then delete it."),
         )
         return redirect("operating:order_detail", pk=order.pk)
     order.delete()

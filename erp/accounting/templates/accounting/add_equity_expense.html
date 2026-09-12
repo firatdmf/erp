@@ -237,7 +237,7 @@
                 </span>
               </label>
               <label>
-                <input type="radio" name="funding_source" value="cari" id="fundCurrentAccount"
+                <input type="radio" name="funding_source" value="current_account" id="fundCurrentAccount"
                        {% if form.paid_by_current_account.value %}checked{% endif %}>
                 <span>
                   <span class="t">{% trans "Someone paid it for the book" %}</span>
@@ -330,8 +330,8 @@
               <div class="pf-f">
                 <label>{% trans "Currency" %}</label>
                 {% comment %}
-                  Free to choose while a current account is funding this: a
-                  cari holds a mix of currencies by design, so a USD account
+                  Free to choose while a current account is funding this: an
+                  account holds a mix of currencies by design, so a USD account
                   can have settled a lira bill. Locked to the account on the
                   cash path, because a cash balance is decremented without
                   converting — see EquityExpenseForm.clean. Disabled submits
@@ -477,7 +477,7 @@
         data-choose="{% trans "Choose what funded this expense." %}"
         data-owe="{% trans "Cash is untouched. The book will owe {name} this amount." %}"
         data-cash-down="{% trans "The balance of {name} goes down by this amount." %}"
-        data-ccy-cari="{% trans "Defaults to the account's own currency — change it if the money was actually spent in another." %}"
+        data-ccy-current-account="{% trans "Defaults to the account's own currency — change it if the money was actually spent in another." %}"
         data-ccy-cash="{% trans "Set by the cash account." %}"></span>
 </div>
 
@@ -507,10 +507,10 @@
   // submits its value, and two funding sources is the one thing
   // EquityExpense's check constraint refuses.
   function applyFunding() {
-    var cari = document.getElementById('fundCurrentAccount').checked;
-    currentAccountPane.hidden = !cari;
-    cashPane.hidden = cari;
-    if (cari) { cashSel.value = ''; } else { setCurrentAccount(''); }
+    var onAccount = document.getElementById('fundCurrentAccount').checked;
+    currentAccountPane.hidden = !onAccount;
+    cashPane.hidden = onAccount;
+    if (onAccount) { cashSel.value = ''; } else { setCurrentAccount(''); }
     cashSel.dispatchEvent(new Event('change'));
     syncCurrency();
     syncSummary();
@@ -659,7 +659,7 @@
     var sel = usingCurrentAccount ? currentAccountSel : cashSel;
     var opt = sel.options[sel.selectedIndex];
     var picked = !!(opt && opt.value);
-    // Off the currency control, which on the cari path need not agree with
+    // Off the currency control, which on the account path need not agree with
     // the account — that disagreement is exactly what it is there for.
     var ccyOpt = ccySel.options[ccySel.selectedIndex];
     document.getElementById('sumCurrency').textContent =

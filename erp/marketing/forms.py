@@ -1,6 +1,10 @@
+import json
+from decimal import Decimal, InvalidOperation
+
 from django import forms
 from django.contrib.postgres.forms import SimpleArrayField
 from django.forms import inlineformset_factory
+from django.utils.translation import gettext as _
 from .models import *
 
 
@@ -61,6 +65,52 @@ class ProductForm(forms.ModelForm):
             # Use count() instead of exists() for better compatibility with some cursor types
             if is_update and self.instance.variants.count() > 0:
                 self.fields["has_variants"].initial = True
+
+    def clean(self):
+        """Refuse a negative variant price or cost before anything is saved.
+
+        The variants arrive as JSON in the same POST, outside any form field,
+        and the view writes them with bulk_update after saving the product —
+        so without this the database constraint would reject them halfway
+        through, after the product itself had already been written.
+        """
+        cleaned_data = super().clean()
+        negative = sorted(_skus_with_negative_money(self.data.get("variants_json")))
+        if negative:
+            raise forms.ValidationError(
+                _("Variant price and cost cannot be negative: %(skus)s")
+                % {"skus": ", ".join(negative)}
+            )
+        return cleaned_data
+
+
+def _skus_with_negative_money(variants_json):
+    """The SKUs in a product form's variants_json whose price or cost is
+    below zero. Blank and unparseable values are not this check's business;
+    handle_variants deals with those as it always has."""
+    try:
+        data = json.loads(variants_json or "[]")
+    except (TypeError, ValueError):
+        return set()
+    if isinstance(data, dict):
+        data = data.get("product_variant_list", [])
+    if not isinstance(data, list):
+        return set()
+
+    found = set()
+    for variant in data:
+        if not isinstance(variant, dict):
+            continue
+        for key in ("variant_price", "variant_cost"):
+            value = variant.get(key)
+            if value in (None, ""):
+                continue
+            try:
+                if Decimal(str(value)) < 0:
+                    found.add(str(variant.get("variant_sku") or "?"))
+            except (InvalidOperation, ValueError):
+                continue
+    return found
 
 class ProductVariantForm(forms.ModelForm):
     class Meta:

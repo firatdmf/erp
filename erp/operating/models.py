@@ -1,4 +1,7 @@
 import traceback
+from decimal import Decimal
+
+from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from crm.models import Contact, Company
@@ -1050,7 +1053,7 @@ class OrderItem(models.Model):
     # what the number meant implicitly before.
     outsourced_quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True, default=None,
-        help_text="Depo dışından temin edilecek miktar — faturaya ve cariye dahildir.",
+        help_text="Quantity sourced from outside the warehouse — included in the invoice and the current account.",
     )
     target_quantity_per_pack = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
@@ -1480,9 +1483,12 @@ class WarehouseProduct(models.Model):
         help_text="What one stock item of this product physically is",
     )
 
-    # Original purchase price as imported from Excel
+    # Original purchase price as imported from Excel. No cost is below
+    # zero (see the CheckConstraints in Meta, which hold for the bulk
+    # import and intake paths that never call full_clean()).
     purchase_price = models.DecimalField(
-        max_digits=14, decimal_places=2, null=True, blank=True
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
     )
     purchase_currency = models.CharField(
         max_length=4, choices=CURRENCY_CHOICES, default='USD'
@@ -1497,11 +1503,13 @@ class WarehouseProduct(models.Model):
     # they still read as plain cents next to purchase_price.
     cost_usd = models.DecimalField(
         max_digits=14, decimal_places=4, null=True, blank=True,
-        help_text="Unit cost in USD"
+        help_text="Unit cost in USD",
+        validators=[MinValueValidator(Decimal("0"))],
     )
     cost_try = models.DecimalField(
         max_digits=14, decimal_places=4, null=True, blank=True,
-        help_text="Unit cost in TRY"
+        help_text="Unit cost in TRY",
+        validators=[MinValueValidator(Decimal("0"))],
     )
 
     # The hidden marketing ProductVariant this warehouse item maps to.
@@ -1524,6 +1532,13 @@ class WarehouseProduct(models.Model):
         ordering = ['name']
         indexes = [
             models.Index(fields=['warehouse', 'sku']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(**{f"{field}__gte": 0}) | models.Q(**{f"{field}__isnull": True}),
+                name=f"operating_warehouseproduct_{field}_not_negative",
+            )
+            for field in ("purchase_price", "cost_usd", "cost_try")
         ]
 
     def __str__(self):
@@ -1789,12 +1804,19 @@ class WarehouseProductItem(models.Model):
     unit_cost_base = models.DecimalField(
         max_digits=14, decimal_places=4, null=True, blank=True,
         help_text="Unit cost when received, in the owning book's base currency",
+        validators=[MinValueValidator(Decimal("0"))],
     )
 
     class Meta:
         ordering = ["-scanned_at"]
         indexes = [
             models.Index(fields=["product", "-scanned_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(unit_cost_base__gte=0) | models.Q(unit_cost_base__isnull=True),
+                name="operating_warehouseproductitem_unit_cost_base_not_negative",
+            ),
         ]
 
     def __str__(self):

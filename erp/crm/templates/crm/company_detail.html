@@ -349,6 +349,26 @@
 
   /* Order history rows — clickable, link to operating:order_detail */
   .od-order-list { display: flex; flex-direction: column; gap: 8px; }
+  /* Account history: picking, and the print/export tools above it.
+     Same rules contact_detail carries for the card it shares. */
+  .od-card-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: -2px 0 12px; }
+  .od-order-pick { display: flex; align-items: center; gap: 10px; }
+  .od-order-pick > .od-order-row { flex: 1; min-width: 0; }
+  .od-account-check {
+    flex: none; width: 15px; height: 15px; cursor: pointer;
+    accent-color: var(--nejum-teal-600);
+  }
+  .od-print-orders {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 11px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--nejum-teal-500); background: white;
+    color: var(--nejum-teal-700); font: 600 11.5px var(--font-sans);
+    transition: all 140ms;
+  }
+  .od-print-orders:hover:not(:disabled) { background: #E6F4F1; }
+  .od-print-orders:disabled {
+    opacity: 0.45; cursor: default; border-color: #E2E8EE; color: var(--gray-500);
+  }
   .od-order-row {
     display: grid;
     grid-template-columns: 1.4fr 130px 1fr 18px;
@@ -624,28 +644,60 @@
           </div>
         </section>
 
-        <!-- LEDGER ACCOUNTS (all books) -->
+        <!-- ACCOUNT HISTORY (every book, pickable) -->
         <section class="od-card">
           <div class="od-card-h">
             <i class="fa fa-book card-ico"></i>
-            <h3>{% trans "Ledger accounts" %}</h3>
-            <span class="od-card-sub">{{ current_account_accounts|length }} {% blocktrans count counter=cari_accounts|length %}book{% plural %}books{% endblocktrans %}</span>
+            <h3>{% trans "Account history" %}</h3>
+            <span class="od-card-sub">{{ current_account_accounts|length }} {% blocktrans count counter=current_account_accounts|length %}account{% plural %}accounts{% endblocktrans %}</span>
           </div>
+          {% comment %}
+            Pick accounts, print or export — the same gesture as Order
+            history above, because it answers the same question. A
+            customer holds one account per book, which is OUR arrangement:
+            picking both and printing gives them the single statement they
+            would recognise, with no book named on it. See
+            accounting.views_accounts.CurrentAccountStatementPrintCombined.
+          {% endcomment %}
+          {% if current_account_accounts %}
+            <div class="od-card-tools">
+              <button type="button" id="printAccountsBtn" class="od-print-orders" disabled
+                      onclick="printSelectedAccounts()"
+                      data-label-idle="{% trans 'Print selected' %}"
+                      data-label-picked="{% trans 'Print' %}">
+                <i class="fa fa-print"></i>
+                <span id="printAccountsLabel">{% trans "Print selected" %}</span>
+              </button>
+              <button type="button" id="excelAccountsBtn" class="od-print-orders" disabled
+                      onclick="excelSelectedAccounts()"
+                      data-label-idle="{% trans 'Excel' %}"
+                      data-label-picked="{% trans 'Excel' %}"
+                      title="{% trans 'Download the selected accounts as one statement' %}">
+                <i class="fa fa-file-excel"></i>
+                <span id="excelAccountsLabel">{% trans "Excel" %}</span>
+              </button>
+            </div>
+          {% endif %}
           <div class="od-order-list">
             {% for a in current_account_accounts %}
-              <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
-                <div class="od-order-id">
-                  <div class="od-order-num">{{ a.book.name }}</div>
-                  <div class="od-order-date">{{ a.code }}</div>
-                </div>
-                <span class="ord-status {% if a.cached_balance > 0 %}pending{% elif a.cached_balance < 0 %}cancelled{% else %}completed{% endif %}">
-                  <span class="ord-status-dot"></span>{{ a.balance_label }}
-                </span>
-                <div class="od-order-total">
-                  {{ a.cached_balance|floatformat:2 }} <span>{{ a.display_currency_symbol }}</span>
-                </div>
-                <i class="fa fa-chevron-right od-order-chev"></i>
-              </a>
+              <div class="od-order-pick">
+                <input type="checkbox" class="od-account-check" value="{{ a.pk }}"
+                       onchange="syncAccountSelection()"
+                       aria-label="{% trans 'Include this account' %} {{ a.code }}">
+                <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
+                  <div class="od-order-id">
+                    <div class="od-order-num">{{ a.book.name }}</div>
+                    <div class="od-order-date">{{ a.code }}</div>
+                  </div>
+                  <span class="ord-status {% if a.cached_balance > 0 %}pending{% elif a.cached_balance < 0 %}cancelled{% else %}completed{% endif %}">
+                    <span class="ord-status-dot"></span>{{ a.balance_label }}
+                  </span>
+                  <div class="od-order-total">
+                    {{ a.cached_balance|floatformat:2 }} <span>{{ a.display_currency_symbol }}</span>
+                  </div>
+                  <i class="fa fa-chevron-right od-order-chev"></i>
+                </a>
+              </div>
             {% empty %}
               <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
                 {% trans "No ledger account in any book yet." %}
@@ -1401,7 +1453,7 @@
     }
 
     container.style.display = 'flex';
-    container.innerHTML = '<div style="margin:auto; background:white; padding:20px; border-radius:8px;"><i class="fas fa-spinner fa-spin"></i> Yükleniyor...</div>';
+    container.innerHTML = '<div style="margin:auto; background:white; padding:20px; border-radius:8px;"><i class="fas fa-spinner fa-spin"></i> {% trans "Loading..." %}</div>';
 
     fetch(`/email/email/${emailId}/`, {
       headers: { 'HX-Request': 'true' }
@@ -1411,7 +1463,7 @@
         container.innerHTML = `
         <div class="compose-modal" style="position:relative; bottom:auto; right:auto; width:800px; height:80vh;">
           <div class="compose-header">
-            <h3>{% trans "E-posta Detayı" %}</h3>
+            <h3>{% trans "Email detail" %}</h3>
             <button class="close-btn" onclick="closeEmailDetailModal()"><i class="fas fa-times"></i></button>
           </div>
           <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
@@ -1709,6 +1761,50 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeEditCompanySidebar();
   });
+
+  // ── Account history: pick, print, export ────────────────────────────
+  // Its own selector and its own functions rather than sharing the order
+  // ones: both cards can sit on this page, and a single `.od-order-check`
+  // query would have Print selected on one card silently carrying the
+  // other card's ticks.
+  function pickedAccountIds() {
+    return Array.from(document.querySelectorAll('.od-account-check:checked'))
+                .map(function (cb) { return cb.value; });
+  }
+
+  function syncAccountSelection() {
+    const btn = document.getElementById('printAccountsBtn');
+    if (!btn) return;
+    const n = pickedAccountIds().length;
+    btn.disabled = n === 0;
+    const xls = document.getElementById('excelAccountsBtn');
+    if (xls) xls.disabled = n === 0;
+    // Labels off data- attributes, not written into this script: they are
+    // translated, and a Turkish label carrying an apostrophe would
+    // otherwise close the JS string it sits in.
+    document.getElementById('printAccountsLabel').textContent =
+      n ? btn.dataset.labelPicked + ' (' + n + ')' : btn.dataset.labelIdle;
+    const xlsLabel = document.getElementById('excelAccountsLabel');
+    if (xls && xlsLabel) {
+      xlsLabel.textContent =
+        n ? xls.dataset.labelPicked + ' (' + n + ')' : xls.dataset.labelIdle;
+    }
+  }
+
+  function printSelectedAccounts() {
+    const ids = pickedAccountIds();
+    if (!ids.length) return;
+    window.open('{% url "accounts:statement_print_combined" %}?ids=' + ids.join(','),
+                '_blank');
+  }
+
+  // Navigates rather than opening a tab: the response is an attachment,
+  // so a new tab would open, take the download and sit there blank.
+  function excelSelectedAccounts() {
+    const ids = pickedAccountIds();
+    if (!ids.length) return;
+    window.location = '{% url "accounts:statement_excel_combined" %}?ids=' + ids.join(',');
+  }
 </script>
 
 <!-- Edit Company Sidebar -->

@@ -67,7 +67,7 @@ class Command(BaseCommand):
         parser.add_argument("--apply", action="store_true",
                             help="Write the freeze. Without this, only reports.")
         parser.add_argument("--repost", action="store_true",
-                            help="Also re-post each order's cari movement to the frozen "
+                            help="Also re-post each order's current account movement to the frozen "
                                  "value. MOVES MONEY. Requires --apply.")
         parser.add_argument("--order", type=int, default=None,
                             help="Restrict to a single order id. Named explicitly, an "
@@ -166,8 +166,8 @@ class Command(BaseCommand):
         if not apply_:
             self.stdout.write(self.style.WARNING(
                 "\nDRY RUN — nothing written. Re-run with --apply to freeze, "
-                "and --apply --repost to also correct the cari balances."))
+                "and --apply --repost to also correct the account balances."))
         elif not repost:
             self.stdout.write(self.style.WARNING(
-                "\nFrozen, but cari balances were NOT touched. The stored movement "
+                "\nFrozen, but account balances were NOT touched. The stored movement "
                 "column above shows where they still disagree; --repost corrects them."))

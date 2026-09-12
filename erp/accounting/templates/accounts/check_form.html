@@ -73,12 +73,12 @@
   .chk-f-f textarea { resize: vertical; min-height: 80px; font-family: var(--font-sans); }
   .chk-f-f input[type=date] { font-variant-numeric: tabular-nums; }
 
-  /* Cari chip when prefilled */
-  .chk-f-cari-chip { display:inline-flex; align-items:center; gap:8px; background: var(--nejum-teal-50); border: 1px solid rgba(20,127,116,0.20); padding: 10px 14px; border-radius: 10px; font: 600 13px var(--font-sans); color: var(--ink); }
-  .chk-f-cari-chip i { width: 14px; height: 14px; color: var(--nejum-teal-700); }
-  .chk-f-cari-chip .code { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 8px; background: white; border-radius: 6px; }
-  .chk-f-cari-chip .change-link { margin-left: 8px; color: var(--gray-500); text-decoration: none; font: 500 12px var(--font-sans); }
-  .chk-f-cari-chip .change-link:hover { color: var(--nejum-teal-700); }
+  /* Account chip when prefilled */
+  .chk-f-account-chip { display:inline-flex; align-items:center; gap:8px; background: var(--nejum-teal-50); border: 1px solid rgba(20,127,116,0.20); padding: 10px 14px; border-radius: 10px; font: 600 13px var(--font-sans); color: var(--ink); }
+  .chk-f-account-chip i { width: 14px; height: 14px; color: var(--nejum-teal-700); }
+  .chk-f-account-chip .code { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 8px; background: white; border-radius: 6px; }
+  .chk-f-account-chip .change-link { margin-left: 8px; color: var(--gray-500); text-decoration: none; font: 500 12px var(--font-sans); }
+  .chk-f-account-chip .change-link:hover { color: var(--nejum-teal-700); }
 
   /* Direction radios */
   .chk-f-dir-radios { display:flex; gap: 10px; }
@@ -132,7 +132,7 @@
         {% if prefilled_current_account %}
         <input type="hidden" name="account" value="{{ prefilled_current_account.id }}">
         <div style="margin-bottom: 14px;">
-          <div class="chk-f-cari-chip">
+          <div class="chk-f-account-chip">
             <i data-lucide="user"></i>
             <span class="code">{{ prefilled_current_account.code }}</span>
             <span>{{ prefilled_current_account.name }}</span>

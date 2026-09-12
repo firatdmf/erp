@@ -5,8 +5,8 @@ getting two accounts in one book. What they can't catch is one real-world
 customer showing up twice behind different rows:
 
   * a Contact-linked account next to that contact's Company-linked account
-    (get_or_create_cari_for_order prefers the company, but a direct call to
-    get_or_create_cari_for_contact makes the contact one anyway),
+    (get_or_create_current_account_for_order prefers the company, but a direct call to
+    get_or_create_current_account_for_contact makes the contact one anyway),
   * two accounts carrying the same tax number (VKN),
   * two unlinked accounts typed in by hand under the same name.
 
@@ -30,7 +30,7 @@ groups yourself; the merge, the blockers and the dry run are the same:
         --merge 88888,2025Ö --into 99999 --merge-cross-entity
 
 NB: after a cross-entity merge the losing CRM records have no account
-left, and any call to get_or_create_cari_for_* will mint them a fresh
+left, and any call to get_or_create_current_account_for_* will mint them a fresh
 one. Delete or merge those records too, or the duplicates grow back.
 """
 from collections import defaultdict

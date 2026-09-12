@@ -4,7 +4,7 @@ from . import views_warehouse
 from . import order_excel
 from . import warehouse_label
 from . import warehouse_excel
-from accounting.book_scope import book_guarded, book_scoped
+from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped
 from .models import Order, Warehouse
 from django.views.generic import TemplateView, RedirectView
 
@@ -80,13 +80,19 @@ urlpatterns = [
     path("orders/print/combined/excel/", order_excel.combined_order_excel, name="order_excel_combined"),
     path("orders/<int:pk>/print-header/", views.update_order_print_header, name="order_print_header"),
     path("orders/<int:pk>/changes/", views.order_changes, name="order_changes"),
-    # Packing-scan flow (reserve warehouse rolls before shipping)
-    path("orders/<int:pk>/pack/", views.order_pack_scan, name="order_pack_scan"),
-    path("orders/<int:pk>/pack/add/", views.order_pack_reserve_add, name="order_pack_reserve_add"),
+    # Packing-scan flow (reserve warehouse rolls before shipping).
+    #
+    # The sales-rep role reaches these (erp.roles), and these routes name
+    # an order by id and nothing else — so for her, and only for her,
+    # the order's book is checked against her assignments the way
+    # order_detail's is. See book_guarded_for_sales_rep for why it is not
+    # simply book_guarded for everybody.
+    path("orders/<int:pk>/pack/", book_guarded_for_sales_rep(views.order_pack_scan, Order, "current_account.book"), name="order_pack_scan"),
+    path("orders/<int:pk>/pack/add/", book_guarded_for_sales_rep(views.order_pack_reserve_add, Order, "current_account.book"), name="order_pack_reserve_add"),
     path("orders/<int:pk>/pack/update/", views.order_pack_reserve_update, name="order_pack_reserve_update"),
     path("orders/<int:pk>/pack/remove/", views.order_pack_reserve_remove, name="order_pack_reserve_remove"),
-    path("orders/<int:pk>/pack/assign_pack/", views.order_pack_reserve_assign_pack, name="order_pack_reserve_assign_pack"),
-    path("orders/<int:pk>/pack/assign_item/", views.order_pack_assign_item, name="order_pack_assign_item"),
+    path("orders/<int:pk>/pack/assign_pack/", book_guarded_for_sales_rep(views.order_pack_reserve_assign_pack, Order, "current_account.book"), name="order_pack_reserve_assign_pack"),
+    path("orders/<int:pk>/pack/assign_item/", book_guarded_for_sales_rep(views.order_pack_assign_item, Order, "current_account.book"), name="order_pack_assign_item"),
     path("orders/<int:pk>/pack/complete/", views.order_pack_complete, name="order_pack_complete"),
     path("orders/create/barcode_check/", views.order_create_barcode_check, name="order_create_barcode_check"),
     path("orders/create/barcode_resolve/", views.order_create_barcode_resolve, name="order_create_barcode_resolve"),
@@ -110,7 +116,10 @@ urlpatterns = [
     ),
     path(
         "orders/<int:pk>/packing_list/",
-        views.OrderPackingList.as_view(),
+        # Guarded with the pack flow above, and for the same reason: the
+        # packing screen POSTs its sack add/delete here.
+        book_guarded_for_sales_rep(
+            views.OrderPackingList.as_view(), Order, "current_account.book"),
         name="order_packing_list",
     ),
     # path("create_product/",views.CreateProduct.as_view(),name="create_product"),

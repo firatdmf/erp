@@ -77,6 +77,8 @@
     border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
   }
   .mf-f input::placeholder, .mf-f textarea::placeholder { color: var(--gray-500); }
+  .mf-f select:disabled { background: #F4F7FB; color: var(--gray-600); cursor: not-allowed; }
+  .mf-hint { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
   .mf-f input[type=date] { font-variant-numeric: tabular-nums; }
 
   /* Direction radio cards */
@@ -153,20 +155,29 @@
 
           <div class="mf-f">
             <label>{% trans "Movement Type" %}<span class="req">*</span></label>
-            <select name="movement_type" required>
+            <select name="movement_type" id="mfType" required>
               {% for val,label in movement_type_choices %}
                 <option value="{{ val }}" {% if movement %}{% if movement.movement_type == val %}selected{% endif %}{% elif val == 'adjustment' %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
           </div>
 
+          {% comment %}
+            A type that changes what the account owes — an adjustment, an
+            opening balance, interest — is in the account's own currency,
+            like an invoice (CurrentAccountMovement.check_currency). The
+            picker is fixed while one is chosen; a disabled select submits
+            nothing, so the hidden input carries the fixed value instead.
+          {% endcomment %}
           <div class="mf-f">
             <label>{% trans "Currency" %}</label>
-            <select name="currency">
+            <select name="currency" id="mfCurrency">
               {% for c in currencies %}
                 <option value="{{ c.id }}" {% if movement %}{% if movement.currency_id == c.id %}selected{% endif %}{% elif c.id == current_account.default_currency_id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
               {% endfor %}
             </select>
+            <input type="hidden" name="currency" id="mfCurrencyFixed" value="{{ debt_currency_id }}" disabled>
+            <span class="mf-hint" id="mfCurrencyHint" hidden>{% trans "Only collections, payments, advances and checks can be in another currency." %}</span>
           </div>
 
           <div class="mf-f span-2">
@@ -232,6 +243,25 @@
   (function(){
     var d = document.querySelector('input[name="date"]');
     if (d && !d.value) { d.valueAsDate = new Date(); }
+  })();
+
+  (function () {
+    var DEBT_TYPES = {{ debt_types_json|safe }};
+    var typeSel = document.getElementById('mfType');
+    var curSel = document.getElementById('mfCurrency');
+    var fixed = document.getElementById('mfCurrencyFixed');
+    var hint = document.getElementById('mfCurrencyHint');
+    if (!typeSel || !curSel || !fixed) return;
+
+    function sync() {
+      var debt = DEBT_TYPES.indexOf(typeSel.value) !== -1;
+      if (debt) curSel.value = fixed.value;
+      curSel.disabled = debt;
+      fixed.disabled = !debt;
+      hint.hidden = !debt;
+    }
+    typeSel.addEventListener('change', sync);
+    sync();
   })();
 </script>
 {% endblock %}

@@ -58,7 +58,7 @@
      the row collapses to a 3-column grid that still fits on one line. */
   .pl-toolbar {
     display: grid;
-    /* Yön | Tip | Cari ara | Başlangıç | Bitiş | Temizle */
+    /* Direction | Type | Account search | From | To | Clear */
     grid-template-columns: minmax(0, 140px) minmax(0, 160px) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 8px;
     align-items: center;
@@ -114,8 +114,8 @@
     background-repeat: no-repeat;
     background-position: right 9px center;
   }
-  /* Cari name search — compact text input matching the rest of the chips. */
-  .pl-toolbar input[type="text"][name="cari_q"] {
+  /* Account name search — compact text input matching the rest of the chips. */
+  .pl-toolbar input[type="text"][name="current_account_q"] {
     flex: 1; min-width: 0;
     padding: 7px 9px;
     border: 0 !important;
@@ -139,7 +139,7 @@
   /* Tablet: 2-up grid; Account spans full row, reset drops below */
   @media (max-width: 900px) {
     .pl-toolbar { grid-template-columns: 1fr 1fr; }
-    .pl-ctl-cari { grid-column: 1 / -1; }
+    .pl-ctl-account { grid-column: 1 / -1; }
     .pl-reset { grid-column: 1 / -1; justify-self: end; }
   }
   /* Phone: stack but keep the bar compact — labels stay inline so
@@ -168,11 +168,11 @@
   .pl-num { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); text-decoration: none; letter-spacing: 0.02em; padding: 3px 8px; background: #F4F7FB; border-radius: 6px; }
   .pl-num:hover { background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
   .pl-date { color: var(--gray-600); font: 500 12.5px var(--font-sans); white-space: nowrap; }
-  .pl-cari { color: var(--ink); font: 600 13px var(--font-sans); text-decoration: none; }
-  .pl-cari:hover { color: var(--nejum-teal-700); }
-  .pl-cari-code { font: 500 11.5px var(--font-mono); color: var(--gray-500); margin-top: 2px; }
+  .pl-account { color: var(--ink); font: 600 13px var(--font-sans); text-decoration: none; }
+  .pl-account:hover { color: var(--nejum-teal-700); }
+  .pl-account-code { font: 500 11.5px var(--font-mono); color: var(--gray-500); margin-top: 2px; }
 
-  /* Per-row "go to cari" action button */
+  /* Per-row "go to account" action button */
   .pl-row-actions { text-align: right; padding-right: 12px !important; }
   .pl-go {
     display: inline-flex; align-items: center; gap: 6px;
@@ -289,10 +289,10 @@
         </select>
       </label>
 
-      <label class="pl-ctl pl-ctl-cari" title="{% trans 'Account' %}">
+      <label class="pl-ctl pl-ctl-account" title="{% trans 'Account' %}">
         <span class="pl-ctl-lbl">{% trans "Account" %}</span>
         <input type="text"
-               name="cari_q"
+               name="current_account_q"
                value="{{ filter_current_account_q }}"
                placeholder="{% trans 'Search…' %}"
                autocomplete="off">
@@ -320,7 +320,7 @@
 <script>
   if (window.lucide) lucide.createIcons();
 
-  /* Live search/filter — mirrors the cari list: debounce both text boxes,
+  /* Live search/filter — mirrors the account list: debounce both text boxes,
      fetch with X-Requested-With, swap only #pl-results, keep the URL
      shareable via replaceState, drop stale responses with a token. */
   (function () {
@@ -361,7 +361,7 @@
         if (e.key === 'Enter') { e.preventDefault(); clearTimeout(debTimer); plFetch(); }
       });
     });
-    var currentAccountQ = form.querySelector('input[name="cari_q"]');
+    var currentAccountQ = form.querySelector('input[name="current_account_q"]');
     if (currentAccountQ) {
       currentAccountQ.addEventListener('input', debounced);
       currentAccountQ.addEventListener('keydown', function (e) {

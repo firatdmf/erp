@@ -108,19 +108,20 @@ works right up until Postgres refuses. Nothing cascades; dependants must be
 removed explicitly, innermost first:
 
 ```
-PaymentAllocation.invoice  → Invoice          PROTECT
-Invoice.cari               → CariAccount      PROTECT
-Payment.cari               → CariAccount      PROTECT
-Payment.cash_account       → CashAccount      PROTECT
-CheckOrPromissoryNote.cari → CariAccount      PROTECT
+PaymentAllocation.invoice             → Invoice          PROTECT
+Invoice.current_account               → CurrentAccount   PROTECT
+Payment.current_account               → CurrentAccount   PROTECT
+Payment.cash_account                  → CashAccount      PROTECT
+CheckOrPromissoryNote.current_account → CurrentAccount   PROTECT
 Invoice.book / Payment.book / CheckOrPromissoryNote.book → Book  PROTECT
 ```
 
 So removing an account means: release its payment allocations, delete its
-invoices, delete its payments, then delete the account. `CariMovement` is
-`CASCADE` and follows on its own. `Order.cari` is `SET_NULL`, so orders survive
-with their link cleared — check whether that is what you want, because an order
-with no cari appears on no customer account at all.
+invoices, delete its payments, then delete the account.
+`CurrentAccountMovement` is `CASCADE` and follows on its own.
+`Order.current_account` is `SET_NULL`, so orders survive with their link
+cleared — check whether that is what you want, because an order with no current
+account appears on no customer account at all.
 
 **Never delete a confirmed payment outright.** Call `Payment.cancel()`, which
 reverses the cash account and the invoice allocations. Deleting the row leaves
@@ -133,13 +134,13 @@ working as designed.
 
 ## 💱 Money
 
-`CariMovement.amount` is in whatever currency the movement was entered in;
+`CurrentAccountMovement.amount` is in whatever currency the movement was entered in;
 `amount_base` is that same figure converted to the base currency at the rate
 recorded on the row. **Sum `amount_base`, never `amount`** — adding EUR to USD
 produces a number that is not money in any currency, and it reads as plausible
 right up until someone reconciles it.
 
-Balances on `CariAccount` are base-currency totals, which is why
+Balances on `CurrentAccount` are base-currency totals, which is why
 `display_currency_symbol` returns the base currency symbol rather than the
 account's own.
 
@@ -147,12 +148,14 @@ account's own.
 
 A `Book` is not only a ledger book — it also carries cash accounts, expenses
 and receivables, so several exist for reasons unrelated to current accounts.
-Do not assume a book with no cari accounts is empty; check
+Do not assume a book with no current accounts is empty; check
 `Book._meta.related_objects` before deleting one.
 
-The ledger book is named per brand in `BRAND_DEFAULTS["<brand>"]
-["CARI_BOOK_NAME"]`, matched by name because each brand runs in its own schema
-where the same book has a different id.
+Which book a new account lands in follows the person entering it: their working
+book (`Member.default_book`), else the first book assigned to them. Work with no
+member behind it — cron, imports, the shell — falls back to
+`CURRENT_ACCOUNT_BOOK_ID`. See `get_default_book` in
+`accounting/services_accounts.py`.
 
 Deleting a book is the most destructive single action in this codebase.
 Everything hanging off it is `CASCADE` and nothing is `PROTECT`, so Postgres
@@ -177,18 +180,15 @@ for qs in collector.fast_deletes:
     seen[qs.model].update(qs.values_list("pk", flat=True))
 ```
 
-## 🔁 Legacy AR/AP mirrors
+## 🔁 Moving accounts between books
 
-Every `CariMovement` copies itself into `AssetAccountsReceivable` (amount > 0)
-or `LiabilityAccountsPayable` (amount < 0) so the older dashboards keep
-working. The mirror is written with `book=movement.book` **at creation only**,
-and `CariMovement.legacy_ar_id` / `legacy_ap_id` hold the link.
-
-Anything that moves a movement between books has to move its mirror too.
-Consolidating the accounts stranded 34 mirrors on the old book, which is why
-that book's page kept listing receivables for customers whose accounts had
-already left it. `move_cari_accounts` now carries them; anything new that
-touches `CariMovement.book` must do the same.
+An account's movements, invoices, payments and checks each carry their own
+`book`, so changing `CurrentAccount.book` on its own leaves the ledger
+inconsistent. Use `python manage.py move_current_accounts`: it moves all of
+them in one transaction, renumbers any account code or document number the
+destination already uses, and advances the destination's counters past what
+arrived. Anything new that touches `CurrentAccountMovement.book` must keep
+those rows together the same way.
 
 ---
 

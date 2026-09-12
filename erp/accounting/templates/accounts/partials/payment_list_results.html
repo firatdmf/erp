@@ -60,8 +60,8 @@ place instead of reloading the whole page.
         </td>
         <td><span class="pl-method">{{ p.get_method_display }}</span></td>
         <td>
-          <a class="pl-cari" href="{% url 'accounts:detail' p.current_account.pk %}">{{ p.current_account.name }}</a>
-          <div class="pl-cari-code">{{ p.current_account.code }}</div>
+          <a class="pl-account" href="{% url 'accounts:detail' p.current_account.pk %}">{{ p.current_account.name }}</a>
+          <div class="pl-account-code">{{ p.current_account.code }}</div>
         </td>
         <td><span class="pl-cash {% if not p.cash_account %}muted{% endif %}">{% if p.cash_account %}{{ p.cash_account.name }}{% else %}—{% endif %}</span></td>
         <td>

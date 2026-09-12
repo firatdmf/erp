@@ -85,9 +85,9 @@
   .ck-dir.received { color: #0E6E4A; background: #D1FAE5; }
   .ck-dir.given    { color: #B23B12; background: #FEE4E2; }
 
-  .ck-cari-link { font: 600 13px var(--font-sans); color: var(--ink); text-decoration: none; }
-  .ck-cari-link:hover { color: var(--nejum-teal-700); }
-  .ck-cari-code { font: 500 11.5px var(--font-mono); color: var(--gray-500); margin-top: 2px; }
+  .ck-account-link { font: 600 13px var(--font-sans); color: var(--ink); text-decoration: none; }
+  .ck-account-link:hover { color: var(--nejum-teal-700); }
+  .ck-account-code { font: 500 11.5px var(--font-mono); color: var(--gray-500); margin-top: 2px; }
 
   .ck-bank { font: 500 12.5px var(--font-sans); color: var(--gray-700); }
   .ck-drawer { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
@@ -235,8 +235,8 @@
             {% endif %}
           </td>
           <td>
-            <a class="ck-cari-link" href="{% url 'accounts:detail' c.current_account.pk %}">{{ c.current_account.name }}</a>
-            <div class="ck-cari-code">{{ c.current_account.code }}</div>
+            <a class="ck-account-link" href="{% url 'accounts:detail' c.current_account.pk %}">{{ c.current_account.name }}</a>
+            <div class="ck-account-code">{{ c.current_account.code }}</div>
           </td>
           <td>
             {% if c.bank %}<div class="ck-bank">{{ c.bank }}{% if c.branch %} · {{ c.branch }}{% endif %}</div>{% endif %}

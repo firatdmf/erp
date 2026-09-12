@@ -125,7 +125,11 @@ class EveryFigureIsBaseCurrency(TestCase):
         return CurrentAccountMovement.objects.create(
             current_account=self.current_account, book=self.book, date="2026-03-01",
             amount=Decimal(amount), currency=currency, exchange_rate=rate,
-            movement_type="opening", description="ob")
+            # An opening balance is in the account's currency now
+            # (CurrentAccountMovement.check_currency); the lira rows this
+            # class is about come in as advances, which may be in any.
+            movement_type="opening" if currency == self.usd else "advance_in",
+            description="ob")
 
     def _row(self):
         resp = self.client.get(

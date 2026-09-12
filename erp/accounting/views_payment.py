@@ -275,6 +275,20 @@ def _fx_context(book):
     return json.dumps({"id": base.pk, "code": base.code, "symbol": base.symbol})
 
 
+def _fx_account_context(current_account):
+    """The account's own currency for the converter, when it keeps one.
+
+    "null" for an account kept in the book's currency, which is every
+    account but the few that trade in lira — the form then converts toward
+    the book, as it always has. Otherwise a payment in any other currency
+    converts toward this one instead: see Payment.rate_is_toward_account.
+    """
+    own = current_account.own_currency if current_account else None
+    if own is None:
+        return "null"
+    return json.dumps({"id": own.pk, "code": own.code, "symbol": own.symbol})
+
+
 # Create
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
@@ -324,6 +338,7 @@ class PaymentCreate(View):
             "method_choices": Payment.METHOD_CHOICES,
             "initial_type":   initial_type,
             "base_currency": _fx_context(prefilled_current_account.book if prefilled_current_account else None),
+            "account_currency": _fx_account_context(prefilled_current_account),
             "open_invoices_json": json.dumps(_serialize_invoices(open_invoices), default=str),
         })
 
@@ -359,7 +374,7 @@ class PaymentCreate(View):
         cash_account_id = request.POST.get("cash_account") or None
 
         with transaction.atomic():
-            payment = Payment.objects.create(
+            payment = Payment(
                 current_account=current_account,
                 book=current_account.book,
                 number=_next_payment_number(current_account.book, ptype),
@@ -370,11 +385,13 @@ class PaymentCreate(View):
                 amount=amount,
                 currency_id=currency_id,
                 cash_account_id=int(cash_account_id) if cash_account_id else None,
-                exchange_rate=_entered_rate(request),
                 description=request.POST.get("description", ""),
                 notes=request.POST.get("notes", ""),
                 created_by=getattr(request.user, "member", None),
             )
+            # Toward the book or toward the account, by the currency picked.
+            payment.set_stated_rate(_entered_rate(request))
+            payment.save()
 
             # Create allocations
             for a in allocations:
@@ -526,6 +543,7 @@ class PaymentEdit(View):
             "type_choices":   Payment.PAYMENT_TYPES,
             "method_choices": Payment.METHOD_CHOICES,
             "base_currency": _fx_context(payment.book or payment.current_account.book),
+            "account_currency": _fx_account_context(payment.current_account),
             "open_invoices_json": json.dumps(_edit_invoice_rows(payment), default=str),
         })
 
@@ -571,7 +589,7 @@ class PaymentEdit(View):
                 payment.currency_id = int(currency_id)
             cash_account_id = request.POST.get("cash_account") or None
             payment.cash_account_id = int(cash_account_id) if cash_account_id else None
-            payment.exchange_rate = _entered_rate(request)
+            payment.set_stated_rate(_entered_rate(request))
             payment.description = request.POST.get("description", "")
             payment.notes = request.POST.get("notes", "")
             # `number` deliberately stays as issued, prefix and all: a

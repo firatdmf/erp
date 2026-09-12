@@ -32,7 +32,7 @@ class PaymentFormDefaultsTest(TestCase):
             book=self.book, name="Cash", currency=self.try_
         )
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-001", name="Maria", type="customer",
+            book=self.book, code="TST-001", name="Maria", type="customer",
             default_currency=self.usd,
         )
 

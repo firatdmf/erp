@@ -488,7 +488,7 @@
               A walk-in has no contact/company/web_client, so without this
               branch it fell through to "Unassigned" — which read as an
               order nobody had attached a customer to. It IS attached: to
-              the shared PERAKENDE cari every retail sale posts to. Only
+              the shared PERAKENDE account every retail sale posts to. Only
               the older retail orders carry a guest name, so name the
               account when there isn't one.
             {% endcomment %}
@@ -896,7 +896,7 @@
       const IS_ADMIN = {% if is_admin %}true{% else %}false{% endif %};
       let deletePw = '';
       if (!IS_ADMIN) {
-        deletePw = prompt('{% trans "Sipariş silmek için şifre girin:" %}') || '';
+        deletePw = prompt('{% trans "Enter the password to delete an order:" %}') || '';
         if (!deletePw) return;
       }
 

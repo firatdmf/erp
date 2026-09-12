@@ -26,7 +26,7 @@ class FxDisclosureBase(TestCase):
         # row's book (accounting.book_scope.book_guarded).
         self.user.member.books.add(self.book)
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-078", name="RANA UYGUR",
+            book=self.book, code="TST-078", name="RANA UYGUR",
             default_currency=self.try_)
 
     def payment(self, currency, rate=Decimal("0.020800"), confirm=True):
@@ -123,7 +123,13 @@ class PaymentDetailPageTest(FxDisclosureBase):
 
     def test_a_base_currency_payment_page_says_nothing_about_rates(self):
         """Every other payment in the book is in USD — a rate row on all
-        of them would be noise on 66 pages to serve one."""
+        of them would be noise on 66 pages to serve one.
+
+        On a dollar ACCOUNT: this fixture's account is kept in lira, and a
+        dollar payment to a lira account does convert — into lira. See
+        accounting.test_own_currency_balance."""
+        self.current_account.default_currency = self.usd
+        self.current_account.save()
         p = self.payment(self.usd)
         response = self.client.get(self.url(p))
         self.assertEqual(response.status_code, 200)
@@ -166,7 +172,9 @@ class StatementRowTest(FxDisclosureBase):
         mv = CurrentAccountMovement.objects.create(
             current_account=self.current_account, book=self.book, date="2026-08-17",
             amount=Decimal("10.00"), currency=self.usd,
-            movement_type="adjustment")
+            # A dollar row on this lira account, so a settling type — see
+            # CurrentAccountMovement.check_currency.
+            movement_type="advance_in")
         mv = CurrentAccountMovement.objects.select_related("currency").get(pk=mv.pk)
         with self.assertNumQueries(0):
             self.assertIsNone(conversion_facts(mv))

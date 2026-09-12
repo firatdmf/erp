@@ -206,10 +206,11 @@ body > main {
 }
 /* ------------------------------------------------------------------------
    Compact mode for the Accounting flyout. It absorbed the old top-level
-   Cari (Current Account) menu, so it now carries ten groups where that one
+   Current Account menu, so it now carries ten groups where that one
    carried six — spacing is tightened globally inside this flyout so more of
    it fits before the body has to scroll. The compact rules were written for
-   [data-flyout="cari"]; that section no longer exists, so they moved here
+   the old Current Account flyout; that section no longer exists, so they
+   moved here
    with it.
    ------------------------------------------------------------------------ */
 [data-flyout="accounting"] > .nj-flyout {
@@ -323,7 +324,7 @@ body > main {
 
 /* Body */
 /* Every flyout body scrolls once it outgrows the viewport. Sections keep
-   absorbing each other — Accounting took in Cari, Operations took in
+   absorbing each other — Accounting took in Current Account, Operations took in
    Procurement, Marketing took in Mail — and a menu that runs off the bottom
    of the screen hides its own last entries with no way to reach them.
    140px leaves room for the 64px topbar, the flyout header and a bottom

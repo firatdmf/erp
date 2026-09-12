@@ -121,7 +121,7 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
         cat = derive_catalog(sku, wp0.name or "")
         base = (cat["base_name"] or sku).strip()
 
-        cost = next((w.cost_usd for w in group if w.cost_usd), None)
+        cost = next((w.cost_usd for w in group if w.cost_usd and w.cost_usd > 0), None)
         barcode = next((w.barcode for w in group if w.barcode), None)
 
         variant, v_how = find_variant(k, _norm(sku))

@@ -206,8 +206,8 @@
           <div class="pd-info">
             <div class="row"><div class="lbl">{% trans "Date" %}</div><div class="val">{{ payment.date|date:"d.m.Y" }}</div></div>
             <div class="row"><div class="lbl">{% trans "Amount" %}</div><div class="val amt">{{ payment.currency.symbol }}{{ payment.amount|money }} {{ payment.currency.code }}</div></div>
-            {# Only for a payment that is not already in the book's own currency. #}
-            {% conversion_facts payment as fx %}
+            {# Only for a payment that converted — into the book's currency, or into the account's when the account keeps its own. #}
+            {% payment_conversion_facts payment as fx %}
             {% include "accounts/partials/fx_conversion.html" with fx=fx %}
             <div class="row"><div class="lbl">{% trans "Cash Account" %}</div><div class="val {% if not payment.cash_account %}muted{% endif %}">{% if payment.cash_account %}{{ payment.cash_account.name }}{% else %}—{% endif %}</div></div>
             <div class="row"><div class="lbl">{% trans "Book" %}</div><div class="val">{{ payment.book.name }}</div></div>

@@ -11,10 +11,12 @@ the group's margin, applied in bulk from the group page.
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext as _
 from django.views import View
 
 from .models import (Product, ProductCategory, ProductVariant,
@@ -190,7 +192,28 @@ class ProductGroupDetail(View):
                 status=400,
             )
 
-        products = group.product_set.prefetch_related("variants")
+        products = list(group.product_set.prefetch_related("variants"))
+
+        # A margin under -100% prices every costed row below zero. Refuse the
+        # whole run up front instead of letting the database reject it
+        # halfway through: name the products so the margin can be fixed.
+        def has_cost(p):
+            return (p.cost and p.cost > 0) or any(
+                v.variant_cost and v.variant_cost > 0 for v in p.variants.all())
+
+        below_zero = sorted(
+            p.sku or p.title for p in products
+            if has_cost(p)
+            and (p.profit_margin if p.profit_margin is not None
+                 else group.profit_margin) < -100
+        )
+        if below_zero:
+            return JsonResponse({
+                "success": False,
+                "error": _("A margin below -100%% would price these products "
+                           "below zero: %(products)s") % {"products": ", ".join(below_zero)},
+            }, status=400)
+
         products_updated = 0
         variants_updated = 0
         skipped_no_cost = 0
@@ -212,12 +235,13 @@ class ProductGroupDetail(View):
             if not touched:
                 skipped_no_cost += 1
 
-        if products_to_save:
-            Product.objects.bulk_update(products_to_save, ["price"], batch_size=500)
-            products_updated = len(products_to_save)
-        if variants_to_save:
-            ProductVariant.objects.bulk_update(variants_to_save, ["variant_price"], batch_size=500)
-            variants_updated = len(variants_to_save)
+        with transaction.atomic():
+            if products_to_save:
+                Product.objects.bulk_update(products_to_save, ["price"], batch_size=500)
+                products_updated = len(products_to_save)
+            if variants_to_save:
+                ProductVariant.objects.bulk_update(variants_to_save, ["variant_price"], batch_size=500)
+                variants_updated = len(variants_to_save)
 
         return JsonResponse({
             "success": True,

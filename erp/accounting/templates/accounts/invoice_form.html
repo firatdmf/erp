@@ -91,12 +91,12 @@
   .if-f input[type=date] { font-variant-numeric: tabular-nums; }
 
   /* Account chip */
-  .if-cari-chip { display:inline-flex; align-items:center; gap: 10px; padding: 10px 14px; background: var(--nejum-teal-50); border: 1px solid rgba(20,127,116,0.20); border-radius: 10px; font: 600 13px var(--font-sans); color: var(--nejum-teal-700); }
-  .if-cari-chip i { width: 14px; height: 14px; }
-  .if-cari-chip .code { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); padding: 3px 8px; background: white; border-radius: 6px; }
-  .if-cari-chip .name { color: var(--ink); }
-  .if-cari-chip .change { margin-left: 6px; color: var(--gray-500); font: 500 12px var(--font-sans); text-decoration: none; }
-  .if-cari-chip .change:hover { color: var(--nejum-teal-700); }
+  .if-account-chip { display:inline-flex; align-items:center; gap: 10px; padding: 10px 14px; background: var(--nejum-teal-50); border: 1px solid rgba(20,127,116,0.20); border-radius: 10px; font: 600 13px var(--font-sans); color: var(--nejum-teal-700); }
+  .if-account-chip i { width: 14px; height: 14px; }
+  .if-account-chip .code { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); padding: 3px 8px; background: white; border-radius: 6px; }
+  .if-account-chip .name { color: var(--ink); }
+  .if-account-chip .change { margin-left: 6px; color: var(--gray-500); font: 500 12px var(--font-sans); text-decoration: none; }
+  .if-account-chip .change:hover { color: var(--nejum-teal-700); }
 
   /* Items table */
   .if-items { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -241,7 +241,7 @@
             {% if prefilled_current_account %}
             <input type="hidden" name="account" value="{{ prefilled_current_account.id }}">
             <div style="margin-bottom: 14px;">
-              <div class="if-cari-chip">
+              <div class="if-account-chip">
                 <i data-lucide="user"></i>
                 <span class="code">{{ prefilled_current_account.code }}</span>
                 <span class="name">{{ prefilled_current_account.name }}</span>
@@ -252,9 +252,10 @@
             <div class="if-row wide" style="margin-bottom: 14px;">
               <div class="if-f">
                 <label>{% trans "Select Account" %}</label>
-                <select name="account" required>
+                <select name="account" id="invoiceAccount" required
+                        onchange="var o=this.options[this.selectedIndex], c=document.getElementById('invoiceCurrency'); if (c) c.options[0].textContent = o.getAttribute('data-currency') || '—';">
                   <option value="">{% trans "— Select account —" %}</option>
-                  {% for c in current_account_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
+                  {% for c in current_account_options %}<option value="{{ c.id }}" data-currency="{{ c.default_currency.code }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
                 </select>
                 <span class="hint">{% trans "If no account exists, first" %} <a href="{% url 'accounts:create' current_book.pk %}">{% trans "open a new account" %}</a>.</span>
               </div>
@@ -272,11 +273,18 @@
                 <label>{% trans "Series" %}</label>
                 <input type="text" name="series" maxlength="10" value="{{ invoice.series|default:'INV' }}">
               </div>
+              {% comment %}
+                Not a choice: an invoice is always in its account's currency
+                (Invoice.check_currency). Shown so the figures below are
+                read in the right money; follows the account picker when
+                there is one.
+              {% endcomment %}
               <div class="if-f">
                 <label>{% trans "Currency" %}</label>
-                <select name="currency">
-                  {% for c in currencies %}<option value="{{ c.id }}" {% if invoice and invoice.currency_id == c.id %}selected{% elif prefilled_current_account and prefilled_current_account.default_currency_id == c.id and not invoice %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
+                <select disabled id="invoiceCurrency">
+                  <option>{% if invoice %}{{ invoice.currency.code }}{% elif prefilled_current_account %}{{ prefilled_current_account.default_currency.code }}{% else %}—{% endif %}</option>
                 </select>
+                <span class="hint">{% trans "Always the account's currency." %}</span>
               </div>
               <div class="if-f">
                 <label>{% trans "Other Charges" %}</label>

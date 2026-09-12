@@ -24,7 +24,7 @@ class InvoiceCurrencyTest(TestCase):
         self.try_ = CurrencyCategory.objects.create(code="TRY", name="Turkish Lira", symbol="₺")
         self.book = Book.objects.create(name="Demfirat")
 
-    def _current_account(self, currency, code="CARI-001"):
+    def _current_account(self, currency, code="TST-001"):
         return CurrentAccount.objects.create(
             book=self.book, code=code, name="Kızılırmak",
             type="supplier", default_currency=currency,
@@ -32,7 +32,7 @@ class InvoiceCurrencyTest(TestCase):
 
     def test_the_alim_is_denominated_in_what_we_owe_them(self):
         self.assertEqual(invoice_currency_for(self._current_account(self.try_)), "TRY")
-        self.assertEqual(invoice_currency_for(self._current_account(self.usd, "CARI-002")), "USD")
+        self.assertEqual(invoice_currency_for(self._current_account(self.usd, "TST-002")), "USD")
 
     def test_an_account_with_no_currency_falls_back_to_base(self):
         """Defensive only — the column is NOT NULL, so this cannot come out

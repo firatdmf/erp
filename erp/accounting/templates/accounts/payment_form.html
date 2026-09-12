@@ -60,14 +60,14 @@
   .pf-btn.confirm { background: linear-gradient(180deg, #0E6E4A, #0A5638); border: 1px solid #084428; color: white; box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18); }
   .pf-btn.confirm:hover { filter: brightness(1.06); color: white; }
 
-  /* Cari chip */
-  .pf-cari-chip { display:inline-flex; align-items:center; gap: 10px; background: var(--nejum-teal-50); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(20,127,116,0.18); margin-bottom: 16px; }
-  .pf-cari-chip i { width: 16px; height: 16px; color: var(--nejum-teal-700); }
-  .pf-cari-chip .code { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 8px; background: white; border-radius: 5px; }
-  .pf-cari-chip .name { font: 700 13.5px var(--font-sans); color: var(--ink); }
-  .pf-cari-chip .balance { font: 500 12px var(--font-sans); color: var(--gray-600); }
-  .pf-cari-chip .change { margin-left: auto; font: 600 12px var(--font-sans); color: var(--gray-500); text-decoration: none; padding: 4px 10px; border-radius: 6px; }
-  .pf-cari-chip .change:hover { color: var(--nejum-teal-700); background: white; }
+  /* Account chip */
+  .pf-account-chip { display:inline-flex; align-items:center; gap: 10px; background: var(--nejum-teal-50); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(20,127,116,0.18); margin-bottom: 16px; }
+  .pf-account-chip i { width: 16px; height: 16px; color: var(--nejum-teal-700); }
+  .pf-account-chip .code { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 8px; background: white; border-radius: 5px; }
+  .pf-account-chip .name { font: 700 13.5px var(--font-sans); color: var(--ink); }
+  .pf-account-chip .balance { font: 500 12px var(--font-sans); color: var(--gray-600); }
+  .pf-account-chip .change { margin-left: auto; font: 600 12px var(--font-sans); color: var(--gray-500); text-decoration: none; padding: 4px 10px; border-radius: 6px; }
+  .pf-account-chip .change:hover { color: var(--nejum-teal-700); background: white; }
 
   /* Form fields */
   .pf-row { display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px 16px; }
@@ -217,7 +217,7 @@
 
             {% if prefilled_current_account %}
             <input type="hidden" name="account" value="{{ prefilled_current_account.id }}">
-            <div class="pf-cari-chip">
+            <div class="pf-account-chip">
               <i data-lucide="user"></i>
               <span class="code">{{ prefilled_current_account.code }}</span>
               <span class="name">{{ prefilled_current_account.name }}</span>
@@ -282,9 +282,12 @@
             </div>
 
             {% comment %}
-              Shown only when the payment's currency differs from the book's
-              own. Same currency means nothing is converted, and a rate of 1
-              beside a repeated figure tells the reader nothing.
+              Shown only when the payment's currency differs from the one it
+              converts into — the book's, or, on an account kept in another
+              currency, the account's (a dollar payment to a lira supplier
+              converts into lira; see Payment.rate_is_toward_account). Same
+              currency means nothing is converted, and a rate of 1 beside a
+              repeated figure tells the reader nothing.
 
               The rate and the converted total are the same relationship read
               from either end, so either can be typed and the other follows.
@@ -301,7 +304,7 @@
                 <div class="pf-fx-grid">
                   <input type="number" step="0.000001" min="0" name="exchange_rate"
                          id="paymentRate" placeholder="0.000000"
-                         value="{% if payment and payment.exchange_rate %}{{ payment.exchange_rate|unlocalize }}{% endif %}">
+                         value="{% if payment and payment.stated_rate %}{{ payment.stated_rate|unlocalize }}{% endif %}">
                   <span class="pf-fx-eq" id="fxEq"></span>
                   <div class="pf-fx-total">
                     <input type="number" step="0.01" min="0" id="paymentBaseTotal"
@@ -624,8 +627,9 @@ if (window.lucide) lucide.createIcons();
     sync(true);
   })();
 
-  // Currency conversion: what this payment comes to in the book's own
-  // currency, and at what rate.
+  // Currency conversion: what this payment comes to in the currency it is
+  // tracked in — the book's own, or the account's when the account keeps a
+  // different one and the payment is not in it — and at what rate.
   //
   // Only relevant when the two differ. The rate and the converted total are
   // one relationship read from either end, so editing either updates the
@@ -633,6 +637,8 @@ if (window.lucide) lucide.createIcons();
   // they were there and the published mid-market number was not.
   (function () {
     var BASE = {{ base_currency|safe }};
+    // Null unless the account is kept in a currency other than the book's.
+    var ACCOUNT = {{ account_currency|default:"null"|safe }};
     var row = document.getElementById('fxRow');
     if (!row || !BASE) return;
 
@@ -644,12 +650,16 @@ if (window.lucide) lucide.createIcons();
     var totalEl = document.getElementById('paymentBaseTotal');
     var noteEl = document.getElementById('fxNote');
     var resetBtn = document.getElementById('fxResetBtn');
-    document.getElementById('fxBaseCode').textContent = BASE.code;
+    var targetCodeEl = document.getElementById('fxBaseCode');
 
     // Set as soon as the user types a rate or a total, and from an existing
     // saved rate on an edit. While true, nothing fetched replaces it.
     var userSet = Boolean(rateEl.value);
     var lastKey = null;
+    // The currency pair the box was last filled for. A rate belongs to its
+    // pair: 0.0206 typed for lira→dollar must not survive a switch to a
+    // dollar payment, where the box now means dollar→lira.
+    var lastPair = null;
 
     // null, not 0, when the box is empty. Coercing it to zero rendered the
     // row as "0.020800 = 0.00" — and a figure sitting after an "=" states
@@ -673,9 +683,17 @@ if (window.lucide) lucide.createIcons();
       eqEl.textContent = '\u00d7 ' + lhs + (code ? ' ' + code : '') + ' =';
     }
 
+    // The currency this payment converts into. Mirrors
+    // Payment.rate_is_toward_account, which files the rate on save.
+    function target() {
+      var opt = currencyEl.options[currencyEl.selectedIndex];
+      if (ACCOUNT && opt && String(ACCOUNT.id) !== String(opt.value)) return ACCOUNT;
+      return BASE;
+    }
+
     function applies() {
       var opt = currencyEl.options[currencyEl.selectedIndex];
-      return opt && String(BASE.id) !== String(opt.value);
+      return opt && String(target().id) !== String(opt.value);
     }
 
     function recalcTotal() {
@@ -699,14 +717,14 @@ if (window.lucide) lucide.createIcons();
 
       var opt = currencyEl.options[currencyEl.selectedIndex];
       var code = opt ? opt.textContent.trim() : '';
-      var key = code + '|' + (dateEl.value || '');
+      var key = code + '|' + target().code + '|' + (dateEl.value || '');
       if (!force && key === lastKey) { recalcTotal(); return; }
       lastKey = key;
 
       noteEl.textContent = '{% trans "fetching…" %}';
       var url = '{% url "accounts:fx_rate_lookup" %}'
         + '?from=' + encodeURIComponent(code)
-        + '&to=' + encodeURIComponent(BASE.code)
+        + '&to=' + encodeURIComponent(target().code)
         + '&date=' + encodeURIComponent(dateEl.value || '');
 
       fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -729,6 +747,15 @@ if (window.lucide) lucide.createIcons();
     }
 
     function sync() {
+      var opt = currencyEl.options[currencyEl.selectedIndex];
+      var pair = (opt ? opt.value : '') + '>' + target().code;
+      if (lastPair !== null && pair !== lastPair) {
+        rateEl.value = '';
+        totalEl.value = '';
+        userSet = false;
+        lastKey = null;
+      }
+      lastPair = pair;
       if (!applies()) {
         row.style.display = 'none';
         // Cleared so a payment switched back to the book's own currency
@@ -740,6 +767,7 @@ if (window.lucide) lucide.createIcons();
         return;
       }
       row.style.display = '';
+      targetCodeEl.textContent = target().code;
       syncEquation();
       fetchRate(false);
     }

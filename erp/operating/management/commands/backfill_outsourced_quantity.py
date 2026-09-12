@@ -165,15 +165,15 @@ class Command(BaseCommand):
             try:
                 mv = post_order_movement(order)
             except Exception as exc:
-                self.stderr.write(f"  ! order {order.pk}: cari re-post failed — {exc}")
+                self.stderr.write(f"  ! order {order.pk}: account re-post failed — {exc}")
                 continue
             repriced += 1
             self.stdout.write(
-                f"  cari re-posted: order {order.pk} -> {mv.amount if mv else 0}"
+                f"  account re-posted: order {order.pk} -> {mv.amount if mv else 0}"
             )
 
         self.stdout.write(self.style.SUCCESS(
-            f"\nBackfilled {len(parsed)} line(s); re-posted {repriced} cari movement(s)."
+            f"\nBackfilled {len(parsed)} line(s); re-posted {repriced} account movement(s)."
         ))
         self.stdout.write(
             "Invoices already issued are NOT rebuilt — reissue them if their "

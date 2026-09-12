@@ -84,9 +84,9 @@
   .cf-toggle .lbl-w b { font: 600 13px var(--font-sans); color: var(--ink); }
   .cf-toggle .lbl-w span { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
 
-  /* Entity-type segmented control — what this cari IS: a company, a
+  /* Entity-type segmented control — what this account IS: a company, a
      person, or a supplier. Picking one decides which CRM record gets
-     created alongside the cari, so it comes before everything else. */
+     created alongside the account, so it comes before everything else. */
   .cf-etype { display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
   .cf-etype-btn { display:flex; flex-direction: column; align-items:center; gap: 6px; padding: 14px 10px; border: 1.5px solid #E0E6EE; border-radius: 10px; background: white; cursor: pointer; transition: all 140ms; }
   .cf-etype-btn i { width: 20px; height: 20px; color: var(--gray-500); }
@@ -168,9 +168,16 @@
 
           <div class="cf-f span-2">
             <label>{% trans "Currency" %}<span class="req">*</span></label>
+            {% if currency_locked %}
+              {# Fixed from the first movement or invoice on — see CurrentAccount.currency_is_locked. No field, so nothing is posted to change it. #}
+              <select disabled><option>{{ current_account.default_currency.code }} — {{ current_account.default_currency.name }}</option></select>
+              <span class="hint">{% trans "The currency of an account can't be changed once it has movements or invoices." %}</span>
+            {% else %}
             <select name="default_currency" required>
               {% for c in currencies %}<option value="{{ c.id }}" {% if current_account and current_account.default_currency_id == c.id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>{% endfor %}
             </select>
+            <span class="hint">{% trans "Choose carefully: it can't be changed once the account has movements or invoices." %}</span>
+            {% endif %}
           </div>
         </div>
       </div>

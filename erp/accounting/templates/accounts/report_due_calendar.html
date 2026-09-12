@@ -86,9 +86,9 @@
 
   .dc-num { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); text-decoration: none; }
   .dc-num:hover { text-decoration: underline; }
-  .dc-cari { font: 600 13.5px var(--font-sans); color: var(--ink); text-decoration: none; }
-  .dc-cari:hover { color: var(--nejum-teal-700); }
-  .dc-cari-code { font: 500 11.5px var(--font-mono); color: var(--gray-500); margin-top: 2px; }
+  .dc-account { font: 600 13.5px var(--font-sans); color: var(--ink); text-decoration: none; }
+  .dc-account:hover { color: var(--nejum-teal-700); }
+  .dc-account-code { font: 500 11.5px var(--font-mono); color: var(--gray-500); margin-top: 2px; }
   .dc-due { font: 600 12.5px var(--font-sans); color: var(--gray-700); font-variant-numeric: tabular-nums; }
   .dc-due .lbl { font: 500 11px var(--font-sans); color: var(--gray-500); margin-right: 4px; }
 
@@ -177,8 +177,8 @@
       <div class="dc-row">
         <a class="dc-num" href="{% url 'accounts:invoice_detail' x.inv.pk %}">{{ x.inv.display_number }}</a>
         <div>
-          <a class="dc-cari" href="{% url 'accounts:detail' x.inv.current_account.pk %}">{{ x.inv.current_account.name }}</a>
-          <div class="dc-cari-code">{{ x.inv.current_account.code }}</div>
+          <a class="dc-account" href="{% url 'accounts:detail' x.inv.current_account.pk %}">{{ x.inv.current_account.name }}</a>
+          <div class="dc-account-code">{{ x.inv.current_account.code }}</div>
         </div>
         <div class="dc-due"><span class="lbl">{% trans "Due:" %}</span>{{ x.inv.due_date|date:"d.m.Y" }}</div>
         <div>

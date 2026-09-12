@@ -37,7 +37,7 @@ class CashEntryRateTests(TestCase):
             book=self.book, name="Cash", currency=self.usd, balance=Decimal("0.00")
         )
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-001", name="Rana", type="customer",
+            book=self.book, code="TST-001", name="Rana", type="customer",
             default_currency=self.try_,
         )
 

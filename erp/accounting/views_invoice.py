@@ -281,7 +281,7 @@ class InvoiceCreate(View):
                 items_json = _json.dumps(items)
 
         current_account_options = (
-            CurrentAccount.objects.filter(is_active=True).order_by("name")
+            CurrentAccount.objects.filter(is_active=True).select_related("default_currency").order_by("name")
             if not prefilled_current_account else CurrentAccount.objects.none()
         )
 
@@ -316,7 +316,9 @@ class InvoiceCreate(View):
 
         invoice_type = request.POST.get("type") or "sales"
         series = request.POST.get("series") or "INV"
-        currency_id = int(request.POST.get("currency") or current_account.default_currency_id)
+        # Always the account's own — an invoice is what the account owes, and
+        # the account keeps that in one currency (Invoice.check_currency).
+        currency_id = current_account.default_currency_id
 
         settings_obj = CurrentAccountSettings.for_book(current_account.book)
         number = settings_obj.next_invoice_number(series=series)
@@ -526,9 +528,8 @@ class InvoiceEdit(View):
             invoice.date = request.POST.get("date") or invoice.date
             invoice.due_date = request.POST.get("due_date") or invoice.due_date
             invoice.delivery_date = request.POST.get("delivery_date") or None
-            currency_id = request.POST.get("currency")
-            if currency_id:
-                invoice.currency_id = int(currency_id)
+            # No currency from the form: an invoice stays in its account's
+            # currency (Invoice.check_currency).
             invoice.other_charges = _parse_decimal(request.POST.get("other_charges"))
             invoice.notes = request.POST.get("notes", "")
             # Per-invoice consignee + issuer overrides

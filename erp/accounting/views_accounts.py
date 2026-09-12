@@ -1,5 +1,5 @@
 """
-Current account (Cari Hesap) views — Phase 1.
+Current account views — Phase 1.
 
     /accounting/accounts/                     → CurrentAccountList
     /accounting/accounts/new/                 → CurrentAccountCreate
@@ -21,7 +21,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum
-from django.http import JsonResponse
+from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -462,6 +462,7 @@ class CurrentAccountEdit(View):
             "books": _member_books(request),
             "currencies": _currencies(),
             "type_choices": CurrentAccount.TYPE_CHOICES,
+            "currency_locked": current_account.currency_is_locked,
         })
 
     def post(self, request, pk):
@@ -485,6 +486,13 @@ class CurrentAccountEdit(View):
 
         currency_id = request.POST.get("default_currency")
         if currency_id and str(current_account.default_currency_id) != str(currency_id):
+            if current_account.currency_is_locked:
+                # The form shows no picker once locked; this is a stale tab
+                # or a hand-made POST. Refuse the whole save rather than
+                # keep the other edits and drop the currency without a word.
+                messages.error(request, _g(
+                    "The currency of an account can't be changed once it has movements or invoices."))
+                return redirect("accounts:edit", pk=current_account.pk)
             current_account.default_currency_id = int(currency_id)
 
         current_account.save()
@@ -548,7 +556,7 @@ class CurrentAccountCrmSearch(View):
     "gurhan" finds "GÜRHAN" from a keyboard that cannot type Ü.
 
     Every candidate says whether it is already spoken for IN THIS BOOK.
-    A CRM record holds at most one account per book (the uniq_cari_book_*
+    A CRM record holds at most one account per book (the uniq_current_account_book_*
     constraints), so offering a taken one could only end in an
     IntegrityError at save time. Naming the account that holds it is more
     useful than hiding it anyway: that account is usually the duplicate
@@ -958,19 +966,46 @@ class CurrentAccountDetail(View):
         )
         # A few more than the 20 shown, because cancelled pairs are
         # dropped below and would otherwise shorten the list.
-        recent_movements = (
+        recent_movements = list(
             current_account.movements
             .select_related("currency", "created_by__user")
             .order_by("-date", "-id")[:30]
         )
+
+        # A lira account's balance, and the column walking back from it,
+        # read in lira — see CurrentAccount.own_currency_balance. Converted
+        # up front so that a row with no rate drops the whole page back to
+        # the base figures, rather than leaving a column that changes
+        # currency halfway down.
+        own_balance = current_account.own_currency_balance()
+        own_values = {}
+        if own_balance is not None:
+            for mv in recent_movements:
+                amount, rate = current_account.in_own_currency(mv)
+                if amount is None:
+                    own_balance = None
+                    break
+                own_values[mv.pk] = (amount, rate)
+
         movements_with_balance = []
-        # cached_balance is a base-currency (USD) figure, so the walk back
-        # through it has to use amount_base too — subtracting a raw EUR
-        # `amount` from a USD balance is what made these columns disagree.
-        running = current_account.cached_balance
-        for mv in recent_movements:
-            movements_with_balance.append({"mv": mv, "balance_after": running})
-            running -= mv.amount_base
+        if own_balance is not None:
+            running = own_balance
+            for mv in recent_movements:
+                amount, rate = own_values[mv.pk]
+                movements_with_balance.append({
+                    "mv": mv, "balance_after": running,
+                    # Only where a conversion happened, as with conversion_facts.
+                    "own_fx": {"amount": amount, "rate": rate} if rate else None,
+                })
+                running -= amount
+        else:
+            # cached_balance is a base-currency (USD) figure, so the walk back
+            # through it has to use amount_base too — subtracting a raw EUR
+            # `amount` from a USD balance is what made these columns disagree.
+            running = current_account.cached_balance
+            for mv in recent_movements:
+                movements_with_balance.append({"mv": mv, "balance_after": running})
+                running -= mv.amount_base
         # Old cancel pairs read as the same collection listed twice, one
         # of the halves looking live. Dropping AFTER the walk keeps every
         # surviving row's balance the one it actually had, and a pair
@@ -992,6 +1027,9 @@ class CurrentAccountDetail(View):
 
         ctx = {
             "current_account":     current_account,
+            "own_balance": own_balance,
+            "own_balance_label": (current_account.label_for(own_balance)
+                                  if own_balance is not None else ""),
             "movements": movements_with_balance,
             "recent_invoices": recent_invoices,
             "recent_orders": recent_orders,
@@ -1216,6 +1254,7 @@ class CurrentAccountMovementCreate(View):
             "current_account": current_account,
             "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
+            **_movement_currency_rule(current_account),
         })
 
     def post(self, request, pk):
@@ -1246,18 +1285,24 @@ class CurrentAccountMovementCreate(View):
         if movement_type == "collection" and current_account.type == "supplier":
             movement_type = "payment"
 
-        mv = CurrentAccountMovement.objects.create(
-            current_account=current_account,
-            book=current_account.book,
-            date=request.POST.get("date") or timezone.now().date(),
-            due_date=request.POST.get("due_date") or None,
-            amount=signed,
-            currency_id=int(currency_id),
-            movement_type=movement_type,
-            description=request.POST.get("description", ""),
-            reference=request.POST.get("reference", ""),
-            created_by=getattr(request.user, "member", None),
-        )
+        try:
+            mv = CurrentAccountMovement.objects.create(
+                current_account=current_account,
+                book=current_account.book,
+                date=request.POST.get("date") or timezone.now().date(),
+                due_date=request.POST.get("due_date") or None,
+                amount=signed,
+                currency_id=int(currency_id),
+                movement_type=movement_type,
+                description=request.POST.get("description", ""),
+                reference=request.POST.get("reference", ""),
+                created_by=getattr(request.user, "member", None),
+            )
+        except ValidationError as exc:
+            # A debt-changing type in another currency — see
+            # CurrentAccountMovement.check_currency.
+            messages.error(request, " ".join(exc.messages))
+            return redirect("accounts:movement_create", pk=current_account.pk)
 
         # Payment mirror (collection / payment types) is handled by the
         # post_save signal on CurrentAccountMovement — see signals.py. That way
@@ -1270,6 +1315,26 @@ class CurrentAccountMovementCreate(View):
 # ---------------------------------------------------------------------------
 # Movement edit / delete — hand-entered rows only
 # ---------------------------------------------------------------------------
+def _movement_currency_rule(current_account, movement=None):
+    """What the movement form's script needs to hold debt-changing types to
+    the account's currency (CurrentAccountMovement.check_currency).
+
+    `debt_currency_id` is the currency those types are fixed to: the
+    account's — or, for an existing row that already broke the rule before
+    it existed, that row's own, so opening it to fix a typo neither refuses
+    to save nor silently turns its lira into dollars.
+    """
+    debt_currency_id = current_account.default_currency_id
+    if (movement is not None
+            and movement.movement_type in CurrentAccountMovement.DEBT_TYPES
+            and movement.currency_id != current_account.default_currency_id):
+        debt_currency_id = movement.currency_id
+    return {
+        "debt_types_json": json.dumps(sorted(CurrentAccountMovement.DEBT_TYPES)),
+        "debt_currency_id": debt_currency_id,
+    }
+
+
 def _own_movement_or_redirect(request, current_account, mv_pk):
     """Fetch a movement of THIS account and refuse it if a document owns
     it. Enforced server-side, not just by hiding the pencil: a typed or
@@ -1369,6 +1434,7 @@ class CurrentAccountMovementEdit(View):
             # silently re-typing the row on the first save.
             "movement_type_choices": _movement_choices_including(mv.movement_type),
             "currencies": _currencies(),
+            **_movement_currency_rule(current_account, mv),
         })
 
     def post(self, request, pk, mv_pk):
@@ -1408,7 +1474,11 @@ class CurrentAccountMovementEdit(View):
 
         mv.description = request.POST.get("description", "")
         mv.reference = request.POST.get("reference", "")
-        mv.save()   # recomputes amount_base + the account balance
+        try:
+            mv.save()   # recomputes amount_base + the account balance
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
 
         messages.success(request, _g("Movement updated."))
         return redirect("accounts:statement", pk=current_account.pk)
@@ -1576,3 +1646,107 @@ class CurrentAccountDelete(View):
             current_account.delete()
             messages.success(request, _g("Account %(code)s deleted.") % {"code": code})
         return redirect("accounts:list", book_id=book_id)
+
+
+# ---------------------------------------------------------------------------
+# Combined statement — several of one customer's accounts on one sheet.
+# ---------------------------------------------------------------------------
+def select_combined_accounts(request):
+    """The accounts a combined statement is being asked for, or a refusal.
+
+    Returns (accounts, None) or (None, response). Shared by the printable
+    sheet and its Excel — the two are one document in two formats, and a
+    rule enforced in only one of them is not a rule. The same shape, and
+    the same refusals, as operating.views.select_combined_orders:
+
+      * nothing picked, or nothing that parses as an id;
+      * an id that matches no account — footing three accounts onto a
+        sheet that names two would put a wrong balance in front of a
+        customer;
+      * more than one customer, or an account attached to nobody: one
+        statement is addressed to one customer, and the accounts are
+        named by id in a URL anyone can retype;
+      * a book the viewer is not assigned to. This is the rule
+        book_guarded applies to a single account's statement, asked here
+        per account because a combined sheet may legitimately span books.
+    """
+    from accounting.services_accounts import member_can_use_book
+
+    ids, seen = [], set()
+    for part in (request.GET.get("ids") or "").split(","):
+        part = part.strip()
+        if part.isdigit() and int(part) not in seen:
+            seen.add(int(part))
+            ids.append(int(part))
+    if not ids:
+        return None, HttpResponseBadRequest(_g("Pick at least one account."))
+
+    accounts = list(
+        CurrentAccount.objects.filter(pk__in=ids)
+        .select_related("book", "default_currency", "contact", "company", "supplier")
+        .order_by("book__name", "pk")
+    )
+    if len(accounts) != len(ids):
+        raise Http404("No such account.")
+
+    who = {(a.contact_id, a.company_id, a.supplier_id) for a in accounts}
+    if len(who) > 1 or who == {(None, None, None)}:
+        return None, HttpResponseBadRequest(
+            _g("A combined statement covers one customer's accounts."))
+
+    member = getattr(request.user, "member", None)
+    for a in accounts:
+        if not member_can_use_book(member, a.book):
+            raise Http404("No such account.")
+
+    return accounts, None
+
+
+@method_decorator(login_required, name="dispatch")
+class CurrentAccountStatementPrintCombined(View):
+    """Several of one customer's accounts as one printable statement.
+
+    It records NOTHING — no document is raised and no ledger row written.
+    That is what lets it cross books: an Invoice belongs to exactly one
+    book because its money does; this belongs to none, so Ergene's rows
+    and Laleli's can be read on one page while the two ledgers they
+    belong to are left exactly as they were. Same reasoning as
+    OrderPrintCombined, which is the sheet this one sits beside on the
+    CRM page.
+
+    Every row names the account it came from, and the header names each
+    account's book beside its code. The merged running balance is still
+    the point — one position, not two — but a reader reconciling a line
+    has to be able to see which ledger it sits in without opening both.
+    """
+    template_name = "accounts/current_account_statement_print_combined.html"
+
+    def get(self, request):
+        from accounting.services_accounts import brand_name_for, combined_statement
+
+        accounts, refusal = select_combined_accounts(request)
+        if refusal is not None:
+            return refusal
+
+        data = combined_statement(accounts)
+        rows = data["rows"]
+        # Annotates each row in place with the description and the
+        # document behind it — the same text the single-account statement
+        # prints, so the two cannot describe one movement differently.
+        _attach_links(rows)
+
+        primary = accounts[0]
+        return render(request, self.template_name, {
+            "accounts": accounts,
+            "customer": primary.crm_link or primary,
+            "customer_name": (getattr(primary.crm_link, "name", None)
+                              or getattr(primary.crm_link, "company_name", None)
+                              or primary.name),
+            "brand_name": brand_name_for(),
+            "rows": rows,
+            "debit_total": data["debit_total"],
+            "credit_total": data["credit_total"],
+            "closing": data["closing"],
+            "currency_symbol": data["currency_symbol"],
+            "printed_at": timezone.now(),
+        })

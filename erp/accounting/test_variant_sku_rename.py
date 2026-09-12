@@ -27,7 +27,7 @@ class VariantSkuRenameReachesDocumentsTest(TestCase):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-001", name="ZÜMRÜT", type="customer",
+            book=self.book, code="TST-001", name="ZÜMRÜT", type="customer",
             default_currency=self.usd,
         )
         self.product = Product.objects.create(

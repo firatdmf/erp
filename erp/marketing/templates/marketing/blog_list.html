@@ -276,7 +276,7 @@
             <tr id="blog-row-{{ post.pk }}">
                 <td>
                     {% if post.cover_image %}
-                    <img src="{{ post.cover_image }}" alt="{{ post.title_tr }}" class="blog-cover">
+                    <img src="{{ post.cover_image }}" alt="{{ post.title }}" class="blog-cover">
                     {% else %}
                     <div class="blog-cover" style="display: flex; align-items: center; justify-content: center;">
                         <i class="fas fa-image" style="color: #9ca3af;"></i>
@@ -284,10 +284,10 @@
                     {% endif %}
                 </td>
                 <td>
-                    <div class="blog-title">{{ post.title_tr }}</div>
+                    <div class="blog-title">{{ post.title }}</div>
                     <div class="blog-slug">/{{ post.slug }}</div>
                 </td>
-                <td>{{ post.category_tr }}</td>
+                <td>{{ post.category }}</td>
                 <td>{{ post.published_at|date:"M d, Y" }}</td>
                 <td>
                     {% if post.is_published %}
@@ -302,7 +302,7 @@
                             <i class="fas fa-edit"></i> Edit
                         </a>
                         <button type="button" class="btn-action btn-delete"
-                            onclick="showDeleteModal({{ post.pk }}, '{{ post.title_tr|escapejs }}')">
+                            onclick="showDeleteModal({{ post.pk }}, '{{ post.title|escapejs }}')">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>

@@ -32,8 +32,12 @@ ORDER_DETAIL = "operating/templates/operating/order_detail.html"
 
 # What stood on the day this was written. Lower them as files are cleared;
 # never raise them.
-BRANCH_CEILING = 86
-TURKISH_MSGID_CEILING = 22
+BRANCH_CEILING = 82
+# The two left are English sentences that quote Turkish: the invoice
+# language selector naming its own "Türkçe" option, and the stock import
+# help listing the literal Turkish column headers of the .xlsx it reads.
+# Both belong in the catalogue keyed as they are, so this floor is 2.
+TURKISH_MSGID_CEILING = 2
 
 
 def templates():

@@ -3340,7 +3340,7 @@ class BlogEdit(generic.UpdateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['page_title'] = f'Edit: {self.object.title_tr}'
+        context['page_title'] = f'Edit: {self.object.title}'
         context['is_edit'] = True
         return context
     

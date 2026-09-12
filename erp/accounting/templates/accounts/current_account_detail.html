@@ -89,8 +89,9 @@
   .cd-tbl .mv-id a { font: 600 11.5px var(--font-mono); color: var(--gray-500);
                      text-decoration: none; white-space: nowrap; }
   .cd-tbl .mv-id a:hover { color: var(--nejum-teal-700); text-decoration: underline; }
-  /* The base-currency value of a row that had to be converted, under the
-     figure it was converted from — same idea as .st-fx on the statement. */
+  /* What a row that had to be converted came to in the balance's currency
+     (base, or the account's own), under the figure it was converted from —
+     same idea as .st-fx on the statement. */
   .cd-fx { display:block; font: 500 10.5px var(--font-mono); color: var(--gray-500);
            margin-top: 2px; white-space: nowrap; }
   .cd-balance .amount { font: 800 38px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.05; }
@@ -287,10 +288,19 @@
       <div class="cd-card">
         <div class="cd-balance">
           <div class="lbl">{% trans "Current Balance" %}</div>
+          {% if own_balance is not None %}
+            {% with cur=current_account.own_currency %}
+            <div class="amount {% if own_balance > 0 %}pos{% elif own_balance < 0 %}neg{% endif %}">
+              {{ cur.symbol|default:cur.code }}{{ own_balance|absval|money }}
+            </div>
+            <div class="sub">{{ own_balance_label }}</div>
+            {% endwith %}
+          {% else %}
           <div class="amount {% if current_account.cached_balance > 0 %}pos{% elif current_account.cached_balance < 0 %}neg{% endif %}">
             {{ current_account.display_currency_symbol }}{{ current_account.absolute_balance|money }}
           </div>
           <div class="sub">{{ current_account.balance_label }}</div>
+          {% endif %}
           {% if current_account.is_over_credit_limit %}
             <div class="warn"><i data-lucide="alert-triangle"></i>{% trans "Credit limit exceeded" %}</div>
           {% endif %}
@@ -472,7 +482,16 @@
               {% conversion_facts m.mv as fx %}
               <td class="num {% if m.mv.amount > 0 %}pos{% elif m.mv.amount < 0 %}neg{% endif %}">
                 {% if m.mv.amount > 0 %}+{% endif %}{{ m.mv.amount|money }} {{ m.mv.currency.code }}
-                {% if fx %}<span class="cd-fx">{{ fx.base_symbol }}{{ fx.base_amount|absval|money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
+                {% if own_balance is not None %}
+                  {% comment %}
+                    An account tracked in its own currency states a rate the
+                    same way a base account does, only toward ITS currency:
+                    a dollar row on a lira account says what it counted for
+                    in lira, and a lira row, which converted nothing, says
+                    nothing.
+                  {% endcomment %}
+                  {% if m.own_fx %}{% with cur=current_account.own_currency %}<span class="cd-fx">{{ cur.symbol|default:cur.code }}{{ m.own_fx.amount|absval|money }} @ {{ m.own_fx.rate|format_rate }}</span>{% endwith %}{% endif %}
+                {% elif fx %}<span class="cd-fx">{{ fx.base_symbol }}{{ fx.base_amount|absval|money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
               </td>
               <td class="num">{{ m.balance_after|money }}</td>
             </tr>

@@ -37,6 +37,7 @@ from django.views.generic import TemplateView
 
 from . import (
     invoice_excel,
+    statement_excel,
     views_check,
     views_invoice,
     views_payment,
@@ -101,6 +102,21 @@ urlpatterns = [
 
     scoped("checks/",                    views_check.CheckList.as_view(),   "check_list"),
     scoped("checks/new/",                views_check.CheckCreate.as_view(), "check_create"),
+
+    # ------------------------------------------------------------------
+    # Spans books on purpose — neither scoped nor owned.
+    # ------------------------------------------------------------------
+    # A customer's accounts in several books read as one statement. Not
+    # book-scoped, because the whole point is that it crosses books, and
+    # not `owned`, because there is no single row whose FK could answer.
+    # It guards itself instead, per account — see
+    # views_accounts.select_combined_accounts.
+    path("accounts/statement/combined/",
+         views.CurrentAccountStatementPrintCombined.as_view(),
+         name="statement_print_combined"),
+    path("accounts/statement/combined/excel/",
+         statement_excel.combined_statement_excel,
+         name="statement_excel_combined"),
 
     # ------------------------------------------------------------------
     # Objects — the row names its own book, so the path does not.

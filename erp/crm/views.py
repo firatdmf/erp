@@ -129,9 +129,7 @@ class ContactCreate(generic.edit.CreateView):
 
     def form_valid(self, form):
         from django.http import JsonResponse
-        import logging
 
-        logger = logging.getLogger(__name__)
         try:
             # Below starts a database transaction block.
             # All database operations inside this block are treated as a single transaction.
@@ -147,16 +145,6 @@ class ContactCreate(generic.edit.CreateView):
                 # Save the contact (pass request for task member)
                 self.object = form.save(request=self.request)
 
-                current_account_warning = None
-                if form.cleaned_data.get("create_current_account", True):
-                    try:
-                        from accounting.services_accounts import get_or_create_current_account_for_contact
-                        member = getattr(self.request.user, "member", None)
-                        get_or_create_current_account_for_contact(self.object, member=member)
-                    except Exception as exc:
-                        logger.exception("Cari creation failed for contact %s: %s", self.object.pk, exc)
-                        current_account_warning = str(exc)
-
                 # Check if AJAX request (from nested sidebar)
                 if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     response = {
@@ -170,8 +158,6 @@ class ContactCreate(generic.edit.CreateView):
                             'company_name': self.object.company.name if self.object.company else ''
                         }
                     }
-                    if current_account_warning:
-                        response['current_account_warning'] = current_account_warning
                     return JsonResponse(response)
 
                 return super().form_valid(form)
@@ -335,16 +321,6 @@ class CompanyCreate(generic.edit.CreateView):
             else:
                 logger.info(f"⊘ Email automation DISABLED for {self.object.name} - Checkbox not checked")
 
-            current_account_warning = None
-            if form.cleaned_data.get("create_current_account", True):
-                try:
-                    from accounting.services_accounts import get_or_create_current_account_for_company
-                    member = getattr(self.request.user, "member", None)
-                    get_or_create_current_account_for_company(self.object, member=member)
-                except Exception as exc:
-                    logger.exception("Cari creation failed for company %s: %s", self.object.pk, exc)
-                    current_account_warning = str(exc)
-
             # Check if AJAX request
             if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 response = {
@@ -352,8 +328,6 @@ class CompanyCreate(generic.edit.CreateView):
                     'redirect_url': self.get_success_url(),
                     'company_name': self.object.name
                 }
-                if current_account_warning:
-                    response['current_account_warning'] = current_account_warning
                 return JsonResponse(response)
 
             # return super().form_valid(form)

@@ -2600,6 +2600,42 @@ def _intake_check_rates(products_in, current_account_obj, rates):
         raise IntakeError({"success": False, "error": str(exc)}, status=400)
 
 
+def _is_negative_price(value):
+    """A stated price below zero. Blank or unreadable is not negative: every
+    caller already treats those as "no price given"."""
+    price = _safe_decimal(value)
+    return price is not None and price < 0
+
+
+def _negative_price_message():
+    from django.utils.translation import gettext as _t
+    return _t("A purchase price cannot be negative.")
+
+
+def _intake_check_prices(products_in):
+    """Refuse, before any stock is written, a line with a negative price.
+
+    Intake used to drop one silently: `price > 0` guards turned a typed -12
+    into "no price", so the receipt went through unvalued and nobody was
+    told. WarehouseProduct's costs are constrained non-negative now, so
+    this is also what keeps a bad line from failing halfway through."""
+    from django.utils.translation import gettext as _t
+    bad = []
+    for i, p_in in enumerate(products_in, start=1):
+        for v in (p_in.get("variants") or []):
+            if _is_negative_price(v.get("price")):
+                label = ((v.get("sku") or v.get("name") or "").strip()
+                         or ((p_in.get("main_product") or {}).get("name") or "").strip()
+                         or _t("product %(n)s") % {"n": i})
+                bad.append(label)
+    if bad:
+        raise IntakeError({
+            "success": False,
+            "error": _t("A purchase price cannot be negative: %(lines)s")
+                     % {"lines": ", ".join(bad)},
+        }, status=400)
+
+
 def _intake_resolve_products(products_in, prefix, *, own_product_ids=()):
     """Pass 1: resolve + validate EVERY product before writing anything, so
     a mistake on product #3 never leaves #1/#2 half-saved.
@@ -2965,6 +3001,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     account_name = current_account_obj.name
     prefix = _intake_prefix(data, account_name)
     _intake_check_rates(products_in, current_account_obj, data.get("rates"))
+    _intake_check_prices(products_in)
     resolved = _intake_resolve_products(products_in, prefix)
     manual_codes = _intake_typed_barcodes(products_in)
 
@@ -3314,6 +3351,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
         prefix = _intake_prefix(data, account.name)
         _intake_check_rates(products_in, account, data.get("rates"))
+        _intake_check_prices(products_in)
         resolved = _intake_resolve_products(
             products_in, prefix,
             own_product_ids={it.product_id for it in items.values() if it.product_id})
@@ -3899,6 +3937,10 @@ class WarehouseProductImport(View):
 
                     qty = _safe_decimal(row[col_qty] if col_qty < len(row) else None, Decimal('0'))
                     price = _safe_decimal(row[col_price] if col_price < len(row) else None)
+                    if price is not None and price < 0:
+                        errors.append(f"Row {idx}: {_negative_price_message()}")
+                        counters['skipped'] += 1
+                        continue
                     currency_raw = row[col_currency] if (col_currency is not None and col_currency < len(row)) else None
                     barcode = row[col_barcode] if (col_barcode is not None and col_barcode < len(row)) else None
                     model = row[col_model] if (col_model is not None and col_model < len(row)) else None
@@ -6063,6 +6105,9 @@ class WarehouseProductEdit(View):
         purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
         purchase_currency = (request.POST.get("purchase_currency") or "USD").strip().upper()
         quantity_raw = (request.POST.get("quantity") or "").strip().replace(",", ".")
+        if _is_negative_price(purchase_price_raw):
+            return JsonResponse(
+                {"success": False, "error": _negative_price_message()}, status=400)
         # Optional: explicitly move this variant under a different catalog
         # main product (the base title typed/picked in the edit modal).
         catalog_base = (request.POST.get("catalog_base_name") or "").strip()
@@ -6728,6 +6773,9 @@ class WarehouseRollScan(View):
             return JsonResponse({"success": False, "error": "Meters must be positive"}, status=400)
         if not sku and not name:
             return JsonResponse({"success": False, "error": "SKU or name is required"}, status=400)
+        if _is_negative_price(request.POST.get("purchase_price")):
+            return JsonResponse(
+                {"success": False, "error": _negative_price_message()}, status=400)
 
         # Reject a re-scan of the SAME roll: each physical roll's barcode is
         # unique, so if one already exists in this warehouse it's a duplicate

@@ -15,14 +15,14 @@ written in a single transaction.
 
 Two things this handles that are easy to miss:
 
-* Each book ran its own CARI-nnn sequence from 001, so unrelated accounts in
+* Each book runs its own code sequence from 001, so unrelated accounts in
   different books share codes. The code is a label, not a key — invoices,
   payments and movements all reference the account by id — so an incoming
   account whose code is taken is renumbered rather than refused.
 
 * The destination's own sequence has to be advanced past whatever arrived.
-  Book 2 sat at next_current_account_seq=3 while accounts numbered up to CARI-074 moved
-  in; left alone it would have handed out CARI-003 and eventually collided
+  Book 2 sat at next_current_account_seq=3 while accounts numbered up to 074 moved
+  in; left alone it would have handed out 003 and eventually collided
   with them.
 
     python manage.py move_current_accounts --to 2 --suppliers
@@ -216,16 +216,29 @@ class Command(BaseCommand):
         self.stdout.write(f"  rows in book {target} whose own book disagrees: {stray}")
 
     # ------------------------------------------------------------------
+    def _code_format(self, target):
+        """The target book's own code prefix and padding — the same two
+        settings next_current_account_code mints from, so a renumbered
+        arrival looks like an account the book opened itself."""
+        settings_obj = CurrentAccountSettings.objects.filter(book_id=target).first()
+        if settings_obj:
+            return (settings_obj.current_account_code_prefix,
+                    settings_obj.current_account_code_padding)
+        field = CurrentAccountSettings._meta.get_field
+        return (field("current_account_code_prefix").default,
+                field("current_account_code_padding").default)
+
     def _allocate_codes(self, target, accounts, recode):
         """Fresh codes for arrivals whose own code is taken in the target."""
         taken = set(CurrentAccount.objects.filter(book_id=target)
                     .values_list("code", flat=True))
         taken |= {a.code for a in accounts if a.id not in recode}
+        prefix, padding = self._code_format(target)
         out, n = {}, 0
         for aid in recode:
             while True:
                 n += 1
-                cand = f"CARI-{n:03d}"
+                cand = f"{prefix}-{str(n).zfill(padding)}"
                 if cand not in taken:
                     break
             taken.add(cand)
@@ -233,13 +246,16 @@ class Command(BaseCommand):
         return out
 
     def _next_seq(self, target, accounts, new_code):
-        """One past the highest CARI-nnn that will exist in the target book."""
+        """One past the highest number in the target book's own prefix that
+        will exist there once the move lands."""
         codes = set(CurrentAccount.objects.filter(book_id=target)
                     .values_list("code", flat=True))
         codes |= {new_code.get(a.id, a.code) for a in accounts}
+        prefix, _padding = self._code_format(target)
+        pattern = re.escape(prefix) + r"-0*(\d+)"
         highest = 0
         for code in codes:
-            m = re.fullmatch(r"CARI-0*(\d+)", (code or "").strip(), re.I)
+            m = re.fullmatch(pattern, (code or "").strip(), re.I)
             if m:
                 highest = max(highest, int(m.group(1)))
         return highest + 1

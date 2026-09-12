@@ -4385,30 +4385,11 @@ msgid "<a href=\"%(report_index_url)s\">Report Center</a> → 4 major reports:"
 msgstr "<a href=\"%(report_index_url)s\">Rapor Merkezi</a> → 4 ana rapor:"
 
 msgid ""
-"<code>CARI-001</code>, <code>CARI-002</code>, ... are assigned automatically"
-msgstr ""
-"<code>CARI-001</code>, <code>CARI-002</code>, ... otomatik olarak atanır"
-
-msgid ""
 "<strong>\"Cancel\"</strong> (if issued): A reverse movement is written, the "
 "original is not deleted"
 msgstr ""
 "<strong>\"İptal\"</strong> (kesildiyse): Ters hareket yazılır, orijinali "
 "silinmez"
-
-msgid ""
-"<strong>\"Issue\"</strong>: Status becomes <em>issued</em>, "
-"<code>CariMovement</code> is created automatically"
-msgstr ""
-"<strong>\"Kes\"</strong>: Durum <em>kesildi</em> olur, "
-"<code>CariMovement</code> otomatik oluşturulur"
-
-msgid ""
-"<strong>+X CariMovement</strong> is written to the customer's current "
-"account (the receivable reopens)"
-msgstr ""
-"Müşterinin cari hesabına <strong>+X CariMovement</strong> yazılır (alacak "
-"yeniden açılır)"
 
 msgid ""
 "<strong>Advance</strong>: The unmatched portion automatically becomes an "
@@ -4436,13 +4417,6 @@ msgstr "<strong>Bakiye</strong> — hareketlerin toplamı, otomatik güncellenir
 
 msgid "<strong>Carry-over</strong> (start-of-period balance)"
 msgstr "<strong>Devir</strong> (dönem başı bakiye)"
-
-msgid ""
-"<strong>Check entry</strong>: <code>/cari/cek-senet/yeni/</code> → "
-"Direction: <em>Received</em>"
-msgstr ""
-"<strong>Çek girişi</strong>: <code>/cari/cek-senet/yeni/</code> → Yön: "
-"<em>Alınan</em>"
 
 msgid ""
 "<strong>Checks / Promissory Notes</strong> — negotiable instruments waiting "
@@ -4539,19 +4513,6 @@ msgid ""
 msgstr ""
 "<strong>Hareketler</strong> — her finansal etki bir satır (fatura, tahsilat,"
 " ciro vs.)"
-
-msgid ""
-"<strong>Open an account card:</strong> <a href=\"%(cari_create_url)s\">New "
-"Account</a> → select customer or supplier, enter the previous opening "
-"balance if any."
-msgstr ""
-"<strong>Cari kartı aç:</strong> <a href=\"%(cari_create_url)s\">Yeni "
-"Cari</a> → müşteri veya tedarikçi seç, varsa önceki açılış bakiyesini gir."
-
-msgid ""
-"<strong>Open an account</strong> (skip if it already exists): "
-"<code>/cari/yeni/</code>"
-msgstr "<strong>Cari aç</strong> (zaten varsa atla): <code>/cari/yeni/</code>"
 
 msgid "<strong>Open an account</strong>: Type = <em>Supplier</em>"
 msgstr "<strong>Cari aç</strong>: Tip = <em>Tedarikçi</em>"
@@ -5608,9 +5569,6 @@ msgstr ""
 msgid "Open invoices will load after selecting an account."
 msgstr "Cari seçilince açık faturalar yüklenir."
 
-msgid "Opened from the <a href=\"%(cari_create_url2)s\">New Account</a> page."
-msgstr "<a href=\"%(cari_create_url2)s\">Yeni Cari</a> sayfasından açılır."
-
 msgid "Opening"
 msgstr "Devir"
 
@@ -5853,7 +5811,7 @@ msgid "Statement"
 msgstr "Ekstre"
 
 msgid "Statement — %(name)s"
-msgstr ""
+msgstr "Ekstre — %(name)s"
 
 msgid "Status Flow"
 msgstr "Durum Akışı"
@@ -5915,13 +5873,6 @@ msgstr "Sistemin kalbi tek bir kural üzerine kuruludur:"
 msgid ""
 "The original movement remains (the receipt from the customer is still valid)"
 msgstr "Orijinal hareket kalır (müşteriden alınan makbuz hâlâ geçerli)"
-
-msgid ""
-"The system opens <strong>one Current Account card for each customer and "
-"supplier</strong> (example code: <code>CARI-001</code>). Under this card:"
-msgstr ""
-"Sistem <strong>her müşteri ve tedarikçi için tek bir Cari Hesap "
-"kartı</strong> açar (örnek kod: <code>CARI-001</code>). Bu kartın altında:"
 
 msgid "This Month (end)"
 msgstr "Bu Ay (sonu)"
@@ -6050,13 +6001,6 @@ msgstr ""
 
 msgid "Will be cancelled. Are you sure?"
 msgstr "İptal edilecek. Emin misin?"
-
-msgid ""
-"Writes <strong>+X CariMovement</strong> to the target account (as if you had"
-" made a payment to them)"
-msgstr ""
-"Hedef cariye <strong>+X CariMovement</strong> yazar (ona ödeme yapmışsın "
-"gibi)"
 
 msgid ""
 "Yes. If the collection amount is greater than the sum of matches, the "
@@ -6360,12 +6304,6 @@ msgstr ""
 msgid "<a href=\"{{ report_index_url }}\">Report Center</a> → 4 major reports:"
 msgstr ""
 
-msgid ""
-"<strong>Open an account card:</strong> <a href=\"{{ cari_create_url }}\">New"
-" Account</a> → select customer or supplier, enter the previous opening "
-"balance if any."
-msgstr ""
-
 msgid "Account Statement"
 msgstr ""
 
@@ -6437,9 +6375,6 @@ msgid "Movement"
 msgstr "Hareket"
 
 msgid "No movements"
-msgstr ""
-
-msgid "Opened from the <a href=\"{{ cari_create_url2 }}\">New Account</a> page."
 msgstr ""
 
 msgid "Past due date"
@@ -7557,10 +7492,6 @@ msgid "Scenario"
 msgstr "Senaryo"
 
 msgid ""
-"This invoice is already issued. Editing will sync the cari ledger. Continue?"
-msgstr ""
-
-msgid ""
 "This order already has an invoice (%(num)s). Cancel or delete it before "
 "creating a new one."
 msgstr ""
@@ -7741,14 +7672,6 @@ msgstr "yeni bir varyant oluşturulacak"
 #: operating/templates/operating/warehouse_detail.html:0
 msgid "Click to fill a variant row with this"
 msgstr "Bir varyant satırını bununla doldurmak için tıklayın"
-
-#: erp/templates/base.html:0
-msgid "Open a current account"
-msgstr "Cari hesabı aç"
-
-#: erp/templates/base.html:0
-msgid "A current account is automatically created for this record."
-msgstr "Bu kayıt için otomatik olarak bir cari hesap oluşturulur."
 
 #: erp/templates/base.html:0
 msgid "Send Follow-up Emails"
@@ -8352,13 +8275,6 @@ msgid "Save changes"
 msgstr "Değişiklikleri kaydet"
 
 msgid ""
-"This permanently removes the physical stock this purchase brought in and "
-"reverses the cari debt. This cannot be undone. Continue?"
-msgstr ""
-"Bu, alımın getirdiği fiziksel stoğu kalıcı olarak siler ve cari borcunu geri"
-" alır. Bu işlem geri alınamaz. Devam edilsin mi?"
-
-msgid ""
 "This purchase's stock links are missing, so it can't be edited from here — "
 "view or cancel it from the purchases page instead."
 msgstr ""
@@ -8589,8 +8505,8 @@ msgstr "Depo seçin…"
 msgid "Receive a delivery into a warehouse. One submit creates the stock — products, variants and each physical roll with its own barcode — and the supplier purchase invoice behind it."
 msgstr "Gelen sevkiyatı depoya alın. Tek kayıtla hem stok — ürünler, varyantlar ve her biri kendi barkoduna sahip toplar — hem de arkasındaki alış faturası oluşur."
 
-msgid "Add or remove the physical rolls on this purchase. Rolls already reserved for a customer order are locked, and the account can't change here."
-msgstr "Bu alımdaki topları ekleyin veya çıkarın. Bir müşteri siparişine ayrılmış toplar kilitlidir ve cari hesap burada değiştirilemez."
+msgid "This purchase has been received, and all of it can still be corrected. Rolls reserved for a customer order can be re-measured, but not removed or moved to another variant."
+msgstr "Bu alım teslim alındı ve tamamı hâlâ düzeltilebilir. Bir müşteri siparişine ayrılmış toplar yeniden ölçülebilir, ancak silinemez veya başka bir varyanta taşınamaz."
 
 msgid "Create a warehouse first — goods are received into a real depot, not a combined view."
 msgstr "Önce bir depo oluşturun — mal kabul gerçek bir depoya yapılır, ortak görünüme değil."
@@ -8598,8 +8514,8 @@ msgstr "Önce bir depo oluşturun — mal kabul gerçek bir depoya yapılır, or
 msgid "Where it lands, who it's bought from, and how it's measured."
 msgstr "Nereye girecek, kimden alındı ve hangi birimle ölçülüyor."
 
-msgid "Set at intake — a purchase can't move between warehouses."
-msgstr "Girişte belirlenir — bir alım depolar arasında taşınamaz."
+msgid "Changing this moves the purchase's rolls there when you save."
+msgstr "Değiştirirseniz, kaydettiğinizde bu alımın topları oraya taşınır."
 
 msgid "Changing this clears the products below."
 msgstr "Bunu değiştirmek aşağıdaki ürünleri temizler."
@@ -9321,11 +9237,58 @@ msgstr "Bu siparişte kargo var"
 msgid "PDF header (default: %(brand)s)"
 msgstr "PDF başlığı (varsayılan: %(brand)s)"
 
-msgid "This purchase has been received, and all of it can still be corrected. Rolls reserved for a customer order can be re-measured, but not removed or moved to another variant."
-msgstr "Bu alım teslim alındı ve tamamı hâlâ düzeltilebilir. Bir müşteri siparişine ayrılmış toplar yeniden ölçülebilir, ancak silinemez veya başka bir varyanta taşınamaz."
+msgid "Account history"
+msgstr "Hesap geçmişi"
 
-msgid "Changing this moves the purchase's rolls there when you save."
-msgstr "Değiştirirseniz, kaydettiğinizde bu alımın topları oraya taşınır."
+msgid "account"
+msgid_plural "accounts"
+msgstr[0] "hesap"
+msgstr[1] "hesap"
+
+msgid "Include this account"
+msgstr "Bu hesabı dahil et"
+
+msgid "Download the selected accounts as one statement"
+msgstr "Seçili hesapları tek ekstre olarak indir"
+
+msgid "Print selected"
+msgstr "Seçilenleri yazdır"
+
+msgid "Pick at least one account."
+msgstr "En az bir hesap seçin."
+
+msgid "A combined statement covers one customer's accounts."
+msgstr "Birleşik ekstre tek bir müşterinin hesaplarını kapsar."
+
+msgid "CURRENT ACCOUNT STATEMENT"
+msgstr "CARİ HESAP EKSTRESİ"
+
+msgid "Current account statement"
+msgstr "Cari hesap ekstresi"
+
+msgid "Account of"
+msgstr "Hesap sahibi"
+
+msgid "Ref"
+msgstr "Ref"
+
+msgid "Account codes"
+msgstr "Hesap kodları"
+
+msgid "Printed"
+msgstr "Yazdırılma"
+
+msgid "No movements on this account."
+msgstr "Bu hesapta hareket yok."
+
+msgid "Balance owed to us"
+msgstr "Bize borç bakiyesi"
+
+msgid "Balance we owe"
+msgstr "Bizim borcumuz"
+
+msgid "Account closed"
+msgstr "Hesap kapalı"
 
 msgid "Reserved for a customer order — it can be re-measured, not removed."
 msgstr "Bir müşteri siparişine ayrılmış — yeniden ölçülebilir, silinemez."
@@ -9369,5 +9332,114 @@ msgstr "Bu toptan metre çıkışı yapılmış — uzunluğu ve barkodu değiş
 msgid "Saving will reduce what these orders have reserved:"
 msgstr "Kaydetmek bu siparişlerin ayırdığı miktarları azaltacak:"
 
+#, python-format
+msgid "This request was split across %(count)s books — each book got its own order and its own current account (%(parts)s)."
+msgstr "Bu talep %(count)s deftere bölündü — her defter kendi siparişini ve kendi cari hesabını aldı (%(parts)s)."
+
+msgid "A completed or shipped order cannot be deleted — its stock and current account records would break. Reopen it first with 'Re-open & Fix' on the order page, then delete it."
+msgstr "Tamamlanmış/gönderilmiş sipariş silinemez — stok ve cari kayıtları bozulur. Önce sipariş detayındaki 'Geri Aç & Düzelt' ile geri açın, sonra silin."
+
 msgid "The purchase invoice was created with a total of 0 — no price was entered. You can edit the invoice from the account page."
 msgstr "Alış faturası 0 tutarla oluşturuldu — fiyat girilmedi. Faturayı cari sayfasından düzenleyebilirsiniz."
+
+msgid "Pick an HTML file"
+msgstr "HTML dosyası seç"
+
+msgid "Pick a folder (HTML + images)"
+msgstr "Klasör seç (HTML + Görseller)"
+
+msgid "Pick an HTML file whose images are linked by relative path (src) — the images are uploaded for you and the links rewritten. If the images sit in a separate subfolder, as a Word export leaves them, use \"Pick a folder\" to send both at once."
+msgstr "İçindeki görsellere göreli yol (src) ile bağlı bir HTML dosyası seçin — görseller otomatik yüklenip bağlantılar güncellenir. Görseller ayrı bir alt klasördeyse (örn. Word'den dışa aktarımda olduğu gibi) \"Klasör seç\" ile ikisini birlikte yükleyin."
+
+msgid "No .html file among the files you picked."
+msgstr "Seçilen dosya(lar) arasında bir .html dosyası bulunamadı."
+
+msgid "Uploading…"
+msgstr "Yükleniyor…"
+
+msgid "images"
+msgstr "görsel"
+
+msgid "Upload failed"
+msgstr "Yüklenemedi"
+
+msgid "Overwrite the content that is already there?"
+msgstr "Mevcut içeriğin üzerine yazılsın mı?"
+
+msgid "images uploaded"
+msgstr "görsel yüklendi"
+
+msgid "warnings"
+msgstr "uyarı"
+
+msgid "Linked order"
+msgstr "Bağlı sipariş"
+
+msgid "will be cancelled and cannot be reopened"
+msgstr "iptal edilecek ve tekrar açılamayacak"
+
+msgid "Never mind"
+msgstr "Vazgeç"
+
+msgid "Yes, cancel it"
+msgstr "Evet, İptal Et"
+
+msgid "Email detail"
+msgstr "E-posta Detayı"
+
+msgid "Delete Blog Post"
+msgstr "Blog Yazısını Sil"
+
+msgid "Are you sure you want to delete this blog post?"
+msgstr "Bu blog yazısını silmek istediğinizden emin misiniz?"
+
+msgid "This cannot be undone."
+msgstr "Bu işlem geri alınamaz."
+
+msgid "Yes, delete it"
+msgstr "Evet, Sil"
+
+msgid "Enter the password to delete an order:"
+msgstr "Sipariş silmek için şifre girin:"
+
+msgid "A cancelled invoice cannot be reopened."
+msgstr "İptal edilen fatura geri açılamaz."
+
+#, python-format
+msgid "Variant price and cost cannot be negative: %(skus)s"
+msgstr "Varyant fiyatı ve maliyeti negatif olamaz: %(skus)s"
+
+#, python-format
+msgid "A margin below -100%% would price these products below zero: %(products)s"
+msgstr "-%%100'ün altındaki bir kâr oranı bu ürünlerin fiyatını sıfırın altına düşürür: %(products)s"
+
+msgid "The currency of an account can't be changed once it has movements or invoices."
+msgstr "Hareketi veya faturası olan bir hesabın para birimi değiştirilemez."
+
+msgid "Choose carefully: it can't be changed once the account has movements or invoices."
+msgstr "Dikkatli seçin: hesabın hareketi veya faturası olduktan sonra değiştirilemez."
+
+#, python-format
+msgid "%(type)s movements must be in the account's currency (%(currency)s). Only collections, payments, advances and checks can be in another currency."
+msgstr "%(type)s hareketleri hesabın para biriminde (%(currency)s) olmalıdır. Yalnızca tahsilat, ödeme, avans ve çekler başka bir para biriminde olabilir."
+
+msgid "Only collections, payments, advances and checks can be in another currency."
+msgstr "Yalnızca tahsilat, ödeme, avans ve çekler başka bir para biriminde olabilir."
+
+#, python-format
+msgid "An invoice must be in its account's currency (%(currency)s)."
+msgstr "Fatura, hesabın para biriminde (%(currency)s) olmalıdır."
+
+msgid "Always the account's currency."
+msgstr "Her zaman hesabın para birimi."
+
+msgid "A purchase price cannot be negative."
+msgstr "Alış fiyatı negatif olamaz."
+
+#, python-format
+msgid "A purchase price cannot be negative: %(lines)s"
+msgstr "Alış fiyatı negatif olamaz: %(lines)s"
+
+#, python-format
+msgid "product %(n)s"
+msgstr "ürün %(n)s"

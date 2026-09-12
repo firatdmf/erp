@@ -524,10 +524,10 @@
         </form>
       {% elif invoice.status == 'cancelled' %}
         {% comment %}Cancelled is terminal — no restore, ever: cancel deletes the
-        cari movement (and cancels the linked order / removes purchase stock),
+        current account movement (and cancels the linked order / removes purchase stock),
         so there is nothing consistent to reopen.{% endcomment %}
         <span class="iv-btn ghost" style="opacity:0.6; cursor:default;"
-              title="{% trans 'İptal edilen fatura geri açılamaz.' %}">
+              title="{% trans "A cancelled invoice cannot be reopened." %}">
           <i data-lucide="ban"></i>{% trans "Cancelled" %}
         </span>
       {% else %}
@@ -788,13 +788,13 @@
     {% if invoice.order_id %}
     <p style="margin:0; font:600 12px var(--font-sans); color:#B91C1C;">
       <i data-lucide="package-x" style="width:13px;height:13px;vertical-align:-2px;"></i>
-      {% trans "Bağlı sipariş" %}: #{{ invoice.order_id }} — {% trans "iptal edilecek ve tekrar açılamayacak" %}
+      {% trans "Linked order" %}: #{{ invoice.order_id }} — {% trans "will be cancelled and cannot be reopened" %}
     </p>
     {% endif %}
     <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
-      <button type="button" class="iv-btn ghost" onclick="ivCloseCancelModal()">{% trans "Vazgeç" %}</button>
+      <button type="button" class="iv-btn ghost" onclick="ivCloseCancelModal()">{% trans "Never mind" %}</button>
       <button type="button" class="iv-btn danger" onclick="document.getElementById('iv-cancel-form').submit()">
-        <i data-lucide="x-circle"></i>{% trans "Evet, İptal Et" %}
+        <i data-lucide="x-circle"></i>{% trans "Yes, cancel it" %}
       </button>
     </div>
   </div>

@@ -40,7 +40,7 @@ class _DryRun(Exception):
 
 
 class Command(BaseCommand):
-    help = "Post a book's existing cari movements and stock into the ledger."
+    help = "Post a book's existing current account movements and stock into the ledger."
 
     def add_arguments(self, parser):
         parser.add_argument("--book", type=int, required=True,
@@ -64,7 +64,7 @@ class Command(BaseCommand):
         movements = list(CurrentAccountMovement.objects.filter(book=book)
                          .select_related("current_account", "currency").order_by("date", "id"))
         if not movements:
-            raise CommandError(f"{book.name} has no cari movements.")
+            raise CommandError(f"{book.name} has no current account movements.")
         cutover = opts["cutover"] or max(m.date for m in movements)
 
         # Movements already posted, so a half-finished run can be resumed.

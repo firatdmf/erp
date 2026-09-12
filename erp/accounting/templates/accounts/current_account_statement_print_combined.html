@@ -1,0 +1,162 @@
+{% load i18n %}{% load humanize %}<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{% trans "Statement" %} — {{ customer_name }}</title>
+  <style>
+    /* Same idiom as operating/order_print.html, which is the sheet this
+       one sits beside on the CRM page: a standalone document, no base
+       template, printed straight from the browser. */
+    @page { size: letter portrait; margin: 0; }
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 11pt; color: #0F1419; line-height: 1.3;
+      padding: 10mm 12mm 9mm 12mm; margin: 0;
+    }
+    @media print {
+      html, body { margin: 0 !important; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; }
+    }
+    .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 7pt; margin-bottom: 10pt; }
+    .hdr td { vertical-align: top; }
+    .hdr .brand { font-size: 16pt; font-weight: bold; color: #944F05; line-height: 1.25; max-width: 105mm; }
+    .hdr .doc-type { font-size: 10.67pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
+    .hdr .date { font-size: 10.67pt; color: #4B5563; text-align: right; }
+
+    .who { width: 100%; margin-bottom: 10pt; }
+    .who td { vertical-align: top; font-size: 10pt; }
+    .who .lbl { font-size: 8.5pt; letter-spacing: 0.8pt; text-transform: uppercase; color: #6B7280; font-weight: bold; }
+    .who .name { font-size: 12.5pt; font-weight: bold; }
+    .who .codes { color: #4B5563; font-size: 9pt; }
+
+    table.rows { width: 100%; border-collapse: collapse; margin-top: 4pt; }
+    table.rows th {
+      background: #0F766E; color: white; font-size: 8.5pt; font-weight: bold;
+      letter-spacing: 0.5pt; text-transform: uppercase;
+      padding: 5pt 6pt; text-align: left; border: 0.5pt solid #0F766E;
+    }
+    table.rows td { padding: 4pt 6pt; border: 0.5pt solid #D7DEE5; font-size: 9.5pt; vertical-align: top; }
+    table.rows td.num, table.rows th.num { text-align: right; white-space: nowrap; }
+    table.rows td.acct { white-space: nowrap; font-size: 9pt; color: #4B5563; }
+    table.rows tr.alt td { background: #F7F9FB; }
+    .bal { font-weight: bold; }
+
+    tfoot td {
+      font-size: 10.5pt; font-weight: bold;
+      border-top: 1.5pt solid #0F1419 !important; padding: 6pt;
+    }
+
+    .closing { margin-top: 12pt; width: 100%; }
+    .closing td { padding: 7pt 9pt; font-size: 12pt; font-weight: bold; }
+    .closing .lbl { background: #EFF3F6; width: 60%; }
+    .closing .val { text-align: right; background: #EFF3F6; white-space: nowrap; }
+
+    .ftr { width: 100%; margin-top: 14pt; border-top: 0.5pt solid #D7DEE5; padding-top: 5pt; font-size: 8.5pt; color: #6B7280; }
+    .ftr .right { text-align: right; }
+    .empty { padding: 14pt 0; color: #6B7280; font-size: 10pt; }
+  </style>
+</head>
+<body>
+
+  <table class="hdr" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>
+        <div class="brand">{{ brand_name|default:"Nejum ERP" }}</div>
+        <div class="doc-type">{% trans "CURRENT ACCOUNT STATEMENT" %}</div>
+      </td>
+      <td align="right">
+        <div class="date">{{ printed_at|date:"d M Y" }}</div>
+      </td>
+    </tr>
+  </table>
+
+  {% comment %}
+    Each account's code with the book it belongs to. The sheet's point is
+    still the merged balance at the foot — one position, not two — but a
+    reader reconciling a line needs to see which ledger it came from, and
+    the Account column on every row is what that reference resolves to.
+  {% endcomment %}
+  <table class="who" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>
+        <div class="lbl">{% trans "Account of" %}</div>
+        <div class="name">{{ customer_name }}</div>
+        <div class="codes">
+          {% trans "Ref" %}:
+          {% for a in accounts %}{{ a.code }} ({{ a.book.name }}){% if not forloop.last %} · {% endif %}{% endfor %}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="rows" cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th>{% trans "Date" %}</th>
+        <th>{% trans "Account" %}</th>
+        <th>{% trans "Type" %}</th>
+        <th>{% trans "Description" %}</th>
+        <th>{% trans "Reference" %}</th>
+        <th class="num">{% trans "Debit" %}</th>
+        <th class="num">{% trans "Credit" %}</th>
+        <th class="num">{% trans "Balance" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+        <tr {% if forloop.counter0|divisibleby:2 %}{% else %}class="alt"{% endif %}>
+          <td>{{ r.mv.date|date:"d.m.Y" }}</td>
+          <td class="acct">{{ r.mv.current_account.code }}</td>
+          <td>{{ r.mv.get_movement_type_display }}</td>
+          <td>{{ r.description|default:r.mv.description|default:"" }}</td>
+          <td>{{ r.mv.reference|default:"" }}</td>
+          <td class="num">{% if r.mv.amount_base > 0 %}{{ r.mv.amount_base|floatformat:2 }}{% endif %}</td>
+          <td class="num">{% if r.mv.amount_base < 0 %}{{ r.mv.amount_base|floatformat:2|cut:"-" }}{% endif %}</td>
+          <td class="num bal">{{ r.balance_after|floatformat:2 }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="empty">{% trans "No movements on this account." %}</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if rows %}
+      <tfoot>
+        <tr>
+          <td colspan="5">{% trans "Total" %}</td>
+          <td class="num">{{ debit_total|floatformat:2 }}</td>
+          <td class="num">{{ credit_total|floatformat:2 }}</td>
+          <td class="num">{{ closing|floatformat:2 }}</td>
+        </tr>
+      </tfoot>
+    {% endif %}
+  </table>
+
+  <table class="closing" cellspacing="0" cellpadding="0">
+    <tr>
+      <td class="lbl">
+        {% if closing > 0 %}{% trans "Balance owed to us" %}
+        {% elif closing < 0 %}{% trans "Balance we owe" %}
+        {% else %}{% trans "Account closed" %}{% endif %}
+      </td>
+      <td class="val">
+        {{ closing|floatformat:2|cut:"-" }} {{ currency_symbol }}
+      </td>
+    </tr>
+  </table>
+
+  <table class="ftr" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>{{ brand_name|default:"Nejum ERP" }} · {% trans "Current account statement" %}</td>
+      <td class="right">{% now "d M Y · H:i" %}</td>
+    </tr>
+  </table>
+
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () { window.print(); }, 250);
+    });
+  </script>
+
+</body>
+</html>

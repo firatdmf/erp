@@ -28,7 +28,7 @@ class PaymentCancelTest(TestCase):
             balance=Decimal("1000.00"),
         )
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="CARI-001", name="Maria", type="customer",
+            book=self.book, code="TST-001", name="Maria", type="customer",
             default_currency=self.usd,
         )
 

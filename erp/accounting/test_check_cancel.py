@@ -26,11 +26,11 @@ class CheckCancelTest(TestCase):
             code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
         self.customer = CurrentAccount.objects.create(
-            book=self.book, code="CARI-001", name="Maria", type="customer",
+            book=self.book, code="TST-001", name="Maria", type="customer",
             default_currency=self.usd,
         )
         self.supplier = CurrentAccount.objects.create(
-            book=self.book, code="CARI-002", name="Karven", type="supplier",
+            book=self.book, code="TST-002", name="Karven", type="supplier",
             default_currency=self.usd,
         )
 

@@ -1,5 +1,5 @@
 """
-Current Account (Cari Hesap) module.
+Current Account module.
 
 Phase 1: Core ledger primitives.
     - CurrentAccount    : Unified card per real-world counterparty (customer/supplier/both)
@@ -224,6 +224,33 @@ class CurrentAccount(models.Model):
                 "An account can be linked to only one of Contact, Company or Supplier."
             )
 
+    # ── The currency lock ─────────────────────────────────────────────
+    # An account's currency is what its debt is kept in, and everything
+    # already on it was entered against that choice: a lira account's
+    # exchange differences are measured from it, and its invoices and
+    # adjustments must be in it. Changing it afterwards would re-read that
+    # history in a different currency — quietly, and for dates that may
+    # already be closed. So it is chosen while the account is empty and
+    # fixed from the first document on. A draft invoice counts: it has
+    # posted no movement yet, but it is already in the account's currency.
+
+    @property
+    def currency_is_locked(self):
+        """Whether default_currency can no longer change."""
+        if not self.pk:
+            return False
+        return self.movements.exists() or self.invoices.exists()
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if self.pk and (update_fields is None or "default_currency" in update_fields):
+            before = (CurrentAccount.objects.filter(pk=self.pk)
+                      .values_list("default_currency_id", flat=True).first())
+            if before is not None and before != self.default_currency_id and self.currency_is_locked:
+                raise ValidationError(
+                    _("The currency of an account can't be changed once it has movements or invoices."))
+        super().save(*args, **kwargs)
+
     # ── CRM link ──────────────────────────────────────────────────────
     # Three nullable FKs hold one relationship, and clean() guarantees at
     # most one is set. The two properties below are that guarantee spelled
@@ -284,13 +311,18 @@ class CurrentAccount(models.Model):
             )
         return self.cached_balance
 
-    @property
-    def balance_label(self):
-        if self.cached_balance > 0:
+    @staticmethod
+    def label_for(balance):
+        """"Owes Us" / "We Owe" / "Closed" for a balance in any currency."""
+        if balance > 0:
             return _("Owes Us")
-        if self.cached_balance < 0:
+        if balance < 0:
             return _("We Owe")
         return _("Closed")
+
+    @property
+    def balance_label(self):
+        return self.label_for(self.cached_balance)
 
     @property
     def absolute_balance(self):
@@ -315,6 +347,77 @@ class CurrentAccount(models.Model):
         Cached on the class — this runs once per row on a 50-row list page.
         """
         return _base_currency_symbol()
+
+    # ── The balance in the account's own currency ─────────────────────
+    # cached_balance stays the base-currency figure: lists add it up, the
+    # credit limit is compared against it, and every other page reads it.
+    # But an account that trades in lira wants its own page to say what it
+    # owes in lira, and that is NOT cached_balance at today's rate — a
+    # lira-only supplier would then owe a different sum every morning
+    # without a single new movement. It is the ledger re-read in lira: a
+    # lira row counts for exactly the lira on it, and only a row entered in
+    # another currency is converted, at the rate on its own date.
+
+    @property
+    def own_currency(self):
+        """The account's currency when that is not the base one, else None."""
+        currency = self.default_currency
+        if currency is None or currency.code == getattr(settings, "BASE_CURRENCY_CODE", "USD"):
+            return None
+        return currency
+
+    def in_own_currency(self, movement):
+        """`movement` in this account's own currency, as (amount, rate).
+
+        A row entered in that currency is its own `amount`, with rate None:
+        nothing was converted. A row whose document stated a rate toward
+        this currency (`account_rate` — a rate typed on the payment form) is
+        its `amount` at that rate. Any other row is its `amount_base` at the
+        published base→own rate on the row's date — the same day save()
+        converted it into base on. (None, None) when that rate cannot be had.
+
+        The published fallback goes from amount_base rather than `amount`,
+        so a row in a third currency passes through the figure the ledger
+        actually holds.
+        """
+        currency = self.own_currency
+        if movement.currency_id == currency.pk:
+            return movement.amount, None
+        if movement.account_rate:
+            rate = movement.account_rate
+            return (movement.amount * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), rate
+        from accounting.services import get_exchange_rate
+        base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
+        # base→own (USD→TRY ≈ 48.5), not own→base: the rate table keeps 6
+        # decimals, and 0.020620 has too few significant figures to divide by.
+        rate = get_exchange_rate(base_code, currency.code, on_date=movement.date)
+        if not rate:
+            return None, None
+        rate = Decimal(str(rate))
+        return (movement.amount_base * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), rate
+
+    def own_currency_balance(self):
+        """The balance in the account's own currency, or None.
+
+        None for a base-currency account, whose cached_balance already is
+        that figure, and None when any live row cannot be converted — a
+        page should fall back to the base balance rather than print a lira
+        total with a row missing from it.
+
+        Counts the same .live() rows recompute_balance does.
+        """
+        currency = self.own_currency
+        if currency is None:
+            return None
+        live = self.movements.live()
+        total = (live.filter(currency_id=currency.pk).aggregate(s=Sum("amount"))["s"]
+                 or Decimal("0.00"))
+        for movement in live.exclude(currency_id=currency.pk).only("amount", "amount_base", "account_rate", "currency", "date"):
+            amount, rate = self.in_own_currency(movement)
+            if amount is None:
+                return None
+            total += amount
+        return total
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +503,15 @@ class CurrentAccountMovement(models.Model):
                                         help_text="Rate from movement currency to base (USD)")
     amount_base   = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"),
                                         help_text="Amount normalized to base currency (USD)")
+    # The same thing again toward the ACCOUNT's currency, for an account kept
+    # in one other than the book's: a dollar payment to a lira supplier is
+    # worth 1.0 in the book and ~48.5 on the supplier's account. Only set
+    # where the posting document stated one — see CurrentAccount.in_own_currency,
+    # which falls back to the published rate for the row's date.
+    account_rate  = models.DecimalField(max_digits=16, decimal_places=8, null=True, blank=True,
+                                        help_text="Rate from movement currency to the account's "
+                                                  "own currency, when that is not the base. "
+                                                  "Blank → the published rate for the date.")
 
     movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPES)
 
@@ -427,6 +539,18 @@ class CurrentAccountMovement(models.Model):
 
     objects = CurrentAccountMovementQuerySet.as_manager()
 
+    # Types that change what the account OWES, as opposed to settling it.
+    # They are entered in the account's own currency, the way an invoice is:
+    # a lira adjustment on a dollar account would be a lira debt the account
+    # does not keep. Settling types — collections, payments, advances,
+    # checks — stay free: paying a lira debt in dollars is ordinary, and
+    # converting that is what the account's rate is for.
+    DEBT_TYPES = frozenset({
+        "opening", "order_sale", "invoice_sale", "invoice_purchase",
+        "return_sale", "return_purchase", "interest", "discount", "adjustment",
+        "legacy_ar", "legacy_ap",
+    })
+
     def __str__(self):
         sign = "+" if self.amount >= 0 else ""
         return f"{self.current_account.code} | {self.date} | {sign}{self.amount} {self.currency.code}"
@@ -452,10 +576,21 @@ class CurrentAccountMovement(models.Model):
         Returns None for "nobody said", which is what lets the published
         rate apply instead.
         """
+        return self._stated_by_source("ledger_exchange_rate")
+
+    def entered_account_rate(self):
+        """`entered_rate`, toward the account's own currency instead of base.
+
+        Asked through `ledger_account_rate()`, on the same opt-in terms.
+        """
+        return self._stated_by_source("ledger_account_rate")
+
+    def _stated_by_source(self, method):
+        """The rate the posting document returns from `method`, or None."""
         if not (self.source_type_id and self.source_id):
             return None
         model = self.source_type.model_class()
-        if model is None or not callable(getattr(model, "ledger_exchange_rate", None)):
+        if model is None or not callable(getattr(model, method, None)):
             # Asked of the CLASS, so the common case — an invoice, an
             # order — costs no query at all.
             return None
@@ -469,10 +604,39 @@ class CurrentAccountMovement(models.Model):
         source = model.objects.filter(pk=self.source_id).first()
         if source is None:
             return None
-        rate = source.ledger_exchange_rate()
+        rate = getattr(source, method)()
         return Decimal(str(rate)) if rate else None
 
+    def check_currency(self):
+        """Refuse a manual debt-changing row in a currency other than the account's.
+
+        Only rows nobody's document posted. A row with a source follows its
+        document: an invoice is held to the same rule on Invoice, while a
+        transfer posts both legs in one currency on purpose, and an order
+        or an expense carries its own. An existing row that already broke
+        the rule — fourteen lira adjustments on dollar accounts predate it —
+        may be saved as it is; changing its currency, account or type
+        brings it under the rule like a new one.
+        """
+        if (self.source_type_id or self.movement_type not in self.DEBT_TYPES
+                or not self.current_account_id
+                or self.currency_id == self.current_account.default_currency_id):
+            return
+        if self.pk:
+            before = (CurrentAccountMovement.objects.filter(pk=self.pk)
+                      .values("currency_id", "current_account_id", "movement_type").first())
+            if (before and before["currency_id"] == self.currency_id
+                    and before["current_account_id"] == self.current_account_id
+                    and before["movement_type"] in self.DEBT_TYPES):
+                return
+        raise ValidationError(
+            _("%(type)s movements must be in the account's currency (%(currency)s). "
+              "Only collections, payments, advances and checks can be in another currency.")
+            % {"type": self.get_movement_type_display(),
+               "currency": self.current_account.default_currency.code})
+
     def save(self, *args, **kwargs):
+        self.check_currency()
         base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
         if self.currency.code == base_code:
             self.exchange_rate = Decimal("1.000000")
@@ -488,6 +652,15 @@ class CurrentAccountMovement(models.Model):
                 ) or Decimal("1.000000")
             self.exchange_rate = Decimal(str(rate))
             self.amount_base = (self.amount * self.exchange_rate).quantize(Decimal("0.01"))
+
+        # Re-asked on every save, as the base rate is on a resync: the
+        # payment's currency or its rate may just have been edited. A row
+        # already in the account's currency converts nothing, so holds none.
+        own = self.current_account.own_currency if self.current_account_id else None
+        if own is None or self.currency_id == own.pk:
+            self.account_rate = None
+        elif self.source_type_id:
+            self.account_rate = self.entered_account_rate()
 
         if not self.book_id and self.current_account_id:
             self.book_id = self.current_account.book_id
@@ -529,8 +702,8 @@ class CurrentAccountSettings(models.Model):
     invoice_seq_year = models.PositiveSmallIntegerField(null=True, blank=True)
     payment_seq_year = models.PositiveSmallIntegerField(null=True, blank=True)
 
-    # ACC, not CARI: the Turkish term was dropped from the interface, and a
-    # book created today should not start minting codes in it. Per-book, so
+    # ACC, not the old Turkish abbreviation: that term was dropped from the
+    # interface, and a book created today should not start minting codes in it. Per-book, so
     # a book already running another prefix keeps it — and the codes it has
     # already issued are never rewritten.
     current_account_code_prefix  = models.CharField(max_length=10, default="ACC")
@@ -810,6 +983,33 @@ class Invoice(models.Model):
             "purchase_return": "return_purchase",
             "proforma":        "invoice_sale",
         }[self.type]
+
+    def check_currency(self):
+        """Refuse an invoice in a currency other than its account's.
+
+        An invoice is what the account owes, and the account keeps its debt
+        in one currency — see CurrentAccount.currency_is_locked. Every path
+        that makes one already follows this (a goods receipt restates its
+        lines, an order's invoice takes the account's currency); this is the
+        guard for the ones that let a person pick. An existing invoice left
+        as it is always saves, so no old document becomes unsaveable.
+        """
+        if (not self.current_account_id or not self.currency_id
+                or self.currency_id == self.current_account.default_currency_id):
+            return
+        if self.pk:
+            before = (Invoice.objects.filter(pk=self.pk)
+                      .values("currency_id", "current_account_id").first())
+            if (before and before["currency_id"] == self.currency_id
+                    and before["current_account_id"] == self.current_account_id):
+                return
+        raise ValidationError(
+            _("An invoice must be in its account's currency (%(currency)s).")
+            % {"currency": self.current_account.default_currency.code})
+
+    def save(self, *args, **kwargs):
+        self.check_currency()
+        super().save(*args, **kwargs)
 
     # -- totals ------------------------------------------------------------
     def recompute_totals(self, save=True):
@@ -1191,6 +1391,14 @@ class Payment(models.Model):
                                         help_text="Rate to the book's base "
                                                   "currency. Blank → the "
                                                   "published rate for the date.")
+    # Toward the ACCOUNT's currency instead, when the account is kept in one
+    # other than the book's and this payment is not in it — the rate at
+    # which a dollar payment to a lira supplier came off what we owe them.
+    # At most one of the two is typed: see set_stated_rate.
+    account_exchange_rate = models.DecimalField(
+        max_digits=14, decimal_places=6, null=True, blank=True,
+        help_text="Rate to the account's own currency, when that is not the "
+                  "base. Blank → the published rate for the date.")
 
     # Cash side — money lands here (or leaves here)
     cash_account = models.ForeignKey(
@@ -1249,6 +1457,38 @@ class Payment(models.Model):
         applies — see CurrentAccountMovement.entered_rate, which is what asks.
         """
         return self.exchange_rate
+
+    def ledger_account_rate(self):
+        """The rate this payment's ledger row converts at toward the account's
+        own currency — asked by CurrentAccountMovement.entered_account_rate."""
+        return self.account_exchange_rate
+
+    @property
+    def rate_is_toward_account(self):
+        """Whether this payment's rate converts into the ACCOUNT's currency.
+
+        True for an account kept in a currency other than the book's, when
+        the payment is not in that currency. A lira account tracks lira, so
+        a dollar payment to it converts into lira — the mirror of a lira
+        payment on a dollar account converting into dollars. A lira payment
+        on that account still states its rate toward the book, which needs
+        one to put it in dollars.
+        """
+        own = self.current_account.own_currency
+        return own is not None and self.currency_id != own.pk
+
+    def set_stated_rate(self, rate):
+        """File a rate typed in the form's one box under the right field,
+        clearing the other so a rate never outlives the currency it was for."""
+        if self.rate_is_toward_account:
+            self.account_exchange_rate, self.exchange_rate = rate, None
+        else:
+            self.exchange_rate, self.account_exchange_rate = rate, None
+
+    @property
+    def stated_rate(self):
+        """What the form's one rate box holds for this payment."""
+        return self.account_exchange_rate if self.rate_is_toward_account else self.exchange_rate
 
     # -- lifecycle ---------------------------------------------------------
     def confirm(self, user=None):

@@ -199,6 +199,11 @@ def read_stock(path):
                 "sets": decimal(raw[C_SETS]) or Decimal("0"),
                 "price": decimal(raw[C_PRICE]),
             })
+            # Warehouse costs cannot be negative. Stop on the sheet row, in
+            # the parse, rather than let the constraint abort the write.
+            if rows[-1]["price"] is not None and rows[-1]["price"] < 0:
+                raise CommandError(
+                    f"Sheet row {n}: price {rows[-1]['price']} is negative.")
         return rows
     finally:
         wb.close()

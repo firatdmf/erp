@@ -244,6 +244,11 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
 
     base_name = (base_name or "").strip() or variant_sku
     cost_dec = _to_decimal(cost)
+    # The catalogue refuses a negative cost at the database. The warehouse
+    # row the caller wrote keeps whatever was typed; the catalogue mirror
+    # just doesn't copy an impossible cost, rather than failing the intake.
+    if cost_dec is not None and cost_dec < 0:
+        cost_dec = None
 
     def _safe_sku(base):
         """The main-product SKU is the base code (K1245.G13 → 'K1245').

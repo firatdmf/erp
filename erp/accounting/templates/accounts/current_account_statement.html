@@ -308,7 +308,7 @@
   <div class="st-head">
     <div class="st-head-l">
       <div class="st-eyebrow">{% trans "Account Statement" %}</div>
-      <h1 class="st-title">{% blocktrans with name=cari.name %}Statement — {{ name }}{% endblocktrans %}</h1>
+      <h1 class="st-title">{% blocktrans with name=current_account.name %}Statement — {{ name }}{% endblocktrans %}</h1>
       <p class="st-sub"><span class="code">{{ current_account.code }}</span> · {{ current_account.book.name }}{% if date_from or date_to %} · {{ date_from|default:'…' }} → {{ date_to|default:'…' }}{% endif %}</p>
     </div>
     <button class="st-btn ghost no-print" onclick="window.print();">

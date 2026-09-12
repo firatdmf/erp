@@ -111,12 +111,123 @@ class SalesRepRoleTests(TestCase):
         self.assertEqual([r["url"] for r in results],
                          [f"/marketing/product_detail/{product.pk}/"])
 
+    def test_may_open_the_order_form_as_a_page(self):
+        """The form's page face, which is the button she actually clicks.
+
+        Creating an order moved off the drawer onto a book-scoped PAGE,
+        and the "New order" button on the order list points at it. The
+        path gate refused it — /operating/books/2/orders/create/ carries
+        the segment "create" — so the one role that exists to raise
+        orders could reach the sales list and 403 on its only button,
+        while the drawer it no longer opens kept working.
+        """
+        from accounting.models import Book
+
+        book = Book.objects.create(name="Laleli Fabric")
+        self.user.member.books.add(book)
+        response = self.client.get(f"/operating/books/{book.pk}/orders/create/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_the_order_page_is_still_scoped_to_her_books(self):
+        """Opening the path did not open the books behind it: the route
+        is book_scoped, so a book she is not assigned is still 404, not
+        a form she can file an order into."""
+        from accounting.models import Book
+
+        stranger = Book.objects.create(name="Somebody Else Fabric")
+        response = self.client.get(f"/operating/books/{stranger.pk}/orders/create/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_the_order_page_pattern_is_anchored_not_a_prefix(self):
+        """One route under /operating/books/<id>/, not everything that
+        starts the same way."""
+        from erp.roles import may_read
+
+        self.assertFalse(may_read("/operating/books/2/orders/create/edit/"))
+        self.assertFalse(may_read("/operating/books/2/orders/delete/1/"))
+        self.assertFalse(may_read("/operating/books/2/warehouses/create/"))
+
     def test_write_allowlist_is_exact_not_a_prefix(self):
         # The trailing-slash sibling is create_web_order (the storefront
         # checkout API), which she must not reach.
         self.assertEqual(
             self.client.post("/operating/orders/create/", {}).status_code, 403
         )
+
+    # ── packing ─────────────────────────────────────────────────────
+    def _packable_order(self):
+        """An order in a book she is assigned, so book_guarded lets her
+        at it. Everything the packing screen needs hangs off the order's
+        current account, which is what carries the book."""
+        from accounting.models import Book, CurrencyCategory
+        from crm.models import Contact
+        from accounting.models import CurrentAccount
+        from operating.models import Order
+
+        book = Book.objects.create(name="Laleli Fabric")
+        self.user.member.books.add(book)
+        currency = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        contact = Contact.objects.create(name="Packing Customer")
+        account = CurrentAccount.objects.create(
+            book=book, code="ACC-PACK", name="Packing Customer",
+            default_currency=currency, contact=contact)
+        return Order.objects.create(current_account=account)
+
+    def test_may_open_and_use_the_packing_screen(self):
+        """She packs what she sells.
+
+        The screen's id sits in the middle of the path and its segment
+        is "pack", so the write-segment rule refused the whole flow —
+        the page over GET and every button on it over POST.
+        """
+        order = self._packable_order()
+        self.assertEqual(
+            self.client.get(f"/operating/orders/{order.pk}/pack/").status_code, 200)
+        for path in (f"/operating/orders/{order.pk}/pack/add/",
+                     f"/operating/orders/{order.pk}/pack/assign_pack/",
+                     f"/operating/orders/{order.pk}/pack/assign_item/",
+                     f"/operating/orders/{order.pk}/packing_list/"):
+            with self.subTest(path=path):
+                self.assertNotEqual(self.client.post(path, {}).status_code, 403)
+
+    def test_packing_stops_short_of_completing(self):
+        """The line the role does not cross. Scanning reserves a roll;
+        completing cuts the stock and bills the customer."""
+        order = self._packable_order()
+        self.assertEqual(
+            self.client.post(f"/operating/orders/{order.pk}/pack/complete/",
+                             {}).status_code, 403)
+
+    def test_she_can_only_pack_orders_in_her_own_books(self):
+        """Opening the route did not open every order behind it. Her book
+        assignment is what bounds which orders are hers to pack, and the
+        pack routes carry no book of their own — book_guarded reads it off
+        the order's current account."""
+        from accounting.models import Book, CurrencyCategory
+        from accounting.models import CurrentAccount
+        from operating.models import Order
+
+        self._packable_order()  # gives her Laleli
+        other = Book.objects.create(name="Ergene Fabric")
+        currency = CurrencyCategory.objects.get(code="USD")
+        account = CurrentAccount.objects.create(
+            book=other, code="ACC-OTHER", name="Not Hers", default_currency=currency)
+        theirs = Order.objects.create(current_account=account)
+
+        self.assertEqual(
+            self.client.get(f"/operating/orders/{theirs.pk}/pack/").status_code, 404)
+        self.assertEqual(
+            self.client.post(f"/operating/orders/{theirs.pk}/pack/add/",
+                             {"barcode": "x"}).status_code, 404)
+
+    def test_the_packing_allowlist_is_anchored_not_a_prefix(self):
+        from erp.roles import may_read, may_write
+
+        self.assertFalse(may_write("/operating/orders/1/pack/complete/"))
+        self.assertFalse(may_write("/operating/orders/1/"))
+        self.assertFalse(may_write("/operating/orders/1/packing_list/export_excel/"))
+        self.assertFalse(may_read("/operating/orders/1/pack/complete/"))
 
     def test_cannot_complete_or_destroy_an_order(self):
         for path in ("/operating/orders/1/pack/complete/",

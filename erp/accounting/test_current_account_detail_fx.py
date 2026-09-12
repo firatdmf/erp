@@ -44,7 +44,12 @@ class CurrentAccountDetailConversionTests(TestCase):
         mv = CurrentAccountMovement(
             current_account=self.current_account, book=self.book, date="2026-08-26",
             amount=Decimal(amount), currency=currency,
-            movement_type="adjustment", description="stopaj",
+            # advance_in, not adjustment: a hand-entered row that changes what is owed
+            # must be in the account's currency (CurrentAccountMovement.check_currency),
+            # and a settling type is the kind that may be in another. An advance is
+            # also the settling type with no Payment mirrored onto it, so the row
+            # stays hand-entered.
+            movement_type="advance_in", description="stopaj",
         )
         if rate is not None:
             mv.exchange_rate = Decimal(rate)

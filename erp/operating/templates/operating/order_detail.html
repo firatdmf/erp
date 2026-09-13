@@ -840,6 +840,74 @@
   /* PDF header editor — uses the page's own .od-input + .ord-btn */
   .oph-input { width: 190px !important; height: 36px; padding: 0 12px !important; }
   @media (max-width: 640px) { .oph-input { width: 100% !important; flex: 1; } .oph-wrap { width: 100%; } }
+
+  /* Complete-order confirm — replaces the browser's confirm() so the
+     line recap is readable and the irreversible bit (stock leaves the
+     shelf) is stated where the eye lands before the button. */
+  .odc-overlay {
+    position: fixed; inset: 0; z-index: 1000; padding: 20px;  /* over the sticky save bar (200) */
+    background: rgba(15, 20, 25, 0.44);
+    display: none; align-items: center; justify-content: center;
+  }
+  .odc-overlay.show { display: flex; animation: odc-fade 140ms ease-out; }
+  @keyframes odc-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes odc-rise { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
+  .odc-shell {
+    width: min(560px, 100%); max-height: min(84vh, 760px);
+    display: flex; flex-direction: column; overflow: hidden;
+    background: white; border-radius: 16px; border: 1px solid #E0E6EE;
+    box-shadow: 0 24px 64px rgba(15, 23, 31, 0.24);
+    animation: odc-rise 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  .odc-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 18px 14px; }
+  .odc-ic {
+    flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: var(--nejum-teal-50); color: var(--nejum-teal-600); font-size: 15px;
+  }
+  .odc-head h3 { margin: 0; font: 700 15px var(--font-sans); color: var(--ink); letter-spacing: -0.01em; }
+  .odc-sub { margin: 3px 0 0; font: 500 12.5px var(--font-sans); color: var(--gray-500); line-height: 1.45; }
+  .odc-x {
+    margin-left: auto; flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+    border: 1px solid transparent; background: transparent; color: var(--gray-400);
+    cursor: pointer; transition: all 140ms;
+  }
+  .odc-x:hover { background: #F1F4F8; color: var(--gray-600); }
+  .odc-warn {
+    display: flex; align-items: flex-start; gap: 9px; margin: 0 18px 14px;
+    padding: 10px 12px; border-radius: 10px;
+    font: 600 12.5px var(--font-sans); line-height: 1.45;
+    background: #FFF8EB; color: #92400E; border: 1px solid #FDE8C4;
+  }
+  .odc-warn i { margin-top: 1px; }
+  .odc-body { flex: 1; overflow-y: auto; padding: 0 18px; }
+  .odc-lbl {
+    font: 700 10.5px var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--gray-400); padding-bottom: 7px;
+  }
+  .odc-tbl { width: 100%; border-collapse: collapse; }
+  .odc-tbl td { padding: 9px 0; border-top: 1px solid #EEF2F7; vertical-align: top; }
+  .odc-tbl tr:first-child td { border-top: none; }
+  .odc-nm { font: 600 13px var(--font-sans); color: var(--ink); }
+  .odc-sku { display: block; margin-top: 2px; font: 500 11px var(--font-mono); color: var(--gray-500); }
+  .odc-qty { white-space: nowrap; text-align: right; font: 500 12.5px var(--font-sans); color: var(--gray-600); padding-left: 14px !important; }
+  .odc-sub-cell { white-space: nowrap; text-align: right; font: 700 13px var(--font-sans); color: var(--ink); padding-left: 14px !important; font-variant-numeric: tabular-nums; }
+  .odc-empty { padding: 14px 0; font: 500 12.5px var(--font-sans); color: var(--gray-500); }
+  .odc-foot { padding: 14px 18px 16px; border-top: 1px solid #EEF2F7; background: #FBFCFE; }
+  .odc-total {
+    display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 12px;
+  }
+  .odc-total span { font: 600 12.5px var(--font-sans); color: var(--gray-600); }
+  .odc-total b { font: 800 19px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.015em; }
+  .odc-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .odc-actions .ord-btn { padding: 9px 16px; }
+  @media (max-width: 480px) {
+    .odc-actions { flex-direction: column-reverse; }
+    .odc-actions .ord-btn { width: 100%; justify-content: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .odc-overlay.show, .odc-shell { animation: none; }
+  }
 </style>
 {% endblock %}
 
@@ -1705,6 +1773,39 @@
   </div>
 </div>
 
+<!-- COMPLETE-ORDER CONFIRM — the last look at the lines before stock
+     and money post. Filled in by odConfirmComplete() at open time from
+     the live table, since inline edits save over AJAX without a reload. -->
+<div class="odc-overlay" id="odConfirmModal" aria-hidden="true">
+  <div class="odc-shell" role="dialog" aria-modal="true" aria-labelledby="odcTitle">
+    <div class="odc-head">
+      <div class="odc-ic"><i class="fa fa-box-open"></i></div>
+      <div style="min-width:0;">
+        <h3 id="odcTitle">{% trans "Complete the order" %}</h3>
+        <p class="odc-sub">{% trans "Check the lines below — after this the stock movement and the ledger entry are posted." %}</p>
+      </div>
+      <button type="button" class="odc-x" id="odcClose" aria-label="{% trans 'Close' %}"><i class="fa fa-xmark"></i></button>
+    </div>
+    <div class="odc-warn"><i class="fa fa-triangle-exclamation"></i><span id="odcWarn"></span></div>
+    <div class="odc-body">
+      <div class="odc-lbl">{% trans "Order lines" %}</div>
+      <table class="odc-tbl"><tbody id="odcRows"></tbody></table>
+    </div>
+    <div class="odc-foot">
+      <div class="odc-total">
+        <span>{% trans "Total" %}</span>
+        <b id="odcTotal">$0.00</b>
+      </div>
+      <div class="odc-actions">
+        <button type="button" class="ord-btn ghost" id="odcCancel">{% trans "Cancel" %}</button>
+        <button type="button" class="ord-btn primary" id="odcOk">
+          <i class="fa fa-check"></i> {% trans "Complete the order" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Sticky save bar — slides in from bottom only when there are
      unsaved changes to the inline-editable fields. -->
 <div id="od-savebar" class="od-savebar" aria-hidden="true">
@@ -1766,37 +1867,129 @@
       });
     }
     const CONFIRM_SHIP_NO_CARGO = '{% trans "The order will complete WITHOUT cargo info and the reserved rolls will be deducted from stock." %}';
-    // Line-by-line recap appended to the complete-confirm so a mistyped
+    // Line-by-line recap shown in the confirm dialog so a mistyped
     // quantity/price gets one last human look before stock + money post.
-    // Server-rendered snapshot as FALLBACK only — the live recap is
-    // built from the table's inputs at confirm time, because inline
-    // edits save via AJAX without a reload and a baked constant would
-    // show the pre-edit numbers.
-    const ORDER_SUMMARY_FALLBACK =
-      {% for item in order_items_sorted %}'• {{ item.product.title|default:item.description|escapejs }}{% if item.product_variant %} ({{ item.product_variant.variant_sku|escapejs }}){% endif %} — {{ item.quantity|floatformat:2 }} × ${{ item.price|floatformat:2 }}\n' +
-      {% endfor %}'{% trans "Total" %}: ${{ order.total_value|floatformat:2 }}';
-    const SUMMARY_TOTAL_LABEL = '{% trans "Total" %}';
-    function buildOrderSummary() {
+    // Server-rendered snapshot as FALLBACK only — the live recap is read
+    // off the table at confirm time, because inline edits save via AJAX
+    // without a reload and a baked constant would show pre-edit numbers.
+    const ORDER_SUMMARY_FALLBACK = [
+      {% for item in order_items_sorted %}{ name: '{{ item.product.title|default:item.description|escapejs }}', sku: '{% if item.product_variant %}{{ item.product_variant.variant_sku|escapejs }}{% endif %}', qty: '{{ item.quantity|default:0 }}', price: '{{ item.price|default:0 }}' },
+      {% endfor %}];
+
+    // Numbers reach us either from an input (plain "12.5") or from a
+    // rendered cell, which in Turkish carries a decimal comma. Thousand
+    // separators are off, so the last . or , is always the decimal point.
+    const parseNum = (raw) => {
+      let v = String(raw == null ? '' : raw).replace(/[^0-9.,\-]/g, '');
+      const cut = Math.max(v.lastIndexOf('.'), v.lastIndexOf(','));
+      if (cut !== -1) v = v.slice(0, cut).replace(/[.,]/g, '') + '.' + v.slice(cut + 1);
+      return parseFloat(v) || 0;
+    };
+    const flattenText = (el) => (el ? el.textContent : '').replace(/\s+/g, ' ').trim();
+
+    function orderSummaryRows() {
       try {
         const rows = document.querySelectorAll('#od-items-tbody tr[data-item-row]');
-        if (!rows.length) return ORDER_SUMMARY_FALLBACK;
-        const lines = [];
-        let total = 0;
-        rows.forEach(r => {
-          const nameEl = r.querySelector('.od-prod span:last-child');
-          const name = (nameEl ? nameEl.textContent : '').trim() || '—';
-          const vsku = (r.children[2] ? r.children[2].textContent : '').trim();
-          const qty = parseFloat(r.querySelector('input[data-field="quantity"]')?.value) || 0;
-          const price = parseFloat(r.querySelector('input[data-field="price"]')?.value) || 0;
-          total += qty * price;
-          lines.push('• ' + name + (vsku && vsku !== '—' ? ' (' + vsku + ')' : '') +
-                     ' — ' + qty.toFixed(2) + ' × $' + price.toFixed(2));
+        if (!rows.length) return ORDER_SUMMARY_FALLBACK.slice();
+        // Saved rows render qty/price as plain text; only rows added in
+        // this session (not yet saved) carry the editable inputs.
+        const cellNum = (row, idx, field) => {
+          const inp = row.querySelector('input[data-field="' + field + '"]');
+          return parseNum(inp ? inp.value : flattenText(row.children[idx]));
+        };
+        return Array.from(rows).map(r => {
+          const sku = flattenText(r.children[2]);
+          return {
+            name: flattenText(r.querySelector('.od-prod span:last-child')) || '—',
+            sku: sku === '—' ? '' : sku,
+            qty: cellNum(r, 3, 'quantity'),
+            price: cellNum(r, 4, 'price'),
+          };
         });
-        lines.push(SUMMARY_TOTAL_LABEL + ': $' + total.toFixed(2));
-        return lines.join('\n');
-      } catch (e) { return ORDER_SUMMARY_FALLBACK; }
+      } catch (e) { return ORDER_SUMMARY_FALLBACK.slice(); }
     }
-    const CONFIRM_TAIL = '\n\n' + '{% trans "Continue?" %}';
+
+    // The complete-order confirm. Resolves true when the user commits,
+    // false on cancel / Esc / backdrop — so submitStatus reads much like
+    // the confirm() it replaced.
+    const odcModal = document.getElementById('odConfirmModal');
+    function odConfirmComplete(noCargo) {
+      const rowsEl = document.getElementById('odcRows');
+      if (!odcModal || !rowsEl) {   // markup missing → fall back, never block the order
+        return Promise.resolve(confirm(noCargo ? CONFIRM_SHIP_NO_CARGO : CONFIRM_SHIP));
+      }
+      const money = (n) => '$' + n.toFixed(2);
+      const lines = orderSummaryRows();
+      let total = 0;
+      rowsEl.textContent = '';
+      lines.forEach(l => {
+        const qty = parseNum(l.qty), price = parseNum(l.price);
+        total += qty * price;
+        const tr = document.createElement('tr');
+        const nameTd = document.createElement('td');
+        const nm = document.createElement('span');
+        nm.className = 'odc-nm';
+        nm.textContent = l.name || '—';
+        nameTd.appendChild(nm);
+        if (l.sku) {
+          const sk = document.createElement('span');
+          sk.className = 'odc-sku';
+          sk.textContent = l.sku;
+          nameTd.appendChild(sk);
+        }
+        const qtyTd = document.createElement('td');
+        qtyTd.className = 'odc-qty';
+        qtyTd.textContent = qty.toFixed(2) + ' × ' + money(price);
+        const subTd = document.createElement('td');
+        subTd.className = 'odc-sub-cell';
+        subTd.textContent = money(qty * price);
+        tr.appendChild(nameTd); tr.appendChild(qtyTd); tr.appendChild(subTd);
+        rowsEl.appendChild(tr);
+      });
+      if (!lines.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.className = 'odc-empty';
+        td.textContent = '{% trans "No lines on this order." %}';
+        tr.appendChild(td);
+        rowsEl.appendChild(tr);
+      }
+      document.getElementById('odcTotal').textContent = money(total);
+      document.getElementById('odcWarn').textContent = noCargo ? CONFIRM_SHIP_NO_CARGO : CONFIRM_SHIP;
+
+      const okBtn = document.getElementById('odcOk');
+      const cancelBtn = document.getElementById('odcCancel');
+      const closeBtn = document.getElementById('odcClose');
+      const lastFocus = document.activeElement;
+      odcModal.classList.add('show');
+      odcModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => okBtn.focus(), 0);
+
+      return new Promise(resolve => {
+        function close(ok) {
+          odcModal.classList.remove('show');
+          odcModal.setAttribute('aria-hidden', 'true');
+          document.body.style.overflow = '';
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          closeBtn.removeEventListener('click', onCancel);
+          odcModal.removeEventListener('mousedown', onBackdrop);
+          document.removeEventListener('keydown', onKey);
+          if (lastFocus && lastFocus.focus) lastFocus.focus();
+          resolve(ok);
+        }
+        const onOk = () => close(true);
+        const onCancel = () => close(false);
+        const onBackdrop = (e) => { if (e.target === odcModal) close(false); };
+        const onKey = (e) => { if (e.key === 'Escape') close(false); };
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        closeBtn.addEventListener('click', onCancel);
+        odcModal.addEventListener('mousedown', onBackdrop);
+        document.addEventListener('keydown', onKey);
+      });
+    }
     function setSkipCargo(v) {
       let inp = document.getElementById('od-skip-cargo-input');
       if (!inp) {
@@ -1809,13 +2002,17 @@
     function submitStatus(s) {
       if (SHIPPED.indexOf(s) !== -1) {
         // Cargo info is OPTIONAL for every order — completing without a
-        // carrier/tracking just gets a slightly different confirm text.
+        // carrier/tracking just gets a slightly different warning.
         const c = ((carrierSel && carrierSel.value) || '').trim();
         const t = ((trackingInp && trackingInp.value) || '').trim();
         const noCargo = (!c && !t) || (hasCargoChk && !hasCargoChk.checked);
-        const msg = (noCargo ? CONFIRM_SHIP_NO_CARGO : CONFIRM_SHIP) + '\n\n' + buildOrderSummary() + CONFIRM_TAIL;
-        if (!confirm(msg)) return;
-        setSkipCargo(noCargo ? '1' : '0');
+        odConfirmComplete(noCargo).then(ok => {
+          if (!ok) return;
+          setSkipCargo(noCargo ? '1' : '0');
+          statusInput.value = s;
+          statusForm.submit();
+        });
+        return;
       }
       statusInput.value = s;
       statusForm.submit();

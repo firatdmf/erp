@@ -83,15 +83,12 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
 
       - name: Test
-        # accounting takes the app label; operating's modules are named
-        # one by one because a bare directory label makes unittest import
-        # them as top-level modules, which breaks their relative imports
-        # ("attempted relative import with no known parent package").
-        # Worth untangling separately — listing them keeps CI honest in
-        # the meantime rather than quietly skipping nine modules.
+        # Every app keeps its tests in an <app>/tests/ package, so a plain
+        # app label loads them all. The labels are listed rather than left
+        # to a bare `manage.py test` because test_req.py in this directory
+        # is not importable and fails discovery before it reaches the apps.
         working-directory: erp
         run: |
-          python manage.py test accounting --no-input
-          python manage.py test $(ls operating/test*.py \
-            | sed 's|operating/||; s|\.py$||; s|^|operating.|' | tr '\n' ' ') \
+          python manage.py test \
+            accounting authentication crm erp.tests marketing operating \
             --no-input

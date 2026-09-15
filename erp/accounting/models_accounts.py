@@ -338,6 +338,35 @@ class CurrentAccount(models.Model):
             )
         return self.cached_balance
 
+    # What each type means, for the tooltip on the badge. The label alone
+    # says "Inter-company" and leaves the reader to guess; this says what
+    # follows from it — who the account is, and for a paired one, that the
+    # other book carries the same entries the other way round.
+    TYPE_EXPLANATIONS = {
+        "customer":     _("Someone who buys from this book. A positive balance is money owed to us."),
+        "supplier":     _("Someone this book buys from. A negative balance is money we owe."),
+        "both":         _("Buys from us and sells to us; the balance is what is left after both."),
+        "staff":        _("A member of staff: wages, advances and expenses paid on their behalf."),
+        "intercompany": _("One of our own books, not a customer or supplier."),
+        "other":        _("Anything that is not a customer, supplier, staff member or one of our books."),
+    }
+
+    @property
+    def type_explanation(self):
+        """One sentence on what this account's type means, plus its pairing."""
+        text = self.TYPE_EXPLANATIONS.get(self.type, "")
+        if self.type == "intercompany":
+            if self.mirror_account_id:
+                text = "%s %s" % (text, _(
+                    "Paired with %(book)s · %(code)s: every entry here is written "
+                    "there with the opposite sign, and entries can only be changed "
+                    "on the side they were made.") % {
+                        "book": self.mirror_account.book.name,
+                        "code": self.mirror_account.code})
+            else:
+                text = "%s %s" % (text, _("Not paired with the other book's account yet."))
+        return text
+
     @staticmethod
     def label_for(balance):
         """"Owes Us" / "We Owe" / "Closed" for a balance in any currency."""

@@ -63,7 +63,7 @@ in place instead of reloading the whole page.
         {% elif c.type == 'both' %}both
         {% elif c.type == 'staff' %}staff
         {% elif c.type == 'intercompany' %}intercompany
-        {% else %}other{% endif %}">
+        {% else %}other{% endif %}" title="{{ c.type_explanation }}">
         <span class="ca-type-dot"></span>{{ c.get_type_display }}
       </span>
     </div>

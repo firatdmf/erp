@@ -184,6 +184,21 @@ class TheAccountSaysSo(MirrorBase):
         page = self.client.get(reverse("accounts:detail", args=[self.shop_side.pk]))
         self.assertContains(page, "Inter-company")
 
+    def test_hovering_the_badge_explains_what_the_type_means(self):
+        page = self.client.get(reverse("accounts:detail", args=[self.shop_side.pk]))
+        self.assertContains(page, "One of our own books, not a customer or supplier.")
+        self.assertContains(page, "Paired with Ergene Fabric · ACC-065")
+
+    def test_an_unpaired_inter_company_account_says_it_is_not_paired_yet(self):
+        lone = CurrentAccount.objects.create(
+            book=self.laleli, code="LONE", name="Third book", type="intercompany",
+            default_currency=self.usd)
+        self.assertIn("Not paired", lone.type_explanation)
+
+    def test_every_type_has_an_explanation(self):
+        for value, _label in CurrentAccount.TYPE_CHOICES:
+            self.assertIn(value, CurrentAccount.TYPE_EXPLANATIONS)
+
     def test_the_page_names_the_account_on_the_other_side(self):
         page = self.client.get(reverse("accounts:detail", args=[self.shop_side.pk]))
         self.assertContains(page, "Mirrored with")

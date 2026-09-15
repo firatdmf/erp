@@ -54,7 +54,7 @@
   .cd-btn.danger:hover { background: #FEF2F2; border-color: #FCA5A5; }
 
   /* Type chip in head */
-  .cd-type { display:inline-flex; align-items:center; gap: 5px; padding: 4px 10px; border-radius: 999px; font: 600 11.5px var(--font-sans); white-space: nowrap; }
+  .cd-type { cursor: help; display:inline-flex; align-items:center; gap: 5px; padding: 4px 10px; border-radius: 999px; font: 600 11.5px var(--font-sans); white-space: nowrap; }
   .cd-type-dot { width: 6px; height: 6px; border-radius: 50%; }
   .cd-type.customer { color: #1565C0; background: #DBEAFE; }
   .cd-type.customer .cd-type-dot { background: #3B82F6; }
@@ -258,7 +258,7 @@
           {% elif current_account.type == 'both' %}both
           {% elif current_account.type == 'staff' %}staff
           {% elif current_account.type == 'intercompany' %}intercompany
-          {% else %}other{% endif %}">
+          {% else %}other{% endif %}" title="{{ current_account.type_explanation }}">
           <span class="cd-type-dot"></span>{{ current_account.get_type_display }}
         </span>
       </div>

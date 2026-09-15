@@ -155,7 +155,11 @@
   .ca-result { font: 500 12.5px var(--font-sans); color: var(--gray-600); }
   .ca-result b { color: var(--ink); font-weight: 700; }
 
-  .ca-list { background: white; border:1px solid #E2E8EE; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  /* overflow stays visible so a row's tooltip is not clipped; the rows
+     carry the rounded corners the container used to clip. */
+  .ca-list { background: white; border:1px solid #E2E8EE; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  .ca-list-head { border-radius: 12px 12px 0 0; }
+  .ca-row:last-child { border-radius: 0 0 12px 12px; }
   .ca-list-head, .ca-row { display: grid; grid-template-columns: 110px 1.6fr 130px 120px 150px 100px 28px; gap: 14px; align-items: center; padding: 12px 18px; }
   .ca-list-head { background: #FAFBFD; border-bottom: 1px solid #E2E8EE; font: 600 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); }
   .ca-list-head .num { text-align: right; }
@@ -179,6 +183,28 @@
   .ca-type.both     .ca-type-dot { background: #A855F7; }
   .ca-type.intercompany { color: #0F766E; background: #CCFBF1; }
   .ca-type.intercompany .ca-type-dot { background: #14B8A6; }
+
+  /* CSS tooltip — shows at once; the native title waits about a second. */
+  .ca-type[data-tip] { position: relative; cursor: help; }
+  .ca-type[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 7px); left: 50%;
+    transform: translateX(-50%);
+    width: max-content; max-width: 290px; white-space: normal; text-align: left;
+    padding: 7px 10px; background: #0F1419; color: #FFF;
+    font: 500 11px/1.45 var(--font-sans, sans-serif);
+    border-radius: 5px; pointer-events: none;
+    opacity: 0; visibility: hidden; transition: opacity 90ms;
+    z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+  .ca-type[data-tip]::before {
+    content: ""; position: absolute; bottom: calc(100% + 3px); left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent; border-top-color: #0F1419;
+    opacity: 0; visibility: hidden; transition: opacity 90ms;
+    pointer-events: none; z-index: 200;
+  }
+  .ca-type[data-tip]:hover::after, .ca-type[data-tip]:hover::before { opacity: 1; visibility: visible; }
   .ca-type.staff    { color: #0E6E4A; background: #D1FAE5; }
   .ca-type.staff    .ca-type-dot { background: #10B981; }
   .ca-type.other    { color: var(--gray-700); background: #EEF1F5; }

@@ -189,6 +189,15 @@ class TheAccountSaysSo(MirrorBase):
         self.assertContains(page, "One of our own books, not a customer or supplier.")
         self.assertContains(page, "Paired with Ergene Fabric · ACC-065")
 
+    def test_the_explanation_shows_at_once_rather_than_as_a_native_title(self):
+        """A title attribute waits about a second; data-tip is CSS and does not."""
+        page = self.client.get(reverse("accounts:detail", args=[self.shop_side.pk]))
+        html = page.content.decode()
+        badge = html[html.index("cd-type\n"):]
+        badge = badge[:badge.index(">") + 1]
+        self.assertIn("data-tip=", badge)
+        self.assertNotIn("title=", badge)
+
     def test_an_unpaired_inter_company_account_says_it_is_not_paired_yet(self):
         lone = CurrentAccount.objects.create(
             book=self.laleli, code="LONE", name="Third book", type="intercompany",

@@ -36,6 +36,17 @@ from django.contrib.auth.decorators import login_required
 #     return HttpResponse('Welcome to the CRM APP')
 
 
+def _accounts_total(accounts):
+    """The client's whole position across every book, for Account history.
+
+    cached_balance is a base-currency sum on every account whatever it
+    trades in (see CurrentAccount.display_currency_symbol), so the books
+    add up directly — no conversion, and no mixing of lira with dollars.
+    """
+    from decimal import Decimal
+    return {"current_account_total": sum((a.cached_balance for a in accounts), Decimal("0.00"))}
+
+
 # Create your views here.
 @method_decorator(login_required, name="dispatch")
 class index(View):
@@ -449,12 +460,16 @@ class ContactDetail(generic.DetailView):
         # One client can hold an account in more than one book — the
         # factory and the wholesaler trade with the same people — so
         # this is the only place their whole position is visible.
+        # Not for a sales rep: customer balances are not theirs to read,
+        # and the account pages behind these rows are closed to the role.
         from accounting.models_accounts import CurrentAccount
-        context["current_account_accounts"] = (
+        from erp.roles import is_sales_rep
+        context["current_account_accounts"] = accounts = [] if is_sales_rep(self.request.user) else list(
             CurrentAccount.objects.filter(contact=contact)
             .select_related("book", "default_currency")
             .order_by("book__name")
         )
+        context.update(_accounts_total(accounts))
         return context
 
     # Normally detail pages do not have post requests, but in here the client can add notes or tasks to the contact.
@@ -597,12 +612,16 @@ class CompanyDetail(generic.DetailView):
         # One client can hold an account in more than one book — the
         # factory and the wholesaler trade with the same people — so
         # this is the only place their whole position is visible.
+        # Not for a sales rep: customer balances are not theirs to read,
+        # and the account pages behind these rows are closed to the role.
         from accounting.models_accounts import CurrentAccount
-        context["current_account_accounts"] = (
+        from erp.roles import is_sales_rep
+        context["current_account_accounts"] = accounts = [] if is_sales_rep(self.request.user) else list(
             CurrentAccount.objects.filter(company=company)
             .select_related("book", "default_currency")
             .order_by("book__name")
         )
+        context.update(_accounts_total(accounts))
 
 
         # print(context["tasks"])

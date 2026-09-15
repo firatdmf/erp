@@ -4,6 +4,7 @@
 {% load todo_tags %}
 {% load crm_tags %}
 {% load static %}
+{% load accounts_tags %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -394,6 +395,9 @@
   .od-order-total { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; text-align: right; }
   .od-order-total span { font-weight: 500; color: var(--gray-500); font-size: 11px; }
   .od-order-chev { color: var(--gray-400); font-size: 13px; justify-self: end; }
+  /* The sum of every book's balance, beside the Account history title.
+     All balances are base currency, so they add up; crm.views._accounts_total. */
+  .od-account-total { font-weight: 500; color: var(--gray-500); font-variant-numeric: tabular-nums; }
 
   /* Status pill (shared with order_list/order_detail color map) */
   .ord-status {
@@ -644,11 +648,12 @@
           </div>
         </section>
 
-        <!-- ACCOUNT HISTORY (every book, pickable) -->
+        <!-- ACCOUNT HISTORY (every book, pickable) — not for sales reps -->
+        {% if not is_sales_rep %}
         <section class="od-card">
           <div class="od-card-h">
             <i class="fa fa-book card-ico"></i>
-            <h3>{% trans "Account history" %}</h3>
+            <h3>{% trans "Account history" %}{% if current_account_accounts %} <span class="od-account-total">({{ current_account_accounts.0.display_currency_symbol }}{{ current_account_total|money }})</span>{% endif %}</h3>
             <span class="od-card-sub">{{ current_account_accounts|length }} {% blocktrans count counter=current_account_accounts|length %}account{% plural %}accounts{% endblocktrans %}</span>
           </div>
           {% comment %}
@@ -693,7 +698,7 @@
                     <span class="ord-status-dot"></span>{{ a.balance_label }}
                   </span>
                   <div class="od-order-total">
-                    {{ a.cached_balance|floatformat:2 }} <span>{{ a.display_currency_symbol }}</span>
+                    <span>{{ a.display_currency_symbol }}</span>{{ a.cached_balance|money }}
                   </div>
                   <i class="fa fa-chevron-right od-order-chev"></i>
                 </a>
@@ -705,6 +710,7 @@
             {% endfor %}
           </div>
         </section>
+        {% endif %}
 
         <!-- ATTACH AN ITEM -->
         <section class="od-card attach-card">

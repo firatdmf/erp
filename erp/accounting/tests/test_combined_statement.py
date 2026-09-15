@@ -311,6 +311,36 @@ class TheCardOnTheCrmPage(CombinedStatementBase):
         self.assertContains(r, reverse("accounts:statement_print_combined"))
         self.assertContains(r, reverse("accounts:statement_excel_combined"))
 
+    def test_the_card_totals_every_book(self):
+        self._both()
+        r = self.client.get(reverse("crm:contact_detail", args=[self.contact.pk]))
+        self.assertEqual(r.context["current_account_total"], Decimal("227.04"))
+        self.assertContains(r, '<span class="od-account-total">($227.04)')
+
+    def test_the_total_groups_thousands(self):
+        self._both()
+        self._move(self.ergene_account, "1500000.00", 3)
+        r = self.client.get(reverse("crm:contact_detail", args=[self.contact.pk]))
+        self.assertContains(r, '<span class="od-account-total">($1,500,227.04)')
+        self.assertContains(r, "<span>$</span>1,499,470.34")
+
+    def test_a_sales_rep_does_not_see_the_card(self):
+        from authentication.models import Permission
+        self._both()
+        perm, _ = Permission.objects.get_or_create(name="sales_rep")
+        self.member.permissions.add(perm)
+        r = self.client.get(reverse("crm:contact_detail", args=[self.contact.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "<h3>Account history")
+        self.assertNotContains(r, 'class="od-account-check"')
+        self.assertNotContains(r, "227.04")
+        self.assertEqual(r.context["current_account_accounts"], [])
+
+    def test_no_total_is_drawn_without_an_account(self):
+        contact = Contact.objects.create(name="Nobody")
+        r = self.client.get(reverse("crm:contact_detail", args=[contact.pk]))
+        self.assertNotContains(r, '<span class="od-account-total">')
+
     def test_the_company_page_offers_them_too(self):
         company = Company.objects.create(name="Karven Tekstil")
         account = CurrentAccount.objects.create(

@@ -70,7 +70,7 @@ def _currencies():
 # habit formed before "payment" was exposed keeps working), but the user
 # can now pick "Payment" directly on any account — e.g. a refund paid out
 # to a customer.
-_HIDDEN_MOVEMENT_TYPES = {"legacy_ar", "legacy_ap", "check_in", "check_out"}
+_HIDDEN_MOVEMENT_TYPES = {"legacy_ar", "legacy_ap", "check_in", "check_out", "intercompany"}
 
 def _user_movement_choices():
     return [(v, l) for v, l in CurrentAccountMovement.MOVEMENT_TYPES if v not in _HIDDEN_MOVEMENT_TYPES]
@@ -774,6 +774,14 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
         # Half of a cancellation pair. Reversing a cancellation is not an
         # edit; it is a new document.
         return _("Cancellation record"), None, False
+    if mv.mirror_of_id:
+        # The other book's half of a paired inter-company movement. It is
+        # rewritten from its original on every save, so it is corrected
+        # there, in the other book.
+        original = mv.mirror_of
+        return (_("Mirror of an entry in %(book)s") % {"book": original.book.name},
+                reverse("accounts:movement_detail", args=[original.current_account_id, original.pk]),
+                False)
     if linked_payment is not None:
         return (_("Collection / Payment"),
                 reverse("accounts:payment_edit", args=[linked_payment.pk]), False)

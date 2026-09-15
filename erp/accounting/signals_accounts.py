@@ -1,12 +1,14 @@
 """
 Signals for the accounting current account ledger.
 
-Two responsibilities:
+Three responsibilities:
 
 1. Auto-assign the book's next account code when a CurrentAccount is
    being created without one.
 2. Mirror collection/payment CurrentAccountMovements into Payment rows, so a movement
    entered anywhere still appears on the payments list.
+3. Write every movement on a paired inter-company account onto its partner
+   with the opposite sign (services_mirror).
 
 There used to be a third: a one-way mirror of every movement into the old
 AssetAccountsReceivable / LiabilityAccountsPayable tables, kept so the
@@ -126,6 +128,22 @@ def mirror_movement_to_payment(sender, instance, created, **kwargs):
         logging.getLogger("accounting.accounts").warning(
             "Mirror to Payment failed for CurrentAccountMovement %s: %s", instance.pk, exc,
         )
+
+
+# ---------------------------------------------------------------------------
+# 3. Keep a paired inter-company account's counterpart in step
+#
+# post_save rather than a call in each document's posting code, so every
+# path that writes a movement — payments, invoices, transfers, expenses,
+# the manual form — is covered by the same rule. Deleting the original
+# needs nothing here: the mirror goes with it by CASCADE.
+# ---------------------------------------------------------------------------
+@receiver(post_save, sender=CurrentAccountMovement)
+def mirror_intercompany_movement(sender, instance, raw=False, **kwargs):
+    if raw or instance.mirror_of_id:
+        return
+    from .services_mirror import sync_mirror
+    sync_mirror(instance)
 
 
 @receiver(post_delete, sender=CurrentAccountMovement)

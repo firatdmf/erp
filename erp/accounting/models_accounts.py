@@ -205,6 +205,27 @@ class CurrentAccount(models.Model):
     cached_balance   = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     last_movement_at = models.DateTimeField(null=True, blank=True)
 
+    # ── Inter-company mirror ──────────────────────────────────────────
+    # Two of our own books keep an account for each other: Laleli's
+    # "DEMFIRAT KARVEN | ERGENE" and Ergene's "DEMFIRAT | LALELI" are one
+    # debt seen from both ends. Kept by hand, the two drifted 14k apart
+    # over three years. Paired, every movement posted on one is written
+    # onto the other with the opposite sign (services_mirror.sync_mirror),
+    # so there is nothing to keep in step.
+    #
+    # Set on BOTH accounts, each pointing at the other. `mirror_since` is
+    # when the pairing started: rows created before it were reconciled by
+    # hand and already have their counterpart, so they are never copied.
+    mirror_account = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        help_text="The other book's account for the same inter-company debt. "
+                  "Movements posted here are mirrored there with the opposite sign.",
+    )
+    mirror_since = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Movements created from this moment on are mirrored.",
+    )
+
     # Meta
     is_active  = models.BooleanField(default=True)
     notes      = models.TextField(blank=True)
@@ -482,6 +503,12 @@ class CurrentAccountMovement(models.Model):
         # see views_accounts._HIDDEN_MOVEMENT_TYPES.
         ("legacy_ar",        _("Legacy - Receivable")),
         ("legacy_ap",        _("Legacy - Payable")),
+        # The other book's half of a movement posted on a mirrored
+        # inter-company account. Written by services_mirror, never picked
+        # by a user, and deliberately none of the settling types: a mirrored
+        # payment is not a payment in this book — no cash moved here — so it
+        # must not reach the payments list or a cash box.
+        ("intercompany",     _("Inter-company mirror")),
     ]
 
     current_account     = models.ForeignKey(CurrentAccount, on_delete=models.CASCADE, related_name="movements")
@@ -531,6 +558,15 @@ class CurrentAccountMovement(models.Model):
         default=False, db_index=True,
         help_text="Excluded from balances and statements, but kept on the "
                   "record — one half of a cancelled document's pair.",
+    )
+
+    # Set only on a mirror row: the movement on the paired account it copies.
+    # CASCADE, so cancelling or deleting the original takes its mirror with
+    # it. A mirror is changed only through its original — see save().
+    mirror_of = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.CASCADE, related_name="mirror",
+        editable=False,
+        help_text="The movement on the paired inter-company account this row mirrors.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -618,7 +654,8 @@ class CurrentAccountMovement(models.Model):
         may be saved as it is; changing its currency, account or type
         brings it under the rule like a new one.
         """
-        if (self.source_type_id or self.movement_type not in self.DEBT_TYPES
+        # A mirror follows its original's currency, whatever this account keeps.
+        if (self.source_type_id or self.mirror_of_id or self.movement_type not in self.DEBT_TYPES
                 or not self.current_account_id
                 or self.currency_id == self.current_account.default_currency_id):
             return
@@ -635,7 +672,15 @@ class CurrentAccountMovement(models.Model):
             % {"type": self.get_movement_type_display(),
                "currency": self.current_account.default_currency.code})
 
+    # Raised when a mirror row is changed any way but through its original.
+    MIRROR_LOCKED = _("This entry mirrors one in the other book. Change it "
+                      "there and this one follows.")
+
     def save(self, *args, **kwargs):
+        # A mirror edited on its own is how the two books drift apart, so
+        # only services_mirror may write one, and it says so with the flag.
+        if self.mirror_of_id and not getattr(self, "_mirror_sync", False):
+            raise ValidationError(self.MIRROR_LOCKED)
         self.check_currency()
         base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
         if self.currency.code == base_code:
@@ -668,6 +713,13 @@ class CurrentAccountMovement(models.Model):
         with transaction.atomic():
             super().save(*args, **kwargs)
             self.current_account.recompute_balance(save=True)
+
+    def delete(self, *args, **kwargs):
+        # Deleting the original removes its mirror by CASCADE, which does not
+        # come through here. Deleting the mirror alone would unbalance the pair.
+        if self.mirror_of_id and not getattr(self, "_mirror_sync", False):
+            raise ValidationError(self.MIRROR_LOCKED)
+        return super().delete(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------

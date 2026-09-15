@@ -136,6 +136,12 @@ class CurrentAccount(models.Model):
         ("supplier", _("Supplier")),
         ("both",     _("Customer & Supplier")),
         ("staff",    _("Staff")),
+        # One of our own books, not a client: Laleli's account for Ergene and
+        # Ergene's for Laleli are two ends of the same debt. Marked so nobody
+        # reads it as a customer, sells to it, or counts it as trade debt
+        # without knowing. The mirror pairing below is what makes the two
+        # halves agree; this is what says so on the page.
+        ("intercompany", _("Inter-company")),
         ("other",    _("Other")),
     ]
 

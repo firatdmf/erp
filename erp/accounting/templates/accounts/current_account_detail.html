@@ -64,6 +64,8 @@
   .cd-type.both     .cd-type-dot { background: #A855F7; }
   .cd-type.staff    { color: #0E6E4A; background: #D1FAE5; }
   .cd-type.staff    .cd-type-dot { background: #10B981; }
+  .cd-type.intercompany { color: #0F766E; background: #CCFBF1; }
+  .cd-type.intercompany .cd-type-dot { background: #14B8A6; }
   .cd-type.other    { color: var(--gray-700); background: #EEF1F5; }
   .cd-type.other    .cd-type-dot { background: var(--gray-500); }
 
@@ -255,6 +257,7 @@
           {% elif current_account.type == 'supplier' %}supplier
           {% elif current_account.type == 'both' %}both
           {% elif current_account.type == 'staff' %}staff
+          {% elif current_account.type == 'intercompany' %}intercompany
           {% else %}other{% endif %}">
           <span class="cd-type-dot"></span>{{ current_account.get_type_display }}
         </span>
@@ -268,6 +271,11 @@
         {% if current_account.credit_limit %}
           <span class="cd-dot"></span>
           <span><i data-lucide="shield"></i>{% trans "Limit" %}: {{ current_account.display_currency_symbol }}{{ current_account.credit_limit|money }}</span>
+        {% endif %}
+        {% if current_account.mirror_account %}
+          <span class="cd-dot"></span>
+          <span title="{% trans "Every movement here is written onto that account with the opposite sign." %}"><i data-lucide="repeat"></i>{% trans "Mirrored with" %}:
+            <a href="{% url 'accounts:detail' current_account.mirror_account.pk %}">{{ current_account.mirror_account.book.name }} · {{ current_account.mirror_account.code }}</a></span>
         {% endif %}
       </div>
     </div>

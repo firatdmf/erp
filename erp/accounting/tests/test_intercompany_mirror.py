@@ -165,6 +165,32 @@ class TheMirrorIsLocked(MirrorBase):
             fetch_redirect_response=False)
 
 
+class TheAccountSaysSo(MirrorBase):
+    """An inter-company account is not a client, and the page says which."""
+
+    def setUp(self):
+        super().setUp()
+        self.shop_side.type = "intercompany"
+        self.shop_side.save(update_fields=["type"])
+        self.pair()
+        user = get_user_model().objects.create_user(username="ledger", password="pw")
+        user.member.books.set([self.laleli, self.ergene])
+        user.member.default_book = self.laleli
+        user.member.save(update_fields=["default_book"])
+        self.client.force_login(user)
+
+    def test_the_type_is_offered_and_printed(self):
+        self.assertIn("intercompany", dict(CurrentAccount.TYPE_CHOICES))
+        page = self.client.get(reverse("accounts:detail", args=[self.shop_side.pk]))
+        self.assertContains(page, "Inter-company")
+
+    def test_the_page_names_the_account_on_the_other_side(self):
+        page = self.client.get(reverse("accounts:detail", args=[self.shop_side.pk]))
+        self.assertContains(page, "Mirrored with")
+        self.assertContains(page, reverse("accounts:detail", args=[self.factory_side.pk]))
+        self.assertContains(page, "ACC-065")
+
+
 class HistoryIsNotCopied(MirrorBase):
     def test_movements_from_before_the_pairing_are_left_alone(self):
         old = self.move(self.shop_side, "-500.00")

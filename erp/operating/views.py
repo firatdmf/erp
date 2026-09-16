@@ -35,7 +35,6 @@ from .models import STATUS_CHOICES
 import segno
 
 import tempfile
-from marketing.utils.bunny_storage import upload_to_bunny
 
 # make the qr codes jso
 
@@ -70,6 +69,12 @@ from crm.models import Contact, Company
 
 # functions are here:
 def generate_machine_qr_for_order(order):
+    # Imported here, not at module scope: a name bound at import time is
+    # the one thing mock.patch on the source module cannot replace, and
+    # every test that thought it had stubbed this upload was quietly
+    # posting QR codes to the live CDN instead.
+    from marketing.utils.bunny_storage import upload_to_bunny
+
     payload = {"order_id": order.pk, "action": "update_status"}
 
     qr = segno.make(json.dumps(payload))  # Convert dict to JSON string
@@ -85,6 +90,9 @@ def generate_machine_qr_for_order(order):
 
 
 def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
+    # Local import for the same reason as generate_machine_qr_for_order.
+    from marketing.utils.bunny_storage import upload_to_bunny
+
     order_id = order_item_unit.order_item.order.pk
     order_item_id = order_item_unit.order_item.pk
     order_item_unit_id = order_item_unit.pk

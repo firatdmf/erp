@@ -44,7 +44,16 @@ TEXT_SUFFIXES = {".py", ".html", ".js", ".css", ".md", ".json", ".txt",
 
 
 def source_files():
+    # STATIC_ROOT holds whatever collectstatic last copied there —
+    # Django admin's own vendored javascript among it, which lists every
+    # Unicode script name, two of which spell the old term. It is build
+    # output, not source, and it is only there at all on a machine (or a
+    # CI run) that has collected static.
+    static_root = os.path.realpath(settings.STATIC_ROOT)
     for dirpath, dirnames, filenames in os.walk(settings.BASE_DIR):
+        if os.path.realpath(dirpath) == static_root:
+            dirnames[:] = []
+            continue
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for name in filenames:
             if Path(name).suffix in TEXT_SUFFIXES:

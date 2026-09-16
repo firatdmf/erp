@@ -475,6 +475,10 @@ BUNNY_STORAGE_ZONE = config("BUNNY_STORAGE_ZONE", default="")
 BUNNY_STORAGE_REGION = config("BUNNY_STORAGE_REGION", default="")  # Empty for main region
 BUNNY_CDN_URL = config("BUNNY_CDN_URL", default="")
 
+# Tests never talk to Bunny. See erp/test_runner.py for why that has to
+# be enforced here rather than left to each test's own @patch.
+TEST_RUNNER = "erp.test_runner.NoCdnTestRunner"
+
 
 # specify the URL where Django should redirect unauthenticated users:
 # LOGIN_URL = 'login'

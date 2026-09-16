@@ -82,6 +82,15 @@ jobs:
         working-directory: erp
         run: python manage.py makemigrations --check --dry-run
 
+      - name: Build the static manifest
+        # settings.py hands staticfiles to whitenoise's manifest storage
+        # whenever DEBUG is off, and DEBUG is off here because nothing
+        # sets it. That storage refuses to resolve a {% static %} path it
+        # has no manifest entry for, so without this step every test that
+        # renders a page dies on base.css rather than on anything real.
+        working-directory: erp
+        run: python manage.py collectstatic --no-input
+
       - name: Test
         # Every app keeps its tests in an <app>/tests/ package, so a plain
         # app label loads them all. The labels are listed rather than left

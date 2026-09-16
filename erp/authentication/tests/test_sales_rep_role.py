@@ -283,6 +283,8 @@ class SalesRepRoleTests(TestCase):
 
     def test_edits_are_limited_to_what_she_created(self):
         """Route is open; the object decides. Both halves matter."""
+        from accounting.models import Book, CurrencyCategory
+        from accounting.models_accounts import CurrentAccount
         from operating.models import Order
         from erp.ownership import can_edit
 
@@ -296,6 +298,19 @@ class SalesRepRoleTests(TestCase):
         # everyone's — see erp.ownership.can_edit.
         boss = User.objects.create_superuser("boss2_test", password="pw-for-test")
         self.assertTrue(can_edit(boss, theirs))
+
+        # The edit route is book_guarded, and an Order reaches its book
+        # through its current account. `theirs` needs one, in a book she
+        # is assigned to — otherwise the guard 404s it before ownership
+        # is ever consulted, and the line below asserts nothing about
+        # who created the order.
+        book = Book.objects.create(name="Laleli Fabric")
+        theirs.current_account = CurrentAccount.objects.create(
+            book=book, code="C-SALES-REP", name="Karven", type="customer",
+            default_currency=CurrencyCategory.objects.create(
+                code="USD", name="US Dollar", symbol="$"))
+        theirs.save(update_fields=["current_account"])
+        self.user.member.books.add(book)
 
         self.assertEqual(
             self.client.get(f"/operating/orders/edit/{theirs.pk}/").status_code, 302

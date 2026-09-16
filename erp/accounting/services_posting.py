@@ -155,6 +155,16 @@ def lines_for_movement(movement):
     if amount == ZERO:
         return []
 
+    # A movement written by an equity record takes that record's contra, not
+    # its type's. An expense a customer paid on the book's behalf is filed as
+    # an `adjustment` on their account (views.handle_expense_on_account
+    # explains why), but what it is is an expense — the same 5100 a
+    # cash-funded one reaches through the cash journal. Read by type alone it
+    # would sit in Suspense as a decision nobody owes.
+    source_model = _source_model_name(movement)
+    if source_model in CASH_CONTRA_BY_SOURCE:
+        contra = CASH_CONTRA_BY_SOURCE[source_model]
+
     cash_account = None
     payment = _payment_for(movement)
     if payment is not None:
@@ -187,6 +197,14 @@ def payment_contra(method, money_in, cash_account=None):
     if method in PAYMENT_NOTE_METHODS:
         return (NOTES_RECEIVABLE if money_in else NOTES_PAYABLE), None
     return SUSPENSE, None
+
+
+def _source_model_name(movement):
+    """The lowercased model name of whatever wrote this movement, or None."""
+    if not movement.source_type_id:
+        return None
+    from django.contrib.contenttypes.models import ContentType
+    return ContentType.objects.get_for_id(movement.source_type_id).model
 
 
 def _payment_for(movement):

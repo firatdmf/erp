@@ -642,3 +642,58 @@ def unbalanced_entries(book=None):
             bad.append({"entry": entry, "debit": debit, "credit": credit,
                         "difference": debit - credit})
     return bad
+
+
+def suspense_report(book, limit=10):
+    """What is sitting in 1900 Suspense on this book, and what put it there.
+
+    Suspense is a promise that somebody will come back and say what an
+    amount really was. A balance nobody looks at is a promise nobody keeps,
+    so the book page shows this whenever the balance is not zero.
+
+    Items are the movements behind the parked lines, newest first, each
+    with the screen that can reclassify it: the payment form for a payment
+    made by offset or "other", the movement form for everything else.
+    Transfer legs are counted but not listed — a transfer's two halves park
+    equal and opposite amounts, so they are not a decision anyone owes.
+    """
+    from django.contrib.contenttypes.models import ContentType
+    from django.urls import reverse
+
+    from .models_accounts import (CurrentAccountMovement,
+                                  CurrentAccountTransfer, Payment)
+
+    lines = JournalLine.objects.filter(entry__book=book, account__code="1900")
+    totals = lines.aggregate(d=Sum("debit"), c=Sum("credit"))
+    balance = (totals["d"] or ZERO) - (totals["c"] or ZERO)
+
+    movement_ct = ContentType.objects.get_for_model(CurrentAccountMovement)
+    transfer_ct = ContentType.objects.get_for_model(CurrentAccountTransfer)
+    payment_ct = ContentType.objects.get_for_model(Payment)
+
+    movement_ids = (lines.filter(entry__source_type=movement_ct)
+                    .values_list("entry__source_id", flat=True))
+    movements = (CurrentAccountMovement.objects
+                 .filter(pk__in=movement_ids)
+                 .exclude(source_type=transfer_ct)
+                 .select_related("current_account")
+                 .order_by("-date", "-id"))
+
+    items = []
+    for mv in movements[:limit]:
+        if mv.source_type_id == payment_ct.pk and mv.source_id:
+            url = reverse("accounts:payment_edit", kwargs={"pk": mv.source_id})
+        else:
+            payment = Payment.objects.filter(posted_movement=mv).only("pk").first()
+            url = (reverse("accounts:payment_edit", kwargs={"pk": payment.pk})
+                   if payment else
+                   reverse("accounts:movement_edit",
+                           kwargs={"pk": mv.current_account_id, "mv_pk": mv.pk}))
+        items.append({"movement": mv, "account": mv.current_account,
+                      "amount": mv.amount_base, "url": url})
+
+    return {
+        "balance": balance,
+        "items": items,
+        "count": movements.count(),
+    }

@@ -574,6 +574,11 @@ class BookDetail(generic.DetailView):
 
         context.update(self._accounting_equation(book))
 
+        # Amounts parked in Suspense until somebody says what they were —
+        # shown here so they are seen, not only on the balance sheet report.
+        from .services_ledger import suspense_report
+        context["suspense"] = suspense_report(book)
+
         return context
 
     # ------------------------------------------------------------------

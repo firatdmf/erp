@@ -154,6 +154,7 @@
 @media (max-width:520px){ .co-cam-shell{max-width:100%;} }
 </style>
 
+{% if deposit_cash_boxes %}{{ deposit_cash_boxes|json_script:"co-deposit-boxes" }}{% endif %}
 <form method="post" id="createOrderForm"
       action="{% if order %}{% url 'operating:edit_order' order.pk %}{% else %}{% url 'operating:create_order' %}{% endif %}"
       data-mode="{% if order %}edit{% else %}create{% endif %}"
@@ -495,6 +496,13 @@
           <input type="number" id="co-deposit-amount" name="deposit_amount" class="form-input"
                  value="" min="0" step="0.01" placeholder="0.00"
                  style="background:#FFF;">
+          {% comment %}Required with an amount: a cash deposit is booked into
+          the kasa it went into, the same rule as Take Payment. Options are
+          filled for the book the deposit belongs to by the script below.{% endcomment %}
+          <label style="margin-top:8px;">{% trans "Cash box" %} <span style="color:#B23B12;">*</span></label>
+          <select id="co-deposit-box" name="deposit_cash_account" class="form-input" style="background:#FFF;">
+            <option value="">{% trans "— Select —" %}</option>
+          </select>
         </div>
         <div id="co-deposit-per-book" style="display:none;"></div>
         <div style="font-size:11.5px; color:#0F766E; margin-top:4px;">
@@ -1193,6 +1201,27 @@
   // book's worth, one box per book the moment it spans two. The per-book
   // inputs are named deposit_amount_<book id>, which is what the save
   // reads first — so the plain box can never double-post onto a split.
+  // The kasas each book can take a deposit into, keyed by book id.
+  const CO_DEPOSIT_BOXES = (function () {
+    const el = document.getElementById('co-deposit-boxes');
+    return el ? JSON.parse(el.textContent) : {};
+  })();
+  function coBoxOptions(bookKey, selected) {
+    return '<option value="">{% trans "— Select —" %}</option>' +
+      (CO_DEPOSIT_BOXES[String(bookKey)] || []).map(function (b) {
+        return '<option value="' + b.id + '"' + (String(b.id) === String(selected) ? ' selected' : '') +
+          '>' + esc(b.label) + '</option>';
+      }).join('');
+  }
+  // The book a one-book basket's deposit is paid into: the book its stock
+  // came from, or the book the form is working in when nothing is picked yet.
+  function coSingleDepositBook() {
+    const books = coBooksInPlay();
+    if (books.length === 1) return books[0].key;
+    const workingEl = document.getElementById('co-book-input');
+    return workingEl ? workingEl.value : '';
+  }
+
   function coRenderDepositBoxes() {
     const single = document.getElementById('co-deposit-single');
     const perBook = document.getElementById('co-deposit-per-book');
@@ -1202,6 +1231,14 @@
       single.style.display = '';
       perBook.style.display = 'none';
       perBook.innerHTML = '';
+      const box = document.getElementById('co-deposit-box');
+      if (box) {
+        const key = coSingleDepositBook();
+        if (box.dataset.bookKey !== String(key)) {
+          box.innerHTML = coBoxOptions(key, box.value);
+          box.dataset.bookKey = String(key);
+        }
+      }
       return;
     }
     single.style.display = 'none';
@@ -1213,8 +1250,12 @@
     // Preserve what is already typed across re-renders — this runs on
     // every product change, and the deposit step may be open.
     const prior = {};
+    const priorBox = {};
     perBook.querySelectorAll('input[data-book-key]').forEach(function (n) {
       prior[n.dataset.bookKey] = n.value;
+    });
+    perBook.querySelectorAll('select[data-book-key]').forEach(function (n) {
+      priorBox[n.dataset.bookKey] = n.value;
     });
     const totals = coBookTotals();
     perBook.innerHTML = books.map(function (b) {
@@ -1228,9 +1269,21 @@
           'name="deposit_amount_' + b.key + '" data-book-key="' + b.key + '" ' +
           'min="0" step="0.01" placeholder="0.00" value="' +
           escAttr(prior[b.key] || '') + '">' +
+        '<select class="form-input co-deposit-book-box" style="width:150px;flex:0 0 auto;background:#FFF;" ' +
+          'name="deposit_cash_account_' + b.key + '" data-book-key="' + b.key + '" ' +
+          'title="{% trans "Cash box" %}">' +
+          coBoxOptions(b.key, priorBox[b.key] || '') +
+        '</select>' +
       '</div>';
     }).join('');
   }
+
+  // Ticking the deposit box can come before any product is picked, so the
+  // cash box list is filled then too, not only when the basket changes.
+  (function () {
+    const toggle = document.getElementById('co-deposit-toggle');
+    if (toggle) toggle.addEventListener('change', function () { coRenderDepositBoxes(); });
+  })();
 
   function renderProducts(opts) {
     opts = opts || {};
@@ -2261,6 +2314,31 @@
     // A fabric/home-textile line's quantity comes entirely from the
     // stock items picked for it — zero stock items means zero quantity, which is
     // never a valid line to submit.
+    // A deposit with an amount must say which kasa it went into — the
+    // server keeps a deposit without one as a draft, but asking here keeps
+    // the operator from having to go and finish it later.
+    var depositToggle = document.getElementById('co-deposit-toggle');
+    if (this.dataset.mode !== 'edit' && depositToggle && depositToggle.checked) {
+      var missingBox = null;
+      var singleWrap = document.getElementById('co-deposit-single');
+      if (singleWrap && singleWrap.style.display !== 'none') {
+        var amt = parseFloat((document.getElementById('co-deposit-amount') || {}).value) || 0;
+        var sbox = document.getElementById('co-deposit-box');
+        if (amt > 0 && sbox && !sbox.value) missingBox = sbox;
+      } else {
+        document.querySelectorAll('#co-deposit-per-book input[data-book-key]').forEach(function (inp) {
+          if (missingBox || !((parseFloat(inp.value) || 0) > 0)) return;
+          var sel = document.querySelector('#co-deposit-per-book select[data-book-key="' + inp.dataset.bookKey + '"]');
+          if (sel && !sel.value) missingBox = sel;
+        });
+      }
+      if (missingBox) {
+        showToast('{% trans "Choose the cash box the deposit went into" %}', 'error');
+        coToggle(4);
+        missingBox.focus();
+        return;
+      }
+    }
     var emptyLine = orderItems.find(function (it) {
       return !it.is_custom_curtain && (parseFloat(it.quantity) || 0) <= 0;
     });

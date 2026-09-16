@@ -252,6 +252,21 @@
       background: #F2FAF6; border-radius: 10px; padding: .8rem 1.1rem;
       font-size: .87rem; color: #1B5E3B;
     }
+    .eq-suspense {
+      margin-top: .75rem;
+      border: 1px solid #F3D9A4; border-left: 4px solid #B7791F;
+      background: #FFFBEB; border-radius: 10px; padding: .9rem 1.1rem;
+      font-size: .85rem; color: #6B4E16; line-height: 1.5;
+    }
+    .eq-suspense-head { display: flex; gap: .75rem; align-items: flex-start; }
+    .eq-suspense-head i { color: #B7791F; margin-top: .15rem; }
+    .eq-suspense-amount { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; color: #8A5A0B; display: block; margin-bottom: .2rem; }
+    .eq-suspense table { width: 100%; border-collapse: collapse; margin-top: .65rem; }
+    .eq-suspense td { padding: .35rem .4rem; border-top: 1px solid #F6E7C4; vertical-align: top; }
+    .eq-suspense td.v { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .eq-suspense .code { font-size: .76rem; color: #8A96A6; }
+    .eq-suspense a.fix { font-weight: 600; color: #8A5A0B; white-space: nowrap; }
+    .eq-suspense .more { margin-top: .5rem; }
     @media (max-width: 900px) {
       .eq-grid { grid-template-columns: 1fr; }
       .eq-op { padding: .15rem 0; }
@@ -320,6 +335,45 @@
         accumulated profit has nowhere to sit and shows up as this gap. Until retained earnings is
         recorded, the two sides cannot meet.
       </div>
+    </div>
+    {% endif %}
+
+    {% if suspense.balance %}
+    {% comment %}
+      Suspense is where the ledger parks an amount nobody has classified —
+      an adjustment, a payment by offset. It is supposed to be empty, so a
+      balance is a to-do list, and it is shown as one.
+    {% endcomment %}
+    <div class="eq-suspense" id="suspenseWarning">
+      <div class="eq-suspense-head">
+        <i class="fas fa-circle-exclamation"></i>
+        <div>
+          <span class="eq-suspense-amount">{{ suspense.balance|format_money }} held in 1900 Suspense</span>
+          {{ suspense.count }} movement{{ suspense.count|pluralize }} {{ suspense.count|pluralize:"is,are" }}
+          waiting for someone to say what {{ suspense.count|pluralize:"it,they" }} really
+          {{ suspense.count|pluralize:"was,were" }} &mdash; a write-off, a discount, interest, a payment.
+          Until then the books balance, but the profit and the cash figures are not final.
+        </div>
+      </div>
+      {% if suspense.items %}
+      <table>
+        {% for it in suspense.items %}
+        <tr>
+          <td>{{ it.movement.date|date:"d M Y" }}</td>
+          <td><span class="code">{{ it.account.code }}</span> {{ it.account.name }}
+            {% if it.movement.description %}<br><span class="code">{{ it.movement.description|truncatechars:70 }}</span>{% endif %}</td>
+          <td class="v">{{ it.amount|format_money }}</td>
+          <td class="v"><a class="fix" href="{{ it.url }}">Classify &rarr;</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+      {% if suspense.count > suspense.items|length %}
+      <div class="more">
+        Showing the latest {{ suspense.items|length }} of {{ suspense.count|intcomma }} &mdash;
+        <a href="{% url 'accounts:report_balance_sheet' book.pk %}">see the balance sheet</a>.
+      </div>
+      {% endif %}
     </div>
     {% endif %}
   </div>

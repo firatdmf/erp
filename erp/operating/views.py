@@ -2012,6 +2012,38 @@ def _deposit_amount_for_book(request, book):
         return 0
 
 
+def _deposit_cash_boxes():
+    """{book id: [{id, label}]} — the kasas a deposit can be taken into.
+
+    Every book's, not only the member's: a basket can pick stock off
+    another book's shelves, and that book's half of the deposit is paid
+    into that book. Keyed by id as a string, because that is what JSON
+    makes of it and what the form's book keys are compared against.
+    """
+    from accounting.models import CashAccount
+    boxes = {}
+    for box in (CashAccount.objects.select_related("currency")
+                .order_by("book_id", "name")):
+        boxes.setdefault(str(box.book_id), []).append(
+            {"id": box.pk, "label": f"{box.name} ({box.currency.code})"})
+    return boxes
+
+
+def _deposit_cash_box_for_book(request, book):
+    """The kasa the deposit on `book`'s order went into, or None.
+
+    Read the same way as the amount — the per-book field first, then the
+    plain one — and only accepted when it belongs to that book, so a box
+    picked for one half of a split can never take the other half's money.
+    """
+    from accounting.models import CashAccount
+    raw = (request.POST.get(f"deposit_cash_account_{book.pk}")
+           or request.POST.get("deposit_cash_account") or "")
+    if not raw.isdigit():
+        return None
+    return CashAccount.objects.filter(pk=int(raw), book=book).first()
+
+
 def _split_summary_message(created):
     """Tell the user their one basket became several orders, and which
     book each went to — otherwise the redirect lands on one order and the
@@ -2830,7 +2862,10 @@ class OrderCreate(View):
         form = OrderForm()
         template = (self.partial_template
                     if request.headers.get("HX-Request") else self.page_template)
-        return render(request, template, {"form": form})
+        return render(request, template, {
+            "form": form,
+            "deposit_cash_boxes": _deposit_cash_boxes(),
+        })
 
     def _settle_book(self, request):
         """Put the book this form is being opened in on the request, so the
@@ -3197,6 +3232,11 @@ class OrderCreate(View):
                 # payment cannot land in two businesses' books.
                 pay_book = order.current_account.book
                 currency = _resolve_currency(order)
+                # A cash deposit is only confirmed with the kasa it went
+                # into — the same rule as Take Payment. The form requires
+                # one; if none arrives anyway the deposit is kept as a
+                # draft to finish rather than lost or booked to no kasa.
+                box = _deposit_cash_box_for_book(request, pay_book)
                 pay = Payment.objects.create(
                     current_account=order.current_account, book=pay_book,
                     number=_next_payment_number(pay_book, "collection"),
@@ -3204,11 +3244,18 @@ class OrderCreate(View):
                     date=date.today(),
                     amount=Decimal(str(deposit_amount)),
                     currency=currency,
+                    cash_account=box,
                     description=f"Deposit for Order #{order.pk}",
                     notes=f"ORD-{order.pk}",
                     created_by=member,
                 )
-                pay.confirm(user=request.user if request.user.is_authenticated else None)
+                if box is None:
+                    from django.utils.translation import gettext as _g
+                    messages.warning(request, _g(
+                        "Deposit %(number)s was saved as a draft: choose the cash "
+                        "box it went into and confirm it.") % {"number": pay.number})
+                else:
+                    pay.confirm(user=request.user if request.user.is_authenticated else None)
             except Exception as _e:
                 messages.warning(request, f"Order saved but deposit posting failed: {_e}")
 

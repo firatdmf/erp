@@ -5787,6 +5787,16 @@ msgstr "Satış dışı gelir."
 msgid "A loss: a debt the book has given up on."
 msgstr "Zarar: vazgeçilen bir alacak."
 
+msgid "Cash box"
+msgstr "Kasa"
+
+msgid "Choose the cash box the deposit went into"
+msgstr "Kaparonun girdiği kasayı seç"
+
+#, python-format
+msgid "Deposit %(number)s was saved as a draft: choose the cash box it went into and confirm it."
+msgstr "%(number)s kaparosu taslak olarak kaydedildi: girdiği kasayı seçip onayla."
+
 msgid "Current account movements by type — these are what the backfill still has to replay"
 msgstr "Türe göre cari hareketleri — geçmiş aktarımının hâlâ işlemesi gerekenler"
 

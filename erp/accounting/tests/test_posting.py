@@ -76,12 +76,41 @@ class PostingRules(TestCase):
         self.assertIsNone(post_movement(self._mv("invoice_sale", "0.00")))
         self.assertEqual(JournalEntry.objects.count(), 0)
 
-    def test_an_undecided_type_is_refused_not_guessed_at(self):
-        """103 adjustments sit on Laleli and they are not one thing. A
-        movement posted to the wrong account is worse than one not posted,
-        because it looks finished."""
+    def test_an_undecided_type_is_parked_not_guessed_at(self):
+        """160 adjustments sit on the two books and they are not one thing.
+        A movement posted to the wrong account is worse than one not posted
+        because it looks finished — so it goes to Suspense, which is a line
+        whose name says it is not.
+
+        Parking rather than refusing is what keeps 1200 equal to what the
+        accounts owe. Refusing left the control account short by the value
+        of every adjustment, which is the one thing a control account may
+        never be."""
+        post_movement(self._mv("adjustment", "500.00"))
+        b = self._balances()
+        self.assertEqual(b["1200"], Decimal("500.00"))
+        self.assertEqual(b["1900"], Decimal("-500.00"))
+        self.assertTrue(balance_sheet(self.book)["balanced"])
+
+    def test_a_type_nobody_has_considered_at_all_still_raises(self):
+        """Suspense is for the types someone looked at and could not
+        decide. A type that reaches the posting rules without appearing in
+        either table got there by being added to the model and forgotten,
+        and that is a mistake rather than a decision to defer."""
+        mv = self._mv("opening", "500.00")
+        mv.movement_type = "teleportation"
         with self.assertRaises(NoRuleFor):
-            post_movement(self._mv("adjustment", "500.00"))
+            lines_for_movement(mv)
+
+    def test_a_void_movement_is_in_no_balance_and_so_in_no_entry(self):
+        """A void row is kept for history and counted in nothing. Posting
+        it would put 1200 above the accounts it summarises by exactly the
+        cancelled documents."""
+        mv = self._mv("order_sale", "400.00")
+        self.assertEqual(self._balances()["1200"], Decimal("400.00"))
+        mv.is_void = True
+        mv.save()
+        self.assertNotIn("1200", self._balances())
         self.assertEqual(JournalEntry.objects.count(), 0)
 
     def test_every_entry_balances_whatever_the_type(self):
@@ -184,8 +213,12 @@ class TheBackfillCommand(TestCase):
         return out.getvalue()
 
     def test_a_dry_run_writes_nothing(self):
+        """Nothing MORE, that is. The four movements posted themselves as
+        they were saved, so what a dry run must not do is add to them."""
+        before = JournalEntry.objects.count()
+        self.assertEqual(before, 4)
         self._run()
-        self.assertEqual(JournalEntry.objects.count(), 0)
+        self.assertEqual(JournalEntry.objects.count(), before)
 
     def test_applying_makes_the_equation_hold(self):
         self._run("--apply")
@@ -211,11 +244,14 @@ class TheBackfillCommand(TestCase):
         self.assertEqual(JournalEntry.objects.count(), entries)
 
     def test_the_batch_reference_can_undo_the_run(self):
+        """Undoing the batch takes back what the BATCH added — the stock
+        and the reclassification — and leaves what live posting had already
+        recorded, which is the net of the four movements."""
         self._run("--apply")
         ref = f"LEDGER-BF-{self.book.pk}"
         self.assertTrue(JournalEntry.objects.filter(reference=ref).exists())
         JournalEntry.objects.filter(reference=ref).delete()
-        self.assertEqual(balance_sheet(self.book)["assets"], Decimal("0.00"))
+        self.assertEqual(balance_sheet(self.book)["assets"], Decimal("1050.00"))
 
 
 class CashEventsGetTheirContra(TestCase):

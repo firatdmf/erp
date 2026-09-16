@@ -373,20 +373,27 @@ class BalanceSheet(View):
     way it has always had to be computed — and there it does not balance,
     by $353,865.03 on Laleli and $1,319,947.21 on Ergene.
 
-    Both are shown because the ledger starts empty and fills up as the
-    posting paths are wired and history is backfilled. Watching the two
-    columns converge IS the migration; when they agree, it is finished.
-    Showing only the ledger would report a tidy zero while the money sat
-    somewhere else entirely.
+    Both are shown because the ledger starts empty and fills up as history
+    is backfilled. Everything that happens from now on posts as it happens
+    — see signals_ledger — so the gap between the columns is the past, not
+    the present, and it stops growing. Watching them converge IS the
+    migration; when they agree, it is finished. Showing only the ledger
+    would report a tidy zero while the money sat somewhere else entirely.
     """
     template_name = "accounts/report_balance_sheet.html"
 
     def get(self, request):
-        from .services_ledger import balance_sheet, subsidiary_equation
+        from .services_ledger import (balance_sheet, reconcile,
+                                       subsidiary_equation)
 
         date_to = request.GET.get("date_to") or None
         gl = balance_sheet(request.book, date_to=date_to)
         subs = subsidiary_equation(request.book)
+        # What each control account says against the ledger it summarises.
+        # The two columns above say whether the ledger has caught up; this
+        # says WHERE it has not, which is the difference between a number to
+        # worry about and a job to do.
+        rec = reconcile(request.book, date_to=date_to)
 
         # How far the ledger has come. Zero when nothing is posted yet; 100
         # when the two agree on total assets.
@@ -398,6 +405,7 @@ class BalanceSheet(View):
         return render(request, self.template_name, {
             "gl": gl,
             "subs": subs,
+            "rec": rec,
             "coverage": coverage,
             "date_to": date_to or "",
             "identity_holds": subs["causes_total"] == subs["residual"],

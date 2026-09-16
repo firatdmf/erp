@@ -34,8 +34,12 @@ Three models:
                 (current account, cash_account) are what let a control account be
                 reconciled against the ledger it summarises.
 
-Nothing posts to these yet. Wiring the existing paths and backfilling
-history are separate jobs — see services_ledger.post_entry.
+Posting is live: signals_ledger hangs the posting off the save of a current
+account movement or a cash row, so every path that writes one — the payment
+form, invoice issue, warehouse intake, the inter-company mirror, an import
+command — reaches the ledger without having to know the ledger exists.
+Backfilling the history that predates that is still a separate job, and
+audit_ledger is what says how far it has got.
 """
 from decimal import Decimal
 

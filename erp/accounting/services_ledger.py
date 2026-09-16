@@ -38,6 +38,26 @@ STANDARD_CHART = [
     ("1300", "Inventory",                  "asset",     True),
     ("1400", "Notes Receivable",           "asset",     True),
     ("1500", "Fixed Assets",               "asset",     False),
+    # Two holding lines, both of which are supposed to end up empty.
+    #
+    # Suspense takes the contra of a movement whose other leg nobody has
+    # decided yet — the 160 adjustments, which are an import correction, an
+    # offset between two accounts and a write-off all filed under one word.
+    # Parking them keeps 1200 reconcilable against the current accounts,
+    # which is the whole job of a control account; refusing them instead
+    # left the ledger tidy and silently short by their value.
+    #
+    # Inter-company clearing takes the contra of a mirror row. A mirror is
+    # the other book's half of an event that happened elsewhere, so this
+    # book knows the value but not the reason. Across a paired book the two
+    # clearing balances are equal and opposite, which is a check nothing
+    # else performs.
+    #
+    # Both are assets by declaration only, so that they sort with the other
+    # 1000s; either can hold a credit balance and read as negative, which is
+    # the honest way for an unclassified amount to look.
+    ("1900", "Suspense",                   "asset",     False),
+    ("1950", "Inter-company Clearing",     "asset",     False),
     ("2000", "Accounts Payable",           "liability", True),
     ("2100", "Notes Payable",              "liability", True),
     ("3000", "Share Capital",              "equity",    False),
@@ -52,6 +72,9 @@ STANDARD_CHART = [
     ("4900", "Other Income",               "revenue",   False),
     ("5000", "Cost of Goods Sold",         "expense",   False),
     ("5100", "Operating Expenses",         "expense",   False),
+    # Debts the book has given up on. Apart from operating expenses so that
+    # "how much did we forgive this year" is one line, not a search.
+    ("5200", "Bad Debts Written Off",      "expense",   False),
     # FX belongs on its own line. Folded into operating expenses it hides
     # the difference between "we spent more" and "the lira moved".
     ("5900", "Foreign Exchange Gain/Loss", "expense",   False),
@@ -75,20 +98,42 @@ def ensure_chart():
     return created
 
 
-def account(code):
-    """The chart account with this code, or a clear error.
+# The standard chart, keyed by code, for the lookup below.
+_STANDARD_BY_CODE = {row[0]: row for row in STANDARD_CHART}
 
-    Raising beats returning None: a posting rule that silently skipped a
-    leg would write a half-entry, and post_entry would then reject the
-    whole event for a reason that points at the wrong place.
+
+def account(code):
+    """The chart account with this code, creating it if it is a standard one.
+
+    Creating on demand, rather than insisting somebody ran a seed command
+    first, because of what the alternative costs now that posting is live.
+    A missing account used to mean a batch run printed an error somebody
+    read; it now means every save quietly fails to post, and the ledger
+    drifts from the accounts it summarises without anything on a page
+    saying so. The chart is a constant of the system, not user data, so
+    there is nothing to lose by materialising a line of it the moment it is
+    first needed.
+
+    A code that is NOT in the standard chart still raises. That is a
+    posting rule naming an account nobody defined — a typo or a half-made
+    decision — and inventing an account to match would turn a loud mistake
+    into a silent one.
     """
     try:
         return ChartAccount.objects.get(code=code)
     except ChartAccount.DoesNotExist:
+        pass
+    if code not in _STANDARD_BY_CODE:
         raise ValidationError(
-            f"No chart account {code!r}. Run accounting.services_ledger."
-            f"ensure_chart() or the seed_chart_of_accounts command."
+            f"No chart account {code!r}, and it is not part of the standard "
+            f"chart. Either the posting rule naming it has a typo, or the "
+            f"account needs adding to STANDARD_CHART."
         )
+    _code, name, type_, is_control = _STANDARD_BY_CODE[code]
+    obj, _made = ChartAccount.objects.get_or_create(
+        code=code, defaults={"name": name, "type": type_,
+                             "is_control": is_control})
+    return obj
 
 
 def debit(code, amount, **kwargs):
@@ -462,3 +507,138 @@ def _inventory_value(book):
         unvalued.count(),
         unvalued.aggregate(m=Sum("quantity_remaining"))["m"] or ZERO,
     )
+
+
+# ---------------------------------------------------------------------------
+# Reconciliation
+#
+# A control account is a summary of a subsidiary ledger, and the only thing
+# that makes it a control account rather than a number is that the two can be
+# checked against each other. Nothing checked them, which is how the books
+# got to $1.67M out without any single page being wrong.
+#
+# Each row below is one such check, and each is honest about the difference
+# rather than about whether the difference is acceptable. A row that does not
+# reconcile names what is missing, because "off by 4,312.90" is a fact and
+# "the ledger is broken" is not.
+# ---------------------------------------------------------------------------
+def _cash_journal_total(book):
+    from .models import CashTransactionEntry
+    return (CashTransactionEntry.objects.filter(book=book)
+            .aggregate(t=Sum(_signed_cash()))["t"] or ZERO)
+
+
+def _current_account_net(book):
+    from .models_accounts import CurrentAccount
+    return (CurrentAccount.objects.filter(book=book)
+            .aggregate(t=Sum("cached_balance"))["t"] or ZERO)
+
+
+def reconcile(book, date_to=None):
+    """Every control account against the ledger it summarises.
+
+    Returns a list of rows and whether they all agree. `ledger` is what the
+    general ledger says; `subsidiary` is what the detail says; `note`
+    explains a difference where the cause is already known, so that a gap
+    nobody has explained yet stands out from one that is simply the next
+    job.
+
+    Receivables and payables are checked as a NET, because that is what the
+    subsidiary ledger holds. Every movement posts to 1200 regardless of
+    which way the account ends up, and reclassify_payables moves the credit
+    balances across afterwards; 1200 less 2000 is therefore the figure to
+    compare, both before that entry is made and after.
+    """
+    # One pass over the ledger rather than a query per account: the trial
+    # balance already groups every line by account, and the codes below are
+    # just a lookup into it. An account with no lines is absent from it and
+    # is worth zero, which is why this reads through .get().
+    tb = trial_balance(book=book, date_to=date_to)
+    by_code = {r["code"]: r["balance"] for r in tb["rows"]}
+
+    def balance(code):
+        return by_code.get(code, ZERO)
+
+    inventory, _unvalued, _metres = _inventory_value(book)
+
+    rows = [
+        {
+            "label": "Receivables less payables",
+            "control": "1200 − 2000",
+            "ledger": balance("1200") - balance("2000"),
+            "subsidiary": _current_account_net(book),
+            "subsidiary_label": "Sum of current account balances",
+            "note": "",
+        },
+        {
+            "label": "Cash and bank",
+            "control": "1000",
+            "ledger": balance("1000"),
+            "subsidiary": _cash_journal_total(book),
+            "subsidiary_label": "Cash journal",
+            "note": "Transfers and currency exchanges move cash on both "
+                    "legs and are not posted yet, so they sit in this gap.",
+        },
+        {
+            "label": "Inventory",
+            "control": "1300",
+            "ledger": balance("1300"),
+            "subsidiary": inventory,
+            "subsidiary_label": "Stock on the shelves, at cost",
+            # Deliberately does not claim a direction. Two unposted
+            # effects pull opposite ways: goods leaving on a sale never
+            # relieve stock, which holds the ledger up, and stock arriving
+            # without a purchase invoice never raises it, which holds it
+            # down. On Ergene the second is the larger and the ledger reads
+            # 50,168.45 BELOW the shelves, so a note asserting the first
+            # would have been a guess printed as a fact.
+            "note": "Cost of goods sold is not posted, so goods leaving on "
+                    "a sale never relieve stock; and stock that arrives "
+                    "without a purchase invoice never raises it. The two "
+                    "pull opposite ways and the difference can run either.",
+        },
+    ]
+    for row in rows:
+        row["difference"] = row["ledger"] - row["subsidiary"]
+        row["reconciled"] = row["difference"] == ZERO
+
+    # Not reconciliations: two holding accounts whose balance IS the
+    # outstanding work. Zero when there is none left.
+    pending = [
+        {"label": "Suspense", "code": "1900", "balance": balance("1900"),
+         "note": "Movements whose other leg nobody has decided."},
+        {"label": "Inter-company clearing", "code": "1950",
+         "balance": balance("1950"),
+         "note": "Mirrored movements whose reason lives in the other book."},
+    ]
+
+    return {
+        "book": book,
+        "date_to": date_to,
+        "rows": rows,
+        "pending": [p for p in pending if p["balance"] != ZERO],
+        "trial_balance_balanced": tb["balanced"],
+        "trial_balance_difference": tb["difference"],
+        "all_reconciled": all(r["reconciled"] for r in rows),
+    }
+
+
+def unbalanced_entries(book=None):
+    """Entries whose lines do not agree, which should be none of them.
+
+    post_entry cannot write one, so anything here arrived another way — a
+    hand-edited row, a restored dump, a migration that wrote lines
+    directly. Worth asking precisely because the answer should be boring.
+    """
+    from .models_ledger import JournalEntry
+
+    entries = JournalEntry.objects.all()
+    if book is not None:
+        entries = entries.filter(book=book)
+    bad = []
+    for entry in entries.annotate(d=Sum("lines__debit"), c=Sum("lines__credit")):
+        debit, credit = entry.d or ZERO, entry.c or ZERO
+        if debit != credit:
+            bad.append({"entry": entry, "debit": debit, "credit": credit,
+                        "difference": debit - credit})
+    return bad

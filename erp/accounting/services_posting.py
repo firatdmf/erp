@@ -38,6 +38,10 @@ CONTRA_BY_TYPE = {
     "invoice_sale":     "4000",
     "return_sale":      "4000",
     "discount":         "4000",
+    # A forgiven debt is not a smaller sale — the sale happened and the
+    # customer did not pay — so it goes to its own expense line, where the
+    # year's total of what was let go can be read off directly.
+    "write_off":        "5200",
     # Purchases land in stock, not in expense: the cost becomes COGS when
     # the goods leave, not when they arrive.
     "invoice_purchase": "1300",
@@ -51,11 +55,32 @@ CONTRA_BY_TYPE = {
     "check_in":         "1400",
     "check_out":        "2100",
     "interest":         "4900",
-    # "adjustment" is deliberately absent. 103 of them sit on Laleli and
-    # they are not one thing — an import correction, an offset between two
-    # accounts and a write-off need three different contras and only a
-    # human can say which is which.
 }
+
+# The types whose other leg nobody has decided, parked rather than guessed.
+#
+# "adjustment" is 160 rows across the two books and it is not one thing —
+# an import correction, an offset between two accounts and a write-off need
+# three different contras and only a human can say which is which.
+# "intercompany" is a mirror of an event in the other book, so this book has
+# the value and not the reason.
+#
+# They used to raise instead, which was the right answer while posting was a
+# batch someone ran and read the output of. It is the wrong answer now that
+# every save posts: a refusal at write time would either lose the row from
+# the ledger or refuse the save itself, and the first of those puts 1200
+# quietly out of step with the current accounts it is supposed to summarise.
+# Parked, the equation still holds and the amount stands on a line whose
+# name says it is not finished.
+PARKED_CONTRA_BY_TYPE = {
+    "adjustment":   "1900",     # Suspense
+    "intercompany": "1950",     # Inter-company Clearing
+}
+
+# Both tables together: what lines_for_movement will actually post to. A
+# type in NEITHER is a type someone added to the model without deciding
+# what it means, and that still raises.
+ALL_CONTRA_BY_TYPE = {**CONTRA_BY_TYPE, **PARKED_CONTRA_BY_TYPE}
 
 
 # Events that move CASH rather than a current account. The cash journal
@@ -92,16 +117,27 @@ def lines_for_movement(movement):
     Sign lives in one place. amount_base is positive when the account owes
     the book more, so the control leg is a debit then and a credit
     otherwise, and the contra always takes the opposite side. Written this
-    way the table above only has to name an account, never a direction,
+    way the tables above only have to name an account, never a direction,
     which is the part that is easy to get backwards.
+
+    Returns no lines at all for a row that is not part of any balance: a
+    void row, or one worth nothing.
     """
     kind = movement.movement_type
-    if kind not in CONTRA_BY_TYPE:
+    if kind not in ALL_CONTRA_BY_TYPE:
         raise NoRuleFor(
             f"No posting rule for movement type {kind!r}. Add one to "
-            f"CONTRA_BY_TYPE once it is decided what the other leg is."
+            f"CONTRA_BY_TYPE once it is decided what the other leg is, or "
+            f"to PARKED_CONTRA_BY_TYPE to hold it in suspense until then."
         )
-    contra = CONTRA_BY_TYPE[kind]
+    contra = ALL_CONTRA_BY_TYPE[kind]
+    # A void row is kept for history and counted in nothing — see
+    # CurrentAccountMovementQuerySet.live(), which is what every balance
+    # reads. Posting it would put 1200 above the accounts it summarises by
+    # exactly the cancelled documents, and a control account that cannot be
+    # reconciled is no better than no control account.
+    if movement.is_void:
+        return []
     amount = Decimal(movement.amount_base or 0)
     if amount == ZERO:
         return []
@@ -114,10 +150,57 @@ def lines_for_movement(movement):
             debit(contra, -amount, memo=memo)]
 
 
+def unpost(source):
+    """Remove whatever the ledger currently says about this source row.
+
+    Returns how many entries went. Deleting rather than reversing is
+    deliberate at this stage: these books are mid-migration and nothing is
+    closed, so a correction should leave the ledger reading as though the
+    mistake had never been typed. Once a period is closed, an edit inside
+    it wants a reversal instead — see close_period, which is the point at
+    which that becomes true.
+    """
+    from django.contrib.contenttypes.models import ContentType
+
+    if source is None or source.pk is None:
+        return 0
+    ct = ContentType.objects.get_for_model(source.__class__)
+    return unpost_ref(ct.pk, source.pk)
+
+
+def unpost_ref(content_type_id, object_id):
+    """unpost, by the pair of ids rather than by the object.
+
+    Needed because the commonest way a source disappears is a CASCADE that
+    takes its cash row with it, and by the time the row's post_delete runs
+    the object it named is already gone. Keying on the ids the row still
+    carries is what stops that leaving an entry behind with nothing to
+    trace it to.
+    """
+    from .models_ledger import JournalEntry
+
+    if not content_type_id or not object_id:
+        return 0
+    deleted, _ = JournalEntry.objects.filter(
+        source_type_id=content_type_id, source_id=object_id).delete()
+    return deleted
+
+
 @transaction.atomic
 def post_movement(movement, *, reference=""):
-    """Post one current account movement, or nothing. Returns the entry or None."""
+    """Make the ledger say exactly what this movement says.
+
+    Idempotent, and that is what lets the same function serve a first post,
+    an edit, a void and a re-run of the backfill. It replaces whatever was
+    posted for this movement before, so calling it twice leaves one entry
+    and calling it after an amount changed leaves the new amount — the
+    alternative, posting only when nothing is there yet, would have let an
+    edited payment keep its old figure in the ledger for ever.
+
+    Returns the entry, or None when the movement belongs in no balance.
+    """
     lines = lines_for_movement(movement)
+    unpost(movement)
     if not lines:
         return None
     return post_entry(
@@ -216,14 +299,23 @@ def lines_for_cash_entry(entry, model_name):
 
 @transaction.atomic
 def post_cash_entry(entry, *, reference=""):
-    """Post one cash-journal row, or nothing. Returns the entry or None."""
+    """Make the ledger say exactly what this cash row says.
+
+    Idempotent on the same terms as post_movement, and keyed on the SOURCE
+    — the dividend or the expense — not on the cash row, because that is
+    the event. A source that writes two cash rows would otherwise get two
+    entries, each balanced on its own, and nothing would catch it.
+
+    Returns the entry, or None when the row is worth nothing.
+    """
     from django.contrib.contenttypes.models import ContentType
 
     model_name = ContentType.objects.get(pk=entry.content_type_id).model
     lines = lines_for_cash_entry(entry, model_name)
+    source = entry.content_type.get_object_for_this_type(pk=entry.content_pk)
+    unpost(source)
     if not lines:
         return None
-    source = entry.content_type.get_object_for_this_type(pk=entry.content_pk)
     return post_entry(
         book=entry.book,
         date=entry.date,
@@ -325,3 +417,59 @@ def close_period(book, *, date_to, description=None, reference="", member=None):
         lines=lines, reference=reference, member=member,
     )
     return entry, balances
+
+
+# ---------------------------------------------------------------------------
+# Previewing a posting before it is made
+#
+# The movement form shows the entry a row will write while it is being typed,
+# so whoever enters it can see both sides and catch a wrong type before it
+# lands — a forgiven debt picked as a discount reads, on the preview, as a
+# smaller sale, which is exactly the mistake worth catching there.
+# ---------------------------------------------------------------------------
+def _account_meanings():
+    """What each account means, in words, for the preview.
+
+    Built per call rather than at import so it is translated into the
+    language of the request that asks.
+    """
+    from django.utils.translation import gettext as _g
+    return {
+        "1000": _g("Money in a cash box or bank account."),
+        "1200": _g("What this account owes the book — its balance."),
+        "1300": _g("Stock bought and not yet sold."),
+        "1400": _g("Cheques and notes received, not yet cashed."),
+        "1900": _g("Held here until somebody decides what this really was."),
+        "1950": _g("The other book's half of an inter-company movement."),
+        "2100": _g("Cheques and notes given, not yet paid."),
+        "3100": _g("Balances carried over from before this system — not this year's trading."),
+        "4000": _g("This period's sales."),
+        "4900": _g("Income that is not a sale."),
+        "5200": _g("A loss: a debt the book has given up on."),
+    }
+
+
+def posting_preview():
+    """The rules the movement form needs to draw an entry, as plain data.
+
+    Account names come from the chart as it stands, so a line someone has
+    renamed is shown by its new name, and fall back to the standard chart
+    for a line not created yet — which is every line on a fresh book.
+    """
+    from .models_ledger import ChartAccount
+    from .services_ledger import STANDARD_CHART
+
+    names = {code: name for code, name, _t, _c in STANDARD_CHART}
+    names.update(ChartAccount.objects.values_list("code", "name"))
+    meanings = _account_meanings()
+
+    def describe(code):
+        return {"code": code, "name": names.get(code, code),
+                "meaning": meanings.get(code, "")}
+
+    return {
+        "control": describe(CURRENT_ACCOUNT_CONTROL),
+        "rules": {kind: {**describe(code),
+                         "parked": kind in PARKED_CONTRA_BY_TYPE}
+                  for kind, code in ALL_CONTRA_BY_TYPE.items()},
+    }

@@ -104,6 +104,23 @@
   .mf-dir label.debit:has(input:checked) { box-shadow: 0 0 0 3px rgba(178,59,18,0.10); }
   .mf-dir label.credit:has(input:checked) { box-shadow: 0 0 0 3px rgba(14,110,74,0.10); }
 
+  /* The entry this row will write, drawn as it is typed. */
+  .mf-ledger { margin: 0 22px 18px; border: 1px solid #E2E8EE; border-radius: 10px; overflow: hidden; }
+  .mf-ledger-h { display:flex; align-items:center; gap:8px; padding: 10px 14px; background:#FAFBFD; border-bottom:1px solid #EEF1F5; font: 700 12.5px var(--font-sans); color: var(--gray-700); }
+  .mf-ledger-h i, .mf-ledger-h svg { width:14px; height:14px; color: var(--nejum-teal-600); }
+  .mf-ledger-h .ok { margin-left:auto; font: 600 11px var(--font-sans); padding: 2px 8px; border-radius: 999px; background:#DCFCE7; color:#166534; }
+  .mf-ledger table { width:100%; border-collapse: collapse; font: 400 13px var(--font-sans); }
+  .mf-ledger th { text-align:left; padding: 7px 14px; font: 600 10.5px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color: var(--gray-500); border-bottom:1px solid #F1F4F8; }
+  .mf-ledger td { padding: 9px 14px; border-bottom:1px solid #F4F7FB; vertical-align: top; }
+  .mf-ledger tr:last-child td { border-bottom: none; }
+  .mf-ledger .num { text-align:right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .mf-ledger .side { font-weight: 700; white-space: nowrap; }
+  .mf-ledger .code { font: 600 11.5px var(--font-mono); color: var(--gray-500); margin-right: 6px; }
+  .mf-ledger .why { font: 400 12px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .mf-ledger .note { margin: 0; padding: 9px 14px; border-top:1px solid #EEF1F5; font: 500 12px var(--font-sans); color: var(--gray-600); }
+  .mf-ledger .note.warn { background:#FFFBEB; color:#92400E; }
+  .mf-ledger .empty { padding: 14px; font: 500 12.5px var(--font-sans); color: var(--gray-500); }
+
   .mf-foot { display:flex; align-items: center; gap: 10px; padding: 14px 22px; background: #FAFBFD; border-top: 1px solid #EEF1F5; }
   .mf-foot-l { font: 500 12px var(--font-sans); color: var(--gray-500); display:flex; align-items:center; gap:6px; }
   .mf-foot-l i { width: 14px; height: 14px; }
@@ -220,6 +237,28 @@
         </div>
       </div>
 
+      {# What the row will write in the general ledger. Filled by the script below. #}
+      <div class="mf-ledger" id="mfLedger">
+        <div class="mf-ledger-h">
+          <i data-lucide="book-open-check"></i>
+          {% trans "What this does in the books" %}
+          <span class="ok" id="mfLedgerOk" hidden>{% trans "Debits = Credits" %}</span>
+        </div>
+        <div class="empty" id="mfLedgerEmpty">{% trans "Enter an amount to see the entry it will write." %}</div>
+        <table id="mfLedgerTable" hidden>
+          <thead><tr>
+            <th>{% trans "Side" %}</th>
+            <th>{% trans "Ledger account" %}</th>
+            <th class="num">{% trans "Amount" %}</th>
+          </tr></thead>
+          <tbody id="mfLedgerRows"></tbody>
+        </table>
+        <p class="note warn" id="mfLedgerParked" hidden>
+          {% trans "No account has been decided for this type, so the other side waits in Suspense. If you know what this really is — a write-off, a return, a payment — pick that type instead." %}
+        </p>
+        <p class="note" id="mfLedgerFx" hidden></p>
+      </div>
+
       <div class="mf-foot">
         <div class="mf-foot-l">
           <i data-lucide="info"></i>
@@ -237,6 +276,7 @@
   </form>
 </div>
 
+{{ posting_preview|json_script:"mfPostingPreview" }}
 <script>
   if (window.lucide) lucide.createIcons();
   // Default date to today if empty
@@ -262,6 +302,79 @@
     }
     typeSel.addEventListener('change', sync);
     sync();
+  })();
+
+  // Draw the entry the row will write. The sign rule is the one
+  // services_posting.lines_for_movement uses: debit means the account owes
+  // more, so the account's own line is the debit and the other side the
+  // credit; a credit is the same entry turned round.
+  (function () {
+    var data = JSON.parse(document.getElementById('mfPostingPreview').textContent);
+    var BASE = "{{ base_currency_code|escapejs }}";
+    var T = {
+      debit: "{% trans 'Debit'|escapejs %}",
+      credit: "{% trans 'Credit'|escapejs %}",
+      fx: "{% trans 'Entered in %(cur)s. The books record it in %(base)s, at the rate for the date.'|escapejs %}"
+    };
+    var form = document.querySelector('.mf form') || document.forms[0];
+    var typeSel = document.getElementById('mfType');
+    var curSel = document.getElementById('mfCurrency');
+    var amount = document.querySelector('input[name="amount"]');
+    var rows = document.getElementById('mfLedgerRows');
+    var table = document.getElementById('mfLedgerTable');
+    var empty = document.getElementById('mfLedgerEmpty');
+    var ok = document.getElementById('mfLedgerOk');
+    var parked = document.getElementById('mfLedgerParked');
+    var fx = document.getElementById('mfLedgerFx');
+
+    function esc(t) {
+      var d = document.createElement('div'); d.textContent = t; return d.innerHTML;
+    }
+    function row(side, acc, text) {
+      return '<tr><td class="side">' + side + '</td>' +
+             '<td><span class="code">' + esc(acc.code) + '</span>' + esc(acc.name) +
+             (acc.meaning ? '<div class="why">' + esc(acc.meaning) + '</div>' : '') + '</td>' +
+             '<td class="num">' + text + '</td></tr>';
+    }
+    function currencyCode() {
+      var opt = curSel && curSel.options[curSel.selectedIndex];
+      return opt ? opt.text.split(' — ')[0].trim() : BASE;
+    }
+
+    function draw() {
+      var rule = data.rules[typeSel.value];
+      var value = parseFloat(amount.value);
+      var dirEl = document.querySelector('input[name="direction"]:checked');
+      if (!rule || !dirEl || !(value > 0)) {
+        table.hidden = true; ok.hidden = true; parked.hidden = true; fx.hidden = true;
+        empty.hidden = false;
+        return;
+      }
+      var cur = currencyCode();
+      var text = esc(value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + cur);
+      var control = data.control;
+      var other = {code: rule.code, name: rule.name, meaning: rule.meaning};
+      var html = dirEl.value === 'debit'
+        ? row(T.debit, control, text) + row(T.credit, other, text)
+        : row(T.debit, other, text) + row(T.credit, control, text);
+      rows.innerHTML = html;
+      table.hidden = false; ok.hidden = false; empty.hidden = true;
+      parked.hidden = !rule.parked;
+      if (cur !== BASE) {
+        fx.textContent = T.fx.replace('%(cur)s', cur).replace('%(base)s', BASE);
+        fx.hidden = false;
+      } else {
+        fx.hidden = true;
+      }
+    }
+
+    [typeSel, curSel, amount].forEach(function (el) {
+      if (el) { el.addEventListener('input', draw); el.addEventListener('change', draw); }
+    });
+    document.querySelectorAll('input[name="direction"]').forEach(function (el) {
+      el.addEventListener('change', draw);
+    });
+    draw();
   })();
 </script>
 {% endblock %}

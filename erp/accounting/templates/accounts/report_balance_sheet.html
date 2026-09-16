@@ -8,9 +8,14 @@ Left: the general ledger, where A = L + E is true by construction — an
 unbalanced entry cannot be stored. Right: the same equation computed from
 the subsidiary ledgers, where it has never balanced.
 
-Both, because the ledger starts empty and fills as the posting paths are
-wired. Showing only the ledger would report a tidy zero while the money sat
-somewhere else; showing only the subsidiary side is what we had before.
+Both, because the ledger starts empty and fills as history is backfilled —
+everything from now on posts as it is saved. Showing only the ledger would
+report a tidy zero while the money sat somewhere else; showing only the
+subsidiary side is what we had before.
+
+Underneath, each control account against the subsidiary ledger it
+summarises. The two columns say whether the ledger has caught up; this says
+where it has not.
 {% endcomment %}
 
 {% block css %}
@@ -72,6 +77,13 @@ somewhere else; showing only the subsidiary side is what we had before.
   .bs-resid-h i, .bs-resid-h svg { width:15px; height:15px; }
   .bs-resid .bs-tbl td { border-bottom-color:#FEF3C7; }
   .bs-resid .bs-tbl tr.total td { border-top-color:#FDE68A; }
+
+  /* The reconciliation reads as information, not as a warning, so it drops
+     the amber the residual panel wears. */
+  .bs-rec { background:#fff; border-color:#E2E8EE; box-shadow:0 1px 2px rgba(15,23,31,.03); }
+  .bs-rec .bs-resid-h { border-bottom-color:#EEF1F5; color:var(--ink); }
+  .bs-rec .bs-tbl td { border-bottom-color:#F4F7FB; }
+  .bs-rec .rec-note { font:400 12px var(--font-sans); color:var(--gray-500); margin-top:3px; line-height:1.5; max-width:62ch; }
 
   .bs-detail { margin-top:20px; }
   .bs-detail summary { cursor:pointer; font:600 12.5px var(--font-sans); color:var(--nejum-teal-700); padding:10px 0; }
@@ -158,9 +170,9 @@ somewhere else; showing only the subsidiary side is what we had before.
       {% else %}
       <div class="bs-empty">
         {% blocktrans trimmed %}
-          Nothing is posted to the general ledger yet. The chart of accounts
-          exists and the equation is enforced, but no transaction writes a
-          journal entry until the posting paths are wired up.
+          Nothing is posted to the general ledger for this book yet. Anything
+          recorded from now on posts itself as it is saved; the history that
+          came before it has to be replayed once, with the backfill.
         {% endblocktrans %}
       </div>
       {% endif %}
@@ -220,6 +232,54 @@ somewhere else; showing only the subsidiary side is what we had before.
     </div>
   </div>
 
+  <!-- ── Control accounts against the ledgers they summarise ───── -->
+  <div class="bs-resid bs-rec">
+    <div class="bs-resid-h">
+      <i data-lucide="scale"></i>
+      {% trans "Control accounts, against the ledger each one summarises" %}
+    </div>
+    <table class="bs-tbl">
+      <tr class="section">
+        <td>{% trans "Ledger account" %}</td>
+        <td class="num">{% trans "General ledger" %}</td>
+        <td class="num">{% trans "Subsidiary" %}</td>
+        <td class="num">{% trans "Difference" %}</td>
+      </tr>
+      {% for r in rec.rows %}
+      <tr>
+        <td>
+          <span class="code">{{ r.control }}</span>{{ r.label }}
+          <span class="muted">— {{ r.subsidiary_label }}</span>
+          {% if not r.reconciled and r.note %}
+          <div class="muted rec-note">{{ r.note }}</div>
+          {% endif %}
+        </td>
+        <td class="num">{{ r.ledger|floatformat:2|intcomma }}</td>
+        <td class="num">{{ r.subsidiary|floatformat:2|intcomma }}</td>
+        <td class="num {% if not r.reconciled %}neg{% endif %}">
+          {% if r.reconciled %}—{% else %}{{ r.difference|floatformat:2|intcomma }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    {% if rec.pending %}
+    <table class="bs-tbl" style="margin-top:10px;">
+      <tr class="section"><td colspan="2">
+        {% trans "Held until somebody says what it was" %}
+      </td></tr>
+      {% for r in rec.pending %}
+      <tr>
+        <td><span class="code">{{ r.code }}</span>{{ r.label }}
+          <div class="muted rec-note">{{ r.note }}</div>
+        </td>
+        <td class="num">{{ r.balance|floatformat:2|intcomma }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+
   <!-- ── Why the subsidiary side does not balance ───────────────── -->
   {% if not subs.balanced %}
   <div class="bs-resid">
@@ -247,7 +307,7 @@ somewhere else; showing only the subsidiary side is what we had before.
   </div>
 
   <details class="bs-detail">
-    <summary>{% trans "Current account movements by type — none of these posts a contra entry" %}</summary>
+    <summary>{% trans "Current account movements by type — these are what the backfill still has to replay" %}</summary>
     <div class="bs-card" style="margin-top:8px;">
       <table class="bs-tbl">
         {% for r in subs.movement_types %}

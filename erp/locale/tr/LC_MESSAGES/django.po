@@ -5729,6 +5729,67 @@ msgstr "Satış Faturası"
 msgid "Sales Return"
 msgstr "Satış İadesi"
 
+msgid "Bad Debt Written Off"
+msgstr "Tahsil Edilemeyen Alacak (Silindi)"
+
+msgid "What this does in the books"
+msgstr "Muhasebe kaydında ne olur"
+
+msgid "Debits = Credits"
+msgstr "Borç = Alacak"
+
+msgid "Enter an amount to see the entry it will write."
+msgstr "Oluşacak kaydı görmek için tutar gir."
+
+msgid "Side"
+msgstr "Taraf"
+
+msgid "Ledger account"
+msgstr "Hesap"
+
+msgid "No account has been decided for this type, so the other side waits in Suspense. If you know what this really is — a write-off, a return, a payment — pick that type instead."
+msgstr "Bu tür için karşı hesap belirlenmedi, bu yüzden karşı taraf Askı hesabında bekler. Bunun gerçekte ne olduğunu biliyorsan — alacak silme, iade, ödeme — o türü seç."
+
+#, python-format
+msgid "Entered in %(cur)s. The books record it in %(base)s, at the rate for the date."
+msgstr "%(cur)s olarak girildi. Muhasebe bunu tarihin kuruyla %(base)s olarak kaydeder."
+
+msgid "Money in a cash box or bank account."
+msgstr "Kasada ya da bankadaki para."
+
+msgid "What this account owes the book — its balance."
+msgstr "Bu carinin bize borcu — bakiyesi."
+
+msgid "Stock bought and not yet sold."
+msgstr "Alınmış ve henüz satılmamış stok."
+
+msgid "Cheques and notes received, not yet cashed."
+msgstr "Alınan, henüz tahsil edilmemiş çek ve senetler."
+
+msgid "Held here until somebody decides what this really was."
+msgstr "Gerçekte ne olduğuna karar verilene kadar burada bekler."
+
+msgid "The other book's half of an inter-company movement."
+msgstr "Şirketler arası hareketin diğer defterdeki yarısı."
+
+msgid "Cheques and notes given, not yet paid."
+msgstr "Verilen, henüz ödenmemiş çek ve senetler."
+
+msgid "Balances carried over from before this system — not this year's trading."
+msgstr "Bu sistemden önceden devreden bakiyeler — bu yılın ticareti değil."
+
+msgid "This period's sales."
+msgstr "Bu dönemin satışları."
+
+msgid "Income that is not a sale."
+msgstr "Satış dışı gelir."
+
+msgid "A loss: a debt the book has given up on."
+msgstr "Zarar: vazgeçilen bir alacak."
+
+msgid "Current account movements by type — these are what the backfill still has to replay"
+msgstr "Türe göre cari hareketleri — geçmiş aktarımının hâlâ işlemesi gerekenler"
+
 msgid ""
 "Same logic: if not confirmed, delete; if confirmed, cancel. Cancel reverses "
 "everything (account, invoice status, cash account)."

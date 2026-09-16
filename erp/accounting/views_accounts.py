@@ -1337,9 +1337,14 @@ def _movement_currency_rule(current_account, movement=None):
             and movement.movement_type in CurrentAccountMovement.DEBT_TYPES
             and movement.currency_id != current_account.default_currency_id):
         debt_currency_id = movement.currency_id
+    from .services_posting import posting_preview
     return {
         "debt_types_json": json.dumps(sorted(CurrentAccountMovement.DEBT_TYPES)),
         "debt_currency_id": debt_currency_id,
+        # The entry the row will write, drawn live under the form — see
+        # services_posting.posting_preview.
+        "posting_preview": posting_preview(),
+        "base_currency_code": getattr(settings, "BASE_CURRENCY_CODE", "USD"),
     }
 
 

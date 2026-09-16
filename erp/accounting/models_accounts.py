@@ -528,6 +528,11 @@ class CurrentAccountMovement(models.Model):
         ("advance_out",      _("Advance Given")),
         ("interest",         _("Interest / Late Fee")),
         ("discount",         _("Discount")),
+        # A debt the book has given up on — a customer who will not pay and
+        # has been let off. Its own type rather than an adjustment because
+        # it is a loss, and a loss has to reach the P&L as one: filed under
+        # "adjustment" it could only ever be parked in Suspense.
+        ("write_off",        _("Bad Debt Written Off")),
         ("adjustment",       _("Offset / Adjustment")),
         ("check_in",         _("Check/Note Received")),
         ("check_out",        _("Check/Note Given")),
@@ -618,7 +623,7 @@ class CurrentAccountMovement(models.Model):
     # converting that is what the account's rate is for.
     DEBT_TYPES = frozenset({
         "opening", "order_sale", "invoice_sale", "invoice_purchase",
-        "return_sale", "return_purchase", "interest", "discount", "adjustment",
+        "return_sale", "return_purchase", "interest", "discount", "write_off", "adjustment",
         "legacy_ar", "legacy_ap",
     })
 

@@ -40,7 +40,7 @@ class PaymentFormDefaultsTest(TestCase):
         return reverse("accounts:payment_create", kwargs={"book_id": self.book.pk}) + "?account=%d" % self.current_account.pk
 
     def method_options(self, html):
-        block = re.search(r'<select name="method">(.*?)</select>', html, re.S).group(1)
+        block = re.search(r'<select name="method"[^>]*>(.*?)</select>', html, re.S).group(1)
         return re.findall(r'<option value="([^"]+)"([^>]*)>', block)
 
     def test_method_defaults_to_cash(self):

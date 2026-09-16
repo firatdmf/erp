@@ -627,6 +627,51 @@ class CurrentAccountMovement(models.Model):
         "legacy_ar", "legacy_ap",
     })
 
+    # Which way each type moves the balance, for the types that only ever go
+    # one way. A sale is always owed more and a collection always owed less;
+    # on the live books every row of these types agreed but one. Opening
+    # balances and adjustments are absent because they genuinely go either
+    # way. Checked on the hand-entry screens only — see
+    # direction_problem — so documents that post their own rows are
+    # untouched.
+    DEBIT_ONLY_TYPES = frozenset({
+        "order_sale", "invoice_sale", "interest", "payment", "advance_out",
+        "return_purchase", "check_out",
+    })
+    CREDIT_ONLY_TYPES = frozenset({
+        "collection", "invoice_purchase", "return_sale", "discount",
+        "write_off", "advance_in", "check_in",
+    })
+
+    @classmethod
+    def fixed_direction(cls, movement_type):
+        """'debit', 'credit', or None when the type may go either way."""
+        if movement_type in cls.DEBIT_ONLY_TYPES:
+            return "debit"
+        if movement_type in cls.CREDIT_ONLY_TYPES:
+            return "credit"
+        return None
+
+    @classmethod
+    def direction_problem(cls, movement_type, direction, existing=None):
+        """Why this type cannot go this way, or None when it can.
+
+        An existing row keeps the direction it already has as long as its
+        type is unchanged, so opening the one discount entered as a debit to
+        fix its description does not refuse to save.
+        """
+        fixed = cls.fixed_direction(movement_type)
+        if fixed is None or fixed == direction:
+            return None
+        if existing is not None and existing.movement_type == movement_type:
+            was = "debit" if existing.amount >= 0 else "credit"
+            if was == direction:
+                return None
+        label = dict(cls.MOVEMENT_TYPES).get(movement_type, movement_type)
+        if fixed == "debit":
+            return _("A %(type)s always increases what the account owes, so it is a debit.") % {"type": label}
+        return _("A %(type)s always reduces what the account owes, so it is a credit.") % {"type": label}
+
     def __str__(self):
         sign = "+" if self.amount >= 0 else ""
         return f"{self.current_account.code} | {self.date} | {sign}{self.amount} {self.currency.code}"
@@ -1512,6 +1557,22 @@ class Payment(models.Model):
                                     related_name="created_payments")
 
     # -- helpers -----------------------------------------------------------
+    # Methods that move real money through a kasa or a bank. For these the
+    # books need to know which one, or the cash account ends up holding
+    # money no cash box shows — 51 of the first 80 confirmed payments did.
+    #
+    # Enforced by the payment screens, not by confirm(): the order form's
+    # "deposit received" box confirms a cash payment and has no picker for
+    # a cash box, and refusing there would lose the deposit altogether.
+    CASH_METHODS = frozenset({"cash", "bank_transfer", "credit_card"})
+
+    NEEDS_CASH_ACCOUNT = _("Choose the cash box or bank account the money went through.")
+
+    @property
+    def needs_cash_account(self):
+        """Whether this payment is missing the kasa or bank it moved through."""
+        return self.method in self.CASH_METHODS and not self.cash_account_id
+
     @property
     def ledger_sign(self):
         """Sign applied to CurrentAccountMovement.amount."""

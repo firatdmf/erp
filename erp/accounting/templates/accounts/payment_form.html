@@ -150,6 +150,24 @@
   .pf-alloc-bar-r { margin-left: auto; display: flex; gap: 6px; }
 
   /* Summary sidebar */
+  /* The entry the payment will write, drawn as it is filled in. */
+  .pf-ledger { margin-top: 14px; border: 1px solid #E2E8EE; border-radius: 10px; overflow: hidden; }
+  .pf-ledger-h { display:flex; align-items:center; gap:6px; padding: 8px 12px; background:#FAFBFD; border-bottom:1px solid #EEF1F5; font: 700 12px var(--font-sans); color: var(--gray-700); }
+  .pf-ledger-h i, .pf-ledger-h svg { width:13px; height:13px; color: var(--nejum-teal-600); }
+  .pf-ledger table { width:100%; border-collapse: collapse; font: 400 12.5px var(--font-sans); }
+  .pf-ledger td { padding: 8px 12px; border-bottom:1px solid #F4F7FB; vertical-align: top; }
+  .pf-ledger tr:last-child td { border-bottom: none; }
+  .pf-ledger .side { font-weight: 700; white-space: nowrap; }
+  .pf-ledger .num { text-align:right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pf-ledger .code { font: 600 11px var(--font-mono); color: var(--gray-500); margin-right: 5px; }
+  .pf-ledger .why { font: 400 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .pf-ledger .note { margin: 0; padding: 8px 12px; border-top:1px solid #EEF1F5; font: 500 11.5px var(--font-sans); color: var(--gray-600); line-height: 1.45; }
+  .pf-ledger .note.warn { background:#FFFBEB; color:#92400E; }
+  .pf-ledger .note.err { background:#FEF2F2; color:#B91C1C; }
+  .pf-ledger .empty { padding: 12px; font: 500 12px var(--font-sans); color: var(--gray-500); }
+  .pf-req { color: #B23B12; margin-left: 2px; }
+  select.pf-missing { border-color: #DC2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.12) !important; }
+
   .pf-sum { padding: 4px 0; }
   .pf-sum .row { display:flex; justify-content: space-between; padding: 10px 0; font: 500 13px var(--font-sans); font-variant-numeric: tabular-nums; }
   .pf-sum .row + .row { border-top: 1px dashed #EEF1F5; }
@@ -246,7 +264,7 @@
               </div>
               <div class="pf-f">
                 <label>{% trans "Method" %}</label>
-                <select name="method">
+                <select name="method" id="paymentMethod">
                   {% for v,l in method_choices %}<option value="{{ v }}" {% if payment %}{% if payment.method == v %}selected{% endif %}{% elif v == 'cash' %}selected{% endif %}>{{ l }}</option>{% endfor %}
                 </select>
               </div>
@@ -271,9 +289,9 @@
                 </select>
               </div>
               <div class="pf-f">
-                <label>{% trans "Cash Account" %}</label>
+                <label>{% trans "Cash Account" %}<span class="pf-req" id="cashReq" hidden>*</span></label>
                 <select name="cash_account" id="paymentCashAccount">
-                  <option value="">{% trans "— Select (optional) —" %}</option>
+                  <option value="">{% trans "— Select —" %}</option>
                   {% for ca in cash_accounts %}
                     <option value="{{ ca.id }}" data-currency="{{ ca.currency_id }}" {% if payment and payment.cash_account_id == ca.id %}selected{% endif %}>{{ ca.name }} ({{ ca.currency.code }}) · {{ ca.book.name }}</option>
                   {% endfor %}
@@ -407,6 +425,16 @@
               <div class="row"><span class="lbl">{% trans "Payment Amount" %}</span><span class="val" id="sumAmount">{{ 0|floatformat:2 }}</span></div>
               <div class="row"><span class="lbl">{% trans "Applied to Invoices" %}</span><span class="val" id="sumAlloc">{{ 0|floatformat:2 }}</span></div>
               <div class="row grand"><span class="lbl">{% trans "Remaining as Advance" %}</span><span class="val" id="sumRemaining">{{ 0|floatformat:2 }}</span></div>
+            </div>
+
+            <div class="pf-ledger" id="pfLedger">
+              <div class="pf-ledger-h"><i data-lucide="book-open-check"></i>{% trans "What this does in the books" %}</div>
+              <div class="empty" id="pfLedgerEmpty">{% trans "Enter an amount to see the entry it will write." %}</div>
+              <table id="pfLedgerTable" hidden><tbody id="pfLedgerRows"></tbody></table>
+              <p class="note err" id="pfLedgerNoBox" hidden>{% trans "Choose the cash box or bank account the money went through." %}</p>
+              <p class="note warn" id="pfLedgerParked" hidden>{% trans "This method moves no identifiable money, so the other side waits in Suspense until somebody says what settled the debt." %}</p>
+              <p class="note" id="pfLedgerNotes" hidden>{% trans "A cheque or note is not cash yet. It waits here until it is cashed or paid." %}</p>
+              <p class="note" id="pfLedgerDraft" hidden>{% trans "A draft writes nothing. The entry is made when the payment is confirmed." %}</p>
             </div>
 
             <div class="pf-actions">
@@ -791,5 +819,100 @@ if (window.lucide) lucide.createIcons();
     sync();
     if (userSet) { noteEl.textContent = '{% trans "your rate" %}'; recalcTotal(); }
   })();
+</script>
+{{ payment_preview|json_script:"pfPaymentPreview" }}
+<script>
+// The payment's entry, and the rule that a cash, transfer or card payment
+// names the kasa or bank it went through. The rule is also enforced on the
+// server (views_payment._confirm_or_warn); this only says so before the
+// form is sent. A draft is exempt — it writes nothing yet.
+(function () {
+  var P = JSON.parse(document.getElementById('pfPaymentPreview').textContent);
+  var CONFIRMED = "{{ payment.status|default:''|escapejs }}" === "confirmed";
+  var T = {
+    debit: "{% trans 'Debit'|escapejs %}",
+    credit: "{% trans 'Credit'|escapejs %}"
+  };
+  var form = document.getElementById('paymentForm');
+  var typeSel = document.getElementById('paymentType');
+  var methodSel = document.getElementById('paymentMethod');
+  var boxSel = document.getElementById('paymentCashAccount');
+  var amountIn = document.getElementById('paymentAmount');
+  var curSel = document.getElementById('paymentCurrency');
+  var el = function (id) { return document.getElementById(id); };
+  var lastSubmitter = null;
+  var tried = false;
+
+  function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+  function selectedText(sel) {
+    var o = sel && sel.options[sel.selectedIndex];
+    return o ? o.text : '';
+  }
+  function row(side, acc, extra, text) {
+    return '<tr><td class="side">' + side + '</td><td><span class="code">' + esc(acc.code) + '</span>' +
+      esc(acc.name) + (extra ? ' · <b>' + esc(extra) + '</b>' : '') +
+      (acc.meaning ? '<div class="why">' + esc(acc.meaning) + '</div>' : '') +
+      '</td><td class="num">' + text + '</td></tr>';
+  }
+  function needsBox() { return P.cash_methods.indexOf(methodSel.value) !== -1; }
+
+  function draw() {
+    var needs = needsBox();
+    el('cashReq').hidden = !needs;
+    var value = parseFloat(amountIn.value);
+    var missing = needs && !boxSel.value;
+    // Said once there is something to confirm, not on an empty form.
+    el('pfLedgerNoBox').hidden = !(missing && (value > 0 || tried));
+    if (!missing) boxSel.classList.remove('pf-missing');
+
+    if (!(value > 0)) {
+      el('pfLedgerTable').hidden = true; el('pfLedgerEmpty').hidden = false;
+      el('pfLedgerParked').hidden = true; el('pfLedgerNotes').hidden = true;
+      el('pfLedgerDraft').hidden = true;
+      return;
+    }
+    var moneyIn = P.money_in_types.indexOf(typeSel.value) !== -1;
+    var other, extra = '';
+    var isNote = P.note_methods.indexOf(methodSel.value) !== -1;
+    if (needs) {
+      other = P.cash;
+      extra = boxSel.value ? selectedText(boxSel).split(' · ')[0] : '';
+    } else if (isNote) {
+      other = moneyIn ? P.notes_in : P.notes_out;
+    } else {
+      other = P.suspense;
+    }
+    var text = esc(value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) +
+                   ' ' + selectedText(curSel));
+    el('pfLedgerRows').innerHTML = moneyIn
+      ? row(T.debit, other, extra, text) + row(T.credit, P.control, '', text)
+      : row(T.debit, P.control, '', text) + row(T.credit, other, extra, text);
+    el('pfLedgerTable').hidden = false;
+    el('pfLedgerEmpty').hidden = true;
+    el('pfLedgerParked').hidden = needs || isNote;
+    el('pfLedgerNotes').hidden = !isNote;
+    el('pfLedgerDraft').hidden = CONFIRMED;
+  }
+
+  [typeSel, methodSel, boxSel, amountIn, curSel].forEach(function (x) {
+    if (x) { x.addEventListener('change', draw); x.addEventListener('input', draw); }
+  });
+  form.querySelectorAll('button[type="submit"]').forEach(function (b) {
+    b.addEventListener('click', function () { lastSubmitter = b; });
+  });
+  form.addEventListener('submit', function (e) {
+    var submitter = e.submitter || lastSubmitter;
+    var confirming = CONFIRMED || (submitter && submitter.name === 'auto_confirm');
+    if (confirming && needsBox() && !boxSel.value) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      tried = true;
+      boxSel.classList.add('pf-missing');
+      el('pfLedgerNoBox').hidden = false;
+      boxSel.focus();
+    }
+  }, true);
+  draw();
+})();
 </script>
 {% endblock %}

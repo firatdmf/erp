@@ -65,23 +65,75 @@ def _currencies():
 #                          (Quick Actions → "Check / Note"), no point
 #                          duplicating them in the generic dropdown
 #
-# "collection" and "payment" are both offered: a supplier account picking
-# "Collection" is still normalised to "payment" at save time below (so a
-# habit formed before "payment" was exposed keeps working), but the user
-# can now pick "Payment" directly on any account — e.g. a refund paid out
-# to a customer.
-_HIDDEN_MOVEMENT_TYPES = {"legacy_ar", "legacy_ap", "check_in", "check_out", "intercompany"}
+# - collection / payment / advance_in / advance_out → money that moved.
+#   Those are recorded with Take Payment / Make Payment, the one screen that
+#   knows the method, the kasa or bank, the invoices paid and the rate. Typed
+#   here they were booked as cash through no cash box at all, which is how
+#   the cash account came to hold money no kasa shows. This form is for the
+#   other job: what the account owes changed and no money moved.
+#
+# - order_sale / invoice_sale / invoice_purchase / return_sale /
+#   return_purchase → trade. Orders and invoices post these themselves;
+#   every one on the live books came from a document. Typed here they
+#   would count the same goods twice, or count goods no document names.
+#
+# An existing row of a hidden type still opens with its own type selected
+# (_movement_choices_including), so editing its description never re-types it.
+_MONEY_MOVEMENT_TYPES = frozenset({"collection", "payment", "advance_in", "advance_out"})
+_DOCUMENT_MOVEMENT_TYPES = frozenset({"order_sale", "invoice_sale", "invoice_purchase",
+                                      "return_sale", "return_purchase"})
+_HIDDEN_MOVEMENT_TYPES = ({"legacy_ar", "legacy_ap", "check_in", "check_out", "intercompany"}
+                          | _MONEY_MOVEMENT_TYPES | _DOCUMENT_MOVEMENT_TYPES)
 
-def _user_movement_choices():
-    return [(v, l) for v, l in CurrentAccountMovement.MOVEMENT_TYPES if v not in _HIDDEN_MOVEMENT_TYPES]
+USE_PAYMENT_SCREEN = _("Money that moved is recorded with Take Payment or Make Payment, "
+                       "which ask where it went.")
+USE_DOCUMENT = _("Sales, purchases and their returns come from orders and invoices, "
+                 "which post them to the account themselves.")
 
 
-def _movement_choices_including(current):
+def _elsewhere(movement_type):
+    """Why this type is not entered on the movement form, or None."""
+    if movement_type in _MONEY_MOVEMENT_TYPES:
+        return USE_PAYMENT_SCREEN
+    if movement_type in _DOCUMENT_MOVEMENT_TYPES:
+        return USE_DOCUMENT
+    return None
+
+OPENING_ONLY_WHEN_EMPTY = _("An opening balance can only be added to an account with no "
+                            "movements yet. To correct a balance that already has history, "
+                            "use an adjustment.")
+
+
+def _opening_allowed(current_account, movement=None):
+    """Whether an opening balance may be entered on this account.
+
+    Only while nothing else is on it. An opening balance is what the
+    account held before its first movement here; typed onto an account
+    with history it restates the past under a name that says it is the
+    starting point, and it books to Opening Balance Equity rather than to
+    anything that explains the change. `movement` is the row being edited,
+    which does not count against itself.
+    """
+    others = CurrentAccountMovement.objects.filter(current_account=current_account)
+    if movement is not None:
+        others = others.exclude(pk=movement.pk)
+    return not others.exists()
+
+
+def _user_movement_choices(current_account=None, movement=None):
+    choices = [(v, l) for v, l in CurrentAccountMovement.MOVEMENT_TYPES
+               if v not in _HIDDEN_MOVEMENT_TYPES]
+    if current_account is not None and not _opening_allowed(current_account, movement):
+        choices = [(v, l) for v, l in choices if v != "opening"]
+    return choices
+
+
+def _movement_choices_including(current, current_account=None, movement=None):
     """The dropdown for an EXISTING row: the normal choices, plus the
     row's own type when that isn't one we offer (an opening balance, a
     legacy marker). Keeps editing a description from quietly re-typing
     the movement."""
-    choices = _user_movement_choices()
+    choices = _user_movement_choices(current_account, movement)
     if current and current not in {v for v, _l in choices}:
         label = dict(CurrentAccountMovement.MOVEMENT_TYPES).get(current, current)
         choices = [(current, label)] + choices
@@ -1260,7 +1312,11 @@ class CurrentAccountMovementCreate(View):
         current_account = get_object_or_404(CurrentAccount, pk=pk)
         return render(request, self.template_name, {
             "current_account": current_account,
-            "movement_type_choices": _user_movement_choices(),
+            "movement_type_choices": _user_movement_choices(current_account),
+            # A new account starts with its opening balance; any other
+            # starts on an adjustment, as it always has.
+            "default_movement_type": ("opening" if _opening_allowed(current_account)
+                                      else "adjustment"),
             "currencies": _currencies(),
             **_movement_currency_rule(current_account),
         })
@@ -1285,13 +1341,17 @@ class CurrentAccountMovementCreate(View):
         currency_id = request.POST.get("currency") or current_account.default_currency_id
         movement_type = request.POST.get("movement_type") or "adjustment"
 
-        # The user always picks "Tahsilat" (collection) in the dropdown,
-        # because we hide "payment". For supplier accounts, money moving
-        # this direction is semantically a PAYMENT (we're paying them),
-        # so normalise here. Keeps Payment.type accurate downstream and
-        # the tahsilat list labels match reality.
-        if movement_type == "collection" and current_account.type == "supplier":
-            movement_type = "payment"
+        if _elsewhere(movement_type):
+            messages.error(request, _elsewhere(movement_type))
+            return redirect("accounts:movement_create", pk=current_account.pk)
+        if movement_type == "opening" and not _opening_allowed(current_account):
+            messages.error(request, OPENING_ONLY_WHEN_EMPTY)
+            return redirect("accounts:movement_create", pk=current_account.pk)
+
+        problem = CurrentAccountMovement.direction_problem(movement_type, direction)
+        if problem:
+            messages.error(request, problem)
+            return redirect("accounts:movement_create", pk=current_account.pk)
 
         try:
             mv = CurrentAccountMovement.objects.create(
@@ -1345,6 +1405,18 @@ def _movement_currency_rule(current_account, movement=None):
         # services_posting.posting_preview.
         "posting_preview": posting_preview(),
         "base_currency_code": getattr(settings, "BASE_CURRENCY_CODE", "USD"),
+        # Which way each one-directional type goes, so the form can set the
+        # direction as the type is picked. An existing row whose direction
+        # disagrees keeps its own — see direction_problem.
+        "fixed_directions": {
+            **{t: "debit" for t in CurrentAccountMovement.DEBIT_ONLY_TYPES},
+            **{t: "credit" for t in CurrentAccountMovement.CREDIT_ONLY_TYPES},
+        },
+        "grandfathered": (
+            {"type": movement.movement_type,
+             "direction": "debit" if movement.amount >= 0 else "credit"}
+            if movement is not None else None
+        ),
     }
 
 
@@ -1445,7 +1517,8 @@ class CurrentAccountMovementEdit(View):
             # The stored type can be one we never offer in the dropdown
             # (an "opening" row, a legacy marker). Add it rather than
             # silently re-typing the row on the first save.
-            "movement_type_choices": _movement_choices_including(mv.movement_type),
+            "movement_type_choices": _movement_choices_including(
+                mv.movement_type, current_account, mv),
             "currencies": _currencies(),
             **_movement_currency_rule(current_account, mv),
         })
@@ -1466,6 +1539,20 @@ class CurrentAccountMovementEdit(View):
             return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
 
         direction = request.POST.get("direction") or "debit"
+        movement_type = request.POST.get("movement_type") or mv.movement_type
+        # A row that already is one keeps its type; nothing becomes one here.
+        if _elsewhere(movement_type) and movement_type != mv.movement_type:
+            messages.error(request, _elsewhere(movement_type))
+            return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
+        if (movement_type == "opening" and mv.movement_type != "opening"
+                and not _opening_allowed(current_account, mv)):
+            messages.error(request, OPENING_ONLY_WHEN_EMPTY)
+            return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
+        problem = CurrentAccountMovement.direction_problem(movement_type, direction, existing=mv)
+        if problem:
+            messages.error(request, problem)
+            return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
+
         mv.amount = abs(amount) if direction == "debit" else -abs(amount)
         # amount_base is what the balance is summed from, and
         # CurrentAccountMovement.save() only recomputes it when it is falsy —
@@ -1478,11 +1565,7 @@ class CurrentAccountMovementEdit(View):
         if currency_id:
             mv.currency_id = int(currency_id)
 
-        movement_type = request.POST.get("movement_type") or mv.movement_type
-        # Same supplier normalisation as the create form — the dropdown
-        # only ever shows "collection".
-        if movement_type == "collection" and current_account.type == "supplier":
-            movement_type = "payment"
+        # movement_type was read and checked above.
         mv.movement_type = movement_type
 
         mv.description = request.POST.get("description", "")

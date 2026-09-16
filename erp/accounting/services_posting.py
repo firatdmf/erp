@@ -106,6 +106,19 @@ CASH_CONTRA_BY_SOURCE = {
 
 CASH_CONTROL = "1000"
 
+# How a Payment's money actually moved, by its method.
+#
+# The movement type says only that a debt was settled; the method says
+# with what, and that decides the other side. A cheque in hand is not cash
+# until it clears, and an offset moves no money at all — booking either
+# into 1000 Cash is what would leave the cash account above every kasa and
+# bank the book has.
+PAYMENT_CASH_METHODS = frozenset({"cash", "bank_transfer", "credit_card"})
+PAYMENT_NOTE_METHODS = frozenset({"check", "promissory_note"})
+NOTES_RECEIVABLE = "1400"
+NOTES_PAYABLE = "2100"
+SUSPENSE = "1900"
+
 
 class NoRuleFor(ValidationError):
     """Raised for a movement type with no contra account decided yet."""
@@ -142,12 +155,62 @@ def lines_for_movement(movement):
     if amount == ZERO:
         return []
 
+    cash_account = None
+    payment = _payment_for(movement)
+    if payment is not None:
+        contra, cash_account = payment_contra(payment.method, amount < ZERO,
+                                              payment.cash_account)
+
     memo = movement.description or movement.get_movement_type_display()
     if amount > ZERO:
         return [debit(CURRENT_ACCOUNT_CONTROL, amount, current_account=movement.current_account, memo=memo),
-                credit(contra, amount, memo=memo)]
+                credit(contra, amount, cash_account=cash_account, memo=memo)]
     return [credit(CURRENT_ACCOUNT_CONTROL, -amount, current_account=movement.current_account, memo=memo),
-            debit(contra, -amount, memo=memo)]
+            debit(contra, -amount, cash_account=cash_account, memo=memo)]
+
+
+def payment_contra(method, money_in, cash_account=None):
+    """(account code, cash account) for a payment made by `method`.
+
+    `money_in` is True when the account now owes less because something
+    came to the book — a collection, a supplier's refund — and False when
+    something went out.
+
+    Cash, transfers and card receipts land in 1000, tagged with the kasa or
+    bank they went through. A cheque or a note received waits in 1400 until
+    it is cashed, and one given in 2100 until it is paid. An offset and
+    "other" say nothing about where value went, so they wait in Suspense
+    until somebody does.
+    """
+    if method in PAYMENT_CASH_METHODS:
+        return CASH_CONTROL, cash_account
+    if method in PAYMENT_NOTE_METHODS:
+        return (NOTES_RECEIVABLE if money_in else NOTES_PAYABLE), None
+    return SUSPENSE, None
+
+
+def _payment_for(movement):
+    """The Payment behind a collection or payment movement, or None.
+
+    Either the payment posted it (Payment.confirm sets the source), or the
+    movement was typed by hand and signals_accounts made a Payment to
+    match. Read from the database rather than through the generic relation:
+    an edit re-saves this movement straight after changing the payment, and
+    a cached copy would still carry the old method.
+    """
+    if movement.movement_type not in ("collection", "payment") or not movement.pk:
+        return None
+    from django.contrib.contenttypes.models import ContentType
+
+    from .models_accounts import Payment
+
+    payments = Payment.objects.select_related("cash_account")
+    if (movement.source_type_id and movement.source_id and
+            movement.source_type_id == ContentType.objects.get_for_model(Payment).pk):
+        found = payments.filter(pk=movement.source_id).first()
+        if found is not None:
+            return found
+    return payments.filter(posted_movement_id=movement.pk).first()
 
 
 def unpost(source):
@@ -449,8 +512,8 @@ def _account_meanings():
     }
 
 
-def posting_preview():
-    """The rules the movement form needs to draw an entry, as plain data.
+def _describer():
+    """A function turning an account code into what the previews show.
 
     Account names come from the chart as it stands, so a line someone has
     renamed is shown by its new name, and fall back to the standard chart
@@ -466,7 +529,33 @@ def posting_preview():
     def describe(code):
         return {"code": code, "name": names.get(code, code),
                 "meaning": meanings.get(code, "")}
+    return describe
 
+
+def payment_preview():
+    """What the payment form needs to draw a payment's entry.
+
+    The same rule payment_contra applies, laid out for a script: which
+    methods go through a cash box, which wait as notes, and which types
+    bring something in rather than send it out.
+    """
+    describe = _describer()
+    return {
+        "control": describe(CURRENT_ACCOUNT_CONTROL),
+        "cash": describe(CASH_CONTROL),
+        "notes_in": describe(NOTES_RECEIVABLE),
+        "notes_out": describe(NOTES_PAYABLE),
+        "suspense": describe(SUSPENSE),
+        "cash_methods": sorted(PAYMENT_CASH_METHODS),
+        "note_methods": sorted(PAYMENT_NOTE_METHODS),
+        # Payment.cash_sign is +1 for these: money comes to the book.
+        "money_in_types": ["collection", "refund_out"],
+    }
+
+
+def posting_preview():
+    """The rules the movement form needs to draw an entry, as plain data."""
+    describe = _describer()
     return {
         "control": describe(CURRENT_ACCOUNT_CONTROL),
         "rules": {kind: {**describe(code),

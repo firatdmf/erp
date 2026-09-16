@@ -38,6 +38,7 @@ from .models import (
     Payment,
     PaymentAllocation,
 )
+from .services_posting import payment_preview
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +341,8 @@ class PaymentCreate(View):
             "base_currency": _fx_context(prefilled_current_account.book if prefilled_current_account else None),
             "account_currency": _fx_account_context(prefilled_current_account),
             "open_invoices_json": json.dumps(_serialize_invoices(open_invoices), default=str),
+            "payment_preview": payment_preview(),
+            "cash_methods": sorted(Payment.CASH_METHODS),
         })
 
     def post(self, request):
@@ -411,10 +414,7 @@ class PaymentCreate(View):
 
             # Auto-confirm if requested
             if request.POST.get("auto_confirm") == "1":
-                try:
-                    payment.confirm(user=request.user)
-                except ValidationError as ve:
-                    messages.warning(request, _g("Saved but could not be confirmed: %(error)s") % {"error": ve})
+                _confirm_or_warn(request, payment)
 
         messages.success(request, _g("Payment created: %(number)s") % {"number": payment.number})
         return redirect("accounts:payment_detail", pk=payment.pk)
@@ -545,6 +545,8 @@ class PaymentEdit(View):
             "base_currency": _fx_context(payment.book or payment.current_account.book),
             "account_currency": _fx_account_context(payment.current_account),
             "open_invoices_json": json.dumps(_edit_invoice_rows(payment), default=str),
+            "payment_preview": payment_preview(),
+            "cash_methods": sorted(Payment.CASH_METHODS),
         })
 
     def post(self, request, pk):
@@ -569,6 +571,16 @@ class PaymentEdit(View):
             messages.error(request,
                            _g("Allocation total (%(total)s) cannot exceed payment amount (%(amount)s).")
                            % {"total": total_alloc, "amount": amount})
+            return redirect("accounts:payment_edit", pk=pk)
+
+        # A confirmed payment is already in the books, so an edit must not
+        # leave it moving cash through no cash box. Checked against what was
+        # submitted, before anything is written.
+        new_method = request.POST.get("method") or payment.method
+        if (payment.status == "confirmed"
+                and new_method in Payment.CASH_METHODS
+                and not request.POST.get("cash_account")):
+            messages.error(request, Payment.NEEDS_CASH_ACCOUNT)
             return redirect("accounts:payment_edit", pk=pk)
 
         was_confirmed  = payment.status == "confirmed"
@@ -629,16 +641,31 @@ class PaymentEdit(View):
             payment.resync_posted_movement(user=request.user)
 
             if request.POST.get("auto_confirm") == "1" and payment.status == "draft":
-                try:
-                    payment.confirm(user=request.user)
-                except ValidationError as ve:
-                    messages.warning(request, _g("Saved but could not be confirmed: %(error)s") % {"error": ve})
+                _confirm_or_warn(request, payment)
 
             for inv in Invoice.objects.filter(pk__in=touched):
                 inv.recompute_payment(save=True)
 
         messages.success(request, _g("Payment updated: %(number)s") % {"number": payment.number})
         return redirect("accounts:payment_detail", pk=payment.pk)
+
+
+def _confirm_or_warn(request, payment):
+    """Confirm a payment the form asked to confirm, or say why not.
+
+    The payment is already saved as a draft by this point, so nothing typed
+    is lost when confirming is refused — the draft is there to finish.
+    """
+    if payment.needs_cash_account:
+        messages.warning(request, _g("Saved as a draft, not confirmed: %(error)s")
+                         % {"error": Payment.NEEDS_CASH_ACCOUNT})
+        return False
+    try:
+        payment.confirm(user=request.user)
+    except ValidationError as ve:
+        messages.warning(request, _g("Saved but could not be confirmed: %(error)s") % {"error": ve})
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -648,6 +675,10 @@ class PaymentEdit(View):
 class PaymentConfirm(View):
     def post(self, request, pk):
         payment = get_object_or_404(Payment, pk=pk)
+        if payment.needs_cash_account:
+            messages.error(request, _g("Confirmation failed: %(error)s")
+                           % {"error": Payment.NEEDS_CASH_ACCOUNT})
+            return redirect("accounts:payment_detail", pk=payment.pk)
         try:
             payment.confirm(user=request.user)
             messages.success(request, _g("Payment confirmed: %(number)s") % {"number": payment.number})

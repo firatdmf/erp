@@ -5790,6 +5790,54 @@ msgstr "Zarar: vazgeçilen bir alacak."
 msgid "Current account movements by type — these are what the backfill still has to replay"
 msgstr "Türe göre cari hareketleri — geçmiş aktarımının hâlâ işlemesi gerekenler"
 
+msgid "Sales, purchases and returns come from orders and invoices."
+msgstr "Satışlar, alışlar ve iadeler siparişlerden ve faturalardan gelir."
+
+msgid "Sales, purchases and their returns come from orders and invoices, which post them to the account themselves."
+msgstr "Satışlar, alışlar ve iadeleri siparişlerden ve faturalardan gelir; bunlar cariye kendileri işlenir."
+
+msgid "An opening balance can only be added to an account with no movements yet. To correct a balance that already has history, use an adjustment."
+msgstr "Açılış bakiyesi yalnızca henüz hareketi olmayan bir cariye girilebilir. Geçmişi olan bir bakiyeyi düzeltmek için düzeltme kaydı kullan."
+
+msgid "Money came in or went out?"
+msgstr "Para girdi ya da çıktı mı?"
+
+msgid "Money that moved is recorded with Take Payment or Make Payment, which ask where it went."
+msgstr "Hareket eden para, nereye gittiğini soran Tahsilat Al veya Ödeme Yap ile kaydedilir."
+
+
+
+
+msgid "Choose the cash box or bank account the money went through."
+msgstr "Paranın geçtiği kasayı ya da banka hesabını seç."
+
+#, python-format
+msgid "Saved as a draft, not confirmed: %(error)s"
+msgstr "Taslak olarak kaydedildi, onaylanmadı: %(error)s"
+
+#, python-format
+msgid "A %(type)s always increases what the account owes, so it is a debit."
+msgstr "%(type)s her zaman carinin borcunu artırır, bu yüzden borç kaydıdır."
+
+#, python-format
+msgid "A %(type)s always reduces what the account owes, so it is a credit."
+msgstr "%(type)s her zaman carinin borcunu azaltır, bu yüzden alacak kaydıdır."
+
+msgid "Set by the movement type."
+msgstr "Hareket türüne göre belirlenir."
+
+msgid "This is booked as cash with no cash box named. To say which kasa or bank the money went through — or that it was a cheque — use Take Payment or Make Payment instead."
+msgstr "Bu, kasa belirtilmeden nakit olarak kaydedilir. Paranın hangi kasa ya da bankadan geçtiğini — ya da çek olduğunu — belirtmek için Tahsilat Al veya Ödeme Yap'ı kullan."
+
+msgid "This method moves no identifiable money, so the other side waits in Suspense until somebody says what settled the debt."
+msgstr "Bu yöntemde belirli bir para hareketi yok, bu yüzden karşı taraf borcu neyin kapattığı belirlenene kadar Askı hesabında bekler."
+
+msgid "A cheque or note is not cash yet. It waits here until it is cashed or paid."
+msgstr "Çek ya da senet henüz nakit değildir. Tahsil edilene ya da ödenene kadar burada bekler."
+
+msgid "A draft writes nothing. The entry is made when the payment is confirmed."
+msgstr "Taslak hiçbir kayıt oluşturmaz. Kayıt, ödeme onaylandığında yapılır."
+
 msgid ""
 "Same logic: if not confirmed, delete; if confirmed, cancel. Cancel reverses "
 "everything (account, invoice status, cash account)."
@@ -6328,6 +6376,9 @@ msgstr "Tahsilat Al"
 
 msgid "Invoice No"
 msgstr "Fatura No"
+
+msgid "Make Payment"
+msgstr "Ödeme Yap"
 
 msgid "Full Statement"
 msgstr "Tam Ekstre"

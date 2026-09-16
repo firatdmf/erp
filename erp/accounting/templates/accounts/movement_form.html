@@ -94,6 +94,8 @@
   .mf-dir .lbl-w { display: flex; flex-direction: column; gap: 1px; }
   .mf-dir .lbl-w b { font: 700 13.5px var(--font-sans); }
   .mf-dir .lbl-w span { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .mf-dir label:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+  .mf-dir label:has(input:disabled):hover { border-color: #E0E6EE; background: white; }
   .mf-dir label.debit { color: #B23B12; }
   .mf-dir label.credit { color: #0E6E4A; }
   .mf-dir label:has(input:checked) {
@@ -174,9 +176,18 @@
             <label>{% trans "Movement Type" %}<span class="req">*</span></label>
             <select name="movement_type" id="mfType" required>
               {% for val,label in movement_type_choices %}
-                <option value="{{ val }}" {% if movement %}{% if movement.movement_type == val %}selected{% endif %}{% elif val == 'adjustment' %}selected{% endif %}>{{ label }}</option>
+                <option value="{{ val }}" {% if movement %}{% if movement.movement_type == val %}selected{% endif %}{% elif val == default_movement_type %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
+            {# This form changes what the account owes; money and trade have their own screens. #}
+            <span class="mf-hint">
+              {% trans "Money came in or went out?" %}
+              <a href="{% url 'accounts:payment_create' current_account.book.pk %}?account={{ current_account.pk }}&type=collection">{% trans "Take Payment" %}</a>
+              ·
+              <a href="{% url 'accounts:payment_create' current_account.book.pk %}?account={{ current_account.pk }}&type=payment">{% trans "Make Payment" %}</a>
+              <br>
+              {% trans "Sales, purchases and returns come from orders and invoices." %}
+            </span>
           </div>
 
           {% comment %}
@@ -215,6 +226,7 @@
                 </div>
               </label>
             </div>
+            <span class="mf-hint" id="mfDirHint" hidden>{% trans "Set by the movement type." %}</span>
           </div>
 
           <div class="mf-f">
@@ -257,6 +269,9 @@
           {% trans "No account has been decided for this type, so the other side waits in Suspense. If you know what this really is — a write-off, a return, a payment — pick that type instead." %}
         </p>
         <p class="note" id="mfLedgerFx" hidden></p>
+        <p class="note" id="mfLedgerUsePayment" hidden>
+          {% trans "This is booked as cash with no cash box named. To say which kasa or bank the money went through — or that it was a cheque — use Take Payment or Make Payment instead." %}
+        </p>
       </div>
 
       <div class="mf-foot">
@@ -277,6 +292,8 @@
 </div>
 
 {{ posting_preview|json_script:"mfPostingPreview" }}
+{{ fixed_directions|json_script:"mfFixedDirections" }}
+{{ grandfathered|json_script:"mfGrandfathered" }}
 <script>
   if (window.lucide) lucide.createIcons();
   // Default date to today if empty
@@ -304,6 +321,32 @@
     sync();
   })();
 
+  // The type decides the direction for the types that only go one way; the
+  // other radio is disabled so it cannot be picked by mistake. An existing
+  // row that already went the other way keeps its own direction while its
+  // type is unchanged (CurrentAccountMovement.direction_problem).
+  (function () {
+    var FIXED = JSON.parse(document.getElementById('mfFixedDirections').textContent);
+    var KEEP = JSON.parse(document.getElementById('mfGrandfathered').textContent);
+    var typeSel = document.getElementById('mfType');
+    var hint = document.getElementById('mfDirHint');
+    var radios = document.querySelectorAll('input[name="direction"]');
+    function apply() {
+      var fixed = FIXED[typeSel.value];
+      if (KEEP && KEEP.type === typeSel.value && KEEP.direction !== fixed) fixed = null;
+      radios.forEach(function (r) {
+        r.disabled = !!fixed && r.value !== fixed;
+        if (fixed && r.value === fixed && !r.checked) {
+          r.checked = true;
+          r.dispatchEvent(new Event('change'));
+        }
+      });
+      hint.hidden = !fixed;
+    }
+    typeSel.addEventListener('change', apply);
+    apply();
+  })();
+
   // Draw the entry the row will write. The sign rule is the one
   // services_posting.lines_for_movement uses: debit means the account owes
   // more, so the account's own line is the debit and the other side the
@@ -326,6 +369,7 @@
     var ok = document.getElementById('mfLedgerOk');
     var parked = document.getElementById('mfLedgerParked');
     var fx = document.getElementById('mfLedgerFx');
+    var usePayment = document.getElementById('mfLedgerUsePayment');
 
     function esc(t) {
       var d = document.createElement('div'); d.textContent = t; return d.innerHTML;
@@ -347,6 +391,7 @@
       var dirEl = document.querySelector('input[name="direction"]:checked');
       if (!rule || !dirEl || !(value > 0)) {
         table.hidden = true; ok.hidden = true; parked.hidden = true; fx.hidden = true;
+        usePayment.hidden = true;
         empty.hidden = false;
         return;
       }
@@ -360,6 +405,7 @@
       rows.innerHTML = html;
       table.hidden = false; ok.hidden = false; empty.hidden = true;
       parked.hidden = !rule.parked;
+      usePayment.hidden = ['collection', 'payment'].indexOf(typeSel.value) === -1;
       if (cur !== BASE) {
         fx.textContent = T.fx.replace('%(cur)s', cur).replace('%(base)s', BASE);
         fx.hidden = false;

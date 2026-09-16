@@ -157,8 +157,14 @@ class PaymentRateTowardAccountTest(OwnCurrencyBase):
         return reverse("accounts:payment_edit", kwargs={"pk": payment.pk})
 
     def post_payment(self, url=None, **overrides):
+        # A cash payment is only confirmed with the kasa it went through.
+        from accounting.models import CashAccount
+        box, _ = CashAccount.objects.get_or_create(
+            book=self.book, name="Kasa",
+            defaults={"currency": self.usd, "balance": Decimal("1000.00")})
         data = {
             "account": self.account.pk, "type": "payment", "method": "cash",
+            "cash_account": box.pk,
             "date": "2026-09-11", "amount": "40.00", "currency": self.usd.pk,
             "description": "", "notes": "", "allocations_json": "[]",
             "auto_confirm": "1", "exchange_rate": "48.600000",

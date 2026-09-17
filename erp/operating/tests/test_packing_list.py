@@ -112,6 +112,72 @@ class PackingListColumns(TestCase):
         self.assertTrue(resp["Content-Disposition"].startswith("inline;"))
         self.assertTrue(resp.content.startswith(b"%PDF"))
 
+    def _pdf_barcode_cells(self):
+        """Build the PDF and return (column width, [(code, font size)])."""
+        from reportlab.platypus import SimpleDocTemplate, Table
+        captured = []
+        real_build = SimpleDocTemplate.build
+
+        def build(doc, story, *a, **kw):
+            captured.extend(story)
+            return real_build(doc, story, *a, **kw)
+
+        with patch.object(SimpleDocTemplate, "build", build):
+            self.client.get(reverse("operating:order_packing_list_pdf",
+                                    kwargs={"pk": self.order.pk}))
+        tbl = next(f for f in captured if isinstance(f, Table) and len(f._colWidths) == 7)
+        cells = []
+        for row in tbl._cellvalues[1:]:
+            cell = row[5]
+            para = cell[0] if isinstance(cell, (list, tuple)) else cell
+            cells.append((para.getPlainText(), para.style.fontSize, para.style.fontName,
+                          para.style.wordWrap))
+        return tbl._colWidths[5], cells
+
+    def test_every_barcode_fits_its_column(self):
+        """A barcode cannot wrap. LZK0300003477 is 26mm at 9pt and used
+        to spill out of a 28mm column (18mm once padded)."""
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        codes = ["LZK0300003477", "8690000000001", "Z14200001609",
+                 "W" * 30]   # far longer than anything on file
+        for roll, code in zip(WarehouseProductItem.objects.order_by("pk"), codes):
+            roll.barcode = code
+            roll.save(update_fields=["barcode"])
+        width, cells = self._pdf_barcode_cells()
+        self.assertEqual(sorted(c[0] for c in cells), sorted(codes))
+        for code, size, font, wrap in cells:
+            with self.subTest(code=code):
+                if code == "W" * 30:
+                    # Too long for any column: smaller, and allowed to break.
+                    self.assertLess(size, 9)
+                    self.assertEqual(wrap, "CJK")
+                else:
+                    self.assertEqual(size, 9)
+                    self.assertLessEqual(stringWidth(code, font, size) + 10, width)
+
+    def test_the_longest_barcode_on_file_still_fits_on_one_line(self):
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        code = "LZK030000347712345"   # 18 characters, the longest in prod
+        roll = WarehouseProductItem.objects.order_by("pk").first()
+        roll.barcode = code
+        roll.save(update_fields=["barcode"])
+        width, cells = self._pdf_barcode_cells()
+        _, size, font, wrap = next(c for c in cells if c[0] == code)
+        self.assertEqual(size, 9)
+        self.assertLessEqual(stringWidth(code, font, size) + 10, width)
+
+    def test_the_table_still_spans_the_page(self):
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table
+        captured = []
+        real_build = SimpleDocTemplate.build
+        with patch.object(SimpleDocTemplate, "build",
+                          lambda d, s, *a, **k: (captured.extend(s), real_build(d, s, *a, **k))):
+            self.client.get(reverse("operating:order_packing_list_pdf",
+                                    kwargs={"pk": self.order.pk}))
+        tbl = next(f for f in captured if isinstance(f, Table) and len(f._colWidths) == 7)
+        self.assertAlmostEqual(sum(tbl._colWidths), 180 * mm, places=3)
+
     def test_the_excel_is_the_downloadable_editable_copy(self):
         resp = self.client.get(
             reverse("operating:export_packing_list_excel", kwargs={"pk": self.order.pk}))

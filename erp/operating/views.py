@@ -5311,8 +5311,34 @@ def order_packing_list_pdf(request, pk):
     item_no = 0
     total_meters = Decimal("0")
 
-    for pack in packs:
-        rows = _pack_roll_rows(pack)
+    # A barcode has no spaces, so its cell cannot wrap — it has to fit on
+    # one line. LZK0300003477 is 26mm at 9pt, and so is a plain 13-digit
+    # EAN; the column is sized to the widest code on this list (padding
+    # included), and the Product column, which wraps, gives up the room.
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    CELL_PAD = 10  # LEFTPADDING + RIGHTPADDING below, in points
+    BARCODE_MIN_W, BARCODE_MAX_W = 32 * mm, 45 * mm
+    rows_by_pack = [(pack, _pack_roll_rows(pack)) for pack in packs]
+    widest = max((stringWidth(str(r['barcode']), font, cell_style.fontSize)
+                  for _, rows in rows_by_pack for r in rows), default=0)
+    barcode_w = min(max(widest + CELL_PAD + 1 * mm, BARCODE_MIN_W), BARCODE_MAX_W)
+
+    def barcode_cell(code):
+        # Longer than even the widest column allows (the longest on file
+        # is 18 characters): shrink the type, and past 6pt let it break
+        # mid-code rather than run out of the cell.
+        room = barcode_w - CELL_PAD
+        size = cell_style.fontSize
+        width = stringWidth(code, font, size)
+        if width <= room:
+            return Paragraph(code, cell_style)
+        size = max(6, size * room / width)
+        return Paragraph(
+            code, ParagraphStyle(name="BarcodeStyle", parent=cell_style,
+                                 fontSize=size, leading=size + 2,
+                                 wordWrap="CJK"))
+
+    for pack, rows in rows_by_pack:
         first = len(data)
         if not rows:
             data.append([
@@ -5333,7 +5359,7 @@ def order_packing_list_pdf(request, pk):
                     cell_style),
                 Paragraph(row['variant'], cell_style),
                 Paragraph(row['product_group'], cell_style),
-                Paragraph(str(row['barcode']), cell_style),
+                barcode_cell(str(row['barcode'])),
                 Paragraph(f"{row['quantity']:.2f} m" if row['quantity'] is not None else "-",
                           num_style),
             ])
@@ -5344,10 +5370,10 @@ def order_packing_list_pdf(request, pk):
     else:
         tbl = Table(data,
                     # Product Group needs 28mm to keep its header on one
-                    # line; the barcode column gives it up, a 13-digit
-                    # EAN at 9pt still clears 28mm.
-                    colWidths=[14 * mm, 10 * mm, 50 * mm, 26 * mm,
-                               28 * mm, 28 * mm, 24 * mm],
+                    # line; the barcode column is sized above, and the
+                    # Product column takes whatever is left of 180mm.
+                    colWidths=[14 * mm, 10 * mm, 78 * mm - barcode_w, 26 * mm,
+                               28 * mm, barcode_w, 24 * mm],
                     repeatRows=1)
         style_cmds = [
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),

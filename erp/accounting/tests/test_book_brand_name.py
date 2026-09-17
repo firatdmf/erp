@@ -148,13 +148,17 @@ class InvoiceIssuer(TestCase):
             f"{settings.BRAND_NAME} {settings.BRAND_LEGAL_SUFFIX}".strip())
 
     def test_the_excel_and_the_printed_invoice_agree(self):
-        import openpyxl
+        from accounting.invoice_doc import build_purchase_doc
         from accounting.invoice_excel import build_invoice_workbook
-        wb = build_invoice_workbook(self.invoice)
+        self.invoice.type = "purchase"
+        self.invoice.save()
+        doc = build_purchase_doc(self.invoice)
+        self.assertEqual(doc.issuer.name, "Karven Home Collection")
+        wb = build_invoice_workbook(doc)
         text = " ".join(
             str(c.value) for row in wb.active.iter_rows() for c in row
             if c.value is not None)
-        self.assertIn(self.invoice.issuer_display_name, text)
+        self.assertIn("KARVEN HOME COLLECTION", text)
 
 
 class CurrentAccountLedgerBook(TestCase):

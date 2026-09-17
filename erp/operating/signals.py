@@ -90,22 +90,16 @@ def email_customer_on_status_change(sender, instance, created, **kwargs):
 @receiver([post_save, post_delete], sender=OrderItem)
 def sync_order_current_account_movement(sender, instance, **kwargs):
     """Whenever an OrderItem changes (qty/price/add/remove), keep the
-    linked current account movement AND the order's live invoice in sync so the
-    customer's balance and their invoice both reflect the latest order
-    total in real time — regardless of which view did the save.
-
-    The invoice half matters because it used to be cut once and never
-    revisited: an edit moved the current account but left the invoice on the old
-    figure, so the two documents disagreed with nothing flagging it."""
+    linked current account movement in sync so the customer's balance
+    reflects the latest order total in real time — regardless of which
+    view did the save. (The order's invoice is built from the order each
+    time it is opened, so it needs no syncing.)"""
     order = instance.order
     if not getattr(order, "current_account_id", None):
         return
     try:
-        from accounting.services_accounts import (
-            post_order_movement, sync_invoice_for_order,
-        )
+        from accounting.services_accounts import post_order_movement
         post_order_movement(order)
-        sync_invoice_for_order(order)
     except Exception:
         # Don't let current account sync break order edits. Errors here surface in
         # the order's "Open current account" view instead.

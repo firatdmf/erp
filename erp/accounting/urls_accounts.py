@@ -36,7 +36,6 @@ from django.urls import path
 from django.views.generic import TemplateView
 
 from . import (
-    invoice_excel,
     statement_excel,
     views_check,
     views_invoice,
@@ -83,10 +82,6 @@ urlpatterns = [
     scoped("accounts/statement/",        views.CurrentAccountStatementAll.as_view(),   "statement_all"),
     scoped("accounts/retail/",           views.RetailCurrentAccountRedirect.as_view(), "retail"),
 
-    scoped("invoices/",                  views_invoice.InvoiceList.as_view(),           "invoice_list"),
-    scoped("invoices/new/",              views_invoice.InvoiceCreate.as_view(),         "invoice_create"),
-    scoped("invoices/settings/",         views_invoice.InvoiceSettingsUpdate.as_view(), "invoice_settings"),
-
     scoped("purchases/",                 views_purchase.PurchaseOrderList.as_view(), "purchase_order_list"),
     scoped("purchases/new/",             views_purchase.GoodsReceipt.as_view(),      "goods_receipt"),
     scoped("purchases/order/",           views_purchase.PurchaseOrderSave.as_view(), "purchase_order_save"),
@@ -95,11 +90,9 @@ urlpatterns = [
     scoped("payments/new/",              views_payment.PaymentCreate.as_view(), "payment_create"),
 
     scoped("reports/",                   views_report.ReportIndex.as_view(),       "report_index"),
-    scoped("reports/aging/",             views_report.AgingReport.as_view(),       "report_aging"),
     scoped("reports/balance-sheet/",     views_report.BalanceSheet.as_view(),      "report_balance_sheet"),
     scoped("reports/trial-balance/",     views_report.TrialBalance.as_view(),      "report_trial_balance"),
     scoped("reports/credit-limit/",      views_report.CreditLimitReport.as_view(), "report_credit_limit"),
-    scoped("reports/due-calendar/",      views_report.DueCalendar.as_view(),       "report_due_calendar"),
 
     scoped("checks/",                    views_check.CheckList.as_view(),   "check_list"),
     scoped("checks/new/",                views_check.CheckCreate.as_view(), "check_create"),
@@ -138,19 +131,17 @@ urlpatterns = [
     path("accounts/transfers/<int:pk>/edit/", views.CurrentAccountTransferEdit.as_view(),   name="transfer_edit"),
     path("accounts/transfers/<int:pk>/undo/", views.CurrentAccountTransferUndo.as_view(),   name="transfer_undo"),
 
-    owned("accounts/invoices/<int:pk>/", views_invoice.InvoiceDetail.as_view(), "invoice_detail", Invoice),
-    path("accounts/invoices/<int:pk>/excel/",   invoice_excel.invoice_excel,            name="invoice_excel"),
-    owned("accounts/invoices/<int:pk>/edit/", views_invoice.InvoiceEdit.as_view(), "invoice_edit", Invoice),
-    path("accounts/invoices/<int:pk>/issue/",   views_invoice.InvoiceIssue.as_view(),   name="invoice_issue"),
-    path("accounts/invoices/<int:pk>/cancel/",  views_invoice.InvoiceCancel.as_view(),  name="invoice_cancel"),
-    path("accounts/invoices/<int:pk>/restore/", views_invoice.InvoiceRestore.as_view(), name="invoice_restore"),
-    path("accounts/invoices/<int:pk>/delete/",  views_invoice.InvoiceDelete.as_view(),  name="invoice_delete"),
+    # Invoices are printouts of an order or a purchase (views_invoice); the
+    # old invoice page only redirects to what it mirrored.
+    owned("accounts/invoices/<int:pk>/", views_invoice.InvoiceRedirect.as_view(), "invoice_detail", Invoice),
 
     path("accounts/purchases/<int:pk>/order/",   views_purchase.PurchaseOrderSave.as_view(),    name="purchase_order_update"),
     path("accounts/purchases/<int:pk>/confirm/", views_purchase.PurchaseOrderConfirm.as_view(), name="purchase_order_confirm"),
     path("accounts/purchases/<int:pk>/print/",   views_purchase.PurchaseOrderPrint.as_view(),   name="purchase_order_print"),
     owned("accounts/purchases/<int:pk>/items/<int:item_pk>/labels/", views_purchase.PurchaseItemLabels.as_view(), "purchase_item_labels", Invoice),
     owned("accounts/purchases/<int:pk>/", views_purchase.PurchaseOrderDetail.as_view(), "purchase_order_detail", Invoice),
+    owned("accounts/purchases/<int:pk>/invoice/", views_invoice.PurchaseInvoice.as_view(), "purchase_invoice", Invoice),
+    owned("accounts/purchases/<int:pk>/invoice/excel/", views_invoice.purchase_invoice_excel, "purchase_invoice_excel", Invoice),
     owned("accounts/purchases/<int:pk>/edit/", views_purchase.GoodsReceipt.as_view(), "goods_receipt_edit", Invoice),
     path("accounts/purchases/<int:pk>/cancel/",  views_purchase.PurchaseCancel.as_view(),       name="purchase_cancel"),
 
@@ -182,18 +173,13 @@ urlpatterns = [
     legacy("accounts/new/",       "create"),
     legacy("accounts/statement/all/", "statement_all"),
     legacy("accounts/retail/",    "retail"),
-    legacy("accounts/invoices/",  "invoice_list"),
-    legacy("accounts/invoices/new/",      "invoice_create"),
-    legacy("accounts/invoices/settings/", "invoice_settings"),
     legacy("accounts/purchases/", "purchase_order_list"),
     legacy("accounts/purchases/new/", "goods_receipt"),
     legacy("accounts/payments/",  "payment_list"),
     legacy("accounts/payments/new/", "payment_create"),
     legacy("accounts/reports/",   "report_index"),
-    legacy("accounts/reports/aging/", "report_aging"),
     legacy("accounts/reports/trial-balance/", "report_trial_balance"),
     legacy("accounts/reports/credit-limit/",  "report_credit_limit"),
-    legacy("accounts/reports/due-calendar/",  "report_due_calendar"),
     legacy("accounts/checks/",    "check_list"),
     legacy("accounts/checks/new/", "check_create"),
 ]

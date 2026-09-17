@@ -48,7 +48,10 @@
   .od-meta { display: flex; align-items: center; gap: 10px; font: 500 12.5px var(--font-sans); color: var(--gray-600); flex-wrap: wrap; }
   .od-meta i { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; color: var(--gray-500); }
   .od-dot { width: 3px; height: 3px; background: #C5CCD3; border-radius: 50%; display: inline-block; }
-  .od-head-r { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  /* The title keeps its natural width; the action buttons take what's left
+     and wrap onto more rows instead of pushing the page wider. */
+  .od-head > div:first-child { flex: 0 0 auto; }
+  .od-head-r { display: flex; gap: 8px; flex: 1 1 0; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
 
   /* BUTTONS */
   .ord-btn {
@@ -69,6 +72,30 @@
     box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
   }
   .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .ord-btn.danger { background: white; border: 1px solid #F3C4C4; color: #B23B3B; }
+  .ord-btn.danger:hover { background: #FEF2F2; border-color: #E8A0A0; }
+  .ord-btn.danger-solid { background: #DC2626; border: 1px solid #B91C1C; color: white; }
+  .ord-btn.danger-solid:hover { filter: brightness(1.05); }
+  .ord-btn.danger-solid:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+  /* Cancelled order: the lines stay readable, but struck through. */
+  .od-prods-cancelled td { color: var(--gray-400); }
+  .od-prods-cancelled td .od-prod span,
+  .od-prods-cancelled td .mono,
+  .od-prods-cancelled td .od-variant-name,
+  .od-prods-cancelled td .od-num-val,
+  .od-prods-cancelled td.num b,
+  .od-prods-cancelled td.num span,
+  .od-totals-cancelled .od-tot-row > span:last-child {
+    text-decoration: line-through; text-decoration-color: #DC2626;
+  }
+  .od-prods-cancelled .od-prod-img { opacity: 0.45; }
+  .od-cancelled-banner {
+    display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+    padding: 8px 12px; border-radius: 8px;
+    background: #FEF2F2; border: 1px solid #FECACA; color: #B23B3B;
+    font: 600 12.5px var(--font-sans);
+  }
 
   /* Products card: Current vs. İlk Oluşturulan (original snapshot) tabs */
   .od-item-tabs {
@@ -730,6 +757,16 @@
   }
   .od-link i { width: 12px; height: 12px; }
   .od-link:hover { text-decoration: underline; }
+  .od-mv-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; background: #FFF; border: 1px solid #EEF1F5; border-radius: 8px;
+    font-size: 12px; color: inherit; text-decoration: none;
+    transition: border-color .12s, background .12s;
+  }
+  .od-mv-row:hover { border-color: var(--nejum-teal-500); background: #F8FAFC; }
+
+  .od-docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+  .od-docs .ord-btn { justify-content: center; }
 
   .od-addr { font: 500 13px var(--font-sans); color: var(--gray-700); line-height: 1.55; }
   .od-addr-name { font-weight: 700; color: #0F1419; }
@@ -754,6 +791,7 @@
   @media (max-width: 700px) {
     .ord { padding: 16px 12px 96px; }
     .od-head { flex-direction: column; align-items: stretch; }
+    .od-head-r { flex: 0 0 auto; }
     .od-form { grid-template-columns: 1fr; }
     .od-tl { grid-template-columns: 1fr; }
   }
@@ -842,8 +880,6 @@
   }
 
   /* PDF header editor — uses the page's own .od-input + .ord-btn */
-  .oph-input { width: 190px !important; height: 36px; padding: 0 12px !important; }
-  @media (max-width: 640px) { .oph-input { width: 100% !important; flex: 1; } .oph-wrap { width: 100%; } }
 
   /* Complete-order confirm — replaces the browser's confirm() so the
      line recap is readable and the irreversible bit (stock leaves the
@@ -904,6 +940,15 @@
   .odc-total span { font: 600 12.5px var(--font-sans); color: var(--gray-600); }
   .odc-total b { font: 800 19px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.015em; }
   .odc-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .odc-ic.danger { background: #FEF2F2; color: #DC2626; }
+  .odc-warn.danger { background: #FEF2F2; color: #991B1B; border-color: #FECACA; }
+  .odx-list { margin: 0 0 14px; padding-left: 18px; font: 500 13px var(--font-sans); color: var(--gray-700); line-height: 1.6; }
+  .odx-reason {
+    width: 100%; min-height: 72px; box-sizing: border-box; resize: vertical;
+    padding: 9px 11px; border: 1px solid #E0E6EE; border-radius: 10px;
+    font: 500 13px var(--font-sans); color: var(--ink); outline: none; margin-bottom: 14px;
+  }
+  .odx-reason:focus { border-color: #E8A0A0; box-shadow: 0 0 0 3px #FEE2E2; }
   .odc-actions .ord-btn { padding: 9px 16px; }
   @media (max-width: 480px) {
     .odc-actions { flex-direction: column-reverse; }
@@ -1001,35 +1046,22 @@
       </div>
     </div>
     <div class="od-head-r">
-      {% get_current_language as LANGUAGE_CODE %}
-      <div id="ophWrap" class="oph-wrap no-print" style="display:inline-flex;align-items:center;gap:8px;">
-        <input id="ophInput" class="od-input oph-input" type="text" maxlength="120"
-               title="{% trans 'Top-left title shown on the printed PDF (blank = brand)' %}"
-               placeholder="{% blocktrans with brand=brand_line|default:'Nejum' %}PDF header (default: {{ brand }}){% endblocktrans %}"
-               value="{{ order.print_header|default:'' }}"
-               onkeydown="if(event.key==='Enter'){event.preventDefault();saveOrderPrintHeader(this.nextElementSibling);}">
-        <button type="button" class="ord-btn ghost" onclick="saveOrderPrintHeader(this)">
-          <i class="fa fa-check"></i>{% trans "Save" %}
-        </button>
-      </div>
       <a href="{% url 'operating:order_print' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
       <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost">
         <i class="fa fa-file-excel"></i>{% trans "Excel" %}
       </a>
-      {% if order.status != 'completed' %}
-        <a href="{% url 'operating:order_production' order.pk %}" class="ord-btn ghost">
-          <i class="fa fa-industry"></i>{% trans "Production" %}
-        </a>
-      {% endif %}
       {% if not shipped and not is_terminal %}
         <a href="{% url 'operating:edit_order' order.pk %}" class="ord-btn ghost">
           <i class="fa fa-pen"></i>{% trans "Edit" %}
         </a>
-        <a href="{% url 'operating:order_pack_scan' order.pk %}" class="ord-btn primary">
-          <i class="fa fa-barcode"></i>{% trans "Pack (Scan rolls)" %}
-        </a>
+      {% endif %}
+      {% comment %}A completed order is re-opened first ("Re-open & Fix"), then cancelled — never in one step. Sales reps can't move an order at all.{% endcomment %}
+      {% if not shipped and not is_terminal and not is_sales_rep %}
+        <button type="button" id="od-cancel-order-btn" class="ord-btn danger">
+          <i class="fa fa-ban"></i>{% trans "Cancel order" %}
+        </button>
       {% endif %}
     </div>
   </div>
@@ -1132,7 +1164,8 @@
                 <button type="submit" class="ord-btn ghost" title="{% trans "Save cargo info only" %}">
                   <i class="fa fa-save"></i> {% trans "Save" %}
                 </button>
-                {% if order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
+                {% if order.order_status == 'cancelled' %}
+                {% elif order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
                 <button type="button" id="od-complete-btn" class="ord-btn primary" data-status="shipped">
                   <i class="fa fa-truck-fast"></i> {% trans "Complete order" %}
                 </button>
@@ -1155,11 +1188,11 @@
         </div>
         {% else %}
         <details class="od-more-status">
-          <summary>{% trans "More statuses (cancelled, returned, delivered…)" %}</summary>
+          <summary>{% trans "More statuses (returned, delivered…)" %}</summary>
           <div class="od-more-grid">
             {% for code, label in status_choices %}
-            {% comment %}packaging → packing-scan flow, shipped → cargo-gated Complete button; keep them out of these one-click shortcuts.{% endcomment %}
-            {% if code != 'packaging' and code != 'shipped' %}
+            {% comment %}packaging → packing-scan flow, shipped → cargo-gated Complete button, cancelled → the confirmed "Cancel order" button; keep them out of these one-click shortcuts.{% endcomment %}
+            {% if code != 'packaging' and code != 'shipped' and code != 'cancelled' %}
             <button type="button" form="od-status-form"
                     class="od-stage-mini {% if order.order_status == code %}active{% endif %}"
                     data-status="{{ code }}">
@@ -1216,8 +1249,13 @@
 
         <div data-item-pane="current">
 
+        {% if order.order_status == 'cancelled' %}
+        <div class="od-cancelled-banner">
+          <i class="fa fa-ban"></i>{% trans "This order was cancelled — its lines are kept for reference only." %}
+        </div>
+        {% endif %}
         <div class="od-prods-scroll">
-        <table class="od-prods{% if is_sales_rep %} od-no-cost{% endif %}">
+        <table class="od-prods{% if is_sales_rep %} od-no-cost{% endif %}{% if order.order_status == 'cancelled' %} od-prods-cancelled{% endif %}">
           <thead>
             <tr>
               <th>{% trans "Product" %}</th>
@@ -1397,7 +1435,7 @@
             </button>
           </div>
         </div>
-        <div class="od-totals">
+        <div class="od-totals{% if order.order_status == 'cancelled' %} od-totals-cancelled{% endif %}">
           <div class="od-tot-row">
             <span>{% trans "Subtotal" %}</span>
             <span data-order-total>${{ order.total_value|floatformat:2 }}</span>
@@ -1649,32 +1687,39 @@
       </section>
       {% endif %}
 
+      {% if order.current_account_id or order.status != 'completed' %}
+      <!-- DOCUMENTS — the invoice (a printout, plus its Excel) and the
+           production sheet, all built from this order each time they're
+           opened; nothing is stored. -->
+      <section class="od-card">
+        <div class="od-card-h"><h3>{% trans "Documents" %}</h3></div>
+        <div class="od-docs">
+          {% if order.current_account_id %}
+          <a href="{% url 'operating:order_invoice' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
+            <i class="fa fa-file-invoice"></i>{% trans "Get invoice" %}
+          </a>
+          <a href="{% url 'operating:order_invoice_excel' order.pk %}" class="ord-btn ghost">
+            <i class="fa fa-file-excel"></i>{% trans "Invoice Excel" %}
+          </a>
+          {% endif %}
+          {% if order.status != 'completed' %}
+          <a href="{% url 'operating:order_production' order.pk %}" class="ord-btn ghost">
+            <i class="fa fa-industry"></i>{% trans "Production" %}
+          </a>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+
       {% if order.current_account %}
       <!-- CURRENT ACCOUNT — internal ledger snapshot -->
       <section class="od-card">
         <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
           <h3>{% trans "Current account" %}</h3>
-          <div style="display:flex; align-items:center; gap:8px;">
-            {% if not has_active_invoice %}
-              {% if order.order_status == "shipped" or order.order_status == "in_transit" or order.order_status == "out_for_delivery" or order.order_status == "delivered" %}
-              <a href="{% url 'accounts:legacy_invoice_create' %}?order={{ order.pk }}"
-                 class="od-link"
-                 style="font-size: 11.5px; padding:5px 10px; background:#147F74; color:#fff; border-radius:6px;"
-                 title="{% trans 'Create invoice from this order' %}">
-                <i class="fa fa-file-invoice"></i> {% trans "Create invoice" %}
-              </a>
-              {% else %}
-              <span style="font-size: 11px; color:#92400E; background:#FEF3C7; border:1px solid #FDE68A; padding:4px 9px; border-radius:6px; white-space:nowrap;"
-                    title="{% trans 'The invoice is issued automatically the moment the order is completed (shipped).' %}">
-                <i class="fa fa-hourglass-half"></i> {% trans "Invoice auto-issues on completion" %}
-              </span>
-              {% endif %}
-            {% endif %}
-            <a href="{% url 'accounts:detail' order.current_account.pk %}"
-               class="od-link" style="font-size: 11.5px;">
-              {% trans "Open account" %} <i class="fa fa-external-link-alt"></i>
-            </a>
-          </div>
+          <a href="{% url 'accounts:detail' order.current_account.pk %}"
+             class="od-link" style="margin-top:0; font-size:11.5px; white-space:nowrap;">
+            {% trans "Open account" %} <i class="fa fa-external-link-alt"></i>
+          </a>
         </div>
 
         <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#F8FAFC; border:1px solid #E2E8EE; border-radius:10px; margin-top:8px;">
@@ -1701,8 +1746,8 @@
           </div>
           <div style="display:flex; flex-direction:column; gap:6px;">
             {% for mv in current_account_recent_movements %}
-            <div {% if mv.source_id == order.pk and mv.movement_type == 'order_sale' %}id="od-current-account-order-mv"{% endif %}
-                 style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#FFF; border:1px solid #EEF1F5; border-radius:8px; font-size:12px;">
+            <a href="{% url 'accounts:movement_detail' order.current_account.pk mv.pk %}"
+               class="od-mv-row" {% if mv.source_id == order.pk and mv.movement_type == 'order_sale' %}id="od-current-account-order-mv"{% endif %}>
               <div style="min-width:0; flex:1;">
                 <div style="font-weight:600; color:#0F1419;">{{ mv.get_movement_type_display }}</div>
                 <div style="color:var(--gray-500); font-size:10.5px; margin-top:1px;">
@@ -1712,62 +1757,9 @@
               <div data-current-account-mv-amount style="font-weight:700; font-variant-numeric:tabular-nums; color:{% if mv.amount >= 0 %}#B45309{% else %}#147F74{% endif %}; flex-shrink:0; margin-left:8px;">
                 {% if mv.amount >= 0 %}+{% endif %}{{ mv.currency.symbol }}{{ mv.amount|floatformat:2 }}
               </div>
-            </div>
+            </a>
             {% endfor %}
           </div>
-        </div>
-        {% endif %}
-      </section>
-      {% endif %}
-
-      {% if order_invoices %}
-      <!-- LINKED INVOICES — invoices generated from this order -->
-      <section class="od-card">
-        <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
-          <h3>{% trans "Invoices" %}</h3>
-          <span style="font:600 11px var(--font-sans); color:var(--gray-500); letter-spacing:.04em; text-transform:uppercase;">
-            {{ order_invoices|length }} {% trans "linked" %}
-          </span>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-          {% for inv in order_invoices %}
-          <a href="{% url 'accounts:invoice_detail' inv.pk %}"
-             style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:#FFF; border:1px solid #E2E8EE; border-radius:9px; text-decoration:none; transition:border-color 140ms;"
-             onmouseover="this.style.borderColor='var(--nejum-teal-300,#66B5B5)'"
-             onmouseout="this.style.borderColor='#E2E8EE'">
-            <div style="min-width:0; flex:1;">
-              <div style="font:600 12px var(--font-mono); color:var(--nejum-teal-700, #005354);">
-                {{ inv.display_number }}
-              </div>
-              <div style="font:500 11px var(--font-sans); color:var(--gray-500); margin-top:2px;">
-                {{ inv.date|date:"d.m.Y" }} · {{ inv.get_type_display }}
-              </div>
-            </div>
-            <span style="flex-shrink:0; padding:2px 8px; border-radius:999px; font:700 10px var(--font-sans); letter-spacing:.06em; text-transform:uppercase;
-              {% if inv.status == 'paid' %}background:#DCFCE7;color:#166534;
-              {% elif inv.status == 'partially_paid' %}background:#FED7AA;color:#9A3412;
-              {% elif inv.status == 'issued' %}background:#DBEAFE;color:#1E40AF;
-              {% elif inv.status == 'draft' %}background:#FEF3C7;color:#92400E;
-              {% elif inv.status == 'overdue' %}background:#FECACA;color:#991B1B;
-              {% elif inv.status == 'cancelled' %}background:#FEE2E2;color:#991B1B;{% endif %}">
-              {{ inv.get_status_display }}
-            </span>
-            <div style="flex-shrink:0; text-align:right;">
-              <div style="font:700 13px var(--font-sans); color:#0F1419; font-variant-numeric:tabular-nums;">
-                {{ inv.currency.symbol }}{{ inv.total|floatformat:2 }}
-              </div>
-              <div style="font:500 10.5px var(--font-sans); color:var(--gray-500); margin-top:1px;">
-                {% trans "Balance" %}: {{ inv.currency.symbol }}{{ inv.balance|floatformat:2 }}
-              </div>
-            </div>
-            <i class="fa fa-chevron-right" style="color:var(--gray-400); font-size:11px;"></i>
-          </a>
-          {% endfor %}
-        </div>
-        {% if has_active_invoice %}
-        <div style="margin-top:10px; padding:8px 10px; background:#F0FDF4; border:1px dashed #BBF7D0; border-radius:7px; font:500 11.5px var(--font-sans); color:#166534;">
-          <i class="fa fa-info-circle"></i>
-          {% trans "An active invoice already exists. Cancel or delete it before creating a new one." %}
         </div>
         {% endif %}
       </section>
@@ -1848,6 +1840,45 @@
   </div>
 </div>
 
+{% if not shipped and not is_terminal and not is_sales_rep %}
+<!-- CANCEL-ORDER CONFIRM — cancelling is terminal, so the dialog spells
+     out what happens and won't submit without a reason (logged to the
+     order's change history). -->
+<div class="odc-overlay" id="odCancelModal" aria-hidden="true">
+  <div class="odc-shell" role="dialog" aria-modal="true" aria-labelledby="odxTitle">
+    <div class="odc-head">
+      <div class="odc-ic danger"><i class="fa fa-ban"></i></div>
+      <div style="min-width:0;">
+        <h3 id="odxTitle">{% trans "Cancel this order?" %}</h3>
+        <p class="odc-sub">{% trans "The order stays on record with its lines crossed out." %}</p>
+      </div>
+      <button type="button" class="odc-x" id="odxClose" aria-label="{% trans 'Close' %}"><i class="fa fa-xmark"></i></button>
+    </div>
+    <div class="odc-warn danger"><i class="fa fa-triangle-exclamation"></i><span>{% trans "This can't be undone. A cancelled order can never be re-opened." %}</span></div>
+    <div class="odc-body">
+      <div class="odc-lbl">{% trans "What happens" %}</div>
+      <ul class="odx-list">
+        {% if reservation_count %}<li>{% blocktrans count counter=reservation_count %}{{ counter }} reserved roll is released{% plural %}{{ counter }} reserved rolls are released{% endblocktrans %}</li>{% endif %}
+        {% if order.current_account_id %}<li>{% trans "The sale is removed from the customer's account" %}</li>{% endif %}
+        {% if order.notify_customer %}<li>{% trans "The customer is emailed that the order was cancelled" %}</li>{% endif %}
+        <li>{% trans "The order can no longer be edited or packed" %}</li>
+      </ul>
+      <label class="odc-lbl" for="odxReason">{% trans "Reason (required)" %}</label>
+      <textarea id="odxReason" class="odx-reason" maxlength="500"
+                placeholder="{% trans 'e.g. Customer changed their mind' %}"></textarea>
+    </div>
+    <div class="odc-foot">
+      <div class="odc-actions">
+        <button type="button" class="ord-btn ghost" id="odxBack">{% trans "Keep the order" %}</button>
+        <button type="button" class="ord-btn danger-solid" id="odxOk" disabled>
+          <i class="fa fa-ban"></i> {% trans "Cancel order" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Sticky save bar — slides in from bottom only when there are
      unsaved changes to the inline-editable fields. -->
 <div id="od-savebar" class="od-savebar" aria-hidden="true">
@@ -1866,26 +1897,6 @@
 </div>
 
 <script>
-  // Save the custom top-left PDF header (blank clears → falls back to brand).
-  function saveOrderPrintHeader(btn) {
-    var input = document.getElementById('ophInput');
-    if (!input) return;
-    var orig = btn.innerHTML;
-    btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
-    var fd = new FormData();
-    fd.append('print_header', (input.value || '').trim());
-    fetch("{% url 'operating:order_print_header' order.pk %}", {
-      method: 'POST', body: fd, credentials: 'same-origin',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' }
-    }).then(function (r) { return r.json(); }).then(function (d) {
-      btn.disabled = false;
-      if (d && d.success) {
-        btn.innerHTML = '<i class="fa fa-check" style="color:#16A34A;"></i>';
-        setTimeout(function () { btn.innerHTML = orig; }, 1300);
-      } else { btn.innerHTML = orig; alert((d && d.error) || 'Error'); }
-    }).catch(function () { btn.disabled = false; btn.innerHTML = orig; alert('Network error'); });
-  }
-
   // Status picker: each stage button + the legacy mini buttons update
   // the hidden input and submit. The carrier/tracking inputs ride
   // along since they're part of the same form.
@@ -2067,6 +2078,54 @@
         submitStatus(s);
       });
     });
+
+    // "Cancel order" — terminal, so a dialog lists the consequences and
+    // the submit stays disabled until a reason is typed. The reason rides
+    // along as cancel_reason; the server refuses a cancel without one.
+    const cancelOrderBtn = document.getElementById('od-cancel-order-btn');
+    const odxModal = document.getElementById('odCancelModal');
+    if (cancelOrderBtn && odxModal) {
+      const reasonEl = document.getElementById('odxReason');
+      const okBtn = document.getElementById('odxOk');
+      let lastFocus = null;
+      function closeCancel() {
+        odxModal.classList.remove('show');
+        odxModal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', onCancelKey);
+        if (lastFocus && lastFocus.focus) lastFocus.focus();
+      }
+      function onCancelKey(e) { if (e.key === 'Escape') closeCancel(); }
+      cancelOrderBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        lastFocus = document.activeElement;
+        odxModal.classList.add('show');
+        odxModal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        document.addEventListener('keydown', onCancelKey);
+        setTimeout(() => reasonEl.focus(), 0);
+      });
+      reasonEl.addEventListener('input', function () {
+        okBtn.disabled = !reasonEl.value.trim();
+      });
+      document.getElementById('odxBack').addEventListener('click', closeCancel);
+      document.getElementById('odxClose').addEventListener('click', closeCancel);
+      odxModal.addEventListener('mousedown', function (e) { if (e.target === odxModal) closeCancel(); });
+      okBtn.addEventListener('click', function () {
+        const reason = reasonEl.value.trim();
+        if (!reason) return;
+        okBtn.disabled = true;
+        let inp = document.getElementById('od-cancel-reason-input');
+        if (!inp) {
+          inp = document.createElement('input');
+          inp.type = 'hidden'; inp.name = 'cancel_reason'; inp.id = 'od-cancel-reason-input';
+          statusForm.appendChild(inp);
+        }
+        inp.value = reason;
+        statusInput.value = 'cancelled';
+        statusForm.submit();
+      });
+    }
 
     // "Geri Aç & Düzelt" — take a completed order back to Paketleniyor:
     // stock returns to the exact rolls, the retail auto-collection is

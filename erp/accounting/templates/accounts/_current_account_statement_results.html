@@ -52,7 +52,7 @@
       {% for r in rows %}
         {% with link_url='' pay=r.linked_payment inv=r.linked_invoice %}
           {% if pay %}{% url 'accounts:payment_detail' pay.pk as link_url %}
-          {% elif inv %}{% url 'accounts:invoice_detail' inv.pk as link_url %}
+          {% elif inv %}{% url 'accounts:purchase_order_detail' inv.pk as link_url %}
           {% endif %}
       <tr {% if link_url %}class="mv-link" data-href="{{ link_url }}" style="cursor:pointer;"{% endif %}>
         <td><span class="st-date">{{ r.mv.date|date:"d.m.Y" }}</span></td>
@@ -80,12 +80,9 @@
               <span class="mv-st mv-st-{{ pay.status }}">{{ pay.get_status_display }}</span>
             {% endif %}
           {% elif inv %}
-            <a href="{% url 'accounts:invoice_detail' inv.pk %}"
+            <a href="{% url 'accounts:purchase_order_detail' inv.pk %}"
                class="mv-ref"
                onclick="event.stopPropagation();">{{ inv.display_number }}</a>
-            {% if r.is_cancel_row or inv.status != 'cancelled' %}
-              <span class="mv-st mv-st-{{ inv.status }}">{{ inv.get_status_display }}</span>
-            {% endif %}
           {% else %}
             <span class="st-ref">{{ r.mv.reference|default:"—" }}</span>
           {% endif %}

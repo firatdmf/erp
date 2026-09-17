@@ -1,21 +1,16 @@
-"""Excel (.xlsx) export of an Invoice — bordered, document-style sheet that
-mirrors the printable invoice and carries the full record: issuer, consignee,
-line items and totals. VAT / discount columns and total lines appear ONLY
-when the invoice actually uses them.
+"""Excel (.xlsx) export of an invoice document (accounting/invoice_doc.py) —
+a bordered, document-style sheet that mirrors the printed invoice: issuer,
+customer or supplier, lines and total.
 """
 from io import BytesIO
 
-from django.conf import settings
-from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
 
 from erp.xlsx_utils import (
     cell, merge, merge_border, section, kv_full, kv_pair,
     GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP, TEXT,
-    F_TITLE, F_SUB, F_DOCNO, F_HEAD, F_VAL, F_VALB, F_TOTAL,
+    F_TITLE, F_DOCNO, F_HEAD, F_VAL, F_VALB, F_TOTAL,
 )
-from .models import Invoice
 
 
 def _dec(v):
@@ -32,51 +27,20 @@ def _date(v):
         return "—"
 
 
-def build_invoice_workbook(invoice):
+def build_invoice_workbook(doc):
+    """`doc` is an invoice_doc.InvoiceDoc — the same object the printed
+    page renders, so the two can never state different figures."""
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
 
-    current_account = invoice.current_account
-    ccode = invoice.currency.code if (invoice.currency_id and invoice.currency) else ""
+    ccode = doc.currency_code
     money = (f'#,##0.00" {ccode}"' if ccode else "#,##0.00")
+    iss, party = doc.issuer, doc.party
+    lines = doc.lines
 
-    def s(name):
-        return getattr(settings, name, "") or ""
-
-    # Issuer = per-invoice snapshot, else the book's brand name, else
-    # brand defaults — resolved on the model so this and the printed
-    # invoice can never name two different senders.
-    iname = invoice.issuer_display_name
-    iaddr = invoice.issuer_address or s("BRAND_ADDRESS")
-    iphone = invoice.issuer_phone or s("BRAND_PHONE")
-    ifax = invoice.issuer_fax or s("BRAND_FAX")
-    iemail = invoice.issuer_email or s("BRAND_EMAIL")
-    itax_office = invoice.issuer_tax_office or s("BRAND_TAX_OFFICE")
-    itax_no = invoice.issuer_tax_number or s("BRAND_TAX_NUMBER")
-
-    # Consignee = per-invoice snapshot, else current account master.
-    def cv(attr):
-        return getattr(current_account, attr, "") if current_account else ""
-    bname = invoice.bill_to_name or (current_account.name if current_account else "—")
-    baddr = invoice.bill_to_address or cv("billing_address")
-    bcity = invoice.bill_to_city or cv("billing_city")
-    bcountry = invoice.bill_to_country or cv("billing_country")
-    bphone = invoice.bill_to_phone or cv("phone")
-    bemail = invoice.bill_to_email or cv("email")
-    btax_office = invoice.bill_to_tax_office or cv("tax_office")
-    btax_no = invoice.bill_to_tax_number or cv("tax_number")
-
-    # Item columns adapt: VAT / Disc only shown when at least one line uses them.
-    items = list(invoice.items.all().select_related("product", "variant"))
-    has_disc = any((it.discount_rate or 0) for it in items)
-    has_vat = any((it.tax_rate or 0) for it in items)
-    icols = [("Description", 34, "desc"), ("SKU", 18, "sku"),
-             ("Qty", 10, "qty"), ("Unit Price", 14, "unit")]
-    if has_disc:
-        icols.append(("Disc %", 9, "disc"))
-    if has_vat:
-        icols.append(("VAT %", 9, "vat"))
-    icols.append(("Line Total", 16, "total"))
+    icols = [("Description", 40, "desc"), ("SKU", 18, "sku"),
+             ("Qty", 12, "qty"), ("Unit", 7, "unit"),
+             ("Unit Price", 14, "price"), ("Line Total", 16, "total")]
     NCOLS = len(icols)
     mid = (NCOLS + 1) // 2
 
@@ -87,126 +51,81 @@ def build_invoice_workbook(invoice):
     for i, (h, w, k) in enumerate(icols, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
-    title = "PROFORMA INVOICE" if invoice.type == "proforma" else "INVOICE"
+    title = "PURCHASE INVOICE" if doc.kind == "purchase" else "INVOICE"
 
     # ── Header ──
     r = 1
-    cell(ws, r, 1, iname.upper(), font=F_TITLE); merge(ws, r, 1, mid)
+    cell(ws, r, 1, (iss.name or "").upper(), font=F_TITLE); merge(ws, r, 1, mid)
     cell(ws, r, mid + 1, title, font=F_DOCNO, align=RIGHT); merge(ws, r, mid + 1, NCOLS)
     r += 1
-    cell(ws, r, 1, "Tax Invoice", font=F_SUB); merge(ws, r, 1, mid)
-    cell(ws, r, mid + 1, f"No: {invoice.number or '—'}", font=F_VALB, align=RIGHT); merge(ws, r, mid + 1, NCOLS)
+    cell(ws, r, mid + 1, f"No: {doc.number or '—'}", font=F_VALB, align=RIGHT); merge(ws, r, mid + 1, NCOLS)
     for c in range(1, NCOLS + 1):
         ws.cell(r, c).border = RULE
     r += 2
 
     # ── Invoice details ──
     r = section(ws, r, "INVOICE DETAILS", NCOLS)
-    r = kv_pair(ws, r, "Invoice No", invoice.number or "—", "Series", invoice.series or "—", NCOLS)
-    r = kv_pair(ws, r, "Type", invoice.get_type_display(), "Status", invoice.get_status_display(), NCOLS)
-    r = kv_pair(ws, r, "Date", _date(invoice.date), "Due Date", _date(invoice.due_date), NCOLS)
-    r = kv_pair(ws, r, "Delivery Date", _date(invoice.delivery_date), "Currency", ccode or "—", NCOLS)
-    linked = ""
-    if invoice.order_id and invoice.order:
-        linked = invoice.order.order_number or f"#{invoice.order_id}"
-    r = kv_pair(ws, r, "Exchange Rate", str(invoice.exchange_rate), "Linked Order", linked or "—", NCOLS)
-    if invoice.earsiv_uuid or invoice.earsiv_status:
-        r = kv_pair(ws, r, "e-Arşiv UUID", invoice.earsiv_uuid or "—", "e-Arşiv Status", invoice.earsiv_status or "—", NCOLS)
+    r = kv_pair(ws, r, "Invoice No", doc.number or "—", "Date", _date(doc.date), NCOLS)
+    r = kv_pair(ws, r, "Currency", ccode or "—", "Lines", str(len(lines)), NCOLS)
     r += 1
 
-    # ── Issuer ──
-    r = section(ws, r, "ISSUER", NCOLS)
-    r = kv_full(ws, r, "Name", iname, NCOLS, bold_value=True)
-    if iaddr:
-        r = kv_full(ws, r, "Address", iaddr, NCOLS)
-    if iphone:
-        r = kv_full(ws, r, "Phone", iphone, NCOLS)
-    if ifax:
-        r = kv_full(ws, r, "Fax", ifax, NCOLS)
-    if iemail:
-        r = kv_full(ws, r, "Email", iemail, NCOLS)
-    if itax_office or itax_no:
-        r = kv_full(ws, r, "Tax Office / No", f"{itax_office}  ·  {itax_no}".strip(" ·"), NCOLS)
-    r += 1
+    def party_block(r, heading, p):
+        r = section(ws, r, heading, NCOLS)
+        r = kv_full(ws, r, "Name", p.name or "—", NCOLS, bold_value=True)
+        if p.address:
+            r = kv_full(ws, r, "Address", p.address, NCOLS)
+        loc = ", ".join([x for x in [p.city, p.country] if x])
+        if loc:
+            r = kv_full(ws, r, "City / Country", loc, NCOLS)
+        if p.phone:
+            r = kv_full(ws, r, "Phone", p.phone, NCOLS)
+        if p.fax:
+            r = kv_full(ws, r, "Fax", p.fax, NCOLS)
+        if p.email:
+            r = kv_full(ws, r, "Email", p.email, NCOLS)
+        if p.tax_office or p.tax_number:
+            r = kv_full(ws, r, "Tax Office / No",
+                        f"{p.tax_office}  ·  {p.tax_number}".strip(" ·"), NCOLS)
+        return r + 1
 
-    # ── Bill to ──
-    r = section(ws, r, "BILL TO", NCOLS)
-    r = kv_full(ws, r, "Name", bname, NCOLS, bold_value=True)
-    if baddr:
-        r = kv_full(ws, r, "Address", baddr, NCOLS)
-    loc = ", ".join([x for x in [bcity, bcountry] if x])
-    if loc:
-        r = kv_full(ws, r, "City / Country", loc, NCOLS)
-    if bphone:
-        r = kv_full(ws, r, "Phone", bphone, NCOLS)
-    if bemail:
-        r = kv_full(ws, r, "Email", bemail, NCOLS)
-    if btax_office or btax_no:
-        r = kv_full(ws, r, "Tax Office / No", f"{btax_office}  ·  {btax_no}".strip(" ·"), NCOLS)
-    r += 1
+    r = party_block(r, "ISSUER", iss)
+    r = party_block(r, "SUPPLIER" if doc.kind == "purchase" else "BILL TO", party)
 
     # ── Items ──
-    r = section(ws, r, f"ITEMS ({len(items)})", NCOLS)
+    r = section(ws, r, f"ITEMS ({len(lines)})", NCOLS)
     for i, (h, w, k) in enumerate(icols, 1):
         cell(ws, r, i, h, font=F_HEAD, fill=FILL_HEAD, border=GRID,
-             align=(LEFT if k in ("desc", "sku") else RIGHT))
+             align=(LEFT if k in ("desc", "sku", "unit") else RIGHT))
     r += 1
 
-    def _val(it, kind, sku):
-        if kind == "desc":
-            return (it.description or (str(it.product) if it.product else "—")), None, TOP
-        if kind == "sku":
-            return (sku or "—"), TEXT, LEFT
-        if kind == "qty":
-            return _dec(it.quantity), "#,##0.00", RIGHT
-        if kind == "unit":
-            return _dec(it.unit_price), money, RIGHT
-        if kind == "disc":
-            return _dec(it.discount_rate), '0.##"%"', RIGHT
-        if kind == "vat":
-            return _dec(it.tax_rate), '0.##"%"', RIGHT
-        return _dec(it.total), money, RIGHT  # total
-
-    for it in items:
-        if it.variant_id and it.variant:
-            sku = getattr(it.variant, "variant_sku", "") or ""
-        elif it.product_id and it.product:
-            sku = getattr(it.product, "sku", "") or ""
-        else:
-            sku = ""
+    for ln in lines:
+        vals = {
+            "desc": (ln.description or "—", None, TOP),
+            "sku": (ln.sku or "—", TEXT, LEFT),
+            "qty": (_dec(ln.quantity), "#,##0.00", RIGHT),
+            "unit": (ln.unit or "", TEXT, LEFT),
+            "price": (_dec(ln.unit_price), money, RIGHT),
+            "total": (_dec(ln.total), money, RIGHT),
+        }
         for i, (h, w, k) in enumerate(icols, 1):
-            v, fmt, al = _val(it, k, sku)
+            v, fmt, al = vals[k]
             cell(ws, r, i, v, font=F_VAL, border=GRID, align=al, fmt=fmt)
         r += 1
 
-    # ── Totals (only the lines that actually apply) ──
+    # ── Total ──
     r += 1
     lc1, lc2, vc = NCOLS - 2, NCOLS - 1, NCOLS
-    rows = []
-    if has_disc or has_vat:
-        rows.append(("Subtotal", invoice.subtotal, False))
-    if invoice.discount_amount:
-        rows.append(("Discount", invoice.discount_amount, False))
-    if invoice.tax_amount:
-        rows.append(("VAT", invoice.tax_amount, False))
-    if invoice.other_charges:
-        rows.append(("Other charges", invoice.other_charges, False))
-    rows.append(("TOTAL", invoice.total, True))
-    if invoice.paid_amount:
-        rows.append(("Paid", invoice.paid_amount, False))
-        rows.append(("Balance", invoice.balance, True))
-    for lbl, val, strong in rows:
-        cell(ws, r, lc1, lbl, font=(F_TOTAL if strong else F_VALB), border=GRID, align=RIGHT)
-        merge(ws, r, lc1, lc2)
-        merge_border(ws, r, lc1, lc2, GRID)
-        cell(ws, r, vc, _dec(val), font=(F_TOTAL if strong else F_VALB), border=GRID, align=RIGHT, fmt=money)
-        r += 1
+    cell(ws, r, lc1, "TOTAL", font=F_TOTAL, border=GRID, align=RIGHT)
+    merge(ws, r, lc1, lc2)
+    merge_border(ws, r, lc1, lc2, GRID)
+    cell(ws, r, vc, _dec(doc.total), font=F_TOTAL, border=GRID, align=RIGHT, fmt=money)
+    r += 1
 
     # ── Notes ──
-    if invoice.notes:
+    if doc.notes:
         r += 1
         r = section(ws, r, "NOTES", NCOLS)
-        cell(ws, r, 1, invoice.notes, font=F_VAL, border=GRID, align=TOP)
+        cell(ws, r, 1, doc.notes, font=F_VAL, border=GRID, align=TOP)
         merge(ws, r, 1, NCOLS)
         merge_border(ws, r, 1, NCOLS, GRID)
         ws.row_dimensions[r].height = 46
@@ -214,17 +133,14 @@ def build_invoice_workbook(invoice):
     return wb
 
 
-@login_required
-def invoice_excel(request, pk):
-    """Download the invoice as an .xlsx file."""
-    invoice = get_object_or_404(Invoice, pk=pk)
-    wb = build_invoice_workbook(invoice)
+def workbook_response(doc):
+    """The document as an .xlsx download."""
+    wb = build_invoice_workbook(doc)
     buf = BytesIO()
     wb.save(buf)
-    label = invoice.display_number if invoice.number else f"invoice-{invoice.pk}"
     resp = HttpResponse(
         buf.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    resp["Content-Disposition"] = f'attachment; filename="{label}.xlsx"'
+    resp["Content-Disposition"] = f'attachment; filename="{doc.filename}.xlsx"'
     return resp

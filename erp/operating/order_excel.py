@@ -207,7 +207,7 @@ def build_order_workbook(order):
     # name — same precedence as order_print.html, so the two documents
     # for one order sign with the same name.
     from accounting.services_accounts import brand_name_for
-    brand = (order.print_header or "").strip() or brand_name_for()
+    brand = brand_name_for()
     ccode = (order.original_currency or order.paid_currency or "USD")
     # The same currency FORMAT the combined sheet uses — "$2.45", the
     # sign worn by the number. This carried the ISO code as a suffix
@@ -407,7 +407,7 @@ def build_combined_workbook(orders):
     from .views import build_order_print_rows
 
     primary = orders[-1]
-    brand = (primary.print_header or "").strip() or brand_name_for()
+    brand = brand_name_for()
     ccode = (primary.original_currency or primary.paid_currency or "USD")
     # A currency FORMAT, not a currency written into the cell: the cell
     # holds 2.45 and shows $2.45, so it sums, charts and multiplies like

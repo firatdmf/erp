@@ -92,6 +92,13 @@
       <a class="po-back" href="{% url 'accounts:purchase_order_print' invoice.pk %}" target="_blank">
         <i class="fa fa-print"></i> {% trans "Print" %}
       </a>
+      {% comment %}The purchase laid out as an invoice — a printout, nothing stored.{% endcomment %}
+      <a class="po-back" href="{% url 'accounts:purchase_invoice' invoice.pk %}" target="_blank" rel="noopener">
+        <i class="fa fa-file-invoice"></i> {% trans "Get invoice" %}
+      </a>
+      <a class="po-back" href="{% url 'accounts:purchase_invoice_excel' invoice.pk %}">
+        <i class="fa fa-file-excel"></i> {% trans "Invoice Excel" %}
+      </a>
       {% if invoice.status != 'cancelled' %}
         {% if is_order or warehouse_id %}
           <a class="po-back" href="{% url 'accounts:goods_receipt_edit' invoice.pk %}">
@@ -141,10 +148,6 @@
       <div class="po-card-v"><a href="{% url 'operating:order_detail' invoice.for_order.pk %}">{{ invoice.for_order.order_number|default:invoice.for_order.pk }} · {{ invoice.for_order.get_client }}</a></div>
     </div>
     {% endif %}
-    <div class="po-card">
-      <div class="po-card-l">{% trans "Accounting record" %}</div>
-      <div class="po-card-v"><a href="{% url 'accounts:invoice_detail' invoice.pk %}">{% trans "View invoice" %} →</a></div>
-    </div>
   </div>
 
   {% if invoice.status != 'cancelled' and not warehouse_id %}
@@ -213,7 +216,7 @@
   // explicit "are you sure", since there is no undo short of cancelling the
   // whole purchase (which deletes the stock items it created).
   window.poConfirm = function (btn) {
-    if (!confirm("{% trans 'Receive this order into the warehouse? The stock and the supplier invoice are created now.' %}")) return;
+    if (!confirm("{% trans 'Receive this order into the warehouse? The stock is added and the supplier debt is posted now.' %}")) return;
     const orig = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';

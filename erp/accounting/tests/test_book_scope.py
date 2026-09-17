@@ -67,8 +67,7 @@ class BookScopedLedger(TestCase):
         self.assertEqual([b.pk for b in r.context["books"]], [self.ergene.pk])
 
     def test_reports_are_scoped_too(self):
-        for name in ("report_aging", "report_trial_balance",
-                     "report_credit_limit", "report_due_calendar"):
+        for name in ("report_trial_balance", "report_credit_limit"):
             with self.subTest(report=name):
                 ok = self.client.get(reverse(f"accounts:{name}",
                                              kwargs={"book_id": self.ergene.pk}))

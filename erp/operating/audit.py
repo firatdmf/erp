@@ -70,7 +70,7 @@ def _log(order, action, field=None, item_label=None, old=None, new=None):
 # Simple scalar fields: compared verbatim, logged one row per field.
 _TRACKED_FIELDS = (
     "order_status", "carrier", "tracking_number", "notes",
-    "print_header", "ettn",
+    "ettn",
     "guest_first_name", "guest_last_name", "guest_email", "guest_phone",
 )
 # Customer FKs: collapsed into ONE 'customer' change with resolved names.

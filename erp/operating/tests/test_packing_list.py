@@ -248,15 +248,6 @@ class BrandHeader(TestCase):
         # Not shouted: the old template ran BRAND_NAME through |upper.
         self.assertNotIn("KARVEN HOME COLLECTION", body)
 
-    def test_a_per_order_print_header_still_wins(self):
-        self.order.print_header = "Karven Contract Division"
-        self.order.save(update_fields=["print_header"])
-        body = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": self.order.pk})
-        ).content.decode()
-        self.assertIn("Karven Contract Division", body)
-        self.assertNotIn(self.LOCKUP, body)
-
     def test_the_order_excel_signs_the_same_way(self):
         import io
         import openpyxl

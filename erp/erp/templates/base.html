@@ -751,23 +751,6 @@
             </ul>
           </div>
           <div class="add-menu-section">
-            <h3>{% trans "Invoices" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'accounts:legacy_invoice_list' %}">
-                  <i class="fas fa-file-invoice" aria-hidden="true"></i>
-                  <span>{% trans "All Invoices" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'accounts:legacy_invoice_create' %}">
-                  <i class="fas fa-file-circle-plus" aria-hidden="true"></i>
-                  <span>{% trans "New Invoice" %}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
             <h3>{% trans "Collection / Payment" %}</h3>
             <ul>
               <li>
@@ -811,21 +794,9 @@
                 </a>
               </li>
               <li>
-                <a href="{% url 'accounts:legacy_report_aging' %}">
-                  <i class="fas fa-clock" aria-hidden="true"></i>
-                  <span>{% trans "Aging" %}</span>
-                </a>
-              </li>
-              <li>
                 <a href="{% url 'accounts:legacy_report_trial_balance' %}">
                   <i class="fas fa-table" aria-hidden="true"></i>
                   <span>{% trans "Trial Balance" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'accounts:legacy_report_due_calendar' %}">
-                  <i class="fas fa-calendar-days" aria-hidden="true"></i>
-                  <span>{% trans "Due Calendar" %}</span>
                 </a>
               </li>
               <li>

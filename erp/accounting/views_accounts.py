@@ -894,8 +894,12 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
         return (_("Collection / Payment"),
                 reverse("accounts:payment_edit", args=[linked_payment.pk]), False)
     if linked_invoice is not None:
-        return (_("Invoice"),
-                reverse("accounts:invoice_edit", args=[linked_invoice.pk]), False)
+        # A purchase posts its supplier debt through its purchase record
+        # (stored as an Invoice), so the row is corrected on the purchase.
+        if linked_invoice.type == "purchase":
+            return (_("Purchase"),
+                    reverse("accounts:purchase_order_detail", args=[linked_invoice.pk]), False)
+        return (_("Linked document"), None, False)
     if mv.source_id and mv.source_type_id:
         model = mv.source_type.model_class()
         if model is not None and model.__name__ == "Order":
@@ -1131,8 +1135,6 @@ class CurrentAccountDetail(View):
         ][:20]
         _attach_links(movements_with_balance)
 
-        recent_invoices = current_account.invoices.select_related("currency").order_by("-date", "-id")[:10]
-
         # Orders attached to this current account — newest first. Items prefetched
         # so gross_profit() can run cheaply in the template if needed.
         recent_orders = (
@@ -1147,7 +1149,6 @@ class CurrentAccountDetail(View):
             "own_balance_label": (current_account.label_for(own_balance)
                                   if own_balance is not None else ""),
             "movements": movements_with_balance,
-            "recent_invoices": recent_invoices,
             "recent_orders": recent_orders,
             "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
@@ -1169,14 +1170,14 @@ class CurrentAccountDetail(View):
 def _cancelled_documents(current_account, date_from="", date_to=""):
     """This account's cancelled documents, for the statement's cancelled view.
 
-    That view filters movements on is_void, and a cancelled INVOICE leaves
+    That view filters movements on is_void, and a cancelled PURCHASE leaves
     such rows behind. A cancelled PAYMENT does not: Payment.cancel deletes
     the movement outright rather than voiding it, deliberately, so the
     account's history is not padded with a dead line for every correction —
     the record lives on the Payment, which keeps its number and status.
 
     Which left the page half-answering its own question. Asking for what
-    was cancelled returned the invoices and silently omitted the payments,
+    was cancelled returned the purchases and silently omitted the payments,
     with nothing to say the rest existed. The documents are listed here
     beside the rows, so the answer is complete without either of those
     cancellation policies having to change.
@@ -1191,13 +1192,16 @@ def _cancelled_documents(current_account, date_from="", date_to=""):
         return qs
 
     docs = []
+    # Purchases are stored as Invoice rows; invoices proper are printouts
+    # and are never cancelled.
     for inv in _window(
-        current_account.invoices.filter(status="cancelled").select_related("currency"), "date"
+        current_account.invoices.filter(status="cancelled", type="purchase")
+        .select_related("currency"), "date"
     ):
         docs.append({
-            "kind": _("Invoice"), "label": inv.display_number, "date": inv.date,
+            "kind": _("Purchase"), "label": inv.display_number, "date": inv.date,
             "amount": inv.total, "currency": inv.currency,
-            "url": _reverse("accounts:invoice_detail", args=[inv.pk]),
+            "url": _reverse("accounts:purchase_order_detail", args=[inv.pk]),
         })
     for pay in _window(
         current_account.payments.filter(status="cancelled").select_related("currency"), "date"

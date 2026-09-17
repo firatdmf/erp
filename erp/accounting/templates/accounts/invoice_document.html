@@ -1,0 +1,531 @@
+{% load i18n %}{% load humanize %}{% load accounts_tags %}{% comment %}
+  The invoice of a sales order or a purchase — a printout built live from
+  that record (accounting/invoice_doc.py). There is nothing to issue, edit
+  or cancel here: change the order or the purchase and this follows. It is
+  print only, like the order's printout: a bare page that opens the print
+  dialog, in the language the app is in.
+{% endcomment %}<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% trans "Invoice" %} {{ doc.number }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+    --rule: #111827;
+    --hair: #D1D5DB;
+  }
+  .iv { max-width: 1100px; margin: 0 auto; padding: 22px 28px 80px; font: 400 13px var(--font-sans); color: var(--ink); }
+  .iv, .iv * { box-sizing: border-box; }
+
+  body { margin: 0; background: white; }
+
+  /* DOCUMENT — formal Karven-style proforma sheet */
+  .doc {
+    background: white;
+    border: 1px solid var(--hair);
+    padding: 26px 32px 36px;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+
+  /* ── Issuer header: brand info ↔ logo ──────────────────── */
+  .doc-issuer-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: 24px;
+    padding-bottom: 12px;
+  }
+  .doc-issuer .name {
+    font: 700 13px var(--font-sans);
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    margin-bottom: 2px;
+  }
+  .doc-issuer .line { font: 500 11px var(--font-sans); color: var(--gray-700); margin-top: 1px; }
+  .doc-issuer .line b { color: var(--ink); font-weight: 700; }
+
+  .doc-logo {
+    width: 110px; height: 110px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--hair);
+    border-radius: 50%;
+    color: var(--gray-400);
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.12em;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .doc-logo img { max-width: 100%; max-height: 100%; border-radius: 50%; }
+
+  /* Title band — outlined banner, B&W like the Karven proforma. */
+  .doc-titlebar {
+    background: white;
+    color: var(--ink);
+    text-align: center;
+    padding: 8px 12px;
+    border: 1.5px solid var(--ink);
+    font: 800 15px var(--font-sans);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 8px 0 6px;
+  }
+
+  /* ── Consignee + invoice meta — TWO separate framed boxes with a
+     gap between them, matching the Karven proforma layout. ──── */
+  .doc-consign {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 16px;
+    margin: 14px 0 18px;
+  }
+  .doc-consign-l, .doc-consign-r {
+    border: 1px solid var(--ink);
+    padding: 0;
+    align-self: start;
+  }
+  .doc-consign .hdr {
+    padding: 5px 10px;
+    font: 700 11px var(--font-sans);
+    color: var(--ink);
+    border-bottom: 1px solid var(--ink);
+    background: white;
+  }
+  .doc-consign .body { padding: 8px 10px 10px; }
+  .doc-consign .name {
+    font: 700 12.5px var(--font-sans);
+    color: var(--ink);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+  }
+  .doc-consign .name a { color: inherit; text-decoration: none; }
+  .doc-consign .line {
+    font: 500 11px var(--font-sans);
+    color: var(--ink);
+    margin-top: 1px;
+  }
+
+  /* Invoice meta — narrow key/value box on the right. No header band,
+     just the rows. */
+  .doc-meta { width: 100%; border-collapse: collapse; }
+  .doc-meta tr { border-bottom: 1px solid var(--ink); }
+  .doc-meta tr:last-child { border-bottom: none; }
+  .doc-meta th, .doc-meta td {
+    padding: 5px 10px;
+    font: 600 11px var(--font-sans);
+    color: var(--ink);
+    text-align: left;
+    vertical-align: middle;
+  }
+  .doc-meta th {
+    background: white;
+    border-right: 1px solid var(--ink);
+    font: 700 10.5px var(--font-sans);
+    color: var(--ink);
+    width: 50%;
+  }
+  .doc-meta td { font-variant-numeric: tabular-nums; }
+
+  /* ── Items table — Karven proforma look (black grid, white bg) ── */
+  table.doc-items {
+    width: 100%;
+    border-collapse: collapse;
+    font: 400 10.5px var(--font-sans);
+    border: 1.2px solid var(--ink);
+    background: white;
+  }
+  table.doc-items thead th {
+    background: white;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    padding: 7px 6px;
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.02em;
+    text-align: center;
+    vertical-align: middle;
+    line-height: 1.25;
+  }
+  table.doc-items thead th .sub {
+    display: block;
+    font: 600 9px var(--font-sans);
+    margin-top: 1px;
+    color: var(--ink);
+  }
+  table.doc-items tbody td {
+    padding: 8px 6px;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    vertical-align: middle;
+    line-height: 1.4;
+    background: white;
+  }
+  table.doc-items tbody td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  table.doc-items tbody td.center { text-align: center; }
+  table.doc-items .row-no { font: 700 10.5px var(--font-sans); color: var(--ink); text-align: center; }
+  table.doc-items .design-id { font: 700 10.5px var(--font-mono); color: var(--ink); text-align: center; }
+  .roll-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .roll-chips .rc-lbl { font: 700 8.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-600, #4B5563); width: 100%; margin-bottom: 1px; }
+  .roll-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border: 1px solid var(--ink); border-radius: 4px; font: 500 9px var(--font-sans); }
+  .roll-chip code { font: 700 9px var(--font-mono); }
+  table.doc-items .desc-multi { white-space: pre-line; }
+
+  /* Amount-to-be-Paid lives as a tfoot row spanning the leading
+     columns, with the total in the last cell. Single solid frame. */
+  table.doc-items tfoot td {
+    border: 1px solid var(--ink);
+    padding: 9px 8px;
+    background: white;
+    font: 700 11px var(--font-sans);
+    color: var(--ink);
+  }
+  table.doc-items tfoot td.label {
+    text-align: right;
+    letter-spacing: 0.04em;
+  }
+  table.doc-items tfoot td.value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+  }
+
+  /* ── Totals + tax breakdown ───────────────────────────── */
+  .doc-bottom {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+    align-items: start;
+    margin-top: 6px;
+  }
+  /* Tax breakdown (left) */
+  .doc-tax {
+    border: 1px solid var(--hair);
+  }
+  .doc-tax-h {
+    background: #F4F7FB;
+    border-bottom: 1px solid var(--hair);
+    padding: 8px 12px;
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--gray-700);
+  }
+  .doc-tax table { width: 100%; border-collapse: collapse; }
+  .doc-tax th, .doc-tax td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--hair);
+    font: 500 12px var(--font-sans);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .doc-tax th { color: var(--gray-500); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .doc-tax tr:last-child td, .doc-tax tr:last-child th { border-bottom: none; }
+  .doc-tax th:first-child, .doc-tax td:first-child { text-align: left; }
+
+  /* Totals (right) */
+  .doc-totals {
+    border: 1px solid var(--rule);
+  }
+  .doc-totals .row {
+    display: flex; justify-content: space-between;
+    padding: 8px 14px;
+    font: 500 13px var(--font-sans);
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--hair);
+    font-variant-numeric: tabular-nums;
+  }
+  .doc-totals .row .val { color: var(--ink); font-weight: 700; }
+  .doc-totals .row.grand {
+    padding: 12px 14px;
+    background: var(--ink); color: white;
+    font: 800 16px var(--font-sans);
+    border-top: 1px solid var(--rule);
+    border-bottom: none;
+    letter-spacing: -0.01em;
+  }
+  .doc-totals .row.grand .val { color: white; font-weight: 800; font-size: 18px; }
+
+  /* Notes */
+  .doc-notes {
+    margin-top: 22px;
+    border-top: 1px dashed var(--hair);
+    padding-top: 14px;
+  }
+  .doc-notes-h {
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--gray-500);
+    margin-bottom: 6px;
+  }
+  .doc-notes-body {
+    color: var(--gray-700);
+    font: 500 12.5px var(--font-sans);
+    white-space: pre-wrap;
+    line-height: 1.6;
+  }
+
+  /* Signatures */
+  .doc-sig {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    margin-top: 60px;
+    padding-top: 18px;
+  }
+  .doc-sig .box {
+    border-top: 1px solid var(--ink);
+    padding-top: 6px;
+    text-align: center;
+    font: 600 10.5px var(--font-sans);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--gray-700);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .doc { padding: 22px 18px; }
+    .doc-top, .doc-parties, .doc-bottom { grid-template-columns: 1fr; }
+    .doc-invblock { text-align: left; }
+    .doc-sig { grid-template-columns: 1fr; gap: 40px; }
+  }
+
+  /* ── Print — strip everything that isn't the document. */
+  @media print {
+    /* Force background colours + borders to render in print.
+       Chrome / Edge drop background-color and weaken borders by
+       default ("Background graphics" unchecked); this brings them
+       back so the teal header / footer + grid lines look identical
+       to the on-screen version. */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    body { background: white !important; padding: 0 !important; margin: 0 !important; }
+    .iv { padding: 0 !important; max-width: none !important; margin: 0 !important; }
+    .doc { border: none; padding: 12mm 10mm; box-shadow: none; }
+    @page { size: A4 portrait; margin: 0; }
+
+    /* Black-and-white print mode — strip every colour so the PDF
+       prints crisp on any printer, no teal banner or grey shading. */
+    .doc, .doc * {
+      color: #000 !important;
+      background: white !important;
+      box-shadow: none !important;
+    }
+    .doc a { color: #000 !important; text-decoration: none !important; }
+    /* Items table — solid black grid */
+    table.doc-items {
+      border: 2px solid #000 !important;
+    }
+    table.doc-items thead th {
+      background: white !important;
+      color: #000 !important;
+      border: 1px solid #000 !important;
+      border-bottom: 2px solid #000 !important;
+      font-weight: 700 !important;
+    }
+    table.doc-items tbody td {
+      border: 1px solid #000 !important;
+      background: white !important;
+    }
+    table.doc-items tbody tr:nth-child(even) td { background: white !important; }
+    /* Amount-to-be-paid lives inside tfoot — same solid black grid. */
+    table.doc-items tfoot td {
+      border: 1px solid #000 !important;
+      background: white !important;
+      color: #000 !important;
+      font-weight: 700 !important;
+    }
+    table.doc-items tfoot td.value { font-weight: 800 !important; }
+    /* Title bar — outlined heading instead of dark band */
+    .doc-titlebar {
+      background: white !important;
+      color: #000 !important;
+      border: 2px solid #000 !important;
+      border-bottom: none !important;
+      font-weight: 800 !important;
+    }
+    /* Consignee + meta — flat black borders */
+    .doc-consign {
+      border: 1.5px solid #000 !important;
+    }
+    .doc-consign .hdr {
+      background: white !important;
+      color: #000 !important;
+      border-bottom: 1px solid #000 !important;
+      font-weight: 700 !important;
+    }
+    .doc-consign-l { border-right: 1.5px solid #000 !important; }
+    .doc-meta th {
+      background: white !important;
+      color: #000 !important;
+      border-right: 1px solid #000 !important;
+      border-bottom: 1px solid #000 !important;
+      font-weight: 700 !important;
+    }
+    .doc-meta td {
+      border-bottom: 1px solid #000 !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="iv">
+
+  <!-- ============== INVOICE DOCUMENT (Karven-style) ============== -->
+  <div class="doc">
+
+    {% with iss=doc.issuer %}
+    <div class="doc-issuer-row">
+      <div class="doc-issuer">
+        <div class="name">{{ iss.name|default:"Nejum ERP" }}</div>
+        {% if iss.address %}<div class="line">{{ iss.address }}</div>{% else %}<div class="line">—</div>{% endif %}
+        {% if iss.phone %}<div class="line">P: {{ iss.phone }}</div>{% endif %}
+        {% if iss.fax %}<div class="line">F: {{ iss.fax }}</div>{% endif %}
+        {% if iss.email %}<div class="line">M: {{ iss.email }}</div>{% endif %}
+        {% if iss.tax_office or iss.tax_number %}
+          <div class="line">
+            {% if iss.tax_office %}<b>{% trans "Tax Office" %}:</b> {{ iss.tax_office }}{% endif %}
+            {% if iss.tax_number %}{% if iss.tax_office %} · {% endif %}<b>{% trans "Tax No" %}:</b> {{ iss.tax_number }}{% endif %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="doc-logo">
+        {% if BRAND_LOGO_URL %}
+          <img src="{{ BRAND_LOGO_URL }}" alt="{{ BRAND_NAME }}">
+        {% else %}
+          {{ iss.name|default:"NEJUM" }}
+        {% endif %}
+      </div>
+    </div>
+    {% endwith %}
+
+    <div class="doc-titlebar">
+      {% if doc.kind == "purchase" %}{% trans "PURCHASE INVOICE" %}{% else %}{% trans "INVOICE" %}{% endif %}
+    </div>
+
+    {% with p=doc.party %}
+    <div class="doc-consign">
+      <div class="doc-consign-l">
+        <div class="hdr">{% if doc.kind == "purchase" %}{% trans "Supplier" %}{% else %}{% trans "Consignee" %}{% endif %}</div>
+        <div class="body">
+          <div class="name">
+            {% if p.account_id %}<a href="{% url 'accounts:detail' p.account_id %}">{{ p.name }}</a>{% else %}{{ p.name|default:"—" }}{% endif %}
+          </div>
+          {% if p.address %}<div class="line" style="white-space:pre-wrap;">{{ p.address }}</div>{% endif %}
+          {% if p.city or p.country %}
+            <div class="line">{{ p.city }}{% if p.city and p.country %}, {% endif %}{{ p.country }}</div>
+          {% endif %}
+          {% if p.phone %}<div class="line">{% trans "Phone" %}: {{ p.phone }}</div>{% endif %}
+          {% if p.email %}<div class="line">{% trans "Email" %}: {{ p.email }}</div>{% endif %}
+          {% if p.tax_office or p.tax_number %}
+            <div class="line" style="margin-top:6px;">
+              {% if p.tax_office %}<b>{% trans "Tax Office" %}:</b> {{ p.tax_office }}{% endif %}
+              {% if p.tax_number %}{% if p.tax_office %} · {% endif %}<b>{% trans "Tax No" %}:</b> {{ p.tax_number }}{% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="doc-consign-r">
+        <table class="doc-meta">
+          <tr>
+            <th>{% trans "Invoice Number" %}</th>
+            <td style="font-family:var(--font-mono); font-weight:700;">{{ doc.number }}</td>
+          </tr>
+          <tr>
+            <th>{% trans "Invoice Date" %}</th>
+            <td>{{ doc.date|date:"F j, Y"|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th>{% trans "Currency" %}</th>
+            <td>{{ doc.currency_code|default:"—" }}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    {% endwith %}
+
+    <table class="doc-items">
+      <thead>
+        <tr>
+          <th style="width: 36px;">{% trans "Line" %}<span class="sub">{% trans "No" %}</span></th>
+          <th style="width: 110px;">{% trans "Design ID" %}</th>
+          <th style="width: 100px;">{% trans "Product Group" %}</th>
+          <th>{% trans "Description" %}</th>
+          <th class="num" style="width: 80px;">{% trans "Quantity" %}</th>
+          <th class="num" style="width: 90px;">{% trans "Unit Price" %}<span class="sub">({{ doc.currency_symbol }}{{ doc.currency_code }} / {% trans "Unit" %})</span></th>
+          <th class="num" style="width: 100px;">{% trans "Total Value" %}<span class="sub">({{ doc.currency_symbol }}{{ doc.currency_code }})</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in doc.lines %}
+        <tr>
+          <td class="row-no">{{ forloop.counter }}</td>
+          <td class="design-id">{{ it.sku|default:"—" }}</td>
+          <td>{{ it.group|default:"—" }}</td>
+          <td class="desc-multi">
+            {{ it.description }}
+            {% if it.rolls %}
+            <div class="roll-chips">
+              {% comment %}"Top" (kumaş topu) = fabric roll — the trade term in English is "Rolls".{% endcomment %}
+              <span class="rc-lbl">{% trans "Rolls" %}</span>
+              {% for r in it.rolls %}
+              <span class="roll-chip"><code>{{ r.barcode|default:"—" }}</code>{{ r.quantity|floatformat:2 }} m</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </td>
+          <td class="num">{{ it.quantity|money }} {{ it.unit|unit_loc }}</td>
+          <td class="num">{{ doc.currency_symbol }}{{ it.unit_price|money }}</td>
+          <td class="num"><b>{{ doc.currency_symbol }}{{ it.total|money }}</b></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" style="text-align:center; color:var(--gray-500);">{% trans "No lines." %}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="6" class="label">{% trans "Amount to be Paid" %} ({{ doc.currency_code }})</td>
+          <td class="value">{{ doc.currency_symbol }}{{ doc.total|money }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    {% if doc.notes %}
+    <div style="margin-top:18px; padding:10px 12px; border:1px solid var(--hair); border-left:3px solid var(--nejum-teal-700, #005354); background:#FAFBFD;">
+      <div style="font:700 10px var(--font-sans); letter-spacing:0.12em; text-transform:uppercase; color:var(--gray-500); margin-bottom:4px;">{% trans "Notes" %}</div>
+      <div style="font:500 11.5px var(--font-sans); color:var(--gray-700); white-space:pre-wrap; line-height:1.5;">{{ doc.notes }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+  window.addEventListener('load', function () {
+    setTimeout(function () { window.print(); }, 250);
+  });
+</script>
+</body>
+</html>

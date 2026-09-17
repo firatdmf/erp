@@ -11,7 +11,7 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.translation import pgettext_lazy
+from django.utils.translation import gettext_lazy, pgettext_lazy
 from django.views import View
 
 from .models import Warehouse, WarehouseProduct, WarehouseProductItem, StockMovement
@@ -5536,6 +5536,12 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
 
 SHIPPED_CLASS = frozenset({"shipped", "in_transit", "out_for_delivery", "delivered"})
 
+# Shown by every caller of apply_order_status_change that gets
+# 'cancel_requires_reopen' back.
+CANCEL_REQUIRES_REOPEN_MSG = gettext_lazy(
+    "A completed order can't be cancelled directly. Use 'Re-open & Fix' "
+    "first, then cancel it.")
+
 
 def order_reservation_shortfalls(order):
     """Items whose ACTIVE (unconsumed) roll reservations do NOT cover
@@ -5668,16 +5674,18 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         invoice bill only the actually-scanned amount regardless (see
         Order.billable_value), so under/over-scanning can never
         mis-charge the customer;
-      * entering 'cancelled' releases every active roll reservation —
-        cancelling a shipped order first restores its cut stock (the
-        leaving_ship branch below), then this drops the (now-inactive)
-        reservation rows entirely, so a cancelled order never keeps
-        warehouse capacity falsely held for stock that'll never ship;
+      * entering 'cancelled' drops every roll reservation row — they're
+        all soft holds, since only a non-completed order can be
+        cancelled — so a cancelled order never keeps warehouse capacity
+        falsely held for stock that'll never ship;
+      * a completed (shipped-class) order can't be cancelled directly —
+        undoing a finished sale takes two deliberate steps: "Re-open &
+        Fix" back to packaging (the cut stock returns), then cancel. Refused with 'cancel_requires_reopen';
       * 'cancelled' is TERMINAL — once an order is cancelled it can
         never move to any other status again (mirrors purchase invoices
-        after PurchaseCancel). Its current account posting was reversed and its
-        invoice(s) cancelled with it; silently re-posting those on an
-        un-cancel was the bug this closes, not a feature to preserve.
+        after PurchaseCancel). Its current account posting was reversed;
+        silently re-posting it on an un-cancel was the bug this closes,
+        not a feature to preserve.
         A mis-cancelled order needs a brand-new order, not a reopen;
       * the status change, its catalog-stock signal, AND the warehouse
         reservation → stock-out conversion all happen inside ONE
@@ -5685,7 +5693,8 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         (no half-shipped, catalog-cut-but-warehouse-not state).
 
     Returns (ok: bool, code: str|None). code is a machine-readable
-    reason on failure: 'order_cancelled_terminal' | 'error:<detail>'."""
+    reason on failure: 'forbidden_sales_rep' | 'order_cancelled_terminal' |
+    'cancel_requires_reopen' | 'error:<detail>'."""
     from erp.roles import is_sales_rep
 
     # Read the role before anything else: a refusal must leave the order
@@ -5704,6 +5713,8 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     changing = bool(new_status) and new_status in valid_statuses and new_status != old_status
     if changing and old_status == "cancelled":
         return False, "order_cancelled_terminal"
+    if changing and new_status == "cancelled" and old_status in SHIPPED_CLASS:
+        return False, "cancel_requires_reopen"
 
     # Stash any cargo info the caller carried.
     if carrier is not None:
@@ -5766,28 +5777,18 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # so the ship-time freeze no longer describes anything.
                 # Re-shipping takes a fresh one.
                 order.release_billable_freeze()
-                # Un-shipped order is no longer a completed sale — its
-                # invoice may not stay live (invoices only exist for
-                # completed orders). Re-shipping issues a fresh one.
-                for _inv in order.invoices.exclude(status="cancelled"):
-                    _inv.cancel(user=user, reason=f"Order #{order.pk} un-shipped")
             if entering_cancelled:
-                # Never any physical stock to restore here: leaving_ship
-                # (if it also fired) already converted consumed rows back
-                # to active ones above, and a non-shipped order's
-                # reservations were never consumed in the first place —
-                # either way they're plain soft holds now, safe to drop.
+                # Never any physical stock to restore here: a completed
+                # order is refused above, and a non-shipped order's
+                # reservations were never consumed — they're plain soft
+                # holds, safe to drop.
                 order.stock_reservations.filter(consumed=False).delete()
                 # A cancelled order must vanish from the books: the
-                # order_sale movement comes off the current account (retail posts
-                # at create too now), and any invoice cut from this
-                # order is cancelled with it (its counter-movement is
-                # 0-amount, the order movement carries the receivable —
-                # see Invoice.issue()).
+                # order_sale movement comes off the current account (retail
+                # posts at create too now). Its invoice is a printout of
+                # the order, so there is nothing else to undo.
                 from accounting.services_accounts import reverse_order_movement
                 reverse_order_movement(order)
-                for _inv in order.invoices.exclude(status="cancelled"):
-                    _inv.cancel(user=user, reason=f"Order #{order.pk} cancelled")
             # Retail money leg — completion posts the sale + auto
             # collection to the shared "Perakende Satışları" account and
             # mirrors it into the Perakende defter; un-ship reverses
@@ -5802,19 +5803,6 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                     post_retail_order_financials(order, user=user)
                 elif leaving_ship:
                     reverse_retail_order_financials(order, user=user)
-            # Completed sale → its invoice cuts itself, retail included
-            # — no manual step. Runs AFTER the retail leg so a legacy
-            # retail order that only gets its current account linked there is still
-            # invoiceable. Swallow-and-log: a numbering hiccup must
-            # never un-ship the order (the order-detail button stays as
-            # the manual fallback).
-            if entering_ship:
-                try:
-                    from accounting.services_accounts import create_invoice_for_order
-                    create_invoice_for_order(order, user=user)
-                except Exception:
-                    import traceback
-                    traceback.print_exc()
     except Exception as _e:
         return False, f"error:{_e}"
     return True, None

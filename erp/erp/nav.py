@@ -125,10 +125,6 @@ NAV_SECTIONS = [
                 {"label": _("All Accounts"), "icon": "id-card",   "url": "accounts:legacy_list"},
                 {"label": _("New Account"),  "icon": "user-plus", "url": "accounts:legacy_create"},
             ]},
-            {"title": _("INVOICES"), "items": [
-                {"label": _("All Invoices"), "icon": "file-text", "url": "accounts:legacy_invoice_list"},
-                {"label": _("New Invoice"),  "icon": "file-plus", "url": "accounts:legacy_invoice_create"},
-            ]},
             {"title": _("COLLECTION / PAYMENT"), "items": [
                 {"label": _("All Payments"),              "icon": "wallet",     "url": "accounts:legacy_payment_list"},
                 {"label": _("New Collection / Payment"),  "icon": "hand-coins", "url": "accounts:legacy_payment_create"},
@@ -144,9 +140,7 @@ NAV_SECTIONS = [
             {"title": _("REPORTS"), "items": [
                 {"label": _("Sales dashboard"), "icon": "bar-chart-3",    "url": "accounting:sales_dashboard"},
                 {"label": _("Report Center"), "icon": "pie-chart",      "url": "accounts:legacy_report_index"},
-                {"label": _("Aging"),         "icon": "clock",          "url": "accounts:legacy_report_aging"},
                 {"label": _("Trial Balance"), "icon": "layout-grid",    "url": "accounts:legacy_report_trial_balance"},
-                {"label": _("Due Calendar"),  "icon": "calendar-clock", "url": "accounts:legacy_report_due_calendar"},
                 {"label": _("Credit Limit"),  "icon": "shield-alert",   "url": "accounts:legacy_report_credit_limit"},
             ]},
             {"title": _("HELP"), "items": [
@@ -203,8 +197,6 @@ NAV_SECTIONS = [
                 {"label": _("Add warehouse"), "icon": "plus-circle", "url": "operating:create_warehouse"},
             ]},
             {"title": _("PURCHASING"), "items": [
-                {"label": _("Purchases"),         "icon": "package-plus", "url": "accounts:legacy_invoice_list",
-                 "query": "?type=purchase"},
                 {"label": _("Purchase requests"), "icon": "file-text",    "url": "operating:purchase_request_list"},
                 {"label": _("Purchase orders"),   "icon": "receipt",      "url": "accounts:legacy_purchase_order_list"},
             ]},

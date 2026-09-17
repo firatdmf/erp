@@ -47,7 +47,7 @@ class ObjectPagesAreRefusedAcrossBooks(TestCase):
 
     def _invoice(self, book, current_account):
         return Invoice.objects.create(
-            book=book, current_account=current_account, type="sales", status="draft",
+            book=book, current_account=current_account, type="purchase", status="draft",
             date="2026-08-21", due_date="2026-09-21",
             currency=self.usd, total=Decimal("100.00"))
 
@@ -62,7 +62,10 @@ class ObjectPagesAreRefusedAcrossBooks(TestCase):
             "account detail": reverse("accounts:detail", args=[self.their_current_account.pk]),
             "account statement": reverse("accounts:statement", args=[self.their_current_account.pk]),
             "account edit": reverse("accounts:edit", args=[self.their_current_account.pk]),
-            "invoice": reverse("accounts:invoice_detail", args=[self.their_invoice.pk]),
+            "purchase": reverse("accounts:purchase_order_detail", args=[self.their_invoice.pk]),
+            "purchase invoice": reverse("accounts:purchase_invoice", args=[self.their_invoice.pk]),
+            "purchase invoice excel": reverse("accounts:purchase_invoice_excel",
+                                              args=[self.their_invoice.pk]),
             "payment": reverse("accounts:payment_detail", args=[self.their_payment.pk]),
         }
 

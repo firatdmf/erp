@@ -371,21 +371,7 @@ class OrderDetail(DetailView):
             ctx["current_account_recent_movements"] = list(
                 current_account.movements.select_related("currency").order_by("-date", "-id")[:5]
             )
-            ctx["current_account_invoices_count"] = current_account.invoices.count()
 
-        # Invoices linked to THIS order. Used to (a) show the user
-        # what's already invoiced and (b) hide the "Create invoice"
-        # button when an active invoice already exists — preventing
-        # accidental duplicates that the user would have to clean up.
-        order_invoices = list(
-            self.object.invoices
-            .select_related("current_account", "currency")
-            .order_by("-date", "-id")
-        )
-        ctx["order_invoices"] = order_invoices
-        ctx["has_active_invoice"] = any(
-            inv.status != "cancelled" for inv in order_invoices
-        )
 
         # Status flow widget on the detail page — 3 ordered primary
         # stages (Açık → Paketleniyor → Gönderildi) with an "active up
@@ -788,6 +774,15 @@ class OrderDetail(DetailView):
         skip_cargo = order.is_retail_order and request.POST.get("skip_cargo") == "1"
         was_shipped = order.order_status in _SHIPPED_CLASS
 
+        # Cancelling is irreversible, so the page asks why and the reason
+        # is required — it lands in the change history below.
+        from django.utils.translation import gettext as _g
+        cancel_reason = (request.POST.get("cancel_reason") or "").strip()
+        cancelling = new_status == "cancelled" and order.order_status != "cancelled"
+        if cancelling and not cancel_reason:
+            messages.error(request, _g("Enter a reason to cancel the order."))
+            return redirect("operating:order_detail", pk=order.pk)
+
         # All status changes funnel through the single atomic helper so
         # the ship gate (cargo required) + the reservation → stock-out
         # conversion can never be bypassed or partially applied.
@@ -804,8 +799,25 @@ class OrderDetail(DetailView):
                 messages.error(request, reservation_shortfall_message(order))
             elif code == "order_cancelled_terminal":
                 messages.error(request, "İptal edilmiş bir sipariş tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun.")
+            elif code == "cancel_requires_reopen":
+                from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
+                messages.error(request, CANCEL_REQUIRES_REOPEN_MSG)
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
+            return redirect("operating:order_detail", pk=order.pk)
+
+        if cancelling:
+            from .models import OrderChange
+            OrderChange.objects.create(
+                order=order, action="field", field="cancel_reason",
+                new_value=cancel_reason,
+                created_by=request.user if request.user.is_authenticated else None,
+            )
+            messages.success(
+                request,
+                _g("Order cancelled — its reservations were released and its account "
+                   "entry was removed."),
+            )
             return redirect("operating:order_detail", pk=order.pk)
 
         now_shipped = order.order_status in _SHIPPED_CLASS
@@ -2356,6 +2368,7 @@ _CHANGE_FIELD_TR = {
     "guest_email": "Misafir e-posta", "guest_phone": "Misafir telefon",
     "customer": "Müşteri", "quantity": "Miktar", "price": "Fiyat",
     "product": "Ürün", "revert_reason": "Geri açma sebebi",
+    "cancel_reason": "İptal sebebi",
 }
 _CHANGE_ACTION_TR = {
     "created": "Oluşturuldu", "status": "Durum",
@@ -2621,19 +2634,6 @@ def order_customer_card_view(request, pk):
     })
 
 
-@require_POST
-def update_order_print_header(request, pk):
-    """Save the custom top-left header text shown on the order's printable PDF.
-    Empty clears it (falls back to the global brand)."""
-    if not request.user.is_authenticated:
-        return JsonResponse({"success": False, "error": "auth"}, status=403)
-    order = get_object_or_404(Order, pk=pk)
-    header = (request.POST.get("print_header") or "").strip()[:120]
-    order.print_header = header or None
-    order.save(update_fields=["print_header", "updated_at"])
-    return JsonResponse({"success": True, "print_header": order.print_header or ""})
-
-
 def build_order_print_rows(order):
     """The decorated line rows an order prints, and what they come to.
 
@@ -2742,7 +2742,7 @@ class OrderPrint(DetailView):
         # the ledger book's brand name. Resolved here rather than in the
         # template so the printed order, its Excel and the invoice
         # raised from it all go through one rule.
-        ctx["brand_line"] = (order.print_header or "").strip() or brand_name_for()
+        ctx["brand_line"] = brand_name_for()
         items, total, total_qty, pack_ids = build_order_print_rows(order)
         # A single group, so the template walks the same loop the
         # combined sheet walks — see OrderPrintCombined. `combined` is
@@ -2891,7 +2891,7 @@ class OrderPrintCombined(LoginRequiredMixin, View):
             "order_total": total,
             "order_total_quantity": total_qty,
             "order_total_packs": len(pack_ids),
-            "brand_line": (primary.print_header or "").strip() or brand_name_for(),
+            "brand_line": brand_name_for(),
             "has_customer_info": bool(primary.contact_id or primary.company_id
                                       or primary.web_client_id),
             "has_delivery_info": order_has_delivery_info(primary),
@@ -4253,7 +4253,7 @@ def export_packing_list_excel(request, pk):
     last_col = len(headers)
     last_letter = get_column_letter(last_col)
 
-    brand_line = (order.print_header or "").strip() or brand_name_for()
+    brand_line = brand_name_for()
     _order_dt = order.order_date or order.created_at.date()
 
     teal = "FF00696A"
@@ -5263,7 +5263,7 @@ def order_packing_list_pdf(request, pk):
     # ── Header: brand + document identity left, document QR top-right ──
     cust_name = _packing_list_customer(order)
 
-    brand_line = (order.print_header or "").strip() or brand_name_for()
+    brand_line = brand_name_for()
     _order_dt = order.order_date or order.created_at.date()
 
     head_left = [
@@ -5984,6 +5984,9 @@ def update_order_status(request, order_id):
                 return JsonResponse({'error': reservation_shortfall_message(order)}, status=400)
             if code == "order_cancelled_terminal":
                 return JsonResponse({'error': 'İptal edilmiş bir sipariş tekrar açılamaz.'}, status=400)
+            if code == "cancel_requires_reopen":
+                from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
+                return JsonResponse({'error': str(CANCEL_REQUIRES_REOPEN_MSG)}, status=400)
             return JsonResponse({'error': 'Durum güncelleme hatası', 'details': (code or '').replace('error:', '')}, status=500)
 
         return JsonResponse({
@@ -6379,6 +6382,9 @@ class WebOrderStatusEdit(View):
                 messages.error(request, reservation_shortfall_message(order))
             elif code == "order_cancelled_terminal":
                 messages.error(request, "İptal edilmiş bir sipariş tekrar açılamaz.")
+            elif code == "cancel_requires_reopen":
+                from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
+                messages.error(request, CANCEL_REQUIRES_REOPEN_MSG)
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
             next_url = request.POST.get('next') or request.GET.get('next')

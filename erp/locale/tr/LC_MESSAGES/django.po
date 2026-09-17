@@ -6720,8 +6720,8 @@ msgstr "örn. 1234567890"
 msgid "— Select —"
 msgstr "— Seçin —"
 
-msgid "More statuses (cancelled, returned, delivered…)"
-msgstr "Diğer durumlar (iptal, iade, teslim edildi…)"
+msgid "More statuses (returned, delivered…)"
+msgstr "Diğer durumlar (iade, teslim edildi…)"
 
 msgid "Save"
 msgstr "Kaydet"
@@ -8445,21 +8445,8 @@ msgstr ""
 "Bu faturanın siparişi de onunla birlikte iptal edildi ve tekrar açılamaz, bu"
 " yüzden fatura da geri alınamaz. Gerekirse yeni bir sipariş oluşturun."
 
-msgid "Invoice Settings"
-msgstr "Fatura Ayarları"
-
-msgid "Invoice language"
-msgstr "Fatura dili"
-
-msgid ""
-"Language of the printable invoice document. English is the default; choose "
-"Türkçe to print invoices with Turkish labels."
-msgstr ""
-"Yazdırılan fatura belgesinin dili. Varsayılan İngilizcedir; Türkçe "
-"seçerseniz fatura etiketleri Türkçe basılır."
-
-msgid "Invoice language updated."
-msgstr "Fatura dili güncellendi."
+msgid "Invoice Excel"
+msgstr "Fatura Excel"
 
 msgid "Cancel invoice?"
 msgstr "Fatura iptal edilsin mi?"
@@ -9265,9 +9252,6 @@ msgstr "Bu barkod %(book)s rafında. Bir sipariş tek bir deftere aittir — bun
 msgid "That barcode is on %(book)s's shelf. Tick “Show stock from my other books” to add it — the order is split by book when you save."
 msgstr "Bu barkod %(book)s rafında. Eklemek için “Diğer defterlerimdeki stoğu göster”i işaretleyin — kaydettiğinizde sipariş deftere göre bölünür."
 
-msgid "Pack (Scan rolls)"
-msgstr "Paketle (Top Okut)"
-
 msgid "No stock is deducted until <b>Complete order</b> is pressed. Cargo info is optional — saved if entered, but the order can complete without it."
 msgstr "<b>Siparişi Tamamla</b> denene kadar stok düşmez. Kargo bilgileri opsiyoneldir — girilirse kaydedilir, girilmese de sipariş tamamlanabilir."
 
@@ -9354,10 +9338,6 @@ msgstr "Bu üründe %(n)s okutulmuş top var. Ürünü kaldırırsanız toplar \
 
 msgid "This order is shipped by carrier"
 msgstr "Bu siparişte kargo var"
-
-#, python-format
-msgid "PDF header (default: %(brand)s)"
-msgstr "PDF başlığı (varsayılan: %(brand)s)"
 
 msgid "Account history"
 msgstr "Hesap geçmişi"
@@ -9827,3 +9807,305 @@ msgstr "Para birimi seçin…"
 #, python-format
 msgid "There is no %(code)s → USD rate for today, so this stock can't be valued. Try again later."
 msgstr "Bugün için %(code)s → USD kuru yok, bu yüzden bu stok değerlenemiyor. Daha sonra tekrar deneyin."
+
+msgid "This order was cancelled — its lines are kept for reference only."
+msgstr "Bu sipariş iptal edildi — satırları yalnızca kayıt için tutuluyor."
+
+msgid "Cancel this order?"
+msgstr "Bu sipariş iptal edilsin mi?"
+
+msgid "The order stays on record with its lines crossed out."
+msgstr "Sipariş, satırlarının üstü çizili olarak kayıtlarda kalır."
+
+msgid "This can't be undone. A cancelled order can never be re-opened."
+msgstr "Bu işlem geri alınamaz. İptal edilen bir sipariş bir daha açılamaz."
+
+msgid "What happens"
+msgstr "Neler olacak"
+
+msgid "The sale is removed from the customer's account"
+msgstr "Satış, müşterinin cari hesabından çıkarılır"
+
+msgid "The customer is emailed that the order was cancelled"
+msgstr "Müşteriye siparişin iptal edildiği e-postayla bildirilir"
+
+msgid "The order can no longer be edited or packed"
+msgstr "Sipariş artık düzenlenemez ve paketlenemez"
+
+msgid "Reason (required)"
+msgstr "Sebep (zorunlu)"
+
+msgid "e.g. Customer changed their mind"
+msgstr "örn. Müşteri vazgeçti"
+
+msgid "Keep the order"
+msgstr "Siparişi koru"
+
+msgid "Enter a reason to cancel the order."
+msgstr "Siparişi iptal etmek için bir sebep girin."
+
+msgid "A completed order can't be cancelled directly. Use 'Re-open & Fix' first, then cancel it."
+msgstr "Tamamlanmış bir sipariş doğrudan iptal edilemez. Önce 'Geri Aç & Düzelt' ile açın, sonra iptal edin."
+
+msgid "%(counter)s reserved roll is released"
+msgid_plural "%(counter)s reserved rolls are released"
+msgstr[0] "%(counter)s ayrılmış top serbest bırakılır"
+msgstr[1] "%(counter)s ayrılmış top serbest bırakılır"
+
+msgctxt "attribute"
+msgid "Color"
+msgstr "Renk"
+
+msgctxt "attribute"
+msgid "Model"
+msgstr "Model"
+
+msgctxt "attribute"
+msgid "Size"
+msgstr "Boyut"
+
+msgctxt "attribute"
+msgid "Size per panel"
+msgstr "Kanat başına boyut"
+
+msgctxt "attribute"
+msgid "Header"
+msgstr "Askı tipi"
+
+msgctxt "attribute"
+msgid "Fabric"
+msgstr "Kumaş"
+
+msgctxt "attribute"
+msgid "Yarn"
+msgstr "İplik"
+
+msgid "e.g. V-106"
+msgstr "ör. V-106"
+
+msgid "e.g. 130 x 210 cm"
+msgstr "ör. 130 x 210 cm"
+
+msgid "e.g. grommet"
+msgstr "ör. halkalı"
+
+msgid "New attribute…"
+msgstr "Yeni özellik…"
+
+msgid "Name of the new attribute (e.g. width):"
+msgstr "Yeni özelliğin adı (ör. genişlik):"
+
+msgid "Variant attributes"
+msgstr "Varyant özellikleri"
+
+msgid "same values as"
+msgstr "şununla aynı değerler:"
+
+msgid "pick that variant, or add a value that tells this one apart"
+msgstr "o varyantı seçin ya da bunu ayırt eden bir değer ekleyin"
+
+msgid "Some variants have the same attribute values as a variant the product already has. Pick that variant, or add a value that tells them apart."
+msgstr "Bazı varyantların özellik değerleri ürünün mevcut bir varyantıyla aynı. O varyantı seçin ya da onları ayırt eden bir değer ekleyin."
+
+msgid "What the goods-receipt page asks about each variant of a new product in this group, in this order. A product can still add others."
+msgstr "Mal kabul sayfasının bu gruptaki yeni bir ürünün her varyantı için bu sırayla sorduğu özellikler. Bir ürün yine de başka özellikler ekleyebilir."
+
+msgid "Move up"
+msgstr "Yukarı taşı"
+
+msgid "Move down"
+msgstr "Aşağı taşı"
+
+msgid "No attributes yet — new products in this group are asked their color."
+msgstr "Henüz özellik yok — bu gruptaki yeni ürünlere rengi sorulur."
+
+msgid "Add an attribute, e.g. color"
+msgstr "Bir özellik ekleyin, ör. renk"
+
+#, python-format
+msgid "%(a)s and %(b)s have the same attribute values."
+msgstr "%(a)s ile %(b)s aynı özellik değerlerine sahip."
+
+#, python-format
+msgid "%(label)s has the same attribute values as %(sku)s — add the stock to %(sku)s, or give it a value that tells it apart."
+msgstr "%(label)s, %(sku)s ile aynı özellik değerlerine sahip — stoğu %(sku)s varyantına ekleyin ya da onu ayırt eden bir değer verin."
+
+msgid "Back to order"
+msgstr "Siparişe dön"
+
+msgid "Download Excel"
+msgstr "Excel indir"
+
+msgid "No lines."
+msgstr "Satır yok."
+
+msgid "PURCHASE INVOICE"
+msgstr "ALIŞ FATURASI"
+
+msgid "Get invoice"
+msgstr "Fatura al"
+
+msgid "Receive this order into the warehouse? The stock is added and the supplier debt is posted now."
+msgstr "Bu sipariş depoya alınsın mı? Stok eklenir ve tedarikçi borcu şimdi işlenir."
+
+msgid "This payment is already confirmed. Saving reposts it: the account movement and the cash balance are updated to match."
+msgstr "Bu ödeme zaten onaylandı. Kaydetmek onu yeniden işler: cari hareketi ve kasa bakiyesi buna göre güncellenir."
+
+msgid "This payment is already confirmed. Editing reposts the account movement and the cash balance. Continue?"
+msgstr "Bu ödeme zaten onaylandı. Düzenlemek cari hareketini ve kasa bakiyesini yeniden işler. Devam edilsin mi?"
+
+msgid "Balance sheet, trial balance and credit limit monitoring — the signals you need to keep receivables and payables under control."
+msgstr "Bilanço, mizan ve risk limiti takibi — alacak ve borçları kontrol altında tutmak için gereken sinyaller."
+
+msgid "Order cancelled — its reservations were released and its account entry was removed."
+msgstr "Sipariş iptal edildi — ayrılan toplar serbest bırakıldı ve cari kaydı kaldırıldı."
+
+msgid "🧾 Printable invoices"
+msgstr "🧾 Yazdırılabilir faturalar"
+
+msgid "ByteEntegre/Logo-style classic current account module. Customer-supplier cards, collections-payments, checks-promissory notes, and reports — all in one place, without the headache."
+msgstr "ByteEntegre/Logo tarzı klasik cari hesap modülü. Müşteri-tedarikçi kartları, tahsilat-ödemeler, çek-senetler ve raporlar — hepsi tek yerde, baş ağrısı olmadan."
+
+msgid "<strong>Movements</strong> — each financial effect is a row (sale, purchase, collection, endorsement, etc.)"
+msgstr "<strong>Hareketler</strong> — her mali etki bir satırdır (satış, alış, tahsilat, ciro vb.)"
+
+msgid "<strong>Sell:</strong> Create an order for the account and complete it — the sale is posted to the account."
+msgstr "<strong>Satış yapın:</strong> Cari için bir sipariş oluşturup tamamlayın — satış cari hesaba işlenir."
+
+msgid "<strong>Take a collection:</strong> On the account page, <strong>\"Take Collection\"</strong> green button → enter the amount and confirm."
+msgstr "<strong>Tahsilat alın:</strong> Cari sayfasında yeşil <strong>\"Tahsilat Al\"</strong> butonu → tutarı girip onaylayın."
+
+msgid "<strong>Create the order</strong> for the account and complete it → the account balance increases automatically"
+msgstr "Cari için <strong>siparişi oluşturun</strong> ve tamamlayın → cari bakiye otomatik olarak artar"
+
+msgid "The customer needs an invoice? \"Get invoice\" on the order prints it or downloads it as Excel"
+msgstr "Müşteri fatura mı istiyor? Siparişteki \"Fatura al\" onu yazdırır veya Excel olarak indirir"
+
+msgid "<strong>Result</strong>: The account balance closes, the cash account increases."
+msgstr "<strong>Sonuç</strong>: Cari bakiye kapanır, kasa artar."
+
+msgid "<strong>Purchase</strong>: Enter the purchase order and receive the goods → the account balance becomes negative"
+msgstr "<strong>Alış</strong>: Satın alma siparişini girip malı teslim alın → cari bakiye eksiye düşer"
+
+msgid "Select the cash account the payment leaves from"
+msgstr "Ödemenin çıktığı kasayı seçin"
+
+msgid "An invoice is a <strong>printout</strong> of a sales order or a purchase — nothing more. It is never issued, edited or cancelled on its own, and it never touches an account: the order and the purchase do that."
+msgstr "Fatura, bir satış siparişinin veya bir alışın <strong>çıktısıdır</strong> — başka bir şey değil. Kendi başına kesilmez, düzenlenmez veya iptal edilmez ve hiçbir cari hesaba dokunmaz: bunu sipariş ve alış yapar."
+
+msgid "<strong>Sales</strong>: open the order → <strong>\"Get invoice\"</strong>"
+msgstr "<strong>Satışlar</strong>: siparişi açın → <strong>\"Fatura al\"</strong>"
+
+msgid "<strong>Purchases</strong>: open the purchase order → <strong>\"Get invoice\"</strong>"
+msgstr "<strong>Alışlar</strong>: satın alma siparişini açın → <strong>\"Fatura al\"</strong>"
+
+msgid "From there, <strong>Print</strong> it or <strong>Download Excel</strong>. It carries the order or purchase number."
+msgstr "Oradan <strong>Yazdır</strong> veya <strong>Excel indir</strong>. Fatura, sipariş veya alış numarasını taşır."
+
+msgid "Change the order or the purchase and the invoice follows the next time you open it."
+msgstr "Siparişi veya alışı değiştirin; fatura bir sonraki açışınızda buna uyar."
+
+msgid "<a href=\"%(report_index_url)s\">Report Center</a> → the major reports:"
+msgstr "<a href=\"%(report_index_url)s\">Rapor Merkezi</a> → ana raporlar:"
+
+msgid "If it is not confirmed, delete it; if it is confirmed, cancel it. Cancel reverses both the account and the cash account."
+msgstr "Onaylanmadıysa silin; onaylandıysa iptal edin. İptal, hem cari hesabı hem kasayı geri alır."
+
+msgid "Show the rolls in this product"
+msgstr "Bu üründeki topları göster"
+
+msgid "Each roll has its own barcode"
+msgstr "Her topun kendi barkodu var"
+
+msgid "Open product"
+msgstr "Ürünü aç"
+
+msgid "Factory second — imperfect roll, not first quality."
+msgstr "Fabrika ikincisi — kusurlu top, birinci kalite değil."
+
+msgid "Catalog"
+msgstr "Katalog"
+
+msgid "Search by barcode…"
+msgstr "Barkoda göre ara…"
+
+msgid "Search by name, SKU, variant SKU…"
+msgstr "Ad, SKU veya varyant SKU ile ara…"
+
+msgid "Filters"
+msgstr "Filtreler"
+
+msgid "Search in"
+msgstr "Aranacak alan"
+
+msgid "Search field"
+msgstr "Arama alanı"
+
+msgid "Search names and SKUs"
+msgstr "Ad ve SKU'larda ara"
+
+msgid "Name / SKU"
+msgstr "Ad / SKU"
+
+msgid "Search product and roll barcodes"
+msgstr "Ürün ve top barkodlarında ara"
+
+msgid "Show variants with zero stock"
+msgstr "Stoğu sıfır olan varyantları göster"
+
+msgid "Show empty products"
+msgstr "Boş ürünleri göster"
+
+msgid "Show only stock reserved for an order"
+msgstr "Yalnızca bir siparişe ayrılmış stoğu göster"
+
+msgid "Only reserved"
+msgstr "Yalnızca ayrılmış"
+
+msgid "List as"
+msgstr "Listeleme"
+
+msgid "Could not load the rolls."
+msgstr "Toplar yüklenemedi."
+
+msgid "Barcode is required — scan or type the roll barcode."
+msgstr "Barkod gerekli — topun barkodunu okutun veya yazın."
+
+msgid "Reserved for an order"
+msgstr "Siparişe ayrılmış"
+
+msgid "held"
+msgstr "tutuluyor"
+
+msgid "not yet shipped"
+msgstr "henüz sevk edilmedi"
+
+msgid "This roll has been used up"
+msgstr "Bu top tükendi"
+
+msgid "This roll is partly used"
+msgstr "Bu top kısmen kullanıldı"
+
+msgid "left"
+msgstr "kaldı"
+
+msgid "manual stock-out"
+msgstr "elle stok çıkışı"
+
+msgid "Packing list"
+msgstr "Paketleme listesi"
+
+msgid "no record of where"
+msgstr "nereye gittiğine dair kayıt yok"
+
+msgid "Used roll"
+msgstr "Kullanılmış top"
+
+msgid "This top belongs to another book. Stock moves between books through a purchase invoice, not a warehouse transfer."
+msgstr "Bu top başka bir deftere ait. Defterler arasında stok, depo transferiyle değil satın alma faturasıyla taşınır."
+
+msgid "— Select a book —"
+msgstr "— Defter seçin —"
+
+msgid "The book that owns this warehouse's stock."
+msgstr "Bu deponun stoğunun ait olduğu defter."

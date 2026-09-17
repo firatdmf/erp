@@ -78,24 +78,11 @@
     <div class="rx-head-l">
       <div class="rx-eyebrow">{% trans "Account Reports" %}</div>
       <h1 class="rx-title">{% trans "Report Center" %}</h1>
-      <p class="rx-sub">{% trans "Aging analysis, trial balance, credit limit monitoring and due-date calendar — every signal you need to keep receivables and payables under control." %}</p>
+      <p class="rx-sub">{% trans "Balance sheet, trial balance and credit limit monitoring — the signals you need to keep receivables and payables under control." %}</p>
     </div>
   </div>
 
   <div class="rx-grid">
-    <a class="rx-card" href="{% url 'accounts:report_aging' current_book.pk %}">
-      <div class="rx-ico"><i data-lucide="clock"></i></div>
-      <h3>{% trans "Aging Report" %}</h3>
-      <p>{% trans "Aging analysis of open receivables and payables: 0-30, 30-60, 60-90, 90+ days" %}</p>
-      <div class="rx-card-foot">
-        {% if overdue_count %}
-          <span class="rx-badge alert">{% blocktrans with count=overdue_count|intcomma %}{{ count }} invoices overdue{% endblocktrans %}</span>
-        {% else %}
-          <span class="rx-badge ok">{% trans "No overdue invoices" %}</span>
-        {% endif %}
-      </div>
-    </a>
-
     <a class="rx-card" href="{% url 'accounts:report_balance_sheet' current_book.pk %}">
       <div class="rx-ico"><i data-lucide="scale"></i></div>
       <h3>{% trans "Balance Sheet" %}</h3>
@@ -123,19 +110,6 @@
           <span class="rx-badge alert">{% blocktrans with count=over_limit_count|intcomma %}{{ count }} accounts exceed the limit{% endblocktrans %}</span>
         {% else %}
           <span class="rx-badge ok">{% trans "No accounts exceeding the limit" %}</span>
-        {% endif %}
-      </div>
-    </a>
-
-    <a class="rx-card" href="{% url 'accounts:report_due_calendar' current_book.pk %}">
-      <div class="rx-ico"><i data-lucide="calendar-clock"></i></div>
-      <h3>{% trans "Due Date Calendar" %}</h3>
-      <p>{% trans "Upcoming due dates — this week, next week, month-end and overdue" %}</p>
-      <div class="rx-card-foot">
-        {% if upcoming_due_count %}
-          <span class="rx-badge warn">{% blocktrans with count=upcoming_due_count|intcomma %}{{ count }} invoices within 7 days{% endblocktrans %}</span>
-        {% else %}
-          <span class="rx-badge ok">{% trans "No upcoming due dates" %}</span>
         {% endif %}
       </div>
     </a>

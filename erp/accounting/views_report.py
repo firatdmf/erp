@@ -1,25 +1,21 @@
 """
 Current-account reports (Phase 4).
 
-    /accounting/accounts/reports/                → ReportIndex (landing page with 4 cards)
-    /accounting/accounts/reports/aging/          → AgingReport     (aged receivables/payables)
+    /accounting/accounts/reports/                → ReportIndex (landing page)
     /accounting/accounts/reports/trial-balance/  → TrialBalance    (current account mizan per book, period filter)
     /accounting/accounts/reports/credit-limit/   → CreditLimitReport
-    /accounting/accounts/reports/due-calendar/   → DueCalendar     (upcoming + overdue invoice due dates)
 """
-from datetime import date as date_cls, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Q, Sum
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext_lazy as _, gettext as _g
 from django.views import View
 
 from accounting.models import Book
-from .models import CurrentAccount, CurrentAccountMovement, Invoice
+from .models import CurrentAccount, CurrentAccountMovement
 
 
 # ---------------------------------------------------------------------------
@@ -30,13 +26,6 @@ class ReportIndex(View):
     template_name = "accounts/report_index.html"
 
     def get(self, request):
-        today = timezone.now().date()
-        overdue_count = Invoice.objects.filter(
-            status__in=["issued", "partially_paid", "overdue"],
-            balance__gt=0,
-            due_date__lt=today,
-        ).count()
-
         over_limit_count = (
             CurrentAccount.objects
             .filter(is_active=True, credit_limit__gt=0)
@@ -44,105 +33,8 @@ class ReportIndex(View):
             .count()
         )
 
-        upcoming_due_count = Invoice.objects.filter(
-            status__in=["issued", "partially_paid"],
-            balance__gt=0,
-            due_date__gte=today,
-            due_date__lte=today + timedelta(days=7),
-        ).count()
-
         return render(request, self.template_name, {
-            "overdue_count":      overdue_count,
             "over_limit_count":   over_limit_count,
-            "upcoming_due_count": upcoming_due_count,
-        })
-
-
-# ---------------------------------------------------------------------------
-# 1. Aging Report — Yaşlandırma
-# ---------------------------------------------------------------------------
-BUCKETS = [
-    ("not_due",    _("Not Due"),     None, 0),    # due_date >= today
-    ("b_0_30",     _("0-30 Days"),   0,    30),
-    ("b_30_60",    _("30-60 Days"),  30,   60),
-    ("b_60_90",    _("60-90 Days"),  60,   90),
-    ("b_90_plus",  _("90+ Days"),    90,   None),
-]
-
-
-@method_decorator(login_required, name="dispatch")
-class AgingReport(View):
-    template_name = "accounts/report_aging.html"
-
-    def get(self, request):
-        today = timezone.now().date()
-
-        book_id = str(request.book.pk)
-        kind = request.GET.get("kind") or "receivable"   # receivable | payable
-
-        # Open invoices with balance > 0, not draft/cancelled
-        qs = (Invoice.objects
-              .filter(balance__gt=0, status__in=["issued", "partially_paid", "overdue"])
-              .select_related("current_account", "currency", "book"))
-
-        if kind == "receivable":
-            qs = qs.filter(type__in=["sales", "purchase_return"])
-        else:
-            qs = qs.filter(type__in=["purchase", "sales_return"])
-
-        if book_id.isdigit():
-            qs = qs.filter(book_id=int(book_id))
-
-        # Group: current account → buckets
-        per_current_account = {}
-        for inv in qs.order_by("current_account__code", "due_date"):
-            row = per_current_account.setdefault(inv.current_account_id, {
-                "current_account": inv.current_account,
-                "currency": inv.currency.code,
-                "buckets": {k: Decimal("0") for k, *_ in BUCKETS},
-                "total": Decimal("0"),
-                "oldest_invoice": None,
-                "max_days_overdue": 0,
-            })
-
-            days = (today - inv.due_date).days
-            if inv.due_date >= today:
-                bucket = "not_due"
-            elif days <= 30:
-                bucket = "b_0_30"
-            elif days <= 60:
-                bucket = "b_30_60"
-            elif days <= 90:
-                bucket = "b_60_90"
-            else:
-                bucket = "b_90_plus"
-
-            row["buckets"][bucket] += inv.balance
-            row["total"] += inv.balance
-            if row["oldest_invoice"] is None or inv.date < row["oldest_invoice"].date:
-                row["oldest_invoice"] = inv
-            if days > row["max_days_overdue"]:
-                row["max_days_overdue"] = days
-
-        rows = sorted(per_current_account.values(), key=lambda r: -r["total"])
-
-        # Grand totals per bucket
-        grand_buckets = {k: Decimal("0") for k, *_ in BUCKETS}
-        grand_total = Decimal("0")
-        for r in rows:
-            for k in grand_buckets:
-                grand_buckets[k] += r["buckets"][k]
-            grand_total += r["total"]
-
-        return render(request, self.template_name, {
-            "today": today,
-            "rows": rows,
-            "buckets": BUCKETS,
-            "grand_buckets": grand_buckets,
-            "grand_total": grand_total,
-            "kind": kind,
-            "filter_book": book_id,
-            "books": Book.objects.all().order_by("name"),
         })
 
 
@@ -296,68 +188,6 @@ class CreditLimitReport(View):
         return render(request, self.template_name, {
             "rows": rows,
             "view": view,
-            "filter_book": book_id,
-            "books": Book.objects.all().order_by("name"),
-        })
-
-
-# ---------------------------------------------------------------------------
-# 4. Due Calendar — Vade Takvimi
-# ---------------------------------------------------------------------------
-@method_decorator(login_required, name="dispatch")
-class DueCalendar(View):
-    template_name = "accounts/report_due_calendar.html"
-
-    def get(self, request):
-        today = timezone.now().date()
-        book_id = str(request.book.pk)
-        kind = request.GET.get("kind") or "receivable"
-
-        qs = (Invoice.objects
-              .filter(balance__gt=0, status__in=["issued", "partially_paid", "overdue"])
-              .select_related("current_account", "currency"))
-        if kind == "receivable":
-            qs = qs.filter(type__in=["sales", "purchase_return"])
-        else:
-            qs = qs.filter(type__in=["purchase", "sales_return"])
-        if book_id.isdigit():
-            qs = qs.filter(book_id=int(book_id))
-
-        # Buckets
-        end_of_this_week = today + timedelta(days=(6 - today.weekday()))
-        end_of_next_week = end_of_this_week + timedelta(days=7)
-        end_of_month     = (today.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-
-        groups = {
-            "overdue":      {"label": _("Overdue"),         "items": [], "total": Decimal("0")},
-            "this_week":    {"label": _("This Week"),       "items": [], "total": Decimal("0")},
-            "next_week":    {"label": _("Next Week"),       "items": [], "total": Decimal("0")},
-            "this_month":   {"label": _("This Month (end)"),"items": [], "total": Decimal("0")},
-            "later":        {"label": _("Later"),           "items": [], "total": Decimal("0")},
-        }
-
-        for inv in qs.order_by("due_date"):
-            d = inv.due_date
-            if d < today:
-                key = "overdue"
-            elif d <= end_of_this_week:
-                key = "this_week"
-            elif d <= end_of_next_week:
-                key = "next_week"
-            elif d <= end_of_month:
-                key = "this_month"
-            else:
-                key = "later"
-            groups[key]["items"].append({
-                "inv": inv,
-                "days_diff": (d - today).days,
-            })
-            groups[key]["total"] += inv.balance
-
-        return render(request, self.template_name, {
-            "today": today,
-            "groups": groups,
-            "kind": kind,
             "filter_book": book_id,
             "books": Book.objects.all().order_by("name"),
         })

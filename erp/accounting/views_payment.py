@@ -2,18 +2,17 @@
 Payment views (Phase 3).
 
     /accounting/accounts/payments/                   → PaymentList
-    /accounting/accounts/payments/new/?account=<id>  → PaymentCreate (open invoices auto-listed)
+    /accounting/accounts/payments/new/?account=<id>  → PaymentCreate
     /accounting/accounts/payments/<id>/              → PaymentDetail
     /accounting/accounts/payments/<id>/edit/         → PaymentEdit (draft or confirmed)
     /accounting/accounts/payments/<id>/confirm/      → PaymentConfirm (POST)
     /accounting/accounts/payments/<id>/cancel/       → PaymentCancel (POST)
     /accounting/accounts/payments/<id>/delete/       → PaymentDelete (draft only, POST)
 
-The create form receives allocations as JSON in the `allocations_json` field:
-    [{"invoice_id": 12, "amount": "150.00"}, {"invoice_id": null, "amount": "50.00"}]
+A payment settles the account, not invoices: invoices are printouts of an
+order or a purchase (accounting/invoice_doc.py) and carry no balance.
 """
 import json
-from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
@@ -34,9 +33,7 @@ from accounting.models import CashAccount, CurrencyCategory
 from .models import (
     CurrentAccount,
     CurrentAccountSettings,
-    Invoice,
     Payment,
-    PaymentAllocation,
 )
 from .services_posting import payment_preview
 
@@ -49,31 +46,6 @@ def _D(val, default="0"):
         return Decimal(str(val if val not in (None, "") else default))
     except (InvalidOperation, ValueError):
         return Decimal(default)
-
-
-def _parse_allocations(raw):
-    """Parse the allocations_json. Returns list of dicts; raises ValueError on bad input."""
-    if not raw:
-        return []
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise ValueError(_g("Could not parse allocations JSON: %(error)s") % {"error": e})
-    if not isinstance(data, list):
-        raise ValueError(_g("Allocations must be a list."))
-    out = []
-    for raw_alloc in data:
-        if not isinstance(raw_alloc, dict):
-            continue
-        amount = _D(raw_alloc.get("amount"))
-        if amount <= 0:
-            continue
-        invoice_id = raw_alloc.get("invoice_id")
-        out.append({
-            "invoice_id": int(invoice_id) if invoice_id else None,
-            "amount": amount,
-        })
-    return out
 
 
 def _entered_rate(request):
@@ -307,17 +279,6 @@ class PaymentCreate(View):
             if not prefilled_current_account else CurrentAccount.objects.none()
         )
 
-        # Open invoices for the prefilled current account
-        open_invoices = []
-        if prefilled_current_account:
-            open_invoices = list(
-                prefilled_current_account.invoices
-                .filter(status__in=["issued", "partially_paid", "overdue"])
-                .order_by("date", "id")
-                .values("id", "series", "number", "date", "due_date", "total", "balance",
-                        "currency__code", "type")
-            )
-
         # Cash accounts scoped to prefilled current account's book if known
         cash_qs = CashAccount.objects.select_related("currency", "book").all().order_by("book", "name")
         if prefilled_current_account:
@@ -340,7 +301,6 @@ class PaymentCreate(View):
             "initial_type":   initial_type,
             "base_currency": _fx_context(prefilled_current_account.book if prefilled_current_account else None),
             "account_currency": _fx_account_context(prefilled_current_account),
-            "open_invoices_json": json.dumps(_serialize_invoices(open_invoices), default=str),
             "payment_preview": payment_preview(),
             "cash_methods": sorted(Payment.CASH_METHODS),
         })
@@ -355,20 +315,6 @@ class PaymentCreate(View):
         amount = _D(request.POST.get("amount"))
         if amount <= 0:
             messages.error(request, _g("Amount must be greater than zero."))
-            return redirect("accounts:payment_create", book_id=request.book.pk)
-
-        try:
-            allocations = _parse_allocations(request.POST.get("allocations_json", ""))
-        except ValueError as e:
-            messages.error(request, str(e))
-            return redirect("accounts:payment_create", book_id=request.book.pk)
-
-        # Verify sum of allocations <= amount
-        total_alloc = sum((a["amount"] for a in allocations), Decimal("0"))
-        if total_alloc > amount + Decimal("0.01"):
-            messages.error(request,
-                           _g("Allocation total (%(total)s) cannot exceed payment amount (%(amount)s).")
-                           % {"total": total_alloc, "amount": amount})
             return redirect("accounts:payment_create", book_id=request.book.pk)
 
         ptype = request.POST.get("type") or "collection"
@@ -396,45 +342,12 @@ class PaymentCreate(View):
             payment.set_stated_rate(_entered_rate(request))
             payment.save()
 
-            # Create allocations
-            for a in allocations:
-                inv = None
-                if a["invoice_id"]:
-                    # Cancelled invoices are terminal (no restore path) — money
-                    # allocated onto one could never be reconciled again.
-                    inv = (Invoice.objects.filter(pk=a["invoice_id"], current_account=current_account)
-                           .exclude(status="cancelled").first())
-                    if not inv:
-                        continue  # invoice not found / wrong current account / cancelled → skip silently
-                PaymentAllocation.objects.create(
-                    payment=payment,
-                    invoice=inv,
-                    amount=a["amount"],
-                )
-
             # Auto-confirm if requested
             if request.POST.get("auto_confirm") == "1":
                 _confirm_or_warn(request, payment)
 
         messages.success(request, _g("Payment created: %(number)s") % {"number": payment.number})
         return redirect("accounts:payment_detail", pk=payment.pk)
-
-
-def _serialize_invoices(invoices_qs_or_dicts):
-    """Convert invoice queryset/values to a JSON-friendly list for the form."""
-    out = []
-    for inv in invoices_qs_or_dicts:
-        out.append({
-            "id": inv["id"],
-            "label": f"{inv['series']}-{inv['number']}",
-            "type": inv["type"],
-            "date": inv["date"].isoformat() if inv["date"] else "",
-            "due_date": inv["due_date"].isoformat() if inv["due_date"] else "",
-            "total": str(inv["total"]),
-            "balance": str(inv["balance"]),
-            "currency": inv["currency__code"],
-        })
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -450,64 +363,25 @@ class PaymentDetail(View):
                                            "posted_movement"),
             pk=pk,
         )
-        allocations = (
-            payment.allocations
-            .select_related("invoice")
-            .order_by("id")
-        )
         return render(request, self.template_name, {
             "payment": payment,
-            "allocations": allocations,
         })
 
 
 # ---------------------------------------------------------------------------
 # Edit
 # ---------------------------------------------------------------------------
-def _edit_invoice_rows(payment):
-    """Invoice rows for the edit form: everything still open on the account,
-    plus whatever this payment is already applied to — a fully-paid invoice
-    is no longer "open", but its allocation still has to be visible and
-    editable here.
-
-    A confirmed payment has already paid its allocations down, so the
-    balance shown adds that share back; otherwise each row would cap the
-    input at what is left AFTER this very payment.
-    """
-    applied = defaultdict(lambda: Decimal("0.00"))
-    for inv_id, amt in payment.allocations.exclude(invoice=None).values_list("invoice_id", "amount"):
-        applied[inv_id] += amt
-
-    rows = (payment.current_account.invoices
-            .filter(Q(status__in=["issued", "partially_paid", "overdue"])
-                    | Q(pk__in=list(applied)))
-            .exclude(status="cancelled")
-            .order_by("date", "id")
-            .values("id", "series", "number", "date", "due_date", "total", "balance",
-                    "currency__code", "type"))
-
-    out = _serialize_invoices(rows)
-    already_counted = payment.status == "confirmed"
-    for row in out:
-        share = applied.get(row["id"], Decimal("0.00"))
-        row["applied"] = str(share)
-        if already_counted:
-            row["balance"] = str(Decimal(row["balance"]) + share)
-    return out
-
-
 @method_decorator(login_required, name="dispatch")
 class PaymentEdit(View):
     """Edit a draft or a confirmed payment.
 
     A confirmed payment has already moved money — it posted a
-    CurrentAccountMovement, shifted a cash account balance and paid invoices down —
-    so an edit has to walk all three back and re-apply them: the ledger
-    row is refreshed in place (resync_posted_movement), the old cash
-    effect is reversed before the new one lands, and every invoice on
-    either the old or the new allocation set is recomputed.
+    CurrentAccountMovement and shifted a cash account balance — so an edit
+    has to walk both back and re-apply them: the ledger row is refreshed
+    in place (resync_posted_movement), and the old cash effect is reversed
+    before the new one lands.
 
-    Cancelled payments are terminal, exactly as with invoices: no edit.
+    Cancelled payments are terminal: no edit.
     The account can't be switched either — moving a posted payment to a
     different current account is a new document, not an edit.
     """
@@ -544,7 +418,6 @@ class PaymentEdit(View):
             "method_choices": Payment.METHOD_CHOICES,
             "base_currency": _fx_context(payment.book or payment.current_account.book),
             "account_currency": _fx_account_context(payment.current_account),
-            "open_invoices_json": json.dumps(_edit_invoice_rows(payment), default=str),
             "payment_preview": payment_preview(),
             "cash_methods": sorted(Payment.CASH_METHODS),
         })
@@ -560,19 +433,6 @@ class PaymentEdit(View):
             messages.error(request, _g("Amount must be greater than zero."))
             return redirect("accounts:payment_edit", pk=pk)
 
-        try:
-            allocations = _parse_allocations(request.POST.get("allocations_json", ""))
-        except ValueError as e:
-            messages.error(request, str(e))
-            return redirect("accounts:payment_edit", pk=pk)
-
-        total_alloc = sum((a["amount"] for a in allocations), Decimal("0"))
-        if total_alloc > amount + Decimal("0.01"):
-            messages.error(request,
-                           _g("Allocation total (%(total)s) cannot exceed payment amount (%(amount)s).")
-                           % {"total": total_alloc, "amount": amount})
-            return redirect("accounts:payment_edit", pk=pk)
-
         # A confirmed payment is already in the books, so an edit must not
         # leave it moving cash through no cash box. Checked against what was
         # submitted, before anything is written.
@@ -586,10 +446,6 @@ class PaymentEdit(View):
         was_confirmed  = payment.status == "confirmed"
         old_cash_id    = payment.cash_account_id
         old_cash_delta = payment.amount * Decimal(payment.cash_sign)
-        # Invoices to re-derive afterwards: the ones this payment is coming
-        # off of as well as the ones it is landing on.
-        touched = set(payment.allocations.exclude(invoice=None)
-                      .values_list("invoice_id", flat=True))
 
         with transaction.atomic():
             payment.type   = request.POST.get("type")   or payment.type
@@ -609,22 +465,6 @@ class PaymentEdit(View):
             # change must not silently renumber it.
             payment.save()
 
-            # Allocations are rebuilt wholesale — same shape as create.
-            payment.allocations.all().delete()
-            for a in allocations:
-                inv = None
-                if a["invoice_id"]:
-                    inv = (Invoice.objects.filter(pk=a["invoice_id"], current_account=payment.current_account)
-                           .exclude(status="cancelled").first())
-                    if not inv:
-                        continue  # invoice not found / wrong current account / cancelled → skip silently
-                    touched.add(inv.pk)
-                PaymentAllocation.objects.create(
-                    payment=payment,
-                    invoice=inv,
-                    amount=a["amount"],
-                )
-
             if was_confirmed:
                 # Reverse what the old figures put on the cash side (which
                 # may have been a different account entirely), then apply
@@ -642,9 +482,6 @@ class PaymentEdit(View):
 
             if request.POST.get("auto_confirm") == "1" and payment.status == "draft":
                 _confirm_or_warn(request, payment)
-
-            for inv in Invoice.objects.filter(pk__in=touched):
-                inv.recompute_payment(save=True)
 
         messages.success(request, _g("Payment updated: %(number)s") % {"number": payment.number})
         return redirect("accounts:payment_detail", pk=payment.pk)

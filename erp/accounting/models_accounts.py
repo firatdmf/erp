@@ -856,12 +856,6 @@ class CurrentAccountSettings(models.Model):
         related_name="current_account_settings_default",
     )
 
-    # Language the printable invoice DOCUMENT renders in (independent of
-    # the UI language) — export invoices go out in English by default.
-    INVOICE_LANGUAGE_CHOICES = [("en", "English"), ("tr", "Türkçe")]
-    invoice_language = models.CharField(
-        max_length=5, choices=INVOICE_LANGUAGE_CHOICES, default="en",
-    )
 
     def __str__(self):
         return f"Current account settings ({self.book.name})"

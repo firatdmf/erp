@@ -4,6 +4,7 @@ from . import views_warehouse
 from . import order_excel
 from . import warehouse_label
 from . import warehouse_excel
+from accounting import views_invoice
 from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped
 from .models import Order, Warehouse
 from django.views.generic import TemplateView, RedirectView
@@ -74,12 +75,14 @@ urlpatterns = [
     path("orders/<int:pk>/", book_guarded(views.OrderDetail.as_view(), Order, "current_account.book"), name="order_detail"),
     path("orders/<int:pk>/customer/", views.order_customer_card_view, name="order_customer_card"),
     path("orders/<int:pk>/print/", views.OrderPrint.as_view(), name="order_print"),
+    # The order's invoice — a printout of the order, nothing stored.
+    path("orders/<int:pk>/invoice/", book_guarded(views_invoice.OrderInvoice.as_view(), Order, "current_account.book"), name="order_invoice"),
+    path("orders/<int:pk>/invoice/excel/", book_guarded(views_invoice.order_invoice_excel, Order, "current_account.book"), name="order_invoice_excel"),
     # Not book_guarded, and not scoped to one order: the sheet is a
     # customer's orders, which may sit in two books. The view checks the
     # viewer against each order's book itself.
     path("orders/print/combined/", views.OrderPrintCombined.as_view(), name="order_print_combined"),
     path("orders/print/combined/excel/", order_excel.combined_order_excel, name="order_excel_combined"),
-    path("orders/<int:pk>/print-header/", views.update_order_print_header, name="order_print_header"),
     path("orders/<int:pk>/changes/", views.order_changes, name="order_changes"),
     # Packing-scan flow (reserve warehouse rolls before shipping).
     #

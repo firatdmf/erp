@@ -305,7 +305,6 @@
       <a class="cd-btn ghost" href="{% url 'accounts:statement' current_account.pk %}"><i data-lucide="file-text"></i>{% trans "Statement" %}</a>
       <a class="cd-btn ghost" href="{% url 'accounts:edit' current_account.pk %}"><i data-lucide="edit-3"></i>{% trans "Edit" %}</a>
       <a class="cd-btn ghost" href="{% url 'accounts:movement_create' current_account.pk %}"><i data-lucide="plus-circle"></i>{% trans "Movement" %}</a>
-      <a class="cd-btn primary" href="{% url 'accounts:invoice_create' current_account.book.pk %}?account={{ current_account.pk }}"><i data-lucide="file-plus"></i>{% trans "New Invoice" %}</a>
     </div>
   </div>
 
@@ -345,7 +344,6 @@
             <h3>{% trans "Quick Actions" %}</h3>
           </div>
           <div style="display:flex; gap:8px; flex-wrap: wrap;">
-            <a class="cd-btn primary" href="{% url 'accounts:invoice_create' current_account.book.pk %}?account={{ current_account.pk }}"><i data-lucide="file-plus"></i>{% trans "Issue Invoice" %}</a>
             <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FFFAF0, #FFFFFF); border-color: #FED7AA; color: #B27500;" href="{% url 'accounts:payment_create' current_account.book.pk %}?account={{ current_account.pk }}&type=collection"><i data-lucide="wallet"></i>{% trans "Take Payment" %}</a>
             <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FEF2F2, #FFFFFF); border-color: #FECACA; color: #B91C1C;" href="{% url 'accounts:payment_create' current_account.book.pk %}?account={{ current_account.pk }}&type=payment"><i data-lucide="banknote"></i>{% trans "Make Payment" %}</a>
             <a class="cd-btn ghost" style="background: linear-gradient(180deg, #F5F3FF, #FFFFFF); border-color: #DDD6FE; color: #7E22CE;" href="{% url 'accounts:check_create' current_account.book.pk %}?account={{ current_account.pk }}"><i data-lucide="scroll-text"></i>{% trans "Check / Note" %}</a>
@@ -402,37 +400,6 @@
       </div>
       {% endif %}
 
-      <!-- Recent invoices -->
-      {% if recent_invoices %}
-      <div class="cd-card">
-        <div class="cd-sect" style="padding-bottom: 4px;">
-          <div class="cd-sect-h">
-            <span class="ico"><i data-lucide="file-text"></i></span>
-            <h3>{% trans "Recent Invoices" %}</h3>
-            <a href="{% url 'accounts:invoice_list' current_account.book.pk %}?account={{ current_account.pk }}" class="all">{% trans "All" %} →</a>
-          </div>
-        </div>
-        <table class="cd-tbl">
-          <thead>
-            <tr><th>{% trans "Invoice No" %}</th><th>{% trans "Date" %}</th><th>{% trans "Type" %}</th><th>{% trans "Status" %}</th><th class="num">{% trans "Total" %}</th><th class="num">{% trans "Balance" %}</th></tr>
-          </thead>
-          <tbody>
-            {% for inv in recent_invoices %}
-            <tr>
-              <td><a class="invno" href="{% url 'accounts:invoice_detail' inv.pk %}">{{ inv.display_number }}</a></td>
-              <td style="color: var(--gray-600); font-size: 12.5px;">{{ inv.date|date:"d.m.Y" }}</td>
-              <td><span class="mv-type">{{ inv.get_type_display }}</span></td>
-              <td style="color: var(--gray-600); font-size: 12px;">{{ inv.get_status_display }}</td>
-              <td class="num">{{ inv.currency.symbol }}{{ inv.total|money }}</td>
-              <td class="num {% if inv.balance > 0 %}pos{% elif inv.balance < 0 %}neg{% endif %}">{{ inv.currency.symbol }}{{ inv.balance|money }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% endif %}
-
-
       <!-- Recent movements -->
       <div class="cd-card">
         <div class="cd-sect" style="padding-bottom: 4px;">
@@ -451,7 +418,7 @@
             {% for m in movements %}
             {% with link_url='' pay=m.linked_payment inv=m.linked_invoice %}
               {% if pay %}{% url 'accounts:payment_detail' pay.pk as link_url %}
-              {% elif inv %}{% url 'accounts:invoice_detail' inv.pk as link_url %}
+              {% elif inv %}{% url 'accounts:purchase_order_detail' inv.pk as link_url %}
               {% endif %}
             <tr {% if link_url %}class="mv-link" data-href="{{ link_url }}" style="cursor:pointer;"{% endif %}>
               {% comment %}
@@ -489,12 +456,9 @@
                     <span class="mv-st mv-st-{{ pay.status }}">{{ pay.get_status_display }}</span>
                   {% endif %}
                 {% elif inv %}
-                  <a href="{% url 'accounts:invoice_detail' inv.pk %}"
+                  <a href="{% url 'accounts:purchase_order_detail' inv.pk %}"
                      class="mv-ref"
                      onclick="event.stopPropagation();">{{ inv.display_number }}</a>
-                  {% if m.is_cancel_row or inv.status != 'cancelled' %}
-                    <span class="mv-st mv-st-{{ inv.status }}">{{ inv.get_status_display }}</span>
-                  {% endif %}
                 {% else %}
                   <span style="color: var(--gray-500);">{{ m.mv.reference|default:"—" }}</span>
                 {% endif %}

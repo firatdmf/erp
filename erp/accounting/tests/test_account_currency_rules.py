@@ -98,14 +98,6 @@ class InvoiceCurrencyTest(CurrencyRulesBase):
         with self.assertRaises(ValidationError):
             self.invoice(currency=self.try_)
 
-    def test_the_form_ignores_a_posted_currency(self):
-        self.client.post(reverse("accounts:invoice_create", kwargs={"book_id": self.book.pk}), {
-            "account": self.account.pk, "type": "sales", "series": "INV",
-            "date": "2026-09-11", "currency": self.try_.pk,
-            "items_json": json.dumps([{"description": "Curtain", "quantity": "1", "unit_price": "10"}]),
-        })
-        self.assertEqual(Invoice.objects.get().currency, self.usd)
-
     def test_an_old_invoice_that_broke_the_rule_still_saves_as_it_is(self):
         inv = self.invoice()
         Invoice.objects.filter(pk=inv.pk).update(currency=self.try_)   # as if from before the rule

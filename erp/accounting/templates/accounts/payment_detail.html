@@ -167,7 +167,7 @@
     <div class="pd-head-r">
       {% if payment.status != 'cancelled' %}
         <a href="{% url 'accounts:payment_edit' payment.pk %}" class="pd-btn ghost"
-           {% if payment.status == 'confirmed' %}onclick="return confirm('{% trans "This payment is already confirmed. Editing reposts the account movement, the cash balance and the invoices it touches. Continue?" %}');"{% endif %}>
+           {% if payment.status == 'confirmed' %}onclick="return confirm('{% trans "This payment is already confirmed. Editing reposts the account movement and the cash balance. Continue?" %}');"{% endif %}>
           <i data-lucide="edit-3"></i> {% trans "Edit" %}
         </a>
       {% endif %}
@@ -221,49 +221,6 @@
         </div>
       </div>
 
-      <!-- Invoice Allocations -->
-      <div class="pd-card">
-        <div class="pd-sect" style="padding-bottom: 4px;">
-          <div class="pd-sect-h">
-            <span class="ico"><i data-lucide="file-text"></i></span>
-            <h3>{% trans "Invoice Allocations" %}</h3>
-          </div>
-        </div>
-        {% if allocations %}
-        <table class="pd-tbl">
-          <thead>
-            <tr>
-              <th>{% trans "Invoice" %}</th>
-              <th>{% trans "Date" %}</th>
-              <th>{% trans "Due Date" %}</th>
-              <th class="num">{% trans "Invoice Total" %}</th>
-              <th class="num">{% trans "Applied" %}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for a in allocations %}
-            <tr>
-              <td>
-                {% if a.invoice %}
-                  <a class="invno" href="{% url 'accounts:invoice_detail' a.invoice.pk %}">{{ a.invoice.display_number }}</a>
-                  <div class="inv-type">{{ a.invoice.get_type_display }}</div>
-                {% else %}
-                  <span class="advance"><span style="width:6px; height:6px; border-radius:50%; background:#F59E0B;"></span>{% trans "ADVANCE (to account)" %}</span>
-                {% endif %}
-              </td>
-              <td><span class="date">{% if a.invoice %}{{ a.invoice.date|date:"d.m.Y" }}{% else %}—{% endif %}</span></td>
-              <td><span class="date">{% if a.invoice %}{{ a.invoice.due_date|date:"d.m.Y" }}{% else %}—{% endif %}</span></td>
-              <td class="num">{% if a.invoice %}{{ a.invoice.total|money }}{% else %}—{% endif %}</td>
-              <td class="num applied">{{ a.amount|money }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="pd-empty">{% trans "No allocations." %}</div>
-        {% endif %}
-      </div>
-
       <!-- Notes -->
       {% if payment.notes %}
       <div class="pd-card">
@@ -280,21 +237,6 @@
 
     <!-- SIDE -->
     <div>
-      <!-- Amount Distribution -->
-      <div class="pd-card">
-        <div class="pd-sect">
-          <div class="pd-sect-h">
-            <span class="ico"><i data-lucide="pie-chart"></i></span>
-            <h3>{% trans "Amount Distribution" %}</h3>
-          </div>
-          <div>
-            <div class="pd-stat-row"><span class="l">{% trans "Payment" %}</span><span class="v">{{ payment.amount|money }}</span></div>
-            <div class="pd-stat-row"><span class="l">{% trans "Allocated" %}</span><span class="v">{{ payment.allocated_amount|money }}</span></div>
-            <div class="pd-stat-row grand"><span class="l">{% trans "Advance" %}</span><span class="v">{{ payment.unallocated_amount|money }}</span></div>
-          </div>
-        </div>
-      </div>
-
       <!-- Account Info -->
       <div class="pd-card">
         <div class="pd-sect">

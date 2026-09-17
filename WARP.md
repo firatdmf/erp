@@ -24,7 +24,7 @@ pip install -r erp/requirements.txt
 # - DEBUG (True/False)
 # - DB_ENGINE (e.g., django.db.backends.postgresql)
 # - DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
-# - Cloudinary credentials for media storage
+# - Bunny CDN credentials for media storage
 ```
 
 ### Database Operations
@@ -99,7 +99,7 @@ erp/                    # Main Django project directory
 ├── todo/              # Task management
 ├── static/            # Static assets (CSS, JS, images)
 ├── templates/         # Shared HTML templates
-└── media/             # User-uploaded files (served via Cloudinary)
+└── media/             # User-uploaded files (served via Bunny CDN)
 ```
 
 ### Core Applications
@@ -132,8 +132,8 @@ erp/                    # Main Django project directory
   - `ProductVariant`: Product variations with separate SKUs
   - `ProductCollection`: Curated product groupings
   - `ProductCategory`: Hierarchical product taxonomy
-  - File attachments for products (images, videos) stored on Cloudinary
-- **Media Handling**: Custom file validators (size, type) with Cloudinary CDN integration
+  - File attachments for products (images, videos) stored on Bunny CDN
+- **Media Handling**: Custom file validators (size, type) with Bunny CDN integration
 - **Features**: PostgreSQL ArrayField for tags, HTMX for dynamic UX
 
 #### Operating Module
@@ -170,7 +170,7 @@ erp/                    # Main Django project directory
    - Product files can be associated with specific variants
 
 5. **Media Management**
-   - Cloudinary integration for all user-uploaded media
+   - Bunny CDN integration for all user-uploaded media
    - Custom validators for file size (10MB max) and type
    - Files organized by product SKU in folder structure
 
@@ -180,7 +180,7 @@ erp/                    # Main Django project directory
 - **Middleware**: WhiteNoise for static files, HTMX middleware enabled
 - **Authentication**: Custom authentication app (django-allauth code commented out)
 - **Static Files**: Served via WhiteNoise in production
-- **Media Files**: Served via Cloudinary CDN
+- **Media Files**: Served via Bunny CDN
 - **CSRF**: Configured for deployment on vercel.app, demfirat.com, nejum.com domains
 
 ### URL Routing Structure
@@ -208,7 +208,6 @@ The project has extensive migrations (39+ in accounting alone), indicating activ
 ### Dependencies of Note
 
 - `django-htmx`: HTMX integration for dynamic UI
-- `cloudinary`: CDN for media files
 - `whitenoise`: Static file serving
 - `psycopg2`: PostgreSQL adapter
 - `python-decouple`: Environment variable management
@@ -238,7 +237,7 @@ The project has extensive migrations (39+ in accounting alone), indicating activ
 
 - Products can be standalone or have variants
 - If a product has variants, SKU/price should be on the variant, not the product
-- All product media goes through Cloudinary
+- All product media goes through Bunny CDN
 - Use `validate_file_size` and `validate_file_type` for uploads
 - Tags are stored in PostgreSQL ArrayField
 
@@ -248,7 +247,7 @@ Essential `.env` variables in `erp/` directory:
 - `SECRET_KEY`: Django secret key
 - `DEBUG`: Boolean for debug mode
 - `DB_ENGINE`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`: Database config
-- Cloudinary credentials (check settings.py for exact names)
+- Bunny CDN credentials (see marketing/utils/bunny_storage.py for exact names)
 
 ### Common Patterns
 

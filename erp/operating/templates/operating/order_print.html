@@ -283,7 +283,7 @@
       <tr>
         <th>{% trans "Product" %}</th>
         <th>{% trans "Variant" %}</th>
-        <th>{% trans "Type" %}</th>
+        <th>{% trans "Group" %}</th>
         <th class="num">{% trans "Quantity" %}</th>
         <th class="num">{% trans "Price" %}</th>
         <th class="num">{% trans "Amount" %}</th>
@@ -316,7 +316,7 @@
           <div class="vname">{{ item.variant_label|default:"—" }}</div>
           <div class="sku">{{ item.product_variant.variant_sku|default:"—" }}</div>
         </td>
-        <td><span class="tname">{{ item.product_type_label|default:"—" }}</span></td>
+        <td><span class="tname">{{ item.product_group_label|default:"—" }}</span></td>
         {% comment %} "2u" keeps the decimal point a point and intcomma:False
            the separator a comma, whatever locale the person printing has
            active — a Turkish session renders 4.577,91 for the same figure,

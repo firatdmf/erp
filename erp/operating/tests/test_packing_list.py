@@ -1,4 +1,4 @@
-"""Packing list: item numbering and the product-type column.
+"""Packing list: item numbering and the product-group column.
 
 Lives outside tests.py because that module currently fails to import
 (a stale `from .models import Product` that no longer resolves), which
@@ -18,7 +18,7 @@ from marketing.models import (Product, ProductCategory, ProductVariant,
                               ProductVariantAttributeValue)
 from operating.models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
                      WarehouseProduct, WarehouseProductItem)
-from operating.views import (_long_date, _pack_roll_rows, _product_type_label,
+from operating.views import (_long_date, _pack_roll_rows, _product_group_label,
                     _variant_label)
 
 
@@ -64,20 +64,15 @@ class PackingListColumns(TestCase):
                     order=self.order, order_item=item, stock_item=roll,
                     warehouse_product=wp, quantity=Decimal("32.45"), pack=pack)
 
-    def test_rows_carry_the_product_type(self):
+    def test_rows_carry_the_product_group(self):
         pack = self.order.packs.get(pack_number=1)
-        types = [r["product_type"] for r in _pack_roll_rows(pack)]
-        self.assertEqual(types, ["Fabric", "Bed Linen"])
+        groups = [r["product_group"] for r in _pack_roll_rows(pack)]
+        self.assertEqual(groups, ["Fabric", "Bed Linen"])
 
-    def test_a_typeless_product_falls_back_to_a_dash(self):
-        Product.objects.update(category=None, type=None)
+    def test_an_ungrouped_product_falls_back_to_a_dash(self):
+        Product.objects.update(category=None)
         pack = self.order.packs.get(pack_number=1)
-        self.assertEqual([r["product_type"] for r in _pack_roll_rows(pack)], ["-", "-"])
-
-    def test_free_text_type_stands_in_for_a_missing_group(self):
-        Product.objects.update(category=None, type="curtain")
-        pack = self.order.packs.get(pack_number=1)
-        self.assertEqual([r["product_type"] for r in _pack_roll_rows(pack)], ["Curtain"] * 2)
+        self.assertEqual([r["product_group"] for r in _pack_roll_rows(pack)], ["-", "-"])
 
     def test_item_numbers_run_across_packages_not_within_them(self):
         self.client.force_login(
@@ -130,7 +125,7 @@ class PackingListColumns(TestCase):
         self.assertEqual(ws["A2"].value, f"Packing List {self.order.pk}")
         self.assertEqual(
             [c.value for c in ws[7]],
-            ["Pack", "No", "Product", "Variant", "Product Type", "SKU",
+            ["Pack", "No", "Product", "Variant", "Product Group", "SKU",
              "Barcode", "Metres"])
         # One merged block per package, down its own items.
         self.assertIn("A8:A9", [str(m) for m in ws.merged_cells.ranges])
@@ -320,30 +315,29 @@ class OrderPrintProductType(TestCase):
         return self._resp().content.decode()
 
     def test_the_line_says_what_kind_of_goods_it_is(self):
-        self.assertEqual(self._items()[0].product_type_label, "Fabric")
+        self.assertEqual(self._items()[0].product_group_label, "Fabric")
 
     def test_it_reads_the_same_word_the_packing_list_prints(self):
-        """Both documents go through _product_type_label, so a customer
+        """Both documents go through _product_group_label, so a customer
         holding the order and the packing list never sees two names for
         one kind of goods."""
-        self.assertEqual(self._items()[0].product_type_label,
-                         _product_type_label(self.product))
+        self.assertEqual(self._items()[0].product_group_label,
+                         _product_group_label(self.product))
 
     def test_a_slugged_group_loses_its_underscore(self):
         self.product.category = ProductCategory.objects.create(
             name="ready-made_curtain")
         self.product.save()
-        self.assertEqual(self._items()[0].product_type_label,
+        self.assertEqual(self._items()[0].product_group_label,
                          "Ready-Made Curtain")
 
     def test_an_unclassified_product_leaves_its_column_empty(self):
-        """Both documents have a Type column to fill now. The helper
+        """Both documents have a Group column to fill now. The helper
         still hands back None rather than "-" — the template is what
         decides how an empty cell reads."""
         self.product.category = None
-        self.product.type = None
         self.product.save()
-        self.assertIsNone(self._items()[0].product_type_label)
+        self.assertIsNone(self._items()[0].product_group_label)
 
     def test_the_line_names_the_variant_AND_gives_its_code(self):
         """The name is what the customer ordered ("Bej-Gumus"); the code

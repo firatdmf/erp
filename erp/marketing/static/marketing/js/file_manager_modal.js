@@ -848,7 +848,7 @@ function createFileItem(file, isNew = false) {
   // Generate appropriate HTML based on file type
   if (isVideo) {
     // For videos, show a thumbnail with play icon overlay
-    const thumbnailUrl = file.video_thumbnail_url || getVideoThumbnailUrl(fileUrl);
+    const thumbnailUrl = file.video_thumbnail_url || '';
     div.innerHTML = `
       <div style="position: relative;">
         <img src="${thumbnailUrl}" alt="${file.name || 'Video'}" class="fm-file-img" onerror="this.src='${fileUrl}'">
@@ -906,19 +906,6 @@ function detectFileType(url) {
     return 'video';
   }
   return 'image';
-}
-
-// Generate Cloudinary video thumbnail URL
-function getVideoThumbnailUrl(videoUrl) {
-  if (!videoUrl) return '';
-  // Cloudinary transformation to get video thumbnail (first frame as jpg)
-  // w_300 = width, h_200 = height, c_fill = crop fill, so_0 = start offset 0
-  const transformedUrl = videoUrl.replace(
-    '/upload/',
-    '/upload/w_300,h_200,c_fill,so_0,f_jpg/'
-  );
-  // Change extension to .jpg
-  return transformedUrl.replace(/\.(mp4|mov|webm|avi|mkv|m4v|wmv)$/i, '.jpg');
 }
 
 
@@ -1578,7 +1565,7 @@ function createProductFileElement(fileId, fileSrc, fileType = 'image') {
   div.style.cssText = 'position: relative; border: 2px solid #e5e7eb; border-radius: 8px; padding: 10px; background: white; width: 150px; opacity: 1;';
 
   const isVideo = fileType === 'video';
-  const thumbnailUrl = isVideo ? getVideoThumbnailUrl(fileSrc) : fileSrc;
+  const thumbnailUrl = isVideo ? '' : fileSrc;
 
   if (isVideo) {
     // Video element with play icon overlay

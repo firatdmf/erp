@@ -686,7 +686,7 @@
       '<span class="np-th-state"></span>' +
       '<span class="np-th-x"></span>' +
     '</div>';
-  // Ürün türü (marketing ProductCategory) options — fabric (Kumaş) comes
+  // Product group (marketing ProductCategory) options — fabric (Kumaş) comes
   // first from the server and is the preselected default for new products.
   const NP_CATS = JSON.parse((document.getElementById('np-cats-data') || {}).textContent || '[]');
   const NP_CAT_SEL = '<select class="np-select np-main-cat">' +
@@ -980,7 +980,7 @@
       // them (see npApplyProductFacts).
       '<div class="np-field np-main-row np-kind-row">' +
         '<div class="np-col np-col-cat">' +
-          '<label>{% trans "Product Type" %}</label>' +
+          '<label>{% trans "Product Group" %}</label>' +
           NP_CAT_SEL + '<div class="np-fact" hidden></div>' +
         '</div>' +
         '<div class="np-col np-col-unit">' +

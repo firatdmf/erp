@@ -2687,8 +2687,8 @@ def build_order_print_rows(order):
         # for an unclassified product becomes None here: the packing
         # list has a column to fill, this layout has a line it can
         # simply leave out.
-        label = _product_type_label(it.product)
-        it.product_type_label = None if label == "-" else label
+        label = _product_group_label(it.product)
+        it.product_group_label = None if label == "-" else label
         # Which variant, by NAME ("Bej-Gümüş") rather than by the
         # SKU the row used to show: MRK00061 tells a customer
         # nothing about the colour they ordered. Same helper, and so
@@ -4023,16 +4023,14 @@ class OrderItemUnitScanPack(View):
         return render(request, self.template_name, context)
 
 
-def _product_type_label(product):
-    """What KIND of thing a packed roll is — "Fabric", "Curtain", … The
-    product group is the real classification; Product.type is the older
-    free-text field kept as a fallback for catalog rows that predate
-    groups. Same precedence the invoice print uses, so a customer
-    reading both documents sees the same word. Group names are stored
-    slugged and lowercase (`bed_linen`), so un-slug them for print."""
+def _product_group_label(product):
+    """Which product group a packed roll belongs to — "Fabric", "Curtain",
+    … The invoice print shows the same group, so a customer reading both
+    documents sees the same word. Group names are stored slugged and
+    lowercase (`bed_linen`), so un-slug them for print."""
     if product is None:
         return "-"
-    name = (product.category.name if product.category_id else None) or product.type
+    name = product.category.name if product.category_id else None
     if not name:
         return "-"
     return name.replace("_", " ").strip().title()
@@ -4104,7 +4102,7 @@ def _pack_roll_rows(pack):
         rows.append({
             "title": title, "sku": sku,
             "variant": _variant_label(variant),
-            "product_type": _product_type_label(product),
+            "product_group": _product_group_label(product),
             "barcode": r.stock_item.barcode if r.stock_item_id else "-",
             "quantity": r.quantity,
         })
@@ -4250,7 +4248,7 @@ def export_packing_list_excel(request, pk):
     ws = wb.active
     ws.title = f"Packing List {pk}"
 
-    headers = ["Pack", "No", "Product", "Variant", "Product Type", "SKU",
+    headers = ["Pack", "No", "Product", "Variant", "Product Group", "SKU",
                "Barcode", "Metres"]
     last_col = len(headers)
     last_letter = get_column_letter(last_col)
@@ -4301,7 +4299,7 @@ def export_packing_list_excel(request, pk):
             item_no += 1
             total_meters += Decimal(r["quantity"] or 0)
             values = [pack.pack_number, item_no, r["title"], r["variant"],
-                      r["product_type"], r["sku"], r["barcode"],
+                      r["product_group"], r["sku"], r["barcode"],
                       float(r["quantity"] or 0)]
             for col_index, value in enumerate(values, start=1):
                 cell = ws.cell(row=row, column=col_index, value=value)
@@ -4358,7 +4356,7 @@ def export_packing_list_excel(request, pk):
     for col in range(5, last_col + 1):
         ws.column_dimensions[get_column_letter(col)].width = 20
     # Header stays put while the list scrolls, and the filter lets staff
-    # pull out one product type or one package before editing.
+    # pull out one product group or one package before editing.
     ws.freeze_panes = ws.cell(row=HEADER_ROW + 1, column=1)
     if item_no:
         ws.auto_filter.ref = f"A{HEADER_ROW}:{last_letter}{row - 1}"
@@ -5197,7 +5195,7 @@ def order_packing_list_pdf(request, pk):
         'pack': "Paket" if is_tr else "Pack",
         'product': "\u00dcr\u00fcn" if is_tr else "Product",
         'variant': "Varyant" if is_tr else "Variant",
-        'product_type': "\u00dcr\u00fcn Tipi" if is_tr else "Product Type",
+        'product_group': "\u00dcr\u00fcn Grubu" if is_tr else "Product Group",
         'barcode': "Barkod" if is_tr else "Barcode",
         'quantity': "Metre" if is_tr else "Metres",
         'total_packages': "Toplam Paket" if is_tr else "Total Packages",
@@ -5303,7 +5301,7 @@ def order_packing_list_pdf(request, pk):
         Paragraph(labels['item_no'], th_style),
         Paragraph(labels['product'], th_style),
         Paragraph(labels['variant'], th_style),
-        Paragraph(labels['product_type'], th_style),
+        Paragraph(labels['product_group'], th_style),
         Paragraph(labels['barcode'], th_style),
         Paragraph(labels['quantity'], th_num_style),
     ]]
@@ -5334,7 +5332,7 @@ def order_packing_list_pdf(request, pk):
                     f"{row['title']}<br/><font size=8 color='#6B7280'>{row['sku']}</font>",
                     cell_style),
                 Paragraph(row['variant'], cell_style),
-                Paragraph(row['product_type'], cell_style),
+                Paragraph(row['product_group'], cell_style),
                 Paragraph(str(row['barcode']), cell_style),
                 Paragraph(f"{row['quantity']:.2f} m" if row['quantity'] is not None else "-",
                           num_style),
@@ -5345,7 +5343,7 @@ def order_packing_list_pdf(request, pk):
         story.append(Paragraph(labels['no_items'], normal_style))
     else:
         tbl = Table(data,
-                    # Product Type needs 28mm to keep its header on one
+                    # Product Group needs 28mm to keep its header on one
                     # line; the barcode column gives it up, a 13-digit
                     # EAN at 9pt still clears 28mm.
                     colWidths=[14 * mm, 10 * mm, 50 * mm, 26 * mm,

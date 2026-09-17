@@ -819,19 +819,19 @@ def warehouse_account_create(request):
     })
 
 
-# DB category slugs → display labels for the manual-add "Product Type"
+# DB category slugs → display labels for the manual-add "Product Group"
 # select (unknown slugs fall back to the raw name). Translated per request,
 # so the select follows the viewer's language like the rest of the page.
 _CATEGORY_LABELS = {
-    "fabric": pgettext_lazy("product type", "Fabric"),
-    "ready-made_curtain": pgettext_lazy("product type", "Ready-made curtain"),
-    "throw": pgettext_lazy("product type", "Throw / Shawl"),
-    "bed": pgettext_lazy("product type", "Bed textile"),
+    "fabric": pgettext_lazy("product group", "Fabric"),
+    "ready-made_curtain": pgettext_lazy("product group", "Ready-made curtain"),
+    "throw": pgettext_lazy("product group", "Throw / Shawl"),
+    "bed": pgettext_lazy("product group", "Bed textile"),
 }
 
 
 def _product_category_choices():
-    """ProductCategories for the manual-add "Product Type" select, fabric first
+    """ProductCategories for the manual-add "Product Group" select, fabric first
     (it's the default for warehouse-minted products — this is a fabric mill)."""
     try:
         from marketing.models import ProductCategory
@@ -2776,7 +2776,7 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
     fabric_cat = _default_fabric_category()
     resolved = []
     for i, p_in in enumerate(products_in, start=1):
-        # Ürün türü (category) — panel sends the chosen id; anything
+        # Product group (category) — panel sends the chosen id; anything
         # missing/invalid falls back to fabric (kumaş), the house default.
         category = None
         cat_id = str(p_in.get("category_id") or "").strip()
@@ -2963,8 +2963,8 @@ def _intake_main_product(item, prefix, *, invoice=None):
                 raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
     else:
         if not main_product.category_id and category:
-            # Existing main product with no type yet — backfill it so
-            # its invoices stop showing a blank "Product Type" column.
+            # Existing main product with no group yet — backfill it so
+            # its invoices stop showing a blank "Product Group" column.
             main_product.category = category
             main_product.save(update_fields=["category"])
         if ((unit and unit != main_product.unit

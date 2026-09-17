@@ -31,7 +31,7 @@ QUALITY_STEP = 10             # Decrease quality by this step each iteration
 class OptimizedImageFile:
     """
     Wrapper that mimics Django's InMemoryUploadedFile interface
-    so it can be passed directly to smart_upload / Cloudinary / Bunny.
+    so it can be passed directly to smart_upload / Bunny.
     """
     def __init__(self, buffer: io.BytesIO, original_name: str):
         self.buffer = buffer

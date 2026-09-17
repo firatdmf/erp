@@ -128,7 +128,7 @@ class GoodsReceiptPageTest(TestCase):
 class GoodsReceiptTranslationTest(TestCase):
     """The page is used in Turkish — its own strings must be in the catalog."""
 
-    def test_product_types_follow_the_language(self):
+    def test_product_groups_follow_the_language(self):
         from marketing.models import ProductCategory
         from operating.views_warehouse import _product_category_choices
 

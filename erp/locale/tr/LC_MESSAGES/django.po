@@ -458,8 +458,8 @@ msgstr "Yeni Kategori"
 msgid "Product Name"
 msgstr "Ürün Adı"
 
-msgid "Product Type"
-msgstr "Ürün Türü"
+msgid "Product Group"
+msgstr "Ürün Grubu"
 
 msgid "Qty Used"
 msgstr "Kullanılan Miktar"
@@ -9696,19 +9696,19 @@ msgstr "Seçenek değerleri büyük harflerle, tirelerle ayrılmış — örn. B
 msgid "No dots. Variant SKUs are built from it: K24644 → K24644.WHITE-140."
 msgstr "Nokta kullanmayın. Varyant SKU'ları bundan oluşturulur: K24644 → K24644.BEYAZ-140."
 
-msgctxt "product type"
+msgctxt "product group"
 msgid "Fabric"
 msgstr "Kumaş"
 
-msgctxt "product type"
+msgctxt "product group"
 msgid "Ready-made curtain"
 msgstr "Hazır Perde"
 
-msgctxt "product type"
+msgctxt "product group"
 msgid "Throw / Shawl"
 msgstr "Örtü / Şal"
 
-msgctxt "product type"
+msgctxt "product group"
 msgid "Bed textile"
 msgstr "Yatak Tekstili"
 

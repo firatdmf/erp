@@ -321,7 +321,7 @@ class CombinedOrderExcel(OlegOrders, TestCase):
             # label for the filter's dropdown, which sits in the cell.
             self.assertLessEqual(width, widest + 5)
 
-        # "Type" holds "Fabric"; "Product" holds four words of a name.
+        # "Group" holds "Fabric"; "Product" holds four words of a name.
         self.assertLess(ws.column_dimensions["E"].width,
                         ws.column_dimensions["A"].width)
 
@@ -363,7 +363,7 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         ws = self._book(self.laleli_a)
         heads = [ws.cell(r, c).value
                  for r in range(1, ws.max_row + 1) for c in range(1, 10)]
-        for h in ("Product", "SKU", "Variant", "Variant SKU", "Type",
+        for h in ("Product", "SKU", "Variant", "Variant SKU", "Group",
                   "Quantity", "Packs"):
             self.assertIn(h, heads)
 

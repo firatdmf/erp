@@ -648,7 +648,7 @@
         <tr>
           <th style="width: 36px;">{% trans "Line" %}<span class="sub">{% trans "No" %}</span></th>
           <th style="width: 110px;">{% trans "Design ID" %}</th>
-          <th style="width: 100px;">{% trans "Product Type" %}</th>
+          <th style="width: 100px;">{% trans "Product Group" %}</th>
           <th>{% trans "Description" %}</th>
           <th class="num" style="width: 80px;">{% trans "Quantity" %}<span class="sub">{{ invoice.current_account.default_currency.code|default:"" }}</span></th>
           <th class="num" style="width: 90px;">{% trans "Unit Price" %}<span class="sub">({{ invoice.currency.symbol }}{{ invoice.currency.code }} / {% trans "Unit" %})</span></th>
@@ -666,7 +666,6 @@
           </td>
           <td>
             {% if it.product.category %}{{ it.product.category.name }}
-            {% elif it.product.type %}{{ it.product.type }}
             {% else %}—{% endif %}
           </td>
           <td class="desc-multi">

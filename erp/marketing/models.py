@@ -248,9 +248,6 @@ class Product(models.Model):
         ProductCategory, on_delete=models.SET_NULL, blank=True, null=True, db_index=True
     )
 
-    # This just like category but custom, you may set it to anything you like. A product can only have one type.
-    type = models.CharField(null=True, blank=True)
-
     # What the product is counted in and how its stock is packed. Facts
     # about the product itself, so they live here once and every warehouse
     # row reads them — see marketing/units.py. (Not is_packaged/pack_count
@@ -897,48 +894,13 @@ class ProductFile(models.Model):
         return self.file_type == 'video'
 
 
-    # only works on single delete, not bulk delete. For bulk we use signals.py
     def delete(self, *args, **kwargs):
-        start = time.perf_counter()
-        print(f"🗑️ ProductFile.delete(pk={self.pk}) called")
-        """
-        Deletes the file from CDN and then from DB.
-        SKIP CDN deletion if skip_cdn=True (for async cleanup).
-        Also skips CDN deletion if another ProductFile still references the same URL (Virtual Sharing).
-        """
-        skip_cdn = kwargs.pop('skip_cdn', False)
-
-        if self.file_url and not skip_cdn:
-            # Virtual Sharing protection — skip CDN if another record uses same URL
-            other_refs = ProductFile.objects.filter(file_url=self.file_url).exclude(pk=self.pk).exists()
-            if other_refs:
-                print(f"   🛡️ Skipping CDN delete — URL still referenced by another ProductFile: {self.file_url}")
-            else:
-                try:
-                    c_start = time.perf_counter()
-                    success = smart_delete(self.file_url)
-                    if success:
-                        print(f"   ✅ CDN delete({self.file_url}) took {(time.perf_counter()-c_start):.3f}s")
-                    else:
-                        print(f"   ⚠️ CDN delete({self.file_url}) failed or file not found")
-                except Exception as e:
-                    print(f"   ❌ Failed to delete CDN resource {self.file_url}: {e}")
-                # Also delete video thumbnail from CDN (with same protection)
-                if self.video_thumbnail:
-                    thumb_refs = ProductFile.objects.filter(video_thumbnail=self.video_thumbnail).exclude(pk=self.pk).exists()
-                    if not thumb_refs:
-                        try:
-                            smart_delete(self.video_thumbnail)
-                            print(f"   ✅ Deleted video thumbnail: {self.video_thumbnail}")
-                        except Exception as e:
-                            print(f"   ⚠️ Failed to delete video thumbnail: {e}")
-        elif skip_cdn:
-            print(f"   ⚡ Skipped CDN deletion for pk={self.pk} (will be cleaned up async)")
-
-        # finally delete the DB record
-        db_start = time.perf_counter()
-        super().delete(*args, **kwargs)
-        print(f"   🗃️ DB delete took {(time.perf_counter()-db_start):.3f}s | TOTAL {(time.perf_counter()-start):.3f}s")
+        """The CDN copy goes in marketing.signals.delete_cdn_file, which also
+        covers bulk and cascade deletes. skip_cdn=True keeps it (for callers
+        that clean the CDN up themselves)."""
+        if kwargs.pop("skip_cdn", False):
+            self._skip_cdn = True
+        return super().delete(*args, **kwargs)
 
     def __str__(self):
         # return f"{self.product or self.product_variant}"
@@ -1174,7 +1136,7 @@ class BlogPost(models.Model):
     category_ru = models.CharField(max_length=100, blank=True, verbose_name="Категория (RU)")
     category_pl = models.CharField(max_length=100, blank=True, verbose_name="Kategoria (PL)")
     
-    # Images (Cloudinary URLs)
+    # Images (Bunny CDN URLs)
     cover_image = models.URLField(blank=True, verbose_name="Kapak Resmi (Liste)")
     hero_image = models.URLField(blank=True, verbose_name="Hero Resmi (Detay)")
     

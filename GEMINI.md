@@ -13,7 +13,7 @@ Nejum ERP (**Nejum ERP - Proje Dokümantasyonu**) is a lightweight, modular, and
   - **Crispy Forms** with **Bootstrap 5** for UI components.
   - **jQuery** and **Alpine.js** for client-side logic.
 - **Asynchronous Tasks:** Celery + Redis (for image uploads and email automation).
-- **Storage/CDN:** Cloudinary (Current), Bunny CDN (Transitioning).
+- **Storage/CDN:** Bunny CDN.
 - **External Integrations:** Gmail API (OAuth2), Google Calendar, Google Drive.
 
 ## Core Modules & Status
@@ -32,7 +32,7 @@ Nejum ERP (**Nejum ERP - Proje Dokümantasyonu**) is a lightweight, modular, and
    pip install -r requirements.txt
    ```
 2. **Configuration:**
-   - Create a `.env` file based on `settings.py` requirements (SECRET_KEY, DB credentials, Cloudinary, etc.).
+   - Create a `.env` file based on `settings.py` requirements (SECRET_KEY, DB credentials, Bunny CDN, etc.).
 3. **Database:**
    ```bash
    python manage.py migrate

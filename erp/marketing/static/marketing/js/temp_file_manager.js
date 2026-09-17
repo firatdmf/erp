@@ -216,7 +216,7 @@ async function tempUploadFile(file, fileType, variantTempId, container) {
 
 /**
  * Delete temporary file
- * @param {string} publicId - Cloudinary public_id
+ * @param {string} publicId - Temporary file id
  * @param {string} fileType - 'main_image' or 'variant_image'
  * @param {string} variantTempId - Temporary variant ID (empty string if not variant)
  * @param {HTMLElement} btn - Delete button element

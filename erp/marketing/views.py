@@ -33,6 +33,7 @@ from .forms import ProductForm, ProductFileFormSet
 
 # Bunny CDN
 from .utils.bunny_storage import upload_to_bunny, delete_from_bunny
+from .signals import cdn_url_in_use
 
 # AVIF Image Optimizer
 from .utils.image_optimizer import optimize_image_to_avif
@@ -329,11 +330,6 @@ class ProductDetail(generic.DetailView):
         context['product_variants'] = list(self.object.variants.all())  # Cache variants
         context['product_collections'] = list(self.object.collections.all())  # Cache collections
         
-        # Clear session cleanup URLs after displaying them in template
-        if 'cloudinary_cleanup_urls' in self.request.session:
-            # Let template access it once, then schedule for deletion
-            context['cleanup_triggered'] = True
-        
         context_time = time.time() - context_start
         print(f"   ✓ Context built: {context_time:.4f}s")
         
@@ -345,7 +341,7 @@ class ProductDetail(generic.DetailView):
         # Clear cleanup URLs after template has rendered
         if 'cdn_cleanup_urls' in self.request.session:
             del self.request.session['cdn_cleanup_urls']
-            print("🗑️ Cleared Cloudinary cleanup URLs from session")
+            print("🗑️ Cleared CDN cleanup URLs from session")
         
         return response
 
@@ -1276,7 +1272,7 @@ class BaseProductView(ModelFormMixin):
                     print(f"Uploaded main product file {product_file.pk} with variants")
             except Exception as e:
                 print(
-                    f"There was a cloudinary error in uploading file: {file_obj}, but we will continue"
+                    f"There was a CDN error in uploading file: {file_obj}, but we will continue"
                 )
                 continue
         
@@ -1764,7 +1760,7 @@ class ProductDelete(View):
 @login_required
 def instant_upload_file(request):
     """
-    Instant file upload - Upload to Cloudinary and save to DB immediately.
+    Instant file upload - Upload to Bunny CDN and save to DB immediately.
     Used for Shopify-style instant upload during product edit.
     Expects: multipart/form-data with 'file', 'product_id', and optional 'variant_id'
     """
@@ -1797,7 +1793,7 @@ def instant_upload_file(request):
         file_type = get_file_type_from_name(file.name)
         resource_type = file_type  # 'image' or 'video'
         
-        # Upload to CDN (Bunny or Cloudinary)
+        # Upload to Bunny CDN
         try:
             folder = f"media/product_images/product_{product.sku}"
             if variant:
@@ -1877,7 +1873,7 @@ def instant_upload_file(request):
 @login_required
 def instant_delete_file(request):
     """
-    Instant file delete - Delete from DB and Cloudinary immediately.
+    Instant file delete - Delete from DB and Bunny CDN immediately.
     Used for Shopify-style instant delete during product edit.
     Expects JSON: {"file_id": 123}
     """
@@ -2162,7 +2158,7 @@ def link_files_to_variant(request):
 @login_required
 def async_delete_cdn_files(request):
     """
-    AJAX endpoint to delete files from CDN (Bunny or Cloudinary) in background.
+    AJAX endpoint to delete files from Bunny CDN in background.
     Called after page redirect to not block user.
     Expects JSON: {"file_urls": ["url1", "url2", ...]}
     """
@@ -2180,10 +2176,8 @@ def async_delete_cdn_files(request):
         for file_url in file_urls:
             if file_url:
                 try:
-                    # CRITICAL: Virtual Sharing protection
-                    # Only delete from CDN if no other ProductFile still references this URL
-                    still_in_use = ProductFile.objects.filter(file_url=file_url).exists()
-                    if still_in_use:
+                    # Only delete from CDN if nothing still shows this URL
+                    if cdn_url_in_use(file_url):
                         print(f"[async_delete_cdn_files] Skipping — URL still in use: {file_url}")
                         skipped_count += 1
                         continue
@@ -2211,7 +2205,7 @@ def async_delete_cdn_files(request):
 def temp_upload_file(request):
     """
     Temporary file upload for product creation (before product_id exists).
-    Uploads to Cloudinary and stores URLs in session.
+    Uploads to Bunny CDN and stores URLs in session.
     Returns: {success: true, file_data: {url, public_id, name, sequence}}
     """
     try:
@@ -2275,7 +2269,7 @@ def temp_upload_file(request):
 @login_required
 def cleanup_temp_files(request):
     """
-    Cleanup temporary files from Cloudinary and session.
+    Cleanup temporary files from Bunny CDN and session.
     Called when user leaves product creation page without saving.
     """
     try:
@@ -2292,7 +2286,6 @@ def cleanup_temp_files(request):
             url = file_data.get('url')
             if url:
                 try:
-                    # Use smart_delete to handle both Bunny and Cloudinary
                     smart_delete(url)
                     deleted_count += 1
                 except Exception as e:
@@ -2304,7 +2297,6 @@ def cleanup_temp_files(request):
                 url = file_data.get('url')
                 if url:
                     try:
-                        # Use smart_delete to handle both Bunny and Cloudinary
                         smart_delete(url)
                         deleted_count += 1
                     except Exception as e:
@@ -2935,7 +2927,7 @@ def get_product(request):
         cursor.execute("""
             SELECT
                 p.id, p.created_at, p.title, p.description, p.sku, p.barcode,
-                p.tags, p.type, p.unit_of_measurement,
+                p.tags, p.unit_of_measurement,
                 -- No p.quantity column: a product's stock is everything the
                 -- warehouse holds across its variants. NULL = carried by no
                 -- warehouse at all, i.e. made to order.
@@ -2963,7 +2955,7 @@ def get_product(request):
 
     # Unpack product row
     (p_id, p_created_at, p_title, p_description, p_sku, p_barcode,
-     p_tags, p_type, p_uom, p_quantity, p_price,
+     p_tags, p_uom, p_quantity, p_price,
      p_featured, p_selling_oos, p_weight, p_uow,
      p_category_id, p_supplier_account_id, p_datasheet_url, p_min_inv,
      p_primary_image_url, p_category_name,
@@ -3079,7 +3071,6 @@ def get_product(request):
         "sku": p_sku,
         "barcode": p_barcode,
         "tags": p_tags,
-        "type": p_type,
         "unit_of_measurement": p_uom,
         "quantity": float(p_quantity) if p_quantity is not None else None,
         "price": float(p_price) if p_price is not None else None,
@@ -3387,7 +3378,7 @@ class BlogDelete(generic.DeleteView):
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_blog_image(request):
-    """Upload image to CDN for blog - uses Bunny CDN if enabled, otherwise Cloudinary"""
+    """Upload image to Bunny CDN for blog"""
     try:
         if 'file' not in request.FILES:
             return JsonResponse({'success': False, 'error': 'No file provided'}, status=400)
@@ -3396,7 +3387,7 @@ def upload_blog_image(request):
         image_type = request.POST.get('type', 'content')  # cover, hero, or content
         blog_slug = request.POST.get('slug', 'temp')
         
-        # Upload using smart_upload (Bunny CDN or Cloudinary)
+        # Upload using smart_upload (Bunny CDN)
         folder = f"media/blog/{blog_slug}"
         url = smart_upload(file, folder)
         
@@ -3505,7 +3496,7 @@ def upload_blog_html(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def delete_blog_image(request):
-    """Delete image from CDN (Bunny or Cloudinary)"""
+    """Delete image from Bunny CDN"""
     try:
         import json
         data = json.loads(request.body)
@@ -3514,7 +3505,6 @@ def delete_blog_image(request):
         if not url:
             return JsonResponse({'success': False, 'error': 'No URL provided'}, status=400)
         
-        # Use smart_delete to handle both Bunny CDN and Cloudinary
         success = smart_delete(url)
         
         if success:

@@ -162,7 +162,7 @@ class Command(BaseCommand):
             })
         products = [
             {"id": p.pk, "title": p.title, "sku": p.sku, "featured": p.featured,
-             "barcode": p.barcode, "type": p.type,
+             "barcode": p.barcode,
              "unit_of_measurement": p.unit_of_measurement,
              "category_id": p.category_id, "supplier_account_id": p.supplier_account_id,
              "cost": str(p.cost) if p.cost is not None else None,

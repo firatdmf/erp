@@ -1497,7 +1497,7 @@ function renderVariantImages(variantIndex) {
         const isPrimary = idx === 0;
         // Detect if file is a video
         const isVideo = isVideoFile(img.url) || img.file_type === 'video';
-        const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
+        const thumbnailUrl = isVideo ? '' : img.url;
 
         if (isVideo) {
             return `
@@ -1791,7 +1791,7 @@ async function removeVariantImage(variantIndex, imageIndex) {
 
     if (!confirmed) return;
 
-    // If image has DB ID, delete from Cloudinary via API
+    // If image has DB ID, delete it (and its CDN file) via API
     if (img.id) {
         try {
             const response = await fetch('/marketing/api/instant_delete_file/', {
@@ -2026,7 +2026,7 @@ function generateImageGrid() {
 
     return uploadedImages.map((img, idx) => {
         const isVideo = isVideoFile(img.url) || img.file_type === 'video';
-        const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
+        const thumbnailUrl = isVideo ? '' : img.url;
 
         const lazyAttr = idx > 9 ? 'loading="lazy"' : '';
         const thumbHTML = isVideo
@@ -2066,27 +2066,6 @@ function isVideoFile(url) {
     // Use regex to match exact extensions at end of URL (or before query string)
     // This avoids false positives like .avif matching .avi
     return /\.(mp4|mov|webm|avi|mkv|m4v|wmv)(\?.*)?$/i.test(lowerUrl);
-}
-
-// Generate video thumbnail URL for Cloudinary videos
-// Returns empty string for non-Cloudinary (e.g., Bunny CDN) videos to use the gradient fallback
-function getVideoThumbnailUrlVariant(videoUrl) {
-    if (!videoUrl) return '';
-
-    // Check if this is a Cloudinary URL (contains res.cloudinary.com or /upload/)
-    const isCloudinary = videoUrl.includes('res.cloudinary.com') ||
-        (videoUrl.includes('/upload/') && videoUrl.includes('cloudinary'));
-
-    if (isCloudinary) {
-        // Cloudinary transformation for video thumbnail
-        // w_300 = width, h_180 = height, c_fill = crop fill, so_0 = start at 0 seconds, f_jpg = jpg format
-        const transformed = videoUrl.replace('/upload/', '/upload/w_300,h_180,c_fill,so_0,f_jpg/');
-        return transformed.replace(/\.(mp4|mov|webm|avi|mkv|m4v)$/i, '.jpg');
-    }
-
-    // For Bunny CDN or other providers, return empty to use gradient fallback
-    // (They don't support automatic thumbnail generation)
-    return '';
 }
 
 // Toggle image selection with Order Tracking
@@ -2389,12 +2368,10 @@ async function handleImageUpload(event) {
             const fileId = isCreateMode ? data.file_data.public_id : data.file.id;
             const fileType = (data.file && data.file.file_type) ? data.file.file_type : (isVideoFile(fileUrl) ? 'video' : 'image');
 
-            const isCloudinary = fileUrl.includes('/upload/');
-            const optimizedUrl = isCloudinary ? fileUrl.replace('/upload/', '/upload/f_auto,q_auto/') : fileUrl;
 
             const newImage = {
                 url: fileUrl,
-                optimized_url: optimizedUrl,
+                optimized_url: fileUrl,
                 name: file.name,
                 file: null,
                 id: fileId,

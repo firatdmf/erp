@@ -2,7 +2,6 @@
 Bunny CDN Storage Utility
 
 This module provides functions to upload and delete files from Bunny CDN Storage.
-It replaces the Cloudinary upload functions in the project.
 """
 
 import requests

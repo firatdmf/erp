@@ -649,7 +649,7 @@
 
         if (imageUrl) {
             try {
-                // Call API to delete from Cloudinary
+                // Call API to delete from the CDN
                 const response = await fetch('{% url "marketing:delete_blog_image" %}', {
                     method: 'POST',
                     headers: {
@@ -661,10 +661,10 @@
 
                 const data = await response.json();
                 if (!data.success) {
-                    console.warn('Could not delete from Cloudinary:', data.error);
+                    console.warn('Could not delete from the CDN:', data.error);
                 }
             } catch (error) {
-                console.warn('Error deleting from Cloudinary:', error);
+                console.warn('Error deleting from the CDN:', error);
             }
         }
 

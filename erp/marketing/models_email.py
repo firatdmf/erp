@@ -353,7 +353,7 @@ class Email(models.Model):
 
 class EmailAttachment(models.Model):
     """
-    E-posta ekleri - Cloudinary'de saklanır.
+    Email attachments, stored on Bunny CDN.
     """
     email = models.ForeignKey(
         Email, 
@@ -362,7 +362,7 @@ class EmailAttachment(models.Model):
     )
     
     filename = models.CharField(max_length=255)
-    file_url = models.URLField(max_length=500)  # Cloudinary URL
+    file_url = models.URLField(max_length=500)  # Bunny CDN URL
     file_size = models.PositiveIntegerField(default=0)  # bytes
     content_type = models.CharField(max_length=100, blank=True)
     

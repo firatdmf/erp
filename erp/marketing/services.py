@@ -95,7 +95,6 @@ def import_stock_from_excel(file_path=None):
                     # stores its own and derives the storefront one.
                     "unit": {"units": "piece", "kg": "kg"}.get(row.get("unit"), "mt"),
                     "category": category,
-                    "type": "embroidery",
                 },
             )
             product.tags = ["stock_imported", "embroidery"]

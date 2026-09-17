@@ -386,7 +386,7 @@ def build_order_workbook(order):
 # about to sort or pivot, and neither works on a value tucked under
 # another. The money columns name the currency in the HEADING and hold
 # bare numbers — see the note on `money` below.
-COMBINED_HEADS = ["Product", "SKU", "Variant", "Variant SKU", "Type",
+COMBINED_HEADS = ["Product", "SKU", "Variant", "Variant SKU", "Group",
                   "Quantity", "Packs", "Price", "Amount"]
 CNCOLS = len(COMBINED_HEADS)
 C_QTY, C_PACKS, C_PRICE, C_AMOUNT = 6, 7, 8, 9
@@ -504,7 +504,7 @@ def build_combined_workbook(orders):
         cell(ws, r, 2, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 3, it.variant_label or "—", font=F_VAL, border=GRID)
         cell(ws, r, 4, vsku or "—", font=F_VAL, border=GRID, fmt=TEXT)
-        cell(ws, r, 5, it.product_type_label or "—", font=F_VAL, border=GRID)
+        cell(ws, r, 5, it.product_group_label or "—", font=F_VAL, border=GRID)
         cell(ws, r, C_QTY, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00")
         cell(ws, r, C_PACKS, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0")
         cell(ws, r, C_PRICE, _dec(it.price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)

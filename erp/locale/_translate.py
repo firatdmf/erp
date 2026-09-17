@@ -80,7 +80,7 @@ TR = {
     "Manufacturing Recipe (BOM)": "Üretim Reçetesi (BOM)", "Sales Channels": "Satış Kanalları",
     "Campaign / Discount": "Kampanya / İndirim", "Product Information": "Ürün Bilgileri",
     "Product Attributes": "Ürün Özellikleri", "Product Organization": "Ürün Organizasyonu",
-    "Product Type": "Ürün Türü", "Product Name": "Ürün Adı", "Cost per item": "Birim maliyet",
+    "Product Group": "Ürün Grubu", "Product Name": "Ürün Adı", "Cost per item": "Birim maliyet",
     "Online Store": "Online Mağaza", "Listed on website": "Web sitesinde listeleniyor",
     "Point of Sale": "Satış Noktası", "Selling policy enabled": "Satış politikası aktif",
     "Sold as a pack": "Paket halinde satılıyor", "Items per pack": "Paket başına adet",

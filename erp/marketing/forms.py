@@ -47,6 +47,7 @@ class ProductForm(forms.ModelForm):
         # default is false, passed through the views.
         is_update = kwargs.pop("is_update", False)
         super(ProductForm, self).__init__(*args, **kwargs)
+        self.is_update = is_update
         
         # Fix cursor issues by ensuring querysets are properly evaluated
         # Force fresh queryset for supplier to avoid stale cursor references
@@ -66,6 +67,23 @@ class ProductForm(forms.ModelForm):
             if is_update and self.instance.variants.count() > 0:
                 self.fields["has_variants"].initial = True
 
+    def clean_sku(self):
+        """A NEW product's SKU is stored in capitals and carries no dot.
+
+        The dot is what separates a variant's SKU from its parent's
+        (K24644.BEYAZ-140), so the parent cannot contain one. Products that
+        already exist keep whatever SKU they have; this is a rule for the
+        catalog from here on, not a cleanup.
+        """
+        sku = (self.cleaned_data.get("sku") or "").strip()
+        if self.is_update:
+            return sku
+        sku = sku.upper()
+        if "." in sku:
+            raise forms.ValidationError(
+                _("A product SKU cannot contain a dot — the dot separates it from its variants' SKUs."))
+        return sku
+
     def clean(self):
         """Refuse a negative variant price or cost before anything is saved.
 
@@ -81,26 +99,52 @@ class ProductForm(forms.ModelForm):
                 _("Variant price and cost cannot be negative: %(skus)s")
                 % {"skus": ", ".join(negative)}
             )
+        parent = cleaned_data.get("sku")
+        if not self.is_update and parent:
+            off = sorted(_skus_off_the_parent(self.data.get("variants_json"), parent))
+            if off:
+                raise forms.ValidationError(
+                    _("Each variant SKU must be the product SKU, a dot, then the "
+                      "variant's own part in capitals (%(example)s): %(skus)s")
+                    % {"example": f"{parent}.{_('WHITE-140')}", "skus": ", ".join(off)}
+                )
         return cleaned_data
+
+
+def _variant_dicts(variants_json):
+    """The variant dicts in a product form's variants_json. Unparseable
+    input yields nothing; handle_variants deals with that as it always has."""
+    try:
+        data = json.loads(variants_json or "[]")
+    except (TypeError, ValueError):
+        return []
+    if isinstance(data, dict):
+        data = data.get("product_variant_list", [])
+    if not isinstance(data, list):
+        return []
+    return [v for v in data if isinstance(v, dict)]
+
+
+def _skus_off_the_parent(variants_json, parent):
+    """The variant SKUs that do not read PARENT.SUFFIX — the parent SKU, a
+    dot, and a non-empty suffix already in capitals. Enforced on new
+    products only; see ProductForm.clean_sku."""
+    prefix = f"{parent}."
+    found = set()
+    for variant in _variant_dicts(variants_json):
+        sku = str(variant.get("variant_sku") or "")
+        suffix = sku[len(prefix):] if sku.startswith(prefix) else ""
+        if not suffix.strip() or suffix != suffix.upper():
+            found.add(sku or "?")
+    return found
 
 
 def _skus_with_negative_money(variants_json):
     """The SKUs in a product form's variants_json whose price or cost is
     below zero. Blank and unparseable values are not this check's business;
     handle_variants deals with those as it always has."""
-    try:
-        data = json.loads(variants_json or "[]")
-    except (TypeError, ValueError):
-        return set()
-    if isinstance(data, dict):
-        data = data.get("product_variant_list", [])
-    if not isinstance(data, list):
-        return set()
-
     found = set()
-    for variant in data:
-        if not isinstance(variant, dict):
-            continue
+    for variant in _variant_dicts(variants_json):
         for key in ("variant_price", "variant_cost"):
             value = variant.get(key)
             if value in (None, ""):

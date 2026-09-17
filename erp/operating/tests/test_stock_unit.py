@@ -6,14 +6,17 @@ after the number. That was harmless while the shelves held nothing but
 fabric, and became wrong the moment a pallet of ready-made curtain sets
 arrived, because a box of 20 sets is not 20 metres of anything.
 
-`WarehouseProduct.unit` says what the numbers mean. These tests pin the
-places that have to read it rather than assume:
+A product's `unit` says what the numbers mean, and its `pack_type` what one
+stock item is. Both live on the main product (marketing.Product); a
+warehouse row reads them from it. These tests pin the places that have to
+read them rather than assume:
 
 * the product rows and the stock-item rows under them
 * the warehouse header total, which must NOT claim a unit when the
   warehouse holds more than one
 * the printed label
 * a move between warehouses, which has to carry the unit with the goods
+* the main product, which is the one place both are stored
 
 Run with:
     python manage.py test operating.test_stock_unit
@@ -27,11 +30,23 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 
+from marketing.models import Product, ProductVariant
 from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 
 def _text(html):
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+
+
+def _stock(warehouse, name, sku, quantity, unit="mt", pack_type="roll"):
+    """A warehouse row of a variant of its own main product, which holds
+    the unit and the pack."""
+    product = Product.objects.create(
+        title=name, sku=f"P-{sku}", featured=False, unit=unit, pack_type=pack_type)
+    variant = ProductVariant.objects.create(product=product, variant_sku=sku)
+    return WarehouseProduct.objects.create(
+        warehouse=warehouse, name=name, sku=sku, quantity=quantity,
+        catalog_variant=variant)
 
 
 class StockUnitIsShownNotAssumed(TestCase):
@@ -42,8 +57,8 @@ class StockUnitIsShownNotAssumed(TestCase):
         self.shop = Warehouse.objects.create(
             name="Ready-made Shop", accounting_book=self.book)
 
-        self.curtains = WarehouseProduct.objects.create(
-            warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
+        self.curtains = _stock(
+            self.shop, name="Peony 84in", sku="RN1357.RM8",
             quantity=Decimal("20"), unit="pack", pack_type="box")
         WarehouseProductItem.objects.create(
             product=self.curtains, quantity=Decimal("20"),
@@ -76,7 +91,7 @@ class StockUnitIsShownNotAssumed(TestCase):
         """Metres of fabric and boxes of curtains do not add up to anything,
         so the total drops the unit rather than picking one of them. The
         per-product rows still carry their own."""
-        WarehouseProduct.objects.create(
+        _stock(
             warehouse=self.shop, name="seta grey", sku="SETA-1",
             quantity=Decimal("300"), unit="mt", pack_type="roll")
         page = self._page()
@@ -88,14 +103,17 @@ class StockUnitIsShownNotAssumed(TestCase):
         """Every product that existed before the field was added is fabric.
         The default is a statement about the data, not a guess, and a
         product created without saying otherwise still reads as metres."""
-        fabric = WarehouseProduct.objects.create(
+        product = Product.objects.create(title="grek tul", sku="GT", featured=False)
+        self.assertEqual((product.unit, product.pack_type), ("mt", "roll"))
+        # A row not linked to any product yet reads the same way.
+        unlinked = WarehouseProduct.objects.create(
             warehouse=self.shop, name="grek tul", sku="GT-1",
             quantity=Decimal("48.5"))
-        self.assertEqual(fabric.unit, "mt")
-        self.assertEqual(fabric.unit_short, "m")
+        self.assertEqual(unlinked.unit, "mt")
+        self.assertEqual(unlinked.unit_short, "m")
 
     def test_an_unrecognised_unit_shows_itself_rather_than_vanishing(self):
-        odd = WarehouseProduct.objects.create(
+        odd = _stock(
             warehouse=self.shop, name="odd", sku="ODD-1",
             quantity=Decimal("1"), unit="yards", pack_type="crate")
         self.assertEqual(odd.unit_short, "yards")
@@ -112,8 +130,8 @@ class TheLabelSaysWhatItIsCounting(TestCase):
         self.book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
         self.shop = Warehouse.objects.create(
             name="Ready-made Shop", accounting_book=self.book)
-        self.wp = WarehouseProduct.objects.create(
-            warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
+        self.wp = _stock(
+            self.shop, name="Peony 84in", sku="RN1357.RM8",
             quantity=Decimal("20"), unit="pack", pack_type="box")
 
         user = get_user_model().objects.create_user("printer", password="pw")
@@ -160,7 +178,7 @@ class MovingStockCarriesTheUnit(TestCase):
             name="Shop A", accounting_book=self.book)
         self.target = Warehouse.objects.create(
             name="Shop B", accounting_book=self.book)
-        self.wp = WarehouseProduct.objects.create(
+        self.wp = _stock(
             warehouse=self.source, name="Peony 84in", sku="RN1357.RM8",
             quantity=Decimal("20"), unit="pack", pack_type="box")
         self.roll = WarehouseProductItem.objects.create(
@@ -207,15 +225,15 @@ class OneStockItemIsCalledWhatItIs(TestCase):
         self.mill = Warehouse.objects.create(
             name="Laleli Fabrika", accounting_book=self.book)
 
-        self.curtains = WarehouseProduct.objects.create(
-            warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
+        self.curtains = _stock(
+            self.shop, name="Peony 84in", sku="RN1357.RM8",
             quantity=Decimal("20"), unit="pack", pack_type="box")
         WarehouseProductItem.objects.create(
             product=self.curtains, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), lot_number="12",
             status="in_stock", unit_cost_base=Decimal("15.55"))
 
-        self.fabric = WarehouseProduct.objects.create(
+        self.fabric = _stock(
             warehouse=self.mill, name="seta grey", sku="SETA-1",
             quantity=Decimal("300"))
         WarehouseProductItem.objects.create(
@@ -260,7 +278,7 @@ class OneStockItemIsCalledWhatItIs(TestCase):
         """Neither word is true of the whole shelf, so it says neither —
         rather than calling a box of curtains a roll, which is what the
         hardcoded label did."""
-        WarehouseProduct.objects.create(
+        _stock(
             warehouse=self.shop, name="grek tul", sku="GT-1",
             quantity=Decimal("50"), unit="mt", pack_type="roll")
         page = _text(self._page(self.shop))
@@ -268,7 +286,7 @@ class OneStockItemIsCalledWhatItIs(TestCase):
         self.assertNotRegex(page, r"\d+ rolls?\b")
 
     def test_the_noun_falls_back_rather_than_vanishing(self):
-        odd = WarehouseProduct.objects.create(
+        odd = _stock(
             warehouse=self.shop, name="odd", sku="ODD-1",
             quantity=Decimal("1"), unit="yards", pack_type="crate")
         self.assertEqual(odd.item_noun, "item")
@@ -279,13 +297,13 @@ class OneStockItemIsCalledWhatItIs(TestCase):
         """The whole reason these are two fields. Metres can arrive on a
         bolt as readily as a roll, and pieces can come in a bag as readily
         as a box — so setting one must not move the other."""
-        bagged = WarehouseProduct.objects.create(
+        bagged = _stock(
             warehouse=self.shop, name="tape", sku="TP-1",
             quantity=Decimal("500"), unit="mt", pack_type="bag")
         self.assertEqual(bagged.unit_short, "m")
         self.assertEqual(bagged.item_noun_plural, "bags")
 
-        boxed_metres = WarehouseProduct.objects.create(
+        boxed_metres = _stock(
             warehouse=self.shop, name="trim", sku="TR-1",
             quantity=Decimal("80"), unit="mt", pack_type="box")
         self.assertEqual(boxed_metres.unit_short, "m")
@@ -306,15 +324,15 @@ class TheProductPageSpeaksTheProductsLanguage(TestCase):
         self.mill = Warehouse.objects.create(
             name="Laleli Fabrika", accounting_book=self.book)
 
-        self.curtains = WarehouseProduct.objects.create(
-            warehouse=self.shop, name="Peony 84in", sku="RN1357.RM8",
+        self.curtains = _stock(
+            self.shop, name="Peony 84in", sku="RN1357.RM8",
             quantity=Decimal("20"), unit="pack", pack_type="box")
         WarehouseProductItem.objects.create(
             product=self.curtains, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), lot_number="12",
             status="in_stock", unit_cost_base=Decimal("15.55"))
 
-        self.fabric = WarehouseProduct.objects.create(
+        self.fabric = _stock(
             warehouse=self.mill, name="seta grey", sku="SETA-1",
             quantity=Decimal("300"))
         WarehouseProductItem.objects.create(
@@ -357,8 +375,56 @@ class TheProductPageSpeaksTheProductsLanguage(TestCase):
         self.assertNotIn("Active boxes", page)
 
     def test_a_product_sold_by_weight_says_weight(self):
-        bale = WarehouseProduct.objects.create(
+        bale = _stock(
             warehouse=self.mill, name="waste", sku="W-1",
             quantity=Decimal("5"), unit="kg", pack_type="bale")
         self.assertEqual(bale.quantity_label, "Weight")
         self.assertEqual(bale.item_noun_plural, "bales")
+
+
+class TheMainProductOwnsUnitAndPack(TestCase):
+    """One product's rows cannot disagree: none of them stores a unit or a
+    pack, they all read their product's."""
+
+    def setUp(self):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
+        self.mill = Warehouse.objects.create(name="Mill", accounting_book=book)
+        self.shop = Warehouse.objects.create(name="Shop", accounting_book=book)
+        self.product = Product.objects.create(
+            title="GREK", sku="GREK", featured=False, unit="mt", pack_type="roll")
+        white = ProductVariant.objects.create(product=self.product, variant_sku="GREK.W")
+        beige = ProductVariant.objects.create(product=self.product, variant_sku="GREK.B")
+        self.rows = [
+            WarehouseProduct.objects.create(warehouse=w, name="GREK", sku=v.variant_sku,
+                                            quantity=Decimal("1"), catalog_variant=v)
+            for w in (self.mill, self.shop) for v in (white, beige)
+        ]
+
+    def test_changing_the_product_changes_every_row(self):
+        self.product.set_unit("piece", "box")
+        for row in self.rows:
+            row = WarehouseProduct.objects.get(pk=row.pk)
+            with self.subTest(row=row.sku, warehouse=row.warehouse_id):
+                self.assertEqual((row.unit, row.pack_type), ("piece", "box"))
+
+    def test_the_storefront_unit_follows(self):
+        """The storefront's coarser unit is derived on every save, so it
+        cannot drift from the stock again."""
+        self.assertEqual(self.product.unit_of_measurement, "mt")
+        self.product.set_unit("piece")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.unit_of_measurement, "units")
+        self.assertEqual(self.product.pack_type, "roll")
+        self.product.unit = "kg"
+        self.product.save(update_fields=["unit"])
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.unit_of_measurement, "kg")
+
+    def test_a_listed_row_costs_no_extra_query(self):
+        rows = list(WarehouseProduct.objects
+                    .select_related("catalog_variant__product")
+                    .filter(pk__in=[r.pk for r in self.rows]))
+        with self.assertNumQueries(0):
+            self.assertEqual({r.unit_short for r in rows}, {"m"})

@@ -91,6 +91,15 @@ class BookScopedLedger(TestCase):
         current_account = CurrentAccount.objects.get(name="Yeni Tekstil")
         self.assertEqual(current_account.book_id, self.laleli.pk)
 
+    def test_a_new_account_starts_in_the_books_currency(self):
+        """Not in whichever currency sorts first — EUR came before TRY."""
+        CurrencyCategory.objects.create(code="EUR", name="Euro", symbol="€")
+        try_ = CurrencyCategory.objects.create(code="TRY", name="Turkish Lira", symbol="₺")
+        self.ergene.base_currency = try_
+        self.ergene.save(update_fields=["base_currency"])
+        r = self.client.get(reverse("accounts:create", kwargs={"book_id": self.ergene.pk}))
+        self.assertContains(r, f'<option value="{try_.pk}" selected>', html=False)
+
 
 class LegacyLedgerUrls(TestCase):
     """The pre-split addresses are in bookmarks; they must still land."""

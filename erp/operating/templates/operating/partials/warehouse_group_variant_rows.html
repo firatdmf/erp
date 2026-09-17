@@ -1,5 +1,5 @@
 {% load i18n %}
-{% load operating_tags %}
+{% load operating_tags erp_tags %}
 {% for p in variants %}
 {% comment %}Product's OWN warehouse id in the link — a combined (ortak)
 warehouse page lists member warehouses' rows.{% endcomment %}
@@ -47,6 +47,14 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
   </td>
   {% comment %}Weighted average of the stock on the floor, matching the flat
   list — not the SKU's last-purchase price.{% endcomment %}
+  {% if is_sales_rep %}
+  {# A sales rep sees the price derived from the cost, and no Total. #}
+  <td class="num" data-label="{% trans 'Price' %}">
+    {% if p.avg_cost %}
+      <span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|sales_rep_price|floatformat:2 }}</span>
+    {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+  </td>
+  {% else %}
   <td class="num" data-label="{% trans 'Unit cost' %}"
       {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:4 }}"{% endif %}>
     {% if p.avg_cost %}
@@ -54,6 +62,7 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
     {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Total' %}">{% if p.line_usd %}<span class="cost-usd">{{ p.warehouse|book_sign }}{{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  {% endif %}
 </tr>
 {% empty %}
 <tr><td colspan="{{ col_count|default:6 }}" style="padding:12px 34px; color:#94A3B8;">{% trans "No variants." %}</td></tr>

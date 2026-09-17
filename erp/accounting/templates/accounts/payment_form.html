@@ -65,6 +65,9 @@
   .pf-account-chip i { width: 16px; height: 16px; color: var(--nejum-teal-700); }
   .pf-account-chip .code { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 8px; background: white; border-radius: 5px; }
   .pf-account-chip .name { font: 700 13.5px var(--font-sans); color: var(--ink); }
+  .pf-account-chip .account-link { display:inline-flex; align-items:center; gap: 10px; text-decoration: none; color: inherit; }
+  .pf-account-chip .account-link:hover .name { color: var(--nejum-teal-700); text-decoration: underline; }
+  .pf-account-chip .account-link .ext { width: 12px; height: 12px; flex: none; margin-left: -7px; color: var(--gray-500); }
   .pf-account-chip .balance { font: 500 12px var(--font-sans); color: var(--gray-600); }
   .pf-account-chip .change { margin-left: auto; font: 600 12px var(--font-sans); color: var(--gray-500); text-decoration: none; padding: 4px 10px; border-radius: 6px; }
   .pf-account-chip .change:hover { color: var(--nejum-teal-700); background: white; }
@@ -194,6 +197,10 @@
   <a class="pf-back" href="{% url 'accounts:payment_detail' payment.pk %}">
     <i data-lucide="arrow-left"></i> {{ payment.number }}
   </a>
+  {% elif prefilled_current_account %}
+  <a class="pf-back" href="{% url 'accounts:detail' prefilled_current_account.pk %}">
+    <i data-lucide="arrow-left"></i> {{ prefilled_current_account.name }}
+  </a>
   {% else %}
   <a class="pf-back" href="{% url 'accounts:payment_list' current_book.pk %}">
     <i data-lucide="arrow-left"></i> {% trans "Payments" %}
@@ -237,8 +244,11 @@
             <input type="hidden" name="account" value="{{ prefilled_current_account.id }}">
             <div class="pf-account-chip">
               <i data-lucide="user"></i>
-              <span class="code">{{ prefilled_current_account.code }}</span>
-              <span class="name">{{ prefilled_current_account.name }}</span>
+              <a class="account-link" href="{% url 'accounts:detail' prefilled_current_account.pk %}" target="_blank" rel="noopener" title="{% trans "Open account in a new tab" %}">
+                <span class="code">{{ prefilled_current_account.code }}</span>
+                <span class="name">{{ prefilled_current_account.name }}</span>
+                <i data-lucide="external-link" class="ext"></i>
+              </a>
               <span class="balance">· {% trans "Balance:" %} {{ prefilled_current_account.display_currency_symbol }}{{ prefilled_current_account.absolute_balance|money }} ({{ prefilled_current_account.balance_label }})</span>
               {% if not payment %}<a href="{% url 'accounts:payment_create' current_book.pk %}" class="change">{% trans "change" %}</a>{% endif %}
             </div>
@@ -451,7 +461,7 @@
                 <i data-lucide="save"></i> {% trans "Save as Draft" %}
               </button>
               {% endif %}
-              <a href="{% if payment %}{% url 'accounts:payment_detail' payment.pk %}{% else %}{% url 'accounts:payment_list' current_book.pk %}{% endif %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
+              <a href="{% if payment %}{% url 'accounts:payment_detail' payment.pk %}{% elif prefilled_current_account %}{% url 'accounts:detail' prefilled_current_account.pk %}{% else %}{% url 'accounts:payment_list' current_book.pk %}{% endif %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
             </div>
           </div>
         </div>

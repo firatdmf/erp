@@ -1,8 +1,10 @@
-"""The order form's stock item picker: FIFO, and only its own shelf.
+"""The order form's stock item picker: oldest day first, then barcode,
+and only its own shelf.
 
 Run with:
     python manage.py test operating.test_roll_picker_order
 """
+import datetime
 import json
 from decimal import Decimal
 from unittest.mock import patch
@@ -89,22 +91,36 @@ class RollPicker(TestCase):
         self.assertEqual([r["barcode"] for r in self._list()],
                          ["BC-OLD-DEAR", "BC-NEW-CHEAP"])
 
-    def test_price_breaks_a_tie_on_age(self):
-        same = self._aged(7)
-        self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-DEAR",
-                  scanned=same)
-        self._top(self._shelf(self.ergene, Decimal("2.16")), "BC-CHEAP",
-                  scanned=same)
+    def test_within_one_day_the_barcode_decides(self):
+        """A stock count enters a shelf in whatever order the rolls were
+        picked up, so the minute is noise; the label sequence is not."""
+        start = self._aged(7)
+        wp = self._shelf(self.ergene, Decimal("2.40"))
+        for minutes, barcode in ((0, "LZK0300003495"), (1, "LZK0300003492"),
+                                 (26, "LZK0300003070"), (60, "LZK0300003478")):
+            self._top(wp, barcode, scanned=start + datetime.timedelta(minutes=minutes))
         self.assertEqual([r["barcode"] for r in self._list()],
-                         ["BC-CHEAP", "BC-DEAR"])
+                         ["LZK0300003070", "LZK0300003478",
+                          "LZK0300003492", "LZK0300003495"])
+
+    def test_an_earlier_day_beats_a_lower_barcode(self):
+        wp = self._shelf(self.ergene, Decimal("2.40"))
+        self._top(wp, "LZK0300003001", scanned=self._aged(1))
+        self._top(wp, "LZK0300003999", scanned=self._aged(30))
+        self.assertEqual([r["barcode"] for r in self._list()],
+                         ["LZK0300003999", "LZK0300003001"])
+
+    def test_price_breaks_a_tie_between_unlabelled_items(self):
+        same = self._aged(7)
+        dear = self._top(self._shelf(self.ergene, Decimal("2.40")), None, scanned=same)
+        cheap = self._top(self._shelf(self.ergene, Decimal("2.16")), None, scanned=same)
+        self.assertEqual([r["id"] for r in self._list()], [cheap.pk, dear.pk])
 
     def test_a_stock_item_with_no_cost_sorts_last_on_a_tie(self):
         same = self._aged(7)
-        self._top(self._shelf(self.ergene, None), "BC-UNKNOWN", scanned=same)
-        self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-PRICED",
-                  scanned=same)
-        self.assertEqual([r["barcode"] for r in self._list()],
-                         ["BC-PRICED", "BC-UNKNOWN"])
+        unknown = self._top(self._shelf(self.ergene, None), None, scanned=same)
+        priced = self._top(self._shelf(self.ergene, Decimal("2.40")), None, scanned=same)
+        self.assertEqual([r["id"] for r in self._list()], [priced.pk, unknown.pk])
 
     # --- book scope -------------------------------------------------
     def test_another_books_shelf_is_not_offered(self):
@@ -120,3 +136,33 @@ class RollPicker(TestCase):
         self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-MINE")
         self.assertEqual(
             [r["barcode"] for r in self._list(book=str(self.laleli.pk))], [])
+
+    # --- cost -------------------------------------------------------
+    def test_each_item_carries_its_cost_per_metre(self):
+        self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-PRICED")
+        self._top(self._shelf(self.ergene, None), "BC-UNKNOWN")
+        resp = self.client.get(reverse("operating:order_create_roll_list"), {"sku": SKU})
+        data = json.loads(resp.content)
+        self.assertEqual({r["barcode"]: r["unit_cost"] for r in data["rolls"]},
+                         {"BC-PRICED": 2.40, "BC-UNKNOWN": None})
+        self.assertTrue(data["cost_symbol"])
+
+    def test_a_sales_rep_is_sent_the_marked_up_price_not_the_cost(self):
+        from authentication.models import Permission
+        perm, _ = Permission.objects.get_or_create(name="sales_rep")
+        self.user.member.permissions.add(perm)
+        self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-PRICED")
+        resp = self.client.get(reverse("operating:order_create_roll_list"), {"sku": SKU})
+        data = json.loads(resp.content)
+        self.assertEqual([r["barcode"] for r in data["rolls"]], ["BC-PRICED"])
+        self.assertNotIn("unit_cost", data["rolls"][0])
+        # 2.40 × 1.10 = 2.64, up to the next 0.05.
+        self.assertEqual(data["rolls"][0]["unit_price"], 2.65)
+
+    def test_a_pack_product_is_not_counted_in_metres(self):
+        self._top(self._shelf(self.ergene, Decimal("12.00")), "BC-BOX")
+        self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-ROLL")
+        self.assertEqual({r["unit"] for r in self._list()}, {"m"})
+        # The unit is the product's, so every shelf of it follows at once.
+        self.variant.product.set_unit("pack", "box")
+        self.assertEqual({r["unit"] for r in self._list()}, {"pack"})

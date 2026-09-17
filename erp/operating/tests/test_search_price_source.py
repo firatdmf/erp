@@ -204,3 +204,54 @@ class TheCostComesOffTheShelf(TestCase):
             self._search()
         self.assertLess(len(ctx.captured_queries), 25,
                         "the search grew a per-row query")
+
+
+class ASalesRepIsQuotedAPriceNotACost(TheCostComesOffTheShelf):
+    """Where staff see the shelf cost, a sales rep sees the price derived
+    from it — cost × 1.10, up to the next 0.05 — and no Cost label."""
+
+    def setUp(self):
+        super().setUp()
+        from authentication.models import Permission
+        User = get_user_model()
+        rep = User.objects.create_user("rep_search", password="pw")
+        rep.member.books.add(self.book)
+        rep.member.default_book = self.book
+        rep.member.save()
+        perm, _ = Permission.objects.get_or_create(name="sales_rep")
+        rep.member.permissions.add(perm)
+        self.client.force_login(rep)
+
+    def test_it_shows_what_the_shelf_cost_not_the_catalog(self):
+        self._shelf("Laleli depo", cost_usd=Decimal("2.40"))
+        body = self._search()
+        row = row_for(body, SKU)
+        self.assertIn("$2.65", row)          # 2.40 × 1.10 = 2.64 → 2.65
+        self.assertNotIn("Cost", row)
+        self.assertNotIn("2.40", body)
+        self.assertIn(",2.65,", body)         # the price the pick pre-fills
+
+    def test_every_shelf_shows_its_own_cost(self):
+        self._shelf("Laleli depo", cost_usd=Decimal("2.40"))
+        self._shelf("Laleli depo 2", cost_usd=Decimal("2.16"))
+        body = self._search()
+        self.assertNotIn("2.40", body)
+        self.assertNotIn("2.16", body)
+
+    def test_the_barcode_lookup_prefills_the_price_too(self):
+        wp = self._shelf("Laleli depo", cost_usd=Decimal("2.40"))
+        import json
+        data = json.loads(self.client.get(
+            reverse("operating:order_create_barcode_resolve"),
+            {"barcode": f"B-{wp.pk}"}).content)
+        self.assertTrue(data["ok"], data)
+        self.assertEqual(data["price"], 96.80)   # variant cost 88.00 × 1.10
+        self.assertFalse(data["is_cost"])
+
+    # Staff-only behaviours the parent asserts; a rep never sees them.
+    test_the_prefill_is_the_working_book_s_cost = None
+    test_it_falls_back_to_the_highest_when_this_book_holds_none = None
+    test_a_shelf_priced_in_another_currency_is_converted = None
+    test_a_priced_row_does_not_advertise_its_cost = None
+    test_a_shelf_that_knows_no_cost_shows_nothing_rather_than_guess = None
+    test_the_cost_is_shown_to_the_cent = None

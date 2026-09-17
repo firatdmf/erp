@@ -91,7 +91,9 @@ def import_stock_from_excel(file_path=None):
                     # "name": row["NAME"],
                     # "price": row["price"],
                     # "quantity": row["quantity"],
-                    "unit_of_measurement": row.get("unit"),
+                    # The sheet uses the storefront's codes; the product
+                    # stores its own and derives the storefront one.
+                    "unit": {"units": "piece", "kg": "kg"}.get(row.get("unit"), "mt"),
                     "category": category,
                     "type": "embroidery",
                 },

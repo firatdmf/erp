@@ -86,6 +86,7 @@ function closeSearchDropdown() {
     if (!container) return;
 
     container.classList.remove('active');
+    document.body.classList.remove('m-search-open');
     document.removeEventListener('click', handleOutsideClick);
 
     // Reset state
@@ -352,6 +353,7 @@ function renderCmdResults(menuResults, dbResults) {
         const iconMap = {
             'Contact': 'fa-user',
             'Company': 'fa-building',
+            'Supplier': 'fa-truck',
             'Product': 'fa-box',
             'Order': 'fa-shopping-cart',
             'Task': 'fa-check-circle'

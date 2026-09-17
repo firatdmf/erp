@@ -736,6 +736,36 @@
     });
   })();
 
+  // ── Products already on the order sink to the bottom of the search ──
+  //
+  // Picking one again opens a second card for the same product. It stays
+  // in the list — a search that silently drops a match reads as a search
+  // that missed it — but at the bottom, greyed, labelled, and inert.
+  (function coMarkAddedResults() {
+    var results = document.getElementById('co-product-results');
+    if (!results) return;
+    var LABEL = '{{ _("Already added")|escapejs }}';
+    results.addEventListener('htmx:afterSwap', function () {
+      var added = new Set(orderItems.map(function (it) { return (it.sku || '').toLowerCase(); }));
+      if (!added.size) return;
+      var list = results.querySelector('.product_autocomplete_list ul');
+      if (!list) return;
+      list.querySelectorAll('li.pa-row[data-sku]').forEach(function (li) {
+        if (!added.has((li.dataset.sku || '').toLowerCase())) return;
+        li.classList.add('pa-added');
+        li.removeAttribute('onclick');
+        var meta = li.querySelector('.pa-meta');
+        if (meta) {
+          var tag = document.createElement('span');
+          tag.className = 'pa-added-tag';
+          tag.textContent = LABEL;
+          meta.appendChild(tag);
+        }
+        list.appendChild(li);
+      });
+    });
+  })();
+
   // ── Delivery address disclosure ─────────────────────────────────
   // Clearing the fields on close is the point: the button says whether
   // this order HAS a delivery address, so closing it has to mean the
@@ -1116,6 +1146,20 @@
         // rows say which, and the save groups the line by what was
         // actually ticked.
         item.availableRolls = (d && d.ok && d.rolls) ? d.rolls : [];
+        // Cost per unit by barcode, kept apart from availableRolls: a
+        // ticked or saved roll is a different object that never carried
+        // it, and the row still wants to show it. A sales rep is sent
+        // unit_price (the cost marked up) and never unit_cost.
+        item.rollCosts = {};
+        item.rollCostIsPrice = false;
+        item.availableRolls.forEach(function (r) {
+          var v = (r.unit_cost != null) ? r.unit_cost : r.unit_price;
+          if (r.unit_price != null) item.rollCostIsPrice = true;
+          if (v != null) item.rollCosts[(r.barcode || '').toLowerCase()] = v;
+        });
+        item.costSymbol = (d && d.cost_symbol) || '';
+        // One card is one SKU, so its items share a unit.
+        item.rollUnit = (item.availableRolls[0] && item.availableRolls[0].unit) || item.rollUnit || 'm';
         item.rollsLoading = false;
         renderProducts();
       })
@@ -1364,15 +1408,22 @@
     var toggleAttrs = locked ? '' :
       (' data-roll-toggle="1" data-i="' + i + '" data-barcode="' + escAttr(r.barcode) + '" data-state="' + state + '"' +
        (ri != null ? ' data-ri="' + ri + '"' : ''));
+    var unit = esc((orderItems[i] || {}).rollUnit || 'm');
     var meterHtml;
     if (picked) {
       meterHtml = r._editing
-        ? '<input type="number" class="form-input" style="width:70px;flex:0 0 auto;" value="' + meters + '" min="0.01" step="0.01" max="' + r.available + '" onclick="event.stopPropagation();" onchange="coRollMeters(' + i + ',' + ri + ',this.value)" autofocus> <span style="font-size:11px;color:#6b7280;">m</span>'
-        : '<span style="font-weight:700;color:#0F766E;white-space:nowrap;">' + (+meters).toFixed(2) + ' m' + (isFull ? '' : ' <span style="font-weight:600;color:#B45309;">({% trans "part" %})</span>') + '</span>';
+        ? '<input type="number" class="form-input" style="width:70px;flex:0 0 auto;" value="' + meters + '" min="0.01" step="0.01" max="' + r.available + '" onclick="event.stopPropagation();" onchange="coRollMeters(' + i + ',' + ri + ',this.value)" autofocus> <span style="font-size:11px;color:#6b7280;">' + unit + '</span>'
+        : '<span style="font-weight:700;color:#0F766E;white-space:nowrap;">' + (+meters).toFixed(2) + ' ' + unit + (isFull ? '' : ' <span style="font-weight:600;color:#B45309;">({% trans "part" %})</span>') + '</span>';
     } else if (locked) {
-      meterHtml = '<span style="font-weight:700;color:#64748B;white-space:nowrap;">' + (+meters).toFixed(2) + ' m</span>';
+      meterHtml = '<span style="font-weight:700;color:#64748B;white-space:nowrap;">' + (+meters).toFixed(2) + ' ' + unit + '</span>';
     } else {
-      meterHtml = '<span style="font-weight:600;color:#0F766E;white-space:nowrap;">' + (+r.available).toFixed(2) + ' m</span>';
+      meterHtml = '<span style="font-weight:600;color:#0F766E;white-space:nowrap;">' + (+r.available).toFixed(2) + ' ' + unit + '</span>';
+    }
+    var costItem = orderItems[i] || {};
+    var cost = (costItem.rollCosts || {})[(r.barcode || '').toLowerCase()];
+    if (cost != null) {
+      meterHtml += '<span title="' + (costItem.rollCostIsPrice ? '{% trans "Price" %}' : '{% trans "Unit cost" %}') + '" style="color:#94A3B8;font-weight:500;white-space:nowrap;">· ' +
+        esc(costItem.costSymbol || '') + (+cost).toFixed(2) + '/' + unit + '</span>';
     }
     var scissorsBtn = picked
       ? '<button type="button" onclick="event.stopPropagation(); coToggleRollCut(' + i + ',' + ri + ')" title="{% trans "Cut part of it" %}" style="background:none;border:0;color:#B45309;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"><i class="fas fa-scissors"></i></button>'
@@ -1968,12 +2019,12 @@
             title = esc(d.title || d.sku || '');
             var roll = d.roll || {};
             facts = camFact('{% trans "SKU" %}', esc(d.sku || '—')) +
-                    camFact('{% trans "Available" %}', (Number(roll.available) || 0).toFixed(2) + ' m') +
+                    camFact('{% trans "Available" %}', (Number(roll.available) || 0).toFixed(2) + ' ' + esc(roll.unit || 'm')) +
                     (roll.warehouse ? camFact('{% trans "Warehouse" %}', esc(roll.warehouse)) : '') +
                     (roll.book ? camFact('{% trans "Book" %}', esc(roll.book)) : '');
           } else {
             title = esc((item && item.title) || '');
-            facts = camFact('{% trans "Available" %}', (Number(d.available) || 0).toFixed(2) + ' m') +
+            facts = camFact('{% trans "Available" %}', (Number(d.available) || 0).toFixed(2) + ' ' + esc(d.unit || 'm')) +
                     (d.warehouse ? camFact('{% trans "Warehouse" %}', esc(d.warehouse)) : '') +
                     (d.book ? camFact('{% trans "Book" %}', esc(d.book)) : '');
           }

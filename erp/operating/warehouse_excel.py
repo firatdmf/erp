@@ -6,6 +6,10 @@ list.
 A combined (ortak) warehouse exports its members' stock, so it grows a
 Location column naming the member each row stands on — the same column the
 page shows.
+
+A sales rep does not read cost: their export prices each row at the sales
+price derived from the unit cost (Br. Fiyat) and leaves out the Toplam
+column and grand total, which are cost times quantity.
 """
 from io import BytesIO
 
@@ -15,8 +19,9 @@ from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 
+from erp.roles import is_sales_rep, sales_rep_price
 from erp.xlsx_utils import (
-    cell, merge, GRID, RULE, FILL_HEAD, FILL_LBL, RIGHT, LEFT,
+    cell, merge, GRID, RULE, FILL_HEAD, FILL_LBL, RIGHT, LEFT, TEXT,
     F_TITLE, F_SUB, F_DOCNO, F_HEAD, F_VAL, F_VALB,
 )
 
@@ -93,7 +98,7 @@ def _filtered_products(warehouse, search, sort, search_by="text"):
 
 
 def build_warehouse_workbook(warehouse, search="", sort="name_asc",
-                             search_by="text"):
+                             search_by="text", for_sales_rep=False):
     from openpyxl import Workbook
 
     brand = (getattr(settings, "BRAND_NAME", "") or "Nejum")
@@ -102,13 +107,17 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
     # A combined (ortak) warehouse pools several members' shelves, so a row
     # is ambiguous without saying which one it came off.
     show_location = warehouse.is_combined
-    ncols = NCOLS + (1 if show_location else 0)
+    # A sales rep's sheet has no Toplam column — see the module docstring.
+    show_total = not for_sales_rep
+    ncols = NCOLS + (1 if show_location else 0) - (0 if show_total else 1)
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Depo"
     ws.sheet_view.showGridLines = False
     widths = [16, 34, 16, 18, 12, 8, 12, 14, 14]
+    if not show_total:
+        widths.pop()
     if show_location:
         widths.insert(4, 20)
     for i, w in enumerate(widths):
@@ -135,6 +144,8 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
     # ── Table header ──
     heads = ["SKU", "Ürün Adı", "Model", "Barkod", "Stok (m)", "Kupon",
              "Rezerve (m)", "Br. Maliyet", "Toplam (USD)"]
+    if not show_total:
+        heads[-2:] = ["Br. Fiyat"]
     if show_location:
         heads.insert(4, "Depo")
     # Location is text like the four columns before it; the numeric block
@@ -152,22 +163,28 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
         # column used to print purchase_price, a last-purchase price, so
         # Br. Maliyet x Stok never came to Toplam.
         unit_cost = ""
-        if p.avg_cost is not None:
+        if p.avg_cost is not None and for_sales_rep:
+            # The price derived from the cost, which moves in 0.05 steps —
+            # two decimals say all of it.
+            unit_cost = (f"{_dec(sales_rep_price(p.avg_cost)):,.2f} "
+                         f"{_cost_currency(p.warehouse)}").strip()
+        elif p.avg_cost is not None:
             unit_cost = f"{_dec(p.avg_cost):,.4f} {_cost_currency(p.warehouse)}".strip()
         c = 1
-        cell(ws, r, c, p.sku or "—", font=F_VAL, border=GRID); c += 1
+        cell(ws, r, c, p.sku or "—", font=F_VAL, border=GRID, fmt=TEXT); c += 1
         cell(ws, r, c, p.name, font=F_VAL, border=GRID); c += 1
         cell(ws, r, c, p.model or "—", font=F_VAL, border=GRID); c += 1
-        cell(ws, r, c, p.barcode or "—", font=F_VAL, border=GRID); c += 1
+        cell(ws, r, c, p.barcode or "—", font=F_VAL, border=GRID, fmt=TEXT); c += 1
         if show_location:
             cell(ws, r, c, p.warehouse.name, font=F_VAL, border=GRID); c += 1
         cell(ws, r, c, _dec(p.quantity), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00"); c += 1
         cell(ws, r, c, p.roll_count or 0, font=F_VAL, border=GRID, align=RIGHT); c += 1
         cell(ws, r, c, _dec(p.reserved), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00"); c += 1
         cell(ws, r, c, unit_cost or "—", font=F_VAL, border=GRID, align=RIGHT); c += 1
-        cell(ws, r, c, _dec(p.line_usd), font=F_VAL, border=GRID, align=RIGHT, fmt='#,##0.00" USD"')
+        if show_total:
+            cell(ws, r, c, _dec(p.line_usd), font=F_VAL, border=GRID, align=RIGHT, fmt='#,##0.00" USD"')
+            total_usd += _dec(p.line_usd)
         total_qty += _dec(p.quantity)
-        total_usd += _dec(p.line_usd)
         r += 1
 
     # ── Totals ──
@@ -175,7 +192,8 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
         cell(ws, r, c, "", font=F_VALB, border=GRID, fill=FILL_LBL)
     cell(ws, r, first_num - 1, "TOPLAM", font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT)
     cell(ws, r, first_num, total_qty, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt="#,##0.00")
-    cell(ws, r, ncols, total_usd, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt='#,##0.00" USD"')
+    if show_total:
+        cell(ws, r, ncols, total_usd, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt='#,##0.00" USD"')
 
     return wb
 
@@ -189,7 +207,8 @@ def warehouse_excel(request, pk):
     search = (request.GET.get('search') or '').strip()
     sort = (request.GET.get('sort') or 'name_asc').strip()
     wb = build_warehouse_workbook(warehouse, search=search, sort=sort,
-                                  search_by=warehouse_search_mode(request))
+                                  search_by=warehouse_search_mode(request),
+                                  for_sales_rep=is_sales_rep(request.user))
     buf = BytesIO()
     wb.save(buf)
     label = f"depo-{warehouse.pk}-{warehouse.name}".replace("/", "-")

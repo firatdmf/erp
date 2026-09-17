@@ -196,6 +196,11 @@
     color: var(--gray-500);
   }
   .ord-list-head .num { text-align: right; }
+  /* A sales rep does not read cost, so their list has no Net worth column —
+     the grid loses that track rather than leaving an empty gap. */
+  .ord-list.no-worth .ord-list-head, .ord-list.no-worth .ord-row {
+    grid-template-columns: 56px minmax(180px, 1.4fr) minmax(140px, 1fr) 130px 160px 20px;
+  }
   .ord-row {
     border-bottom: 1px solid #EEF1F5;
     cursor: pointer;
@@ -409,6 +414,9 @@
       grid-template-columns: 56px minmax(140px, 1.2fr) minmax(120px, 0.9fr) 110px 130px 150px 20px;
       gap: 14px;
     }
+    .ord-list.no-worth .ord-list-head, .ord-list.no-worth .ord-row {
+      grid-template-columns: 56px minmax(140px, 1.2fr) minmax(120px, 0.9fr) 110px 150px 20px;
+    }
     .ord-search-input { width: 240px; }
   }
   @media (max-width: 900px) {
@@ -419,6 +427,7 @@
       gap: 10px;
       padding: 14px;
     }
+    .ord-list.no-worth .ord-row { grid-template-columns: 56px 1fr auto; }
     .ord-row > .ord-cell, .ord-row > .num { grid-column: 2 / -2; }
     .ord-row > .ord-actions { grid-column: 1 / -1; justify-self: start; }
     .ord-chev { display: none; }
@@ -514,13 +523,15 @@
 
   <!-- LIST -->
   {% if warehouses %}
-  <div class="ord-list">
+  <div class="ord-list{% if is_sales_rep %} no-worth{% endif %}">
     <div class="ord-list-head">
       <span></span>
       <span>{% trans "Name" %}</span>
       <span>{% trans "Location" %}</span>
       <span class="num">{% trans "Products" %}</span>
+      {% if not is_sales_rep %}
       <span class="num">{% trans "Net worth" %}</span>
+      {% endif %}
       <span>{% trans "Actions" %}</span>
       <span></span>
     </div>
@@ -573,9 +584,11 @@
           {{ w.n_products|default:0 }}<span>{% trans "items" %}</span>
         </div>
 
+        {% if not is_sales_rep %}
         <div class="num ord-metric money">
           ${{ w.total_value_usd|floatformat:0 }}
         </div>
+        {% endif %}
 
         <div class="ord-actions">
           <a href="{% url 'operating:warehouse_detail' w.pk %}" class="ord-action" title="{% trans 'View' %}">

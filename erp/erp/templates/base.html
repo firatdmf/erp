@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=5.1" />
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=11" />
+  <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=12" />
   {% comment %}Rows of the order-screen product search. Loaded here rather
   than in the three templates that render them (create-order sidebar, full
   create-order page, order-detail add-product) so the row internals have
@@ -45,7 +45,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=20" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=43" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=11" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=12" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=31" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard-mobile.css' %}?v=7" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/responsive-content.css' %}?v=4" />
@@ -434,6 +434,7 @@
             <i class="fas fa-sliders-h"></i>
           </button>
         </div>
+        <button type="button" class="m-search-cancel" onclick="closeSearchDropdown(); event.stopPropagation();">{% trans "Cancel" %}</button>
 
         <!-- Dropdown Panel (no separate search header) -->
         <div class="search-dropdown-panel" id="searchDropdownPanel">
@@ -1147,6 +1148,7 @@
 
   <script src="{% static 'erp/js/text_fold.js' %}"></script>
   <script src="{% static 'erp/js/command_palette.js' %}"></script>
+  <script src="{% static 'erp/js/submit_shortcut.js' %}"></script>
 
   <!-- Task Sidebar Modal -->
   <div id="taskSidebarOverlay" class="sidebar-overlay" onclick="closeTaskSidebar()">

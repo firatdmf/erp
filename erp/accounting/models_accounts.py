@@ -989,6 +989,18 @@ class Invoice(models.Model):
     )
     intake_plan = models.JSONField(null=True, blank=True)
 
+    # for_order — the CUSTOMER order a purchase is bought for, when stock
+    # is ordered in because a client asked for something the shelves don't
+    # have. Purchases only. Deliberately not `order` above: an invoice with
+    # `order` set skips its ledger posting (the order's own billing covers
+    # it), which on a purchase would silently drop what we owe the supplier.
+    # On receipt, the rolls this purchase brings in are reserved for it —
+    # see operating.order_purchases.
+    for_order = models.ForeignKey(
+        "operating.Order", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="supplier_purchases",
+    )
+
     # Totals (auto-recomputed from items)
     subtotal        = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     discount_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))

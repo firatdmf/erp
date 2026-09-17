@@ -232,6 +232,80 @@ class CrmLinkPicker(TestCase):
         self.assertEqual(self._search(""), [])
 
 
+class CreateLinkedToExistingRecord(TestCase):
+    """The new-account form can attach an existing CRM record instead of
+    minting a second one."""
+
+    def setUp(self):
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Laleli Fabric")
+        self.user = get_user_model().objects.create_user(username="ledger", password="pw")
+        self.member = self.user.member
+        self.member.books.set([self.book])
+        self.member.default_book = self.book
+        self.member.save(update_fields=["default_book"])
+        self.client.force_login(self.user)
+        self.company = Company.objects.create(name="Gürhan Tekstil")
+
+    def _create(self, **post):
+        data = {"entity_type": "company", "name": "Gürhan Tekstil",
+                "default_currency": self.usd.pk}
+        data.update(post)
+        return self.client.post(
+            reverse("accounts:create", kwargs={"book_id": self.book.pk}), data)
+
+    def test_the_form_searches_in_its_own_book(self):
+        r = self.client.get(
+            reverse("accounts:create_crm_search", kwargs={"book_id": self.book.pk}),
+            {"q": "gurhan"})
+        self.assertEqual([(x["kind"], x["id"]) for x in r.json()["results"]],
+                         [("company", self.company.pk)])
+
+    def test_the_search_names_the_account_already_holding_a_candidate(self):
+        CurrentAccount.objects.create(book=self.book, code="00554", name="GÜRHAN",
+                                      company=self.company, default_currency=self.usd)
+        r = self.client.get(
+            reverse("accounts:create_crm_search", kwargs={"book_id": self.book.pk}),
+            {"q": "gurhan"})
+        self.assertEqual(r.json()["results"][0]["taken"]["code"], "00554")
+
+    def test_linking_an_existing_company_does_not_create_another(self):
+        """Without the link, the same name was refused as a duplicate."""
+        self._create(link_kind="company", link_id=self.company.pk,
+                     name="Gürhan (Laleli)", tax_number="123")
+        self.assertEqual(Company.objects.count(), 1)
+        current_account = CurrentAccount.objects.get(company=self.company)
+        self.assertEqual(current_account.book_id, self.book.pk)
+        self.assertEqual(current_account.name, "Gürhan (Laleli)")
+        self.assertEqual(current_account.tax_number, "123")
+
+    def test_the_link_decides_the_kind(self):
+        supplier = Supplier.objects.create(company_name="Gürhan İplik")
+        CurrentAccount.objects.filter(supplier=supplier).delete()  # the signal's own
+        self._create(entity_type="company", link_kind="supplier", link_id=supplier.pk)
+        self.assertTrue(CurrentAccount.objects.filter(book=self.book, supplier=supplier).exists())
+        self.assertEqual(Company.objects.count(), 1)
+
+    def test_a_record_that_already_has_an_account_here_is_not_overwritten(self):
+        held = CurrentAccount.objects.create(book=self.book, code="00554", name="GÜRHAN",
+                                             company=self.company, default_currency=self.usd,
+                                             tax_number="old")
+        r = self._create(link_kind="company", link_id=self.company.pk, tax_number="new")
+        self.assertRedirects(r, reverse("accounts:detail", args=[held.pk]),
+                             fetch_redirect_response=False)
+        held.refresh_from_db()
+        self.assertEqual(held.tax_number, "old")
+        self.assertEqual(CurrentAccount.objects.filter(company=self.company).count(), 1)
+
+    def test_a_record_deleted_meanwhile_is_reported(self):
+        pk = self.company.pk
+        self.company.delete()
+        r = self._create(link_kind="company", link_id=pk)
+        self.assertRedirects(r, reverse("accounts:create", kwargs={"book_id": self.book.pk}),
+                             fetch_redirect_response=False)
+        self.assertFalse(CurrentAccount.objects.exists())
+
+
 class CrmLinkFilter(TestCase):
     """The list has to be able to show what is still unidentified — 85% of
     the Laleli book on the day this was written."""

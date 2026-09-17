@@ -96,6 +96,36 @@
   .cf-etype-btn.active i, .cf-etype-btn.active b { color: var(--nejum-teal-700); }
   .cf-etype-hint { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin: -8px 0 16px; }
 
+  /* Link an existing CRM record instead of creating one — same rows as
+     the picker on the account page. */
+  .cf-crm { margin-bottom: 16px; }
+  .cf-crm-search { position: relative; }
+  .cf-crm-search i, .cf-crm-search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--gray-400); pointer-events: none; }
+  .cf-crm-search input { width: 100%; padding: 9px 12px 9px 33px; border: 1px solid #E0E6EE; border-radius: 9px; font: 500 13px var(--font-sans); color: var(--ink); background: white; outline: none; transition: border-color 140ms, box-shadow 140ms; }
+  .cf-crm-search input:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .cf-crm-results { margin-top: 8px; border: 1px solid #E2E8EE; border-radius: 9px; overflow: hidden; max-height: 260px; overflow-y: auto; }
+  .cf-crm-res { display:flex; align-items:center; gap: 9px; width: 100%; padding: 9px 11px; background: white; border: none; border-bottom: 1px solid #EEF1F5; text-align: left; cursor: pointer; font: 500 12.5px var(--font-sans); color: var(--ink); }
+  .cf-crm-res:last-child { border-bottom: none; }
+  .cf-crm-res:hover { background: #F4FAFA; }
+  .cf-crm-res i, .cf-crm-res svg { width: 13px; height: 13px; flex-shrink: 0; color: var(--gray-500); }
+  .cf-crm-res .t { min-width: 0; flex: 1; }
+  .cf-crm-res .t b { display:block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cf-crm-res .t small { display:block; font: 500 11px var(--font-sans); color: var(--gray-500); }
+  .cf-crm-res .k { font: 700 9.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #EEF1F5; color: var(--gray-600); flex-shrink: 0; }
+  .cf-crm-res.taken { cursor: default; background: #FAFBFD; }
+  .cf-crm-res.taken .t b { color: var(--gray-500); }
+  .cf-crm-res .held { font: 600 11px ui-monospace, Menlo, monospace; color: var(--nejum-teal-700); text-decoration: none; flex-shrink: 0; }
+  .cf-crm-res .held:hover { text-decoration: underline; }
+  .cf-crm-empty { padding: 12px; text-align: center; font: 500 12px var(--font-sans); color: var(--gray-500); }
+  .cf-crm-chip { display:flex; align-items:center; gap: 9px; padding: 10px 12px; background: var(--nejum-teal-50); border: 1px solid #B9DAD6; border-radius: 9px; font: 500 12.5px var(--font-sans); color: var(--nejum-teal-700); }
+  .cf-crm-chip[hidden] { display: none; }
+  .cf-crm-chip i, .cf-crm-chip svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .cf-crm-chip b { font-weight: 700; }
+  .cf-crm-chip button { margin-left: auto; display:inline-flex; align-items:center; gap: 4px; background: none; border: none; cursor: pointer; font: 600 12px var(--font-sans); color: var(--gray-600); }
+  .cf-crm-chip button:hover { color: var(--ink); }
+  .cf-etype.locked .cf-etype-btn { pointer-events: none; opacity: 0.45; }
+  .cf-etype.locked .cf-etype-btn.active { opacity: 1; }
+
   .cf-foot { display:flex; align-items: center; gap: 10px; padding: 14px 22px; background: #FAFBFD; border-top: 1px solid #EEF1F5; }
   .cf-foot-l { font: 500 12px var(--font-sans); color: var(--gray-500); display:flex; align-items:center; gap:6px; }
   .cf-foot-l i { width: 14px; height: 14px; }
@@ -132,7 +162,27 @@
 
         {% if not current_account %}
         <input type="hidden" name="entity_type" id="cf-entity-type" value="company">
-        <div class="cf-etype">
+        <input type="hidden" name="link_kind" id="cf-link-kind">
+        <input type="hidden" name="link_id" id="cf-link-id">
+        {% comment %}
+          Search first, create second — the same order as the picker on the
+          account page, and for the same reason: a customer the CRM already
+          knows should get an account, not a second CRM record.
+        {% endcomment %}
+        <div class="cf-crm" data-search-url="{% url 'accounts:create_crm_search' current_book.pk %}">
+          <div class="cf-crm-search" id="cf-crm-searchbox">
+            <i data-lucide="search"></i>
+            <input type="text" id="cf-crm-q" autocomplete="off"
+                   placeholder="{% trans 'Already in the CRM? Search contacts, companies, suppliers…' %}">
+          </div>
+          <div id="cf-crm-results" class="cf-crm-results" hidden></div>
+          <div id="cf-crm-chip" class="cf-crm-chip" hidden>
+            <i data-lucide="link"></i>
+            <span>{% trans "Linking to" %} <b id="cf-crm-chip-name"></b></span>
+            <button type="button" id="cf-crm-clear"><i data-lucide="x"></i>{% trans "Remove" %}</button>
+          </div>
+        </div>
+        <div class="cf-etype" id="cf-etype">
           <div class="cf-etype-btn active" data-etype="company" onclick="cfPickEtype('company')">
             <i data-lucide="building-2"></i><b>{% trans "Company" %}</b>
           </div>
@@ -143,7 +193,8 @@
             <i data-lucide="truck"></i><b>{% trans "Supplier" %}</b>
           </div>
         </div>
-        <div class="cf-etype-hint">{% trans "A matching CRM record is created together with the account — this decides which kind." %}</div>
+        <div class="cf-etype-hint" id="cf-etype-hint">{% trans "A matching CRM record is created together with the account — this decides which kind." %}</div>
+        <div class="cf-etype-hint" id="cf-etype-hint-linked" hidden>{% trans "The account is attached to the record above — no new CRM record is created." %}</div>
         {% endif %}
 
         <div class="cf-row">
@@ -174,7 +225,7 @@
               <span class="hint">{% trans "The currency of an account can't be changed once it has movements or invoices." %}</span>
             {% else %}
             <select name="default_currency" required>
-              {% for c in currencies %}<option value="{{ c.id }}" {% if current_account and current_account.default_currency_id == c.id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>{% endfor %}
+              {% for c in currencies %}<option value="{{ c.id }}" {% if current_account %}{% if current_account.default_currency_id == c.id %}selected{% endif %}{% elif default_currency_id == c.id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>{% endfor %}
             </select>
             <span class="hint">{% trans "Choose carefully: it can't be changed once the account has movements or invoices." %}</span>
             {% endif %}
@@ -351,5 +402,114 @@
       if (inputEl) inputEl.placeholder = lbl.placeholder;
     }
   };
+
+  // ── Link an existing CRM record. Only on a new account; the edit page
+  //    links from the account detail page instead.
+  (function () {
+    var wrap = document.querySelector('.cf-crm');
+    if (!wrap) return;
+    var url = wrap.dataset.searchUrl;
+    var input = document.getElementById('cf-crm-q');
+    var box = document.getElementById('cf-crm-results');
+    var searchbox = document.getElementById('cf-crm-searchbox');
+    var chip = document.getElementById('cf-crm-chip');
+    var kindInput = document.getElementById('cf-link-kind');
+    var idInput = document.getElementById('cf-link-id');
+    var nameInput = document.getElementById('cf-name-input');
+    var etype = document.getElementById('cf-etype');
+    var KIND = {
+      contact: {icon: 'user', label: '{% trans "Contact" %}'},
+      company: {icon: 'building-2', label: '{% trans "Company" %}'},
+      supplier: {icon: 'truck', label: '{% trans "Supplier" %}'}
+    };
+    var timer = null, token = 0, filledName = null;
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+      });
+    }
+
+    function render(results) {
+      if (!results.length) {
+        box.innerHTML = '<div class="cf-crm-empty">{% trans "Nothing found — a new record is created with the account." %}</div>';
+        box.hidden = false;
+        return;
+      }
+      box.innerHTML = results.map(function (r) {
+        var k = KIND[r.kind] || {icon: 'circle', label: r.kind};
+        var sub = r.sub ? '<small>' + esc(r.sub) + '</small>' : '';
+        if (r.taken) {
+          // One CRM record holds one account per book — open that one.
+          return '<div class="cf-crm-res taken" title="' +
+            esc('{% trans "Already linked to another account in this book" %}') + '">' +
+            '<i data-lucide="' + k.icon + '"></i>' +
+            '<span class="t"><b>' + esc(r.label) + '</b>' + sub + '</span>' +
+            '<a class="held" href="' + esc(r.taken.url) + '" title="' + esc(r.taken.name) + '">' +
+            esc(r.taken.code) + '</a></div>';
+        }
+        return '<button type="button" class="cf-crm-res" data-kind="' + esc(r.kind) +
+          '" data-id="' + esc(r.id) + '" data-label="' + esc(r.label) + '">' +
+          '<i data-lucide="' + k.icon + '"></i>' +
+          '<span class="t"><b>' + esc(r.label) + '</b>' + sub + '</span>' +
+          '<span class="k">' + esc(k.label) + '</span></button>';
+      }).join('');
+      box.hidden = false;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function search() {
+      var q = input.value.trim();
+      if (!q) { box.hidden = true; box.innerHTML = ''; return; }
+      var mine = ++token;
+      fetch(url + '?q=' + encodeURIComponent(q),
+            {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (mine === token) render(d.results || []); })
+        .catch(function () {});
+    }
+
+    function setLinked(on) {
+      searchbox.hidden = on;
+      chip.hidden = !on;
+      etype.classList.toggle('locked', on);
+      document.getElementById('cf-etype-hint').hidden = on;
+      document.getElementById('cf-etype-hint-linked').hidden = !on;
+    }
+
+    input.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(search, 250);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); search(); }
+    });
+    // Delegated: the rows are replaced on every keystroke.
+    box.addEventListener('click', function (e) {
+      var btn = e.target.closest('.cf-crm-res[data-kind]');
+      if (!btn) return;
+      kindInput.value = btn.dataset.kind;
+      idInput.value = btn.dataset.id;
+      document.getElementById('cf-crm-chip-name').textContent = btn.dataset.label;
+      cfPickEtype(btn.dataset.kind);
+      // The account is named after the record unless the reader already
+      // typed a name of their own.
+      if (!nameInput.value.trim() || nameInput.value === filledName) {
+        nameInput.value = btn.dataset.label;
+        filledName = nameInput.value;
+      }
+      box.hidden = true;
+      setLinked(true);
+    });
+    document.getElementById('cf-crm-clear').addEventListener('click', function () {
+      kindInput.value = '';
+      idInput.value = '';
+      if (nameInput.value === filledName) nameInput.value = '';
+      filledName = null;
+      setLinked(false);
+      input.focus();
+      search();
+    });
+  })();
 </script>
 {% endblock %}

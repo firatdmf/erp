@@ -32,7 +32,7 @@ Ambiguities are REPORTED in the summary's `conflicts`, never guessed.
 from contextlib import nullcontext as _nullcontext
 
 from .catalog_sync import _fold, _norm_attr, _norm_value, derive_catalog
-from marketing.models import SKU_MAX_LENGTH
+from marketing.models import SKU_MAX_LENGTH, ProductCategory
 
 
 def _norm(s):
@@ -192,9 +192,13 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                         summary["actions"].append(f"NEW PRODUCT '{base}' (hidden) for {sku}")
                         if apply:
                             taken = Product.objects.filter(sku__iexact=base[:SKU_MAX_LENGTH]).exists()
+                            # Warehouse stock without a product is imported
+                            # fabric (the Ergene and Excel imports), so its
+                            # new product says so — type, unit and pack.
                             parent = Product.objects.create(
                                 title=base, sku=(None if taken else (base[:SKU_MAX_LENGTH] or None)),
-                                featured=False, unit_of_measurement="mt",
+                                featured=False, unit="mt", pack_type="roll",
+                                category=ProductCategory.objects.filter(name="fabric").first(),
                             )
                             if parent.sku:
                                 p_sku_exact[parent.sku.strip().lower()] = parent

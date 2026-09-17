@@ -12,6 +12,7 @@ from crm.models import Contact, Company
 #     Book,
 #     # RawMaterialGoodsReceiptItem,
 # )
+from marketing import units
 from marketing.models import Product, ProductVariant
 # Straight from crm — marketing used to re-export Supplier as a side effect
 # of Product.supplier, which is now a current account account instead.
@@ -1409,79 +1410,18 @@ class WarehouseProduct(models.Model):
     model = models.CharField(max_length=128, blank=True, null=True)
     quantity = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
-    # What this product is COUNTED IN. Everything on the shelf used to be
-    # fabric, so every screen said "m" and the stock-item columns were
-    # literally named `meters` — which made a box of 20 curtain sets read
-    # as "20m". The codes are the ones the goods-receipt form has always
-    # offered (see _PRODUCT_UNIT_MAP in views_warehouse); they were
-    # collected at intake and then thrown away.
-    #
-    # Defaults to metres: every product that existed before this field is
-    # fabric, so the default is not a guess.
-    # Codes AND labels are English. They used to be "adet" and "paket",
-    # because that is what the goods-receipt form had always submitted —
-    # which made the stored value, the form option and every lookup key
-    # Turkish. Turkish belongs in the .po catalogue, not in the data.
-    UNIT_CHOICES = [
-        ("mt", _("Metre")),
-        ("piece", _("Piece")),
-        ("pack", _("Pack")),
-        ("kg", _("Kilogram")),
-    ]
-    UNIT_SHORT = {"mt": _("m"), "piece": _("pcs"),
-                  "pack": _("pack"), "kg": _("kg")}
-
-    # How this product is PACKED — what one stock item physically is. A
-    # stock item is a lot that arrived together and is picked from
-    # together: a roll of cloth, a box of curtain sets, a bale of waste.
-    #
-    # Separate from `unit` on purpose. The two are related but not the
-    # same question, and deriving one from the other is only right until
-    # it isn't: metres can arrive on a bolt as easily as a roll, and
-    # pieces can come in a bag as easily as a box. What a thing is
-    # measured in and what it is packed in are two facts, so they are two
-    # fields.
-    PACK_CHOICES = [
-        ("roll", _("Roll")),
-        ("box", _("Box")),
-        ("bale", _("Bale")),
-        ("bag", _("Bag")),
-        ("bundle", _("Bundle")),
-        ("pallet", _("Pallet")),
-    ]
-    PACK_NOUN = {
-        "roll": (_("roll"), _("rolls")),
-        "box": (_("box"), _("boxes")),
-        "bale": (_("bale"), _("bales")),
-        "bag": (_("bag"), _("bags")),
-        "bundle": (_("bundle"), _("bundles")),
-        "pallet": (_("pallet"), _("pallets")),
-    }
-    # Font Awesome class to match. A scroll for a roll of cloth, a carton
-    # for a box — the icon was doing as much of the telling as the word.
-    PACK_ICON = {"roll": "fa-scroll", "box": "fa-box", "bale": "fa-cubes-stacked",
-                 "bag": "fa-sack-xmark", "bundle": "fa-boxes-stacked",
-                 "pallet": "fa-pallet"}
-
-    # The pack a unit arrives in when nobody has said otherwise. Used to
-    # seed existing rows in the migration and to pick a sensible default
-    # for a newly-received product; it is a starting point, not a rule,
-    # and the field can be changed independently afterwards.
-    PACK_FOR_UNIT = {"mt": "roll", "kg": "bale", "piece": "box", "pack": "box"}
-
-    # What the quantity COLUMN is headed. Metres of cloth are a length and
-    # kilos are a weight; a count of curtain sets is neither, and reading
-    # "Length: 20" over a box of them is simply wrong.
-    QUANTITY_LABEL = {"mt": _("Length"), "kg": _("Weight")}
-
-    unit = models.CharField(
-        max_length=8, choices=UNIT_CHOICES, default="mt",
-        help_text="What this product is counted in",
-    )
-    pack_type = models.CharField(
-        max_length=12, choices=PACK_CHOICES, default="roll",
-        help_text="What one stock item of this product physically is",
-    )
+    # What this product is counted in and how it is packed are facts about
+    # the MAIN product, so they are read from it (see the `unit` and
+    # `pack_type` properties) rather than stored here, where one product's
+    # rows could disagree. The constants stay reachable from this class for
+    # the code that already names them.
+    UNIT_CHOICES = units.UNIT_CHOICES
+    UNIT_SHORT = units.UNIT_SHORT
+    PACK_CHOICES = units.PACK_CHOICES
+    PACK_NOUN = units.PACK_NOUN
+    PACK_ICON = units.PACK_ICON
+    PACK_FOR_UNIT = units.PACK_FOR_UNIT
+    QUANTITY_LABEL = units.QUANTITY_LABEL
 
     # Original purchase price as imported from Excel. No cost is below
     # zero (see the CheckConstraints in Meta, which hold for the bulk
@@ -1545,39 +1485,52 @@ class WarehouseProduct(models.Model):
         return f"{self.name} ({self.sku or '-'}) @ {self.warehouse.name}"
 
     @property
+    def catalog_product(self):
+        """The main product this row is stock of, or None while unlinked.
+        List views select_related("catalog_variant__product") so reading
+        it costs no query per row."""
+        variant = self.catalog_variant if self.catalog_variant_id else None
+        return variant.product if variant is not None else None
+
+    @property
+    def unit(self):
+        """What this row is counted in — its main product's unit. A row not
+        yet linked to one is metres, what every unlinked import is."""
+        product = self.catalog_product
+        return product.unit if product is not None else units.DEFAULT_UNIT
+
+    @property
+    def pack_type(self):
+        product = self.catalog_product
+        return product.pack_type if product is not None else units.DEFAULT_PACK
+
+    @property
     def unit_short(self):
-        """The unit as it is printed next to a number — "m", "ad", "pkt".
+        """The unit as it is printed next to a number — "m", "pcs".
 
         Templates render `{{ p.quantity }} {{ p.unit_short }}` instead of a
-        hardcoded "m". Falls back to the raw code so an unrecognised unit
-        shows itself rather than disappearing.
-        """
-        # str() forces the lazy translation at ACCESS time, so it picks up
-        # the language active on this request — and so callers comparing it,
-        # or dropping it into JSON, get a plain string rather than a proxy.
-        return str(self.UNIT_SHORT.get(self.unit, self.unit or ""))
+        hardcoded "m"."""
+        return units.unit_short(self.unit)
 
     @property
     def item_noun(self):
         """"roll" / "box" — one stock item of this product, singular."""
-        return str(self.PACK_NOUN.get(
-            self.pack_type, (_("item"), _("items")))[0])
+        return units.pack_nouns(self.pack_type)[0]
 
     @property
     def item_noun_plural(self):
-        return str(self.PACK_NOUN.get(
-            self.pack_type, (_("item"), _("items")))[1])
+        return units.pack_nouns(self.pack_type)[1]
 
     @property
     def item_icon(self):
-        return self.PACK_ICON.get(self.pack_type, "fa-layer-group")
+        return units.PACK_ICON.get(self.pack_type, "fa-layer-group")
 
     @property
     def quantity_label(self):
         """Column heading for this product's quantity — "Length" for cloth,
         "Weight" for anything sold by the kilo, "Quantity" for things that
         are counted."""
-        return str(self.QUANTITY_LABEL.get(self.unit, _("Quantity")))
+        return units.quantity_label(self.unit)
 
     # Live USD/TRY rate fetched lazily so the model file doesn't pull
     # in accounting at import time. Cached per call.

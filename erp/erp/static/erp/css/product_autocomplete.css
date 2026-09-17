@@ -172,6 +172,27 @@
   font-weight: 900;
 }
 
+/* A product already on the order. The order form moves it to the bottom
+ * and takes its click away (a second card for the same product splits one
+ * line in two); it stays listed so the search does not look like it
+ * missed. !important for the same reason as the headings above. */
+.product_autocomplete_list li.pa-row.pa-added {
+  cursor: default !important;
+  opacity: .55;
+}
+.product_autocomplete_list li.pa-row.pa-added:hover {
+  background: transparent !important;
+}
+.product_autocomplete_list .pa-added-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  color: #475569;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+}
+
 /* Catalog rows ship with the response but stay closed until asked for.
  * Rendering them up front is what makes the expander instant — it is a
  * class toggle, not a second round-trip on a keystroke-driven search. */

@@ -5,7 +5,7 @@ from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from todo.models import Task
-from crm.models import Contact, Company
+from crm.models import Contact, Company, Supplier
 from itertools import chain
 from operator import attrgetter
 from django.db.models import Value, CharField
@@ -368,6 +368,22 @@ class GlobalSearch(View):
                     'detail': c.status,
                     'url': url,
                     'icon': 'fa-building'
+                })
+
+        # 2b. Suppliers (plain email/phone fields, unlike contacts)
+        if search_type in ['all', 'contacts']:
+            suppliers = Supplier.objects.filter(
+                unaccent_icontains(query, 'company_name', 'contact_name') |
+                Q(email__icontains=query) |
+                Q(phone__icontains=query)
+            )[:limit]
+            for s in suppliers:
+                results.append({
+                    'type': 'Supplier',
+                    'name': str(s),
+                    'detail': (s.contact_name if s.company_name else '') or s.email,
+                    'url': reverse('crm:supplier_detail', args=[s.id]),
+                    'icon': 'fa-truck'
                 })
 
         # 3. Products

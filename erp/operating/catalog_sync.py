@@ -285,7 +285,7 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         fabric = ProductCategory.objects.filter(name="fabric").first()
         product = Product.objects.create(
             title=base_name, sku=_safe_sku(base_name), featured=False,
-            unit_of_measurement="mt",
+            unit="mt", pack_type="roll",
             category=fabric,
         )
         product_created = True

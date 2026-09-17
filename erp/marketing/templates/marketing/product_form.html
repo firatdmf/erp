@@ -53,6 +53,11 @@
       gap: 15px !important;
     }
 
+    .sku-prefixed { display: flex; align-items: stretch; }
+    .sku-prefixed .sku-prefix { display: inline-flex; align-items: center; padding: 0 10px; background: #F1F5F9; border: 1px solid #E2E8F0; border-right: 0; border-radius: 8px 0 0 8px; font-family: var(--font-mono, ui-monospace, Menlo, monospace); font-size: 13px; color: #475569; white-space: nowrap; }
+    .sku-prefixed .sku-prefix[hidden] { display: none; }
+    .sku-prefixed .sku-prefix:not([hidden]) + input { border-top-left-radius: 0; border-bottom-left-radius: 0; text-transform: uppercase; }
+    .sku-hint { margin: 6px 0 0; font-size: 11.5px; color: #64748B; }
     .form-group {
       width: 100% !important;
       max-width: 100% !important;
@@ -151,7 +156,14 @@
     </div>
   </div>
 
-  <form method="post" id="product_form" class="product-form-layout" enctype="multipart/form-data">
+  {% comment %}New products follow the SKU rule PARENT.VALUE-VALUE
+  (K24644.BEYAZ-140); products that already exist keep the SKUs they have.
+  variant_form_modern.js reads this flag, and ProductForm enforces the same
+  rule on the server.{% endcomment %}
+  <form method="post" id="product_form" class="product-form-layout" enctype="multipart/form-data"{% if not is_update %} data-sku-rule="1"
+    data-sku-msg-title="{% trans 'SKU needed' %}"
+    data-sku-msg-parent="{% trans 'Enter the product SKU first. Each variant SKU is built from it: the product SKU, a dot, then the option values (K24644.WHITE-140).' %}"
+    data-sku-msg-suffix="{% trans 'Every variant needs its own part after the product SKU and the dot. Open the variants with an empty one and fill it in.' %}"{% endif %}>
     {% csrf_token %}
 
     <!-- LEFT COLUMN (MAIN CONTENT) -->
@@ -672,6 +684,9 @@
           <div class="form-group">
             <label for="id_sku">{% trans "SKU (Stock Keeping Unit)" %}</label>
             {{ form.sku }}
+            {% if not is_update %}
+            <p class="sku-hint">{% trans "No dots. Variant SKUs are built from it: K24644 → K24644.WHITE-140." %}</p>
+            {% endif %}
             {% if product and product.sku %}
               {% with cat=product.category.name|default:'fabric'|lower %}
               <a href="https://demfirat.com/tr/product/{{ cat }}/{{ product.sku }}/"
@@ -702,8 +717,12 @@
             </div>
           </div>
           <div class="form-group">
-            <label for="id_unit_of_measurement">{% trans "Unit" %}</label>
-            {{ form.unit_of_measurement }}
+            <label for="id_unit">{% trans "Unit" %}</label>
+            {{ form.unit }}
+          </div>
+          <div class="form-group">
+            <label for="id_pack_type">{% trans "Packed as" %}</label>
+            {{ form.pack_type }}
           </div>
           <div class="form-group">
             <label for="id_minimum_inventory_level">{% trans "Min. Inventory Level" %}</label>
@@ -1957,7 +1976,11 @@
       <div class="form-row">
         <div class="form-group">
           <label for="modal_variant_sku">{% trans "SKU (Stock Keeping Unit)" %}</label>
-          <input type="text" id="modal_variant_sku" class="form-input">
+          <div class="sku-prefixed">
+            <span class="sku-prefix" id="modal_variant_sku_prefix" hidden></span>
+            <input type="text" id="modal_variant_sku" class="form-input">
+          </div>
+          <p class="sku-hint" id="modal_variant_sku_hint" hidden>{% trans "Option values in capitals, separated by dashes — e.g. WHITE-140." %}</p>
         </div>
 
         <div class="form-group">

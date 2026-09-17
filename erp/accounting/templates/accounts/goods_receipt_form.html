@@ -78,8 +78,8 @@
   .gr-sec-d { font: 500 12px var(--font-sans); color: var(--gray-500); }
 
   /* Delivery meta — the three facts that describe the whole batch. */
-  .gr-meta { display: grid; grid-template-columns: 1fr 1.4fr 0.7fr; gap: 16px; align-items: start; }
-  .gr-meta.dates { grid-template-columns: 1fr 1fr 2.1fr; }
+  .gr-meta { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; align-items: start; }
+  .gr-meta.dates { grid-template-columns: 1fr 1fr 1.4fr 1.6fr; }
   @media (max-width: 860px) { .gr-meta, .gr-meta.dates { grid-template-columns: 1fr; } }
   .np-input.np-notes { height: 40px; padding-top: 10px; resize: vertical; line-height: 1.35; }
 
@@ -245,6 +245,13 @@
   .np-variant-row { display: flex; gap: 8px; margin-bottom: 10px; }
   .np-variant-row .np-input { height: 38px; }
   .np-main-row { display: flex; gap: 8px; }
+  @media (max-width: 520px) { .np-kind-row { flex-wrap: wrap; } .np-kind-row .np-col { flex: 1 1 40%; } }
+  .np-kind-row .np-fact {
+    min-height: 38px; display: flex; align-items: center;
+    font: 600 13px var(--font-sans); color: var(--gray-700, #334155);
+  }
+  .np-kind-hint { margin: -10px 0 14px; }
+  .np-kind-row [hidden], .np-kind-hint[hidden] { display: none !important; }
   .np-main-sku, .np-v-sku { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
 
   /* Every input says what it is above itself, in the same voice as the
@@ -305,7 +312,11 @@
 
   /* Purchase-price row (variant card + no-variant block) — amount and its
      currency read as one field, under one label. */
-  .np-price-row { margin-bottom: 10px; }
+  .np-price-row { margin-bottom: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .np-price-row > .np-col { flex: 1 1 180px; }
+  /* Sale price — only asked for a purchase bought for a customer. */
+  .np-sale-col { display: none; }
+  #grDoc.gr-for-customer .np-sale-col { display: block; }
   .np-price-pair { display: flex; align-items: center; gap: 8px; }
   .np-price-pair .np-input { height: 36px; flex: 1; min-width: 0; }
   .np-price-pair .np-select { height: 36px; width: 84px; flex: 0 0 84px; padding: 0 6px; }
@@ -390,13 +401,13 @@
       <div class="gr-eyebrow">{% trans "Procurement" %}</div>
       {% if edit_invoice %}
         <h1 class="gr-title">{% trans "Goods receipt" %} <code>{{ edit_invoice.number }}</code></h1>
-        <div class="gr-sub">{% trans "This purchase has been received, and all of it can still be corrected. Rolls reserved for a customer order can be re-measured, but not removed or moved to another variant." %}</div>
+        <div class="gr-sub">{% trans "This purchase has been received, and all of it can still be corrected. Items reserved for a customer order can be re-measured, but not removed or moved to another variant." %}</div>
       {% elif order_invoice %}
         <h1 class="gr-title">{% trans "Purchase order" %} <code>{{ order_invoice.number }}</code></h1>
         <div class="gr-sub">{% trans "Nothing has reached the warehouse yet, so everything here is still editable. Confirming it receives the goods and posts what you owe the supplier." %}</div>
       {% else %}
         <h1 class="gr-title">{% trans "Purchase order" %}</h1>
-        <div class="gr-sub">{% trans "Write the delivery down first and receive it when it arrives — or receive it straight away if it is already here. Receiving creates the stock (products, variants and each roll with its own barcode) and the supplier invoice behind it." %}</div>
+        <div class="gr-sub">{% trans "Write the delivery down first and receive it when it arrives — or receive it straight away if it is already here. Receiving creates the stock (products, variants and each item with its own barcode) and the supplier invoice behind it." %}</div>
       {% endif %}
     </div>
     {% if edit_invoice %}
@@ -423,7 +434,7 @@
       <div class="gr-sec-h">
         <span class="gr-sec-n">1</span>
         <span class="gr-sec-t">{% trans "Incoming delivery" %}</span>
-        <span class="gr-sec-d">{% trans "Where it lands, who it's bought from, and how it's measured." %}</span>
+        <span class="gr-sec-d">{% trans "Where it lands and who it's bought from." %}</span>
       </div>
 
       <div class="gr-meta">
@@ -440,7 +451,7 @@
             {% endfor %}
           </select>
           <div class="np-hint">
-            {% if edit_invoice %}{% trans "Changing this moves the purchase's rolls there when you save." %}
+            {% if edit_invoice %}{% trans "Changing this moves the purchase's items there when you save." %}
             {% else %}{% trans "Changing this clears the products below." %}{% endif %}
           </div>
         </div>
@@ -498,18 +509,7 @@
             </div>
           </div>
 
-          <div class="np-hint">{% trans "Barcode prefix" %}: <b id="npPrefix">GEN</b> · {% trans "each roll gets its own unique barcode" %}</div>
-        </div>
-
-        <!-- Unit (generic: fabric=m, bedding=pcs, …) — whole batch -->
-        <div class="np-field">
-          <label>{% trans "Unit" %}</label>
-          <select id="npUnit" class="np-select" onchange="npRelabelUnits(); npSummaryUpdate();">
-            <option value="mt">{% trans "Meter (m)" %}</option>
-            <option value="piece">{% trans "Piece (pcs)" %}</option>
-            <option value="kg">kg</option>
-            <option value="pack">{% trans "Package" %}</option>
-          </select>
+          <div class="np-hint">{% trans "Barcode prefix" %}: <b id="npPrefix">GEN</b> · {% trans "each item gets its own unique barcode" %}</div>
         </div>
       </div>
 
@@ -523,6 +523,35 @@
         <div class="np-field">
           <label>{% trans "Expected delivery" %}</label>
           <input type="date" id="npDeliveryDate" class="np-input" value="{{ delivery_date }}">
+        </div>
+        <!-- The customer this is bought for. Saving creates their order,
+             priced at each variant's sale price; receiving reserves the
+             arriving rolls for it. Fixed once the order exists. -->
+        <div class="np-field">
+          <label>{% trans "For customer" %}</label>
+          {% if for_order %}
+            <div class="np-sup-chip">
+              <i class="fa fa-user"></i>
+              <span>{{ for_order.get_client }} ·
+                <a href="{% url 'operating:order_detail' for_order.pk %}">{{ for_order.order_number|default:for_order.pk }}</a></span>
+            </div>
+          {% elif edit_invoice %}
+            <div class="np-input" style="display:flex; align-items:center;">—</div>
+          {% else %}
+            <div class="np-sup" id="npCustomerBox">
+              <input type="text" id="npCustomerSearch" class="np-input" autocomplete="off"
+                     placeholder="{% trans 'None — for stock' %}"
+                     oninput="npCustSearch(this.value)">
+              <div class="np-sup-results" id="npCustomerResults" hidden></div>
+            </div>
+            <div class="np-sup-chip" id="npCustomerChip" hidden>
+              <i class="fa fa-user"></i>
+              <span id="npCustomerChipName"></span>
+              <button type="button" class="np-sup-clear" onclick="npCustClear()"
+                      title="{% trans 'Change customer' %}">&times;</button>
+            </div>
+            <div class="np-hint">{% trans "Saving creates the customer's order; receiving reserves the items for it." %}</div>
+          {% endif %}
         </div>
         <div class="np-field">
           <label>{% trans "Notes" %}</label>
@@ -611,6 +640,7 @@
 </div>
 
 {{ product_categories|json_script:"np-cats-data" }}
+{{ pack_types|json_script:"np-packs-data" }}
 {% if intake_plan %}{{ intake_plan|json_script:"gr-plan-data" }}{% endif %}
 <script>
 (function () {
@@ -651,7 +681,63 @@
   const NP_CAT_SEL = '<select class="np-select np-main-cat">' +
     NP_CATS.map(function (c) { return '<option value="' + c.id + '"' + (c.is_default ? ' selected' : '') + '>' + c.label + '</option>'; }).join('') +
     '</select>';
-  const GR_SKU_MAX = {{ sku_max_length }};   // marketing.models.SKU_MAX_LENGTH
+  // What one stock item of a product physically is — roll, box, bale… Each
+  // card asks, and words its rows with the answer ("Box 2", "Add box").
+  // Until someone picks, a card follows the batch's unit (metres → roll).
+  const NP_PACKS = JSON.parse((document.getElementById('np-packs-data') || {}).textContent || '{"choices":[],"for_unit":{}}');
+  // What a product is counted in. Per product, like its pack: one delivery
+  // can bring metres of cloth and pieces of curtain together.
+  const NP_UNIT_SEL = '<select class="np-select np-main-unit" onchange="npUnitPicked(this)">' +
+    '<option value="mt">{% trans "Meter (m)" %}</option>' +
+    '<option value="piece">{% trans "Piece (pcs)" %}</option>' +
+    '<option value="kg">kg</option>' +
+    '<option value="pack">{% trans "Package" %}</option>' +
+    '</select>';
+  const NP_UNIT_SHORT = { mt: 'm', piece: '{% trans "pcs" %}', kg: 'kg', pack: '{% trans "pack" %}' };
+  function npUnitOf(card) {
+    const sel = card && card.querySelector('.np-main-unit');
+    return (sel && sel.value) || 'mt';
+  }
+  const NP_PACK_SEL = '<select class="np-select np-main-pack" onchange="npPackPicked(this)">' +
+    NP_PACKS.choices.map(function (c) { return '<option value="' + c.value + '">' + c.label + '</option>'; }).join('') +
+    '</select>';
+  function npUnitPack(card) {
+    return NP_PACKS.for_unit[npUnitOf(card)] || 'roll';
+  }
+  // {label, one, many} for a card — or the neutral "item" when unknown.
+  function npPackOf(card) {
+    const sel = card && card.querySelector('.np-main-pack');
+    const v = sel ? sel.value : '';
+    return NP_PACKS.choices.filter(function (c) { return c.value === v; })[0] ||
+      { value: '', label: '{% trans "Item" %}', one: '{% trans "item" %}', many: '{% trans "items" %}' };
+  }
+  // Rewrite every pack word inside one card.
+  window.npRelabelPack = function (card) {
+    const p = npPackOf(card);
+    const vr = card.querySelector('.np-vr-label');
+    if (vr) vr.textContent = '{% trans "Variants & {items}" %}'.replace('{items}', p.many);
+    card.querySelectorAll('.np-add-top-label').forEach(function (el) {
+      el.textContent = '{% trans "Add {item}" %}'.replace('{item}', p.one).replace('{Item}', p.label);
+    });
+    card.querySelectorAll('.np-tops').forEach(function (tops) {
+      Array.prototype.forEach.call(tops.children, function (r, i) {
+        const no = r.querySelector('.np-top-no'); if (no) no.textContent = p.label + ' ' + (i + 1);
+      });
+    });
+  };
+  window.npPackPicked = function (sel) {
+    sel.dataset.touched = '1';
+    npRelabelPack(sel.closest('.np-product-card'));
+    npSummaryUpdate();
+  };
+  // The customer's price for a variant, in the customer's account currency.
+  const NP_SALE = '<div class="np-col np-sale-col">' +
+    '<label>{% trans "Sale price (customer)" %}</label>' +
+    '<input class="np-input np-v-sale" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">' +
+    '</div>';
+  const GR_CUSTOMER_URL = "{% url 'crm:customer_autocomplete' %}";
+  const GR_SKU_MAX = {{ sku_max_length }};                  // Product.sku max_length
+  const GR_VARIANT_SKU_MAX = {{ variant_sku_max_length }};  // ProductVariant.variant_sku max_length
   const GR_EDIT_ID = {% if edit_invoice %}{{ edit_invoice.pk }}{% else %}null{% endif %};
   const GR_ORDER_ID = {% if order_invoice %}{{ order_invoice.pk }}{% else %}null{% endif %};
   const GR_ORDER_URL = "{% url 'accounts:purchase_order_save' current_book.pk %}";
@@ -779,9 +865,9 @@
     }, 120);
   }
 
-  function unitShort() {
-    const u = (document.getElementById('npUnit') || {}).value || 'mt';
-    return ({ mt: 'm', piece: 'pcs', kg: 'kg', pack: 'pack' })[u] || u;
+  function unitShort(card) {
+    const u = npUnitOf(card);
+    return NP_UNIT_SHORT[u] || u;
   }
   function slug(s) {
     return (s || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/gi, '').slice(0, 10);
@@ -838,10 +924,6 @@
               '<div class="np-hint">{% trans "auto and unique — overwrite it with the code the mill uses." %}</div>' +
             '</div>' +
           '</div>' +
-          '<div class="np-field" style="margin:8px 0 0;">' +
-            '<label>{% trans "Product Type" %}</label>' +
-            NP_CAT_SEL +
-          '</div>' +
         '</div>' +
         '<div class="np-existing-main np-ac-wrap" style="display:none;">' +
           '<div class="np-col">' +
@@ -854,8 +936,26 @@
           '<div class="np-existing-variants" style="display:none;"></div>' +
         '</div>' +
       '</div>' +
+      // What the product is, what it's counted in and how it's packed —
+      // one row. A new product is asked all three; an existing one states
+      // them (see npApplyProductFacts).
+      '<div class="np-field np-main-row np-kind-row">' +
+        '<div class="np-col np-col-cat">' +
+          '<label>{% trans "Product Type" %}</label>' +
+          NP_CAT_SEL + '<div class="np-fact" hidden></div>' +
+        '</div>' +
+        '<div class="np-col np-col-unit">' +
+          '<label>{% trans "Unit" %}</label>' +
+          NP_UNIT_SEL + '<div class="np-fact" hidden></div>' +
+        '</div>' +
+        '<div class="np-col np-col-pack">' +
+          '<label>{% trans "Packed as" %}</label>' +
+          NP_PACK_SEL + '<div class="np-fact" hidden></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="np-hint np-kind-hint" hidden>{% trans "This product already has stock, so its unit and pack are set on the product page." %}</div>' +
       '<div class="np-field" style="margin-bottom:8px;">' +
-        '<label>{% trans "Variants & rolls" %}</label>' +
+        '<label class="np-vr-label"></label>' +
         '<div class="np-seg">' +
           '<button type="button" class="np-seg-btn" data-hv="0" onclick="npSetHasVariants(this, false)">{% trans "No variant" %}</button>' +
           '<button type="button" class="np-seg-btn active" data-hv="1" onclick="npSetHasVariants(this, true)">{% trans "Has variants" %}</button>' +
@@ -871,16 +971,23 @@
                 NP_CUR +
               '</div>' +
             '</div>' +
+            NP_SALE +
           '</div>' +
           NP_TOPS_HEAD +
           '<div class="np-tops np-nv-tops"></div>' +
-          '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-no-variant\').querySelector(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add roll" %}</button>' +
+          '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-no-variant\').querySelector(\'.np-variant\'))"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>' +
         '</div>' +
       '</div>' +
       '<div class="np-variants-wrap">' +
         '<div class="np-variants"></div>' +
         '<button type="button" class="np-add-variant" onclick="npAddVariant(this.closest(\'.np-product-card\'))"><i class="fa fa-plus"></i> {% trans "Add variant" %}</button>' +
       '</div>';
+    // A delivery is mostly one kind of goods, so a new product starts on
+    // the unit of the one above it.
+    const cards = wrap.querySelectorAll('.np-product-card');
+    if (cards.length) el.querySelector('.np-main-unit').value = npUnitOf(cards[cards.length - 1]);
+    el.querySelector('.np-main-pack').value = npUnitPack(el);
+    npRelabelPack(el);
     wrap.appendChild(el);
     npAddVariant(el);
     npFetchNextSku(el);
@@ -916,6 +1023,7 @@
     });
     card.querySelector('.np-new-main').style.display = (mode === 'new') ? '' : 'none';
     card.querySelector('.np-existing-main').style.display = (mode === 'existing') ? '' : 'none';
+    npApplyProductFacts(card, null);
     if (mode === 'new') {
       // Leaving "existing" — drop its search + selection state so a fresh
       // "New" entry never inherits the previous product's variant badges.
@@ -1193,7 +1301,7 @@
     const card = vEl.closest('.np-product-card');
     const root = npBaseSku(card);
     const sfx = slug(nameI.value) || vEl.dataset.vid;
-    skuI.value = root ? (root + '.' + sfx).slice(0, GR_SKU_MAX) : '';
+    skuI.value = root ? (root + '.' + sfx).slice(0, GR_VARIANT_SKU_MAX) : '';
   };
 
   // Debounced existing/new classification of a variant card's name, ONLY
@@ -1313,11 +1421,11 @@
       '<div class="np-variant-row">' +
         '<div class="np-col np-col-name">' +
           '<label>{% trans "Color / model" %}</label>' +
-          '<input class="np-input np-v-name" placeholder="{% trans "e.g. Beyaz" %}" oninput="npSuggestVariantSku(this.closest(\'.np-variant\')); npQueueVariantMatch(this.closest(\'.np-variant\'))">' +
+          '<input class="np-input np-v-name" placeholder="{% trans "e.g. White" %}" oninput="npSuggestVariantSku(this.closest(\'.np-variant\')); npQueueVariantMatch(this.closest(\'.np-variant\'))">' +
         '</div>' +
         '<div class="np-col np-col-sku">' +
           '<label>{% trans "Variant SKU" %}</label>' +
-          '<input class="np-input np-v-sku" maxlength="' + GR_SKU_MAX + '" placeholder="{% trans "auto" %}" oninput="npUnlockVariantSku(this)">' +
+          '<input class="np-input np-v-sku" maxlength="' + GR_VARIANT_SKU_MAX + '" placeholder="{% trans "auto" %}" oninput="npUnlockVariantSku(this)">' +
         '</div>' +
       '</div>' +
       '<div class="np-v-match"></div>' +
@@ -1329,11 +1437,13 @@
             NP_CUR +
           '</div>' +
         '</div>' +
+        NP_SALE +
       '</div>' +
       NP_TOPS_HEAD +
       '<div class="np-tops"></div>' +
-      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add roll" %}</button>';
+      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>';
     cardEl.querySelector('.np-variants').appendChild(el);
+    npRelabelPack(cardEl);
     npSuggestVariantSku(el);
     npAddTop(el);
     npRenumberVariants(cardEl);
@@ -1372,9 +1482,9 @@
     const row = document.createElement('div');
     row.className = 'np-top';
     row.innerHTML =
-      '<span class="np-top-no">{% trans "Roll" %} ' + n + '</span>' +
+      '<span class="np-top-no">' + npPackOf(vEl.closest('.np-product-card')).label + ' ' + n + '</span>' +
       '<input class="np-input np-top-qty" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
-      '<span class="np-top-unit">' + unitShort() + '</span>' +
+      '<span class="np-top-unit">' + unitShort(vEl.closest('.np-product-card')) + '</span>' +
       // Blank = mint one from the account prefix at save. Filled = this stock item
       // arrived already labelled and keeps the code printed on it.
       '<input class="np-input np-top-bc" type="text" maxlength="64" spellcheck="false"' +
@@ -1421,7 +1531,7 @@
       const v = (el.value || '').trim().toUpperCase();
       if (v && counts[v] > 1) {
         el._npDupe = true;
-        npBcMark(el, 'bad', '{% trans "This barcode is entered on more than one roll." %}');
+        npBcMark(el, 'bad', '{% trans "This barcode is entered on more than one item." %}');
       } else if (el._npDupe) {
         el._npDupe = false;
         // Fall back to whatever the server last said about this value.
@@ -1478,18 +1588,33 @@
 
   window.npRemoveTop = function (btn) {
     const t = btn.closest('.np-top');
-    const tops = t && t.parentElement;
+    const card = t && t.closest('.np-product-card');
     if (t) t.remove();
-    if (tops) Array.prototype.forEach.call(tops.children, function (r, i) {
-      const no = r.querySelector('.np-top-no'); if (no) no.textContent = '{% trans "Roll" %} ' + (i + 1);
-    });
+    if (card) npRelabelPack(card);
     npBcSyncDupes();   // removing a row can clear a clash it was causing
     npSummaryUpdate();
   };
-  window.npRelabelUnits = function () {
-    const u = unitShort();
-    document.querySelectorAll('#grDoc .np-top-unit').forEach(function (s) { s.textContent = u; });
+  // A card's unit changed: its rows say the new unit, and its pack follows
+  // unless someone already picked one.
+  window.npRelabelUnits = function (card) {
+    const u = unitShort(card);
+    card.querySelectorAll('.np-top-unit').forEach(function (s) { s.textContent = u; });
+    const sel = card.querySelector('.np-main-pack');
+    if (sel && !sel.dataset.touched) { sel.value = npUnitPack(card); npRelabelPack(card); }
   };
+  window.npUnitPicked = function (sel) {
+    npRelabelUnits(sel.closest('.np-product-card'));
+    npSummaryUpdate();
+  };
+  // "rolls" when every product is packed alike, "items" when they differ.
+  function npBatchNoun() {
+    const nouns = {};
+    document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
+      nouns[npPackOf(card).many] = true;
+    });
+    const keys = Object.keys(nouns);
+    return keys.length === 1 ? keys[0] : '{% trans "items" %}';
+  }
 
   // Aggregate across EVERY product card — the whole batch's totals, so the
   // action bar reflects everything on the page, not just one product.
@@ -1518,17 +1643,20 @@
   }
 
   window.npSummaryUpdate = function () {
-    let pcount = 0, vcount = 0, tcount = 0, total = 0;
-    const money = {};
+    let pcount = 0, vcount = 0, tcount = 0;
+    const totals = {};   // unit → quantity; units can't be added together
+    let unit = 'mt';
     function addQ(q) {
       const val = parseFloat((q.value || '').replace(',', '.'));
-      if (!isNaN(val) && val > 0) { tcount++; total += val; }
+      if (!isNaN(val) && val > 0) { tcount++; totals[unit] = (totals[unit] || 0) + val; }
     }
+    const money = {};
     function addMoney(m) {
       if (m) money[m.code] = (money[m.code] || 0) + m.amount;
     }
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
       pcount++;
+      unit = npUnitOf(card);
       if (card._npHasVariants) {
         card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
           vcount++;
@@ -1545,7 +1673,11 @@
     if (el) {
       el.style.color = '';
       let html = '<b>' + pcount + '</b> {% trans "products" %} · <b>' + vcount + '</b> {% trans "variants" %} · ' +
-        '<b>' + tcount + '</b> {% trans "rolls" %} · <b>' + (Math.round(total * 100) / 100) + '</b> ' + unitShort();
+        '<b>' + tcount + '</b> ' + npBatchNoun() +
+        (Object.keys(totals).length ? '' : ' · <b>0</b> ' + unitShort(document.querySelector('#npProducts .np-product-card'))) +
+        Object.keys(totals).map(function (u) {
+          return ' · <b>' + (Math.round(totals[u] * 100) / 100) + '</b> ' + (NP_UNIT_SHORT[u] || u);
+        }).join('');
       // One figure, in the currency the alım is actually cut in, because
       // that is the number the operator is about to commit to. A line whose
       // rate is still missing is NAMED rather than folded in at par — the
@@ -1699,6 +1831,7 @@
   // never lingers.
   window.npResetExistingVariants = function (cardEl) {
     cardEl._npExistingVariants = [];
+    npApplyProductFacts(cardEl, null);
     const box = cardEl.querySelector('.np-existing-variants');
     if (box) { box.style.display = 'none'; box.innerHTML = ''; }
     cardEl.querySelectorAll('.np-variants .np-v-match').forEach(function (m) {
@@ -1709,13 +1842,54 @@
     });
   };
 
+  // An existing product's type, unit and pack are its own: the card states
+  // them instead of asking. Unit and pack stay editable only while the
+  // product has no stock from anywhere else (facts.unit_locked false).
+  // `facts` null = a new product, or none picked yet: ask everything.
+  // The selects keep the product's values even when hidden, so the card's
+  // wording and the totals follow the product.
+  window.npApplyProductFacts = function (card, facts) {
+    card._npFacts = facts;
+    const existing = card._npMode === 'existing';
+    const catCol = card.querySelector('.np-col-cat');
+    const catText = catCol.querySelector('.np-fact');
+    catCol.querySelector('.np-main-cat').hidden = existing;
+    catText.hidden = !existing;
+    catText.textContent = (facts && facts.category_label) || '—';
+
+    const locked = !!(facts && facts.unit_locked);
+    [['.np-col-unit', '.np-main-unit', 'unit', 'unit_label'],
+     ['.np-col-pack', '.np-main-pack', 'pack_type', 'pack_label']].forEach(function (f) {
+      const col = card.querySelector(f[0]);
+      const sel = col.querySelector(f[1]);
+      const text = col.querySelector('.np-fact');
+      if (facts && facts[f[2]]) sel.value = facts[f[2]];
+      // Like a new card's, the pack follows a changed unit until someone
+      // picks one — the product's pack is where it starts, not a choice.
+      delete sel.dataset.touched;
+      sel.hidden = locked;
+      text.hidden = !locked;
+      text.textContent = (facts && facts[f[3]]) || '';
+    });
+    card.querySelector('.np-kind-hint').hidden = !locked;
+    // Rows say the product's unit; not npRelabelUnits, which would also
+    // reset the pack to the unit's usual one over the product's own.
+    const u = unitShort(card);
+    card.querySelectorAll('.np-top-unit').forEach(function (s) { s.textContent = u; });
+    npRelabelPack(card);
+    npSummaryUpdate();
+  };
+
   window.npLoadExistingVariants = function (cardEl, productId) {
     const box = cardEl.querySelector('.np-existing-variants');
     if (!box) return;
     if (!productId) { npResetExistingVariants(cardEl); return; }
-    fetch(npWhUrl(NP_VARIANTS_TPL).replace(/\/0\/$/, '/' + productId + '/'), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    // The purchase being edited, whose own stock doesn't lock the unit.
+    const invoiceQ = NP_EDIT_INVOICE_ID ? '?invoice=' + NP_EDIT_INVOICE_ID : '';
+    fetch(npWhUrl(NP_VARIANTS_TPL).replace(/\/0\/$/, '/' + productId + '/') + invoiceQ, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (d.product) npApplyProductFacts(cardEl, d.product);
         cardEl._npExistingVariants = d.results || [];
         box.style.display = '';
         if (!cardEl._npExistingVariants.length) {
@@ -1911,7 +2085,7 @@
     });
     const dropped = Object.keys(NP_EDIT_ROLLS).filter(function (id) { return !kept[id]; });
     if (dropped.length && !confirm(
-        '{% trans "These rolls will be deleted from stock:" %}\n' +
+        '{% trans "These items will be deleted from stock:" %}\n' +
         dropped.map(function (id) { return NP_EDIT_ROLLS[id] || ('#' + id); }).join(', ') +
         '\n\n{% trans "Continue?" %}')) {
       return;
@@ -1950,7 +2124,7 @@
           // order changed because of this save, so say which one.
           const trimmed = d.reservations_trimmed || [];
           if (trimmed.length) {
-            alert('{% trans "Reserved quantities were reduced to fit the corrected rolls:" %}\n' +
+            alert('{% trans "Reserved quantities were reduced to fit the corrected items:" %}\n' +
                   trimmed.map(function (t) { return t.label + ': ' + t.was + ' → ' + t.now; }).join('\n'));
           }
           window.location.href = NP_PURCHASE_DETAIL_TPL.replace('/0/', '/' + NP_EDIT_INVOICE_ID + '/');
@@ -2061,10 +2235,11 @@
           if (name || sku || tops.length) variants.push({
             name: name, sku: sku, tops: tops,
             price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
+            sale_price: (v.querySelector('.np-v-sale') || {}).value || '',
             invoice_item_id: npIdOf(v, 'itemId')
           });
         });
-        if (!variants.length) { alert(label + ': {% trans "Add at least one variant with a roll." %}'); return; }
+        if (!variants.length) { alert(label + ': {% trans "Add at least one variant with an item." %}'); return; }
       } else {
         const block = card.querySelector('.np-no-variant');
         const tops = npCollectTops(block);
@@ -2072,12 +2247,15 @@
         const priceEl = block.querySelector('.np-nv-price');
         const curEl = block.querySelector('.np-v-cur');
         variants.push({ name: '', sku: '', tops: tops, price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
+                        sale_price: (block.querySelector('.np-v-sale') || {}).value || '',
                         invoice_item_id: npIdOf(block.querySelector('.np-variant'), 'itemId') });
       }
 
       const catSel = card.querySelector('.np-main-cat');
       products.push({ main_product: main, has_variants: card._npHasVariants, variants: variants,
-                      category_id: (catSel && catSel.value) || null });
+                      category_id: (catSel && catSel.value) || null,
+                      unit: npUnitOf(card),
+                      pack_type: npPackOf(card).value || null });
     }
 
     const sel = document.getElementById('npSupplier');
@@ -2095,8 +2273,11 @@
     }
     return {
       current_account_id: sel.value,
+      customer: npCustomer,
       barcode_prefix: (opt && opt.getAttribute('data-prefix')) || '',
-      unit: document.getElementById('npUnit').value || 'mt',
+      // Batch-wide unit, from before each product had its own — the server
+      // only falls back on it for a product that names none.
+      unit: products.length ? products[0].unit : 'mt',
       // What the rate boxes above say, so the alım is cut at the rate the
       // page showed. Without these the server falls back to the published
       // rate and the total that posts is not the total that was agreed to.
@@ -2146,13 +2327,15 @@
 
   // Receive: for a saved order, store any edits first and then confirm it,
   // so what lands in the warehouse is exactly what is on screen.
+  // A new purchase bought for a customer takes the same road: saving it
+  // is what creates the customer's order the rolls are then reserved for.
   window.npReceiveNow = function () {
-    if (!GR_ORDER_ID) { npSave(); return; }
+    if (!GR_ORDER_ID && !npCustomer) { npSave(); return; }
     const btn = document.getElementById('npSaveBtn');
     const payload = npOrderPayload();
     if (!payload) return;
     npBusy(btn, '{% trans "Saving…" %}');
-    fetch(GR_ORDER_UPDATE_TPL.replace('/0/', '/' + GR_ORDER_ID + '/'), {
+    fetch(GR_ORDER_ID ? GR_ORDER_UPDATE_TPL.replace('/0/', '/' + GR_ORDER_ID + '/') : GR_ORDER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(payload),
@@ -2163,7 +2346,7 @@
           npUnbusy(btn);
           return;
         }
-        return fetch(GR_CONFIRM_TPL.replace('/0/', '/' + GR_ORDER_ID + '/'), {
+        return fetch(GR_CONFIRM_TPL.replace('/0/', '/' + d.invoice_id + '/'), {
           method: 'POST',
           headers: { 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
         }).then(function (r) { return r.json(); })
@@ -2171,6 +2354,12 @@
             if (c && c.success) {
               (c.warnings || []).forEach(function (w) { console.warn('intake:', w); });
               window.location.href = c.detail_url;
+            } else if (!GR_ORDER_ID) {
+              // The order was saved just now — go to it, so a retry confirms
+              // that one instead of saving a second copy.
+              alert(((c && c.error) || '{% trans "Could not save." %}') + '\n\n' +
+                    '{% trans "The purchase order was saved; confirm it from its page." %}');
+              window.location.href = d.detail_url;
             } else {
               alert((c && c.error) || '{% trans "Could not save." %}');
               npUnbusy(btn);
@@ -2203,7 +2392,7 @@
           if (summary) {
             summary.style.color = '#0E6E4A';
             summary.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "Saved" %} · <b>' + list.length + '</b> {% trans "products" %} · ' +
-              '<b>' + vtotal + '</b> {% trans "variants" %} · <b>' + ttotal + '</b> {% trans "rolls" %}';
+              '<b>' + vtotal + '</b> {% trans "variants" %} · <b>' + ttotal + '</b> ' + npBatchNoun();
           }
           (d.warnings || []).forEach(function (w) { console.warn('catalog:', w); });
           btn.innerHTML = '<i class="fa fa-check"></i> {% trans "Done" %}';
@@ -2238,8 +2427,6 @@
     const wrap = document.getElementById('npProducts');
     wrap.innerHTML = '';
 
-    const unitSel = document.getElementById('npUnit');
-    if (unitSel && plan.unit) unitSel.value = plan.unit;
     const sel = document.getElementById('npSupplier');
     if (sel && plan.current_account_id) sel.value = String(plan.current_account_id);
     npSupSyncFromSelect();
@@ -2264,6 +2451,19 @@
       }
       const catSel = card.querySelector('.np-main-cat');
       if (catSel && p.category_id) catSel.value = String(p.category_id);
+      if (mp.mode === 'existing' && p.unit_locked !== undefined) npApplyProductFacts(card, p);
+      // A plan saved before products had their own unit has one for all.
+      const unitSel = card.querySelector('.np-main-unit');
+      if (unitSel && (p.unit || plan.unit)) {
+        unitSel.value = p.unit || plan.unit;
+        npRelabelUnits(card);
+      }
+      const packSel = card.querySelector('.np-main-pack');
+      if (packSel && p.pack_type) {
+        packSel.value = p.pack_type;
+        packSel.dataset.touched = '1';
+        npRelabelPack(card);
+      }
 
       const hasV = p.has_variants !== false;
       npSetHasVariants(card.querySelector('.np-seg-btn[data-hv="' + (hasV ? '1' : '0') + '"]'), hasV);
@@ -2280,7 +2480,6 @@
       }
     });
 
-    npRelabelUnits();
     npLoading = false;
     npSummaryUpdate();
   }
@@ -2303,6 +2502,8 @@
     if (priceI && v.price) priceI.value = v.price;
     const curI = vEl.querySelector('.np-v-cur');
     if (curI && v.currency) curI.value = v.currency;
+    const saleI = vEl.querySelector('.np-v-sale');
+    if (saleI && v.sale_price) saleI.value = v.sale_price;
 
     // One roll row already exists from npAddVariant/npSetHasVariants.
     const tops = (v.tops || []);
@@ -2340,13 +2541,78 @@
     const lock = document.createElement('span');
     lock.className = 'np-top-lock';
     lock.title = goneOut
-      ? '{% filter escapejs %}{% trans "Metres have already gone out of this roll — its length and barcode can't change, and it can't be removed." %}{% endfilter %}'
+      ? '{% filter escapejs %}{% trans "Stock has already gone out of this item — its quantity and barcode can't change, and it can't be removed." %}{% endfilter %}'
       : '{% trans "Reserved for a customer order — it can be re-measured, not removed." %}';
     lock.innerHTML = NP_LOCK;
     x.replaceWith(lock);
   }
 
+  // ── For customer ─────────────────────────────────────────────────
+  // The CRM contact/company this purchase is bought for. Same search the
+  // order form uses; its rows carry data-type / data-pk / data-name.
+  let npCustomer = null;
+  let npCustTimer = null;
+  function npCustMode() {
+    const on = !!npCustomer || {{ for_order|yesno:"true,false" }};
+    const doc = document.getElementById('grDoc');
+    if (doc) doc.classList.toggle('gr-for-customer', on);
+  }
+  window.npCustSearch = function (q) {
+    const box = document.getElementById('npCustomerResults');
+    clearTimeout(npCustTimer);
+    if (!(q || '').trim()) { box.hidden = true; box.innerHTML = ''; return; }
+    npCustTimer = setTimeout(function () {
+      fetch(GR_CUSTOMER_URL + '?customer=' + encodeURIComponent(q.trim()),
+            { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          const rows = Array.prototype.map.call(doc.querySelectorAll('.customer-ac-item'), function (li) {
+            const icon = li.getAttribute('data-type') === 'company' ? 'fa-briefcase' : 'fa-user';
+            return '<div class="np-sup-opt" data-type="' + npEsc(li.getAttribute('data-type')) +
+                   '" data-pk="' + npEsc(li.getAttribute('data-pk')) +
+                   '" data-name="' + npEsc(li.getAttribute('data-name')) + '">' +
+                   '<span><i class="fa ' + icon + '"></i> ' + npEsc(li.getAttribute('data-name')) + '</span></div>';
+          });
+          box.innerHTML = rows.join('') ||
+            '<div class="np-sup-empty">{% filter escapejs %}{% trans "No customer matches — add them in CRM first." %}{% endfilter %}</div>';
+          box.hidden = false;
+        });
+    }, 250);
+  };
+  window.npCustPick = function (type, pk, name) {
+    npCustomer = { type: type, pk: pk };
+    document.getElementById('npCustomerChipName').textContent = name;
+    document.getElementById('npCustomerChip').hidden = false;
+    document.getElementById('npCustomerBox').hidden = true;
+    document.getElementById('npCustomerResults').hidden = true;
+    npCustMode();
+  };
+  window.npCustClear = function () {
+    npCustomer = null;
+    document.getElementById('npCustomerChip').hidden = true;
+    document.getElementById('npCustomerBox').hidden = false;
+    const input = document.getElementById('npCustomerSearch');
+    input.value = '';
+    input.focus();
+    npCustMode();
+  };
+  const custResults = document.getElementById('npCustomerResults');
+  if (custResults) {
+    custResults.addEventListener('mousedown', function (e) {
+      const row = e.target.closest('.np-sup-opt');
+      if (!row) return;
+      e.preventDefault();
+      npCustPick(row.getAttribute('data-type'), row.getAttribute('data-pk'),
+                 row.getAttribute('data-name'));
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('#npCustomerBox')) custResults.hidden = true;
+    });
+  }
+
   // ── Boot ─────────────────────────────────────────────────────────
+  npCustMode();
   const whSelInit = document.getElementById('npWarehouse');
   if (whSelInit) whSelInit._npPrev = whSelInit.value;
   npSupSyncFromSelect();
@@ -2355,6 +2621,9 @@
     npLoadForEdit(GR_EDIT_ID);
   } else if (GR_PLAN && (GR_PLAN.products || []).length) {
     npLoadFromPlan(GR_PLAN);
+    // A purchase pre-filled from a customer order has no account yet, so
+    // its cards wait behind the gate until one is picked.
+    npGateUpdate();
   } else {
     npGateUpdate();
     npSummaryUpdate();

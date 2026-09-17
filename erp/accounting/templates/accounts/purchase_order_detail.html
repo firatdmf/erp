@@ -135,6 +135,12 @@
       <div class="po-card-l">{% trans "Total" %}</div>
       <div class="po-card-v total">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|money }}</div>
     </div>
+    {% if invoice.for_order %}
+    <div class="po-card">
+      <div class="po-card-l">{% trans "For customer order" %}</div>
+      <div class="po-card-v"><a href="{% url 'operating:order_detail' invoice.for_order.pk %}">{{ invoice.for_order.order_number|default:invoice.for_order.pk }} · {{ invoice.for_order.get_client }}</a></div>
+    </div>
+    {% endif %}
     <div class="po-card">
       <div class="po-card-l">{% trans "Accounting record" %}</div>
       <div class="po-card-v"><a href="{% url 'accounts:invoice_detail' invoice.pk %}">{% trans "View invoice" %} →</a></div>

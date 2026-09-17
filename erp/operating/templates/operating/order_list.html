@@ -517,12 +517,14 @@
         </div>
         <div class="num ord-total">
           {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {% if not is_sales_rep %}{# profit is the margin; not the role's to read #}
           {% with gp=order.gross_profit %}
             <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
               ${{ gp|floatformat:2 }}
             </div>
           {% endwith %}
+          {% endif %}
         </div>
         <span class="ord-status {{ order.order_status }}">
           <span class="ord-status-dot"></span>
@@ -588,12 +590,14 @@
         </div>
         <div class="num ord-total">
           {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {% if not is_sales_rep %}{# profit is the margin; not the role's to read #}
           {% with gp=order.gross_profit %}
             <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
               ${{ gp|floatformat:2 }}
             </div>
           {% endwith %}
+          {% endif %}
         </div>
         <span class="ord-status {{ order.order_status }}">
           <span class="ord-status-dot"></span>
@@ -655,12 +659,14 @@
         </div>
         <div class="num ord-total">
           {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {% if not is_sales_rep %}{# profit is the margin; not the role's to read #}
           {% with gp=order.gross_profit %}
             <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
               ${{ gp|floatformat:2 }}
             </div>
           {% endwith %}
+          {% endif %}
         </div>
         <span class="ord-status {{ order.order_status }}">
           <span class="ord-status-dot"></span>
@@ -719,12 +725,14 @@
         </div>
         <div class="num ord-total">
           {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {% if not is_sales_rep %}{# profit is the margin; not the role's to read #}
           {% with gp=order.gross_profit %}
             <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
               ${{ gp|floatformat:2 }}
             </div>
           {% endwith %}
+          {% endif %}
         </div>
         <span class="ord-status {{ order.order_status }}">
           <span class="ord-status-dot"></span>

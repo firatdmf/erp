@@ -357,6 +357,10 @@
   .od-prods th:nth-child(6), .od-prods td:nth-child(6) { width: 76px; }        /* Cost */
   .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 92px; }        /* Amount */
   .od-prods th.od-edit-only, .od-prods td.od-edit-only { width: 38px; text-align: center; }        /* Delete btn */
+  /* A sales rep's table: the Cost cells are drawn EMPTY and hidden, not
+     left out, so every nth-child width above and below still lands on
+     its own column. */
+  .od-prods.od-no-cost .od-cost-col { display: none; }
 
   /* Inline editable cells — look like static text until focused. They
      fill their fixed-width cell so Qty + Price line up exactly. */
@@ -1213,7 +1217,7 @@
         <div data-item-pane="current">
 
         <div class="od-prods-scroll">
-        <table class="od-prods">
+        <table class="od-prods{% if is_sales_rep %} od-no-cost{% endif %}">
           <thead>
             <tr>
               <th>{% trans "Product" %}</th>
@@ -1221,7 +1225,7 @@
               <th>{% trans "Variant" %}</th>
               <th class="num">{% trans "Qty" %}</th>
               <th class="num">{% trans "Price" %}</th>
-              <th class="num" title="{% trans 'Per-unit cost (internal)' %}">{% trans "Cost" %}</th>
+              <th class="num od-cost-col"{% if not is_sales_rep %} title="{% trans 'Per-unit cost (internal)' %}"{% endif %}>{% if not is_sales_rep %}{% trans "Cost" %}{% endif %}</th>
               <th class="num">{% trans "Amount" %}</th>
             </tr>
           </thead>
@@ -1282,7 +1286,10 @@
               </td>
               <td class="num"><span class="od-num-val">{{ item.quantity|default:0|floatformat:"-2" }}</span></td>
               <td class="num"><span class="od-num-val">${{ item.price|default:0|floatformat:2 }}</span></td>
-              <td class="num" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}">
+              {% if is_sales_rep %}
+              <td class="num od-cost-col" data-item-cost="{{ item.pk }}"></td>
+              {% else %}
+              <td class="num od-cost-col" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}">
                 {% with uc=item.unit_cost %}
                   {% if uc and uc > 0 %}
                     <span style="color:var(--gray-700);">${{ uc|floatformat:2 }}</span>
@@ -1291,6 +1298,7 @@
                   {% endif %}
                 {% endwith %}
               </td>
+              {% endif %}
               <td class="num" data-item-subtotal="{{ item.pk }}"><b>${{ item.subtotal|floatformat:2 }}</b></td>
             </tr>
             {% if item.is_tracked and item.scanned_count %}
@@ -1430,6 +1438,7 @@
             <span style="font-weight:700;">{{ total_scanned_count }} {% trans "tops" %} · {{ total_scanned_meters|floatformat:"-2" }} m</span>
           </div>
           {% endif %}
+          {% if not is_sales_rep %}
           {% with tc=order.total_cost gp=order.gross_profit gm=order.gross_margin_pct %}
           <div class="od-tot-row" style="margin-top:6px; padding:8px 10px; background:#FFFBEB; border:1px dashed #FDE68A; border-radius:8px; color:#92400E;">
             <span style="display:inline-flex; align-items:center; gap:6px;">
@@ -1456,6 +1465,7 @@
           </div>
           {% endif %}
           {% endwith %}
+          {% endif %}
           {% if order.paid_amount and order.paid_currency and order.paid_currency != 'USD' %}
           <div class="od-tot-row" style="opacity:0.7;">
             <span style="font-size: 11.5px;">{% trans "Customer paid" %} ({{ order.paid_currency }})</span>
@@ -1606,6 +1616,38 @@
     <div class="od-right">
       <!-- CUSTOMER (HTMX-managed partial) -->
       {% include "operating/partials/_customer_card.html" with cust_card_mode='view' %}
+
+      {% if not is_sales_rep and order.current_account %}
+      <!-- SUPPLIER PURCHASES — stock ordered in for this client (a purchase
+           saved for a customer creates the order). Receiving one reserves
+           its rolls for this order. -->
+      <section class="od-card" id="od-supplier-purchases">
+        <div class="od-card-h">
+          <h3>{% trans "Supplier purchases" %}</h3>
+        </div>
+        {% if supplier_purchases %}
+          <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;">
+          {% for p in supplier_purchases %}
+            <li style="display:flex; justify-content:space-between; gap:8px; font-size:12.5px;">
+              <span>
+                <a href="{% url 'accounts:purchase_order_detail' p.pk %}"><b>{{ p.number }}</b></a>
+                · {{ p.current_account.name }}
+              </span>
+              <span style="color:{% if p.status == 'draft' %}#92400E{% else %}#0E6E4A{% endif %}; white-space:nowrap;">
+                {% if p.status == 'draft' %}
+                  {% trans "Awaiting delivery" %}{% if p.delivery_date %} · {{ p.delivery_date|date:"d.m.Y" }}{% endif %}
+                {% else %}
+                  {% trans "Received" %} · {{ p.held_quantity|floatformat:"-2" }} {% trans "reserved" %}
+                {% endif %}
+              </span>
+            </li>
+          {% endfor %}
+          </ul>
+        {% else %}
+          <div class="od-card-sub">{% trans "Nothing ordered from a supplier for this order." %}</div>
+        {% endif %}
+      </section>
+      {% endif %}
 
       {% if order.current_account %}
       <!-- CURRENT ACCOUNT — internal ledger snapshot -->
@@ -2770,7 +2812,7 @@
           '<td class="num"><input type="number" class="od-inline-input" step="0.01" min="0"' +
             ' value="' + p + '" data-item-id="' + tempId + '" data-field="price"' +
             ' data-original="" onwheel="this.blur()"></td>' +
-          '<td class="num" data-item-cost="' + tempId + '" data-unit-cost="' + (it.unit_cost || 0) + '">' +
+          '<td class="num od-cost-col" data-item-cost="' + tempId + '" data-unit-cost="' + (it.unit_cost || 0) + '">' +
             ((it.unit_cost && Number(it.unit_cost) > 0)
               ? '<span style="color:var(--gray-700);">$' + Number(it.unit_cost).toFixed(2) + '</span>'
               : '<span class="od-empty-mute" title="No cost set">—</span>') +

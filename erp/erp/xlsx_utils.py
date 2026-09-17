@@ -26,6 +26,12 @@ F_TOTAL = Font(size=11, bold=True, color=INK)
 FILL_HEAD = PatternFill("solid", fgColor=HEADBG)
 FILL_LBL = PatternFill("solid", fgColor=LBLBG)
 
+# Excel's "Text" number format, for codes: SKUs and barcodes. openpyxl
+# already writes them as text, but a cell someone retypes in Excel is parsed
+# again unless it is formatted as Text — "3010.140" would come back as the
+# number 3010.14 and a 13-digit barcode as 8.69E+12.
+TEXT = "@"
+
 RIGHT = Alignment(horizontal="right", vertical="center", wrap_text=True)
 LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
 CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)

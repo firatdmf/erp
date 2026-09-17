@@ -230,10 +230,18 @@ def _order_item_variant_label(it):
     return " / ".join(vals) if vals else None
 
 
-def _order_profit_snapshot(order):
+def _order_profit_snapshot(order, user):
     """Order-level cost + profit numbers for the totals widget. Shared by
     OrderDetail.post and the pack-reserve endpoints so any change that
-    shifts billed value can refresh the UI without a reload."""
+    shifts billed value can refresh the UI without a reload.
+
+    None for a sales rep, whose page draws no cost or profit to refresh:
+    what the order cost us is the margin, and that is not the role's to
+    read. Taking the user here, rather than at each call site, is what
+    keeps a new endpoint from forgetting."""
+    from erp.roles import is_sales_rep
+    if is_sales_rep(user):
+        return None
     try:
         tc = float(order.total_cost() or 0)
         gp = float(order.gross_profit() or 0)
@@ -286,6 +294,21 @@ class OrderDetail(DetailView):
     template_name = "operating/order_detail.html"
     context_object_name = "order"
 
+    def _supplier_purchases(self):
+        """Purchases bought for this order, each with how much of what it
+        brought in this order still holds."""
+        from django.db.models import Q, Sum
+        return list(
+            self.object.supplier_purchases
+            .exclude(status="cancelled")
+            .select_related("current_account")
+            .annotate(held_quantity=Sum(
+                "items__warehouse_stock_items__reservations__quantity",
+                filter=Q(items__warehouse_stock_items__reservations__order=self.object),
+            ))
+            .order_by("-date", "-pk")
+        )
+
     def get_queryset(self):
         # Prefetch items + their product/variant so gross_profit() can
         # read costs without extra queries (the template also iterates
@@ -311,6 +334,7 @@ class OrderDetail(DetailView):
         short_amount, short_rows = self.object.scan_shortfall()
         ctx["scan_shortfall"] = short_amount
         ctx["scan_shortfall_rows"] = short_rows
+        ctx["supplier_purchases"] = self._supplier_purchases()
         # Attach available-stock metadata to each item so the template
         # can show "Stok: N" next to the qty input and compute the max
         # the user can bump it to (current qty + remaining stock).
@@ -481,8 +505,11 @@ class OrderDetail(DetailView):
             except Exception:
                 pass
 
+        from erp.roles import is_sales_rep
+        hide_cost = is_sales_rep(request.user)
+
         def _profit_snapshot():
-            return _order_profit_snapshot(order)
+            return _order_profit_snapshot(order, request.user)
 
         def _current_account_snapshot():
             return _order_current_account_snapshot(order)
@@ -603,7 +630,7 @@ class OrderDetail(DetailView):
                     "quantity": float(qty),
                     "price": float(price),
                     "subtotal": float(qty * price),
-                    "unit_cost": float(unit_cost or 0),
+                    "unit_cost": None if hide_cost else float(unit_cost or 0),
                     "stock": float(stock) if stock is not None else None,
                     "max_qty": max_qty,
                     "allow_oversell": allow_oversell,
@@ -668,7 +695,7 @@ class OrderDetail(DetailView):
                     "quantity": float(qty),
                     "price": float(price),
                     "subtotal": float(item.subtotal()),
-                    "unit_cost": float(item.unit_cost() or 0),
+                    "unit_cost": None if hide_cost else float(item.unit_cost() or 0),
                     "stock": float(new_stock) if new_stock is not None else None,
                     "max_qty": max_qty,
                     "allow_oversell": allow_oversell,
@@ -1518,7 +1545,7 @@ def order_pack_reserve_add(request, pk):
         from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r),
-                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order)})
+                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order, request.user)})
 
 
 @login_required
@@ -1554,7 +1581,7 @@ def order_pack_reserve_update(request, pk):
         from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r),
-                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order)})
+                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order, request.user)})
 
 
 @login_required
@@ -1579,7 +1606,7 @@ def order_pack_reserve_remove(request, pk):
         from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "removed": removed,
-                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order)})
+                         "current_account": _order_current_account_snapshot(order), "profit": _order_profit_snapshot(order, request.user)})
 
 
 @login_required
@@ -1674,6 +1701,8 @@ def order_create_barcode_check(request):
         "ok": True,
         "stock_item_id": roll.pk,
         "available": float(avail),
+        # What `available` counts: metres of cloth, packs of curtains.
+        "unit": roll.product.unit_short if roll.product else "",
         "warehouse": (wh.name if wh else ""),
         # The shelf's book. A card that has not been tagged yet adopts
         # it; one that has refuses a scan from anywhere else, because a
@@ -2147,7 +2176,13 @@ def order_create_barcode_resolve(request):
     else:
         cost = (cv.variant_cost if cv else None) or (parent.cost if parent else None)
         if cost:
-            price, is_cost = cost, True
+            # A sales rep is never handed the cost: they get the price
+            # derived from it, and it is a price, so no "Purchase cost" flag.
+            from erp.roles import is_sales_rep, sales_rep_price
+            if is_sales_rep(request.user):
+                price = sales_rep_price(cost)
+            else:
+                price, is_cost = cost, True
 
     return JsonResponse({
         "ok": True,
@@ -2159,6 +2194,7 @@ def order_create_barcode_resolve(request):
             "id": roll.pk,
             "barcode": roll.barcode or "",
             "available": float(avail),
+            "unit": wp.unit_short,
             "warehouse": (wp.warehouse.name if wp.warehouse_id else ""),
             # The shelf's book, so a line minted straight from a scan is
             # tagged like one picked out of the browsable list.
@@ -2178,13 +2214,22 @@ def order_create_roll_list(request):
     warehouse SKU), and the same reservation-aware availability as
     order_create_barcode_check. Read-only — reserves nothing."""
     from django.db.models import DecimalField, F, Q
-    from django.db.models.functions import Coalesce
+    from django.db.models.functions import Coalesce, TruncDate
     from .models import WarehouseProductItem
     sku = (request.GET.get("sku") or "").strip()
     if not sku:
         return JsonResponse({"ok": False, "error": "Ürün bilgisi eksik."}, status=400)
     # OLDEST first — FIFO. Fabric that has sat longest goes out first
     # instead of ageing on the shelf behind items scanned last week.
+    #
+    # By the DAY an item was entered, then by barcode. scanned_at is when
+    # the record was made, not when the fabric arrived: a stock count
+    # enters a whole shelf in one afternoon, in whatever order the rolls
+    # were picked up, so the minute says nothing about age (LZK00003's
+    # twelve rolls all went in on 17 June, 3495 first and 3070 fifth). The
+    # barcode is the maker's sequence, so within one day's intake it is
+    # the better age — and the list reads in the order the labels do.
+    # The day still keeps next month's delivery behind this one.
     #
     # This orders by age rather than by price on purpose. Draining the
     # cheap stock first reads like thrift, but items of one SKU are
@@ -2196,7 +2241,8 @@ def order_create_roll_list(request):
     # or weighted average, and specific identification is for items that
     # genuinely are not interchangeable.
     #
-    # Cost still breaks ties, and the basis is the one the balance sheet
+    # Cost breaks what is left — two items entered the same day with no
+    # barcode on either — and the basis is the one the balance sheet
     # values this item at (see accounting.services_ledger
     # ._inventory_value) — the purchase-invoice line where there is one,
     # the product's cost otherwise — so the list and the books never
@@ -2208,7 +2254,8 @@ def order_create_roll_list(request):
     rolls = (
         WarehouseProductItem.objects
         .select_related("product", "product__warehouse",
-                        "product__warehouse__accounting_book")
+                        "product__warehouse__accounting_book",
+                        "product__catalog_variant__product")
         .filter(status__in=["in_stock", "partial"])
         # Its two siblings — the product search and order_create_barcode_check
         # — narrow to the working book; this one never did, so it offered
@@ -2219,7 +2266,8 @@ def order_create_roll_list(request):
         .filter(product__warehouse__accounting_book__in=_books_in_scope(request))
         .filter(Q(product__catalog_variant__variant_sku__iexact=sku) | Q(product__sku__iexact=sku))
         .annotate(unit_cost=unit_cost)
-        .order_by("scanned_at", F("unit_cost").asc(nulls_last=True))[:60]
+        .order_by(TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),
+                  F("unit_cost").asc(nulls_last=True))[:60]
     )
     editing = _editing_order_id(request)
     rolls = list(rolls)
@@ -2233,6 +2281,13 @@ def order_create_roll_list(request):
     if editing is not None:
         holds = holds.exclude(order_id=editing)
     reserved = dict(holds.values_list("stock_item_id").annotate(s=Sum("quantity")))
+
+    # Each item's cost per unit, beside its quantity — the same basis as
+    # the sort above. A sales rep is sent the price derived from it
+    # instead (erp.roles.sales_rep_price), never the cost: cost is the
+    # margin, and the role does not read it.
+    from erp.roles import is_sales_rep, sales_rep_price
+    show_cost = not is_sales_rep(request.user)
 
     out = []
     for roll in rolls:
@@ -2251,8 +2306,16 @@ def order_create_roll_list(request):
             "book_id": (wh.accounting_book_id if wh else None),
             "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
             "available": float(avail),
+            # What the quantity and the cost are counted in: metres for
+            # cloth, but a box of ready-made curtains is packs.
+            "unit": roll.product.unit_short if roll.product else "",
+            **({"unit_cost": float(roll.unit_cost) if roll.unit_cost is not None else None}
+               if show_cost else
+               {"unit_price": (float(sales_rep_price(roll.unit_cost))
+                               if roll.unit_cost is not None else None)}),
         })
-    return JsonResponse({"ok": True, "rolls": out})
+    from accounting.models_accounts import _base_currency_symbol
+    return JsonResponse({"ok": True, "rolls": out, "cost_symbol": _base_currency_symbol()})
 
 
 @login_required
@@ -4243,6 +4306,8 @@ def export_packing_list_excel(request, pk):
             for col_index, value in enumerate(values, start=1):
                 cell = ws.cell(row=row, column=col_index, value=value)
                 cell.border = grid
+                if col_index in (6, 7):  # SKU, barcode — see erp.xlsx_utils.TEXT
+                    cell.number_format = "@"
                 cell.alignment = Alignment(
                     horizontal="right" if col_index in (2, last_col) else "left",
                     vertical="center")
@@ -4589,6 +4654,9 @@ def product_autocomplete(request):
             _rate["v"] = WarehouseProduct._usd_try_rate()
         return _rate["v"]
 
+    from erp.roles import is_sales_rep, sales_rep_price
+    rep = is_sales_rep(request.user)
+
     def shelf_cost_usd(wp):
         """What one unit on THIS shelf cost, in USD, or None.
 
@@ -4689,7 +4757,7 @@ def product_autocomplete(request):
                      if cost is not None else "")
             out.append(
                 f"<span class='pa-stock pa-stock--wh'>"
-                f"{escape((wh or '')[:14])} {float(q or 0):g} m{money}</span>")
+                f"{escape((wh or '')[:14])} {float(q or 0):g} {escape(wp.unit_short)}{money}</span>")
         return "".join(out)
 
     def book_cell(books):
@@ -4716,7 +4784,8 @@ def product_autocomplete(request):
         if qualifier:
             name += f" <span class='pa-qual'>— {escape(qualifier)}</span>"
         return (
-            f"<li class='pa-row {extra_class}' onclick=\"selectProduct({js_args})\">"
+            f"<li class='pa-row {extra_class}' data-sku='{escape(sku)}' "
+            f"onclick=\"selectProduct({js_args})\">"
             f"<span class='pa-main'>{name} <code class='pa-sku'>{escape(sku)}</code></span>"
             f"<span class='pa-meta'>{meta}{price_cell(price, is_cost)}</span>"
             f"</li>"
@@ -4783,7 +4852,15 @@ def product_autocomplete(request):
             price, is_cost = sale, False
         else:
             shelf = warehouse_cost(group)
-            price, is_cost = (shelf, True) if shelf is not None else (0, False)
+            if shelf is None:
+                price, is_cost = 0, False
+            elif rep:
+                # A sales rep is quoted the price derived from the cost,
+                # never the cost — and it is a price, so no Cost label and
+                # no per-shelf cost chips below.
+                price, is_cost = sales_rep_price(shelf), False
+            else:
+                price, is_cost = shelf, True
         total = sum((q or 0) for _wh, q, _wp in group["stocks"])
         title_js = js_str(f"{base_title} — {qualifier}" if qualifier else base_title)
         cat_js = js_str(parent.category.name if parent.category else "")

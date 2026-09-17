@@ -11,9 +11,11 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.translation import pgettext_lazy
 from django.views import View
 
 from .models import Warehouse, WarehouseProduct, WarehouseProductItem, StockMovement
+from marketing import units
 from marketing.models import SKU_MAX_LENGTH
 
 
@@ -803,28 +805,60 @@ def warehouse_account_create(request):
     })
 
 
-# DB category slugs → Turkish display labels for the manual-add "Ürün Türü"
-# select (unknown slugs fall back to the raw name).
-_CATEGORY_TR_LABELS = {
-    "fabric": "Kumaş",
-    "ready-made_curtain": "Hazır Perde",
-    "throw": "Örtü / Şal",
-    "bed": "Yatak Tekstili",
+# DB category slugs → display labels for the manual-add "Product Type"
+# select (unknown slugs fall back to the raw name). Translated per request,
+# so the select follows the viewer's language like the rest of the page.
+_CATEGORY_LABELS = {
+    "fabric": pgettext_lazy("product type", "Fabric"),
+    "ready-made_curtain": pgettext_lazy("product type", "Ready-made curtain"),
+    "throw": pgettext_lazy("product type", "Throw / Shawl"),
+    "bed": pgettext_lazy("product type", "Bed textile"),
 }
 
 
 def _product_category_choices():
-    """ProductCategories for the manual-add "Ürün Türü" select, fabric first
+    """ProductCategories for the manual-add "Product Type" select, fabric first
     (it's the default for warehouse-minted products — this is a fabric mill)."""
     try:
         from marketing.models import ProductCategory
         rows = list(ProductCategory.objects.all().order_by("name"))
         rows.sort(key=lambda c: (c.name != "fabric", c.name))
         return [{"id": c.id, "name": c.name,
-                 "label": _CATEGORY_TR_LABELS.get(c.name, c.name),
+                 "label": str(_CATEGORY_LABELS.get(c.name, c.name)),
                  "is_default": c.name == "fabric"} for c in rows]
     except Exception:
         return []
+
+
+def _pack_type_choices():
+    """What one stock item can be, for the intake form's "Packed as" select:
+    the title-case label, the singular and plural nouns the form words its
+    rows with, and which pack each unit starts on."""
+    return {
+        "choices": [
+            {"value": value, "label": str(label),
+             "one": str(WarehouseProduct.PACK_NOUN[value][0]),
+             "many": str(WarehouseProduct.PACK_NOUN[value][1])}
+            for value, label in WarehouseProduct.PACK_CHOICES
+        ],
+        "for_unit": WarehouseProduct.PACK_FOR_UNIT,
+    }
+
+
+def _product_facts(product, invoice=None):
+    """What the goods-receipt form states about an existing main product:
+    its type, unit and pack, and whether this purchase may still change
+    the unit and pack (`unit_locked` — see _product_stock_elsewhere)."""
+    category = product.category if product.category_id else None
+    return {
+        "category_label": (str(_CATEGORY_LABELS.get(category.name, category.name))
+                           if category else ""),
+        "unit": product.unit,
+        "unit_label": str(dict(units.UNIT_CHOICES).get(product.unit, product.unit)),
+        "pack_type": product.pack_type,
+        "pack_label": str(dict(units.PACK_CHOICES).get(product.pack_type, product.pack_type)),
+        "unit_locked": _product_stock_elsewhere(product, invoice),
+    }
 
 
 def _default_fabric_category():
@@ -837,10 +871,23 @@ def _default_fabric_category():
         return None
 
 
-# Manual-add unit → a valid marketing.Product.unit_of_measurement choice
-# (the model only allows units/mt/kg; the real per-roll quantity is generic).
-_PRODUCT_UNIT_MAP = {"mt": "mt", "kg": "kg", "piece": "units",
-                     "pack": "units", "units": "units"}
+def _intake_unit(unit):
+    """A unit code the form sent, if it is one the product can hold."""
+    unit = (unit or "").strip()
+    return unit if unit in dict(units.UNIT_CHOICES) else None
+
+
+def _product_stock_elsewhere(product, invoice=None):
+    """Whether `product` holds stock that did not come in on `invoice`.
+
+    A product's unit and pack describe all of its stock, so a purchase may
+    set them only while every item it has came in on that purchase — or it
+    has none yet. Otherwise they are the product's to change, on its own
+    page."""
+    items = WarehouseProductItem.objects.filter(product__catalog_variant__product=product)
+    if invoice is not None:
+        items = items.exclude(purchase_invoice_item__invoice=invoice)
+    return items.exists()
 
 
 def _product_sku_minter(prefix):
@@ -1107,7 +1154,8 @@ class WarehouseList(View):
         recent = _decorate_movements(list(
             StockMovement.objects
             .filter(product__warehouse__in=warehouses)
-            .select_related("product", "product__warehouse", "created_by")
+            .select_related("product", "product__warehouse", "created_by",
+                            "product__catalog_variant__product")
             .order_by("-created_at")[:6]
         ))
         return render(request, self.template_name, {
@@ -1552,15 +1600,12 @@ class WarehouseDetail(View):
                        .values("base").annotate(
                 variant_count=Count("id"),
                 linked=Count("catalog_variant"),
-                # The unit the group is counted in. Max() rather than a
-                # GROUP BY member: every product under one base SKU is the
-                # same goods in different colours, so they share a unit, and
-                # grouping by it as well would split a group the moment one
-                # row was mis-set. A mixed group renders the alphabetically
-                # last code, which is wrong but visible — better than the
-                # hardcoded "m" that stood here before.
-                unit=Max("unit"),
-                pack_type=Max("pack_type"),
+                # The unit the group is counted in: its main product's.
+                # Max() rather than a GROUP BY member only because the base
+                # SKU, not the product, is what groups here; rows under one
+                # base share a product and so a unit.
+                unit=Max("catalog_variant__product__unit"),
+                pack_type=Max("catalog_variant__product__pack_type"),
                 total_qty=Coalesce(Sum("quantity"), Decimal("0"),
                                    output_field=DecimalField(max_digits=18, decimal_places=2)),
                 total_usd=Coalesce(Sum("stock_value"), Decimal("0"),
@@ -1645,12 +1690,9 @@ class WarehouseDetail(View):
                 "variant_count": g["variant_count"],
                 "roll_total": _roll_counts.get(g["base"], 0),
                 "total_qty": g["total_qty"],
-                "unit_short": str(WarehouseProduct.UNIT_SHORT.get(
-                    g.get("unit"), g.get("unit") or "")),
-                "item_noun": str(WarehouseProduct.PACK_NOUN.get(
-                    g.get("pack_type"), ("item", "items"))[0]),
-                "item_noun_plural": str(WarehouseProduct.PACK_NOUN.get(
-                    g.get("pack_type"), ("item", "items"))[1]),
+                "unit_short": units.unit_short(g.get("unit") or units.DEFAULT_UNIT),
+                "item_noun": units.pack_nouns(g.get("pack_type") or units.DEFAULT_PACK)[0],
+                "item_noun_plural": units.pack_nouns(g.get("pack_type") or units.DEFAULT_PACK)[1],
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "avg_cost_usd": g["avg_cost"],
@@ -1678,7 +1720,7 @@ class WarehouseDetail(View):
             # Full-width cells (pagination, empty states, expanded rolls)
             # span the table — which grows a Location column on a combined
             # (ortak) page, so the number cannot be hard-coded.
-            'col_count': _warehouse_col_count(warehouse),
+            'col_count': _warehouse_col_count(warehouse, request.user),
         }
 
         # HTMX partial refresh for search/sort/page — re-renders ONLY the
@@ -1714,7 +1756,8 @@ class WarehouseDetail(View):
         recent_movements = _decorate_movements(list(
             StockMovement.objects
             .filter(product__warehouse_id__in=scope_ids)
-            .select_related("product", "created_by")
+            .select_related("product", "created_by",
+                            "product__catalog_variant__product")
             .order_by("-created_at")[:6]
         ))
 
@@ -1751,10 +1794,13 @@ def _warehouse_sole_unit(scope_ids):
     warehouse that starts as fabric and later takes a pallet of curtains
     stops calling itself metres the moment that happens.
     """
-    units = set(WarehouseProduct.objects
-                .filter(warehouse_id__in=scope_ids)
-                .values_list("unit", flat=True).distinct())
-    return units.pop() if len(units) == 1 else None
+    # A row not yet linked to a product counts as the default unit, the
+    # same answer WarehouseProduct.unit gives for it.
+    found = {u or WarehouseProduct.UNIT_CHOICES[0][0] for u in
+             WarehouseProduct.objects
+             .filter(warehouse_id__in=scope_ids)
+             .values_list("catalog_variant__product__unit", flat=True).distinct()}
+    return found.pop() if len(found) == 1 else None
 
 
 def _warehouse_unit_short(scope_ids):
@@ -1767,9 +1813,10 @@ def _warehouse_unit_short(scope_ids):
 
 def _warehouse_sole_pack(scope_ids):
     """The one way a warehouse's stock is packed, or None if it varies."""
-    packs = set(WarehouseProduct.objects
-                .filter(warehouse_id__in=scope_ids)
-                .values_list("pack_type", flat=True).distinct())
+    packs = {p or WarehouseProduct.PACK_CHOICES[0][0] for p in
+             WarehouseProduct.objects
+             .filter(warehouse_id__in=scope_ids)
+             .values_list("catalog_variant__product__pack_type", flat=True).distinct()}
     return packs.pop() if len(packs) == 1 else None
 
 
@@ -1826,7 +1873,7 @@ def warehouse_group_variants(request, pk):
         "shown": len(variants),
         "total": total,
         "base": base,
-        "col_count": _warehouse_col_count(warehouse),
+        "col_count": _warehouse_col_count(warehouse, request.user),
     })
 
 
@@ -1869,11 +1916,17 @@ def warehouse_roll_photo(request, warehouse_pk, roll_pk):
     return FileResponse(open(path, "rb"), content_type="image/jpeg")
 
 
-def _warehouse_col_count(warehouse):
+def _warehouse_col_count(warehouse, user):
     """Columns in the warehouse product table — 6, plus the Location
     column a combined (ortak) warehouse adds to say which member holds
-    each row. Full-width cells span this."""
-    return 7 if warehouse.is_combined else 6
+    each row, less the cost Total column a sales rep is not shown.
+    Full-width cells span this."""
+    from erp.roles import is_sales_rep
+
+    count = 7 if warehouse.is_combined else 6
+    if is_sales_rep(user):
+        count -= 1
+    return count
 
 
 def _cost_sign(warehouse):
@@ -1947,7 +2000,7 @@ def warehouse_product_rolls(request, warehouse_pk, product_pk):
         "shown": len(rolls),
         "total": total,
         "truncated": truncated,
-        "col_count": _warehouse_col_count(warehouse),
+        "col_count": _warehouse_col_count(warehouse, request.user),
     })
 
 
@@ -2192,11 +2245,8 @@ def warehouse_roll_move_here(request, pk, roll_pk):
             target_wp = WarehouseProduct.objects.create(
                 warehouse=target_warehouse, name=source_wp.name, sku=source_wp.sku,
                 barcode=source_wp.barcode, quantity=Decimal("0"),
-                # Carried across, not defaulted: the same goods moving shelf
-                # to shelf are still counted the same way, and a destination
-                # row that fell back to metres would relabel a box of
-                # curtain sets the moment it was moved.
-                unit=source_wp.unit, pack_type=source_wp.pack_type,
+                # Same variant, so the same product — and with it the same
+                # unit and pack; nothing to carry across.
                 purchase_price=source_wp.purchase_price,
                 purchase_currency=source_wp.purchase_currency,
                 cost_usd=source_wp.cost_usd, cost_try=source_wp.cost_try,
@@ -2342,7 +2392,14 @@ def catalog_product_variants(request, pk, product_id):
             # deleted read "33.66" here long after its stock hit zero.
             "variant_quantity": float(v.live_quantity or 0),
         })
-    return JsonResponse({"results": results})
+    # The product's own type, unit and pack, which the form states rather
+    # than asks. `invoice` is the purchase being edited, whose own stock
+    # doesn't stop it changing them.
+    from accounting.models import Invoice
+    invoice_id = request.GET.get("invoice") or ""
+    invoice = (Invoice.objects.filter(pk=int(invoice_id), type="purchase").first()
+               if invoice_id.isdigit() else None)
+    return JsonResponse({"results": results, "product": _product_facts(product, invoice)})
 
 
 @login_required
@@ -2636,14 +2693,18 @@ def _intake_check_prices(products_in):
         }, status=400)
 
 
-def _intake_resolve_products(products_in, prefix, *, own_product_ids=()):
+def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
+                             default_unit=None):
     """Pass 1: resolve + validate EVERY product before writing anything, so
     a mistake on product #3 never leaves #1/#2 half-saved.
 
     `own_product_ids` — main products a purchase being edited already
     carries. They are accepted as "existing" even when they are not the
     hidden catalog products intake normally picks from, because refusing a
-    purchase its own product would make it uneditable."""
+    purchase its own product would make it uneditable.
+
+    `default_unit` — the payload's batch-wide unit, from before each
+    product carried its own. A card without a unit takes it."""
     from django.db.models import Q
     from marketing.models import Product as _Prod, ProductCategory as _PCat
     import re as _re_sku
@@ -2659,6 +2720,11 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=()):
             category = _PCat.objects.filter(pk=int(cat_id)).first()
         if category is None:
             category = fabric_cat
+        # What one stock item of it physically is (roll, box, …). Anything
+        # missing/unknown is None, and the caller falls back to the unit's.
+        pack_type = str(p_in.get("pack_type") or "").strip()
+        if pack_type not in dict(WarehouseProduct.PACK_CHOICES):
+            pack_type = None
         variants_in = p_in.get("variants") or []
         if not isinstance(variants_in, list) or not variants_in:
             raise IntakeError({"success": False, "error": f"Ürün {i}: en az bir varyant ekleyin."}, status=400)
@@ -2709,6 +2775,8 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=()):
             "desired_sku": desired_sku, "sku_is_auto": sku_is_auto,
             "has_variants": has_variants,
             "variants_in": variants_in, "category": category,
+            "pack_type": pack_type,
+            "unit": _intake_unit(p_in.get("unit") or default_unit),
         })
     return resolved
 
@@ -2766,9 +2834,14 @@ def _intake_typed_barcodes(products_in, *, current_barcodes=None):
     return manual_codes
 
 
-def _intake_main_product(item, prefix, prod_unit):
+def _intake_main_product(item, prefix, *, invoice=None):
     """The main product one resolved card lands under — created now if the
-    card asked for a new one."""
+    card asked for a new one.
+
+    A new product takes the card's unit and pack. An existing one keeps its
+    own unless nothing but `invoice` ever brought it stock (see
+    _product_stock_elsewhere); whatever the card said, the product's values
+    are what the purchase lines and warehouse rows then use."""
     from django.db import transaction, IntegrityError
     from marketing.models import Product as _Prod
 
@@ -2776,6 +2849,11 @@ def _intake_main_product(item, prefix, prod_unit):
     base_name = item["base_name"]
     desired_sku = item["desired_sku"]
     category = item["category"]
+    unit = item["unit"]
+    pack_type = item["pack_type"]
+    if unit and not pack_type and (main_product is None or unit != main_product.unit):
+        # A unit with no pack named starts on that unit's usual pack.
+        pack_type = units.PACK_FOR_UNIT[unit]
 
     # NEW main product → the typed SKU if there was one, else an
     # AUTO, globally-unique code = supplier prefix + number (e.g.
@@ -2788,7 +2866,8 @@ def _intake_main_product(item, prefix, prod_unit):
         def _mint_main(sku):
             return _Prod.objects.create(
                 title=base_name, sku=sku, featured=False,
-                unit_of_measurement=prod_unit,
+                unit=unit or units.DEFAULT_UNIT,
+                pack_type=pack_type or units.PACK_FOR_UNIT[unit or units.DEFAULT_UNIT],
                 category=category,
             )
         if desired_sku and not item["sku_is_auto"]:
@@ -2818,11 +2897,16 @@ def _intake_main_product(item, prefix, prod_unit):
                     continue
             if main_product is None:
                 raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
-    elif not main_product.category_id and category:
-        # Existing main product with no type yet — backfill it so
-        # its invoices stop showing a blank "Ürün Tipi" column.
-        main_product.category = category
-        main_product.save(update_fields=["category"])
+    else:
+        if not main_product.category_id and category:
+            # Existing main product with no type yet — backfill it so
+            # its invoices stop showing a blank "Product Type" column.
+            main_product.category = category
+            main_product.save(update_fields=["category"])
+        if ((unit and unit != main_product.unit
+             or pack_type and pack_type != main_product.pack_type)
+                and not _product_stock_elsewhere(main_product, invoice)):
+            main_product.set_unit(unit, pack_type)
     return main_product
 
 
@@ -2875,18 +2959,17 @@ def _take_purchase_price(wp, price, currency, cost_usd, cost_try):
                            "cost_usd", "cost_try", "updated_at"])
 
 
-def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
-                       wh_unit, wh_pack, usd_try, take_price=True):
-    """Find or create the WarehouseProduct ONE variant row lands in, and
-    work out everything else the row means: its SKU (deduplicated within the
-    product, and globally when auto), its colour/model attribute, its price
-    and cost. Mutates `seen_skus`.
+def _intake_variant_identity(main_product, base_name, v, idx, seen_skus):
+    """What ONE variant row is, before any stock exists: its SKU
+    (deduplicated within the product, and globally when auto) and its
+    colour/model attribute. Mutates `seen_skus`.
 
-    `take_price` — intake makes every batch's price the product's
-    last-purchase price. A purchase edit decides that for itself.
+    Shared by intake and by a draft purchase bought for a customer, which
+    has to put the variant in the catalog at save time so the customer's
+    order has a line to point at — and must mint the SKU the receipt will
+    later find.
 
-    Returns a dict: wp, created, sku, name, wp_name, attr_name, attr_value,
-    price, currency, cost_usd, cost_try."""
+    Returns a dict: sku, name, attr_name, attr_value."""
     from .catalog_sync import translate_color
 
     v_name = (v.get("name") or "").strip()
@@ -2919,8 +3002,28 @@ def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
 
     # Colour vs model attribute, derived from the variant name.
     eng = translate_color(v_name) if v_name else None
-    attr_name = ("color" if eng else ("model" if v_name else None))
-    attr_value = (eng or v_name) or None
+    return {
+        "sku": v_sku, "name": v_name,
+        "attr_name": ("color" if eng else ("model" if v_name else None)),
+        "attr_value": (eng or v_name) or None,
+    }
+
+
+def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
+                       usd_try, take_price=True):
+    """Find or create the WarehouseProduct ONE variant row lands in, and
+    work out everything else the row means: its SKU (deduplicated within the
+    product, and globally when auto), its colour/model attribute, its price
+    and cost. Mutates `seen_skus`.
+
+    `take_price` — intake makes every batch's price the product's
+    last-purchase price. A purchase edit decides that for itself.
+
+    Returns a dict: wp, created, sku, name, wp_name, attr_name, attr_value,
+    price, currency, cost_usd, cost_try."""
+    ident = _intake_variant_identity(main_product, base_name, v, idx, seen_skus)
+    v_sku, v_name = ident["sku"], ident["name"]
+    attr_name, attr_value = ident["attr_name"], ident["attr_value"]
 
     price, currency = _purchase_price(v)
     cost_usd, cost_try = _purchase_costs(price, currency, usd_try)
@@ -2938,7 +3041,6 @@ def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
             purchase_price=(price if (price and price > 0) else None),
             purchase_currency=currency,
             cost_usd=cost_usd, cost_try=cost_try,
-            unit=wh_unit, pack_type=wh_pack,
         )
     elif take_price and price and price > 0:
         _take_purchase_price(wp, price, currency, cost_usd, cost_try)
@@ -2972,6 +3074,13 @@ def _intake_catalog_link(wp, target, main_product, base_name, first_barcode, war
     return cat_variant
 
 
+def announce_order_hold(request, result):
+    """Put perform_intake's customer-order hold outcome on the next page."""
+    if result.get("order_hold"):
+        level, text = result["order_hold"]
+        getattr(messages, level)(request, text)
+
+
 def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     """Receive a delivery into `warehouse`: create the products, variants and
     physical stock items described by `data`, then post the purchase invoice.
@@ -2991,7 +3100,6 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     """
     from django.db import transaction
 
-    unit = (data.get("unit") or "mt").strip()[:20] or "mt"
     products_in = data.get("products")
     if not isinstance(products_in, list) or not products_in:
         raise IntakeError({"success": False, "error": "En az bir ürün ekleyin."}, status=400)
@@ -3002,28 +3110,24 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     prefix = _intake_prefix(data, account_name)
     _intake_check_rates(products_in, current_account_obj, data.get("rates"))
     _intake_check_prices(products_in)
-    resolved = _intake_resolve_products(products_in, prefix)
+    resolved = _intake_resolve_products(products_in, prefix,
+                                        default_unit=data.get("unit"))
     manual_codes = _intake_typed_barcodes(products_in)
+    # The customer order this stock is bought for. Only a confirmed draft
+    # can have one: a purchase for a customer is always saved first, since
+    # saving it is what creates the customer's order.
+    for_order = invoice.for_order if invoice is not None else None
 
     created_list = []
     warnings = []
     purchase_lines = []   # aggregated across the WHOLE batch → one alış faturası
     mint = _barcode_minter(prefix, reserved=manual_codes)
-    prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
-    # What the WAREHOUSE row is counted in. `prod_unit` above is the
-    # catalog's flattened version (marketing.Product allows only
-    # units/mt/kg, so piece and pack both collapse to "units"); the
-    # warehouse keeps the distinction the form actually collected.
-    wh_unit = unit if unit in dict(WarehouseProduct.UNIT_CHOICES) else "mt"
-    # A starting point for how it is packed, not a rule — `pack_type` is
-    # its own field and can be corrected without touching the unit.
-    wh_pack = WarehouseProduct.PACK_FOR_UNIT.get(wh_unit, "roll")
     usd_try = _get_usd_try_rate() or Decimal("1")
 
     try:
         with transaction.atomic():
             for item in resolved:
-                main_product = _intake_main_product(item, prefix, prod_unit)
+                main_product = _intake_main_product(item, prefix, invoice=invoice)
                 base_name = item["base_name"]
                 created = {"main_product": {
                                "id": main_product.id, "title": main_product.title,
@@ -3040,7 +3144,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                         continue
                     target = _intake_variant_wp(
                         warehouse, main_product, base_name, v, idx, seen_skus,
-                        wh_unit=wh_unit, wh_pack=wh_pack, usd_try=usd_try,
+                        usd_try=usd_try,
                     )
                     wp = target["wp"]
 
@@ -3073,7 +3177,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                         purchase_lines.append({
                             "description": target["wp_name"],
                             "quantity": added_qty,
-                            "unit": unit,
+                            "unit": main_product.unit,
                             "unit_price": price if (price and price > 0) else Decimal("0"),
                             "currency": target["currency"],
                             "product": main_product,
@@ -3151,11 +3255,49 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                      "error": f"Alım faturası kaydedilemedi: {exc}"}, status=500)
             warnings.append(f"Stok eklendi ama alış faturası oluşturulamadı: {exc}")
 
+    # Hold what arrived for the customer it was bought for. A hold that
+    # can't be made is a warning — the goods are in either way, and can
+    # still be picked for the order by hand.
+    # Reported through `order_hold`, which the receiving views turn into a
+    # message on the page the user lands on — the form only logs warnings.
+    held = []
+    order_hold = None
+    if for_order is not None and purchase_info is not None:
+        from django.utils.translation import gettext as _t
+        from accounting.models import Invoice as _Invoice
+        from .order_purchases import hold_received_rolls
+        number = for_order.order_number or for_order.pk
+        try:
+            with transaction.atomic():
+                held = hold_received_rolls(
+                    _Invoice.objects.select_related("for_order")
+                    .get(pk=purchase_info["invoice_id"]),
+                    user=user)
+        except Exception as exc:
+            order_hold = ("warning", _t(
+                "The rolls could not be reserved for order %(number)s: %(error)s")
+                % {"number": number, "error": exc})
+        else:
+            if held:
+                order_hold = ("success", _t(
+                    "%(count)s rolls reserved for order %(number)s.")
+                    % {"count": len(held), "number": number})
+            else:
+                order_hold = ("warning", _t(
+                    "Nothing was reserved for order %(number)s — none of the received "
+                    "rolls match a line it still needs.")
+                    % {"number": number})
+        warnings.append(order_hold[1])
+
     return {
         "created": created_list,
         "warnings": warnings,
         "prefix": prefix,
         "purchase": purchase_info,
+        "held_for_order": [
+            {"barcode": h["barcode"], "quantity": float(h["quantity"])} for h in held
+        ],
+        "order_hold": order_hold,
     }
 
 
@@ -3176,11 +3318,14 @@ class WarehouseManualAdd(View):
       {
         "current_account_id": 163,                   # REQUIRED → barcode prefix + alım
         "barcode_prefix": "KZL",          # optional explicit override
-        "unit": "mt",                     # mt | piece | kg | pack | ...
+        "unit": "mt",                     # legacy batch-wide unit, used by a
+                                          # product that names none
         "products": [
           {
             "main_product": {"mode": "new"|"existing", "id": 12,
                               "name": "GREK", "sku": "GREK"},
+            "unit": "mt",                 # mt | piece | kg | pack
+            "pack_type": "roll",          # roll | box | bale | bag | bundle | pallet
             "has_variants": true,
             "variants": [
               {"name": "Beyaz", "sku": "GREK-BEYAZ",
@@ -3221,6 +3366,7 @@ class WarehouseManualAdd(View):
             )
         except IntakeError as exc:
             return JsonResponse(exc.payload, status=exc.status)
+        announce_order_hold(request, result)
         return JsonResponse({"success": True, **result})
 
 
@@ -3297,11 +3443,6 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
     if not isinstance(products_in, list) or not products_in:
         raise IntakeError({"success": False, "error": "En az bir ürün olmalı."}, status=400)
 
-    unit = (data.get("unit") or "mt").strip()[:20] or "mt"
-    prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
-    wh_unit = unit if unit in dict(WarehouseProduct.UNIT_CHOICES) else "mt"
-    wh_pack = WarehouseProduct.PACK_FOR_UNIT.get(wh_unit, "roll")
-
     with transaction.atomic():
         invoice = (Invoice.objects.select_for_update()
                    .filter(pk=invoice_pk, type="purchase").first())
@@ -3332,7 +3473,6 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                               .select_related("product", "product__warehouse"))
         }
         items = {it.pk: it for it in invoice.items.all()}
-        old_unit = next((it.unit for it in items.values()), unit)
         # Which products each line's rolls sat on BEFORE this edit — a line
         # landing somewhere new is what needs its catalog link, and a line
         # that never had rolls is not measured by them.
@@ -3354,7 +3494,8 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         _intake_check_prices(products_in)
         resolved = _intake_resolve_products(
             products_in, prefix,
-            own_product_ids={it.product_id for it in items.values() if it.product_id})
+            own_product_ids={it.product_id for it in items.values() if it.product_id},
+            default_unit=data.get("unit"))
         manual_codes = _intake_typed_barcodes(
             products_in, current_barcodes={pk: r.barcode for pk, r in rolls.items()})
 
@@ -3462,7 +3603,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         warnings, trimmed, line_updates = [], [], []
         line_wps = {}
         for card in resolved:
-            main_product = _intake_main_product(card, prefix, prod_unit)
+            main_product = _intake_main_product(card, prefix, invoice=invoice)
             base_name = card["base_name"]
             seen_skus = set()
             for idx, v in enumerate(_intake_variants(card, main_product), start=1):
@@ -3490,13 +3631,13 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                     line_updates.append({
                         "invoice_item_id": item.pk,
                         "quantity": Decimal("0") if had_rolls else item.quantity,
-                        "unit": unit, "unit_price": billed["unit_price"],
+                        "unit": main_product.unit, "unit_price": billed["unit_price"],
                     })
                     continue
 
                 target = _intake_variant_wp(
                     warehouse, main_product, base_name, v, idx, seen_skus,
-                    wh_unit=wh_unit, wh_pack=wh_pack, usd_try=usd_try, take_price=False,
+                    usd_try=usd_try, take_price=False,
                 )
                 wp = target["wp"]
                 touched[wp.pk] = wp
@@ -3624,7 +3765,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                 update = {
                     "invoice_item_id": item.pk if item is not None else None,
                     "product": main_product, "variant": wp.catalog_variant,
-                    "unit": unit, "unit_price": billed["unit_price"],
+                    "unit": main_product.unit, "unit_price": billed["unit_price"],
                     "quantity": quantity, "new_roll_ids": line_roll_ids,
                 }
                 if landed_here or price_changed or renamed:
@@ -3639,16 +3780,6 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         for it in items.values():
             if it.pk not in kept_items:
                 it.delete()
-
-        if unit != old_unit:
-            # The lines say the new unit already. A product's own unit only
-            # follows where every roll it holds came in on this purchase —
-            # relabelling stock another delivery brought is not this edit's
-            # to do.
-            for wp in line_wps.values():
-                if not wp.stock_items.exclude(purchase_invoice_item__invoice=invoice).exists():
-                    wp.unit, wp.pack_type = wh_unit, wh_pack
-                    wp.save(update_fields=["unit", "pack_type", "updated_at"])
 
         for wp in touched.values():
             _recount_wp(wp)
@@ -3729,6 +3860,8 @@ class WarehousePurchaseEdit(View):
                                      if product else
                                      {"mode": "new", "name": it.description, "sku": ""}),
                     "category_id": product.category_id if product else None,
+                    "unit": it.unit,
+                    **(_product_facts(product, invoice) if product else {}),
                     "has_variants": True,
                     "variants": [],
                 }
@@ -5857,7 +5990,8 @@ class WarehouseMovementsAll(View):
         import operator
 
         qs = (StockMovement.objects
-              .select_related("product", "product__warehouse", "stock_item", "created_by"))
+              .select_related("product", "product__warehouse", "stock_item", "created_by",
+                              "product__catalog_variant__product"))
 
         wh_param = (request.GET.get("warehouse") or "").strip()
         if wh_param.isdigit():
@@ -5965,7 +6099,8 @@ class WarehouseMovements(View):
         qs = (
             StockMovement.objects
             .filter(product__warehouse=warehouse)
-            .select_related("product", "stock_item", "created_by")
+            .select_related("product", "stock_item", "created_by",
+                            "product__catalog_variant__product")
         )
 
         types_param = (request.GET.get("type") or "").strip()

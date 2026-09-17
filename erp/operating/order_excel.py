@@ -24,7 +24,7 @@ from openpyxl.worksheet.properties import PageSetupProperties
 
 from erp.xlsx_utils import (
     cell, merge, merge_border, section, kv_full, kv_pair,
-    GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP, INK,
+    GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP, INK, TEXT,
     F_TITLE, F_SUB, F_DOCNO, F_HEAD, F_VAL, F_VALB, F_TOTAL,
 )
 from .models import Order
@@ -348,8 +348,8 @@ def build_order_workbook(order):
             title = f"{title}\n{it.description}"
         vsku = it.product_variant.variant_sku if (it.product_variant_id and it.product_variant) else "—"
         cell(ws, r, 1, title, font=F_VAL, border=GRID, align=TOP)
-        cell(ws, r, 2, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID)
-        cell(ws, r, 3, vsku or "—", font=F_VAL, border=GRID)
+        cell(ws, r, 2, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID, fmt=TEXT)
+        cell(ws, r, 3, vsku or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 4, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00")
         cell(ws, r, 5, _dec(price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         cell(ws, r, 6, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
@@ -501,9 +501,9 @@ def build_combined_workbook(orders):
         vsku = (it.product_variant.variant_sku
                 if (it.product_variant_id and it.product_variant) else None)
         cell(ws, r, 1, title, font=F_VAL, border=GRID, align=TOP)
-        cell(ws, r, 2, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID)
+        cell(ws, r, 2, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 3, it.variant_label or "—", font=F_VAL, border=GRID)
-        cell(ws, r, 4, vsku or "—", font=F_VAL, border=GRID)
+        cell(ws, r, 4, vsku or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 5, it.product_type_label or "—", font=F_VAL, border=GRID)
         cell(ws, r, C_QTY, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00")
         cell(ws, r, C_PACKS, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0")

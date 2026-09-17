@@ -44,6 +44,7 @@ middleware is the security boundary; hiding a link is only courtesy.
 """
 
 import re
+from decimal import ROUND_CEILING, Decimal
 
 SALES_REP = "sales_rep"
 
@@ -331,3 +332,27 @@ def may_read(path):
     return any(
         path.startswith(p) for p in READ_PREFIXES if p != "/"
     )
+
+
+# ── What a sales rep is shown in place of a cost ──────────────────────
+# Cost is the margin, and the role does not read it. But a rep quoting a
+# customer still needs a number wherever staff would see the cost — a
+# stock item with no sale price on file, a roll in the picker — so the
+# role sees a sales price derived from it instead: the cost plus the
+# house markup, rounded UP to the next 0.05 so it is a price a person
+# would say out loud and never lands below cost-plus-markup.
+SALES_REP_MARKUP = Decimal("1.10")
+SALES_REP_PRICE_STEP = Decimal("0.05")
+
+
+def sales_rep_price(cost):
+    """`cost` marked up for a sales rep: cost × 1.10, up to the next 0.05.
+
+    None for None, so a missing cost stays missing rather than becoming a
+    price of zero. A cost that already lands on a step stays put.
+    """
+    if cost is None:
+        return None
+    marked = Decimal(str(cost)) * SALES_REP_MARKUP
+    steps = (marked / SALES_REP_PRICE_STEP).to_integral_value(rounding=ROUND_CEILING)
+    return (steps * SALES_REP_PRICE_STEP).quantize(Decimal("0.01"))

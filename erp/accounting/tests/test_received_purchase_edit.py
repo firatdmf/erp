@@ -258,11 +258,176 @@ class ReceivedPurchaseEditTest(TestCase):
 
     def test_the_unit(self):
         form = self._form()
-        form["unit"] = "piece"
+        self.assertEqual(form["products"][0]["unit"], "mt")
+        form["products"][0]["unit"] = "piece"
         self.assertEqual(self._save(form).status_code, 200)
         self.assertEqual(self._invoice().items.get().unit, "piece")
         # Every roll on it came in on this purchase, so the product follows.
         self.assertEqual(WarehouseProduct.objects.get().unit, "piece")
+
+    def test_a_unit_change_takes_its_pack_unless_one_was_picked(self):
+        form = self._form()
+        form["products"][0]["unit"] = "piece"
+        form["products"][0]["pack_type"] = None
+        self._save(form)
+        self.assertEqual(WarehouseProduct.objects.get().pack_type, "box")
+
+    def test_a_form_from_before_products_had_units_still_saves(self):
+        form = self._form()
+        del form["products"][0]["unit"]
+        form["unit"] = "kg"
+        self.assertEqual(self._save(form).status_code, 200)
+        self.assertEqual(self._invoice().items.get().unit, "kg")
+
+    def test_each_product_keeps_its_own_unit(self):
+        form = self._form()
+        form["products"].append({
+            "main_product": {"mode": "new", "name": "PERDE", "sku": "PRD02"},
+            "unit": "piece", "has_variants": True,
+            "variants": [{"name": "Krem", "sku": "PRD02.KREM", "price": "9",
+                          "currency": "USD", "tops": [{"qty": 6}]}],
+        })
+        self.assertEqual(self._save(form).status_code, 200)
+        units = dict(self._invoice().items.values_list("description", "unit"))
+        self.assertEqual(sorted(units.values()), ["mt", "piece"])
+        self.assertEqual(WarehouseProduct.objects.get(sku="PRD02.KREM").unit, "piece")
+        self.assertEqual(WarehouseProduct.objects.get(sku="PRD02.KREM").pack_type, "box")
+        self.assertEqual(WarehouseProduct.objects.get(sku="K24644.G07").unit, "mt")
+
+    # ── Pack type ───────────────────────────────────────────────────
+    def test_the_pack_it_was_received_as_comes_back(self):
+        self.assertEqual(WarehouseProduct.objects.get().pack_type, "roll")
+        self.assertEqual(self._form()["products"][0]["pack_type"], "roll")
+
+    def test_the_pack_can_be_corrected(self):
+        form = self._form()
+        form["products"][0]["pack_type"] = "bale"
+        self.assertEqual(self._save(form).status_code, 200)
+        self.assertEqual(WarehouseProduct.objects.get().pack_type, "bale")
+        self.assertEqual(WarehouseProduct.objects.get().unit, "mt")
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def _receive_order(self, pack_type, mock_upload, unit=None):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        order = self.client.post(
+            reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
+            data=json.dumps({
+                "warehouse_id": self.wh.pk, "current_account_id": self.karven.pk,
+                "unit": "mt", "date": "2026-08-22",
+                "products": [{
+                    "main_product": {"mode": "new", "name": "PERDE", "sku": "PRD01"},
+                    "has_variants": True, "pack_type": pack_type, "unit": unit,
+                    "variants": [{"name": "Krem", "sku": "PRD01.KREM", "price": "9",
+                                  "currency": "USD", "tops": [{"qty": 4}]}],
+                }],
+            }), content_type="application/json")
+        confirm = self.client.post(
+            reverse("accounts:purchase_order_confirm", args=[order.json()["invoice_id"]]))
+        self.assertTrue(confirm.json()["success"], confirm.json())
+        return WarehouseProduct.objects.get(sku="PRD01.KREM")
+
+    def test_an_order_is_received_in_the_pack_it_names(self):
+        self.assertEqual(self._receive_order("box").pack_type, "box")
+
+    def test_an_order_keeps_each_products_unit(self):
+        wp = self._receive_order("box", unit="piece")
+        self.assertEqual((wp.unit, wp.pack_type), ("piece", "box"))
+        self.assertEqual(wp.stock_items.get().purchase_invoice_item.unit, "piece")
+
+    def test_an_order_lists_each_product_in_its_own_unit(self):
+        order = self.client.post(
+            reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
+            data=json.dumps({
+                "warehouse_id": self.wh.pk, "current_account_id": self.karven.pk,
+                "unit": "mt", "date": "2026-08-23",
+                "products": [
+                    {"main_product": {"mode": "new", "name": "GREK", "sku": "GRK01"},
+                     "has_variants": True,
+                     "variants": [{"name": "Beyaz", "price": "2", "currency": "USD",
+                                   "tops": [{"qty": 40}]}]},
+                    {"main_product": {"mode": "new", "name": "PERDE", "sku": "PRD03"},
+                     "unit": "piece", "has_variants": True,
+                     "variants": [{"name": "Krem", "price": "9", "currency": "USD",
+                                   "tops": [{"qty": 6}]}]},
+                ],
+            }), content_type="application/json")
+        draft = Invoice.objects.get(pk=order.json()["invoice_id"])
+        self.assertEqual(sorted(draft.items.values_list("unit", flat=True)), ["mt", "piece"])
+
+    def test_an_unknown_pack_falls_back_to_the_units(self):
+        self.assertEqual(self._receive_order("crate").pack_type, "roll")
+
+    # ── The main product owns unit and pack ─────────────────────────
+    def _product(self):
+        return Product.objects.get(sku="K24644")
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def _receive_more(self, product, mock_upload, unit="piece", pack_type="box",
+                      sku="K24644.G08", barcode="KRV-C"):
+        """A second purchase, of an EXISTING product, naming a unit."""
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        order = self.client.post(
+            reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
+            data=json.dumps({
+                "warehouse_id": self.wh.pk, "current_account_id": self.karven.pk,
+                "date": "2026-08-24",
+                "products": [{
+                    "main_product": {"mode": "existing", "id": product.pk},
+                    "unit": unit, "pack_type": pack_type, "has_variants": True,
+                    "variants": [{"name": "G08", "sku": sku, "price": "3",
+                                  "currency": "USD", "tops": [{"qty": 5, "barcode": barcode}]}],
+                }],
+            }), content_type="application/json")
+        invoice_id = order.json()["invoice_id"]
+        confirm = self.client.post(reverse("accounts:purchase_order_confirm", args=[invoice_id]))
+        self.assertTrue(confirm.json()["success"], confirm.json())
+        return Invoice.objects.get(pk=invoice_id)
+
+    def test_an_existing_product_with_stock_keeps_its_unit(self):
+        """Its rolls are metres; a card saying pieces must not make this
+        delivery's line say pieces over the same goods."""
+        second = self._receive_more(self._product())
+        product = self._product()
+        self.assertEqual((product.unit, product.pack_type), ("mt", "roll"))
+        self.assertEqual(second.items.get().unit, "mt")
+        self.assertEqual(self._roll("KRV-C").product.unit, "mt")
+
+    def test_an_existing_product_with_no_stock_takes_the_cards_unit(self):
+        empty = Product.objects.create(title="PERDE", sku="PRD09", featured=False)
+        second = self._receive_more(empty, sku="PRD09.KREM")
+        empty.refresh_from_db()
+        self.assertEqual((empty.unit, empty.pack_type), ("piece", "box"))
+        self.assertEqual(empty.unit_of_measurement, "units")
+        self.assertEqual(second.items.get().unit, "piece")
+
+    def test_an_edit_cannot_relabel_stock_another_purchase_brought(self):
+        self._receive_more(self._product(), unit="mt", pack_type="roll")
+        form = self._form()
+        self.assertTrue(form["products"][0]["unit_locked"])
+        form["products"][0]["unit"] = "piece"
+        form["products"][0]["pack_type"] = "box"
+        self.assertEqual(self._save(form).status_code, 200)
+        product = self._product()
+        self.assertEqual((product.unit, product.pack_type), ("mt", "roll"))
+        self.assertEqual(self._invoice().items.get().unit, "mt")
+
+    def test_the_reopened_purchase_states_the_product(self):
+        card = self._form()["products"][0]
+        self.assertEqual((card["unit"], card["pack_type"], card["unit_locked"]),
+                         ("mt", "roll", False))
+        self.assertEqual(card["unit_label"], "Metre")
+        self.assertEqual(card["pack_label"], "Roll")
+
+    def test_the_variants_endpoint_states_the_product(self):
+        url = reverse("operating:catalog_product_variants",
+                      args=[self.wh.pk, self._product().pk])
+        facts = self.client.get(url).json()["product"]
+        self.assertEqual((facts["unit"], facts["pack_type"]), ("mt", "roll"))
+        # Its only stock came in on this purchase: locked for any other
+        # purchase, open while editing this one.
+        self.assertTrue(facts["unit_locked"])
+        self.assertFalse(self.client.get(url, {"invoice": self.invoice_id})
+                         .json()["product"]["unit_locked"])
 
     # ── Rolls ───────────────────────────────────────────────────────
     def test_a_roll_can_be_re_measured(self):

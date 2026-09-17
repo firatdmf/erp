@@ -79,6 +79,7 @@ urlpatterns = [
     # ------------------------------------------------------------------
     scoped("accounts/",                  views.CurrentAccountList.as_view(),           "list"),
     scoped("accounts/new/",              views.CurrentAccountCreate.as_view(),         "create"),
+    scoped("accounts/new/crm-search/",   views.CurrentAccountCreateCrmSearch.as_view(), "create_crm_search"),
     scoped("accounts/statement/",        views.CurrentAccountStatementAll.as_view(),   "statement_all"),
     scoped("accounts/retail/",           views.RetailCurrentAccountRedirect.as_view(), "retail"),
 

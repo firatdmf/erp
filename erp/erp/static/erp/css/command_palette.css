@@ -670,6 +670,11 @@ main {
     color: #d97706;
 }
 
+.result-item-icon.supplier {
+    background: #ffe4e6;
+    color: #e11d48;
+}
+
 .result-item-icon.product {
     background: #d1fae5;
     color: #059669;

@@ -73,6 +73,18 @@ class DryRunPredictsTheApplyRunTest(TestCase):
         self.assertFalse(
             WarehouseProduct.objects.filter(catalog_variant=None).exists())
 
+    def test_the_new_parent_is_typed_fabric_in_metres_on_rolls(self):
+        """The Ergene import's 380 products came out of here with no type,
+        and every invoice line for them showed a blank one."""
+        from marketing.models import ProductCategory
+        fabric = ProductCategory.objects.get_or_create(name="fabric")[0]
+        reconcile_all_warehouse_links(apply=True)
+        parent = Product.objects.get()
+        self.assertEqual((parent.category, parent.unit, parent.pack_type),
+                         (fabric, "mt", "roll"))
+        self.assertEqual(
+            {wp.unit_short for wp in WarehouseProduct.objects.all()}, {"m"})
+
     def test_a_second_apply_is_a_no_op(self):
         reconcile_all_warehouse_links(apply=True)
         again = reconcile_all_warehouse_links(apply=True)

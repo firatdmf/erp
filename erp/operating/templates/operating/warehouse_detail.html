@@ -1520,8 +1520,16 @@
                 <th>{% trans "Location" %}</th>
                 {% endif %}
                 <th class="num">{% trans "Qty" %}</th>
+                {% comment %}A sales rep does not read cost: the unit column
+                shows them a price derived from it, and the Total column —
+                cost times quantity, with nothing to derive — is left out.
+                The rows partial makes the same choice.{% endcomment %}
+                {% if is_sales_rep %}
+                <th class="num">{% trans "Price" %}</th>
+                {% else %}
                 <th class="num" title="{% trans 'Weighted-average unit cost of the stock on the floor' %}">{% trans "Unit cost" %}</th>
                 <th class="num">{% trans "Total" %}</th>
+                {% endif %}
               </tr>
             </thead>
             <tbody id="wh-rows">
@@ -1662,10 +1670,12 @@
             <div class="val">{{ total_quantity|floatformat:0|intcomma }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> {{ total_unit_short }}</span></div>
             <div class="lbl">{% trans "Total stock" %}</div>
           </div>
+          {% if not is_sales_rep %}
           <div class="od-stat full">
             <div class="val">${{ total_value_usd|floatformat:2|intcomma }}</div>
             <div class="lbl">{% trans "Net worth (USD)" %}</div>
           </div>
+          {% endif %}
         </div>
       </section>
     </div>

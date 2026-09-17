@@ -10,6 +10,8 @@ import mimetypes
 from django.core.exceptions import ValidationError
 from django.contrib.postgres.fields import ArrayField
 
+from . import units
+
 
 
 # Create your functions here.
@@ -249,11 +251,27 @@ class Product(models.Model):
     # This just like category but custom, you may set it to anything you like. A product can only have one type.
     type = models.CharField(null=True, blank=True)
 
+    # What the product is counted in and how its stock is packed. Facts
+    # about the product itself, so they live here once and every warehouse
+    # row reads them — see marketing/units.py. (Not is_packaged/pack_count
+    # below: those describe how the storefront SELLS it, "pack of 12".)
+    unit = models.CharField(
+        max_length=8, choices=units.UNIT_CHOICES, default=units.DEFAULT_UNIT,
+        help_text="What this product is counted in",
+    )
+    pack_type = models.CharField(
+        max_length=12, choices=units.PACK_CHOICES, default=units.DEFAULT_PACK,
+        help_text="What one stock item of this product physically is",
+    )
+
+    # The storefront's coarser unit. Derived from `unit` on every save, so
+    # it can't disagree with the stock again; never edit it directly.
     unit_of_measurement = models.CharField(
         choices=QUANTITY_UNIT_TYPE_CHOICES,
         null=True,
         blank=True,
         default=QUANTITY_UNIT_TYPE_CHOICES[0][0],
+        editable=False,
     )
 
     # NO quantity column. A catalog product's stock is the sum of what the
@@ -363,6 +381,49 @@ class Product(models.Model):
             return self.sku
         else:
             return self.title
+
+    def save(self, *args, **kwargs):
+        self.unit_of_measurement = units.UNIT_TO_STOREFRONT.get(self.unit, "units")
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "unit" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "unit_of_measurement"}
+        super().save(*args, **kwargs)
+
+    def set_unit(self, unit=None, pack_type=None):
+        """Change what the product is counted in and/or how it is packed,
+        keeping the storefront unit in step. Saves only what changed; returns
+        whether anything did."""
+        changed = []
+        if unit and unit != self.unit:
+            self.unit = unit
+            changed.append("unit")
+        if pack_type and pack_type != self.pack_type:
+            self.pack_type = pack_type
+            changed.append("pack_type")
+        if changed:
+            self.save(update_fields=changed)
+        return bool(changed)
+
+    @property
+    def unit_short(self):
+        return units.unit_short(self.unit)
+
+    @property
+    def item_noun(self):
+        """"roll" / "box" — one stock item of this product, singular."""
+        return units.pack_nouns(self.pack_type)[0]
+
+    @property
+    def item_noun_plural(self):
+        return units.pack_nouns(self.pack_type)[1]
+
+    @property
+    def item_icon(self):
+        return units.PACK_ICON.get(self.pack_type, "fa-layer-group")
+
+    @property
+    def quantity_label(self):
+        return units.quantity_label(self.unit)
 
     # Fallback chain: product override → product group default → None.
     @property

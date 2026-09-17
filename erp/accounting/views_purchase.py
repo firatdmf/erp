@@ -33,7 +33,7 @@ from .services_accounts import (
     _currency_by_code, convert_lines_to_currency, invoice_currency_for,
     mark_as_supplier, MixedCurrencyError,
 )
-from marketing.models import SKU_MAX_LENGTH
+from marketing.models import Product, ProductVariant
 
 
 def _fallback_code_prefix():
@@ -67,7 +67,7 @@ class PurchaseOrderList(View):
         # Laleli's suppliers and Laleli's money.
         qs = (
             Invoice.objects.filter(type="purchase", book=request.book)
-            .select_related("current_account", "currency")
+            .select_related("current_account", "currency", "for_order")
             .order_by("-date", "-id")
         )
 
@@ -129,7 +129,8 @@ class PurchaseOrderDetail(View):
 
     def get(self, request, pk):
         invoice = get_object_or_404(
-            Invoice.objects.select_related("current_account", "currency", "book", "intake_warehouse"),
+            Invoice.objects.select_related("current_account", "currency", "book", "intake_warehouse",
+                                           "for_order"),
             pk=pk, type="purchase",
         )
         items = list(
@@ -232,13 +233,14 @@ class GoodsReceipt(View):
 
     def get(self, request, pk=None):
         from operating.views_warehouse import (
-            _account_choices, _product_category_choices,
+            _account_choices, _pack_type_choices, _product_category_choices,
         )
 
         # Combined ("ortak") warehouses are browsing views over other
         # warehouses and hold no stock of their own — intake into one is
         # blocked everywhere else too, so they aren't offered here.
         warehouses = list(Warehouse.objects.exclude(kind="combined").order_by("name"))
+        for_order = None        # the customer order this purchase is bought for
         invoice = None          # a RECEIVED purchase: edited against the rolls it has
         order = None            # a DRAFT order: nothing received yet, just a plan
         selected_id = None
@@ -265,6 +267,7 @@ class GoodsReceipt(View):
             request.book = doc.book
             back_url = reverse("accounts:purchase_order_detail", args=[doc.pk])
 
+            for_order = doc.for_order
             if doc.status == "draft":
                 # Still an order — it owns a plan, not stock, so the form
                 # opens the way it was left and everything stays editable.
@@ -301,6 +304,7 @@ class GoodsReceipt(View):
             "edit_invoice": invoice,
             "order_invoice": order,
             "intake_plan": (order.intake_plan or {}) if order else None,
+            "for_order": for_order,
             "can_confirm": can_confirm_purchase(request.user),
             "today": date.today().isoformat(),
             "order_date": (doc.date.isoformat() if doc else date.today().isoformat()),
@@ -309,7 +313,10 @@ class GoodsReceipt(View):
             "back_url": back_url,
             "accounts": _account_choices(),
             "product_categories": _product_category_choices(),
-            "sku_max_length": SKU_MAX_LENGTH,
+            "pack_types": _pack_type_choices(),
+            # Read off the fields, so the inputs cap exactly where the model does.
+            "sku_max_length": Product._meta.get_field("sku").max_length,
+            "variant_sku_max_length": ProductVariant._meta.get_field("variant_sku").max_length,
             # The house's own code, so the SKU the page previews for an
             # account with no consonants to abbreviate is the one the save
             # actually mints — see views_warehouse._fallback_prefix.
@@ -345,10 +352,26 @@ def plan_lines(plan):
     catalog or the warehouse: an order that is still an order must leave no
     trace outside its own document.
     """
+    from marketing.models import Product
+
     lines = []
-    unit = (plan.get("unit") or "mt")[:20]
-    for p_in in (plan.get("products") or []):
+    products = plan.get("products") or []
+    # An existing product is counted in its own unit, whatever the card
+    # says — the same rule perform_intake() applies at confirm time.
+    def existing_id(p_in):
         mp = p_in.get("main_product") or {}
+        pid = str(mp.get("id") or "")
+        return int(pid) if mp.get("mode") == "existing" and pid.isdigit() else None
+
+    existing_units = dict(Product.objects
+                          .filter(pk__in=[i for i in map(existing_id, products) if i])
+                          .values_list("pk", "unit"))
+    for p_in in products:
+        mp = p_in.get("main_product") or {}
+        # Plans saved before products had their own unit carry a single
+        # batch-wide one instead.
+        unit = (existing_units.get(existing_id(p_in))
+                or p_in.get("unit") or plan.get("unit") or "mt")[:20]
         base = (mp.get("name") or "").strip()
         for v_in in (p_in.get("variants") or []):
             qty = Decimal("0")
@@ -376,6 +399,11 @@ def plan_lines(plan):
                 "variant": None,
             })
     return lines
+
+
+class _SaveRefused(Exception):
+    """Aborts a purchase save — and rolls back what it wrote — with a
+    user-facing message."""
 
 
 @method_decorator(login_required, name="dispatch")
@@ -412,6 +440,16 @@ class PurchaseOrderSave(View):
                  "error": _("Pick a current account — the purchase is posted to it.")},
                 status=400)
 
+        from operating.order_purchases import (
+            CustomerOrderError, parse_customer, plan_variant_skus,
+            put_plan_in_catalog, sync_customer_order,
+        )
+        from operating.views_warehouse import IntakeError
+        try:
+            customer = parse_customer(data)
+        except CustomerOrderError as exc:
+            return JsonResponse({"success": False, "error": str(exc)}, status=400)
+
         lines = plan_lines(data)
         if not lines:
             return JsonResponse(
@@ -419,62 +457,89 @@ class PurchaseOrderSave(View):
 
         order_date = _parse_date(data.get("date")) or date.today()
         delivery = _parse_date(data.get("delivery_date"))
+        order_warning = None
+        try:
+            with transaction.atomic():
+                if pk is not None:
+                    invoice = get_object_or_404(
+                        Invoice.objects.select_for_update(), pk=pk, type="purchase")
+                    if invoice.status != "draft":
+                        return JsonResponse(
+                            {"success": False,
+                             "error": "Bu alım onaylanmış — sipariş olarak düzenlenemez."}, status=400)
+                else:
+                    invoice = Invoice(type="purchase", status="draft")
 
-        with transaction.atomic():
-            if pk is not None:
-                invoice = get_object_or_404(
-                    Invoice.objects.select_for_update(), pk=pk, type="purchase")
-                if invoice.status != "draft":
-                    return JsonResponse(
-                        {"success": False,
-                         "error": "Bu alım onaylanmış — sipariş olarak düzenlenemez."}, status=400)
-            else:
-                invoice = Invoice(type="purchase", status="draft")
+                # Same rule as the received alım: one currency, the account's
+                # own, and any line priced in another restated into it at the
+                # rate the order carried. A draft that billed lira as dollars
+                # would only be discovered when it was confirmed.
+                try:
+                    lines = convert_lines_to_currency(
+                        lines, invoice_currency_for(current_account),
+                        rates=data.get("rates"), on_date=order_date,
+                    )
+                except MixedCurrencyError as exc:
+                    return JsonResponse({"success": False, "error": str(exc)}, status=400)
 
-            # Same rule as the received alım: one currency, the account's
-            # own, and any line priced in another restated into it at the
-            # rate the order carried. A draft that billed lira as dollars
-            # would only be discovered when it was confirmed.
-            try:
-                lines = convert_lines_to_currency(
-                    lines, invoice_currency_for(current_account),
-                    rates=data.get("rates"), on_date=order_date,
-                )
-            except MixedCurrencyError as exc:
-                return JsonResponse({"success": False, "error": str(exc)}, status=400)
+                invoice.current_account = current_account
+                invoice.book = current_account.book
+                invoice.currency = _currency_by_code(invoice_currency_for(current_account))
+                invoice.date = order_date
+                invoice.delivery_date = delivery
+                invoice.due_date = order_date + timedelta(days=current_account.payment_term_days or 30)
+                invoice.intake_warehouse = warehouse
+                previous_skus = plan_variant_skus(invoice.intake_plan)
+                invoice.notes = (data.get("notes") or "")[:2000]
+                if not invoice.pk:
+                    settings_obj = CurrentAccountSettings.for_book(current_account.book)
+                    invoice.series = "PUR"
+                    invoice.number = settings_obj.next_invoice_number(series="PUR")
+                    invoice.created_by = getattr(request.user, "member", None)
+                invoice.save()
 
-            invoice.current_account = current_account
-            invoice.book = current_account.book
-            invoice.currency = _currency_by_code(invoice_currency_for(current_account))
-            invoice.date = order_date
-            invoice.delivery_date = delivery
-            invoice.due_date = order_date + timedelta(days=current_account.payment_term_days or 30)
-            invoice.intake_warehouse = warehouse
-            invoice.intake_plan = data
-            invoice.notes = (data.get("notes") or "")[:2000]
-            if not invoice.pk:
-                settings_obj = CurrentAccountSettings.for_book(current_account.book)
-                invoice.series = "PUR"
-                invoice.number = settings_obj.next_invoice_number(series="PUR")
-                invoice.created_by = getattr(request.user, "member", None)
-            invoice.save()
+                # Bought for a customer: the products go in the catalog now, so
+                # the customer's order has lines to point at. That rewrites the
+                # plan to name them, which is why it is stored only after.
+                if customer is not None or invoice.for_order_id:
+                    if (invoice.for_order_id and invoice.for_order.current_account_id
+                            and invoice.for_order.current_account.book_id
+                            != warehouse.accounting_book_id):
+                        raise _SaveRefused(_(
+                            "This purchase is for an order in another book — "
+                            "receive it into a warehouse of that book."))
+                    order_lines = put_plan_in_catalog(data)
+                    order_warning = sync_customer_order(
+                        invoice, customer, order_lines,
+                        book=warehouse.accounting_book,
+                        member=getattr(request.user, "member", None),
+                        previous_skus=previous_skus,
+                    )
+                invoice.intake_plan = data
+                invoice.save(update_fields=["intake_plan", "updated_at"])
 
-            # Rebuilt from the plan every save — a draft has no rolls pointing
-            # at its items, so there is nothing to preserve by editing in place.
-            invoice.items.all().delete()
-            for i, line in enumerate(lines, start=1):
-                InvoiceItem.objects.create(
-                    invoice=invoice, line_no=i,
-                    description=line["description"], quantity=line["quantity"],
-                    unit=line["unit"], unit_price=line["unit_price"],
-                    discount_rate=Decimal("0"), tax_rate=Decimal("0"),
-                )
-            invoice.recompute_totals(save=True)
-            invoice.refresh_from_db()
-            # A draft order is already an intention to buy from them, and it
-            # is the account page's own answer to "who do we buy from" that
-            # goes stale otherwise.
-            mark_as_supplier(current_account)
+                # Rebuilt from the plan every save — a draft has no rolls pointing
+                # at its items, so there is nothing to preserve by editing in place.
+                invoice.items.all().delete()
+                for i, line in enumerate(lines, start=1):
+                    InvoiceItem.objects.create(
+                        invoice=invoice, line_no=i,
+                        description=line["description"], quantity=line["quantity"],
+                        unit=line["unit"], unit_price=line["unit_price"],
+                        discount_rate=Decimal("0"), tax_rate=Decimal("0"),
+                    )
+                invoice.recompute_totals(save=True)
+                invoice.refresh_from_db()
+                # A draft order is already an intention to buy from them, and it
+                # is the account page's own answer to "who do we buy from" that
+                # goes stale otherwise.
+                mark_as_supplier(current_account)
+        except _SaveRefused as exc:
+            return JsonResponse({"success": False, "error": str(exc)}, status=400)
+        except IntakeError as exc:
+            return JsonResponse(exc.payload, status=exc.status)
+        if order_warning:
+            messages.warning(request, order_warning)
 
         return JsonResponse({
             "success": True,
@@ -496,7 +561,9 @@ class PurchaseOrderConfirm(View):
     """
 
     def post(self, request, pk):
-        from operating.views_warehouse import IntakeError, perform_intake
+        from operating.views_warehouse import (
+            IntakeError, announce_order_hold, perform_intake,
+        )
 
         if not can_confirm_purchase(request.user):
             return JsonResponse(
@@ -526,6 +593,7 @@ class PurchaseOrderConfirm(View):
                 )
         except IntakeError as exc:
             return JsonResponse(exc.payload, status=exc.status)
+        announce_order_hold(request, result)
 
         return JsonResponse({
             "success": True,
@@ -692,4 +760,13 @@ class PurchaseCancel(View):
         except PurchaseCancelBlocked as exc:
             return JsonResponse({"success": False, "error": str(exc), "blocked": exc.blockers}, status=422)
 
+        # The customer's order was the client's request, not the purchase's
+        # — it may be filled another way, or carry a deposit. Say it is
+        # still there rather than cancelling it behind their back.
+        order = invoice.for_order
+        if order is not None and order.order_status not in {"cancelled", "returned"}:
+            messages.warning(request, _(
+                "Order %(number)s for this purchase is still open — cancel it on the "
+                "order page if the customer no longer needs it.")
+                % {"number": order.order_number or order.pk})
         return JsonResponse({"success": True, "invoice_id": invoice.pk})

@@ -585,7 +585,69 @@
     overflow-y: auto;
   }
   .m-fav-sheet-body .m-drawer-item { margin: 4px 0; }
+
+  /* ============================================================
+     SEARCH — the desktop top bar's search box, shown full-screen
+     while body.m-search-open (set by mobileOpenSearch)
+     ============================================================ */
+  body.m-search-open { overflow: hidden !important; }
+  body.m-search-open .global-top-bar {
+    display: flex !important;
+    left: 0 !important;
+    height: 60px !important;
+    padding: 0 10px !important;
+    gap: 0 !important;
+    z-index: 300 !important;
+  }
+  body.m-search-open .global-top-bar .top-bar-left,
+  body.m-search-open .global-top-bar .top-bar-right { display: none !important; }
+  body.m-search-open .global-top-bar .top-bar-center {
+    flex: 1 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+  body.m-search-open .global-top-bar .search-container {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    max-width: none !important;
+  }
+  body.m-search-open .global-top-bar .search-box-wrapper {
+    flex: 1 !important;
+    min-width: 0 !important;
+    height: 42px !important;
+  }
+  /* 16px stops iOS zooming the page when the input takes focus */
+  body.m-search-open .global-top-bar .search-input { font-size: 16px !important; }
+  body.m-search-open .global-top-bar .search-dropdown-panel {
+    position: fixed !important;
+    top: 60px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin-top: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  body.m-search-open .global-top-bar .search-dropdown-body {
+    flex: 1 !important;
+    max-height: none !important;
+  }
+  body.m-search-open .global-top-bar .m-search-cancel {
+    display: block !important;
+    flex-shrink: 0;
+    padding: 8px 4px;
+    border: 0;
+    background: transparent;
+    color: #0F766E;
+    font: 600 15px 'Plus Jakarta Sans', system-ui, sans-serif;
+    cursor: pointer;
+  }
 }
+
+.m-search-cancel { display: none; }
 
 /* ============================================================
    DARK THEME
@@ -609,6 +671,7 @@
     background: #66C2C2;
   }
   [data-theme="dark"] .m-page-title { color: #F1F5F8; }
+  [data-theme="dark"] body.m-search-open .global-top-bar .m-search-cancel { color: #66C2C2; }
   [data-theme="dark"] .m-badge { box-shadow: 0 0 0 2px rgba(22, 27, 33, 0.95); }
 
   [data-theme="dark"] .m-bottomnav {

@@ -109,7 +109,9 @@ class TheProductFormChecksItsVariantsFirst(TestCase):
     def test_the_form_is_quiet_when_the_variants_are_fine(self):
         from marketing.forms import ProductForm
 
-        payload = json.dumps([{"variant_sku": "OK", "variant_price": "3"}])
+        # PARENT.SUFFIX — a new product's variants must follow that rule too
+        # (see test_new_product_sku_rule), and this test is about money only.
+        payload = json.dumps([{"variant_sku": "DRP9.OK", "variant_price": "3"}])
         form = ProductForm(data={"title": "Drape", "sku": "DRP9", "variants_json": payload})
         form.is_valid()
 

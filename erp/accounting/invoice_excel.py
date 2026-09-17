@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404
 
 from erp.xlsx_utils import (
     cell, merge, merge_border, section, kv_full, kv_pair,
-    GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP,
+    GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP, TEXT,
     F_TITLE, F_SUB, F_DOCNO, F_HEAD, F_VAL, F_VALB, F_TOTAL,
 )
 from .models import Invoice
@@ -156,7 +156,7 @@ def build_invoice_workbook(invoice):
         if kind == "desc":
             return (it.description or (str(it.product) if it.product else "—")), None, TOP
         if kind == "sku":
-            return (sku or "—"), None, LEFT
+            return (sku or "—"), TEXT, LEFT
         if kind == "qty":
             return _dec(it.quantity), "#,##0.00", RIGHT
         if kind == "unit":

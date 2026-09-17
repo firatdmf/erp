@@ -5,6 +5,63 @@ let variantImages = {}; // Store images for each variant: { variantIndex: { imag
 let currentEditingVariantIndex = null;
 let productAttributes = []; // Product-level attributes to show in variant table
 
+// ── SKU rule for NEW products: PARENT.VALUE-VALUE (K24644.BEYAZ-140) ──
+// The product SKU, a dot, then the variant's option values in capitals
+// joined by dashes. The product form sets data-sku-rule only when creating;
+// existing products keep the SKUs they have. ProductForm enforces the same
+// rule on the server.
+function skuRuleOn() {
+    return !!document.querySelector('#product_form[data-sku-rule]');
+}
+function skuRuleMsg(key) {
+    const form = document.getElementById('product_form');
+    return (form && form.dataset[key]) || '';
+}
+function skuParent() {
+    return (document.getElementById('id_sku')?.value || '').trim().toUpperCase();
+}
+function skuSuffixClean(text) {
+    return String(text || '').trim().toUpperCase().replace(/\s+/g, '_');
+}
+function skuSuffixFromValues(values) {
+    return values.map(skuSuffixClean).filter(Boolean).join('-');
+}
+// Without a product SKU yet, a variant holds just its suffix; the prefix
+// is written in as soon as the product SKU is typed.
+function skuJoin(parent, suffix) {
+    return parent ? `${parent}.${suffix}` : suffix;
+}
+function skuSuffixOf(sku, parent) {
+    sku = sku || '';
+    if (parent && sku.startsWith(parent + '.')) return sku.slice(parent.length + 1);
+    return parent ? null : sku;
+}
+
+// Keep the product SKU in capitals and dot-free, and carry every variant
+// SKU along when it changes. A variant SKU that no longer starts with the
+// old prefix was typed by hand some other way and is left alone.
+document.addEventListener('DOMContentLoaded', () => {
+    const parentInput = document.getElementById('id_sku');
+    if (!parentInput || !skuRuleOn()) return;
+    let lastParent = skuParent();
+    parentInput.addEventListener('input', () => {
+        const raw = parentInput.value;
+        const clean = raw.toUpperCase().replace(/\./g, '');
+        if (clean !== raw) {
+            const caret = parentInput.selectionStart - (raw.length - clean.length);
+            parentInput.value = clean;
+            parentInput.setSelectionRange(caret, caret);
+        }
+        const next = skuParent();
+        if (next === lastParent) return;
+        document.querySelectorAll('input[name^="variant_sku_"]').forEach(inp => {
+            const suffix = skuSuffixOf(inp.value, lastParent);
+            if (suffix !== null) inp.value = skuJoin(next, suffix);
+        });
+        lastParent = next;
+    });
+});
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('variant_component')) {
@@ -920,6 +977,18 @@ function updateVariantTable() {
         return;
     }
 
+    // Drop the old rows and every per-index store. Rows are numbered by
+    // position, and the new combinations do not line up with the old ones —
+    // left in place, row 2 of the new table would read row 2 of the old one
+    // and take another variant's SKU, price and images (two rows then carry
+    // the same SKU and the form refuses to submit). Everything worth keeping
+    // is in variantBackup, keyed by combination, and is restored below.
+    table.innerHTML = '';
+    variantImages = {};
+    if (typeof variantAttributesData !== 'undefined') {
+        Object.keys(variantAttributesData).forEach(k => delete variantAttributesData[k]);
+    }
+
     if (allCombinations.length === 0) {
         console.log('No combinations, hiding table');
         table.style.display = 'none';
@@ -1171,9 +1240,11 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         const _slugBits = displayOptions
             .map(opt => (combo[opt] || '').toString().trim().toLowerCase().replace(/\s+/g, '_'))
             .filter(Boolean);
-        const _autoSku = _parentSku
-            ? `${_parentSku}_${_slugBits.join('_')}`
-            : _slugBits.join('_');
+        const _autoSku = skuRuleOn()
+            ? skuJoin(skuParent(), skuSuffixFromValues(displayOptions.map(opt => combo[opt])))
+            : (_parentSku
+                ? `${_parentSku}_${_slugBits.join('_')}`
+                : _slugBits.join('_'));
 
         const price = priceInput?.value || existingData.price || _parentPrice || '';
         const quantity = quantityInput?.value || existingData.quantity || '';
@@ -2878,6 +2949,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 return false;
             }
 
+            // New product: variants need the product SKU to hang off, and
+            // each needs a part of its own after the dot.
+            if (skuRuleOn()) {
+                const variantSkus = document.querySelectorAll('input[name^="variant_sku_"]');
+                if (variantSkus.length) {
+                    const parent = skuParent();
+                    if (!parent) {
+                        e.preventDefault();
+                        showErrorModal(skuRuleMsg('skuMsgTitle'), skuRuleMsg('skuMsgParent'));
+                        document.getElementById('id_sku')?.focus();
+                        return false;
+                    }
+                    const bare = Array.from(variantSkus).some(inp => !skuSuffixOf(inp.value, parent));
+                    if (bare) {
+                        e.preventDefault();
+                        showErrorModal(skuRuleMsg('skuMsgTitle'), skuRuleMsg('skuMsgSuffix'));
+                        return false;
+                    }
+                }
+            }
+
             // Prepare variants data
             const prepareStart = performance.now();
             console.log('\n════════════ [SAVE] Variant state right before submit ════════════');
@@ -3615,6 +3707,21 @@ function openVariantDetailModal(variantIndex) {
     if (barcodeEl) barcodeEl.value = barcode;
     if (activeEl) activeEl.checked = isActive;
 
+    // New product: the product SKU is a fixed prefix, only the part after
+    // the dot is typed.
+    const prefixEl = document.getElementById('modal_variant_sku_prefix');
+    const hintEl = document.getElementById('modal_variant_sku_hint');
+    if (skuRuleOn()) {
+        const parent = skuParent();
+        const suffix = skuSuffixOf(sku, parent);
+        if (skuEl) skuEl.value = suffix === null ? sku : suffix;
+        if (prefixEl) { prefixEl.textContent = parent + '.'; prefixEl.hidden = !parent; }
+        if (hintEl) hintEl.hidden = false;
+    } else {
+        if (prefixEl) prefixEl.hidden = true;
+        if (hintEl) hintEl.hidden = true;
+    }
+
     const titleEl = document.getElementById('variant_modal_title');
     if (titleEl) titleEl.textContent = `Edit Variant #${idx}`;
 
@@ -3639,7 +3746,8 @@ function saveVariantDetailModal() {
     // Get values from modal
     const price = document.getElementById('modal_variant_price').value;
     const cost = document.getElementById('modal_variant_cost').value;
-    const sku = document.getElementById('modal_variant_sku').value;
+    let sku = document.getElementById('modal_variant_sku').value;
+    if (skuRuleOn()) sku = skuJoin(skuParent(), skuSuffixClean(sku));
     const barcode = document.getElementById('modal_variant_barcode').value;
     const isActive = document.getElementById('modal_variant_active').checked;
 

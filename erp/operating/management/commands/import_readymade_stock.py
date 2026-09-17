@@ -354,8 +354,6 @@ class Command(BaseCommand):
                 defaults={
                     "name": variant.full_name or variant.variant_sku,
                     "quantity": Decimal("0"),
-                    "unit": UNIT,
-                    "pack_type": PACK_TYPE,
                 },
             )
             stats["products"] += 1
@@ -363,8 +361,8 @@ class Command(BaseCommand):
             # price or a newly-linked variant lands on a re-import too.
             wp.barcode = barcode or wp.barcode
             wp.catalog_variant = variant
-            wp.unit = UNIT
-            wp.pack_type = PACK_TYPE
+            # How the sets are counted and packed belongs to their product.
+            variant.product.set_unit(UNIT, PACK_TYPE)
             if price:
                 wp.purchase_price = price
                 wp.purchase_currency = PRICE_CURRENCY

@@ -122,4 +122,4 @@ class PurchaseEditGoneOutRollsTest(base.TestCase):
     def test_the_form_renders_with_the_warnings(self):
         r = self.client.get(reverse("accounts:goods_receipt_edit", args=[self.invoice_id]))
         self.assertContains(r, "Saving will reduce what these orders have reserved:")
-        self.assertContains(r, "its length and barcode can\\u0027t change")
+        self.assertContains(r, "its quantity and barcode can\\u0027t change")

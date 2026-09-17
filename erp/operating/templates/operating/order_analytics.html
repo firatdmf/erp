@@ -131,6 +131,7 @@
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 14px; margin-bottom: 16px;
   }
+  .an-kpis.an-kpis--two { grid-template-columns: repeat(2, 1fr); }  /* a sales rep's: no Profit or COGS */
   @media (max-width: 1000px) { .an-kpis { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 520px)  { .an-kpis { grid-template-columns: 1fr; } }
   .an-kpi {
@@ -399,7 +400,7 @@
   </form>
 
   <!-- KPI cards -->
-  <div class="an-kpis">
+  <div class="an-kpis{% if is_sales_rep %} an-kpis--two{% endif %}">
     <div class="an-kpi">
       <div class="an-kpi-top">
         <span class="an-kpi-label">{% trans "Revenue" %}</span>
@@ -409,6 +410,7 @@
       <div class="an-kpi-meta">{{ summary.total_orders }} {% trans "orders" %}</div>
     </div>
 
+    {% if not is_sales_rep %}{# profit and COGS are the margin; not the role's to read #}
     <div class="an-kpi profit {% if summary.total_profit < 0 %}neg{% endif %}">
       <div class="an-kpi-top">
         <span class="an-kpi-label">{% trans "Profit" %}</span>
@@ -429,6 +431,7 @@
       <div class="an-kpi-value">${{ summary.total_cost|floatformat:2 }}</div>
       <div class="an-kpi-meta">{% trans "Goods sold" %}</div>
     </div>
+    {% endif %}
 
     <div class="an-kpi orders">
       <div class="an-kpi-top">

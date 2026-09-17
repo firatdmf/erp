@@ -386,6 +386,9 @@ class CurrentAccountCreate(View):
             "current_account": None,
             "books": _member_books(request),
             "currencies": _currencies(),
+            # A new account starts in the book's own currency, not whichever
+            # currency sorts first.
+            "default_currency_id": request.book.effective_base_currency.pk,
             "type_choices": CurrentAccount.TYPE_CHOICES,
             "entity_types": self.ENTITY_TYPES,
         })
@@ -421,8 +424,43 @@ class CurrentAccountCreate(View):
         country = request.POST.get("billing_country", "TR").strip()
         member = getattr(request.user, "member", None)
 
+        # Picked from the search on the form: the customer is already in
+        # the CRM, so the account is attached to that record instead of
+        # minting a second one.
+        link_kind = request.POST.get("link_kind", "").strip()
+        linked = None
+        if link_kind:
+            if link_kind not in _CRM_KINDS:
+                messages.error(request, _g("Pick a contact, company or supplier."))
+                return redirect("accounts:create", book_id=request.book.pk)
+            linked = _crm_model(link_kind).objects.filter(
+                pk=request.POST.get("link_id") or None).first()
+            if linked is None:
+                messages.error(request, _g("That CRM record no longer exists."))
+                return redirect("accounts:create", book_id=request.book.pk)
+            # The get_or_create_* services below would hand back the
+            # holder, and the fields further down would overwrite it.
+            holder = CurrentAccount.objects.filter(
+                book=request.book, **{link_kind: linked}).first()
+            if holder is not None:
+                messages.error(
+                    request,
+                    _g("%(name)s already has account %(code)s (%(account)s) in this book.")
+                    % {"name": str(linked), "code": holder.code, "account": holder.name},
+                )
+                return redirect("accounts:detail", pk=holder.pk)
+            entity_type = link_kind
+
         try:
-            if entity_type == "company":
+            if linked is not None:
+                creator = {
+                    "company": get_or_create_current_account_for_company,
+                    "contact": get_or_create_current_account_for_contact,
+                    "supplier": get_or_create_current_account_for_supplier,
+                }[link_kind]
+                current_account = creator(linked, member=member, book=request.book)
+                current_account.name = name
+            elif entity_type == "company":
                 if Company.objects.filter(name__iexact=name).exists():
                     messages.error(request, _g("A company with this name already exists."))
                     return redirect("accounts:create", book_id=request.book.pk)
@@ -600,6 +638,65 @@ def _crm_model(kind):
     return {"contact": Contact, "company": Company, "supplier": Supplier}[kind]
 
 
+_CRM_SEARCH_LIMIT = 8
+
+
+def _crm_candidates(book, q, exclude=None):
+    """CRM records matching `q`, each saying which account in `book`
+    already holds it (see CurrentAccountCrmSearch)."""
+    from crm.models import Company, Contact, Supplier
+
+    q = (q or "").strip()
+    if not q:
+        return []
+    needle = tr_fold(q)
+    limit = _CRM_SEARCH_LIMIT
+
+    found = {
+        "contact": list(
+            Contact.objects.annotate(_f=tr_fold_expr("name"))
+            .filter(_f__contains=needle).order_by("name")[:limit]
+        ),
+        "company": list(
+            Company.objects.annotate(_f=tr_fold_expr("name"))
+            .filter(_f__contains=needle).order_by("name")[:limit]
+        ),
+        # A supplier is named by whichever of the two columns is
+        # filled — __str__ prefers company_name — so both are searched.
+        "supplier": list(
+            Supplier.objects.annotate(_fc=tr_fold_expr("company_name"),
+                                      _fn=tr_fold_expr("contact_name"))
+            .filter(Q(_fc__contains=needle) | Q(_fn__contains=needle))
+            .order_by("company_name", "contact_name")[:limit]
+        ),
+    }
+
+    results = []
+    for kind in _CRM_KINDS:
+        rows = found[kind]
+        if not rows:
+            continue
+        # One query per kind, not one per row.
+        holders_qs = CurrentAccount.objects.filter(book=book, **{f"{kind}__in": rows})
+        if exclude is not None:
+            holders_qs = holders_qs.exclude(pk=exclude.pk)
+        holders = {getattr(c, f"{kind}_id"): c for c in holders_qs}
+        for obj in rows:
+            held = holders.get(obj.pk)
+            results.append({
+                "kind": kind,
+                "id": obj.pk,
+                "label": str(obj),
+                "sub": _crm_subtitle(obj),
+                "taken": None if held is None else {
+                    "code": held.code,
+                    "name": held.name,
+                    "url": reverse("accounts:detail", args=[held.pk]),
+                },
+            })
+    return results
+
+
 @method_decorator(login_required, name="dispatch")
 class CurrentAccountCrmSearch(View):
     """Candidate CRM records for the account page's link picker (JSON).
@@ -614,62 +711,21 @@ class CurrentAccountCrmSearch(View):
     useful than hiding it anyway: that account is usually the duplicate
     the reader was about to create by hand.
     """
-    LIMIT = 8
 
     def get(self, request, pk):
-        from crm.models import Company, Contact, Supplier
-
         current_account = get_object_or_404(CurrentAccount, pk=pk)
-        q = (request.GET.get("q") or "").strip()
-        if not q:
-            return JsonResponse({"results": []})
-        needle = tr_fold(q)
+        return JsonResponse({"results": _crm_candidates(
+            current_account.book, request.GET.get("q"), exclude=current_account)})
 
-        found = {
-            "contact": list(
-                Contact.objects.annotate(_f=tr_fold_expr("name"))
-                .filter(_f__contains=needle).order_by("name")[:self.LIMIT]
-            ),
-            "company": list(
-                Company.objects.annotate(_f=tr_fold_expr("name"))
-                .filter(_f__contains=needle).order_by("name")[:self.LIMIT]
-            ),
-            # A supplier is named by whichever of the two columns is
-            # filled — __str__ prefers company_name — so both are searched.
-            "supplier": list(
-                Supplier.objects.annotate(_fc=tr_fold_expr("company_name"),
-                                          _fn=tr_fold_expr("contact_name"))
-                .filter(Q(_fc__contains=needle) | Q(_fn__contains=needle))
-                .order_by("company_name", "contact_name")[:self.LIMIT]
-            ),
-        }
 
-        results = []
-        for kind in _CRM_KINDS:
-            rows = found[kind]
-            if not rows:
-                continue
-            # One query per kind, not one per row.
-            holders = {
-                getattr(c, f"{kind}_id"): c
-                for c in CurrentAccount.objects
-                .filter(book=current_account.book, **{f"{kind}__in": rows})
-                .exclude(pk=current_account.pk)
-            }
-            for obj in rows:
-                held = holders.get(obj.pk)
-                results.append({
-                    "kind": kind,
-                    "id": obj.pk,
-                    "label": str(obj),
-                    "sub": _crm_subtitle(obj),
-                    "taken": None if held is None else {
-                        "code": held.code,
-                        "name": held.name,
-                        "url": reverse("accounts:detail", args=[held.pk]),
-                    },
-                })
-        return JsonResponse({"results": results})
+@method_decorator(login_required, name="dispatch")
+class CurrentAccountCreateCrmSearch(View):
+    """The same candidates for the new-account form, which has no account
+    yet — only the book it will land in."""
+
+    def get(self, request):
+        return JsonResponse({"results": _crm_candidates(
+            request.book, request.GET.get("q"))})
 
 
 @method_decorator(login_required, name="dispatch")

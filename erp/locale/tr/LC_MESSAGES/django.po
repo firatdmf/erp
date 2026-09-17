@@ -612,6 +612,9 @@ msgstr "Şirket / Çalışma Alanı"
 msgid "Your workspace name is managed by an administrator."
 msgstr "Çalışma alanı adın yönetici tarafından yönetilir."
 
+msgid "You sign in with this username. Ask an administrator to change it."
+msgstr "Bu kullanıcı adıyla giriş yaparsın. Değiştirmek için yöneticiye başvur."
+
 msgid "Save Changes"
 msgstr "Değişiklikleri Kaydet"
 
@@ -1419,7 +1422,7 @@ msgid "Initial Quantity"
 msgstr "Initial Quantity"
 
 msgid "Item"
-msgstr "Item"
+msgstr "Kalem"
 
 msgid "Item No"
 msgstr "Item No"
@@ -5787,18 +5790,15 @@ msgstr "Satış dışı gelir."
 msgid "A loss: a debt the book has given up on."
 msgstr "Zarar: vazgeçilen bir alacak."
 
-msgid "Cash box"
-msgstr "Kasa"
-
-msgid "Choose the cash box the deposit went into"
-msgstr "Kaparonun girdiği kasayı seç"
-
 #, python-format
 msgid "Deposit %(number)s was saved as a draft: choose the cash box it went into and confirm it."
 msgstr "%(number)s kaparosu taslak olarak kaydedildi: girdiği kasayı seçip onayla."
 
-msgid "Current account movements by type — these are what the backfill still has to replay"
-msgstr "Türe göre cari hareketleri — geçmiş aktarımının hâlâ işlemesi gerekenler"
+msgid "Choose the cash box the deposit went into"
+msgstr "Kaparonun girdiği kasayı seç"
+
+msgid "Cash box"
+msgstr "Kasa"
 
 msgid "Sales, purchases and returns come from orders and invoices."
 msgstr "Satışlar, alışlar ve iadeler siparişlerden ve faturalardan gelir."
@@ -5847,6 +5847,9 @@ msgstr "Çek ya da senet henüz nakit değildir. Tahsil edilene ya da ödenene k
 
 msgid "A draft writes nothing. The entry is made when the payment is confirmed."
 msgstr "Taslak hiçbir kayıt oluşturmaz. Kayıt, ödeme onaylandığında yapılır."
+
+msgid "Current account movements by type — these are what the backfill still has to replay"
+msgstr "Türe göre cari hareketleri — geçmiş aktarımının hâlâ işlemesi gerekenler"
 
 msgid ""
 "Same logic: if not confirmed, delete; if confirmed, cancel. Cancel reverses "
@@ -6384,11 +6387,11 @@ msgstr "Limit"
 msgid "Take Payment"
 msgstr "Tahsilat Al"
 
-msgid "Invoice No"
-msgstr "Fatura No"
-
 msgid "Make Payment"
 msgstr "Ödeme Yap"
+
+msgid "Invoice No"
+msgstr "Fatura No"
 
 msgid "Full Statement"
 msgstr "Tam Ekstre"
@@ -6777,9 +6780,6 @@ msgstr "Alış fiyatı"
 
 msgid "Add roll"
 msgstr "Top ekle"
-
-msgid "Color / model (e.g. Beyaz)"
-msgstr "Renk / model (örn. Beyaz)"
 
 msgid "SKU (auto)"
 msgstr "SKU (otomatik)"
@@ -8724,7 +8724,7 @@ msgstr "Varyant SKU"
 msgid "auto"
 msgstr "otomatik"
 
-msgid "e.g. Beyaz"
+msgid "e.g. White"
 msgstr "ör. Beyaz"
 
 msgid "e.g. GREK"
@@ -9565,3 +9565,255 @@ msgstr "Alış fiyatı negatif olamaz: %(lines)s"
 #, python-format
 msgid "product %(n)s"
 msgstr "ürün %(n)s"
+
+msgid "Open account in a new tab"
+msgstr "Cari hesabı yeni sekmede aç"
+
+#, python-format
+msgid "The rolls could not be reserved for order %(number)s: %(error)s"
+msgstr "Toplar %(number)s siparişi için rezerve edilemedi: %(error)s"
+
+#, python-format
+msgid ""
+"Nothing was reserved for order %(number)s — none of the received rolls match "
+"a line it still needs."
+msgstr ""
+"%(number)s siparişi için hiçbir şey rezerve edilmedi — gelen topların hiçbiri "
+"siparişin hâlâ ihtiyaç duyduğu bir kaleme uymuyor."
+
+msgid "None — for stock"
+msgstr "Yok — stok için"
+
+msgid "For"
+msgstr "Sipariş"
+
+msgid "Supplier purchases"
+msgstr "Tedarikçi alımları"
+
+msgid "Awaiting delivery"
+msgstr "Teslimat bekleniyor"
+
+msgid "reserved"
+msgstr "rezerve"
+
+msgid "Nothing ordered from a supplier for this order."
+msgstr "Bu sipariş için tedarikçiden henüz bir şey sipariş edilmedi."
+
+#, python-format
+msgid "%(count)s rolls reserved for order %(number)s."
+msgstr "%(number)s siparişi için %(count)s top rezerve edildi."
+
+msgid "Already added"
+msgstr "Zaten eklendi"
+
+msgid "Already in the CRM? Search contacts, companies, suppliers…"
+msgstr "CRM'de zaten var mı? Kişi, firma, tedarikçi ara…"
+
+msgid "Linking to"
+msgstr "Bağlanacak kayıt:"
+
+msgid "The account is attached to the record above — no new CRM record is created."
+msgstr "Hesap yukarıdaki kayda bağlanır — yeni CRM kaydı oluşturulmaz."
+
+msgid "Nothing found — a new record is created with the account."
+msgstr "Sonuç yok — hesapla birlikte yeni bir kayıt oluşturulur."
+
+msgid "%(name)s already has account %(code)s (%(account)s) in this book."
+msgstr "%(name)s kaydının bu defterde zaten %(code)s (%(account)s) hesabı var."
+
+msgid "The customer picked for this purchase was not found."
+msgstr "Bu alım için seçilen müşteri bulunamadı."
+
+#, python-format
+msgid "Ordered in from %(supplier)s — purchase %(number)s"
+msgstr "%(supplier)s tedarikçisinden sipariş edildi — alım %(number)s"
+
+#, python-format
+msgid ""
+"Order %(number)s is already being packed, so its lines were not changed — "
+"edit them on the order."
+msgstr ""
+"%(number)s siparişi zaten paketleniyor, bu yüzden kalemleri değiştirilmedi — "
+"siparişin kendisinden düzenleyin."
+
+msgid ""
+"This purchase is for an order in another book — receive it into a warehouse "
+"of that book."
+msgstr ""
+"Bu alım başka bir defterdeki bir sipariş için — o defterin bir deposuna mal "
+"kabul yapın."
+
+#, python-format
+msgid ""
+"Order %(number)s for this purchase is still open — cancel it on the order "
+"page if the customer no longer needs it."
+msgstr ""
+"Bu alımın %(number)s siparişi hâlâ açık — müşterinin artık ihtiyacı yoksa "
+"sipariş sayfasından iptal edin."
+
+msgid "For customer"
+msgstr "Müşteri için"
+
+msgid "Change customer"
+msgstr "Müşteriyi değiştir"
+
+msgid "Saving creates the customer's order; receiving reserves the rolls for it."
+msgstr ""
+"Kaydetmek müşterinin siparişini oluşturur; mal kabul, topları bu sipariş "
+"için rezerve eder."
+
+msgid "Sale price (customer)"
+msgstr "Satış fiyatı (müşteri)"
+
+msgid "No customer matches — add them in CRM first."
+msgstr "Eşleşen müşteri yok — önce CRM'e ekleyin."
+
+msgid "The purchase order was saved; confirm it from its page."
+msgstr "Satın alma siparişi kaydedildi; kendi sayfasından onaylayın."
+
+msgid "A product SKU cannot contain a dot — the dot separates it from its variants' SKUs."
+msgstr "Ürün SKU'su nokta içeremez — nokta, ürünü varyantlarının SKU'larından ayırır."
+
+#, python-format
+msgid "Each variant SKU must be the product SKU, a dot, then the variant's own part in capitals (%(example)s): %(skus)s"
+msgstr "Her varyant SKU'su ürün SKU'su, bir nokta ve ardından büyük harflerle varyantın kendi kısmından oluşmalıdır (%(example)s): %(skus)s"
+
+msgid "WHITE-140"
+msgstr "BEYAZ-140"
+
+msgid "SKU needed"
+msgstr "SKU gerekli"
+
+msgid "Enter the product SKU first. Each variant SKU is built from it: the product SKU, a dot, then the option values (K24644.WHITE-140)."
+msgstr "Önce ürün SKU'sunu girin. Her varyant SKU'su bundan oluşturulur: ürün SKU'su, bir nokta, ardından seçenek değerleri (K24644.BEYAZ-140)."
+
+msgid "Every variant needs its own part after the product SKU and the dot. Open the variants with an empty one and fill it in."
+msgstr "Her varyantın, ürün SKU'su ve noktadan sonra kendine ait bir kısmı olmalıdır. Bu kısmı boş olan varyantları açıp doldurun."
+
+msgid "Option values in capitals, separated by dashes — e.g. WHITE-140."
+msgstr "Seçenek değerleri büyük harflerle, tirelerle ayrılmış — örn. BEYAZ-140."
+
+msgid "No dots. Variant SKUs are built from it: K24644 → K24644.WHITE-140."
+msgstr "Nokta kullanmayın. Varyant SKU'ları bundan oluşturulur: K24644 → K24644.BEYAZ-140."
+
+msgctxt "product type"
+msgid "Fabric"
+msgstr "Kumaş"
+
+msgctxt "product type"
+msgid "Ready-made curtain"
+msgstr "Hazır Perde"
+
+msgctxt "product type"
+msgid "Throw / Shawl"
+msgstr "Örtü / Şal"
+
+msgctxt "product type"
+msgid "Bed textile"
+msgstr "Yatak Tekstili"
+
+msgid "item"
+msgstr "kalem"
+
+msgid "Packed as"
+msgstr "Ambalaj türü"
+
+msgid "Variants & {items}"
+msgstr "Varyantlar ve {items}"
+
+msgid "Add {item}"
+msgstr "{Item} ekle"
+
+msgid "box"
+msgstr "kutu"
+
+msgid "boxes"
+msgstr "kutu"
+
+msgid "bale"
+msgstr "balya"
+
+msgid "bales"
+msgstr "balya"
+
+msgid "Bale"
+msgstr "Balya"
+
+msgid "bag"
+msgstr "çuval"
+
+msgid "bags"
+msgstr "çuval"
+
+msgid "Bag"
+msgstr "Çuval"
+
+msgid "bundle"
+msgstr "deste"
+
+msgid "bundles"
+msgstr "deste"
+
+msgid "Bundle"
+msgstr "Deste"
+
+msgid "pallet"
+msgstr "palet"
+
+msgid "pallets"
+msgstr "palet"
+
+msgid "Pallet"
+msgstr "Palet"
+
+msgid "This purchase has been received, and all of it can still be corrected. Items reserved for a customer order can be re-measured, but not removed or moved to another variant."
+msgstr "Bu alım teslim alındı ve tamamı hâlâ düzeltilebilir. Bir müşteri siparişine ayrılmış kalemler yeniden ölçülebilir, ancak silinemez veya başka bir varyanta taşınamaz."
+
+msgid "Write the delivery down first and receive it when it arrives — or receive it straight away if it is already here. Receiving creates the stock (products, variants and each item with its own barcode) and the supplier invoice behind it."
+msgstr "Sevkiyatı önce yazın, geldiğinde mal kabul edin — ya da zaten geldiyse hemen kabul edin. Mal kabul; stoğu (ürünler, varyantlar ve her biri kendi barkoduna sahip kalemler) ve arkasındaki alış faturasını oluşturur."
+
+msgid "Changing this moves the purchase's items there when you save."
+msgstr "Değiştirirseniz, kaydettiğinizde bu alımın kalemleri oraya taşınır."
+
+msgid "each item gets its own unique barcode"
+msgstr "her kalem kendi benzersiz barkodunu alır"
+
+msgid "Saving creates the customer's order; receiving reserves the items for it."
+msgstr "Kaydetmek müşterinin siparişini oluşturur; mal kabul, kalemleri bu sipariş için rezerve eder."
+
+msgid "These items will be deleted from stock:"
+msgstr "Bu kalemler stoktan silinecek:"
+
+msgid "Reserved quantities were reduced to fit the corrected items:"
+msgstr "Ayrılan miktarlar, düzeltilen kalemlere sığacak şekilde azaltıldı:"
+
+msgid "Add at least one variant with an item."
+msgstr "En az bir kalem içeren bir varyant ekleyin."
+
+msgid "Stock has already gone out of this item — its quantity and barcode can't change, and it can't be removed."
+msgstr "Bu kalemden stok çıkışı yapılmış — miktarı ve barkodu değiştirilemez, silinemez."
+
+msgid "This barcode is entered on more than one item."
+msgstr "Bu barkod birden fazla kaleme girildi."
+
+msgid "Where it lands and who it's bought from."
+msgstr "Nereye girecek ve kimden alındı."
+
+msgid "This product already has stock, so its unit and pack are set on the product page."
+msgstr "Bu ürünün zaten stoğu var; birimi ve ambalajı ürün sayfasında belirlenir."
+
+msgctxt "unit"
+msgid "Metre"
+msgstr "Metre"
+
+msgctxt "unit"
+msgid "Piece"
+msgstr "Adet"
+
+msgctxt "unit"
+msgid "Pack"
+msgstr "Paket"
+
+msgctxt "unit"
+msgid "Kilogram"
+msgstr "Kilogram"

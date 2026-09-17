@@ -640,3 +640,14 @@ def _readable_sections(sections):
         if groups:
             kept.append({**section, "groups": groups})
     return kept
+
+
+@register.filter
+def sales_rep_price(cost):
+    """`{{ cost|sales_rep_price }}` — what a sales rep sees in place of a
+    cost. Derived on every render; see erp.roles.sales_rep_price."""
+    from erp.roles import sales_rep_price as _price
+    try:
+        return _price(cost)
+    except Exception:
+        return None

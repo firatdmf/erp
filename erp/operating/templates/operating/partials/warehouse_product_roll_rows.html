@@ -1,4 +1,4 @@
-{% load i18n accounts_tags %}
+{% load i18n accounts_tags erp_tags %}
 {% get_current_language as LANGUAGE_CODE %}
 {% comment %}The rolls ("top" in Turkish) inside one product, injected as ONE row under
 that product's line when it is expanded. A single full-width cell rather
@@ -40,7 +40,8 @@ them into the same grid squeezed both.{% endcomment %}
 
         <div class="wh-roll-cost">
           {% if r.unit_cost_base is not None %}
-            {{ cost_sign }}{{ r.unit_cost_base|money }}
+            {# A sales rep sees the price derived from the roll's cost, not the cost. #}
+            {% if is_sales_rep %}{{ cost_sign }}{{ r.unit_cost_base|sales_rep_price|money }}{% else %}{{ cost_sign }}{{ r.unit_cost_base|money }}{% endif %}
           {% else %}
             <span style="color:#C5CCD3;" title="{% blocktrans with n=product.item_noun %}No cost recorded for this {{ n }}.{% endblocktrans %}">&mdash;</span>
           {% endif %}

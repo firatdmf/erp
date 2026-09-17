@@ -143,7 +143,14 @@
         <tr class="po-row" data-href="{% url 'accounts:purchase_order_detail' inv.pk %}">
           <td><a class="po-num" href="{% url 'accounts:purchase_order_detail' inv.pk %}">{{ inv.number }}</a></td>
           <td><span class="po-date">{{ inv.date|date:"d.m.Y" }}</span></td>
-          <td><a class="po-supplier" href="{% url 'accounts:detail' inv.current_account.pk %}">{{ inv.current_account.name }}</a></td>
+          <td>
+            <a class="po-supplier" href="{% url 'accounts:detail' inv.current_account.pk %}">{{ inv.current_account.name }}</a>
+            {% if inv.for_order %}
+              <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
+                {% trans "For" %} <a href="{% url 'operating:order_detail' inv.for_order.pk %}">{{ inv.for_order.order_number|default:inv.for_order.pk }}</a>
+              </div>
+            {% endif %}
+          </td>
           <td><span class="po-items-count">{{ inv.item_count }} {% trans "product" %}</span></td>
           <td>
             <span class="po-badge {{ inv.status }}">{{ inv.get_status_display }}</span>

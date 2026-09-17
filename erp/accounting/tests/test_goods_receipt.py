@@ -128,6 +128,25 @@ class GoodsReceiptPageTest(TestCase):
 class GoodsReceiptTranslationTest(TestCase):
     """The page is used in Turkish — its own strings must be in the catalog."""
 
+    def test_product_types_follow_the_language(self):
+        from marketing.models import ProductCategory
+        from operating.views_warehouse import _product_category_choices
+
+        ProductCategory.objects.get_or_create(name="fabric")
+        for lang, label in (("en", "Fabric"), ("tr", "Kumaş")):
+            with self.subTest(lang=lang), translation.override(lang):
+                fabric = _product_category_choices()[0]
+                self.assertEqual((fabric["name"], fabric["label"]), ("fabric", label))
+
+    def test_pack_words_are_translated(self):
+        from operating.views_warehouse import _pack_type_choices
+
+        with translation.override("tr"):
+            box = {c["value"]: c for c in _pack_type_choices()["choices"]}["box"]
+            self.assertEqual((box["label"], box["one"], box["many"]), ("Kutu", "kutu", "kutu"))
+            self.assertEqual(translation.gettext("Packed as"), "Ambalaj türü")
+            self.assertEqual(translation.gettext("Add {item}"), "{Item} ekle")
+
     def test_new_strings_are_translated(self):
         with translation.override("tr"):
             self.assertEqual(translation.gettext("Goods receipt"), "Mal kabul")

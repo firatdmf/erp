@@ -9823,3 +9823,7 @@ msgstr "Bu hesabın tutulduğu para birimini seçin."
 
 msgid "Select currency…"
 msgstr "Para birimi seçin…"
+
+#, python-format
+msgid "There is no %(code)s → USD rate for today, so this stock can't be valued. Try again later."
+msgstr "Bugün için %(code)s → USD kuru yok, bu yüzden bu stok değerlenemiyor. Daha sonra tekrar deneyin."

@@ -218,6 +218,48 @@ class PurchaseForCustomerTest(TestCase):
         self.assertTrue(any("Nothing was reserved" in w for w in r.json()["warnings"]))
 
     # ── Around it ───────────────────────────────────────────────────
+    # ── The sale price is in the customer's currency ────────────────
+    def _currency(self, customer_type, pk, warehouse=None):
+        r = self.client.get(
+            reverse("operating:warehouse_customer_currency", args=[(warehouse or self.wh).pk]),
+            {"type": customer_type, "pk": pk})
+        self.assertEqual(r.status_code, 200, r.content)
+        return r.json()
+
+    def test_a_customer_with_an_account_prices_in_its_currency(self):
+        try_ = CurrencyCategory.objects.create(code="TRY", name="Lira", symbol="₺")
+        CurrentAccount.objects.create(book=self.book, code="C-OLG", name="Oleg",
+                                      type="customer", contact=self.customer,
+                                      default_currency=try_)
+        self.assertEqual(self._currency("contact", self.customer.pk),
+                         {"currency": "TRY", "account": "Oleg"})
+        # In a book where they have no account yet, the one the order
+        # would open is in the default currency.
+        self.assertEqual(self._currency("contact", self.customer.pk, self.other_wh),
+                         {"currency": "USD", "account": None})
+
+    def test_a_contact_at_a_company_prices_in_the_companys_currency(self):
+        """The order bills the company's account, not the person's."""
+        from crm.models import Company
+        eur = CurrencyCategory.objects.create(code="EUR", name="Euro", symbol="€")
+        company = Company.objects.create(name="Motuzenko Ltd")
+        self.customer.company = company
+        self.customer.save()
+        CurrentAccount.objects.create(book=self.book, code="C-MTZ", name="Motuzenko Ltd",
+                                      type="customer", company=company, default_currency=eur)
+        self.assertEqual(self._currency("contact", self.customer.pk)["currency"], "EUR")
+        self.assertEqual(self._currency("company", company.pk)["currency"], "EUR")
+
+    def test_an_unknown_customer_has_no_currency(self):
+        r = self.client.get(reverse("operating:warehouse_customer_currency", args=[self.wh.pk]),
+                            {"type": "contact", "pk": 999999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_a_reopened_order_states_its_orders_currency(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        r = self.client.get(reverse("accounts:goods_receipt_edit", args=[inv_id]))
+        self.assertEqual(r.context["for_order_currency"], "USD")
+
     def test_the_order_page_lists_its_purchases(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order

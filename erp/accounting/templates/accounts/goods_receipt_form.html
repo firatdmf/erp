@@ -316,6 +316,8 @@
   .np-price-row > .np-col { flex: 1 1 180px; }
   /* Sale price — only asked for a purchase bought for a customer. */
   .np-sale-col { display: none; }
+  .np-sale-cur { display: flex; align-items: center; min-width: 34px;
+                 font: 600 12px var(--font-sans); color: var(--gray-600); }
   #grDoc.gr-for-customer .np-sale-col { display: block; }
   .np-price-pair { display: flex; align-items: center; gap: 8px; }
   .np-price-pair .np-input { height: 36px; flex: 1; min-width: 0; }
@@ -740,10 +742,33 @@
     npSummaryUpdate();
   };
   // The customer's price for a variant, in the customer's account currency.
+  // Stated, not chosen: the customer's order is billed in their account's
+  // currency, so that is what this price is in (npSetSaleCurrency).
   const NP_SALE = '<div class="np-col np-sale-col">' +
     '<label>{% trans "Sale price (customer)" %}</label>' +
-    '<input class="np-input np-v-sale" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">' +
+    '<div class="np-price-pair">' +
+      '<input class="np-input np-v-sale" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">' +
+      '<span class="np-sale-cur"></span>' +
+    '</div>' +
     '</div>';
+  const GR_CUSTOMER_CURRENCY_TPL = "{% url 'operating:warehouse_customer_currency' 0 %}";
+  let npSaleCurrency = "{{ for_order_currency|escapejs }}";
+  window.npShowSaleCurrency = function (root) {
+    (root || document).querySelectorAll('.np-sale-cur').forEach(function (el) {
+      el.textContent = npSaleCurrency;
+    });
+  };
+  // The currency of the customer's account in the chosen warehouse's book —
+  // the book their order is created in.
+  window.npSetSaleCurrency = function () {
+    if (!npCustomer || !npWhId()) { npShowSaleCurrency(); return; }
+    const url = npWhUrl(GR_CUSTOMER_CURRENCY_TPL) + '?type=' + encodeURIComponent(npCustomer.type) +
+                '&pk=' + encodeURIComponent(npCustomer.pk);
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { npSaleCurrency = (d && d.currency) || ''; npShowSaleCurrency(); })
+      .catch(function () { npSaleCurrency = ''; npShowSaleCurrency(); });
+  };
   const GR_CUSTOMER_URL = "{% url 'crm:customer_autocomplete' %}";
   const GR_SKU_MAX = {{ sku_max_length }};                  // Product.sku max_length
   const GR_VARIANT_SKU_MAX = {{ variant_sku_max_length }};  // ProductVariant.variant_sku max_length
@@ -824,6 +849,8 @@
     document.getElementById('npProducts').innerHTML = '';
     npGateUpdate();
     npSummaryUpdate();
+    // Another warehouse can mean another book, and another account there.
+    npSetSaleCurrency();
   };
 
   function npCurPrefix() {
@@ -998,6 +1025,7 @@
     el.querySelector('.np-main-pack').value = npUnitPack(el);
     npRelabelPack(el);
     npDefaultCurrencies(el);
+    npShowSaleCurrency(el);
     wrap.appendChild(el);
     npAddVariant(el);
     npFetchNextSku(el);
@@ -1460,6 +1488,7 @@
       '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>';
     cardEl.querySelector('.np-variants').appendChild(el);
     npDefaultCurrencies(el);
+    npShowSaleCurrency(el);
     npRelabelPack(cardEl);
     npSuggestVariantSku(el);
     npAddTop(el);
@@ -2618,6 +2647,7 @@
     document.getElementById('npCustomerBox').hidden = true;
     document.getElementById('npCustomerResults').hidden = true;
     npCustMode();
+    npSetSaleCurrency();
   };
   window.npCustClear = function () {
     npCustomer = null;
@@ -2627,6 +2657,8 @@
     input.value = '';
     input.focus();
     npCustMode();
+    npSaleCurrency = '';
+    npShowSaleCurrency();
   };
   const custResults = document.getElementById('npCustomerResults');
   if (custResults) {

@@ -70,7 +70,9 @@ def _safe_decimal(value, default=None):
 
 
 def _get_usd_try_rate():
-    """Best-effort USD->TRY rate. Falls back to 1 if unavailable."""
+    """Today's published USD->TRY rate, or None when there isn't one.
+
+    Never 1: a missing rate read as parity once valued lira as dollars."""
     try:
         from accounting.services import get_exchange_rate
         rate = get_exchange_rate("USD", "TRY")
@@ -78,7 +80,7 @@ def _get_usd_try_rate():
             return Decimal(str(rate))
     except Exception:
         pass
-    return Decimal('1')
+    return None
 
 
 # Last resort for an auto-minted code, when there is no supplier name to
@@ -2415,6 +2417,42 @@ def catalog_product_variants(request, pk, product_id):
 
 
 @login_required
+def warehouse_customer_currency(request, pk):
+    """The currency a customer's order out of this warehouse's book is kept in.
+
+    A purchase bought for a customer creates their order in the warehouse's
+    book, against the account get_or_create_current_account_for_order picks
+    there — the company's, else the contact's. The order's prices are
+    billed in that account's currency, so the goods-receipt page shows it
+    beside every sale price. A customer with no account there yet gets one
+    in the default currency, which is what this answers for them."""
+    from accounting.models_accounts import CurrentAccount
+    from accounting.services_accounts import _resolve_currency
+    from crm.models import Company, Contact
+
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    customer_pk = request.GET.get("pk") or ""
+    if not customer_pk.isdigit():
+        return JsonResponse({"error": "pk required"}, status=400)
+    if request.GET.get("type") == "company":
+        contact, company = None, Company.objects.filter(pk=int(customer_pk)).first()
+    else:
+        contact = Contact.objects.filter(pk=int(customer_pk)).first()
+        company = getattr(contact, "company", None) if contact else None
+    if contact is None and company is None:
+        return JsonResponse({"error": "not found"}, status=404)
+
+    accounts = (CurrentAccount.objects.filter(book_id=warehouse.accounting_book_id)
+                .select_related("default_currency"))
+    account = (accounts.filter(company=company) if company else
+               accounts.filter(contact=contact)).first()
+    currency = (account.default_currency if account and account.default_currency_id
+                else _resolve_currency())
+    return JsonResponse({"currency": currency.code,
+                         "account": account.name if account else None})
+
+
+@login_required
 def catalog_variant_match(request, pk, product_id):
     """Classify a variant being typed into the "Yeni ürün" panel as
     EXISTING (adds stock to an already-catalogued variant), CONFLICTING
@@ -2662,11 +2700,25 @@ def _intake_check_rates(products_in, current_account_obj, rates):
         for p_in in products_in
         for v in (p_in.get("variants") or [])
     ]
+    billing = invoice_currency_for(current_account_obj)
     try:
-        convert_lines_to_currency(priced, invoice_currency_for(current_account_obj),
-                                  rates=rates, on_date=None)
+        convert_lines_to_currency(priced, billing, rates=rates, on_date=None)
     except MixedCurrencyError as exc:
         raise IntakeError({"success": False, "error": str(exc)}, status=400)
+
+    # The stock is valued in USD, every book's base, and the ledger's stock
+    # account is built from that. A price with no way into USD would be
+    # stored unvalued — or, as it once was, at parity — so it is refused.
+    cost_rates = _PurchaseRates(billing, rates)
+    for line in priced:
+        code = line["currency"].upper()
+        if cost_rates.rate(code, "USD") is None:
+            from django.utils.translation import gettext as _t
+            raise IntakeError({
+                "success": False,
+                "error": _t("There is no %(code)s → USD rate for today, so this stock "
+                            "can't be valued. Try again later.") % {"code": code},
+            }, status=400)
 
 
 def _is_negative_price(value):
@@ -2944,21 +2996,52 @@ def _purchase_price(v):
     return price, currency
 
 
-def _purchase_costs(price, currency, usd_try):
+class _PurchaseRates:
+    """The rates that turn a purchase price into its stock's USD and TRY
+    costs.
+
+    The rates the receipt showed come first — each currency INTO `billing`,
+    the very ones the invoice is converted at — so the stock is valued at
+    the rate the debt was booked at. Anything they don't cover falls back
+    to the published rate for the day. A pair with neither has no rate:
+    never parity."""
+
+    def __init__(self, billing="USD", page_rates=None):
+        self.page = {}
+        for code, rate in (page_rates or {}).items():
+            rate = _safe_decimal(rate)
+            if rate and rate > 0:
+                self.page[(code or "").upper()] = rate
+        self.page[(billing or "USD").upper()] = Decimal("1")
+
+    def rate(self, source, target):
+        source, target = (source or "").upper(), (target or "").upper()
+        if source == target:
+            return Decimal("1")
+        if source in self.page and target in self.page:
+            return self.page[source] / self.page[target]
+        try:
+            from accounting.services import get_exchange_rate
+            rate = _safe_decimal(get_exchange_rate(source, target))
+        except Exception:
+            rate = None
+        return rate if rate and rate > 0 else None
+
+    def costs(self, price, currency):
+        """(cost_usd, cost_try) for one unit; None where there is no rate."""
+        if not price or price <= 0:
+            return None, None
+        out = []
+        for target in ("USD", "TRY"):
+            rate = self.rate(currency, target)
+            out.append((price * rate).quantize(Decimal("0.0001")) if rate else None)
+        return tuple(out)
+
+
+def _purchase_costs(price, currency, rates):
     """Purchase price (alış fiyatı) → unit cost in USD/TRY, so the
-    warehouse value rollup reflects it."""
-    cost_usd = cost_try = None
-    if price is not None and price > 0:
-        if currency == "USD":
-            cost_usd = price
-            cost_try = (price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
-        elif currency == "TRY":
-            cost_try = price
-            if usd_try and usd_try > 0:
-                cost_usd = (price / usd_try).quantize(Decimal("0.0001"))
-        elif currency == "EUR":
-            cost_usd = price   # coarse EUR≈USD for the rollup
-    return cost_usd, cost_try
+    warehouse value rollup reflects it. `rates` is a _PurchaseRates."""
+    return rates.costs(price, currency)
 
 
 def _take_purchase_price(wp, price, currency, cost_usd, cost_try):
@@ -3022,7 +3105,7 @@ def _intake_variant_identity(main_product, base_name, v, idx, seen_skus):
 
 
 def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
-                       usd_try, take_price=True):
+                       rates, take_price=True):
     """Find or create the WarehouseProduct ONE variant row lands in, and
     work out everything else the row means: its SKU (deduplicated within the
     product, and globally when auto), its colour/model attribute, its price
@@ -3038,7 +3121,7 @@ def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
     attr_name, attr_value = ident["attr_name"], ident["attr_value"]
 
     price, currency = _purchase_price(v)
-    cost_usd, cost_try = _purchase_costs(price, currency, usd_try)
+    cost_usd, cost_try = _purchase_costs(price, currency, rates)
 
     wp_name = (f"{base_name} {v_name}".strip()) or v_sku
     # Reuse an existing same-SKU product in this warehouse rather
@@ -3134,7 +3217,8 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     warnings = []
     purchase_lines = []   # aggregated across the WHOLE batch → one alış faturası
     mint = _barcode_minter(prefix, reserved=manual_codes)
-    usd_try = _get_usd_try_rate() or Decimal("1")
+    from accounting.services_accounts import invoice_currency_for
+    cost_rates = _PurchaseRates(invoice_currency_for(current_account_obj), data.get("rates"))
 
     try:
         with transaction.atomic():
@@ -3156,7 +3240,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                         continue
                     target = _intake_variant_wp(
                         warehouse, main_product, base_name, v, idx, seen_skus,
-                        usd_try=usd_try,
+                        rates=cost_rates,
                     )
                     wp = target["wp"]
 
@@ -3611,7 +3695,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         invoice.save()
 
         # ── The lines ──
-        usd_try = _get_usd_try_rate() or Decimal("1")
+        cost_rates = _PurchaseRates(billing, data.get("rates"))
         warnings, trimmed, line_updates = [], [], []
         line_wps = {}
         for card in resolved:
@@ -3649,7 +3733,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
                 target = _intake_variant_wp(
                     warehouse, main_product, base_name, v, idx, seen_skus,
-                    usd_try=usd_try, take_price=False,
+                    rates=cost_rates, take_price=False,
                 )
                 wp = target["wp"]
                 touched[wp.pk] = wp
@@ -4045,7 +4129,7 @@ class WarehouseProductImport(View):
             return JsonResponse({'success': True, 'created': 0, 'updated': 0, 'skipped': 0, 'unchanged': 0, 'total': 0})
 
         usd_to_try = _get_usd_try_rate()
-        try_to_usd = (Decimal('1') / usd_to_try) if usd_to_try and usd_to_try != 0 else Decimal('0')
+        cost_rates = _PurchaseRates()
 
         # Pre-fetch existing rows once — by SKU
         existing_by_sku = {
@@ -4106,15 +4190,10 @@ class WarehouseProductImport(View):
                     cost_usd = None
                     cost_try = None
                     if price is not None:
-                        if currency == 'USD':
-                            cost_usd = price
-                            cost_try = price * usd_to_try
-                        elif currency == 'TRY':
-                            cost_try = price
-                            cost_usd = price * try_to_usd
-                        else:
-                            cost_usd = price
-                            cost_try = price * usd_to_try
+                        # A zero price is a real, free item; anything else is
+                        # converted at the day's rate, or left unvalued.
+                        cost_usd, cost_try = ((price, price) if price == 0
+                                              else cost_rates.costs(price, currency))
 
                     existing = existing_by_sku.get(sku_str) if sku_str else None
 
@@ -6289,16 +6368,7 @@ class WarehouseProductEdit(View):
                 product.purchase_price = pp
                 product.purchase_currency = purchase_currency
                 update_fields.extend(["purchase_price", "purchase_currency"])
-                usd_try = _get_usd_try_rate() or Decimal("1")
-                if purchase_currency == "USD":
-                    product.cost_usd = pp
-                    product.cost_try = (pp * usd_try).quantize(Decimal("0.0001")) if usd_try else None
-                elif purchase_currency == "TRY":
-                    product.cost_try = pp
-                    if usd_try and usd_try > 0:
-                        product.cost_usd = (pp / usd_try).quantize(Decimal("0.0001"))
-                elif purchase_currency == "EUR":
-                    product.cost_usd = pp
+                product.cost_usd, product.cost_try = _PurchaseRates().costs(pp, purchase_currency)
                 update_fields.extend(["cost_usd", "cost_try"])
                 if price_changed:
                     changes.append(f"price → {pp} {purchase_currency}")
@@ -6991,19 +7061,8 @@ class WarehouseRollScan(View):
                 # value rollup actually reflects the price (the
                 # rollup multiplies quantity * cost_usd; if only
                 # purchase_price is set the rollup stays $0).
-                usd_try = _get_usd_try_rate() or Decimal("1")
-                if purchase_currency == "USD":
-                    product.cost_usd = purchase_price
-                    product.cost_try = (purchase_price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
-                elif purchase_currency == "TRY":
-                    product.cost_try = purchase_price
-                    if usd_try and usd_try > 0:
-                        product.cost_usd = (purchase_price / usd_try).quantize(Decimal("0.0001"))
-                elif purchase_currency == "EUR":
-                    # Treat as a USD-equivalent for the value rollup —
-                    # not perfect but better than $0. The accounting
-                    # service can be extended later for true EUR.
-                    product.cost_usd = purchase_price
+                product.cost_usd, product.cost_try = _PurchaseRates().costs(
+                    purchase_price, purchase_currency)
             except (InvalidOperation, TypeError):
                 pass
         # Update product-level barcode if it didn't have one (per-roll

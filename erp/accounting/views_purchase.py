@@ -305,6 +305,11 @@ class GoodsReceipt(View):
             "order_invoice": order,
             "intake_plan": (order.intake_plan or {}) if order else None,
             "for_order": for_order,
+            # What an existing customer order's prices are billed in.
+            "for_order_currency": (
+                for_order.current_account.default_currency.code
+                if for_order and for_order.current_account_id
+                and for_order.current_account.default_currency_id else ""),
             "can_confirm": can_confirm_purchase(request.user),
             "today": date.today().isoformat(),
             "order_date": (doc.date.isoformat() if doc else date.today().isoformat()),

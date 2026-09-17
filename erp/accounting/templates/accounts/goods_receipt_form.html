@@ -905,8 +905,11 @@
     const u = npUnitOf(card);
     return NP_UNIT_SHORT[u] || u;
   }
+  // The whole name, not a prefix of it: a suggestion cut at 10 characters
+  // stopped following the Color / model field partway through a word. The
+  // full SKU is capped at GR_VARIANT_SKU_MAX where it is built.
   function slug(s) {
-    return (s || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/gi, '').slice(0, 10);
+    return (s || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/gi, '');
   }
   function npBaseSku(cardEl) {
     if (cardEl._npMode === 'existing') {

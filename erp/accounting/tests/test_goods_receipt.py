@@ -156,3 +156,48 @@ class GoodsReceiptTranslationTest(TestCase):
                 translation.gettext("Select the warehouse this delivery is received into."),
                 "Bu sevkiyatın gireceği depoyu seçin.",
             )
+
+
+class InlineAccountCarriesItsCurrencyTest(TestCase):
+    """The goods-receipt page prices a delivery in the account's currency by
+    default, so an account created or found from its search box has to say
+    which currency that is."""
+
+    def setUp(self):
+        user = get_user_model().objects.create_superuser("acc_maker", "a@m.t", "pw")
+        self.client.force_login(user)
+        self.try_ = CurrencyCategory.objects.create(code="TRY", name="Lira", symbol="TL")
+        self.book = Book.objects.create(name="Demfirat")
+        user.member.books.add(self.book)
+        user.member.default_book = self.book
+        user.member.save()
+
+    def _create(self, name, currency=None, status=200):
+        import json
+        body = {"name": name}
+        if currency is not None:
+            body["currency"] = currency
+        r = self.client.post(reverse("operating:warehouse_account_create"),
+                             data=json.dumps(body), content_type="application/json")
+        self.assertEqual(r.status_code, status, r.content)
+        return r.json()
+
+    def test_an_existing_account_says_its_currency(self):
+        """Found by name, it keeps its own currency — none is asked for."""
+        CurrentAccount.objects.create(book=self.book, code="K-1", name="Kızılırmak",
+                                      type="supplier", default_currency=self.try_)
+        d = self._create("kizilirmak")
+        self.assertEqual((d["created"], d["currency"]), (False, "TRY"))
+
+    def test_a_new_account_is_kept_in_the_currency_chosen(self):
+        d = self._create("Yeni Tedarikçi", currency="try")
+        self.assertTrue(d["created"])
+        self.assertEqual(d["currency"], "TRY")
+        self.assertEqual(CurrentAccount.objects.get(pk=d["id"]).default_currency, self.try_)
+
+    def test_a_new_account_needs_a_currency(self):
+        for currency in (None, "", "XXX"):
+            with self.subTest(currency=currency):
+                d = self._create("Para Birimsiz", currency=currency, status=400)
+                self.assertFalse(d["success"])
+        self.assertFalse(CurrentAccount.objects.filter(name="Para Birimsiz").exists())

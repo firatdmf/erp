@@ -27,7 +27,7 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views import View
 
-from .models import Invoice, InvoiceItem
+from .models import CurrencyCategory, Invoice, InvoiceItem
 from .models_accounts import CurrentAccount, CurrentAccountSettings
 from .services_accounts import (
     _currency_by_code, convert_lines_to_currency, invoice_currency_for,
@@ -314,6 +314,9 @@ class GoodsReceipt(View):
             "accounts": _account_choices(),
             "product_categories": _product_category_choices(),
             "pack_types": _pack_type_choices(),
+            # For an account created from the account search.
+            "currencies": list(CurrencyCategory.objects.order_by("code")
+                               .values_list("code", flat=True)),
             # Read off the fields, so the inputs cap exactly where the model does.
             "sku_max_length": Product._meta.get_field("sku").max_length,
             "variant_sku_max_length": ProductVariant._meta.get_field("variant_sku").max_length,

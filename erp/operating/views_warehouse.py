@@ -766,8 +766,9 @@ def warehouse_account_create(request):
     if request.method != "POST":
         return JsonResponse({"success": False, "error": "POST required"}, status=405)
 
+    from accounting.models import CurrencyCategory
     from accounting.models_accounts import CurrentAccount
-    from accounting.services_accounts import get_default_book, _resolve_currency
+    from accounting.services_accounts import get_default_book
     from .catalog_sync import _fold
 
     try:
@@ -777,6 +778,7 @@ def warehouse_account_create(request):
     name = (data.get("name") or "").strip()
     phone = (data.get("phone") or "").strip()
     email = (data.get("email") or "").strip()
+    currency_code = (data.get("currency") or "").strip().upper()
 
     if not name:
         return JsonResponse({"success": False, "error": "Hesap adı gerekli."}, status=400)
@@ -791,17 +793,27 @@ def warehouse_account_create(request):
         return JsonResponse({
             "success": True, "created": False, "id": existing.id,
             "name": existing.name, "prefix": _consonant_prefix(existing.name),
+            # What the page defaults its prices to.
+            "currency": getattr(existing.default_currency, "code", "") or "",
         })
 
+    # What we will owe them in — asked, never assumed: every purchase from
+    # the account is billed in it, and its prices default to it.
+    currency = CurrencyCategory.objects.filter(code=currency_code).first() if currency_code else None
+    if currency is None:
+        return JsonResponse({"success": False,
+                             "error": str(_lz("Choose the currency this account is kept in."))},
+                            status=400)
     current_account = CurrentAccount.objects.create(
         book=book, name=name, type="supplier",
-        default_currency=_resolve_currency(),
+        default_currency=currency,
         phone=phone[:30], email=email,
         created_by=getattr(request.user, "member", None),
     )
     return JsonResponse({
         "success": True, "created": True, "id": current_account.id,
         "name": current_account.name, "prefix": _consonant_prefix(current_account.name),
+        "currency": getattr(current_account.default_currency, "code", "") or "",
     })
 
 

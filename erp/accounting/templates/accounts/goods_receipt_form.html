@@ -497,6 +497,13 @@
             </div>
             <div class="np-row" style="margin-top:10px;">
               <div class="np-col">
+                <label>{% trans "Currency" %} <span style="color:#C0392B;">*</span></label>
+                <select id="npSupNewCurrency" class="np-select">
+                  <option value="">{% trans "Select currency…" %}</option>
+                  {% for code in currencies %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="np-col">
                 <label>{% trans "Phone" %}</label>
                 <input type="text" id="npSupNewPhone" class="np-input" placeholder="{% trans 'Optional' %}">
               </div>
@@ -662,7 +669,9 @@
   const NP_CSRF = "{{ csrf_token }}";
   const NP_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
   const NP_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="lock-ico"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
-  const NP_CUR = '<select class="np-select np-v-cur" onchange="npSummaryUpdate()"><option>USD</option><option>TRY</option><option>EUR</option></select>';
+  // A price starts in the account's currency (see npDefaultCurrencies);
+  // picking another marks it as chosen, so a change of account leaves it.
+  const NP_CUR = '<select class="np-select np-v-cur" onchange="this.dataset.touched = \'1\'; npSummaryUpdate()"><option>USD</option><option>TRY</option><option>EUR</option></select>';
   // Roll rows repeat, so their columns are captioned once above the list.
   // The empty spans hold the gutter/unit/state/remove columns so each
   // caption lines up with the field under it.
@@ -988,6 +997,7 @@
     if (cards.length) el.querySelector('.np-main-unit').value = npUnitOf(cards[cards.length - 1]);
     el.querySelector('.np-main-pack').value = npUnitPack(el);
     npRelabelPack(el);
+    npDefaultCurrencies(el);
     wrap.appendChild(el);
     npAddVariant(el);
     npFetchNextSku(el);
@@ -1065,6 +1075,7 @@
     if (window.npGateUpdate) npGateUpdate();
     // A different account can bill in a different currency, which changes
     // which lines need converting at all.
+    npDefaultCurrencies();
     npSummaryUpdate();
   };
 
@@ -1138,7 +1149,7 @@
 
   // Point the hidden <select> at `id`, adding the option first when the
   // supplier was just created and isn't in the list yet.
-  window.npSupSelect = function (id, name, prefix) {
+  window.npSupSelect = function (id, name, prefix, currency) {
     const sel = document.getElementById('npSupplier');
     if (!sel) return;
     if (id && !sel.querySelector('option[value="' + id + '"]')) {
@@ -1146,6 +1157,7 @@
       opt.value = String(id);
       opt.textContent = name || '';
       opt.setAttribute('data-prefix', prefix || 'GEN');
+      opt.setAttribute('data-currency', currency || '');
       sel.appendChild(opt);
     }
     sel.value = id ? String(id) : '';
@@ -1200,7 +1212,7 @@
     const panel = document.getElementById('npSupplierNew');
     if (!panel) return;
     panel.hidden = true;
-    ['npSupNewName', 'npSupNewPhone'].forEach(function (id) {
+    ['npSupNewName', 'npSupNewPhone', 'npSupNewCurrency'].forEach(function (id) {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     const sel = document.getElementById('npSupplier');
@@ -1210,6 +1222,9 @@
   window.npSupSaveNew = function (btn) {
     const name = (document.getElementById('npSupNewName').value || '').trim();
     if (!name) { document.getElementById('npSupNewName').focus(); return; }
+    // Every purchase from the account is billed in this, so it is asked.
+    const currencyEl = document.getElementById('npSupNewCurrency');
+    if (!currencyEl.value) { currencyEl.focus(); return; }
     const orig = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';
@@ -1219,6 +1234,7 @@
                  'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify({
         name: name,
+        currency: currencyEl.value,
         phone: (document.getElementById('npSupNewPhone').value || '').trim(),
       }),
     }).then(function (r) { return r.json(); })
@@ -1226,7 +1242,7 @@
         if (!d || !d.success) { alert((d && d.error) || '{% trans "Account could not be created." %}'); return; }
         // `created:false` means the name already existed — we just select
         // it rather than letting a duplicate through.
-        npSupSelect(d.id, d.name, d.prefix);
+        npSupSelect(d.id, d.name, d.prefix, d.currency);
       })
       .catch(function () { alert('{% trans "Account could not be created." %}'); })
       .finally(function () { btn.disabled = false; btn.innerHTML = orig; });
@@ -1443,6 +1459,7 @@
       '<div class="np-tops"></div>' +
       '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>';
     cardEl.querySelector('.np-variants').appendChild(el);
+    npDefaultCurrencies(el);
     npRelabelPack(cardEl);
     npSuggestVariantSku(el);
     npAddTop(el);
@@ -1715,6 +1732,20 @@
   // agreed better than a published source does.
   const NP_FX_LOOKUP = "{% url 'accounts:fx_rate_lookup' %}";
   const npFxRates = {};   // currency code -> rate typed or fetched
+
+  // Every price nobody set by hand follows the account's currency: that is
+  // what the purchase is billed in, so a price already in it needs no rate.
+  // A price quoted in another currency is still chosen per row, and
+  // converted at the rate shown.
+  window.npDefaultCurrencies = function (root) {
+    const code = npBillingCurrency();
+    (root || document).querySelectorAll('.np-v-cur').forEach(function (sel) {
+      if (sel.dataset.touched) return;
+      if (Array.prototype.some.call(sel.options, function (o) { return o.value === code; })) {
+        sel.value = code;
+      }
+    });
+  };
 
   window.npBillingCurrency = function () {
     const sel = document.getElementById('npSupplier');
@@ -2501,7 +2532,7 @@
     const priceI = vEl.querySelector(noVariant ? '.np-nv-price' : '.np-v-price');
     if (priceI && v.price) priceI.value = v.price;
     const curI = vEl.querySelector('.np-v-cur');
-    if (curI && v.currency) curI.value = v.currency;
+    if (curI && v.currency) { curI.value = v.currency; curI.dataset.touched = '1'; }
     const saleI = vEl.querySelector('.np-v-sale');
     if (saleI && v.sale_price) saleI.value = v.sale_price;
 

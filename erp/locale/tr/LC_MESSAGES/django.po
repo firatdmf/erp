@@ -9817,3 +9817,9 @@ msgstr "Paket"
 msgctxt "unit"
 msgid "Kilogram"
 msgstr "Kilogram"
+
+msgid "Choose the currency this account is kept in."
+msgstr "Bu hesabın tutulduğu para birimini seçin."
+
+msgid "Select currency…"
+msgstr "Para birimi seçin…"

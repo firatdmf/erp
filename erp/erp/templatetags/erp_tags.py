@@ -600,17 +600,42 @@ def nav_sections(context, surface="desktop"):
     A sales rep sees only the entries her role can actually open. Which
     those are is not listed anywhere: each item is checked against the
     same gate the middleware enforces (erp.roles.may_use_nav_item), so
-    the menu tracks the rules instead of copying them. Hiding an entry
-    is courtesy, not security — ReadOnlyRoleMiddleware refuses the
+    the menu tracks the rules instead of copying them. An item marked
+    `admin` drops for anyone who is not one. Hiding an entry is
+    courtesy, not security — the middleware and the view refuse the
     request either way.
     """
     from erp.nav import NAV_SECTIONS, mobile_sections
     from erp.roles import is_sales_rep
+    from operating.views_warehouse import _is_admin
 
+    user = context.get("user")
     sections = mobile_sections() if surface == "mobile" else NAV_SECTIONS
-    if is_sales_rep(context.get("user")):
+    if is_sales_rep(user):
         sections = _readable_sections(sections)
+    if not _is_admin(user):
+        sections = _sections_without(sections, lambda i: i.get("admin"))
     return sections
+
+
+def _sections_without(sections, drop):
+    """`sections` with every item `drop` says yes to removed, and any
+    group or menu it empties removed with it — an empty flyout is worse
+    than no flyout."""
+    kept = []
+    for section in sections:
+        if not section.get("groups"):
+            if not drop(section):
+                kept.append(section)
+            continue
+        groups = []
+        for group in section["groups"]:
+            items = [i for i in group["items"] if not drop(i)]
+            if items:
+                groups.append({**group, "items": items})
+        if groups:
+            kept.append({**section, "groups": groups})
+    return kept
 
 
 def _readable_sections(sections):

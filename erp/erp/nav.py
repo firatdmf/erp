@@ -26,6 +26,10 @@ An ITEM points somewhere in exactly one of three ways:
   * `action`— the name of a JS function base.html defines (the drawer
               closes itself before calling it; the sidebar doesn't need
               to)
+
+An item may also carry `admin: True`, which hides it from anyone the
+view behind it would refuse (operating.views_warehouse._is_admin). The
+view is the rule; this only spares the click.
 """
 from django.utils.translation import gettext_lazy as _
 
@@ -57,7 +61,7 @@ NAV_SECTIONS = [
                 {"label": _("Order"),     "icon": "shopping-cart", "action": "openOrderSidebar"},
                 {"label": _("Blog post"), "icon": "book-open",     "url": "marketing:blog_create"},
                 {"label": _("Supplier"),  "icon": "truck",         "action": "openAddSupplierSidebar"},
-                {"label": _("Warehouse"), "icon": "warehouse",     "action": "openWarehouseSidebar"},
+                {"label": _("Warehouse"), "icon": "warehouse",     "action": "openWarehouseSidebar", "admin": True},
             ]},
         ],
     },
@@ -194,7 +198,7 @@ NAV_SECTIONS = [
             ]},
             {"title": _("WAREHOUSE"), "items": [
                 {"label": _("My warehouses"), "icon": "warehouse",   "url": "operating:warehouse_list"},
-                {"label": _("Add warehouse"), "icon": "plus-circle", "url": "operating:create_warehouse"},
+                {"label": _("Add warehouse"), "icon": "plus-circle", "url": "operating:create_warehouse", "admin": True},
             ]},
             {"title": _("PURCHASING"), "items": [
                 {"label": _("Purchase requests"), "icon": "file-text",    "url": "operating:purchase_request_list"},

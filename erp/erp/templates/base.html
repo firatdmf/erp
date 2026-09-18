@@ -994,12 +994,14 @@
                   <span>My Warehouses</span>
                 </a>
               </li>
+              {% if is_brand_admin %}
               <li>
                 <a href="{% url 'operating:create_warehouse' %}">
                   <i class="fas fa-plus-circle" aria-hidden="true"></i>
                   <span>Add Warehouse</span>
                 </a>
               </li>
+              {% endif %}
             </ul>
           </div>
           <div class="add-menu-section">

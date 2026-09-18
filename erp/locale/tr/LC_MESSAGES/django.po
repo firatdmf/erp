@@ -10172,3 +10172,22 @@ msgstr "Alış"
 #. The customer's order total on the goods-receipt summary bar.
 msgid "Sale"
 msgstr "Satış"
+
+#. A member of a combined (ortak) warehouse that the person editing it was
+#. not offered, because it sits in a book they do not work in. Shown ticked
+#. and disabled, and kept as it is when they save.
+msgid "Belongs to a book you do not work in — it stays as it is."
+msgstr "Çalışmadığınız bir deftere ait — olduğu gibi kalır."
+
+#. Beside such a member's name, in place of its location.
+msgid "another book"
+msgstr "başka defter"
+
+#. Refused when a non-admin opens or posts the warehouse form — the full
+#. page, the sidebar panel and its JSON all say this.
+msgid "Only an administrator can create a warehouse."
+msgstr "Depo yalnızca bir yönetici tarafından açılabilir."
+
+#. The empty warehouse list, seen by someone who may not open one.
+msgid "An administrator opens a warehouse; ask for one and it will appear here."
+msgstr "Depoyu bir yönetici açar; istediğinizde burada görünür."

@@ -1347,15 +1347,21 @@ class Warehouse(models.Model):
 
     def visible_to(self, member):
         """Whether this member may read the warehouse's shelves: they must
-        work in every book whose stock it shows. For a normal warehouse
-        that is its own book; a combined one that mixes books is only for
-        someone assigned to all of them."""
+        work in at least one of the books whose stock it shows.
+
+        For a normal warehouse that is its own book, so the rule is the
+        plain one — Ergene's shelves are for Ergene's people. A combined
+        warehouse is the deliberate exception: merging Laleli's depots
+        with Ergene's is a decision that the two are browsed together, so
+        whoever works in either book sees the whole of it. Only someone
+        with a book in common with a member sees it at all, and a
+        warehouse showing no book's stock is shown to nobody."""
         from accounting.services_accounts import member_books
         ids = self.source_book_ids()
         if not ids:
             return False
         allowed = set(member_books(member).values_list("pk", flat=True))
-        return ids <= allowed
+        return bool(ids & allowed)
 
     def scope_ids(self):
         """Warehouse ids whose stock this warehouse SHOWS: its members for

@@ -237,6 +237,13 @@
           {% empty %}
           <span style="color:#94a3b8; font-size:13px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilecek normal depo yok.{% else %}No normal warehouses to merge.{% endif %}</span>
           {% endfor %}
+          {% for w in locked_members %}
+          <label style="display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:#94a3b8; text-transform:none; letter-spacing:0; cursor:not-allowed;" title="{% trans "Belongs to a book you do not work in — it stays as it is." %}">
+            <input type="checkbox" checked disabled style="width:auto; accent-color:#94a3b8;">
+            {{ w.name }}
+            <span style="font-weight:500; font-size:12px;">— {% trans "another book" %}</span>
+          </label>
+          {% endfor %}
         </div>
         <div class="hint">{% if LANGUAGE_CODE|slice:":2" == "tr" %}En az iki depo seçin (ör. Laleli Store + Factory Solids). Ortak deponun defteri olmaz — her üye depo kendi defterine aittir.{% else %}Pick at least two (e.g. Laleli Store + Factory Solids). A combined warehouse has no book of its own — each member keeps its own.{% endif %}</div>
       </div>

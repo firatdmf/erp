@@ -486,9 +486,11 @@
       <a href="{% url 'operating:warehouse_movements_all' %}" class="ord-btn ghost">
         <i class="fa fa-clock-rotate-left"></i>{% trans "Recent activity" %}
       </a>
+      {% if is_brand_admin %}
       <a href="{% url 'operating:create_warehouse' %}" class="ord-btn primary">
         <i class="fa fa-plus"></i>{% trans "Add warehouse" %}
       </a>
+      {% endif %}
     </div>
   </div>
 
@@ -618,10 +620,14 @@
   <div class="ord-empty">
     <div class="ico"><i class="fa fa-warehouse"></i></div>
     <h3>{% trans "No warehouses yet" %}</h3>
+    {% if is_brand_admin %}
     <p>{% trans "Create your first warehouse to start tracking inventory" %}</p>
     <a href="{% url 'operating:create_warehouse' %}" class="ord-btn primary">
       <i class="fa fa-plus"></i>{% trans "Add warehouse" %}
     </a>
+    {% else %}
+    <p>{% trans "An administrator opens a warehouse; ask for one and it will appear here." %}</p>
+    {% endif %}
   </div>
   {% endif %}
 

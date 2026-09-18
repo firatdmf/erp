@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum, F, DecimalField, Q
 from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.http import JsonResponse, StreamingHttpResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -43,9 +43,10 @@ def _tr_upper(s):
 
 
 def _is_admin(user):
-    """Only admins may DELETE warehouses / products — editing stays open to
-    everyone. Admin = Django superuser/staff, or a Member carrying the
-    'admin' permission (authentication.Permission name='admin')."""
+    """Only admins may CREATE or DELETE warehouses / delete products —
+    editing an existing warehouse stays open to everyone. Admin = Django
+    superuser/staff, or a Member carrying the 'admin' permission
+    (authentication.Permission name='admin')."""
     if not getattr(user, "is_authenticated", False):
         return False
     if user.is_superuser or user.is_staff:
@@ -54,6 +55,18 @@ def _is_admin(user):
         return user.member.permissions.filter(name="admin").exists()
     except Exception:
         return False
+
+
+def _warehouse_admin_only():
+    """The words a non-admin is told when they try to open a warehouse.
+
+    A warehouse is the shape of the business — which books hold stock,
+    which depots an order may draw on, which of them are browsed
+    together. Anyone may correct one that exists; adding another is a
+    decision about the company, so it is an admin's. One sentence, in
+    one place, for the page, the sidebar and the JSON alike."""
+    from django.utils.translation import gettext as _t
+    return _t("Only an administrator can create a warehouse.")
 
 
 def _sheet_barcode(value):
@@ -1191,7 +1204,7 @@ def warehouse_guarded(view):
 
     `book_guarded` follows one FK to one book, which a combined warehouse
     does not have: its stock belongs to its members' books, and it is
-    only readable by someone who works in all of them (Warehouse.visible_to).
+    readable by anyone who works in one of them (Warehouse.visible_to).
     404 rather than 403, as book_guarded does."""
     from functools import wraps
     from django.http import Http404
@@ -1215,8 +1228,10 @@ class WarehouseList(View):
         # reading Laleli's shelves — and a warehouse with no book stated
         # is shown to nobody rather than to everybody.
         from accounting.services_accounts import member_books
-        # A combined warehouse has no book of its own and is listed only
-        # when the member works in every book its members belong to.
+        # A combined warehouse has no book of its own. Merging two books'
+        # depots into one is a decision that they are browsed together,
+        # so it is listed for anyone who works in ONE of its members'
+        # books — and, like everything else, shown whole (Warehouse.visible_to).
         member = getattr(request.user, "member", None)
         allowed = set(member_books(member).values_list("pk", flat=True))
         warehouses = [
@@ -1226,7 +1241,7 @@ class WarehouseList(View):
                 n_products=Count('products'),
             ).prefetch_related('combined_sources').order_by('name')
             if not w.is_combined
-            or ({m.accounting_book_id for m in w.combined_sources.all()} or {None}) <= allowed
+            or {m.accounting_book_id for m in w.combined_sources.all()} & allowed
         ]
         # Combined (ortak) warehouses own no products — their card shows
         # the MEMBERS' variant count and member names instead.
@@ -1295,28 +1310,46 @@ def _resolve_warehouse_book(request, kind='normal'):
 def _combined_form_ctx(warehouse=None, request=None):
     """Shared context for the warehouse form: books + the normal warehouses
     offered as members of a combined (ortak) warehouse."""
+    choices = list(Warehouse.objects.filter(
+        kind='normal',
+        accounting_book__in=_get_book_choices(request),
+    ).order_by('name'))
     ctx = {
         'warehouse': warehouse,
         'books': _get_book_choices(request),
-        # Only warehouses from books this member works in: a combined
-        # warehouse merges its members' stock, so offering another
-        # book's warehouse here is offering a way to read it.
-        'member_choices': Warehouse.objects.filter(
-            kind='normal',
-            accounting_book__in=_get_book_choices(request),
-        ).order_by('name'),
+        # Only warehouses from books this member works in: MERGING another
+        # book's warehouse in is a decision to browse the two together,
+        # and that is not one to make about a book you do not work in.
+        # (Reading a merge someone else made is another matter — see
+        # Warehouse.visible_to.)
+        'member_choices': choices,
         'combined_selected': set(),
+        # Members this editor was not offered, because they sit in a book
+        # they do not work in. Shown, so the form does not appear to say
+        # the warehouse merges fewer depots than it does, and kept on save
+        # rather than dropped: a box that was never offered cannot have
+        # been unticked.
+        'locked_members': [],
     }
     if warehouse is not None and warehouse.is_combined:
         ctx['combined_selected'] = set(
             warehouse.combined_sources.values_list('id', flat=True))
+        offered = {w.pk for w in choices}
+        ctx['locked_members'] = [m for m in warehouse.combined_sources.order_by('name')
+                                 if m.pk not in offered]
     return ctx
 
 
-def _parse_combined_fields(request, *, exclude_pk=None):
+def _parse_combined_fields(request, *, warehouse=None):
     """Read kind + member selection from the warehouse form POST.
     Returns (kind, sources, error). Members must be NORMAL warehouses
-    (no combined-of-combined) and a combined warehouse needs ≥ 2."""
+    (no combined-of-combined) and a combined warehouse needs ≥ 2.
+
+    `warehouse` is the one being edited, if any: its own row is never a
+    member of itself, and members sitting in a book this editor does not
+    work in are kept. Those were not on the form, so their absence from
+    the POST is not somebody removing them — it is the form having
+    nothing to say about them."""
     kind = (request.POST.get('kind') or 'normal').strip()
     if kind not in ('normal', 'combined'):
         kind = 'normal'
@@ -1327,9 +1360,14 @@ def _parse_combined_fields(request, *, exclude_pk=None):
     # be a way to read its shelves.
     qs = Warehouse.objects.filter(pk__in=ids, kind='normal',
                                   accounting_book__in=_get_book_choices(request))
-    if exclude_pk:
-        qs = qs.exclude(pk=exclude_pk)
+    if warehouse is not None:
+        qs = qs.exclude(pk=warehouse.pk)
     sources = list(qs)
+    if warehouse is not None and warehouse.is_combined:
+        offered = {b.pk for b in _get_book_choices(request)}
+        picked = {w.pk for w in sources}
+        sources += [m for m in warehouse.combined_sources.all()
+                    if m.pk not in picked and m.accounting_book_id not in offered]
     if len(sources) < 2:
         return kind, sources, "Ortak depo için en az iki normal depo seçin."
     return kind, sources, None
@@ -1338,6 +1376,15 @@ def _parse_combined_fields(request, *, exclude_pk=None):
 @method_decorator(login_required, name='dispatch')
 class WarehouseCreate(View):
     template_name = "operating/warehouse_form.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        # The form and the save both — an unreachable button is courtesy,
+        # this is the rule. Back to the list with a reason rather than a
+        # bare 403: they were offered the page by a link somewhere.
+        if not _is_admin(request.user):
+            messages.error(request, _warehouse_admin_only())
+            return redirect('operating:warehouse_list')
+        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
         return render(request, self.template_name, _combined_form_ctx(request=request))
@@ -1390,11 +1437,22 @@ class WarehouseCreatePartial(View):
     template_name = "operating/_warehouse_form_partial.html"
 
     def get(self, request):
+        if not _is_admin(request.user):
+            # HTMX swaps this into the sidebar, which it does not do for a
+            # 4xx — so the refusal is the panel's content rather than its
+            # status. The POST below is the one that has to say no.
+            from django.utils.html import escape
+            return HttpResponse(
+                '<div style="padding:22px; color:#64748b; font-size:13.5px;">'
+                f'{escape(_warehouse_admin_only())}</div>')
         return render(request, self.template_name, {
             'books': _get_book_choices(request),
         })
 
     def post(self, request):
+        if not _is_admin(request.user):
+            return JsonResponse({"success": False, "error": _warehouse_admin_only()},
+                                status=403)
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
         description = (request.POST.get('description') or '').strip()
@@ -1450,7 +1508,7 @@ class WarehouseEdit(View):
             messages.error(request, "Another warehouse with this name already exists")
             return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
 
-        kind, sources, kind_err = _parse_combined_fields(request, exclude_pk=warehouse.pk)
+        kind, sources, kind_err = _parse_combined_fields(request, warehouse=warehouse)
         if kind_err:
             messages.error(request, kind_err)
             return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))

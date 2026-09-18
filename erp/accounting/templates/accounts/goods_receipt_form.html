@@ -386,6 +386,7 @@
   .np-gate i { color: var(--gray-400); }
   .np-add-product[disabled] { opacity: .45; cursor: not-allowed; }
   .np-summary .np-sum-money { font-weight: 700; color: var(--nejum-teal-700, #005354); }
+  .np-summary .np-sum-sale { font-weight: 700; color: #0E6E4A; }
   .np-summary .np-sum-pending { font-weight: 600; color: #8B5A00; }
 </style>
 {% endblock %}
@@ -671,6 +672,9 @@
   const NP_URL_TPL = "{% url 'operating:warehouse_manual_add' 0 %}";
   const NP_SEARCH = "{% url 'operating:catalog_base_search' 0 %}";
   const NP_NEXTSKU = "{% url 'operating:warehouse_next_sku' 0 %}";
+  const NP_NEXTBC = "{% url 'operating:warehouse_next_barcode' 0 %}";
+  // What a barcode box says before it can name the code it will be given.
+  const NP_BC_AUTO = "{% filter escapejs %}{% trans "Barcode (auto)" %}{% endfilter %}";
   // Product id isn't known until an existing main product is picked, so we
   // template the URL with a "0" placeholder and swap it in per-call.
   const NP_VARIANTS_TPL = "{% url 'operating:catalog_product_variants' 0 0 %}";
@@ -1247,6 +1251,7 @@
     const p = npCurPrefix();
     const a = document.getElementById('npPrefix'); if (a) a.textContent = p;
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) { npFetchNextSku(card); });
+    npRefreshNextBarcode();
     if (window.npGateUpdate) npGateUpdate();
     // A different account can bill in a different currency, which changes
     // which lines need converting at all.
@@ -1688,7 +1693,7 @@
       // Blank = mint one from the account prefix at save. Filled = this stock item
       // arrived already labelled and keeps the code printed on it.
       '<input class="np-input np-top-bc" type="text" maxlength="64" spellcheck="false"' +
-      ' placeholder="{% trans "Barcode (auto)" %}" oninput="npBarcodeInput(this)">' +
+      ' placeholder="' + NP_BC_AUTO + '" oninput="npBarcodeInput(this)">' +
       '<span class="np-top-bc-state" aria-live="polite"></span>' +
       '<button type="button" class="np-mini-x" title="{% trans "Remove" %}" onclick="npRemoveTop(this)">' + NP_TRASH + '</button>';
     tops.appendChild(row);
@@ -1701,6 +1706,45 @@
   // server can't see them). Both mark the field .bad, and npSave refuses
   // to submit while any .bad field is on screen.
   const NP_BC_CHECK_URL = "{% url 'operating:warehouse_barcode_available' %}";
+
+  // ── The label each roll will carry ───────────────────────────────
+  // Every roll left blank is auto-labelled on save, in one run from the
+  // account's prefix. Showing those codes as placeholders means the page
+  // says what is about to be printed instead of the word "auto" — so a
+  // roll that must carry the mill's own code is easy to spot as the one
+  // row typed over. Indicative, like the SKU preview beside it: the codes
+  // are minted for real on save, against what the database holds then.
+  let npNextBc = null;   // { prefix, seq, width }
+
+  window.npRefreshNextBarcode = function () {
+    const prefix = npCurPrefix();
+    if (!prefix) { npNextBc = null; npApplyBarcodePlaceholders(); return; }
+    if (npNextBc && npNextBc.prefix === prefix) { npApplyBarcodePlaceholders(); return; }
+    fetch(npWhUrl(NP_NEXTBC) + '?prefix=' + encodeURIComponent(prefix),
+          { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        const m = /^(.*?)(\d+)$/.exec((d && d.barcode) || '');
+        npNextBc = m ? { prefix: prefix, seq: parseInt(m[2], 10), width: m[2].length } : null;
+        npApplyBarcodePlaceholders();
+      }).catch(function () { npNextBc = null; });
+  };
+
+  window.npApplyBarcodePlaceholders = function () {
+    const rows = npBcInputs();
+    if (!npNextBc) {
+      rows.forEach(function (el) { el.placeholder = NP_BC_AUTO; });
+      return;
+    }
+    // Typed codes are the ones the minter skips, so counting only the
+    // blank rows is what the save will actually do.
+    let n = npNextBc.seq;
+    rows.forEach(function (el) {
+      if ((el.value || '').trim()) { el.placeholder = NP_BC_AUTO; return; }
+      el.placeholder = npNextBc.prefix + String(n).padStart(npNextBc.width, '0');
+      n += 1;
+    });
+  };
 
   function npBcRows() {
     return Array.prototype.slice.call(document.querySelectorAll('#npProducts .np-top-bc'));
@@ -1755,9 +1799,12 @@
     if (value && own && value.toUpperCase() === own.toUpperCase()) {
       npBcMark(el, null, ''); npBcSyncDupes(); return;
     }
-    if (!value) { npBcMark(el, null, ''); npBcSyncDupes(); return; }
+    if (!value) { npBcMark(el, null, ''); npBcSyncDupes(); npApplyBarcodePlaceholders(); return; }
     npBcMark(el, 'busy', '');
     npBcSyncDupes();
+    // A row that now carries a typed code gives its auto one back to the
+    // rows below it.
+    npApplyBarcodePlaceholders();
     el._npBcTimer = setTimeout(function () {
       const asked = value;
       fetch(NP_BC_CHECK_URL + '?code=' + encodeURIComponent(asked), {
@@ -1842,6 +1889,22 @@
     return { code: ((curEl && curEl.value) || 'USD').toUpperCase(), amount: qty * price };
   }
 
+  // What the CUSTOMER is charged for one variant row. Their order is
+  // billed in their own account's currency (npSaleCurrency), which is
+  // rarely the one we buy in — so this total is carried and shown
+  // separately rather than added to what the delivery costs.
+  function npSaleMoney(scope) {
+    const priceEl = scope.querySelector('.np-v-sale');
+    const price = parseFloat(((priceEl && priceEl.value) || '').replace(',', '.'));
+    if (!isFinite(price) || price <= 0) return 0;
+    let qty = 0;
+    scope.querySelectorAll('.np-top-qty').forEach(function (q) {
+      const v = parseFloat((q.value || '').replace(',', '.'));
+      if (!isNaN(v) && v > 0) qty += v;
+    });
+    return qty * price;
+  }
+
   window.npSummaryUpdate = function () {
     let pcount = 0, vcount = 0, tcount = 0;
     const totals = {};   // unit → quantity; units can't be added together
@@ -1851,6 +1914,7 @@
       if (!isNaN(val) && val > 0) { tcount++; totals[unit] = (totals[unit] || 0) + val; }
     }
     const money = {};
+    let sale = 0;
     function addMoney(m) {
       if (m) money[m.code] = (money[m.code] || 0) + m.amount;
     }
@@ -1862,11 +1926,12 @@
           vcount++;
           v.querySelectorAll('.np-top-qty').forEach(addQ);
           addMoney(npMoney(v, '.np-v-price'));
+          sale += npSaleMoney(v);
         });
       } else {
         card.querySelectorAll('.np-nv-tops .np-top-qty').forEach(addQ);
         const block = card.querySelector('.np-no-variant');
-        if (block) addMoney(npMoney(block, '.np-nv-price'));
+        if (block) { addMoney(npMoney(block, '.np-nv-price')); sale += npSaleMoney(block); }
       }
     });
     const el = document.getElementById('npSummary');
@@ -1892,7 +1957,11 @@
         else pending.push(c);
       });
       if (billed > 0 || pending.length) {
+        // Named only when a sale figure sits beside it — on a purchase for
+        // stock there is nothing to tell it apart from.
+        const forCustomer = !!(npCustMode && npCustMode());
         html += ' · <span class="np-sum-money">' +
+          (forCustomer ? '{% trans "Buy" %} ' : '') +
           (NP_CUR_SYMBOL[target] || '') +
           billed.toLocaleString(undefined, { minimumFractionDigits: 2,
                                              maximumFractionDigits: 2 }) +
@@ -1902,9 +1971,20 @@
                   ' {% trans "awaiting a rate" %}</span>';
         }
       }
+      // What the customer's order comes to, beside what the delivery
+      // costs. Two currencies side by side and never summed: the supplier
+      // bills us in theirs, we bill the customer in theirs.
+      if (sale > 0 && npCustMode && npCustMode()) {
+        html += ' · <span class="np-sum-sale">{% trans "Sale" %} ' +
+          (NP_CUR_SYMBOL[npSaleCurrency] || '') +
+          sale.toLocaleString(undefined, { minimumFractionDigits: 2,
+                                           maximumFractionDigits: 2 }) +
+          (NP_CUR_SYMBOL[npSaleCurrency] ? '' : ' ' + npSaleCurrency) + '</span>';
+      }
       el.innerHTML = html;
     }
     if (window.npFxUpdate) npFxUpdate(money);
+    if (window.npApplyBarcodePlaceholders) npApplyBarcodePlaceholders();
   };
 
   // ── Rates for the lines that are not in the account's currency ──────
@@ -2786,10 +2866,13 @@
   // order form uses; its rows carry data-type / data-pk / data-name.
   let npCustomer = null;
   let npCustTimer = null;
+  // Is this purchase being bought for a customer? Also the one place the
+  // page is put into that mode, which is what shows the sale-price boxes.
   function npCustMode() {
     const on = !!npCustomer || {{ for_order|yesno:"true,false" }};
     const doc = document.getElementById('grDoc');
     if (doc) doc.classList.toggle('gr-for-customer', on);
+    return on;
   }
   window.npCustSearch = function (q) {
     const box = document.getElementById('npCustomerResults');

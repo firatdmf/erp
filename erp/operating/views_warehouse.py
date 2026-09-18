@@ -2614,6 +2614,19 @@ def warehouse_next_sku(request, pk):
     return JsonResponse({"prefix": prefix, "sku": sku})
 
 
+def warehouse_next_barcode(request, pk):
+    """Preview the next auto stock-item barcode for a prefix, so the
+    goods-receipt page can show each roll the label it will carry BEFORE
+    saving. Indicative only, exactly like warehouse_next_sku: the codes are
+    minted authoritatively on save, against what the database holds then."""
+    prefix = (request.GET.get("prefix") or "").strip().upper()[:6] or _fallback_prefix()
+    try:
+        barcode = _barcode_minter(prefix)()
+    except Exception:
+        barcode = f"{prefix}000001"
+    return JsonResponse({"prefix": prefix, "barcode": barcode})
+
+
 def _warehouse_dup_sku_count(warehouse):
     """How many SKUs in the warehouse are carried by >1 WarehouseProduct
     (i.e. duplicate variant rows that should be merged). Case-insensitive."""

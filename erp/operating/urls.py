@@ -50,6 +50,7 @@ urlpatterns = [
     path("warehouses/<int:pk>/manual-add/", views_warehouse.WarehouseManualAdd.as_view(), name="warehouse_manual_add"),
     path("warehouses/<int:pk>/purchase/<int:invoice_id>/edit/", views_warehouse.WarehousePurchaseEdit.as_view(), name="warehouse_purchase_edit"),
     path("warehouses/<int:pk>/next-sku/", views_warehouse.warehouse_next_sku, name="warehouse_next_sku"),
+    path("warehouses/<int:pk>/next-barcode/", views_warehouse.warehouse_next_barcode, name="warehouse_next_barcode"),
     path("warehouses/<int:pk>/merge-duplicates/", views_warehouse.WarehouseMergeDuplicates.as_view(), name="warehouse_merge_duplicates"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/", views_warehouse.WarehouseProductDetail.as_view(), name="warehouse_product_detail"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/edit/", views_warehouse.WarehouseProductEdit.as_view(), name="warehouse_product_edit"),

@@ -238,17 +238,17 @@
           <span style="color:#94a3b8; font-size:13px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilecek normal depo yok.{% else %}No normal warehouses to merge.{% endif %}</span>
           {% endfor %}
         </div>
-        <div class="hint">{% if LANGUAGE_CODE|slice:":2" == "tr" %}En az iki depo seçin (ör. Laleli Store + Factory Solids).{% else %}Pick at least two (e.g. Laleli Store + Factory Solids).{% endif %}</div>
+        <div class="hint">{% if LANGUAGE_CODE|slice:":2" == "tr" %}En az iki depo seçin (ör. Laleli Store + Factory Solids). Ortak deponun defteri olmaz — her üye depo kendi defterine aittir.{% else %}Pick at least two (e.g. Laleli Store + Factory Solids). A combined warehouse has no book of its own — each member keeps its own.{% endif %}</div>
       </div>
-      <div class="wh-form-field">
-        <label>{% trans "Accounting book" %} <span style="color:#94a3b8; font-weight:500;">({% trans "optional" %})</span></label>
+      <div class="wh-form-field" id="wh-book-field">
+        <label>{% trans "Accounting book" %} <span style="color:#ef4444;">*</span></label>
         <select name="accounting_book">
-          <option value="">{% trans "— No accounting link —" %}</option>
+          <option value="">{% trans "— Select a book —" %}</option>
           {% for book in books %}
             <option value="{{ book.pk }}" {% if warehouse.accounting_book_id == book.pk %}selected{% endif %}>{{ book.name }}</option>
           {% endfor %}
         </select>
-        <div class="hint">{% trans "Link this warehouse's net worth to a specific accounting book." %}</div>
+        <div class="hint">{% trans "The book that owns this warehouse's stock." %}</div>
       </div>
       <div class="wh-form-field">
         <label>{% trans "Description" %}</label>
@@ -270,6 +270,10 @@
     var combined = document.querySelector('input[name="kind"][value="combined"]');
     var field = document.getElementById('wh-members-field');
     if (field) field.style.display = (combined && combined.checked) ? '' : 'none';
+    // A combined warehouse owns no stock, so it takes no book — its
+    // members each have their own.
+    var book = document.getElementById('wh-book-field');
+    if (book) book.style.display = (combined && combined.checked) ? 'none' : '';
   }
   whKindToggle();
 </script>

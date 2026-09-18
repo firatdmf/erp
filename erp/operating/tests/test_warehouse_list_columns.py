@@ -121,7 +121,7 @@ class CombinedWarehouseSaysWhichShelf(TestCase):
             name="Laleli Fabrika", location="Ergene / Tekirdağ",
             accounting_book=self.book)
         self.combined = Warehouse.objects.create(
-            name="Ortak Perde Depo", kind="combined", accounting_book=self.book)
+            name="Ortak Perde Depo", kind="combined")
         self.combined.combined_sources.set([self.store, self.factory])
 
         user = get_user_model().objects.create_user("wh", password="pw")

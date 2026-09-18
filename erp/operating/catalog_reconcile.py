@@ -220,7 +220,8 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                                 name=_norm_attr(cat["attribute_name"]))
                             val, _c = ProductVariantAttributeValue.objects.get_or_create(
                                 product_variant_attribute=attr,
-                                product_variant_attribute_value=_norm_value(cat["attribute_value"]))
+                                product_variant_attribute_value=_norm_value(cat["attribute_value"],
+                                                                                     cat["attribute_name"]))
                             variant.product_variant_attribute_values.add(val)
 
                 # Counted in BOTH modes — how many rows actually change hands

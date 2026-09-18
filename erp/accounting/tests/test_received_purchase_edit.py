@@ -114,6 +114,8 @@ class ReceivedPurchaseEditTest(TestCase):
         self.assertEqual(card["main_product"]["sku"], "K24644")
         v = card["variants"][0]
         self.assertEqual((v["name"], v["sku"], v["price"]), ("G07", "K24644.G07", "3.5"))
+        # The row's fields, as stored: a code, not a colour, so a model.
+        self.assertEqual(v["attributes"], [{"name": "model", "value": "g07"}])
         self.assertEqual([t["qty"] for t in v["tops"]], ["30", "20"])
         self.assertTrue(all(t["stock_item_id"] for t in v["tops"]))
 
@@ -222,7 +224,7 @@ class ReceivedPurchaseEditTest(TestCase):
 
     def test_renaming_a_variant_renames_it(self):
         form = self._form()
-        self._variant(form)["name"] = "G07 Krem"
+        self._variant(form)["attributes"] = [{"name": "model", "value": "G07 Krem"}]
         self.assertEqual(self._save(form).status_code, 200)
         wp = WarehouseProduct.objects.get()
         self.assertEqual(wp.name, "K24644 G07 Krem")
@@ -232,7 +234,7 @@ class ReceivedPurchaseEditTest(TestCase):
     def test_a_different_variant_takes_the_rolls_with_it(self):
         form = self._form()
         v = self._variant(form)
-        v["name"], v["sku"] = "G08", "K24644.G08"
+        v["attributes"], v["sku"] = [{"name": "model", "value": "G08"}], "K24644.G08"
         r = self._save(form)
         self.assertEqual(r.status_code, 200, r.content)
 
@@ -249,7 +251,7 @@ class ReceivedPurchaseEditTest(TestCase):
         self._reserve("KRV-A", "10")
         form = self._form()
         v = self._variant(form)
-        v["name"], v["sku"] = "G08", "K24644.G08"
+        v["attributes"], v["sku"] = [{"name": "model", "value": "G08"}], "K24644.G08"
         r = self._save(form)
         self.assertEqual(r.status_code, 422)
         self.assertEqual(r.json()["blocked"][0]["barcode"], "KRV-A")

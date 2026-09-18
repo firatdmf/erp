@@ -33,6 +33,18 @@ class CatalogSyncConflict(Exception):
     """Raised when a variant_sku already belongs to a different base product."""
 
 
+class LookAlikeVariant(CatalogSyncConflict):
+    """A NEW variant whose attribute values are exactly those of a variant
+    the product already has. The catalog could not tell the two apart, so
+    the caller is told which one it resembles instead."""
+
+    def __init__(self, variant):
+        self.variant = variant
+        super().__init__(
+            f"'{variant.variant_sku}' already has these attribute values — "
+            f"add the stock to it, or give this variant a value that tells it apart.")
+
+
 # ---------------------------------------------------------------------------
 # Turkish → English colour dictionary.
 # EDIT HERE: keys are the label tokens (any case), values the English colour
@@ -42,7 +54,7 @@ class CatalogSyncConflict(Exception):
 TR_EN_COLORS = {
     "BEYAZ": "WHITE",
     "SIYAH": "BLACK",
-    "GRI": "GREY",
+    "GRI": "GRAY",          # American spelling, as the catalog stores it
     "GUMUS": "SILVER",
     "KREM": "CREAM",
     "EKRU": "ECRU",
@@ -89,12 +101,15 @@ def _fold(token: str) -> str:
 
 def _norm_attr(name: str) -> str:
     """Mirror ProductVariantAttribute.save() normalization."""
-    return (name or "").lower().replace(" ", "")
+    from marketing.attributes import normalize_attribute_name
+    return normalize_attribute_name(name)
 
 
-def _norm_value(value: str) -> str:
+def _norm_value(value: str, attribute_name: str = "") -> str:
     """Mirror ProductVariantAttributeValue.save() normalization."""
-    return (value or "").lower().replace(" ", "_")
+    from marketing.attributes import normalize_attribute_value
+    return normalize_attribute_value(attribute_name, value)
+
 
 
 # Modifiers that precede a colour, e.g. "AÇIK KREM" (light cream).
@@ -218,29 +233,109 @@ def _to_decimal(v):
 
 
 @transaction.atomic
-def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
+def variant_attributes(variant):
+    """[(name, value)] a variant carries, oldest link first."""
+    if variant is None:
+        return []
+    return [(av.product_variant_attribute.name, av.product_variant_attribute_value)
+            for av in variant.product_variant_attribute_values
+            .select_related("product_variant_attribute").order_by("id")]
+
+
+def _attribute_pairs(attributes, attribute_name, attribute_value):
+    """[(name, value)] normalised, in order, blanks and repeats dropped."""
+    pairs = list(attributes or [])
+    if not pairs and attribute_name and attribute_value:
+        pairs = [(attribute_name, attribute_value)]
+    out, seen = [], set()
+    for name, value in pairs:
+        name = _norm_attr(name)
+        value = _norm_value(value, name)
+        if name and value and name not in seen:
+            seen.add(name)
+            out.append((name, value))
+    return out
+
+
+def _variant_attribute_set(variant_ids):
+    """{variant_id: frozenset((name, value))} for the given variants."""
+    from marketing.models import ProductVariant
+    Through = ProductVariant.product_variant_attribute_values.through
+    out = {vid: set() for vid in variant_ids}
+    for vid, name, value in Through.objects.filter(productvariant_id__in=variant_ids).values_list(
+            "productvariant_id",
+            "productvariantattributevalue__product_variant_attribute__name",
+            "productvariantattributevalue__product_variant_attribute_value"):
+        out[vid].add((name, value))
+    return {vid: frozenset(v) for vid, v in out.items()}
+
+
+def find_lookalike(product, attributes, exclude_variant_id=None):
+    """The variant of `product` whose attribute values are exactly
+    `attributes` (normalised pairs), or None."""
+    from marketing.models import ProductVariant
+    wanted = frozenset(_attribute_pairs(attributes, None, None))
+    if not wanted:
+        return None
+    ids = list(ProductVariant.objects.filter(product=product)
+               .exclude(pk=exclude_variant_id or 0).values_list("id", flat=True))
+    for vid, found in _variant_attribute_set(ids).items():
+        if found == wanted:
+            return ProductVariant.objects.get(pk=vid)
+    return None
+
+
+def set_variant_attributes(variant, attributes, *, replace):
+    """Link `variant` to each (name, value). `replace`: drop every value it
+    had before (a variant being created, or described in full); otherwise
+    only the named attributes change and the rest stay."""
+    from marketing.models import (ProductVariant, ProductVariantAttribute,
+                                  ProductVariantAttributeValue)
+    Through = ProductVariant.product_variant_attribute_values.through
+    links = Through.objects.filter(productvariant_id=variant.id)
+    if replace:
+        links.delete()
+    for name, value in attributes:
+        attribute, _ = ProductVariantAttribute.objects.get_or_create(name=name)
+        value_obj = (ProductVariantAttributeValue.objects
+                     .filter(product_variant_attribute=attribute,
+                             product_variant_attribute_value=value).first())
+        if value_obj is None:
+            value_obj = ProductVariantAttributeValue.objects.create(
+                product_variant_attribute=attribute, product_variant_attribute_value=value)
+        if not replace:
+            links.filter(productvariantattributevalue__product_variant_attribute=attribute) \
+                 .exclude(productvariantattributevalue=value_obj).delete()
+        Through.objects.get_or_create(productvariant_id=variant.id,
+                                      productvariantattributevalue_id=value_obj.id)
+
+
+def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None,
                          variant_sku, variant_barcode=None,
-                         cost=None, existing_base_product=None):
+                         cost=None, existing_base_product=None,
+                         attributes=None, refuse_lookalike=False):
     """Idempotently create/link a HIDDEN catalog Product (main) + ProductVariant
     (the scanned item). Returns (product, variant, product_created, variant_created).
 
     - NO quantity is passed or written. The variant's stock is the sum of the
       WarehouseProduct rows pointing at it, read through live_quantity; the
       caller writes the warehouse row, and that IS the stock.
-    - Re-scanning the same variant_sku updates it in place (no duplicate).
-    - A different variant_sku that matches an EXISTING (product, attribute_name,
-      attribute_value) is treated as the SAME logical variant rather than
-      forking a second ProductVariant; its own variant_sku is left untouched.
+    - A variant is its SKU: re-syncing the same variant_sku updates it in
+      place, and a different variant_sku is a different variant. (A new SKU
+      used to be folded into any variant with the same colour, which put
+      K24828İT.G50's stock on K24828İT.G137 because both are "gri_simli".)
+    - `attributes`: [(name, value), …] describing the variant, in order.
+      The older single `attribute_name`/`attribute_value` still works.
+    - `refuse_lookalike`: raise LookAlikeVariant rather than create a variant
+      whose values equal an existing one's.
     - Raises CatalogSyncConflict if variant_sku already belongs to another product.
     """
-    from marketing.models import (
-        Product, ProductVariant, ProductVariantAttribute,
-        ProductVariantAttributeValue,
-    )
+    from marketing.models import Product, ProductVariant
 
     variant_sku = (variant_sku or "").strip()
     if not variant_sku:
         raise CatalogSyncConflict("variant_sku is required")
+    pairs = _attribute_pairs(attributes, attribute_name, attribute_value)
 
     base_name = (base_name or "").strip() or variant_sku
     cost_dec = _to_decimal(cost)
@@ -298,12 +393,9 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
             if new_sku:
                 product.sku = new_sku
                 product.save(update_fields=["sku"])
-        # Lock the product row for the rest of this transaction. There's no
-        # DB constraint on (product, attribute_value) — only variant_sku is
-        # globally unique — so without this, two concurrent syncs for the
-        # SAME new (product, attribute) pair would both see no attr_matched
-        # row below and both create(), forking a duplicate variant. Locking
-        # the parent product serializes concurrent syncs onto it.
+        # Lock the product row for the rest of this transaction, so two
+        # concurrent syncs of new look-alike variants can't both pass the
+        # look-alike check below.
         Product.objects.select_for_update().filter(pk=product.id).first()
 
     # 2) Lock the variant row (concurrent scans of the same roll are safe).
@@ -315,24 +407,6 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
             f"#{existing.product_id}, not '{base_name}' (#{product.id})."
         )
 
-    # 1b) Same logical variant under a DIFFERENT sku? A caller (e.g. the
-    #     manual warehouse-intake form) may hand us a freshly minted
-    #     variant_sku for what is actually a colour/model this product
-    #     already carries — get_or_create-by-sku alone would then fork a
-    #     second ProductVariant for it. Reuse the attribute-matched row
-    #     instead, adding the incoming stock to it (unlike the mirror
-    #     behaviour below, this quantity is genuinely NEW stock, not a
-    #     restatement of the same roll/scan).
-    attr_matched = False
-    if existing is None and attribute_name and attribute_value:
-        attr_matched = (ProductVariant.objects.select_for_update()
-                        .filter(product=product,
-                                product_variant_attribute_values__product_variant_attribute__name=_norm_attr(attribute_name),
-                                product_variant_attribute_values__product_variant_attribute_value=_norm_value(attribute_value))
-                        .first())
-        if attr_matched:
-            existing = attr_matched
-
     if existing:
         variant = existing
         variant_created = False
@@ -341,9 +415,6 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         # old behaviour.
         if not product.featured:
             variant.variant_featured = False
-        # No quantity is written: the variant's stock is the sum of the
-        # WarehouseProduct rows pointing at it (live_quantity), and the
-        # caller has just written the row that this `qty` came from.
         if variant_barcode and not variant.variant_barcode:
             variant.variant_barcode = variant_barcode[:14]
         if cost_dec is not None:
@@ -352,6 +423,10 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
             "variant_featured", "variant_barcode", "variant_cost",
         ])
     else:
+        if refuse_lookalike and pairs:
+            twin = find_lookalike(product, pairs)
+            if twin is not None:
+                raise LookAlikeVariant(twin)
         variant = ProductVariant.objects.create(
             product=product, variant_sku=variant_sku, variant_featured=False,
             variant_barcode=(variant_barcode or None) and variant_barcode[:14],
@@ -359,61 +434,14 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         )
         variant_created = True
 
-    # 3) Attribute. A scanned product carries ONE attribute dimension
-    #    (colour OR model) and ONE value. Enforce both:
-    #      • LATEST value wins for THIS variant — re-scanning the same
-    #        variant_sku with a new colour (blue → navy blue) REPLACES the
-    #        old value instead of piling up "blue, navy_blue".
-    #      • LATEST attribute TYPE wins for the whole product — mixing
-    #        "color" and "model" on one product spawns a colour×model matrix
-    #        of phantom variants, so every OTHER variant of the product is
-    #        migrated onto this scan's dimension (each value's text is kept).
-    # A FEATURED parent's attribute setup belongs to the web team — only
-    # attach attributes to a variant we just created there, never rewire
-    # its existing variants or replace a web variant's values.
-    if attribute_name and attribute_value and (variant_created or not product.featured):
-        Through = ProductVariant.product_variant_attribute_values.through
-        target_attr, _ = ProductVariantAttribute.objects.get_or_create(
-            name=_norm_attr(attribute_name))
+    # 3) Attributes. A new variant gets exactly these; an existing one has
+    #    the named attributes set and keeps any others. A FEATURED parent's
+    #    attribute setup belongs to the web team, so only a variant just
+    #    created there is described. Other variants are never touched.
+    if pairs and (variant_created or not product.featured):
+        set_variant_attributes(variant, pairs, replace=variant_created)
 
-        if not product.featured:
-            # Migrate OTHER variants of this product off any different dimension.
-            other_links = (Through.objects
-                           .filter(productvariant__product=product)
-                           .exclude(productvariant_id=variant.id)
-                           .select_related("productvariantattributevalue"))
-            for link in other_links:
-                val = link.productvariantattributevalue
-                if val.product_variant_attribute_id == target_attr.id:
-                    continue
-                # NORMALISE before the lookup. ProductVariantAttributeValue
-                # .save() rewrites this field (lower-case, spaces → "_"), so
-                # get_or_create() with a raw value searches for text the table
-                # can never hold: it misses, inserts, and save() then folds the
-                # new row onto an existing one — an IntegrityError on the
-                # (attribute, value) unique constraint rather than a reuse.
-                # Values written by paths that bypass save() (the product
-                # form's bulk_create) are stored unfolded, e.g. "Silver", and
-                # were exactly what tripped this.
-                moved, _ = ProductVariantAttributeValue.objects.get_or_create(
-                    product_variant_attribute=target_attr,
-                    product_variant_attribute_value=_norm_value(
-                        val.product_variant_attribute_value))
-                Through.objects.get_or_create(
-                    productvariant_id=link.productvariant_id,
-                    productvariantattributevalue_id=moved.id)
-                link.delete()
-
-        # THIS variant: drop every old value, keep only the latest one.
-        value_obj, _ = ProductVariantAttributeValue.objects.get_or_create(
-            product_variant_attribute=target_attr,
-            product_variant_attribute_value=_norm_value(attribute_value))
-        Through.objects.filter(productvariant_id=variant.id).delete()
-        Through.objects.get_or_create(
-            productvariant_id=variant.id,
-            productvariantattributevalue_id=value_obj.id)
-
-    # 5) No parent stock to write. A product's quantity is everything the
+    # 4) No parent stock to write. A product's quantity is everything the
     #    warehouse holds across its variants, read through
     #    Product.live_quantity rather than stored.
 
@@ -451,13 +479,8 @@ def resync_warehouse_product(wp, base_override=None):
                       f"(ürün #{clash.product_id}).")
 
     with _tx.atomic():
-        attr_name = attr_value = None
+        kept = variant_attributes(old)
         if old:
-            av = (old.product_variant_attribute_values
-                  .select_related("product_variant_attribute").order_by("-id").first())
-            if av:
-                attr_name = av.product_variant_attribute.name
-                attr_value = av.product_variant_attribute_value
             old_pid = old.product_id
             wp.catalog_variant = None
             wp.save(update_fields=["catalog_variant"])
@@ -470,8 +493,9 @@ def resync_warehouse_product(wp, base_override=None):
         base = (base_override or cat["base_name"] or "").strip()
         _p, variant, _pc, _vc = sync_roll_to_catalog(
             base_name=base,
-            attribute_name=attr_name or cat["attribute_name"],
-            attribute_value=attr_value or cat["attribute_value"],
+            attributes=kept or None,
+            attribute_name=cat["attribute_name"],
+            attribute_value=cat["attribute_value"],
             variant_sku=sku, variant_barcode=wp.barcode,
             cost=wp.cost_usd,
         )
@@ -513,13 +537,10 @@ def rebuild_catalog_from_warehouse(warehouse=None, apply=True):
     snaps, old_variant_ids, old_product_ids = [], set(), set()
     for wp in wps:
         v = wp.catalog_variant
-        av = (v.product_variant_attribute_values
-              .select_related("product_variant_attribute").order_by("-id").first())
         snaps.append({
             "wp": wp, "sku": (wp.sku or "").strip(), "name": wp.name or "",
             "barcode": wp.barcode, "qty": wp.quantity, "cost": wp.cost_usd,
-            "attr_name": av.product_variant_attribute.name if av else None,
-            "attr_value": av.product_variant_attribute_value if av else None,
+            "attributes": variant_attributes(v),
         })
         old_variant_ids.add(v.id)
         old_product_ids.add(v.product_id)
@@ -557,8 +578,9 @@ def rebuild_catalog_from_warehouse(warehouse=None, apply=True):
             try:
                 _p, variant, _pc, _vc = sync_roll_to_catalog(
                     base_name=cat["base_name"],
-                    attribute_name=s["attr_name"] or cat["attribute_name"],
-                    attribute_value=s["attr_value"] or cat["attribute_value"],
+                    attributes=s["attributes"] or None,
+                    attribute_name=cat["attribute_name"],
+                    attribute_value=cat["attribute_value"],
                     variant_sku=s["sku"], variant_barcode=s["barcode"],
                     cost=s["cost"],
                 )

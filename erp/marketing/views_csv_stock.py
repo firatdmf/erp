@@ -13,6 +13,7 @@ telling you which lines disagree, so someone can go and count.
 """
 
 import csv
+import re
 import io
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from django.http import JsonResponse
@@ -178,6 +179,59 @@ def extract_data(rows):
     return csv_data, total_rows
 
 
+# A code Excel has already turned into a number. "3010.140" is a decimal to
+# Excel, so it comes back as 3010.14 with the trailing zero gone, and
+# "0000103" comes back as 103. Our own .xlsx downloads write SKU cells as
+# text and are safe; a CSV has no formatting at all, so a supplier's sheet
+# opened and saved in Excel arrives already damaged. Nothing can recover the
+# original from the number, but the SKU it came from is usually still
+# findable — and saying so beats a silent "not found".
+_NUMBER_LIKE = re.compile(r"^\d+(\.\d+)?$")
+
+
+def _codes_excel_turned_into_numbers(codes):
+    """For each not-found code that reads as a number, the SKUs it could
+    have been: the same digits with trailing zeros (3010.14 → 3010.140) or
+    with leading zeros (103 → 0000103) put back."""
+    suspects = []
+    for code in codes:
+        if not _NUMBER_LIKE.match(code):
+            continue
+        if "." in code:
+            # Excel dropped trailing zeros after the dot.
+            candidates = _skus_starting_with(code, digits_only_tail=True)
+        else:
+            # Excel dropped leading zeros.
+            candidates = _skus_ending_with_zero_padded(code)
+        if candidates:
+            suspects.append({"code": code, "likely": candidates[:5]})
+    return suspects
+
+
+def _skus_starting_with(code, digits_only_tail=False):
+    found = []
+    for sku in list(ProductVariant.objects.filter(variant_sku__startswith=code)
+                    .values_list("variant_sku", flat=True)[:20]) + \
+              list(Product.objects.filter(sku__startswith=code)
+                   .values_list("sku", flat=True)[:20]):
+        tail = sku[len(code):]
+        if tail and (not digits_only_tail or tail.isdigit()):
+            found.append(sku)
+    return sorted(set(found))
+
+
+def _skus_ending_with_zero_padded(code):
+    found = []
+    for sku in list(ProductVariant.objects.filter(variant_sku__endswith=code)
+                    .values_list("variant_sku", flat=True)[:20]) + \
+              list(Product.objects.filter(sku__endswith=code)
+                   .values_list("sku", flat=True)[:20]):
+        head = sku[: len(sku) - len(code)]
+        if head and set(head) == {"0"}:
+            found.append(sku)
+    return sorted(set(found))
+
+
 @login_required
 @require_POST
 @csrf_protect
@@ -267,11 +321,16 @@ def csv_stock_update(request):
         # 3) Codes not found in either
         not_found = [code for code in csv_data.keys() if code not in matched_codes]
 
+        # Codes the sheet lost to Excel's number formatting, with the SKU
+        # each most likely came from.
+        numbered = _codes_excel_turned_into_numbers(not_found)
+
         print(f"[COMPARE] Matched: {matched_count}, Differing: {differing_count}, "
-              f"Not found: {len(not_found)}")
+              f"Not found: {len(not_found)}, read as numbers: {len(numbered)}")
 
         return JsonResponse({
             'success': True,
+            'number_damaged': numbered[:20],
             'read_only': True,
             'total_rows': total_rows,
             'matched': matched_count,

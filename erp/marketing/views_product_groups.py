@@ -19,8 +19,35 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views import View
 
-from .models import (Product, ProductCategory, ProductVariant,
+from .attributes import normalize_attribute_name
+from .models import (CategoryVariantAttribute, Product, ProductCategory,
+                     ProductVariant, ProductVariantAttribute,
                      with_product_live_quantity)
+
+
+def _attribute_choices():
+    """Every attribute name a group's preset can pick from."""
+    return list(ProductVariantAttribute.objects.order_by("name").values_list("name", flat=True))
+
+
+def _save_variant_attributes(group, request):
+    """Replace the group's attribute preset with the posted list, in order.
+    A name not in the catalog yet is added to it once, in the stored
+    spelling (see marketing/attributes.py). Pages that don't send the
+    list leave the preset alone."""
+    if not request.POST.get("variant_attributes_sent"):
+        return
+    names = []
+    for raw in request.POST.getlist("variant_attributes"):
+        name = normalize_attribute_name(raw)
+        if name and name not in names:
+            names.append(name)
+    with transaction.atomic():
+        group.variant_attribute_presets.all().delete()
+        for position, name in enumerate(names):
+            attribute, _created = ProductVariantAttribute.objects.get_or_create(name=name)
+            CategoryVariantAttribute.objects.create(
+                category=group, attribute=attribute, position=position)
 
 
 def _safe_decimal(value):
@@ -91,7 +118,9 @@ class ProductGroupCreate(View):
     are all set in one go, so a group never starts as an empty shell."""
 
     def get(self, request):
-        return render(request, "marketing/product_group_create.html", {})
+        return render(request, "marketing/product_group_create.html", {
+            "variant_attribute_names": _attribute_choices(),
+        })
 
     def post(self, request):
         name = (request.POST.get("name") or "").strip()
@@ -107,6 +136,7 @@ class ProductGroupCreate(View):
         group = ProductCategory(name=name)
         _fill_group_settings(group, request)
         group.save()
+        _save_variant_attributes(group, request)
         return JsonResponse({"success": True, "existed": False, "id": group.pk})
 
 
@@ -152,6 +182,7 @@ class ProductGroupDetail(View):
             "group": group,
             "rows": rows,
             "stats": stats,
+            "variant_attribute_names": _attribute_choices(),
         })
 
     def post(self, request, pk):
@@ -180,6 +211,7 @@ class ProductGroupDetail(View):
 
         _fill_group_settings(group, request)
         group.save()
+        _save_variant_attributes(group, request)
         return JsonResponse({"success": True, "name": group.name})
 
     def _apply_margin(self, request, group):

@@ -33,7 +33,7 @@ from .services_accounts import (
     _currency_by_code, convert_lines_to_currency, invoice_currency_for,
     mark_as_supplier, MixedCurrencyError,
 )
-from marketing.models import Product, ProductVariant
+from marketing.models import Product, ProductVariant, ProductVariantAttribute
 
 
 def _fallback_code_prefix():
@@ -319,6 +319,9 @@ class GoodsReceipt(View):
             "accounts": _account_choices(),
             "product_categories": _product_category_choices(),
             "pack_types": _pack_type_choices(),
+            # Every attribute a variant can be described by, for "+ Attribute".
+            "variant_attribute_names": list(
+                ProductVariantAttribute.objects.order_by("name").values_list("name", flat=True)),
             # For an account created from the account search.
             "currencies": list(CurrencyCategory.objects.order_by("code")
                                .values_list("code", flat=True)),
@@ -361,6 +364,7 @@ def plan_lines(plan):
     trace outside its own document.
     """
     from marketing.models import Product
+    from operating.views_warehouse import _row_label
 
     lines = []
     products = plan.get("products") or []
@@ -392,7 +396,7 @@ def plan_lines(plan):
                     qty += q
             if qty <= 0:
                 continue
-            v_name = (v_in.get("name") or "").strip()
+            v_name = _row_label(v_in)
             try:
                 price = Decimal(str(v_in.get("price") or "0").replace(",", "."))
             except (InvalidOperation, ValueError):

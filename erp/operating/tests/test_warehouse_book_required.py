@@ -65,3 +65,93 @@ class WarehouseNeedsABook(TestCase):
         Warehouse.objects.create(name="Ergene Depo", accounting_book=self.ergene)
         with self.assertRaises(ProtectedError):
             self.ergene.delete()
+
+
+class CombinedWarehouseHasNoBook(TestCase):
+    """A combined warehouse owns no stock, so it names no book. Its
+    members each carry their own, and the page reads the book off them:
+    one shared book is shown, a mix shows none."""
+
+    def setUp(self):
+        self.laleli = Book.objects.create(name="Laleli Fabric")
+        self.ergene = Book.objects.create(name="Ergene Fabric")
+        self.store = Warehouse.objects.create(name="Laleli", accounting_book=self.laleli)
+        self.factory = Warehouse.objects.create(name="Laleli Fabrika", accounting_book=self.laleli)
+        self.ergene_depot = Warehouse.objects.create(name="Ergene Fabrika", accounting_book=self.ergene)
+        User = get_user_model()
+        self.laleli_only = User.objects.create_user("laleli_only", password="pw")
+        self.laleli_only.member.books.add(self.laleli)
+        self.both = User.objects.create_user("both", password="pw")
+        self.both.member.books.add(self.laleli, self.ergene)
+
+    def _combined(self, name, *sources):
+        wh = Warehouse.objects.create(name=name, kind="combined")
+        wh.combined_sources.set(sources)
+        return wh
+
+    def test_the_database_refuses_a_combined_warehouse_with_a_book(self):
+        with self.assertRaises(IntegrityError):
+            Warehouse.objects.create(name="Ortak", kind="combined",
+                                     accounting_book=self.laleli)
+
+    def test_the_form_creates_one_without_asking_for_a_book(self):
+        self.client.force_login(self.laleli_only)
+        self.client.post(reverse("operating:create_warehouse"), {
+            "name": "Ortak", "kind": "combined",
+            "combined_sources": [self.store.pk, self.factory.pk],
+        })
+        wh = Warehouse.objects.get(name="Ortak")
+        self.assertIsNone(wh.accounting_book)
+        self.assertEqual(wh.owning_book, self.laleli)
+
+    def test_turning_a_warehouse_combined_drops_its_book(self):
+        empty = Warehouse.objects.create(name="Bos", accounting_book=self.laleli)
+        self.client.force_login(self.laleli_only)
+        self.client.post(reverse("operating:warehouse_edit", args=[empty.pk]), {
+            "name": "Bos", "kind": "combined",
+            "accounting_book": str(self.laleli.pk),
+            "combined_sources": [self.store.pk, self.factory.pk],
+        })
+        empty.refresh_from_db()
+        self.assertTrue(empty.is_combined)
+        self.assertIsNone(empty.accounting_book)
+
+    def test_another_books_warehouse_cannot_be_merged_in(self):
+        self.client.force_login(self.laleli_only)
+        self.client.post(reverse("operating:create_warehouse"), {
+            "name": "Ortak", "kind": "combined",
+            "combined_sources": [self.store.pk, self.ergene_depot.pk],
+        })
+        self.assertFalse(Warehouse.objects.filter(name="Ortak").exists())
+
+    def test_one_shared_book_is_shown(self):
+        wh = self._combined("Ortak", self.store, self.factory)
+        self.client.force_login(self.laleli_only)
+        resp = self.client.get(reverse("operating:warehouse_detail", args=[wh.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["owning_book"], self.laleli)
+
+    def test_a_mix_of_books_shows_none(self):
+        wh = self._combined("Ortak", self.store, self.ergene_depot)
+        self.client.force_login(self.both)
+        resp = self.client.get(reverse("operating:warehouse_detail", args=[wh.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.context["owning_book"])
+
+    def test_a_mix_is_hidden_from_someone_outside_one_of_its_books(self):
+        """It shows Ergene's shelves, so a Laleli-only member may not read
+        it — not on the page, not in the list."""
+        wh = self._combined("Ortak", self.store, self.ergene_depot)
+        self.client.force_login(self.laleli_only)
+        for name in ("warehouse_detail", "warehouse_edit"):
+            resp = self.client.get(reverse(f"operating:{name}", args=[wh.pk]))
+            self.assertEqual(resp.status_code, 404, name)
+        listed = self.client.get(reverse("operating:warehouse_list")).context["warehouses"]
+        self.assertNotIn(wh, listed)
+        self.assertIn(self.store, listed)
+
+    def test_a_mix_is_listed_for_someone_in_all_its_books(self):
+        wh = self._combined("Ortak", self.store, self.ergene_depot)
+        self.client.force_login(self.both)
+        listed = self.client.get(reverse("operating:warehouse_list")).context["warehouses"]
+        self.assertIn(wh, listed)

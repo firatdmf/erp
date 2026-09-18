@@ -30,6 +30,7 @@ from .models import (
     with_product_live_quantity,
 )
 from .forms import ProductForm, ProductFileFormSet
+from .attributes import normalize_attribute_name, normalize_attribute_value
 
 # Bunny CDN
 from .utils.bunny_storage import upload_to_bunny, delete_from_bunny
@@ -472,14 +473,10 @@ class BaseProductView(ModelFormMixin):
             print(f"  🔍 Processing attr_name={attr_name!r} → values: {list(by_value.keys()) if isinstance(by_value, dict) else by_value}")
             if not isinstance(by_value, dict):
                 continue
-            attr_name_norm = (attr_name or '').strip().lower()
+            attr_name_norm = normalize_attribute_name(attr_name)
             if not attr_name_norm:
                 continue
-            # Match attribute by case-insensitive normalized name
-            attr = ProductVariantAttribute.objects.filter(name__iexact=attr_name_norm).first()
-            if not attr:
-                # Try with spaces removed (model.save normalization)
-                attr = ProductVariantAttribute.objects.filter(name__iexact=attr_name_norm.replace(' ', '')).first()
+            attr = ProductVariantAttribute.objects.filter(name=attr_name_norm).first()
             print(f"    attr lookup '{attr_name_norm}' → pk={attr.pk if attr else None} name={attr.name if attr else None!r}")
             if not attr:
                 continue
@@ -495,7 +492,7 @@ class BaseProductView(ModelFormMixin):
 
                 if not url:
                     continue
-                value_norm = (value or '').strip().lower().replace(' ', '_')
+                value_norm = normalize_attribute_value(attr_name_norm, value)
                 if not value_norm:
                     continue
 
@@ -704,8 +701,12 @@ class BaseProductView(ModelFormMixin):
         for variant_data in variants_data:
             variant_attribute_values_dict = variant_data.get("variant_attribute_values", {})
             for attr_name, attr_value in variant_attribute_values_dict.items():
-                normalized_name = str(attr_name).strip()
-                normalized_value = str(attr_value).strip()
+                # The stored spelling (marketing/attributes.py): the page
+                # sends what was typed, "Color: Smoky Quartz".
+                normalized_name = normalize_attribute_name(attr_name)
+                normalized_value = normalize_attribute_value(normalized_name, attr_value)
+                if not normalized_name or not normalized_value:
+                    continue
                 all_attr_names.add(normalized_name)
                 all_attr_value_pairs.add((normalized_name, normalized_value))
         
@@ -944,8 +945,8 @@ class BaseProductView(ModelFormMixin):
             variant_attribute_values_dict = variant_data.get("variant_attribute_values", {})
             
             for attr_name, attr_value in variant_attribute_values_dict.items():
-                normalized_name = str(attr_name).strip()
-                normalized_value = str(attr_value).strip()
+                normalized_name = normalize_attribute_name(attr_name)
+                normalized_value = normalize_attribute_value(normalized_name, attr_value)
                 value_obj = attr_value_cache.get((normalized_name, normalized_value))
                 if value_obj:
                     m2m_entries.append(ThroughModel(

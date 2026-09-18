@@ -56,6 +56,32 @@ def _is_admin(user):
         return False
 
 
+def _sheet_barcode(value):
+    """A barcode cell as it was meant to read, plus a warning when Excel
+    has already eaten part of it.
+
+    A barcode column left as General in Excel is a number, and a number
+    loses its leading zeros: "000508345" comes back as 508345, and a whole
+    number can come back as 8690000000123.0. The trailing ".0" is put back
+    the way it came; the lost zeros cannot be — nothing in the cell says how
+    many there were — so the row still imports and the sheet is told.
+
+    Returns (barcode, warning); warning is None when nothing looks wrong.
+    """
+    if value is None:
+        return None, None
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    text = str(value).strip()
+    if text.endswith('.0') and text[:-2].isdigit():
+        text = text[:-2]
+    if text and text.isdigit() and len(text) < 12:
+        from django.utils.translation import gettext as _t
+        return text, _t("is shorter than a barcode — Excel may have dropped "
+                        "leading zeros. Format the column as Text and upload again.")
+    return text, None
+
+
 def _safe_decimal(value, default=None):
     """Convert any cell value to Decimal, returning default on failure."""
     if value is None or value == '':
@@ -839,6 +865,8 @@ def _product_category_choices():
         rows.sort(key=lambda c: (c.name != "fabric", c.name))
         return [{"id": c.id, "name": c.name,
                  "label": str(_CATEGORY_LABELS.get(c.name, c.name)),
+                 # What a new product of the group is asked per variant.
+                 "attribute_names": c.variant_attribute_names(),
                  "is_default": c.name == "fabric"} for c in rows]
     except Exception:
         return []
@@ -859,6 +887,24 @@ def _pack_type_choices():
     }
 
 
+def product_attribute_names(product=None, category=None):
+    """The attributes a product's variants are described by, in order: its
+    group's preset first, then any other attribute its variants carry. A
+    new product (no `product`) gets its group's preset."""
+    from marketing.models import ProductVariant
+    category = category or (product.category if product is not None and product.category_id else None)
+    names = category.variant_attribute_names() if category is not None else []
+    if product is not None:
+        Through = ProductVariant.product_variant_attribute_values.through
+        for name in (Through.objects.filter(productvariant__product=product)
+                     .order_by("id")
+                     .values_list("productvariantattributevalue__product_variant_attribute__name",
+                                  flat=True)):
+            if name not in names:
+                names.append(name)
+    return names
+
+
 def _product_facts(product, invoice=None):
     """What the goods-receipt form states about an existing main product:
     its type, unit and pack, and whether this purchase may still change
@@ -872,6 +918,7 @@ def _product_facts(product, invoice=None):
         "pack_type": product.pack_type,
         "pack_label": str(dict(units.PACK_CHOICES).get(product.pack_type, product.pack_type)),
         "unit_locked": _product_stock_elsewhere(product, invoice),
+        "attribute_names": product_attribute_names(product),
     }
 
 
@@ -1139,6 +1186,25 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
     return survivor, merged
 
 
+def warehouse_guarded(view):
+    """404 a warehouse route for a member who may not read its shelves.
+
+    `book_guarded` follows one FK to one book, which a combined warehouse
+    does not have: its stock belongs to its members' books, and it is
+    only readable by someone who works in all of them (Warehouse.visible_to).
+    404 rather than 403, as book_guarded does."""
+    from functools import wraps
+    from django.http import Http404
+
+    @wraps(view)
+    def wrapper(request, *args, pk=None, **kwargs):
+        warehouse = get_object_or_404(Warehouse, pk=pk)
+        if not warehouse.visible_to(getattr(request.user, "member", None)):
+            raise Http404("No such record.")
+        return view(request, *args, pk=pk, **kwargs)
+    return wrapper
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseList(View):
     template_name = "operating/warehouse_list.html"
@@ -1149,12 +1215,19 @@ class WarehouseList(View):
         # reading Laleli's shelves — and a warehouse with no book stated
         # is shown to nobody rather than to everybody.
         from accounting.services_accounts import member_books
+        # A combined warehouse has no book of its own and is listed only
+        # when the member works in every book its members belong to.
         member = getattr(request.user, "member", None)
-        warehouses = list(Warehouse.objects.filter(
-            accounting_book__in=member_books(member),
-        ).annotate(
-            n_products=Count('products'),
-        ).prefetch_related('combined_sources').order_by('name'))
+        allowed = set(member_books(member).values_list("pk", flat=True))
+        warehouses = [
+            w for w in Warehouse.objects.filter(
+                Q(accounting_book__in=allowed) | Q(kind='combined'),
+            ).annotate(
+                n_products=Count('products'),
+            ).prefetch_related('combined_sources').order_by('name')
+            if not w.is_combined
+            or ({m.accounting_book_id for m in w.combined_sources.all()} or {None}) <= allowed
+        ]
         # Combined (ortak) warehouses own no products — their card shows
         # the MEMBERS' variant count and member names instead.
         for w in warehouses:
@@ -1198,13 +1271,16 @@ def _get_book_choices(request=None):
         return []
 
 
-def _resolve_warehouse_book(request):
-    """The Book a new warehouse is being created in, or (None, error).
+def _resolve_warehouse_book(request, kind='normal'):
+    """The Book a warehouse is being saved in, or (None, error).
 
-    Required — a warehouse states which book owns its stock — and
-    checked against the member's assignments, because the id comes from
-    a form the browser controls.
+    Required for a normal warehouse — it states which book owns its
+    stock — and checked against the member's assignments, because the id
+    comes from a form the browser controls. A combined warehouse owns no
+    stock and takes no book: (None, None).
     """
+    if kind == 'combined':
+        return None, None
     book_id = (request.POST.get('accounting_book') or '').strip()
     if not book_id.isdigit():
         return None, "Bir defter seçin — deponun stoğu bir defterin varlığıdır."
@@ -1247,7 +1323,10 @@ def _parse_combined_fields(request, *, exclude_pk=None):
     if kind != 'combined':
         return 'normal', [], None
     ids = [int(x) for x in request.POST.getlist('combined_sources') if str(x).isdigit()]
-    qs = Warehouse.objects.filter(pk__in=ids, kind='normal')
+    # Only the members the form offered: another book's warehouse would
+    # be a way to read its shelves.
+    qs = Warehouse.objects.filter(pk__in=ids, kind='normal',
+                                  accounting_book__in=_get_book_choices(request))
     if exclude_pk:
         qs = qs.exclude(pk=exclude_pk)
     sources = list(qs)
@@ -1280,7 +1359,7 @@ class WarehouseCreate(View):
             messages.error(request, kind_err)
             return render(request, self.template_name, _combined_form_ctx(request=request))
 
-        book, book_err = _resolve_warehouse_book(request)
+        book, book_err = _resolve_warehouse_book(request, kind)
         if book_err:
             messages.error(request, book_err)
             return render(request, self.template_name, _combined_form_ctx(request=request))
@@ -1386,7 +1465,7 @@ class WarehouseEdit(View):
         warehouse.description = description or None
         warehouse.kind = kind
 
-        book, book_err = _resolve_warehouse_book(request)
+        book, book_err = _resolve_warehouse_book(request, kind)
         if book_err:
             messages.error(request, book_err)
             return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
@@ -1795,6 +1874,7 @@ class WarehouseDetail(View):
             # of them until Ready-made Shop, still read "12,345 m".
             'total_unit_short': _warehouse_unit_short(scope_ids),
             **_warehouse_item_words(scope_ids),
+            'owning_book': warehouse.owning_book,
             'combined_members': (list(warehouse.combined_sources.order_by('name'))
                                  if warehouse.is_combined else []),
         })
@@ -2223,7 +2303,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
              "error": "Bu stock item tükenmiş — taşınacak metre yok."}, status=400)
 
     # Stock may not cross between BOOKS on a warehouse move. A book is a
-    # business: Warehouse.accounting_book is required and PROTECTed because
+    # business: a stocked Warehouse.accounting_book is required and PROTECTed because
     # the shelves are that business's asset, and its net worth is the sum of
     # them. Carrying a stock item from one book's depot to another's hands over an
     # asset — 857m of K24593.G07 is about $2,058 — and this view records only
@@ -2400,6 +2480,11 @@ def catalog_product_variants(request, pk, product_id):
             "id": v.id,
             "label": label,
             "attribute_name": (av.product_variant_attribute.name if av else None),
+            # Every value, so picking the chip fills the row's fields.
+            "attributes": [{"name": x.product_variant_attribute.name,
+                            "value": x.product_variant_attribute_value}
+                           for x in sorted(v.product_variant_attribute_values.all(),
+                                           key=lambda x: x.id)],
             "variant_sku": v.variant_sku,
             "variant_barcode": v.variant_barcode,
             # Live, not the stored mirror: a variant whose only roll was
@@ -2454,101 +2539,66 @@ def warehouse_customer_currency(request, pk):
 
 @login_required
 def catalog_variant_match(request, pk, product_id):
-    """Classify a variant being typed into the "Yeni ürün" panel as
-    EXISTING (adds stock to an already-catalogued variant), CONFLICTING
-    (the SKU belongs to another product, and the save will refuse it) or
-    NEW (will create one), using the SAME parse/translate logic
-    sync_roll_to_catalog uses at save time — so the preview badge and the
-    actual save never disagree on what counts as "the same variant".
+    """Classify a variant row of the goods-receipt page the way the save will:
 
-    The real-WarehouseProduct requirement applies to the NAME/attribute
-    match only — see catalog_product_variants for why. Matching an orphaned
-    catalog variant on a colour would silently add real intake stock to a
-    row with no warehouse row behind it, instead of properly creating or
-    linking one.
+    - EXISTING — its SKU is a variant of this product; stock is added to it.
+    - CONFLICT — its SKU belongs to another product; the save refuses it.
+    - LOOK-ALIKE — a new SKU whose attribute values equal an existing
+      variant's; the save refuses it (see _intake_check_lookalikes).
+    - NEW — anything else.
 
-    An EXACT SKU match is the opposite case. variant_sku is globally unique,
-    so the save (sync_roll_to_catalog step 2) has no choice but to reuse the
-    row that already holds the typed code — it cannot mint a second variant
-    under the same SKU. Excluding orphans here made the badge promise "new"
-    for a SKU the save then reused, which is exactly the preview/save
-    disagreement this endpoint exists to prevent."""
-    from .catalog_sync import translate_color, _norm_attr, _norm_value
+    A variant is its SKU. Matching on a colour used to add stock to
+    whichever variant shared it.
+
+    GET: sku, and `attrs` — JSON [{name, value}] — or, from a page older
+    than attribute fields, `name`."""
+    import json as _json
     from marketing.models import Product, ProductVariant
+    from .catalog_sync import find_lookalike
 
-    name = (request.GET.get("name") or "").strip()
     sku = (request.GET.get("sku") or "").strip()
-    if not name and not sku:
-        return JsonResponse({"exists": False, "attribute_name": None, "attribute_value": None})
-
-    eng = translate_color(name) if name else None
-    attribute_name = "color" if eng else "model"
-    attribute_value = eng or name
+    try:
+        rows = _json.loads(request.GET.get("attrs") or "null")
+    except ValueError:
+        rows = None
+    pairs = _row_attributes({"attributes": rows, "name": request.GET.get("name")})
+    described = [{"name": n, "value": v} for n, v in pairs]
+    if not pairs and not sku:
+        return JsonResponse({"exists": False, "attributes": []})
 
     # Scoped to hidden/warehouse products only — see catalog_product_variants.
     product = Product.objects.filter(pk=product_id, featured=False).first()
-    match = None
-    if product is not None and sku:
-        # SKU first, because that is what the save actually dedups on
-        # ("same SKU = same variant" — see perform_intake). Colour matching
-        # only ever worked for names translate_color recognises, so a variant
-        # catalogued as "petrol+marletto" or "MARLETTOO" read as NEW here and
-        # was then reused by the save — the preview and the save disagreeing
-        # is exactly what this endpoint exists to prevent.
-        # No warehouse-link filter here: see the docstring. The SKU is
-        # unique, so whatever holds it IS the row the save will land on,
-        # stock behind it or not.
-        match = (ProductVariant.objects
-                 .filter(product=product, variant_sku__iexact=sku)
-                 .first())
-    if match is None and product is not None and name:
-        match = (ProductVariant.objects
-                 .filter(product=product,
-                         warehouse_products__isnull=False,
-                         product_variant_attribute_values__product_variant_attribute__name=_norm_attr(attribute_name),
-                         product_variant_attribute_values__product_variant_attribute_value=_norm_value(attribute_value))
-                 .first())
+    match = (ProductVariant.objects.filter(product=product, variant_sku__iexact=sku).first()
+             if product is not None and sku else None)
 
-    # A SKU already spoken for by ANOTHER product is not "new" either.
-    # variant_sku is globally unique, so sync_roll_to_catalog refuses it
-    # outright (CatalogSyncConflict, step 2) — the batch comes back with a
-    # warning after the operator has typed the whole delivery in. Saying so
-    # here, while the box is still under the cursor, is the difference
-    # between a correction and a re-entry.
-    #
-    # Not scoped to hidden products the way the match above is: the save's
-    # lookup is global, so a clash with a featured web product's variant
-    # stops the intake just the same and has to be reported just the same.
-    if match is None and sku:
-        clash = (ProductVariant.objects
-                 .filter(variant_sku__iexact=sku)
-                 .exclude(product_id=product_id)
-                 .select_related("product")
-                 .first())
+    if match is not None:
+        return JsonResponse({
+            "exists": True, "attributes": described,
+            "variant_sku": match.variant_sku,
+            "variant_quantity": float(match.live_quantity or 0),
+        })
+
+    # A SKU already spoken for by ANOTHER product is not "new" either:
+    # variant_sku is globally unique, so the save refuses it. Not scoped to
+    # hidden products — a featured web product's variant blocks it too.
+    if sku:
+        clash = (ProductVariant.objects.filter(variant_sku__iexact=sku)
+                 .exclude(product_id=product_id).select_related("product").first())
         if clash is not None:
             return JsonResponse({
-                "exists": False,
-                "conflict": True,
-                "attribute_name": attribute_name,
-                "attribute_value": attribute_value,
+                "exists": False, "conflict": True, "attributes": described,
                 "variant_sku": clash.variant_sku,
                 "conflict_product": clash.product.title,
                 "conflict_product_sku": clash.product.sku or "",
             })
 
-    if match:
+    twin = find_lookalike(product, pairs) if product is not None else None
+    if twin is not None:
         return JsonResponse({
-            "exists": True,
-            "attribute_name": attribute_name,
-            "attribute_value": attribute_value,
-            "variant_sku": match.variant_sku,
-            "variant_quantity": float(match.live_quantity or 0),
+            "exists": False, "lookalike": True, "attributes": described,
+            "variant_sku": twin.variant_sku,
         })
-    return JsonResponse({
-        "exists": False,
-        "attribute_name": attribute_name,
-        "attribute_value": attribute_value,
-    })
+    return JsonResponse({"exists": False, "attributes": described})
 
 
 @login_required
@@ -2745,7 +2795,7 @@ def _intake_check_prices(products_in):
     for i, p_in in enumerate(products_in, start=1):
         for v in (p_in.get("variants") or []):
             if _is_negative_price(v.get("price")):
-                label = ((v.get("sku") or v.get("name") or "").strip()
+                label = ((v.get("sku") or _row_label(v) or "").strip()
                          or ((p_in.get("main_product") or {}).get("name") or "").strip()
                          or _t("product %(n)s") % {"n": i})
                 bad.append(label)
@@ -3054,27 +3104,117 @@ def _take_purchase_price(wp, price, currency, cost_usd, cost_try):
                            "cost_usd", "cost_try", "updated_at"])
 
 
+def _row_attributes(v):
+    """[(name, value)] one variant row describes its variant with, in the
+    stored spelling: the row's own attribute fields, a colour typed in
+    Turkish (KREM) stored by its English key (cream). A row saved before
+    rows had fields carries one free-text `name`, read the old way: a
+    colour if it is one, a model otherwise."""
+    from marketing.attributes import normalize_attribute_name, normalize_attribute_value
+    from .catalog_sync import translate_color
+
+    def pair(name, value):
+        name = normalize_attribute_name(name)
+        value = (value or "").strip()
+        if name == "color":
+            value = translate_color(value) or value
+        value = normalize_attribute_value(name, value)
+        return (name, value) if name and value else None
+
+    rows = v.get("attributes")
+    pairs = []
+    if isinstance(rows, list):
+        for a in rows:
+            if isinstance(a, dict):
+                found = pair(a.get("name"), a.get("value"))
+                if found and found[0] not in {n for n, _ in pairs}:
+                    pairs.append(found)
+    legacy = (v.get("name") or "").strip()
+    if not pairs and legacy:
+        found = pair("color", legacy) if translate_color(legacy) else pair("model", legacy)
+        pairs = [found] if found else []
+    return pairs
+
+
+def _row_label(v):
+    """What a row calls its variant, as typed: the values in order."""
+    rows = v.get("attributes")
+    if isinstance(rows, list) and rows:
+        typed = [str(a.get("value") or "").strip() for a in rows if isinstance(a, dict)]
+        label = " ".join(t for t in typed if t)
+        if label:
+            return label
+    return (v.get("name") or "").strip()
+
+
+def _intake_check_lookalikes(resolved):
+    """Refuse, before any stock is written, a variant the catalog could not
+    tell apart from another: a NEW variant whose attribute values equal an
+    existing variant of its product, or another row of the same product in
+    this delivery. An existing variant is only checked when the row changes
+    its values — look-alikes already in the catalog don't block receiving."""
+    from django.utils.translation import gettext as _t
+    from marketing.models import ProductVariant
+    from .catalog_sync import find_lookalike, variant_attributes
+
+    problems = []
+    for item in resolved:
+        product = item["main_product"]
+        seen = {}
+        for v in _intake_variants_raw(item):
+            pairs = frozenset(_row_attributes(v))
+            if not pairs:
+                continue
+            sku = (v.get("sku") or "").strip()
+            label = _row_label(v) or sku
+            existing = (ProductVariant.objects.filter(product=product, variant_sku__iexact=sku).first()
+                        if product is not None and sku else None)
+            if existing is not None and frozenset(variant_attributes(existing)) == pairs:
+                seen.setdefault(pairs, label)
+                continue
+            if pairs in seen:
+                problems.append(_t("%(a)s and %(b)s have the same attribute values.")
+                                % {"a": seen[pairs], "b": label})
+                continue
+            seen[pairs] = label
+            twin = (find_lookalike(product, list(pairs),
+                                   exclude_variant_id=existing.pk if existing else None)
+                    if product is not None else None)
+            if twin is not None:
+                problems.append(_t("%(label)s has the same attribute values as %(sku)s — "
+                                   "add the stock to %(sku)s, or give it a value that tells "
+                                   "it apart.") % {"label": label, "sku": twin.variant_sku})
+    if problems:
+        raise IntakeError({"success": False, "error": " ".join(problems),
+                           "lookalikes": problems}, status=400)
+
+
+def _intake_variants_raw(item):
+    """The rows a card carries, as sent (no-variant mode: its one row)."""
+    rows = item["variants_in"]
+    return rows if item["has_variants"] else rows[:1]
+
+
 def _intake_variant_identity(main_product, base_name, v, idx, seen_skus):
     """What ONE variant row is, before any stock exists: its SKU
     (deduplicated within the product, and globally when auto) and its
-    colour/model attribute. Mutates `seen_skus`.
+    attributes. Mutates `seen_skus`.
 
     Shared by intake and by a draft purchase bought for a customer, which
     has to put the variant in the catalog at save time so the customer's
     order has a line to point at — and must mint the SKU the receipt will
     later find.
 
-    Returns a dict: sku, name, attr_name, attr_value."""
-    from .catalog_sync import translate_color
-
-    v_name = (v.get("name") or "").strip()
+    Returns a dict: sku, name, attributes."""
+    v_name = _row_label(v)
+    attributes = _row_attributes(v)
     typed_sku = (v.get("sku") or "").strip()[:SKU_MAX_LENGTH]
     v_sku = typed_sku
     if not v_sku:
         # AUTO variant SKU rooted on the (minted) main product SKU.
         root = (main_product.sku or base_name or "SKU").strip()
-        suffix = _slug_token(v_name) or str(idx)
-        v_sku = f"{root}-{suffix}"[:SKU_MAX_LENGTH]
+        suffix = "-".join(t for t in (_slug_token(val) for _, val in attributes) if t) or str(idx)
+        v_sku = f"{root}.{suffix}"[:SKU_MAX_LENGTH]
 
     def _bump(s, n):
         tail = str(n)
@@ -3095,13 +3235,7 @@ def _intake_variant_identity(main_product, base_name, v, idx, seen_skus):
             v_sku = _bump(base_v, dup)
     seen_skus.add(v_sku)
 
-    # Colour vs model attribute, derived from the variant name.
-    eng = translate_color(v_name) if v_name else None
-    return {
-        "sku": v_sku, "name": v_name,
-        "attr_name": ("color" if eng else ("model" if v_name else None)),
-        "attr_value": (eng or v_name) or None,
-    }
+    return {"sku": v_sku, "name": v_name, "attributes": attributes}
 
 
 def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
@@ -3114,11 +3248,10 @@ def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
     `take_price` — intake makes every batch's price the product's
     last-purchase price. A purchase edit decides that for itself.
 
-    Returns a dict: wp, created, sku, name, wp_name, attr_name, attr_value,
+    Returns a dict: wp, created, sku, name, wp_name, attributes,
     price, currency, cost_usd, cost_try."""
     ident = _intake_variant_identity(main_product, base_name, v, idx, seen_skus)
     v_sku, v_name = ident["sku"], ident["name"]
-    attr_name, attr_value = ident["attr_name"], ident["attr_value"]
 
     price, currency = _purchase_price(v)
     cost_usd, cost_try = _purchase_costs(price, currency, rates)
@@ -3142,7 +3275,7 @@ def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
 
     return {
         "wp": wp, "created": created, "sku": v_sku, "name": v_name,
-        "wp_name": wp_name, "attr_name": attr_name, "attr_value": attr_value,
+        "wp_name": wp_name, "attributes": ident["attributes"],
         "price": price, "currency": currency,
         "cost_usd": cost_usd, "cost_try": cost_try,
     }
@@ -3151,16 +3284,20 @@ def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
 def _intake_catalog_link(wp, target, main_product, base_name, first_barcode, warnings):
     """Mirror a variant row onto the catalog and link its WarehouseProduct
     to the variant. A clash is a warning, never a failed receipt."""
-    from .catalog_sync import sync_roll_to_catalog, CatalogSyncConflict
+    from .catalog_sync import sync_roll_to_catalog, CatalogSyncConflict, LookAlikeVariant
     try:
         _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
             base_name=base_name,
-            attribute_name=target["attr_name"],
-            attribute_value=target["attr_value"],
+            attributes=target["attributes"],
             variant_sku=target["sku"], variant_barcode=first_barcode,
             cost=target["cost_usd"],
             existing_base_product=main_product,
+            refuse_lookalike=True,
         )
+    except LookAlikeVariant as exc:
+        # Pass 1 checks this; reaching it means a concurrent save made the
+        # twin. Refused like the check would have, and rolled back.
+        raise IntakeError({"success": False, "error": f"{target['sku']}: {exc}"}, status=409)
     except CatalogSyncConflict as exc:
         warnings.append(f"{target['sku']}: {exc}")
         return None
@@ -3207,6 +3344,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     _intake_check_prices(products_in)
     resolved = _intake_resolve_products(products_in, prefix,
                                         default_unit=data.get("unit"))
+    _intake_check_lookalikes(resolved)
     manual_codes = _intake_typed_barcodes(products_in)
     # The customer order this stock is bought for. Only a confirmed draft
     # can have one: a purchase for a customer is always saved first, since
@@ -3235,7 +3373,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                 seen_skus = set()
                 for idx, v in enumerate(_intake_variants(item, main_product), start=1):
                     stock_items = v.get("tops") or []
-                    if (not (v.get("name") or "").strip()
+                    if (not _row_label(v)
                             and not (v.get("sku") or "").strip() and not stock_items):
                         continue
                     target = _intake_variant_wp(
@@ -3592,6 +3730,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             products_in, prefix,
             own_product_ids={it.product_id for it in items.values() if it.product_id},
             default_unit=data.get("unit"))
+        _intake_check_lookalikes(resolved)
         manual_codes = _intake_typed_barcodes(
             products_in, current_barcodes={pk: r.barcode for pk, r in rolls.items()})
 
@@ -3706,7 +3845,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                 tops = [t for t in (v.get("tops") or [])
                         if (_safe_decimal(t.get("qty")) or Decimal("0")) > 0]
                 item = items.get(_int_or_none(v.get("invoice_item_id")))
-                if (item is None and not (v.get("name") or "").strip()
+                if (item is None and not _row_label(v)
                         and not (v.get("sku") or "").strip() and not tops):
                     continue
 
@@ -3843,11 +3982,23 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                                              target["cost_usd"], target["cost_try"])
 
                 renamed = False
-                if (not landed_here and not target["created"]
-                        and target["name"] != _purchase_variant_label(wp, main_product.title)):
-                    wp.name = target["wp_name"]
-                    wp.save(update_fields=["name", "updated_at"])
-                    renamed = True
+                if not landed_here and not target["created"]:
+                    if isinstance(v.get("attributes"), list):
+                        # A row with attribute fields is renamed when its
+                        # values change — not when their stored spelling
+                        # ("dark_cream") differs from the name it was
+                        # received under ("KOYU KREM").
+                        from .catalog_sync import set_variant_attributes, variant_attributes
+                        variant = wp.catalog_variant
+                        if frozenset(target["attributes"]) != frozenset(variant_attributes(variant)):
+                            if variant is not None and not variant.product.featured:
+                                set_variant_attributes(variant, target["attributes"], replace=True)
+                            renamed = True
+                    elif target["name"] != _purchase_variant_label(wp, main_product.title):
+                        renamed = True
+                    if renamed:
+                        wp.name = target["wp_name"]
+                        wp.save(update_fields=["name", "updated_at"])
 
                 metres_now = sum(
                     WarehouseProductItem.objects.filter(pk__in=line_roll_ids)
@@ -3910,6 +4061,7 @@ class WarehousePurchaseEdit(View):
     def get(self, request, pk, invoice_id):
         from django.db.models import Exists, OuterRef, Prefetch
         from accounting.models import Invoice
+        from .catalog_sync import variant_attributes
         from .models import OrderStockReservation
 
         get_object_or_404(Warehouse, pk=pk)
@@ -3966,6 +4118,8 @@ class WarehousePurchaseEdit(View):
             groups[key]["variants"].append({
                 "invoice_item_id": it.pk,
                 "name": _purchase_variant_label(wp, title) if wp is not None else it.description,
+                "attributes": [{"name": n, "value": val} for n, val in variant_attributes(
+                    wp.catalog_variant if wp is not None and wp.catalog_variant_id else None)],
                 "sku": (wp.sku or "") if wp is not None else "",
                 "price": _plain_decimal(it.unit_price),
                 "currency": invoice.currency.code,
@@ -4174,7 +4328,9 @@ class WarehouseProductImport(View):
                     barcode = row[col_barcode] if (col_barcode is not None and col_barcode < len(row)) else None
                     model = row[col_model] if (col_model is not None and col_model < len(row)) else None
 
-                    barcode = str(barcode).strip() if barcode is not None else None
+                    barcode, barcode_warning = _sheet_barcode(barcode)
+                    if barcode_warning:
+                        errors.append(f"Row {idx}: {barcode} {barcode_warning}")
                     model = str(model).strip() if model is not None else None
 
                     # Currency

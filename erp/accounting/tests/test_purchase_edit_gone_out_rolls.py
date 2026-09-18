@@ -98,7 +98,7 @@ class PurchaseEditGoneOutRollsTest(base.TestCase):
         self._stock_out("KRV-A", 2)
         form = self._form()
         v = self._variant(form)
-        v["name"], v["sku"] = "G08", "K24644.G08"
+        v["attributes"], v["sku"] = [{"name": "model", "value": "G08"}], "K24644.G08"
         self._assert_refused(form, "KRV-A")
         self.assertFalse(WarehouseProduct.objects.filter(sku="K24644.G08").exists())
 

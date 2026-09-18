@@ -3,7 +3,8 @@
 The product-group settings cards, shared by the create page (group = None →
 blank fields, visibility defaults on) and the detail/settings page (group
 set → current values, plus the bulk apply-margin box).
-Expects: group (ProductCategory or None).
+Expects: group (ProductCategory or None), variant_attribute_names (every
+attribute a preset can pick from).
 {% endcomment %}
 
 <div class="pgd-card">
@@ -94,3 +95,78 @@ Expects: group (ProductCategory or None).
     <div class="pgd-hint">{% trans "Customs tariff code used on export paperwork for this group." %}</div>
   </div>
 </div>
+
+{# What each variant of a new product in the group is asked, in order. #}
+<div class="pgd-card">
+  <div class="pgd-card-title"><i data-lucide="list-checks"></i>{% trans "Variant attributes" %}</div>
+  <div class="pgd-hint pgd-attr-intro">{% trans "What the goods-receipt page asks about each variant of a new product in this group, in this order. A product can still add others." %}</div>
+  <input type="hidden" name="variant_attributes_sent" value="1">
+  <div class="pgd-attr-list" id="pgdAttrList">
+    {% for name in group.variant_attribute_names %}
+      <div class="pgd-attr">
+        <input type="hidden" name="variant_attributes" value="{{ name }}">
+        <span class="pgd-attr-name">{{ name|capfirst }}</span>
+        <button type="button" class="pgd-attr-btn" title="{% trans 'Move up' %}" onclick="pgdAttrMove(this, -1)">&uarr;</button>
+        <button type="button" class="pgd-attr-btn" title="{% trans 'Move down' %}" onclick="pgdAttrMove(this, 1)">&darr;</button>
+        <button type="button" class="pgd-attr-btn" title="{% trans 'Remove' %}" onclick="this.closest('.pgd-attr').remove()">&times;</button>
+      </div>
+    {% empty %}
+      <div class="pgd-hint pgd-attr-empty">{% trans "No attributes yet — new products in this group are asked their color." %}</div>
+    {% endfor %}
+  </div>
+  <div class="pgd-attr-add">
+    <input class="pgd-input" id="pgdAttrNew" list="pgdAttrOptions" autocomplete="off"
+           placeholder="{% trans 'Add an attribute, e.g. color' %}"
+           onkeydown="if (event.key === 'Enter') { event.preventDefault(); pgdAttrAdd(); }">
+    <datalist id="pgdAttrOptions">
+      {% for name in variant_attribute_names %}<option value="{{ name }}">{% endfor %}
+    </datalist>
+    <button type="button" class="pgd-btn" onclick="pgdAttrAdd()">{% trans "Add" %}</button>
+  </div>
+</div>
+<style>
+  .pgd-attr-intro { margin: -6px 0 12px; }
+  .pgd-attr-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .pgd-attr { display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+              border: 1px solid var(--border-subtle, #E2E8EE); border-radius: 8px; }
+  .pgd-attr-name { flex: 1; font: 600 13px var(--font-sans, sans-serif); }
+  .pgd-attr-btn { border: 0; background: transparent; cursor: pointer; font-size: 15px;
+                  color: var(--fg-muted, #6B7280); padding: 2px 6px; border-radius: 6px; }
+  .pgd-attr-btn:hover { background: var(--bg-subtle, #F1F5F9); }
+  .pgd-attr-add { display: flex; gap: 8px; }
+  .pgd-attr-add .pgd-input { flex: 1; }
+</style>
+<script>
+  // The list is plain hidden inputs in order, so the settings form posts it
+  // as it stands; the server replaces the preset with it.
+  function pgdAttrMove(btn, step) {
+    const row = btn.closest('.pgd-attr');
+    const other = step < 0 ? row.previousElementSibling : row.nextElementSibling;
+    if (!other || !other.classList.contains('pgd-attr')) return;
+    if (step < 0) row.parentNode.insertBefore(row, other);
+    else row.parentNode.insertBefore(other, row);
+  }
+  function pgdAttrAdd() {
+    const input = document.getElementById('pgdAttrNew');
+    const name = (input.value || '').toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+    if (!name) return;
+    const list = document.getElementById('pgdAttrList');
+    const taken = Array.prototype.some.call(list.querySelectorAll('input[name="variant_attributes"]'),
+      function (i) { return i.value === name; });
+    input.value = '';
+    if (taken) return;
+    const empty = list.querySelector('.pgd-attr-empty');
+    if (empty) empty.remove();
+    const row = document.createElement('div');
+    row.className = 'pgd-attr';
+    row.innerHTML =
+      '<input type="hidden" name="variant_attributes">' +
+      '<span class="pgd-attr-name"></span>' +
+      '<button type="button" class="pgd-attr-btn" title="{% trans 'Move up' %}" onclick="pgdAttrMove(this, -1)">&uarr;</button>' +
+      '<button type="button" class="pgd-attr-btn" title="{% trans 'Move down' %}" onclick="pgdAttrMove(this, 1)">&darr;</button>' +
+      '<button type="button" class="pgd-attr-btn" title="{% trans 'Remove' %}" onclick="this.closest(\'.pgd-attr\').remove()">&times;</button>';
+    row.querySelector('input').value = name;
+    row.querySelector('.pgd-attr-name').textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    list.appendChild(row);
+  }
+</script>

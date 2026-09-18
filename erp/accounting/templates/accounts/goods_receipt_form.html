@@ -252,6 +252,15 @@
   }
   .np-kind-hint { margin: -10px 0 14px; }
   .np-kind-row [hidden], .np-kind-hint[hidden] { display: none !important; }
+  .np-attr-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .np-attr-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
+                  border: 1px solid #D5DDE3; border-radius: 999px; background: #F4F7F9;
+                  font: 600 12px var(--font-sans); color: var(--gray-700, #334155); }
+  .np-attr-x { border: 0; background: transparent; color: var(--gray-500); cursor: pointer;
+               font-size: 14px; line-height: 1; padding: 0 0 0 2px; }
+  .np-attr-add { width: auto; min-width: 140px; height: 30px; font-size: 12px; }
+  .np-v-attrs { flex: 2; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .np-v-attrs .np-col { flex: 1 1 110px; }
   .np-main-sku, .np-v-sku { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
 
   /* Every input says what it is above itself, in the same voice as the
@@ -650,6 +659,7 @@
 
 {{ product_categories|json_script:"np-cats-data" }}
 {{ pack_types|json_script:"np-packs-data" }}
+{{ variant_attribute_names|json_script:"np-attrs-data" }}
 {% if intake_plan %}{{ intake_plan|json_script:"gr-plan-data" }}{% endif %}
 <script>
 (function () {
@@ -689,9 +699,136 @@
   // Product group (marketing ProductCategory) options — fabric (Kumaş) comes
   // first from the server and is the preselected default for new products.
   const NP_CATS = JSON.parse((document.getElementById('np-cats-data') || {}).textContent || '[]');
-  const NP_CAT_SEL = '<select class="np-select np-main-cat">' +
+  const NP_CAT_SEL = '<select class="np-select np-main-cat" onchange="npCategoryChanged(this)">' +
     NP_CATS.map(function (c) { return '<option value="' + c.id + '"' + (c.is_default ? ' selected' : '') + '>' + c.label + '</option>'; }).join('') +
     '</select>';
+  // ── Variant attributes ───────────────────────────────────────────
+  // A card asks each variant row one question per attribute in its list:
+  // a new product starts from its group's preset, an existing one from
+  // what its variants carry, and "+ Attribute" adds any other. The values
+  // are what the catalog stores, so nothing is guessed from free text.
+  const NP_ALL_ATTRS = JSON.parse((document.getElementById('np-attrs-data') || {}).textContent || '[]');
+  const NP_ATTR_LABELS = {
+    'color': '{% trans "Color" context "attribute" %}', 'model': '{% trans "Model" context "attribute" %}',
+    'size': '{% trans "Size" context "attribute" %}', 'size per panel': '{% trans "Size per panel" context "attribute" %}',
+    'header': '{% trans "Header" context "attribute" %}', 'fabric': '{% trans "Fabric" context "attribute" %}',
+    'yarn': '{% trans "Yarn" context "attribute" %}'
+  };
+  const NP_ATTR_HINTS = {
+    'color': '{% trans "e.g. White" %}', 'model': '{% trans "e.g. V-106" %}',
+    'size': '{% trans "e.g. 130 x 210 cm" %}', 'size per panel': '{% trans "e.g. 130 x 210 cm" %}',
+    'header': '{% trans "e.g. grommet" %}'
+  };
+  function npAttrKey(n) { return String(n || '').toLowerCase().split(/\s+/).filter(Boolean).join(' '); }
+  function npAttrLabel(n) {
+    return NP_ATTR_LABELS[n] || (n.charAt(0).toUpperCase() + n.slice(1));
+  }
+  function npPresetAttrs(card) {
+    const sel = card.querySelector('.np-main-cat');
+    const cat = NP_CATS.filter(function (c) { return String(c.id) === String(sel && sel.value); })[0];
+    const names = (cat && cat.attribute_names) || [];
+    return names.length ? names.slice() : ['color'];
+  }
+  // The attributes some row of the card has a value for.
+  function npAttrsInUse(card) {
+    const used = [];
+    card.querySelectorAll('.np-v-attr').forEach(function (i) {
+      if ((i.value || '').trim() && used.indexOf(i.dataset.attr) === -1) used.push(i.dataset.attr);
+    });
+    return used;
+  }
+  window.npSetCardAttrs = function (card, names) {
+    const list = [];
+    names.concat(npAttrsInUse(card)).forEach(function (n) {
+      n = npAttrKey(n);
+      if (n && list.indexOf(n) === -1) list.push(n);
+    });
+    if (!list.length) list.push('color');
+    card._npAttrs = list;
+    const chips = card.querySelector('.np-attr-chips');
+    if (chips) {
+      chips.innerHTML = list.map(function (n) {
+        return '<span class="np-attr-chip">' + npEsc(npAttrLabel(n)) +
+          (list.length > 1 ? '<button type="button" class="np-attr-x" title="{% trans "Remove" %}" data-attr="' +
+            npEsc(n) + '" onclick="npRemoveCardAttr(this)">&times;</button>' : '') + '</span>';
+      }).join('');
+    }
+    const add = card.querySelector('.np-attr-add');
+    if (add) {
+      add.innerHTML = '<option value="">+ {% trans "Attribute" %}</option>' +
+        NP_ALL_ATTRS.filter(function (n) { return list.indexOf(n) === -1; }).map(function (n) {
+          return '<option value="' + npEsc(n) + '">' + npEsc(npAttrLabel(n)) + '</option>';
+        }).join('') +
+        '<option value="__new">{% trans "New attribute…" %}</option>';
+    }
+    card.querySelectorAll('.np-variants .np-variant').forEach(function (v) { npRenderRowAttrs(v, card); });
+  };
+  window.npAddCardAttr = function (sel) {
+    const card = sel.closest('.np-product-card');
+    let name = sel.value;
+    sel.value = '';
+    if (!name) return;
+    if (name === '__new') {
+      name = window.prompt('{% filter escapejs %}{% trans "Name of the new attribute (e.g. width):" %}{% endfilter %}');
+      if (!name) return;
+    }
+    npSetCardAttrs(card, (card._npAttrs || []).concat([name]));
+  };
+  window.npRemoveCardAttr = function (btn) {
+    const card = btn.closest('.np-product-card');
+    const name = btn.dataset.attr;
+    card.querySelectorAll('.np-v-attr').forEach(function (i) {
+      if (i.dataset.attr === name) i.value = '';
+    });
+    npSetCardAttrs(card, (card._npAttrs || []).filter(function (n) { return n !== name; }));
+    npRefreshVariantSkus(card);
+    npRefreshVariantMatches(card);
+  };
+  window.npCategoryChanged = function (sel) {
+    const card = sel.closest('.np-product-card');
+    if (card._npMode !== 'existing') npSetCardAttrs(card, npPresetAttrs(card));
+  };
+  // One field per attribute; what was typed survives a rebuild.
+  window.npRenderRowAttrs = function (vEl, card) {
+    const box = vEl.querySelector('.np-v-attrs');
+    if (!box) return;
+    const typed = {};
+    box.querySelectorAll('.np-v-attr').forEach(function (i) { typed[i.dataset.attr] = i.value; });
+    box.innerHTML = (card._npAttrs || ['color']).map(function (n) {
+      return '<div class="np-col">' +
+        '<label>' + npEsc(npAttrLabel(n)) + '</label>' +
+        '<input class="np-input np-v-attr" data-attr="' + npEsc(n) + '" value="' + npEsc(typed[n] || '') + '"' +
+        ' placeholder="' + npEsc(NP_ATTR_HINTS[n] || '') + '" oninput="npRowAttrInput(this)">' +
+        '</div>';
+    }).join('');
+  };
+  window.npRowAttrInput = function (input) {
+    const vEl = input.closest('.np-variant');
+    npSuggestVariantSku(vEl);
+    npQueueVariantMatch(vEl);
+  };
+  function npRowAttrs(vEl) {
+    return Array.prototype.map.call(vEl.querySelectorAll('.np-v-attr'), function (i) {
+      return { name: i.dataset.attr, value: (i.value || '').trim() };
+    }).filter(function (a) { return a.value; });
+  }
+  function npRowLabel(vEl) {
+    return npRowAttrs(vEl).map(function (a) { return a.value; }).join(' ');
+  }
+  // Fill a row's fields from [{name, value}], adding any attribute the
+  // card doesn't ask yet.
+  function npFillRowAttrs(vEl, card, attrs) {
+    const missing = attrs.map(function (a) { return npAttrKey(a.name); })
+      .filter(function (n) { return (card._npAttrs || []).indexOf(n) === -1; });
+    if (missing.length) npSetCardAttrs(card, (card._npAttrs || []).concat(missing));
+    attrs.forEach(function (a) {
+      const input = Array.prototype.find.call(vEl.querySelectorAll('.np-v-attr'), function (i) {
+        return i.dataset.attr === npAttrKey(a.name);
+      });
+      if (input) input.value = a.value || '';
+    });
+  }
+
   // What one stock item of a product physically is — roll, box, bale… Each
   // card asks, and words its rows with the answer ("Box 2", "Add box").
   // Until someone picks, a card follows the batch's unit (metres → roll).
@@ -993,6 +1130,12 @@
         '</div>' +
       '</div>' +
       '<div class="np-hint np-kind-hint" hidden>{% trans "This product already has stock, so its unit and pack are set on the product page." %}</div>' +
+      // The questions each variant row is asked.
+      '<div class="np-field np-attr-field">' +
+        '<label>{% trans "Variant attributes" %}</label>' +
+        '<div class="np-attr-bar"><span class="np-attr-chips"></span>' +
+          '<select class="np-select np-attr-add" onchange="npAddCardAttr(this)"></select></div>' +
+      '</div>' +
       '<div class="np-field" style="margin-bottom:8px;">' +
         '<label class="np-vr-label"></label>' +
         '<div class="np-seg">' +
@@ -1029,6 +1172,7 @@
     npRelabelPack(el);
     npDefaultCurrencies(el);
     npShowSaleCurrency(el);
+    npSetCardAttrs(el, npPresetAttrs(el));
     wrap.appendChild(el);
     npAddVariant(el);
     npFetchNextSku(el);
@@ -1339,7 +1483,6 @@
     cardEl.querySelectorAll('.np-variants .np-variant').forEach(function (v) { npSuggestVariantSku(v); });
   };
   window.npSuggestVariantSku = function (vEl) {
-    const nameI = vEl.querySelector('.np-v-name');
     const skuI = vEl.querySelector('.np-v-sku');
     // matchLocked = the SKU is the REAL sku of an existing variant (set by
     // npCheckVariantMatch below) — the auto-suggestion must never overwrite
@@ -1347,7 +1490,9 @@
     if (!skuI || skuI.dataset.touched || skuI.dataset.matchLocked) return;
     const card = vEl.closest('.np-product-card');
     const root = npBaseSku(card);
-    const sfx = slug(nameI.value) || vEl.dataset.vid;
+    // PARENT.VALUE-VALUE, in the card's attribute order.
+    const sfx = npRowAttrs(vEl).map(function (a) { return slug(a.value); })
+      .filter(Boolean).join('-') || vEl.dataset.vid;
     skuI.value = root ? (root + '.' + sfx).slice(0, GR_VARIANT_SKU_MAX) : '';
   };
 
@@ -1366,18 +1511,17 @@
   window.npCheckVariantMatch = function (vEl) {
     const badge = vEl.querySelector('.np-v-match');
     const skuI = vEl.querySelector('.np-v-sku');
-    const nameI = vEl.querySelector('.np-v-name');
-    if (!badge || !skuI || !nameI) return;
+    if (!badge || !skuI) return;
     const card = vEl.closest('.np-product-card');
     const productId = card.querySelector('.np-main-id').value;
-    const name = (nameI.value || '').trim();
+    const attrs = npRowAttrs(vEl);
     // The SKU is the differentiator, so it is what the question leads with —
     // the server answers on it first and falls back to the name.
     const sku = (skuI.value || '').trim();
     // Release a previous lock as soon as the classification is stale — it
     // gets re-set below if the (possibly new) name/SKU still matches.
     delete skuI.dataset.matchLocked;
-    if (card._npMode !== 'existing' || !productId || (!name && !sku)) {
+    if (card._npMode !== 'existing' || !productId || (!attrs.length && !sku)) {
       badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = '';
       skuI.classList.remove('bad');
       return;
@@ -1387,7 +1531,7 @@
     // later one could overwrite the badge/lock with a stale classification.
     const reqToken = (vEl._npMatchToken = (vEl._npMatchToken || 0) + 1);
     fetch(npWhUrl(NP_MATCH_TPL).replace(/\/0\/$/, '/' + productId + '/') +
-          '?name=' + encodeURIComponent(name) + '&sku=' + encodeURIComponent(sku),
+          '?attrs=' + encodeURIComponent(JSON.stringify(attrs)) + '&sku=' + encodeURIComponent(sku),
       { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -1420,6 +1564,15 @@
           badge.innerHTML = '<i class="fa fa-exclamation-triangle"></i> ' +
             '{% trans "in use" %} — {% trans "this variant SKU is already used on" %} ' +
             npEsc(owner);
+          delete skuI.dataset.matchLocked;
+        } else if (d.lookalike) {
+          // The save refuses a variant the catalog couldn't tell apart
+          // from one it has, so the row says which one before saving.
+          badge.classList.add('show', 'bad'); badge.classList.remove('new');
+          skuI.classList.remove('bad');
+          badge.innerHTML = '<i class="fa fa-exclamation-triangle"></i> ' +
+            '{% trans "same values as" %} ' + npEsc(d.variant_sku) + ' — ' +
+            '{% trans "pick that variant, or add a value that tells this one apart" %}';
           delete skuI.dataset.matchLocked;
         } else {
           badge.classList.add('show', 'new'); badge.classList.remove('bad');
@@ -1466,10 +1619,7 @@
         '<button type="button" class="np-mini-x np-variant-rm" title="{% trans "Remove" %}" onclick="npRemoveVariant(this)">' + NP_TRASH + '</button>' +
       '</div>' +
       '<div class="np-variant-row">' +
-        '<div class="np-col np-col-name">' +
-          '<label>{% trans "Color / model" %}</label>' +
-          '<input class="np-input np-v-name" placeholder="{% trans "e.g. White" %}" oninput="npSuggestVariantSku(this.closest(\'.np-variant\')); npQueueVariantMatch(this.closest(\'.np-variant\'))">' +
-        '</div>' +
+        '<div class="np-v-attrs"></div>' +
         '<div class="np-col np-col-sku">' +
           '<label>{% trans "Variant SKU" %}</label>' +
           '<input class="np-input np-v-sku" maxlength="' + GR_VARIANT_SKU_MAX + '" placeholder="{% trans "auto" %}" oninput="npUnlockVariantSku(this)">' +
@@ -1490,6 +1640,7 @@
       '<div class="np-tops"></div>' +
       '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>';
     cardEl.querySelector('.np-variants').appendChild(el);
+    npRenderRowAttrs(el, cardEl);
     npDefaultCurrencies(el);
     npShowSaleCurrency(el);
     npRelabelPack(cardEl);
@@ -1935,6 +2086,8 @@
       text.textContent = (facts && facts[f[3]]) || '';
     });
     card.querySelector('.np-kind-hint').hidden = !locked;
+    npSetCardAttrs(card, (facts && facts.attribute_names && facts.attribute_names.length)
+      ? facts.attribute_names : npPresetAttrs(card));
     // Rows say the product's unit; not npRelabelUnits, which would also
     // reset the pack to the unit's usual one over the product's own.
     const u = unitShort(card);
@@ -1995,17 +2148,16 @@
     if (taken) { npDropVariant(taken); return; }
     let target = Array.prototype.find.call(
       cardEl.querySelectorAll('.np-variants .np-variant'),
-      function (vEl) { return !(vEl.querySelector('.np-v-name') || {}).value; }
+      function (vEl) { return !npRowAttrs(vEl).length && !(vEl.querySelector('.np-v-sku') || {}).dataset.touched; }
     );
     if (!target) {
       npAddVariant(cardEl);
       const all = cardEl.querySelectorAll('.np-variants .np-variant');
       target = all[all.length - 1];
     }
-    const nameI = target.querySelector('.np-v-name');
     const skuI = target.querySelector('.np-v-sku');
     const badge = target.querySelector('.np-v-match');
-    nameI.value = v.label || v.variant_sku;
+    npFillRowAttrs(target, cardEl, v.attributes || []);
     skuI.value = v.variant_sku;
     skuI.dataset.matchLocked = '1';
     if (badge) {
@@ -2272,6 +2424,18 @@
       return;
     }
 
+    // And a new variant the catalog couldn't tell apart from one it has —
+    // the save refuses that too (the badge names the variant).
+    const lookalike = Array.prototype.filter.call(
+      document.querySelectorAll('#npProducts .np-v-match.bad'),
+      function (b) { return !b.closest('.np-variant').querySelector('.np-v-sku.bad'); }
+    );
+    if (lookalike.length) {
+      alert('{% filter escapejs %}{% trans "Some variants have the same attribute values as a variant the product already has. Pick that variant, or add a value that tells them apart." %}{% endfilter %}');
+      lookalike[0].closest('.np-variant').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     const products = [];
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i];
@@ -2290,13 +2454,13 @@
       const variants = [];
       if (card._npHasVariants) {
         card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
-          const name = (v.querySelector('.np-v-name').value || '').trim();
+          const attrs = npRowAttrs(v);
           const sku = (v.querySelector('.np-v-sku').value || '').trim();
           const priceEl = v.querySelector('.np-v-price');
           const curEl = v.querySelector('.np-v-cur');
           const tops = npCollectTops(v);
-          if (name || sku || tops.length) variants.push({
-            name: name, sku: sku, tops: tops,
+          if (attrs.length || sku || tops.length) variants.push({
+            name: npRowLabel(v), attributes: attrs, sku: sku, tops: tops,
             price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
             sale_price: (v.querySelector('.np-v-sale') || {}).value || '',
             invoice_item_id: npIdOf(v, 'itemId')
@@ -2556,9 +2720,16 @@
       vEl.dataset.origSku = v.sku || '';
     }
     if (!noVariant) {
-      const nameI = vEl.querySelector('.np-v-name');
+      const card = vEl.closest('.np-product-card');
       const skuI = vEl.querySelector('.np-v-sku');
-      if (nameI) nameI.value = v.name || '';
+      if (v.attributes && v.attributes.length) {
+        npFillRowAttrs(vEl, card, v.attributes);
+      } else if (v.name) {
+        // Saved before rows had attribute fields: the old free text goes
+        // in the first field, to be checked before saving.
+        const first = vEl.querySelector('.np-v-attr');
+        if (first) first.value = v.name;
+      }
       if (skuI && v.sku) { skuI.value = v.sku; skuI.dataset.touched = '1'; }
     }
     const priceI = vEl.querySelector(noVariant ? '.np-nv-price' : '.np-v-price');

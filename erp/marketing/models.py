@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.postgres.fields import ArrayField
 
 from . import units
+from .attributes import normalize_attribute_name, normalize_attribute_value
 
 
 
@@ -178,6 +179,35 @@ class ProductCategory(models.Model):
 
     def __str__(self):
         return f"{self.name}"
+
+    def variant_attribute_names(self):
+        """The attributes this group's variants are described by, in order —
+        what a new product in the group is asked (see CategoryVariantAttribute)."""
+        return list(self.variant_attribute_presets.order_by("position", "id")
+                    .values_list("attribute__name", flat=True))
+
+
+class CategoryVariantAttribute(models.Model):
+    """One attribute in a product group's preset: the questions a new
+    product of the group is asked about each variant (fabric: color,
+    model…), in order. Edited on the product group page; a product can
+    still describe its variants with attributes beyond its group's."""
+
+    category = models.ForeignKey(ProductCategory, on_delete=models.CASCADE,
+                                 related_name="variant_attribute_presets")
+    attribute = models.ForeignKey("ProductVariantAttribute", on_delete=models.CASCADE,
+                                  related_name="category_presets")
+    position = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["category", "attribute"],
+                                    name="uniq_category_variant_attribute"),
+        ]
+
+    def __str__(self):
+        return f"{self.category.name}: {self.attribute.name}"
 
 
 # How long a SKU may be, for products and variants alike. Was 20, which is
@@ -740,8 +770,10 @@ class ProductVariantAttribute(models.Model):
     name = models.CharField(max_length=255, verbose_name="Attribute Name", unique=True)
 
     def save(self, *args, **kwargs):
-        # Convert the name to lowercase before saving
-        self.name = self.name.lower().replace(" ", "")
+        # One spelling for every writer — see marketing/attributes.py. Spaces
+        # stay single rather than removed: the storefront reads
+        # "size per panel" by that name.
+        self.name = normalize_attribute_name(self.name)
         super(ProductVariantAttribute, self).save(*args, **kwargs)
 
     def __str__(self):
@@ -769,9 +801,9 @@ class ProductVariantAttributeValue(models.Model):
         return f"{self.product_variant_attribute.name}: {self.product_variant_attribute_value}"
 
     def save(self, *args, **kwargs):
-        self.product_variant_attribute_value = (
-            self.product_variant_attribute_value.lower().replace(" ", "_")
-        )
+        # Sizes keep their spaces ("130 x 210 cm"); see marketing/attributes.py.
+        self.product_variant_attribute_value = normalize_attribute_value(
+            self.product_variant_attribute.name, self.product_variant_attribute_value)
         super().save(*args, **kwargs)
 
 

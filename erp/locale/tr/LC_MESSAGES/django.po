@@ -10109,3 +10109,51 @@ msgstr "— Defter seçin —"
 
 msgid "The book that owns this warehouse's stock."
 msgstr "Bu deponun stoğunun ait olduğu defter."
+
+msgid "Created with Nejum"
+msgstr "Nejum ile düzenlenmiştir"
+
+msgid "Company Profile"
+msgstr "Şirket Profili"
+
+msgid "The name, address and tax details your invoices, orders and packing lists print."
+msgstr "Faturalarınızın, siparişlerinizin ve çeki listelerinizin yazdırdığı ad, adres ve vergi bilgileri."
+
+msgid "Only an administrator can change these. This is what documents print today."
+msgstr "Bunları yalnızca bir yönetici değiştirebilir. Belgelerin bugün yazdırdığı bilgiler bunlardır."
+
+msgid "Name on documents"
+msgstr "Belgelerdeki ad"
+
+msgid "How the business signs its customer documents. A ledger book can override this for its own paperwork."
+msgstr "İşletmenin müşteri belgelerini hangi adla imzaladığı. Bir defter, kendi evrakı için bunu değiştirebilir."
+
+msgid "Legal suffix"
+msgstr "Ünvan eki"
+
+msgid "Logo URL"
+msgstr "Logo adresi"
+
+msgid "Shown on the printed invoice. Leave blank to print the name only."
+msgstr "Yazdırılan faturada görünür. Yalnızca ad yazdırmak için boş bırakın."
+
+msgid "Nejum credit line"
+msgstr "Nejum imza satırı"
+
+msgid "Print “Created with Nejum” at the foot of customer documents"
+msgstr "Müşteri belgelerinin altına “Nejum ile düzenlenmiştir” yazdır"
+
+msgid "Never shown on invoices or account statements."
+msgstr "Faturalarda ve cari hesap ekstrelerinde asla gösterilmez."
+
+msgid "Save Company Profile"
+msgstr "Şirket Profilini Kaydet"
+
+msgid "Company profile updated."
+msgstr "Şirket profili güncellendi."
+
+msgid "Only an administrator can change the company profile."
+msgstr "Şirket profilini yalnızca bir yönetici değiştirebilir."
+
+msgid "is shorter than a barcode — Excel may have dropped leading zeros. Format the column as Text and upload again."
+msgstr "bir barkod için fazla kısa — Excel baştaki sıfırları düşürmüş olabilir. Sütunu Metin olarak biçimlendirip yeniden yükleyin."

@@ -459,7 +459,8 @@ def _inventory_value(book):
     """(value, unvalued roll count, unvalued metres) for a book's stock.
 
     Stock belongs to whoever owns the shelves it sits on. Warehouse
-    .accounting_book is a required FK, so the rolls in Ergene Fabrika are
+    .accounting_book is required on every warehouse that holds stock (only
+    a combined view, which holds none, goes without), so the rolls in Ergene Fabrika are
     Ergene's whether or not anyone ever invoiced them.
 
     This used to scope by the purchase-invoice line the roll arrived on,

@@ -76,7 +76,8 @@ def put_plan_in_catalog(plan):
     from .catalog_sync import CatalogSyncConflict, sync_roll_to_catalog
     from .views_warehouse import (
         IntakeError, _intake_account, _intake_main_product,
-        _intake_prefix, _intake_resolve_products, _intake_variant_identity,
+        _intake_check_lookalikes, _intake_prefix, _intake_resolve_products,
+        _intake_variant_identity, _row_label,
         _intake_variants,
     )
 
@@ -85,6 +86,7 @@ def put_plan_in_catalog(plan):
     prefix = _intake_prefix(plan, account.name)
     resolved = _intake_resolve_products(products_in, prefix,
                                         default_unit=plan.get("unit"))
+    _intake_check_lookalikes(resolved)
 
     lines = []
     for p_in, item in zip(products_in, resolved):
@@ -98,16 +100,16 @@ def put_plan_in_catalog(plan):
         for idx, (v_in, v) in enumerate(zip(p_in.get("variants") or [], rows), start=1):
             qty = sum((_decimal(t.get("qty")) for t in (v.get("tops") or [])),
                       Decimal("0"))
-            if not (v.get("name") or "").strip() and not (v.get("sku") or "").strip() and qty <= 0:
+            if not _row_label(v) and not (v.get("sku") or "").strip() and qty <= 0:
                 continue
             ident = _intake_variant_identity(main_product, item["base_name"], v, idx, seen)
             try:
                 _p, variant, _pc, _vc = sync_roll_to_catalog(
                     base_name=item["base_name"],
-                    attribute_name=ident["attr_name"],
-                    attribute_value=ident["attr_value"],
+                    attributes=ident["attributes"],
                     variant_sku=ident["sku"],
                     existing_base_product=main_product,
+                    refuse_lookalike=True,
                 )
             except CatalogSyncConflict as exc:
                 raise IntakeError({"success": False, "error": f"{ident['sku']}: {exc}"},

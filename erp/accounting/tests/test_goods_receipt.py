@@ -38,8 +38,7 @@ class GoodsReceiptPageTest(TestCase):
             accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         # Combined ("ortak") warehouses hold no stock of their own — nothing
         # can be received into one, so the picker must not offer it.
-        self.virtual = Warehouse.objects.create(name="Hepsi",
-            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0], kind="combined")
+        self.virtual = Warehouse.objects.create(name="Hepsi", kind="combined")
 
     def _purchase(self, warehouse=None, number="PO-1"):
         inv = Invoice.objects.create(

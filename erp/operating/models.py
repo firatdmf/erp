@@ -1288,16 +1288,31 @@ class Warehouse(models.Model):
     # to everyone and searchable from every order.
     #
     # PROTECT rather than SET_NULL: a book holding stock cannot be
-    # deleted out from under it, and there is no longer a null to fall
-    # back to.
+    # deleted out from under it.
+    #
+    # Only a NORMAL warehouse has one. A combined warehouse owns no stock,
+    # so there is nothing for a book to own; its members each carry their
+    # own, and `owning_book` reads it off them. The constraint in Meta
+    # holds both halves.
     accounting_book = models.ForeignKey(
         'accounting.Book',
         on_delete=models.PROTECT,
         related_name='warehouses',
-        help_text="Accounting book this warehouse's stock belongs to"
+        null=True, blank=True,
+        help_text="Accounting book this warehouse's stock belongs to "
+                  "(normal warehouses only)"
     )
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=(models.Q(kind="normal", accounting_book__isnull=False)
+                       | models.Q(kind="combined", accounting_book__isnull=True)),
+                name="warehouse_book_only_on_normal",
+            ),
+        ]
 
     def __str__(self):
         return self.name
@@ -1305,6 +1320,42 @@ class Warehouse(models.Model):
     @property
     def is_combined(self):
         return self.kind == "combined"
+
+    def source_book_ids(self):
+        """Ids of the books whose stock this warehouse shows: its own for a
+        normal warehouse, every member's for a combined one."""
+        if not self.is_combined:
+            return {self.accounting_book_id} if self.accounting_book_id else set()
+        return set(self.combined_sources.values_list("accounting_book_id", flat=True))
+
+    @property
+    def owning_book(self):
+        """The one book this warehouse's stock belongs to, or None.
+
+        A combined warehouse whose members all sit in the same book belongs
+        to that book. One that mixes books belongs to none of them — naming
+        either would be wrong about the other's shelves."""
+        if not self.is_combined:
+            return self.accounting_book
+        if not hasattr(self, "_owning_book"):
+            ids = self.source_book_ids()
+            self._owning_book = None
+            if len(ids) == 1:
+                from accounting.models import Book
+                self._owning_book = Book.objects.filter(pk=ids.pop()).first()
+        return self._owning_book
+
+    def visible_to(self, member):
+        """Whether this member may read the warehouse's shelves: they must
+        work in every book whose stock it shows. For a normal warehouse
+        that is its own book; a combined one that mixes books is only for
+        someone assigned to all of them."""
+        from accounting.services_accounts import member_books
+        ids = self.source_book_ids()
+        if not ids:
+            return False
+        allowed = set(member_books(member).values_list("pk", flat=True))
+        return ids <= allowed
 
     def scope_ids(self):
         """Warehouse ids whose stock this warehouse SHOWS: its members for

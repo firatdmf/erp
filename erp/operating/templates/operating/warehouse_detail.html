@@ -55,6 +55,50 @@
   .od-meta i { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; color: var(--gray-500); }
   .od-dot { width: 3px; height: 3px; background: #C5CCD3; border-radius: 50%; display: inline-block; }
   .od-head-r { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .od-title-edit {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 9px; margin-left: -6px;
+    color: #64748B; text-decoration: none; font-size: 14px;
+    transition: background 140ms, color 140ms;
+  }
+  .od-title-edit:hover { background: #E9F5F3; color: #0F766E; }
+  .od-combined { position: relative; display: inline-flex; outline: none; cursor: default; }
+  .od-combined-pop {
+    display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 50;
+    min-width: 220px; max-width: 300px; padding: 10px;
+    flex-direction: column; gap: 4px;
+    background: #fff; border: 1px solid #DDD6FE; border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(15,23,31,0.12);
+  }
+  .od-combined-pop::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+  /* Hover only where there is a real pointer; a touch screen turns a tap
+     into a sticky hover, so there the chip opens and closes on tap
+     (.is-open, set by whToggleCombined) and the popup is pinned inside
+     the viewport. */
+  @media (hover: hover) {
+    .od-combined:hover .od-combined-pop { display: flex; }
+  }
+  .od-combined.is-open .od-combined-pop { display: flex; }
+  @media (hover: none) {
+    .od-combined { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .od-combined-pop { position: fixed; top: auto; left: 16px; right: 16px; max-width: none; }
+    .od-combined-pop::before { display: none; }
+    .od-combined-pop a { padding: 10px 8px; }
+  }
+  .od-combined-note { font: 500 11.5px var(--font-sans,sans-serif); color: #64748B; margin-bottom: 4px; }
+  .od-combined-label {
+    font: 700 10px var(--font-sans,sans-serif); letter-spacing: 0.08em; text-transform: uppercase;
+    color: #94A3B8; padding: 2px 6px;
+  }
+  .od-combined-pop a {
+    font: 600 12.5px var(--font-sans,sans-serif); color: #0F766E; text-decoration: none;
+    padding: 5px 6px; border-radius: 6px;
+  }
+  .od-combined-pop a:hover { background: #E9F5F3; }
+  .od-foot {
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+    margin-top: 18px; padding-top: 16px; border-top: 1px solid #E2E8EE;
+  }
 
   /* BUTTONS */
   .ord-btn {
@@ -161,16 +205,8 @@
   .wh-searchby-btn:not(.active):hover { background: #F4F7FB; }
 
   /* ── FILTER PANEL ─────────────────────────────────────────
-     Wide screens: display:contents dissolves the wrapper, so its groups
-     are direct flex children of the toolbar and it reads exactly as it did
-     before the drawer existed. Phones turn it into a real drawer (see the
-     640px block) because stacked these controls buried the results. */
-  .wh-filters { display: contents; }
-  .wh-filters-grp { display: contents; }
-  .wh-filters-lbl, .wh-filters-head, .wh-filters-foot { display: none; }
-  .wh-filters-sort { display: contents; }
-  .od-toolbar > .wh-filters #whChips { flex: 1 1 100%; margin-bottom: 0; }
-  .wh-filter-btn, .wh-filters-scrim { display: none; }
+     A drawer at every width (see FILTER DRAWER below), opened from the
+     sliders icon inside the search box, so the search gets the whole row. */
   .wh-empty-toggle {
     display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
     user-select: none; font: 500 13px var(--font-sans); color: var(--gray-700);
@@ -182,11 +218,11 @@
     margin-bottom: 14px;
   }
   .od-search {
-    position: relative; flex: 1 1 480px; max-width: 640px; min-width: 260px;
+    position: relative; flex: 1 1 100%; min-width: 0;
   }
   .od-search input {
     width: 100%; box-sizing: border-box;
-    padding: 13px 16px 13px 42px;
+    padding: 13px 52px 13px 42px;
     background: white; border: 1.5px solid #E0E6EE;
     border-radius: 12px; outline: none;
     font: 500 14.5px var(--font-sans); color: var(--ink);
@@ -613,32 +649,33 @@
       margin-left: 20px; border-left: 4px solid #16a394; border-radius: 0 0 10px 0;
     }
   }
-  /* ── FILTER DRAWER (everything below the desktop layout) ──
-     The toolbar stacks from 1024px down, which puts ~260px of controls
-     between the search box and the first result — you type and the
-     results are off screen. Below this width they live in a drawer. */
-  @media (max-width: 1024px) {
-    /* ── Filters collapse into a drawer ──
-       The search box and the Filter button share one line; everything else
-       moves off screen until asked for, so results start ~200px higher. */
-    .od-toolbar { flex-wrap: nowrap; align-items: stretch; }
-    .od-search { flex: 1 1 auto; min-width: 0; }
+  /* ── FILTER DRAWER ──
+     Every filter lives off screen until asked for, at every width: inline,
+     the toggles and sort chips squeezed the search box, and stacked on a
+     phone they pushed the results ~200px down. The only trace left in the
+     toolbar is the sliders icon inside the search box. `@media all` just
+     keeps the block's shape from when it was phones-only. */
+  @media all {
     .wh-filter-btn {
-      display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
-      padding: 0 13px; min-height: 46px; box-sizing: border-box;
-      background: #fff; border: 1.5px solid #E0E6EE; border-radius: 12px;
-      font: 700 12.5px var(--font-sans); color: var(--gray-700); cursor: pointer;
+      position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; padding: 0; box-sizing: border-box;
+      background: transparent; border: none; border-radius: 9px;
+      font-size: 15px; color: var(--gray-500); cursor: pointer;
+      transition: background 140ms, color 140ms;
     }
+    .wh-filter-btn:hover { background: #F4F7FB; color: var(--gray-700); }
     .wh-filter-btn[aria-expanded="true"],
     .wh-filter-btn.has-filters {
-      border-color: var(--nejum-teal-500); color: var(--nejum-teal-700);
-      background: var(--nejum-teal-50);
+      color: var(--nejum-teal-700); background: var(--nejum-teal-50);
     }
     .wh-filter-count {
+      position: absolute; top: 2px; right: 1px;
       display: inline-flex; align-items: center; justify-content: center;
-      min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+      min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px;
+      box-sizing: border-box;
       background: var(--nejum-teal-600); color: #fff;
-      font: 800 10.5px var(--font-sans);
+      font: 800 9.5px var(--font-sans);
     }
     .wh-filter-count[hidden] { display: none; }
 
@@ -734,9 +771,9 @@
     .od-card-h { flex-wrap: wrap; }
     .od-card-sub { flex-basis: 100%; margin-left: 0; margin-top: 2px; }
 
-    /* Search + Filter share the row (see the drawer block above). */
+    /* The filter icon sits inside the search box (see the drawer block above). */
     .od-toolbar { gap: 9px; margin-bottom: 12px; }
-    .od-search input { padding: 12px 14px 12px 40px; font-size: 16px; }  /* 16px: iOS won't zoom the page on focus */
+    .od-search input { padding: 12px 50px 12px 40px; font-size: 16px; }  /* 16px: iOS won't zoom the page on focus */
     .od-fchip { min-height: 36px; }
 
     /* Pagination: centred, wrapping, thumb-sized. */
@@ -1250,31 +1287,34 @@
     <div>
       <div class="od-head-row">
         <h1 class="od-title">{{ warehouse.name }}</h1>
-        {% if warehouse.is_combined %}
-          <span class="od-chip" style="background:#EDE9FE;color:#5B21B6;border:1px solid #DDD6FE;"
-                title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Sanal görünüm — üye depoların stoğunu tek listede gösterir{% else %}Virtual view — shows the member warehouses' stock as one{% endif %}">
-            <i class="fa fa-layer-group"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Ortak Depo{% else %}Combined{% endif %}
-          </span>
-        {% endif %}
-        {% if warehouse.accounting_book %}
-          <span class="od-chip teal">
-            <i class="fa fa-book"></i>{{ warehouse.accounting_book.name }}
-          </span>
-        {% endif %}
-      </div>
-      {% if warehouse.is_combined and combined_members %}
-      <div style="margin:4px 0 2px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-        <span style="font:600 11.5px var(--font-sans,sans-serif); color:#64748B;">
-          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilen depolar:{% else %}Merged warehouses:{% endif %}
-        </span>
-        {% for m in combined_members %}
-        <a href="{% url 'operating:warehouse_detail' m.pk %}"
-           style="font:700 11.5px var(--font-sans,sans-serif); color:#0F766E; background:#E9F5F3; border:1px solid rgba(20,127,116,0.25); padding:2px 9px; border-radius:999px; text-decoration:none;">
-          {{ m.name }}
+        <a href="{% url 'operating:warehouse_edit' warehouse.pk %}" class="od-title-edit"
+           title="{% trans 'Edit' %}" aria-label="{% trans 'Edit' %}">
+          <i class="fa fa-pen"></i>
         </a>
-        {% endfor %}
+        {% if warehouse.is_combined %}
+          <span class="od-combined" role="button" tabindex="0" aria-expanded="false"
+                onclick="whToggleCombined(event, this)"
+                onkeydown="if (event.key === 'Enter' || event.key === ' ') whToggleCombined(event, this)">
+            <span class="od-chip" style="background:#EDE9FE;color:#5B21B6;border:1px solid #DDD6FE;">
+              <i class="fa fa-layer-group"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Ortak Depo{% else %}Combined{% endif %}
+            </span>
+            <span class="od-combined-pop" role="tooltip">
+              <span class="od-combined-note">{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Sanal görünüm — üye depoların stoğunu tek listede gösterir{% else %}Virtual view — shows the member warehouses' stock as one{% endif %}</span>
+              {% if combined_members %}
+              <span class="od-combined-label">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilen depolar{% else %}Merged warehouses{% endif %}</span>
+              {% for m in combined_members %}
+              <a href="{% url 'operating:warehouse_detail' m.pk %}">{{ m.name }}</a>
+              {% endfor %}
+              {% endif %}
+            </span>
+          </span>
+        {% endif %}
+        {% if owning_book %}
+          <span class="od-chip teal">
+            <i class="fa fa-book"></i>{{ owning_book.name }}
+          </span>
+        {% endif %}
       </div>
-      {% endif %}
       {% trans "No location" as no_location %}
       <div class="od-meta">
         <span>
@@ -1340,17 +1380,6 @@
         <i class="fa fa-file-import"></i>{% trans "Sync Products" %}
       </button>
       {% endif %}
-      <button type="button" class="ord-btn ghost" onclick="downloadWarehouseExcel()" title="{% trans 'Download the current list as an Excel file' %}">
-        <i class="fa fa-file-excel"></i>{% trans "Export to Excel" %}
-      </button>
-      <a href="{% url 'operating:warehouse_edit' warehouse.pk %}" class="ord-btn ghost">
-        <i class="fa fa-edit"></i>{% trans "Edit" %}
-      </a>
-      {% if is_admin %}
-      <button type="button" class="ord-btn ghost danger" onclick="openDeleteConfirm()">
-        <i class="fa fa-trash"></i>{% trans "Delete" %}
-      </button>
-      {% endif %}
     </div>
   </div>
 
@@ -1392,6 +1421,14 @@
                    hx-include="#whSortInput, #whViewInput, #whShowEmptyInput, #whReservedOnlyInput, #whSearchByInput"
                    hx-sync="this:replace"
                    name="search">
+            {% comment %}The filters open as a drawer from this icon, so the
+            search box keeps the whole row.{% endcomment %}
+            <button type="button" class="wh-filter-btn" id="whFilterBtn"
+                    onclick="openWhFilters()" aria-controls="whFilters" aria-expanded="false"
+                    title="{% trans 'Filters' %}" aria-label="{% trans 'Filters' %}">
+              <i class="fa fa-sliders"></i>
+              <span class="wh-filter-count" id="whFilterCount" hidden>0</span>
+            </button>
           </div>
 
           {% comment %}The hidden fields carry filter state into every HTMX
@@ -1404,15 +1441,6 @@
           <input type="hidden" id="whReservedOnlyInput" name="reserved_only" value="{% if reserved_only %}1{% endif %}">
           <input type="hidden" id="whSortInput" name="sort" value="{{ sort|default:'name_asc' }}">
 
-          {% comment %}Phones only: stacked, these controls put ~260px of
-          chrome between the search box and the first result, so typing
-          pushes the results off screen. There they collapse behind this
-          button and open as a drawer.{% endcomment %}
-          <button type="button" class="wh-filter-btn" id="whFilterBtn"
-                  onclick="openWhFilters()" aria-controls="whFilters" aria-expanded="false">
-            <i class="fa fa-sliders"></i> {% trans "Filter" %}
-            <span class="wh-filter-count" id="whFilterCount" hidden>0</span>
-          </button>
 
           {% comment %}display:contents on wide screens — these groups fall
           straight into the toolbar's flex flow, so the desktop toolbar keeps
@@ -1578,11 +1606,11 @@
             </div>
           {% endif %}
 
-          {% if warehouse.accounting_book %}
+          {% if owning_book %}
             <div class="od-dt-block">
               <span class="k">{% trans "Accounting book" %}</span>
               <div class="od-dt-stack">
-                <span class="v-line"><i class="fa fa-book" style="color:var(--nejum-teal-600);margin-right:6px;"></i>{{ warehouse.accounting_book.name }}</span>
+                <span class="v-line"><i class="fa fa-book" style="color:var(--nejum-teal-600);margin-right:6px;"></i>{{ owning_book.name }}</span>
               </div>
             </div>
           {% endif %}
@@ -1679,6 +1707,18 @@
         </div>
       </section>
     </div>
+  </div>
+
+  <!-- FOOT -->
+  <div class="od-foot">
+    <button type="button" class="ord-btn ghost" onclick="downloadWarehouseExcel()" title="{% trans 'Download the current list as an Excel file' %}">
+      <i class="fa fa-file-excel"></i>{% trans "Export to Excel" %}
+    </button>
+    {% if is_admin %}
+    <button type="button" class="ord-btn ghost danger" onclick="openDeleteConfirm()">
+      <i class="fa fa-trash"></i>{% trans "Delete" %}
+    </button>
+    {% endif %}
   </div>
 </div>
 
@@ -2406,6 +2446,32 @@
     whFilterChanged();
     whSyncFilterCount();
   }
+
+  // The combined chip's member list. Hover opens it on desktop; a tap (or
+  // Enter) toggles it everywhere, and on touch screens it is placed under
+  // the chip with fixed positioning so it can't run off the page.
+  function whToggleCombined(ev, chip) {
+    if (ev.target.closest('.od-combined-pop a')) return;   // let links navigate
+    ev.preventDefault();
+    const open = !chip.classList.contains('is-open');
+    chip.classList.toggle('is-open', open);
+    chip.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open && window.matchMedia('(hover: none)').matches) {
+      chip.querySelector('.od-combined-pop').style.top =
+        (chip.getBoundingClientRect().bottom + 6) + 'px';
+    }
+  }
+  function whCloseCombined() {
+    document.querySelectorAll('.od-combined.is-open').forEach(function (c) {
+      c.classList.remove('is-open');
+      c.setAttribute('aria-expanded', 'false');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.od-combined')) whCloseCombined();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') whCloseCombined(); });
+  window.addEventListener('scroll', whCloseCombined, { passive: true });
 
   const whExcelUrl = "{% url 'operating:warehouse_excel' warehouse.pk %}";
   function downloadWarehouseExcel() {

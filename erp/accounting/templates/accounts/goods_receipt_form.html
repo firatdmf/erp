@@ -1731,7 +1731,7 @@
   };
 
   window.npApplyBarcodePlaceholders = function () {
-    const rows = npBcInputs();
+    const rows = npBcRows();
     if (!npNextBc) {
       rows.forEach(function (el) { el.placeholder = NP_BC_AUTO; });
       return;

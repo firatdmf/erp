@@ -144,6 +144,7 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     """
     from accounting.services_accounts import (
         get_or_create_current_account_for_order, post_order_movement,
+        stamp_order_currency,
     )
     from .models import Order, OrderItem
     from .views import _as_line_decimal, generate_machine_qr_for_order
@@ -198,6 +199,10 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
         if account is not None:
             order.current_account = account
             order.save(update_fields=["current_account"])
+            # The sale prices on the purchase form are stated in this
+            # account's currency, so the order must say so too — otherwise
+            # they are read as dollars by everything downstream.
+            stamp_order_currency(order, account)
         order.original_snapshot = order.build_snapshot()
         order.save(update_fields=["original_snapshot"])
         try:

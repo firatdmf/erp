@@ -589,6 +589,129 @@ class Order(models.Model):
         help_text="Linked current account (auto-resolved from contact/company)"
     )
 
+    # What this order's prices are IN. Orders used to have no currency at
+    # all: every price was taken to be dollars, by a convention written
+    # down in services_accounts._resolve_currency and nowhere the operator
+    # could see. A customer whose account trades in euros was then quoted
+    # in euros, stored as dollars and billed as dollars — the figure on
+    # the order, on its print and in the ledger all agreed with each other
+    # and with nothing the customer had agreed to.
+    #
+    # Set from the customer's own account when the order is raised. NULL on
+    # the orders that predate this column; every one of them was entered
+    # under the dollar convention, so `order_currency` reads NULL as USD
+    # rather than pretending the question was answered.
+    currency = models.ForeignKey(
+        "accounting.CurrencyCategory",
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name="orders",
+        help_text="The currency this order's prices are in (the customer's own).",
+    )
+    # What one unit of `currency` was worth in base (USD) when the order
+    # was raised, so the ledger posts what the sale was worth on the day
+    # and a later rate move doesn't rewrite history. NULL = nobody stated
+    # one; the published rate for the order's date applies.
+    #
+    # NOT the `exchange_rate` field above: that one belongs to the
+    # web-checkout block (original_currency → paid_currency), and says what
+    # the shopper was charged in at the till. This one is about what the
+    # order itself is denominated in.
+    currency_rate = models.DecimalField(
+        max_digits=16, decimal_places=8, null=True, blank=True,
+        help_text="Rate from this order's currency to base, as at the order date.",
+    )
+
+    @property
+    def order_currency(self):
+        """The currency this order is in, never None.
+
+        NULL means an order raised before orders carried one, which by the
+        convention of the time was dollars.
+        """
+        from accounting.models import CurrencyCategory
+
+        if self.currency_id:
+            return self.currency
+        return CurrencyCategory.objects.filter(code="USD").first()
+
+    @property
+    def currency_code(self):
+        cur = self.order_currency
+        return (cur.code if cur else "USD")
+
+    @property
+    def currency_symbol(self):
+        """What to print in front of this order's figures."""
+        cur = self.order_currency
+        return (cur.symbol if (cur and cur.symbol) else "$")
+
+    def ledger_exchange_rate(self):
+        """The rate the ledger converts this order's movement at.
+
+        The opt-in hook CurrentAccountMovement.entered_rate() looks for
+        (see its docstring): stating it here is what keeps a euro order's
+        balance from being counted as dollars at par.
+        """
+        return self.currency_rate
+
+    def rate_to_base(self):
+        """What one unit of this order's currency is worth in base.
+
+        The rule the whole app follows: an order is SHOWN in the
+        customer's currency and RECORDED to the book in base. This is the
+        one number that carries a figure across that line.
+
+        The rate the order was raised at wins — a sale is worth what it
+        was worth on the day, and a later rate move must not restate it.
+        Only an order that never stored one asks for the published rate,
+        and a base-currency order needs no rate at all.
+        """
+        from decimal import Decimal
+
+        if self.currency_rate:
+            return Decimal(str(self.currency_rate))
+        from django.conf import settings as _s
+        base = getattr(_s, "BASE_CURRENCY_CODE", "USD")
+        if self.currency_code.upper() == base.upper():
+            return Decimal("1")
+        from accounting.services import get_exchange_rate
+        rate = get_exchange_rate(self.currency_code, base, on_date=self.order_date)
+        return Decimal(str(rate)) if rate else Decimal("1")
+
+    def to_base(self, amount):
+        """`amount`, stated in this order's currency, as the book sees it."""
+        from decimal import Decimal, ROUND_HALF_UP
+
+        if amount is None:
+            return Decimal("0.00")
+        return (Decimal(str(amount)) * self.rate_to_base()).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def snapshot_currency_symbol(self):
+        """The symbol for the frozen "originally created" figures.
+
+        Snapshots taken before orders carried a currency stored no code;
+        they were dollars, like every order of that time.
+        """
+        from accounting.models import CurrencyCategory
+
+        code = (self.original_snapshot or {}).get("currency_code") if self.original_snapshot else None
+        if not code:
+            return "$" if not self.currency_id else self.currency_symbol
+        cur = CurrencyCategory.objects.filter(code=code).first()
+        return (cur.symbol if (cur and cur.symbol) else code)
+
+    def total_value_base(self):
+        """What this order adds to the book: its total, in base currency.
+
+        What every roll-up across orders must sum. Adding `total_value()`
+        over a mixed-currency set adds euros to dollars and calls the
+        result money.
+        """
+        return self.to_base(self.total_value())
+
     @property
     def split_siblings(self):
         """The OTHER orders this one was split from, in book order.
@@ -930,6 +1053,10 @@ class Order(models.Model):
             "delivery_country": self.delivery_country or "",
             "delivery_phone": self.delivery_phone or "",
             "total_value": _f(self.total_value()),
+            # What those figures are in. Without it the frozen copy is a
+            # number with no money attached, and the tab that exists to
+            # show what the customer originally agreed could not say it.
+            "currency_code": self.currency_code,
             "items": items,
         }
 
@@ -1168,10 +1295,12 @@ class OrderItem(models.Model):
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
-    def unit_cost(self):
-        """Cost per unit for gross-profit calc. Prefer the variant's
-        own cost; fall back to the parent product's cost. Returns 0 if
-        nothing is set so callers don't crash on None * Decimal."""
+    def unit_cost_base(self):
+        """Cost per unit as the catalog keeps it: base currency.
+
+        Prefer the variant's own cost; fall back to the parent product's.
+        Returns 0 if nothing is set so callers don't crash on None * Decimal.
+        """
         from decimal import Decimal
         if self.product_variant and self.product_variant.variant_cost is not None:
             return self.product_variant.variant_cost
@@ -1179,8 +1308,28 @@ class OrderItem(models.Model):
             return self.product.cost
         return Decimal("0")
 
+    def unit_cost(self):
+        """Cost per unit IN THE ORDER'S CURRENCY, so it can be set against
+        a price in that currency.
+
+        Catalog costs are kept in base (see unit_cost_base); a euro order's
+        price is in euros. Subtracting one from the other without this
+        crossing is how a euro order's margin came out as though euros and
+        dollars were the same money.
+        """
+        from decimal import Decimal
+
+        cost = self.unit_cost_base()
+        if not cost or not self.order_id:
+            return cost
+        rate = self.order.rate_to_base()
+        if not rate or rate == Decimal("1"):
+            return cost
+        return (Decimal(str(cost)) / rate).quantize(Decimal("0.0001"))
+
     def line_cost(self):
-        """Cost of this whole line, rounded to cents like subtotal()."""
+        """Cost of this whole line, in the order's currency, rounded to
+        cents like subtotal()."""
         from decimal import Decimal, ROUND_HALF_UP
         qty = self.quantity or Decimal("0")
         return (self.unit_cost() * qty).quantize(

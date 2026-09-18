@@ -392,7 +392,7 @@
                 {% endif %}
               </td>
               <td class="num">{{ o.items.count }}</td>
-              <td class="num">${{ o.total_value|money }}</td>
+              <td class="num">{{ o.currency_symbol }}{{ o.total_value|money }}</td>
             </tr>
             {% endfor %}
           </tbody>

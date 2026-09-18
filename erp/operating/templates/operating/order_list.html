@@ -516,12 +516,12 @@
           {% endif %}
         </div>
         <div class="num ord-total">
-          {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
           {% if not is_sales_rep %}{# profit is the margin; not the role's to read #}
           {% with gp=order.gross_profit %}
             <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
-              ${{ gp|floatformat:2 }}
+              {{ order.currency_symbol }}{{ gp|floatformat:2 }}
             </div>
           {% endwith %}
           {% endif %}
@@ -589,12 +589,12 @@
           <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-store" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "ERP" %}</span>
         </div>
         <div class="num ord-total">
-          {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
           {% if not is_sales_rep %}{# profit is the margin; not the role's to read #}
           {% with gp=order.gross_profit %}
             <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
-              ${{ gp|floatformat:2 }}
+              {{ order.currency_symbol }}{{ gp|floatformat:2 }}
             </div>
           {% endwith %}
           {% endif %}
@@ -658,12 +658,12 @@
           {% endif %}
         </div>
         <div class="num ord-total">
-          {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
           {% if not is_sales_rep %}{# profit is the margin; not the role's to read #}
           {% with gp=order.gross_profit %}
             <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
-              ${{ gp|floatformat:2 }}
+              {{ order.currency_symbol }}{{ gp|floatformat:2 }}
             </div>
           {% endwith %}
           {% endif %}
@@ -724,12 +724,12 @@
           <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-store" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "ERP" %}</span>
         </div>
         <div class="num ord-total">
-          {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
           {% if not is_sales_rep %}{# profit is the margin; not the role's to read #}
           {% with gp=order.gross_profit %}
             <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
-              ${{ gp|floatformat:2 }}
+              {{ order.currency_symbol }}{{ gp|floatformat:2 }}
             </div>
           {% endwith %}
           {% endif %}

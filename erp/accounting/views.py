@@ -2556,9 +2556,17 @@ class SalesDashboardView(View):
             # Derive cost from Revenue and Profit to ensure consistency (Revenue - Cost = Profit)
             # Cost = Revenue - Profit
             order_cost = order_revenue - order_profit
-            
-            total_revenue += order_revenue
-            total_cost += order_cost
+
+            # This report is the BOOK's view of many orders at once, so it
+            # adds them in base currency. Each order's own figures stay in
+            # the currency it was agreed in — that is what its row and its
+            # own page show — and cross at its own rate here. Without this
+            # a euro order's revenue joined the total as though euros and
+            # dollars were the same money.
+            order_revenue_base = order.to_base(order_revenue)
+            order_cost_base = order.to_base(order_cost)
+            total_revenue += order_revenue_base
+            total_cost += order_cost_base
             
             order_list.append({
                 'id': order.id,
@@ -2568,6 +2576,9 @@ class SalesDashboardView(View):
                 'revenue': order_revenue,
                 'cost': order_cost,
                 'profit': order_profit,
+                'currency_symbol': order.currency_symbol,
+                # What this order contributed to the totals above.
+                'revenue_base': order_revenue_base,
                 'status': order.order_status or order.payment_status or 'pending',
                 'payment_status': order.payment_status,
             })
@@ -2584,11 +2595,11 @@ class SalesDashboardView(View):
         month_ago = end_date - timedelta(days=30)
         
         week_revenue = sum(
-            o['revenue'] for o in order_list 
+            o['revenue_base'] for o in order_list
             if o['date'] >= week_ago
         )
         month_revenue = sum(
-            o['revenue'] for o in order_list 
+            o['revenue_base'] for o in order_list
             if o['date'] >= month_ago
         )
         

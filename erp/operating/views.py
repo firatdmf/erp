@@ -2634,6 +2634,16 @@ def order_customer_card_view(request, pk):
     })
 
 
+def _base_currency_symbol():
+    """The symbol for figures the BOOK holds — what everything converts to."""
+    from django.conf import settings as _s
+    from accounting.models import CurrencyCategory
+
+    code = getattr(_s, "BASE_CURRENCY_CODE", "USD")
+    cur = CurrencyCategory.objects.filter(code=code).first()
+    return (cur.symbol if (cur and cur.symbol) else "$")
+
+
 def build_order_print_rows(order):
     """The decorated line rows an order prints, and what they come to.
 
@@ -2750,6 +2760,7 @@ class OrderPrint(DetailView):
         ctx["order_groups"] = [{"order": order, "items": items}]
         ctx["order_items"] = items
         ctx["order_total"] = total
+        ctx["order_currency_symbol"] = order.currency_symbol
         ctx["order_total_quantity"] = total_qty
         ctx["order_total_packs"] = len(pack_ids)
         ctx["is_pdf"] = True   # template can strip JS auto-print when rendering for PDF
@@ -2853,11 +2864,19 @@ class OrderPrintCombined(LoginRequiredMixin, View):
 
         groups, items = [], []
         total, total_qty, pack_ids = Decimal("0.00"), Decimal("0"), set()
+        # One sheet, one total — so it has to be in ONE currency. Orders
+        # for the same customer usually share theirs; where they don't
+        # (an order raised before orders carried one is dollars, a newer
+        # one may be euros) the sheet totals in base, which is what the
+        # book records anyway, and says so rather than adding the two.
+        base_total = Decimal("0.00")
+        codes = {o.currency_code for o in orders}
         for o in orders:
             rows, o_total, o_qty, o_packs = build_order_print_rows(o)
             groups.append({"order": o, "items": rows})
             items.extend(rows)
             total += o_total
+            base_total += o.to_base(o_total)
             total_qty += o_qty
             # Union, not a sum: an order's pack set may overlap another's
             # only if the same roll went out twice, which it cannot — but
@@ -2888,7 +2907,10 @@ class OrderPrintCombined(LoginRequiredMixin, View):
             "combined_to": dates[-1] if dates else None,
             "order_groups": groups,
             "order_items": items,
-            "order_total": total,
+            "order_total": total if len(codes) == 1 else base_total,
+            "order_currency_symbol": (primary.currency_symbol if len(codes) == 1
+                                      else _base_currency_symbol()),
+            "combined_mixed_currency": sorted(codes) if len(codes) > 1 else None,
             "order_total_quantity": total_qty,
             "order_total_packs": len(pack_ids),
             "brand_line": brand_name_for(),
@@ -3256,7 +3278,7 @@ class OrderCreate(View):
         try:
             from accounting.services_accounts import (
                 get_or_create_current_account_for_order, post_order_movement,
-                get_or_create_retail_current_account,
+                get_or_create_retail_current_account, stamp_order_currency,
             )
             if order.is_retail_order:
                 current_account = get_or_create_retail_current_account(
@@ -3267,6 +3289,10 @@ class OrderCreate(View):
             if current_account and order.current_account_id != current_account.pk:
                 order.current_account = current_account
                 order.save(update_fields=["current_account"])
+            # What the order is priced in — the customer's own currency,
+            # settled here at the one moment the order is raised, before
+            # anything posts against it.
+            stamp_order_currency(order, current_account)
             post_order_movement(order, member=member)
         except Exception as _e:
             messages.warning(request, f"Order saved but current account sync had an issue: {_e}")
@@ -6161,7 +6187,20 @@ class OrderAnalytics(LoginRequiredMixin, View):
         #    that is off by a cent or more from the orders behind it.
         #    Postgres ROUND(numeric, 2) rounds half away from zero, which is
         #    the ROUND_HALF_UP the model side uses.
-        line_rev = Round(F("quantity") * F("price"), 2, output_field=DEC)
+        #
+        #    IN BASE CURRENCY, every figure on this page. An order is shown
+        #    in its customer's currency and recorded to the book in base;
+        #    a page that adds many orders together is the book's view, and
+        #    summing the raw prices would add euros to dollars. Each line's
+        #    revenue is carried across at the rate its own order was raised
+        #    at (NULL = an order in base, worth one to one). Costs come from
+        #    the catalog, which already keeps them in base, so only the
+        #    revenue side converts — which is also why this no longer
+        #    mirrors OrderItem.unit_cost(), whose job is to state a cost in
+        #    the ORDER's currency for the order page.
+        order_rate = Coalesce(F("order__currency_rate"), Value(Decimal("1")),
+                              output_field=DEC)
+        line_rev = Round(F("quantity") * F("price") * order_rate, 2, output_field=DEC)
         line_cost = Round(F("quantity") * unit_cost_expr, 2, output_field=DEC)
 
         items = OrderItem.objects.filter(order_id__in=filtered_ids)

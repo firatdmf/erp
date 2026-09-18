@@ -1323,21 +1323,21 @@
                 {% endif %}
               </td>
               <td class="num"><span class="od-num-val">{{ item.quantity|default:0|floatformat:"-2" }}</span></td>
-              <td class="num"><span class="od-num-val">${{ item.price|default:0|floatformat:2 }}</span></td>
+              <td class="num"><span class="od-num-val">{{ order.currency_symbol }}{{ item.price|default:0|floatformat:2 }}</span></td>
               {% if is_sales_rep %}
               <td class="num od-cost-col" data-item-cost="{{ item.pk }}"></td>
               {% else %}
               <td class="num od-cost-col" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}">
                 {% with uc=item.unit_cost %}
                   {% if uc and uc > 0 %}
-                    <span style="color:var(--gray-700);">${{ uc|floatformat:2 }}</span>
+                    <span style="color:var(--gray-700);">{{ order.currency_symbol }}{{ uc|floatformat:2 }}</span>
                   {% else %}
                     <span class="od-empty-mute" title="{% trans 'No cost set on this product' %}">—</span>
                   {% endif %}
                 {% endwith %}
               </td>
               {% endif %}
-              <td class="num" data-item-subtotal="{{ item.pk }}"><b>${{ item.subtotal|floatformat:2 }}</b></td>
+              <td class="num" data-item-subtotal="{{ item.pk }}"><b>{{ order.currency_symbol }}{{ item.subtotal|floatformat:2 }}</b></td>
             </tr>
             {% if item.is_tracked and item.scanned_count %}
             <tr class="od-tops-row" data-tops-for="{{ item.pk }}" style="display:none;">
@@ -1438,11 +1438,11 @@
         <div class="od-totals{% if order.order_status == 'cancelled' %} od-totals-cancelled{% endif %}">
           <div class="od-tot-row">
             <span>{% trans "Subtotal" %}</span>
-            <span data-order-total>${{ order.total_value|floatformat:2 }}</span>
+            <span data-order-total>{{ order.currency_symbol }}{{ order.total_value|floatformat:2 }}</span>
           </div>
           <div class="od-tot-row total">
             <span>{% trans "Grand total" %}</span>
-            <span data-order-total>${{ order.total_value|floatformat:2 }}</span>
+            <span data-order-total>{{ order.currency_symbol }}{{ order.total_value|floatformat:2 }}</span>
           </div>
           {% if scan_shortfall %}
           {% comment %}
@@ -1458,7 +1458,7 @@
               {% trans "Not yet scanned" %}
             </span>
             <span style="text-align:right;">
-              <span style="font-weight:700;">${{ scan_shortfall|floatformat:2 }}</span>
+              <span style="font-weight:700;">{{ order.currency_symbol }}{{ scan_shortfall|floatformat:2 }}</span>
               <span style="display:block; font-weight:500; font-size:10.5px; opacity:.85;">
                 {% trans "Billed in full regardless" %}
               </span>
@@ -1483,7 +1483,7 @@
               <i class="fa fa-lock" style="font-size:10px; opacity:0.6;" title="{% trans 'Internal only — not on invoice' %}"></i>
               {% trans "Total cost (COGS)" %}
             </span>
-            <span data-order-cost style="font-weight:700;">${{ tc|floatformat:2 }}</span>
+            <span data-order-cost style="font-weight:700;">{{ order.currency_symbol }}{{ tc|floatformat:2 }}</span>
           </div>
           <div id="od-profit-row" class="od-tot-row od-gross"
                style="margin-top:4px; padding:8px 10px; border-radius:8px;
@@ -1494,7 +1494,7 @@
               {% trans "Profit" %}
               <small data-order-margin style="opacity:0.75; font-weight:600;">{% if gm is not None and tc and tc > 0 %}· {{ gm }}%{% endif %}</small>
             </span>
-            <span data-order-profit style="font-weight:700;">${{ gp|floatformat:2 }}</span>
+            <span data-order-profit style="font-weight:700;">{{ order.currency_symbol }}{{ gp|floatformat:2 }}</span>
           </div>
           {% if not tc or tc == 0 %}
           <div class="od-tot-row" style="margin-top:4px; padding:6px 10px; font-size:11px; color:#92400E; background:#FEF3C7; border:1px dashed #FCD34D; border-radius:8px;">
@@ -1549,8 +1549,8 @@
                   {% endif %}
                 </td>
                 <td class="num">{{ oi.quantity|floatformat:"-2" }}</td>
-                <td class="num">${{ oi.price|floatformat:2 }}</td>
-                <td class="num"><b>${{ oi.subtotal|floatformat:2 }}</b></td>
+                <td class="num">{{ order.currency_symbol }}{{ oi.price|floatformat:2 }}</td>
+                <td class="num"><b>{{ order.currency_symbol }}{{ oi.subtotal|floatformat:2 }}</b></td>
               </tr>
               {% empty %}
               <tr><td colspan="6" class="od-empty-mute" style="text-align:center; padding:16px;">{% trans "No items recorded in the original snapshot." %}</td></tr>
@@ -1561,7 +1561,7 @@
           <div class="od-totals">
             <div class="od-tot-row total">
               <span>{% trans "Original grand total" %}</span>
-              <span>${{ order.original_snapshot.total_value|floatformat:2 }}</span>
+              <span>{{ order.snapshot_currency_symbol }}{{ order.original_snapshot.total_value|floatformat:2 }}</span>
             </div>
           </div>
         </div>
@@ -1798,7 +1798,7 @@
         <div class="od-detail-list">
           {% if order.payment_status %}<div class="od-dt"><span>{% trans "Status" %}</span><b>{{ order.get_payment_status_display }}</b></div>{% endif %}
           {% if order.payment_method %}<div class="od-dt"><span>{% trans "Method" %}</span><b>{{ order.payment_method }}</b></div>{% endif %}
-          {% if order.original_price %}<div class="od-dt"><span>{% trans "Amount" %}</span><b>${{ order.original_price|floatformat:2 }}</b></div>{% endif %}
+          {% if order.original_price %}<div class="od-dt"><span>{% trans "Amount" %}</span><b>{{ order.original_currency|default:order.currency_code }} {{ order.original_price|floatformat:2 }}</b></div>{% endif %}
           {% if order.card_last_four %}<div class="od-dt"><span>{% trans "Card" %}</span><b>{{ order.card_association|default:"Card" }} •••• {{ order.card_last_four }}</b></div>{% endif %}
         </div>
       </section>
@@ -1828,7 +1828,7 @@
     <div class="odc-foot">
       <div class="odc-total">
         <span>{% trans "Total" %}</span>
-        <b id="odcTotal">$0.00</b>
+        <b id="odcTotal">{{ order.currency_symbol }}0.00</b>
       </div>
       <div class="odc-actions">
         <button type="button" class="ord-btn ghost" id="odcCancel">{% trans "Cancel" %}</button>
@@ -1897,6 +1897,11 @@
 </div>
 
 <script>
+  // What this order is priced in — the customer's own currency.
+  // Every figure the scripts below rewrite is in it, so the symbol
+  // has to travel with them: they overwrite what the server rendered.
+  const ORDER_CUR = "{{ order.currency_symbol|escapejs }}";
+
   // Status picker: each stage button + the legacy mini buttons update
   // the hidden input and submit. The carrier/tracking inputs ride
   // along since they're part of the same form.
@@ -1971,7 +1976,7 @@
       if (!odcModal || !rowsEl) {   // markup missing → fall back, never block the order
         return Promise.resolve(confirm(noCargo ? CONFIRM_SHIP_NO_CARGO : CONFIRM_SHIP));
       }
-      const money = (n) => '$' + n.toFixed(2);
+      const money = (n) => ORDER_CUR + n.toFixed(2);
       const lines = orderSummaryRows();
       let total = 0;
       rowsEl.textContent = '';
@@ -2204,22 +2209,22 @@
           // Update the row subtotal display
           const subEl = row.querySelector('[data-item-subtotal]');
           if (subEl) {
-            subEl.innerHTML = '<b>$' + sub.toFixed(2) + '</b>';
+            subEl.innerHTML = '<b>' + ORDER_CUR + sub.toFixed(2) + '</b>';
           }
         }
       });
       // Update order totals display
       document.querySelectorAll('[data-order-total]').forEach(el => {
-        el.textContent = '$' + orderTotal.toFixed(2);
+        el.textContent = ORDER_CUR + orderTotal.toFixed(2);
       });
       
       // Update cost, profit, margin
       document.querySelectorAll('[data-order-cost]').forEach(el => {
-        el.textContent = '$' + totalCost.toFixed(2);
+        el.textContent = ORDER_CUR + totalCost.toFixed(2);
       });
       const grossProfit = orderTotal - totalCost;
       document.querySelectorAll('[data-order-profit]').forEach(el => {
-        el.textContent = '$' + grossProfit.toFixed(2);
+        el.textContent = ORDER_CUR + grossProfit.toFixed(2);
       });
       document.querySelectorAll('[data-order-margin]').forEach(el => {
         if (totalCost > 0) {
@@ -2338,10 +2343,10 @@
     function applyProfitSnapshot(p) {
       if (!p) return;
       document.querySelectorAll('[data-order-cost]').forEach(el => {
-        el.textContent = '$' + Number(p.total_cost || 0).toFixed(2);
+        el.textContent = ORDER_CUR + Number(p.total_cost || 0).toFixed(2);
       });
       document.querySelectorAll('[data-order-profit]').forEach(el => {
-        el.textContent = '$' + Number(p.gross_profit || 0).toFixed(2);
+        el.textContent = ORDER_CUR + Number(p.gross_profit || 0).toFixed(2);
       });
       document.querySelectorAll('[data-order-margin]').forEach(el => {
         el.textContent = (p.margin === null || p.margin === undefined) ? '' : ('· ' + p.margin + '%');
@@ -2536,7 +2541,7 @@
           if (costCell) {
             costCell.setAttribute('data-item-cost', realId);
             if (r.item.unit_cost && Number(r.item.unit_cost) > 0) {
-              costCell.innerHTML = '<span style="color:var(--gray-700);">$' + Number(r.item.unit_cost).toFixed(2) + '</span>';
+              costCell.innerHTML = '<span style="color:var(--gray-700);">' + ORDER_CUR + Number(r.item.unit_cost).toFixed(2) + '</span>';
             } else {
               costCell.innerHTML = '<span class="od-empty-mute" title="No cost set">—</span>';
             }
@@ -2545,7 +2550,7 @@
           const subCell = newRow.querySelector('[data-item-subtotal]');
           if (subCell) {
             subCell.setAttribute('data-item-subtotal', realId);
-            subCell.innerHTML = '<b>$' + Number(r.item.subtotal).toFixed(2) + '</b>';
+            subCell.innerHTML = '<b>' + ORDER_CUR + Number(r.item.subtotal).toFixed(2) + '</b>';
           }
 
           const stockWrap = newRow.querySelector('[data-row-stock]');
@@ -2580,7 +2585,7 @@
             el.setAttribute('data-original', el.value);
             if (r.subtotal !== undefined) {
               const sub = document.querySelector('[data-item-subtotal="' + el.getAttribute('data-item-id') + '"]');
-              if (sub) sub.innerHTML = '<b>$' + Number(r.subtotal).toFixed(2) + '</b>';
+              if (sub) sub.innerHTML = '<b>' + ORDER_CUR + Number(r.subtotal).toFixed(2) + '</b>';
             }
             if (r.order_total !== undefined) latestTotal = r.order_total;
             if (r.current_account) applyCurrentAccountSnapshot(r.current_account);
@@ -2590,7 +2595,7 @@
         }
         if (latestTotal !== null) {
           document.querySelectorAll('[data-order-total]').forEach(el => {
-            el.textContent = '$' + Number(latestTotal).toFixed(2);
+            el.textContent = ORDER_CUR + Number(latestTotal).toFixed(2);
           });
         }
         // Structural change → reload so the new line's stock items section, scan
@@ -2873,10 +2878,10 @@
             ' data-original="" onwheel="this.blur()"></td>' +
           '<td class="num od-cost-col" data-item-cost="' + tempId + '" data-unit-cost="' + (it.unit_cost || 0) + '">' +
             ((it.unit_cost && Number(it.unit_cost) > 0)
-              ? '<span style="color:var(--gray-700);">$' + Number(it.unit_cost).toFixed(2) + '</span>'
+              ? '<span style="color:var(--gray-700);">' + ORDER_CUR + Number(it.unit_cost).toFixed(2) + '</span>'
               : '<span class="od-empty-mute" title="No cost set">—</span>') +
           '</td>' +
-          '<td class="num" data-item-subtotal="' + tempId + '"><b>$' + Number(it.subtotal).toFixed(2) + '</b></td>' +
+          '<td class="num" data-item-subtotal="' + tempId + '"><b>' + ORDER_CUR + Number(it.subtotal).toFixed(2) + '</b></td>' +
           '<td class="od-edit-only"><button type="button" class="od-row-del" data-remove-item="' + tempId + '" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button></td>';
         tbody.appendChild(tr);
 

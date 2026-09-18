@@ -190,10 +190,18 @@ def brand_name_for(book=None) -> str:
 def _resolve_currency(order=None) -> CurrencyCategory:
     """Pick a CurrencyCategory for new movements/current accounts.
 
-    Order doesn't have a currency field — orders are stored in USD by
-    convention (per the rest of the codebase). Fall back to whichever
-    currency is marked "USD"/base, or the first row.
+    An order states what it is priced in (Order.currency), and that is what
+    its receivable posts in. It used to state nothing: every order was
+    taken to be dollars by a convention written down here and nowhere the
+    operator could see, so a customer quoted in euros was billed in dollars
+    and their balance moved by the wrong number. Orders raised before the
+    column exists carry NULL, which still means dollars — that IS what they
+    were entered as — so nothing about them changes.
+
+    Falls back to whichever currency is marked "USD"/base, or the first row.
     """
+    if order is not None and getattr(order, "currency_id", None):
+        return order.currency
     base_code = "USD"
     cur = CurrencyCategory.objects.filter(code=base_code).first()
     if cur:
@@ -206,6 +214,47 @@ def _resolve_currency(order=None) -> CurrencyCategory:
 # ---------------------------------------------------------------------------
 # Current account resolution
 # ---------------------------------------------------------------------------
+def stamp_order_currency(order, account=None, *, save=True):
+    """Give an order the currency it is priced in: its customer's own.
+
+    Called once, when the order is raised — the currency is a fact about
+    what was agreed, so a later change to the account's default must not
+    reach back and restate orders already placed. `currency_rate` freezes
+    what that currency was worth in base on the day, for the same reason:
+    the ledger converts the receivable at the rate of the sale, not at
+    today's.
+
+    Does nothing when the account has no currency of its own, leaving the
+    order NULL — which reads as dollars, the convention it would have been
+    entered under anyway.
+    """
+    # Once only. An order already priced states what was agreed, and a
+    # later call — a customer swapped on the order screen, a re-post, a
+    # backfill — must not restate it: the prices on the lines would keep
+    # their numbers while silently changing what those numbers mean.
+    if order.currency_id:
+        return order
+    account = account or getattr(order, "current_account", None)
+    currency = getattr(account, "default_currency", None)
+    if currency is None:
+        return order
+
+    order.currency = currency
+    base = getattr(settings, "BASE_CURRENCY_CODE", "USD")
+    if currency.code.upper() != base.upper():
+        from accounting.services import get_exchange_rate
+        on = order.order_date or (order.created_at.date() if order.created_at else None)
+        try:
+            order.currency_rate = get_exchange_rate(currency.code, base, on_date=on)
+        except Exception:
+            # No rate today is not a reason to lose the order: the ledger
+            # falls back to the published rate for its date.
+            order.currency_rate = None
+    if save and order.pk:
+        order.save(update_fields=["currency", "currency_rate"])
+    return order
+
+
 def get_or_create_current_account_for_order(order, *, member=None, book=None) -> CurrentAccount | None:
     """Find (or create) the current account for an order's customer.
 

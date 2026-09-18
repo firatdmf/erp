@@ -330,8 +330,8 @@
         <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}
           {% if item.pack_count %}<div class="packs">{{ item.pack_count }} {% blocktrans count counter=item.pack_count %}pack{% plural %}packs{% endblocktrans %}</div>{% endif %}
         </td>
-        <td class="num">${{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
-        <td class="num">${{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
+        <td class="num">{{ order_currency_symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
+        <td class="num">{{ order_currency_symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
       </tr>
       {% endfor %}
       {% endfor %}
@@ -350,7 +350,7 @@
         <td class="lbl-left" colspan="3">{% trans "Total" %}</td>
         <td class="val">{{ order_total_quantity|floatformat:"2u"|intcomma:False }}</td>
         <td></td>
-        <td class="val">${{ order_total|floatformat:"2u"|intcomma:False }}</td>
+        <td class="val">{{ order_currency_symbol }}{{ order_total|floatformat:"2u"|intcomma:False }}{% if combined_mixed_currency %}<div class="packs">{% blocktrans with codes=combined_mixed_currency|join:", " %}converted from {{ codes }}{% endblocktrans %}</div>{% endif %}</td>
       </tr>
       {% if order_total_packs %}
       <tr class="sum">

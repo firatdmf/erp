@@ -127,7 +127,11 @@ def build_order_doc(order):
 
     acc = order.current_account
     book = acc.book if acc else None
-    currency = (acc.default_currency if acc else None) or _resolve_currency(order)
+    # The order's own currency, which IS what its prices are in. Reading
+    # the account's default instead was right only by luck: an order is
+    # priced once, and an account whose currency changed afterwards would
+    # have restated every invoice ever raised against it.
+    currency = _resolve_currency(order) or (acc.default_currency if acc else None)
 
     # Billed quantities, not raw ones — the same numbers the account and
     # the order screen state (Order.get_billable_line_quantities).

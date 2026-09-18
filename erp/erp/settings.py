@@ -272,6 +272,8 @@ BRAND_DEFAULTS = {
         "BRAND_TAX_OFFICE": "",
         "BRAND_TAX_NUMBER": "",
         "BRAND_LOGO_URL": "",
+        # The house colour its documents print its name in.
+        "BRAND_COLOR": "#944F05",
         # Empty → invoices use the legacy dashed format INV-YEAR-NNNNNN
         # (see CurrentAccountSettings.next_invoice_number). Set a non-empty value
         # to switch to the compact PREFIX+YEAR+SEQ shape.
@@ -316,6 +318,7 @@ BRAND_EMAIL = config("BRAND_EMAIL", default=_brand_cfg.get("BRAND_EMAIL", "")).s
 BRAND_TAX_OFFICE = config("BRAND_TAX_OFFICE", default=_brand_cfg.get("BRAND_TAX_OFFICE", "")).strip()
 BRAND_TAX_NUMBER = config("BRAND_TAX_NUMBER", default=_brand_cfg.get("BRAND_TAX_NUMBER", "")).strip()
 BRAND_LOGO_URL = config("BRAND_LOGO_URL", default=_brand_cfg.get("BRAND_LOGO_URL", "")).strip()
+BRAND_COLOR = config("BRAND_COLOR", default=_brand_cfg.get("BRAND_COLOR", "#944F05")).strip()
 BRAND_INVOICE_PREFIX = config("BRAND_INVOICE_PREFIX", default=_brand_cfg.get("BRAND_INVOICE_PREFIX", "")).strip()
 BRAND_CODE_PREFIX = config(
     "BRAND_CODE_PREFIX", default=_brand_cfg.get("BRAND_CODE_PREFIX", "DMF")

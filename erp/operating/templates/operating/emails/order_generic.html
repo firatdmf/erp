@@ -112,7 +112,7 @@
                 Order reference: <b style="color:#64748B;">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</b>
                 {% if BRAND_EMAIL %} · To stop order emails, reply “unsubscribe”.{% endif %}
               </div>
-              {% if NEJUM_CREDIT %}<div style="margin-top:10px;font-size:10.5px;"><a href="{{ NEJUM_URL }}" style="color:#7FB0AB;text-decoration:none;">{{ NEJUM_CREDIT }}</a></div>{% endif %}
+              {% if NEJUM_CREDIT_HTML %}<div style="margin-top:10px;font-size:10.5px;">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
             </td>
           </tr>
         </table>

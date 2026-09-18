@@ -25,7 +25,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string, TemplateDoesNotExist
 
 from erp.branding import brand
-from erp.nejum_credit import NEJUM_URL, nejum_credit
+from erp.nejum_credit import NEJUM_URL, credit_html, credit_text, draw_credit
 from django.utils.html import strip_tags
 
 
@@ -373,14 +373,10 @@ def _render_order_pdf(order):
         # ---- Footer ----
         story += [Spacer(1, 18),
                   HRFlowable(width="100%", thickness=0.75, color=INK, spaceAfter=4)]
-        credit = nejum_credit()
-        foot_cells = [par(f"{brand.upper()} · {_('Order')} {num}", 8, color=MUT)]
-        if credit:
-            # On the footer line, not under it — see erp/nejum_credit.py.
-            from erp.nejum_credit import CREDIT_COLOR
-            foot_cells.append(par(credit, 8, color=colors.HexColor(CREDIT_COLOR), align=1))
-        foot_cells.append(par(datef(timezone.now(), "d M Y · H:i"), 8, color=MUT, align=2))
-        foot = Table([foot_cells], colWidths=[CW / len(foot_cells)] * len(foot_cells))
+        foot = Table([[
+            par(f"{brand.upper()} · {_('Order')} {num}", 8, color=MUT),
+            par(datef(timezone.now(), "d M Y · H:i"), 8, color=MUT, align=2),
+        ]], colWidths=[CW / 2] * 2)
         foot.setStyle(TableStyle([
             ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
@@ -391,7 +387,9 @@ def _render_order_pdf(order):
         doc = SimpleDocTemplate(
             buf, pagesize=A4, topMargin=16 * mm, bottomMargin=16 * mm,
             leftMargin=15 * mm, rightMargin=15 * mm, title=f"Order #{order.pk}")
-        doc.build(story)
+        # The credit is a line of its own in the bottom margin, on every
+        # page — not part of the document's own footer.
+        doc.build(story, onFirstPage=draw_credit, onLaterPages=draw_credit)
     except Exception:
         traceback.print_exc()
         return (None, None)
@@ -449,7 +447,8 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
             "BRAND_ADDRESS": brand("BRAND_ADDRESS"),
             # Rendered without a request, so the context processor that
             # carries these to every page does not run here.
-            "NEJUM_CREDIT": nejum_credit(),
+            "NEJUM_CREDIT": credit_text(),
+            "NEJUM_CREDIT_HTML": credit_html(),
             "NEJUM_URL": NEJUM_URL,
         }
         if extra_context:

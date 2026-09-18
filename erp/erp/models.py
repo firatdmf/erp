@@ -32,6 +32,9 @@ class BrandProfile(models.Model):
     tax_office = models.CharField(max_length=120, blank=True)
     tax_number = models.CharField(max_length=60, blank=True)
     logo_url = models.URLField(max_length=500, blank=True)
+    # The colour the house's own name prints in — its half of the credit
+    # line at the foot of every document (erp/nejum_credit.py).
+    brand_color = models.CharField(max_length=9, blank=True)
 
     # The "Created with Nejum" credit on customer documents
     # (erp/nejum_credit.py). Not blank-able: it is a yes or a no.

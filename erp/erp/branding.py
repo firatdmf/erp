@@ -30,6 +30,7 @@ TEXT_FIELDS = {
     "tax_office": "BRAND_TAX_OFFICE",
     "tax_number": "BRAND_TAX_NUMBER",
     "logo_url": "BRAND_LOGO_URL",
+    "brand_color": "BRAND_COLOR",
 }
 SETTING_TO_FIELD = {v: k for k, v in TEXT_FIELDS.items()}
 

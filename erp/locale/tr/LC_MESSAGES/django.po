@@ -10110,8 +10110,8 @@ msgstr "— Defter seçin —"
 msgid "The book that owns this warehouse's stock."
 msgstr "Bu deponun stoğunun ait olduğu defter."
 
-msgid "Created with Nejum"
-msgstr "Nejum ile düzenlenmiştir"
+msgid "%(brand)s is powered by %(nejum)s"
+msgstr "%(brand)s, %(nejum)s ile güçlendirilmiştir"
 
 msgid "Company Profile"
 msgstr "Şirket Profili"
@@ -10140,8 +10140,8 @@ msgstr "Yazdırılan faturada görünür. Yalnızca ad yazdırmak için boş bı
 msgid "Nejum credit line"
 msgstr "Nejum imza satırı"
 
-msgid "Print “Created with Nejum” at the foot of customer documents"
-msgstr "Müşteri belgelerinin altına “Nejum ile düzenlenmiştir” yazdır"
+msgid "Print “<your name> is powered by Nejum” at the foot of customer documents"
+msgstr "Müşteri belgelerinin altına “<adınız>, Nejum ile güçlendirilmiştir” yazdır"
 
 msgid "Never shown on invoices or account statements."
 msgstr "Faturalarda ve cari hesap ekstrelerinde asla gösterilmez."
@@ -10157,3 +10157,18 @@ msgstr "Şirket profilini yalnızca bir yönetici değiştirebilir."
 
 msgid "is shorter than a barcode — Excel may have dropped leading zeros. Format the column as Text and upload again."
 msgstr "bir barkod için fazla kısa — Excel baştaki sıfırları düşürmüş olabilir. Sütunu Metin olarak biçimlendirip yeniden yükleyin."
+
+msgid "Brand colour"
+msgstr "Marka rengi"
+
+msgid "Hex code, e.g. #944F05. The colour your name prints in on documents."
+msgstr "Hex kodu, örn. #944F05. Adınızın belgelerde yazdırıldığı renk."
+
+#. The purchase total on the goods-receipt summary bar, shown when the
+#. delivery is bought for a customer and a sale total sits beside it.
+msgid "Buy"
+msgstr "Alış"
+
+#. The customer's order total on the goods-receipt summary bar.
+msgid "Sale"
+msgstr "Satış"

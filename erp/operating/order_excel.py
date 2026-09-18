@@ -22,7 +22,7 @@ from django.shortcuts import get_object_or_404
 from openpyxl.styles import Border, Font, PatternFill, Side
 from openpyxl.worksheet.properties import PageSetupProperties
 
-from erp.nejum_credit import set_nejum_credit_footer
+from erp.nejum_credit import set_credit_footer
 from erp.xlsx_utils import (
     cell, merge, merge_border, section, kv_full, kv_pair,
     GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP, INK, TEXT,
@@ -378,7 +378,7 @@ def build_order_workbook(order):
         merge_border(ws, r, 1, NCOLS, GRID)
         ws.row_dimensions[r].height = 46
 
-    set_nejum_credit_footer(ws)
+    set_credit_footer(ws)
     return wb
 
 
@@ -547,7 +547,7 @@ def build_combined_workbook(orders):
     if rows:
         ws.auto_filter.ref = f"A{head_row - 1}:{last_col}{head_row + len(rows) - 1}"
     ws.freeze_panes = ws.cell(head_row, 1)
-    set_nejum_credit_footer(ws)
+    set_credit_footer(ws)
 
     # ── How it prints ────────────────────────────────────────────────
     # Nine columns of a customer's goods do not fit the width of a

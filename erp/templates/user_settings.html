@@ -284,6 +284,14 @@
                          placeholder="{{ brand_fields.tax_number.effective }}"
                          {% if not is_brand_admin %}disabled{% endif %}>
                 </div>
+                <div class="st-form-group">
+                  <label class="st-form-label" for="id_brand_color">{% trans "Brand colour" %}</label>
+                  <input type="text" name="brand_color" id="id_brand_color" class="st-input"
+                         value="{{ brand_fields.brand_color.value }}"
+                         placeholder="{{ brand_fields.brand_color.effective }}"
+                         {% if not is_brand_admin %}disabled{% endif %}>
+                  <p class="st-help">{% trans "Hex code, e.g. #944F05. The colour your name prints in on documents." %}</p>
+                </div>
                 <div class="st-form-group is-full">
                   <label class="st-form-label" for="id_logo_url">{% trans "Logo URL" %}</label>
                   <input type="url" name="logo_url" id="id_logo_url" class="st-input"
@@ -297,7 +305,7 @@
                   <label style="display:flex;align-items:center;gap:10px;font-size:13.5px;">
                     <input type="checkbox" name="nejum_credit" {% if brand_nejum_credit %}checked{% endif %}
                            {% if not is_brand_admin %}disabled{% endif %}>
-                    {% trans "Print “Created with Nejum” at the foot of customer documents" %}
+                    {% trans "Print “<your name> is powered by Nejum” at the foot of customer documents" %}
                   </label>
                   <p class="st-help">{% trans "Never shown on invoices or account statements." %}</p>
                 </div>

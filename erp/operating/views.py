@@ -4349,8 +4349,8 @@ def export_packing_list_excel(request, pk):
             lbl.fill = header_fill
             val.fill = header_fill
 
-    from erp.nejum_credit import set_nejum_credit_footer
-    set_nejum_credit_footer(ws)
+    from erp.nejum_credit import set_credit_footer
+    set_credit_footer(ws)
 
     ws.column_dimensions["A"].width = 8
     ws.column_dimensions["B"].width = 6
@@ -5424,8 +5424,8 @@ def order_packing_list_pdf(request, pk):
         ]))
         story.append(totals_tbl)
 
-    from erp.nejum_credit import draw_nejum_credit
-    doc.build(story, onFirstPage=draw_nejum_credit, onLaterPages=draw_nejum_credit)
+    from erp.nejum_credit import draw_credit
+    doc.build(story, onFirstPage=draw_credit, onLaterPages=draw_credit)
     buffer.seek(0)
 
     response = HttpResponse(buffer, content_type='application/pdf')

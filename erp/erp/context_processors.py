@@ -7,7 +7,7 @@ from django.db.models import Value, CharField
 from django.core.cache import cache
 from django.conf import settings as _settings
 from erp.branding import brand_values
-from erp.nejum_credit import NEJUM_URL, nejum_credit
+from erp.nejum_credit import NEJUM_URL, credit_html, credit_text
 
 
 def ui_theme(request):
@@ -33,7 +33,9 @@ def ui_theme(request):
         # Edited on the Settings page, falling back to settings.py.
         **brand_values(),
         # "" when the brand has the credit off, so templates just test it.
-        "NEJUM_CREDIT": nejum_credit(),
+        # The HTML one carries each name in its own colour.
+        "NEJUM_CREDIT": credit_text(),
+        "NEJUM_CREDIT_HTML": credit_html(),
         "NEJUM_URL": NEJUM_URL,
     }
 

@@ -39,5 +39,7 @@
 {{ BRAND_NAME|default:"Nejum" }}{% if BRAND_ADDRESS %}
 {{ BRAND_ADDRESS }}{% endif %}{% if BRAND_PHONE %}
 {{ BRAND_PHONE }}{% endif %}{% if BRAND_EMAIL %}
-{{ BRAND_EMAIL }}{% endif %}
+{{ BRAND_EMAIL }}{% endif %}{% if NEJUM_CREDIT %}
+
+{{ NEJUM_CREDIT }} · nejum.com{% endif %}
 {% endautoescape %}

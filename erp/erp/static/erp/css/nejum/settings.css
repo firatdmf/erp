@@ -148,6 +148,10 @@
   border-color: #B8DCDC;
   color: var(--st-teal-deep);
 }
+#Settings_Page .st-nav-link--danger,
+#Settings_Page .st-nav-link--danger .st-nav-ico { color: #B91C1C; }
+#Settings_Page .st-nav-link--danger:hover { background: #FEF2F2; color: #991B1B; }
+#Settings_Page .st-nav-link--danger:hover .st-nav-ico { border-color: #FCA5A5; color: #991B1B; }
 #Settings_Page .st-nav-link.is-disabled {
   color: var(--st-ink-4);
   cursor: not-allowed;

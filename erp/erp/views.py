@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.views import View
@@ -33,12 +34,73 @@ class user_settings(View):
         google_creds = None
         if request.user.is_authenticated:
             google_creds = GoogleChatCredentials.objects.filter(user=request.user).first()
-            
+
+        from erp.branding import brand, brand_flag
+        from operating.views_warehouse import _is_admin
+        # The company tab shows what documents currently print — the
+        # edited value or, where nothing was typed, the code default as
+        # a placeholder — so the page never looks emptier than reality.
+        from erp.models import BrandProfile
+        from erp.branding import TEXT_FIELDS
+        row = BrandProfile.objects.first()
+        brand_fields = [
+            {
+                "name": field,
+                "value": (getattr(row, field, "") or "") if row else "",
+                "effective": brand(setting),
+            }
+            for field, setting in TEXT_FIELDS.items()
+        ]
         return render(request, self.template_name, {
             "google_creds": google_creds,
             "is_google_connected": google_creds is not None,
-            "user": request.user
+            "user": request.user,
+            "is_brand_admin": _is_admin(request.user),
+            "brand_fields": {f["name"]: f for f in brand_fields},
+            "brand_nejum_credit": brand_flag("NEJUM_CREDIT"),
         })
+
+
+@method_decorator(login_required, name="dispatch")
+class BrandProfileUpdate(View):
+    """Save the company's own identity — what its documents print.
+
+    Admin only: this is the name, address and tax number every customer
+    document signs with, not a personal preference. Answers with the
+    same inline banner the other Settings forms use (htmx swaps it in).
+    """
+
+    def post(self, request):
+        from django.utils.translation import gettext as _
+        from erp.branding import TEXT_FIELDS
+        from erp.models import BrandProfile
+        from operating.views_warehouse import _is_admin
+
+        def banner(ok, text):
+            colour = ("#d1fae5", "#065f46") if ok else ("#fee2e2", "#991b1b")
+            icon = "check-circle" if ok else "exclamation-circle"
+            return HttpResponse(
+                f'<div class="alert" role="alert" style="padding:1rem;'
+                f'background-color:{colour[0]};color:{colour[1]};'
+                f'border-radius:0.5rem;margin-bottom:1rem;">'
+                f'<i class="fas fa-{icon}"></i> {text}</div>')
+
+        if not _is_admin(request.user):
+            return banner(False, _("Only an administrator can change the company profile."))
+
+        row = BrandProfile.get()
+        for field in TEXT_FIELDS:
+            if field in request.POST:
+                setattr(row, field, (request.POST.get(field) or "").strip())
+        row.nejum_credit = request.POST.get("nejum_credit") == "on"
+        row.updated_by = request.user
+        try:
+            row.full_clean()
+        except ValidationError as exc:
+            return banner(False, "; ".join(
+                f"{f}: {' '.join(m)}" for f, m in exc.message_dict.items()))
+        row.save()
+        return banner(True, _("Company profile updated."))
 
 
 class test_page(TemplateView):

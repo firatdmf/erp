@@ -1070,8 +1070,9 @@ class Invoice(models.Model):
             explicit = (self.book.brand_name or "").strip()
         if explicit:
             return explicit
-        base = getattr(settings, "BRAND_NAME", "") or "Nejum ERP"
-        suffix = (getattr(settings, "BRAND_LEGAL_SUFFIX", "") or "").strip()
+        from erp.branding import brand
+        base = brand("BRAND_NAME") or "Nejum ERP"
+        suffix = brand("BRAND_LEGAL_SUFFIX")
         return f"{base} {suffix}".strip() if suffix else base
 
     @property

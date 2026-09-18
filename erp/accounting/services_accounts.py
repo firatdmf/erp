@@ -181,7 +181,8 @@ def brand_name_for(book=None) -> str:
             book = None
     if book is not None:
         return book.effective_brand_name
-    return (getattr(settings, "BRAND_DISPLAY_NAME", "")
+    from erp.branding import brand
+    return (brand("BRAND_DISPLAY_NAME")
             or getattr(settings, "BRAND_NAME", "")
             or "Nejum")
 

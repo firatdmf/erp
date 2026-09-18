@@ -10,10 +10,10 @@ from django.test import RequestFactory, TestCase
 from erp.nav import MOBILE_FIRST, NAV_SECTIONS, mobile_sections
 
 # Surfaces the drawer owns that the desktop sidebar has no equivalent
-# for: Settings/Sign out live in the desktop TOP BAR, and the favourites
+# for: Settings lives in the desktop TOP BAR, and the favourites
 # sheet mirrors the top bar's favourites dropdown. Both are documented
 # in _mobile_shell.html.
-MOBILE_ONLY_LABELS = {"Settings", "Sign Out"}
+MOBILE_ONLY_LABELS = {"Settings"}
 
 DESKTOP_ITEM = re.compile(
     r'<a class="nj-fly-item"\s*(?:href="([^"]*)")?\s*(?:onclick="([^"]*)")?[^>]*>'

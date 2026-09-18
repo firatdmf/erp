@@ -23,6 +23,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string, TemplateDoesNotExist
+
+from erp.branding import brand
+from erp.nejum_credit import NEJUM_URL, nejum_credit
 from django.utils.html import strip_tags
 
 
@@ -370,10 +373,14 @@ def _render_order_pdf(order):
         # ---- Footer ----
         story += [Spacer(1, 18),
                   HRFlowable(width="100%", thickness=0.75, color=INK, spaceAfter=4)]
-        foot = Table([[
-            par(f"{brand.upper()} · {_('Order')} {num}", 8, color=MUT),
-            par(datef(timezone.now(), "d M Y · H:i"), 8, color=MUT, align=2),
-        ]], colWidths=[CW / 2] * 2)
+        credit = nejum_credit()
+        foot_cells = [par(f"{brand.upper()} · {_('Order')} {num}", 8, color=MUT)]
+        if credit:
+            # On the footer line, not under it — see erp/nejum_credit.py.
+            from erp.nejum_credit import CREDIT_COLOR
+            foot_cells.append(par(credit, 8, color=colors.HexColor(CREDIT_COLOR), align=1))
+        foot_cells.append(par(datef(timezone.now(), "d M Y · H:i"), 8, color=MUT, align=2))
+        foot = Table([foot_cells], colWidths=[CW / len(foot_cells)] * len(foot_cells))
         foot.setStyle(TableStyle([
             ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
@@ -422,7 +429,7 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
         order_items, order_total = _order_lines_and_total(order)
         from accounting.services_accounts import brand_name_for
         brand_name = brand_name_for()
-        brand_email = getattr(settings, "BRAND_EMAIL", "") or ""
+        brand_email = brand("BRAND_EMAIL")
 
         # Render subject + HTML body. Per-event templates first, fall
         # back to a generic one so adding a new status doesn't crash.
@@ -438,8 +445,12 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
             "currency_symbol": _currency_symbol(order),
             "BRAND_NAME": brand_name,
             "BRAND_EMAIL": brand_email,
-            "BRAND_PHONE": getattr(settings, "BRAND_PHONE", "") or "",
-            "BRAND_ADDRESS": getattr(settings, "BRAND_ADDRESS", "") or "",
+            "BRAND_PHONE": brand("BRAND_PHONE"),
+            "BRAND_ADDRESS": brand("BRAND_ADDRESS"),
+            # Rendered without a request, so the context processor that
+            # carries these to every page does not run here.
+            "NEJUM_CREDIT": nejum_credit(),
+            "NEJUM_URL": NEJUM_URL,
         }
         if extra_context:
             ctx.update(extra_context)

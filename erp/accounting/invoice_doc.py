@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.conf import settings
+from erp.branding import brand
 
 
 @dataclass
@@ -69,7 +69,7 @@ class InvoiceDoc:
 
 
 def _s(name):
-    return getattr(settings, name, "") or ""
+    return brand(name)
 
 
 def _issuer(book):
@@ -77,7 +77,7 @@ def _issuer(book):
     profile in settings — the same precedence the old invoice used."""
     name = ((getattr(book, "brand_name", "") or "").strip() if book else "")
     if not name:
-        base = _s("BRAND_NAME") or "Nejum ERP"
+        base = brand("BRAND_NAME") or "Nejum ERP"
         suffix = _s("BRAND_LEGAL_SUFFIX").strip()
         name = f"{base} {suffix}".strip() if suffix else base
     return Party(

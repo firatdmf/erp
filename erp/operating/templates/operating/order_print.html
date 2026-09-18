@@ -179,6 +179,9 @@
     .foot { margin-top: 9pt; padding-top: 6pt; border-top: 1px solid #E2E8EE; font-size: 9.33pt; color: #6B7280; width: 100%; }
     .foot td { vertical-align: top; }
     .foot .right { text-align: right; }
+    /* Light teal — erp/nejum_credit.py CREDIT_COLOR. */
+    .foot .nejum { text-align: center; color: #7FB0AB; }
+    .foot .nejum a { color: inherit; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -376,6 +379,9 @@
   <table class="foot" cellspacing="0" cellpadding="0">
     <tr>
       <td>{{ brand_line|default:"Nejum ERP" }} · {% if combined %}{% trans "Orders" %}{% else %}{% trans "Order" %}{% endif %}</td>
+      {% comment %}The credit rides the footer line rather than sitting on
+      a line of its own: same row as who sent the document and when.{% endcomment %}
+      {% if NEJUM_CREDIT %}<td class="nejum"><a href="{{ NEJUM_URL }}">{{ NEJUM_CREDIT }}</a></td>{% endif %}
       <td class="right">{% now "d M Y · H:i" %}</td>
     </tr>
   </table>

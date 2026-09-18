@@ -281,6 +281,11 @@ BRAND_DEFAULTS = {
         # operating.views_warehouse._consonant_prefix. It reads as the
         # house's own code because that is whose goods they became.
         "BRAND_CODE_PREFIX": "DMF",
+        # A small "Created with Nejum" credit at the foot of the
+        # documents a customer receives (see erp/nejum_credit.py). On for
+        # the house; a company that licenses Nejum under its own name can
+        # have it off.
+        "NEJUM_CREDIT": True,
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3000",
     },
@@ -316,6 +321,7 @@ BRAND_CODE_PREFIX = config(
     "BRAND_CODE_PREFIX", default=_brand_cfg.get("BRAND_CODE_PREFIX", "DMF")
 ).strip().upper() or "DMF"
 CLIENT_PUBLIC_URL = config("CLIENT_PUBLIC_URL", default=_brand_cfg["CLIENT_PUBLIC_URL"]).strip()
+NEJUM_CREDIT = config("NEJUM_CREDIT", default=_brand_cfg.get("NEJUM_CREDIT", True), cast=bool)
 print(f"[BRAND] Active brand: {BRAND} (schema={DB_SCHEMA})")
 
 _template_dirs = [os.path.join(BASE_DIR, "templates")]

@@ -6,6 +6,8 @@ from operator import attrgetter
 from django.db.models import Value, CharField
 from django.core.cache import cache
 from django.conf import settings as _settings
+from erp.branding import brand_values
+from erp.nejum_credit import NEJUM_URL, nejum_credit
 
 
 def ui_theme(request):
@@ -28,14 +30,11 @@ def ui_theme(request):
         "UI_THEME": getattr(_settings, "UI_THEME", ""),
         "DB_SCHEMA": getattr(_settings, "DB_SCHEMA", "public"),
         "BRAND_NAME": getattr(_settings, "BRAND_NAME", "Nejum"),
-        "BRAND_LEGAL_SUFFIX": getattr(_settings, "BRAND_LEGAL_SUFFIX", ""),
-        "BRAND_ADDRESS": getattr(_settings, "BRAND_ADDRESS", ""),
-        "BRAND_PHONE": getattr(_settings, "BRAND_PHONE", ""),
-        "BRAND_FAX": getattr(_settings, "BRAND_FAX", ""),
-        "BRAND_EMAIL": getattr(_settings, "BRAND_EMAIL", ""),
-        "BRAND_LOGO_URL": getattr(_settings, "BRAND_LOGO_URL", ""),
-        "BRAND_TAX_OFFICE": getattr(_settings, "BRAND_TAX_OFFICE", ""),
-        "BRAND_TAX_NUMBER": getattr(_settings, "BRAND_TAX_NUMBER", ""),
+        # Edited on the Settings page, falling back to settings.py.
+        **brand_values(),
+        # "" when the brand has the credit off, so templates just test it.
+        "NEJUM_CREDIT": nejum_credit(),
+        "NEJUM_URL": NEJUM_URL,
     }
 
 # This is for base view functions to work on everywhere

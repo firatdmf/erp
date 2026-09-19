@@ -51,47 +51,13 @@ button {
   cursor: pointer;
 }
 
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 6rem;
-  height: 100vh;
-  background-color: var(--bg-primary);
-  border-right: 1px solid var(--border-color);
-  transition: all var(--transition-speed) ease;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  /* no internal scroll */
-  overflow-x: hidden;
-}
-
-/* Remove scrollbar completely */
-.navbar::-webkit-scrollbar {
-  display: none;
-}
-
-.navbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.navbar-nav {
-  list-style: none;
-  padding: 0.3rem 0 1.0rem 0;
-  /* üst az, alt biraz daha fazla boşluk */
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  /* öğeleri tüm yükseklikte dağıt */
-  width: 100%;
-  height: 100%;
-}
-
+/* The pre-theme sidebar — <nav class="navbar"> in base.html, with its
+   hover-open #addExpanded / #marketingExpanded / #operatingExpanded /
+   #accountingExpanded / #teamExpanded / #procurementExpanded flyouts and
+   the search overlay that predated the command palette — was deleted.
+   Its rules went with it. The .nav-item / .nav-link / .link-text / .logo /
+   .add-menu-* rules below stayed: other templates still use those class
+   names, so they are no longer navbar-only. */
 .nav-item {
   width: 100%;
 }
@@ -108,159 +74,6 @@ button {
 .last2items {
   margin-top: 0;
   width: 100%;
-}
-
-.nav-item #add-button {
-  position: relative;
-  overflow: visible;
-}
-
-
-/* #searchBarOverlay{
-  display:none;
-  position: fixed;
-  background-color: rgba(0,0,0,0.7);
-  height:100vh;
-  width:200vw;
-  z-index: 1;
-}
-
-#searchBarOverlay:target{
-  display:block;
-}
-
-.navbar .navbar-nav .searchBar {
-  position: fixed;
-  padding:22px 30px;
-  text-align: center;
-  width:40vw;
-  height:50vh;
-  background-color: white;
-  border-radius: 30px;
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  -ms-transform: translate(-50%, -50%);
-  -moz-transform: translate(-50%, -50%);
-  -webkit-transform: translate(-50%, -50%);
-  transform: translate(-50%, -50%);
-}
-
-#searchInput{
-  position: relative;
-  width:100%;
-} */
-
-.navbar #searchButton {
-  cursor: pointer;
-}
-
-.navbar .overlay #searchInput {
-  width: 100%;
-  padding: 0;
-}
-
-.navbar .overlay {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 10vh;
-  z-index: 1000;
-}
-
-.navbar .overlay .overlayContent {
-  background: var(--bg-primary);
-  padding: 2rem;
-  border-radius: var(--border-radius);
-  width: 90%;
-  max-width: 640px;
-  box-shadow: var(--shadow-lg);
-  animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.navbar .overlay .recent h4 {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 1.5rem 0 0.75rem;
-}
-
-.navbar .overlay .searchResults {
-  margin-top: 1.5rem;
-}
-
-.navbar .overlay .result-item {
-  padding: 0.875rem 1rem;
-  border-bottom: 1px solid var(--border-color);
-  border-radius: var(--border-radius-sm);
-  margin-bottom: 0.5rem;
-  transition: all var(--transition-speed) ease;
-}
-
-.navbar .overlay .result-item:hover {
-  background: var(--bg-hover);
-  cursor: pointer;
-  transform: translateX(4px);
-}
-
-.navbar .overlay .recent ul {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
-}
-
-.navbar .overlay .recent ul li {
-  margin-top: 0.5rem;
-}
-
-.navbar .overlay .recent ul li a {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem;
-  border-radius: var(--border-radius-sm);
-  transition: all var(--transition-speed) ease;
-}
-
-.navbar .overlay .recent ul li a:hover {
-  background: var(--bg-hover);
-}
-
-.navbar .overlay .recent ul li a i {
-  color: var(--text-secondary);
-  font-size: 1rem;
-}
-
-
-.nav-item .nav-separator {
-  padding: 0.1rem 0;
-}
-
-.nav-item .nav-separator-line {
-  border-bottom: 1px solid var(--border-color);
-  margin: 0.1rem auto;
-  width: 60%;
 }
 
 .nav-link {
@@ -320,13 +133,6 @@ button {
   fill: white;
 } */
 
-/* .navbar:hover {
-  width: 16rem;
-}
-.navbar:hover .link-text {
-  display: flex;
-} */
-
 path {
   fill: var(--text-secondary);
   transition: fill var(--transition-speed) ease;
@@ -383,111 +189,8 @@ a:hover {
   transition: all 0.0s;
 } */
 
-/* .navbar .logo:hover .logo-text, .navbar .logo:hover i {
-  transform: rotate(360deg);
-  transition: all var(--transition-speed) ease;
-
-} */
-
-/* now let's make it responsive */
-/* small screens */
-/* @media only screen and (max-width: 600px) {
-  .navbar {
-    bottom: 0;
-    width:100vw;
-    height:5rem;
-
-  }
-  .logo{
-    display: none;
-  }
-
-  .navbar-nav{
-    flex-direction: row;
-  }
-
-  .nav-link{
-    justify-content: center;
-  }
-  main{
-    margin:0;
-  }
-} */
-
-/* large screens */
-/* @media only screen and (min-width: 600px) {
-  .navbar {
-    top: 0;
-    width: 5rem;
-    height: 100vh;
-  }
-
-  .navbar:hover {
-    width: 16rem;
-  }
-  .navbar:hover .link-text {
-    display: inline;
-    transition: opacity var(--transition-speed);
-  }
-} */
-
-
-#addButton {
-  position: relative;
-}
-
-#addButton .nav-link {
-  position: relative;
-}
-
-/* Add menüsü için hover bridge - boşluğu kapatan görünmez alan */
-#addButton::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 100%;
-  width: 10px;
-  height: 100%;
-  background: transparent;
-  z-index: 9998;
-}
-
-/* Add menüsü hover durumu */
-#addButton:hover #addExpanded,
-#addButton:hover::after,
-#addExpanded:hover {
-  display: block;
-}
-
 .nav-item {
   position: relative;
-}
-
-.nav-item #addExpanded {
-  display: none;
-  position: fixed;
-  left: 6rem;
-  background-color: var(--bg-primary);
-  width: 340px;
-  padding: 0;
-  border-radius: var(--border-radius);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-color);
-  z-index: 9999;
-  animation: slideIn 0.25s ease;
-  overflow: hidden;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 /* Add Menu Header */
@@ -567,229 +270,6 @@ a:hover {
   color: var(--accent-primary);
 }
 
-#addExpanded .futureFeature {
-  text-decoration: line-through;
-}
-
-/* Marketing menüsü için stil - Add ile aynı yapı */
-#marketingButton {
-  position: relative;
-}
-
-#marketingButton .nav-link {
-  position: relative;
-}
-
-/* Marketing menüsü için hover bridge */
-#marketingButton::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 100%;
-  width: 10px;
-  height: 100%;
-  background: transparent;
-  z-index: 9998;
-}
-
-/* Marketing menüsü hover durumu */
-#marketingButton:hover #marketingExpanded,
-#marketingButton:hover::after,
-#marketingExpanded:hover {
-  display: block;
-}
-
-#marketingExpanded {
-  display: none;
-  position: fixed;
-  left: 6rem;
-  background-color: var(--bg-primary);
-  width: 340px;
-  padding: 0;
-  border-radius: var(--border-radius);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-color);
-  z-index: 9999;
-  animation: slideIn 0.25s ease;
-  overflow: hidden;
-}
-
-/* Operating menüsü için stil - Marketing ile aynı yapı */
-#operatingButton {
-  position: relative;
-}
-
-#operatingButton .nav-link {
-  position: relative;
-}
-
-/* Operating menüsü için hover bridge */
-#operatingButton::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 100%;
-  width: 10px;
-  height: 100%;
-  background: transparent;
-  z-index: 9998;
-}
-
-/* Operating menüsü hover durumu */
-#operatingButton:hover #operatingExpanded,
-#operatingButton:hover::after,
-#operatingExpanded:hover {
-  display: block;
-}
-
-#operatingExpanded {
-  display: none;
-  position: fixed;
-  left: 6rem;
-  background-color: var(--bg-primary);
-  width: 340px;
-  padding: 0;
-  border-radius: var(--border-radius);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-color);
-  z-index: 9999;
-  animation: slideIn 0.25s ease;
-  overflow: hidden;
-}
-
-
-/* Accounting menüsü için stil - Marketing ile aynı yapı */
-#accountingButton {
-  position: relative;
-}
-
-#accountingButton .nav-link {
-  position: relative;
-}
-
-/* Accounting menüsü için hover bridge */
-#accountingButton::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 100%;
-  width: 10px;
-  height: 100%;
-  background: transparent;
-  z-index: 9998;
-}
-
-/* Accounting menüsü hover durumu */
-#accountingButton:hover #accountingExpanded,
-#accountingButton:hover::after,
-#accountingExpanded:hover {
-  display: block;
-}
-
-#accountingExpanded {
-  display: none;
-  position: fixed;
-  left: 6rem;
-  background-color: var(--bg-primary);
-  width: 340px;
-  padding: 0;
-  border-radius: var(--border-radius);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-color);
-  z-index: 9999;
-  animation: slideIn 0.25s ease;
-  overflow: hidden;
-}
-
-/* Team menüsü için stil */
-#teamButton {
-  position: relative;
-}
-
-#teamButton .nav-link {
-  position: relative;
-}
-
-/* Team menüsü için hover bridge */
-#teamButton::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 100%;
-  width: 10px;
-  height: 100%;
-  background: transparent;
-  z-index: 9998;
-}
-
-/* Team menüsü hover durumu */
-#teamButton:hover #teamExpanded,
-#teamButton:hover::after,
-#teamExpanded:hover {
-  display: block;
-}
-
-#teamExpanded {
-  display: none;
-  position: fixed;
-  top: 60px;
-  left: 6rem;
-  background-color: var(--bg-primary);
-  width: 340px;
-  padding: 0;
-  border-radius: var(--border-radius);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-color);
-  z-index: 9999;
-  animation: slideIn 0.25s ease;
-  overflow: hidden;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-/* Procurement menüsü için stil - Operating ile aynı yapı */
-#procurementButton {
-  position: relative;
-}
-
-#procurementButton .nav-link {
-  position: relative;
-}
-
-/* Procurement menüsü için hover bridge */
-#procurementButton::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 100%;
-  width: 10px;
-  height: 100%;
-  background: transparent;
-  z-index: 9998;
-}
-
-/* Procurement menüsü hover durumu */
-#procurementButton:hover #procurementExpanded,
-#procurementButton:hover::after,
-#procurementExpanded:hover {
-  display: block;
-}
-
-#procurementExpanded {
-  display: none;
-  position: fixed;
-  left: 6rem;
-  background-color: var(--bg-primary);
-  width: 340px;
-  padding: 0;
-  border-radius: var(--border-radius);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-color);
-  z-index: 9999;
-  animation: slideIn 0.25s ease;
-  overflow: hidden;
-}
-
 /* Below is for countdown */
 /* ------------------------------------------------ */
 /* general styling */
@@ -843,11 +323,6 @@ a:hover {
   }
 }
 
-
-#nejum_logo_text {
-  color: teal;
-  font-weight: 700;
-}
 
 .errorlist {
   color: var(--accent-hover);
@@ -1708,18 +1183,10 @@ tbody td {
     padding: 1rem 1.5rem;
   }
 
-  .navbar {
-    width: 5rem;
-  }
-
   header .line {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
-  }
-
-  .nav-item #addExpanded {
-    left: 5rem;
   }
 }
 
@@ -1727,20 +1194,6 @@ tbody td {
   main {
     margin-left: 0;
     padding: 1rem;
-  }
-
-  .navbar {
-    width: 100%;
-    height: auto;
-    bottom: 0;
-    top: auto;
-    border-right: none;
-    border-top: 1px solid var(--border-color);
-  }
-
-  .navbar-nav {
-    flex-direction: row;
-    overflow-x: auto;
   }
 
   .logo {

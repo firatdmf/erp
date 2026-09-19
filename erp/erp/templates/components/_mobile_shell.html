@@ -108,15 +108,6 @@
       </div>
     {% endfor %}
 
-    {% comment %}Mobile-only utility section — Settings already lives in the desktop TOPBAR (not its sidebar), so there is no desktop sidebar equivalent to mirror here; kept for mobile convenience since the drawer is the only full-screen nav surface on mobile. Sign Out lives on the Settings page.{% endcomment %}
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Account" context "sidebar" %}</div>
-      <a class="m-drawer-item" href="{% url 'user_settings' %}">
-        <span class="m-drawer-ico"><i data-lucide="settings"></i></span>
-        <span class="m-drawer-label">{% trans "Settings" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
   </div>
 </aside>
 

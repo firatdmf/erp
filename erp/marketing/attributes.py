@@ -13,6 +13,7 @@ value is lower_case_with_underscores.
 import re
 
 _SIZE_RE = re.compile(r"^(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?$", re.I)
+_BARE_NUMBER_RE = re.compile(r"^\d+(?:[.,]\d+)?$")
 
 
 def normalize_attribute_name(name):
@@ -55,3 +56,24 @@ def value_label(value):
     """How a stored value is shown: "dark_cream" → "Dark cream"."""
     text = str(value or "").replace("_", " ")
     return text[:1].upper() + text[1:]
+
+
+def is_width_attribute(name):
+    return normalize_attribute_name(name) == "width"
+
+
+def display_value(attribute_name, value):
+    """How one value of `attribute_name` reads on screen.
+
+    The underscores are a storage habit, not something to read: a value
+    is stored "cactus_green" and shown "Cactus green". A width is stored
+    as the bare number the fabric is measured by ("250"), which in a
+    column of variant values is a number with nothing to say what it
+    measures — so it prints with its unit, "250 cm", the way a size
+    already prints "160 x 200 cm". A width that was typed with a unit
+    already ("150cm") is left as the person wrote it.
+    """
+    text = value_label(value)
+    if is_width_attribute(attribute_name) and _BARE_NUMBER_RE.match(text):
+        return f"{text} cm"
+    return text

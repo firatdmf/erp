@@ -283,6 +283,8 @@
   /* Customer-facing order_status colour map (matches ORDER_STATUS_CHOICES —
      this is the field the order actually progresses through; the legacy
      production `status` field is no longer surfaced here). */
+  .ord-status.pre_order        { color: #6D28D9; background: #EDE9FE; }
+  .ord-status.pre_order        .ord-status-dot { background: #8B5CF6; }
   .ord-status.pending          { color: #B27500; background: #FEF3C7; }
   .ord-status.pending          .ord-status-dot { background: #F59E0B; }
   .ord-status.confirmed        { color: #1565C0; background: #DBEAFE; }
@@ -526,9 +528,9 @@
           {% endwith %}
           {% endif %}
         </div>
-        <span class="ord-status {{ order.order_status }}">
+        <span class="ord-status {% if order.is_pre_order %}pre_order{% else %}{{ order.order_status }}{% endif %}">
           <span class="ord-status-dot"></span>
-          {% if order.order_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ order.get_order_status_display }}{% endif %}
+          {% if order.order_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ order.status_label }}{% endif %}
         </span>
         <i class="fa fa-chevron-right ord-chev"></i>
       </a>
@@ -599,9 +601,9 @@
           {% endwith %}
           {% endif %}
         </div>
-        <span class="ord-status {{ order.order_status }}">
+        <span class="ord-status {% if order.is_pre_order %}pre_order{% else %}{{ order.order_status }}{% endif %}">
           <span class="ord-status-dot"></span>
-          {% if order.order_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ order.get_order_status_display }}{% endif %}
+          {% if order.order_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ order.status_label }}{% endif %}
         </span>
         <i class="fa fa-chevron-right ord-chev"></i>
       </a>
@@ -668,9 +670,9 @@
           {% endwith %}
           {% endif %}
         </div>
-        <span class="ord-status {{ order.order_status }}">
+        <span class="ord-status {% if order.is_pre_order %}pre_order{% else %}{{ order.order_status }}{% endif %}">
           <span class="ord-status-dot"></span>
-          {% if order.order_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ order.get_order_status_display }}{% endif %}
+          {% if order.order_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ order.status_label }}{% endif %}
         </span>
         <i class="fa fa-chevron-right ord-chev"></i>
       </a>
@@ -734,9 +736,9 @@
           {% endwith %}
           {% endif %}
         </div>
-        <span class="ord-status {{ order.order_status }}">
+        <span class="ord-status {% if order.is_pre_order %}pre_order{% else %}{{ order.order_status }}{% endif %}">
           <span class="ord-status-dot"></span>
-          {% if order.order_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ order.get_order_status_display }}{% endif %}
+          {% if order.order_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ order.status_label }}{% endif %}
         </span>
         <i class="fa fa-chevron-right ord-chev"></i>
       </a>

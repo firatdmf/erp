@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load l10n %}
 {% load static %}
 
 {% block css %}
@@ -148,10 +149,14 @@
 
       {# ============ B2B QUICK ORDER / QUOTE PANEL ============ #}
       {% with camp=product.campaign %}
+      {% comment %}The figures the quote panel computes with are written
+      unlocalized: a localized 13.50 is "13,50" with Turkish active, and
+      parseFloat stops at the comma and quietly quotes 13. What the
+      shopper READS is localized as usual, further down.{% endcomment %}
       <div class="b2b-quote" id="b2bQuote"
-           data-base-price="{{ product.price|default:0 }}"
+           data-base-price="{{ product.price|default:0|unlocalize }}"
            data-campaign-type="{{ camp.campaign_type|default:'' }}"
-           data-campaign-percent="{{ camp.discount_percent|default:0 }}"
+           data-campaign-percent="{{ camp.discount_percent|default:0|unlocalize }}"
            data-campaign-end="{{ camp.end_date|date:'Y-m-d'|default:'' }}">
         <div class="b2b-head">
           <span class="b2b-ico"><i data-lucide="shopping-cart"></i></span>
@@ -178,9 +183,9 @@
         <div class="b2b-tiers" id="b2bTiers">
           {% for t in camp.tiers.all %}
           <div class="b2b-tier"
-               data-min="{{ t.min_qty }}"
-               data-max="{{ t.max_qty|default_if_none:'' }}"
-               data-pct="{{ t.discount_percent }}">
+               data-min="{{ t.min_qty|unlocalize }}"
+               data-max="{{ t.max_qty|default_if_none:''|unlocalize }}"
+               data-pct="{{ t.discount_percent|unlocalize }}">
             <div class="b2b-tier-range">
               {{ t.min_qty }}{% if t.max_qty %} – {{ t.max_qty }}{% else %}+{% endif %}
               <small>{% trans "units" %}</small>
@@ -274,7 +279,7 @@
             <th>{% trans "SKU" %}</th>
             <th>{% trans "Attributes" %}</th>
             <th>{% trans "Price" %}</th>
-            <th>{% trans "Availability" %}</th>
+            <th>{% trans "In stock" %}</th>
             <th>{% trans "Barcode" %}</th>
             <th>{% trans "Status" %}</th>
           </tr>
@@ -308,10 +313,28 @@
               {% if not variant.stock_tracked %}
                 {# No warehouse carries it: made to order, NOT out of stock. #}
                 <span class="variant-availability">{% trans "Made to order" %}</span>
-              {% elif variant.live_quantity >= 50 %}
-                <span class="variant-availability"><b>50+</b></span>
+              {% elif variant.live_quantity > 0 %}
+                {% comment %}The number itself. This page is read by the people
+                who sell and cut the cloth, who need to know whether 40 metres
+                are left — the storefront's "50+" hedge is for buyers, and it
+                called every variant under fifty "unavailable".{% endcomment %}
+                <span class="variant-availability"><b>{{ variant.live_quantity|floatformat:"-2" }}</b> {{ product.unit_short }}</span>
+                {% comment %}The total counts every warehouse in every book, so
+                where it is split it says so by name. Nobody should read one
+                company's cloth and another's as a single pile to cut
+                from.{% endcomment %}
+                {% if variant.stock_locations %}
+                <span class="stock-where">
+                  {% for row in variant.stock_locations %}
+                  <span class="stock-at">
+                    <span class="q">{{ row.quantity|floatformat:"-2" }}</span>
+                    <span class="wh">{{ row.warehouse.name }}</span>
+                  </span>
+                  {% endfor %}
+                </span>
+                {% endif %}
               {% else %}
-                <span class="variant-availability is-out">{% trans "Unavailable" %}</span>
+                <span class="variant-availability is-out">{% trans "Out of stock" %}</span>
               {% endif %}
             </td>
             <td>{{ variant.variant_barcode|default:"-" }}</td>
@@ -588,6 +611,19 @@
     letter-spacing: 0.005em;
   }
   .variant-availability b { font-weight: 800; }
+  /* Under the total, where it stands. Quiet: the total is the headline,
+     the split is what you read before walking to a warehouse. Block-level
+     so it starts beneath the badge instead of running on beside it, and
+     one grid for the whole list rather than a row each — the figures share
+     a column of their own, right-aligned so they read down as a column of
+     numbers, each with its warehouse named beside it. */
+  .stock-where { display: grid; width: max-content;
+                 grid-template-columns: auto auto;
+                 column-gap: 8px; row-gap: 1px; margin-top: 5px; }
+  .stock-at { display: contents; }
+  .stock-at .q { font: 700 11px 'Plus Jakarta Sans', sans-serif; color: #374151;
+                 text-align: right; font-variant-numeric: tabular-nums; }
+  .stock-at .wh { font: 500 11px 'Plus Jakarta Sans', sans-serif; color: #6B7280; }
   .variant-availability.is-out {
     background: #F4F6F8;
     color: #94A3B8;

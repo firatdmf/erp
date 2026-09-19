@@ -33,7 +33,9 @@ from .services_accounts import (
     _currency_by_code, convert_lines_to_currency, invoice_currency_for,
     mark_as_supplier, MixedCurrencyError,
 )
-from marketing.models import Product, ProductVariant, ProductVariantAttribute
+from marketing.models import (
+    Product, ProductVariant, ProductVariantAttribute, ProductVariantAttributeValue,
+)
 
 
 def _fallback_code_prefix():
@@ -140,7 +142,17 @@ class PurchaseOrderDetail(View):
                 Prefetch(
                     "warehouse_stock_items",
                     queryset=WarehouseProductItem.objects.select_related("product", "product__warehouse"),
-                )
+                ),
+                # The line spells out what was bought — SKU and every
+                # attribute behind it — so fetch the values once for the
+                # page rather than once per line as the template walks them.
+                # Their order is the model's (by attribute name), so every
+                # line reads its attributes in the same sequence.
+                Prefetch(
+                    "variant__product_variant_attribute_values",
+                    queryset=ProductVariantAttributeValue.objects.select_related(
+                        "product_variant_attribute"),
+                ),
             )
             .order_by("line_no")
         )

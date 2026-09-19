@@ -161,6 +161,11 @@
   }
   .rolls-table tbody tr:last-child td { border-bottom: none; }
   .rolls-table tbody tr:hover { background: #FAFBFD; }
+  /* The roll a ?roll= link arrived for. The edit box opens over it, so
+     the mark is what the page looks like once the box is closed again —
+     it says which roll was just being corrected. */
+  .rolls-table tbody tr.roll-hit td { background: #FFFBEB; }
+  .rolls-table tbody tr.roll-hit td:first-child { box-shadow: inset 3px 0 0 var(--nejum-teal-700); }
   .roll-2nd-badge {
     display: inline-flex; align-items: center;
     margin-left: 6px; padding: 1px 6px;
@@ -1585,5 +1590,20 @@
       alert('{% trans "Network error" %}');
     });
   }
+
+  // ?roll=<pk> — arrive on one roll. The packing screen sends a packer
+  // here from the roll's card when they spot a barcode typed in wrong,
+  // and the roll they mean is somewhere down a list of hundreds, so the
+  // link opens its edit box rather than leaving them to find it.
+  (function () {
+    const want = new URLSearchParams(window.location.search).get('roll');
+    if (!want) return;
+    const row = document.getElementById('roll-row-' + want);
+    if (!row) return;
+    row.classList.add('roll-hit');
+    try { row.scrollIntoView({ block: 'center' }); } catch (e) {}
+    const edit = row.querySelector('button[onclick^="openRollEdit"]');
+    if (edit) openRollEdit(edit);
+  })();
 </script>
 {% endblock %}

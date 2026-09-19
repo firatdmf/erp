@@ -251,7 +251,7 @@ def build_order_workbook(order):
             payment = order.get_payment_status_display()
         except Exception:
             payment = order.payment_status
-    r = kv_pair(ws, r, "Order No", num, "Status", order.get_order_status_display() or order.order_status, NCOLS)
+    r = kv_pair(ws, r, "Order No", num, "Status", order.status_label or order.order_status, NCOLS)
     r = kv_pair(ws, r, "Order Date", _dt(order.order_date) if order.order_date else _dt(order.created_at), "Payment", payment or "—", NCOLS)
     current_account_name = order.current_account.name if (order.current_account_id and order.current_account) else "—"
     r = kv_pair(ws, r, "Last Update", _dt(order.updated_at), "Currency", ccode, NCOLS)

@@ -267,6 +267,8 @@ class ProductDetail(generic.DetailView):
         
         # Use Prefetch objects for better control and ordering
         from django.db.models import Prefetch
+        # Imported here, not at module load: operating already imports marketing.
+        from operating.models import WarehouseProduct
         
         queryset = Product.objects.select_related(
             'category',
@@ -279,7 +281,19 @@ class ProductDetail(generic.DetailView):
                 queryset=ProductFile.objects.select_related('product_variant').order_by('sequence', 'pk')
             ),
             'collections',
-            'variants',  # Prefetch variants first
+            # The variants carry their own stock: annotated here so the
+            # table can print the metres the warehouse actually holds
+            # without a query per row.
+            Prefetch('variants', queryset=with_live_quantity(ProductVariant.objects.all())),
+            # Where those metres are. The total spans every warehouse in
+            # every book — 75 variants stand in both Laleli's and Ergene's —
+            # so the rows behind it come along to be named.
+            Prefetch(
+                'variants__warehouse_products',
+                queryset=(WarehouseProduct.objects
+                          .select_related('warehouse')
+                          .order_by('warehouse__name')),
+            ),
             # Then prefetch variant files with ordering - single query for ALL variant files
             Prefetch(
                 'variants__files',
@@ -328,7 +342,15 @@ class ProductDetail(generic.DetailView):
                 seen_urls.add(f.file_url)
                 unique_files.append(f)
         context['product_files'] = unique_files
-        context['product_variants'] = list(self.object.variants.all())  # Cache variants
+        variants = list(self.object.variants.all())
+        for variant in variants:
+            # Named only when there is something to tell apart: one
+            # warehouse holding the lot needs no breakdown under its own
+            # total, but 143.50 in Laleli beside 479.10 in Ergene must
+            # never read as one pile of 622.60 to cut from.
+            held = [row for row in variant.warehouse_products.all() if row.quantity]
+            variant.stock_locations = held if len(held) > 1 else []
+        context['product_variants'] = variants  # Cache variants
         context['product_collections'] = list(self.object.collections.all())  # Cache collections
         
         context_time = time.time() - context_start

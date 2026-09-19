@@ -451,10 +451,9 @@ class ContactDetail(generic.DetailView):
         # the row template links to operating:order_detail for the
         # full picture.
         from operating.models import Order
-        context["orders"] = (
-            Order.objects.filter(contact=contact)
-            .order_by("-created_at")[:25]
-        )
+        context["orders"] = Order.with_pre_order_flag(
+            Order.objects.filter(contact=contact).order_by("-created_at")
+        )[:25]
 
         # ── Ledger accounts across every book ─────────────────
         # One client can hold an account in more than one book — the

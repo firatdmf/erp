@@ -10,10 +10,11 @@ from django.test import RequestFactory, TestCase
 from erp.nav import MOBILE_FIRST, NAV_SECTIONS, mobile_sections
 
 # Surfaces the drawer owns that the desktop sidebar has no equivalent
-# for: Settings lives in the desktop TOP BAR, and the favourites
-# sheet mirrors the top bar's favourites dropdown. Both are documented
-# in _mobile_shell.html.
-MOBILE_ONLY_LABELS = {"Settings"}
+# for: the favourites sheet mirrors the top bar's favourites dropdown,
+# which the mobile shell's media query hides. Settings used to be here
+# too, back when it was a top-bar button; it is a nav.py section now and
+# so has to appear on both surfaces like everything else.
+MOBILE_ONLY_LABELS = set()
 
 DESKTOP_ITEM = re.compile(
     r'<a class="nj-fly-item"\s*(?:href="([^"]*)")?\s*(?:onclick="([^"]*)")?[^>]*>'

@@ -136,6 +136,8 @@
     font: 600 12.5px var(--font-sans); white-space: nowrap; width: fit-content;
   }
   .ord-status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .ord-status.pre_order     { color: #6D28D9; background: #EDE9FE; }
+  .ord-status.pre_order     .ord-status-dot { background: #8B5CF6; }
   .ord-status.pending       { color: #B27500; background: #FEF3C7; }
   .ord-status.pending       .ord-status-dot { background: #F59E0B; }
   .ord-status.confirmed     { color: #0E6E4A; background: #D1FAE5; }
@@ -574,6 +576,11 @@
      `anywhere` lets the break land mid-token so the label stays boxed. */
   .od-variant-name { font: 600 12.5px var(--font-sans); color: #0F1419; line-height: 1.3;
     overflow-wrap: anywhere; }
+  /* One attribute value per line. Joined with " / " they read as one
+     run-on phrase, and a value that is itself spaced ("160 x 200 cm")
+     wrapped wherever the 105px column ran out rather than where the
+     value ended. */
+  .od-variant-name span { display: block; }
   .od-variant-sku { display: inline-block; margin-top: 2px; font-size: 10.5px; color: #94A3B8;
     overflow-wrap: anywhere; }
   .od-num-val { font: 700 13px var(--font-sans); font-variant-numeric: tabular-nums; color: #0F1419; }
@@ -988,9 +995,10 @@
         {% endif %}
 
         {% if order.order_status %}
-          <span class="ord-status {{ order.order_status }}">
+          <span class="ord-status {% if order.is_pre_order %}pre_order{% else %}{{ order.order_status }}{% endif %}">
             <span class="ord-status-dot"></span>
-            {% if order.order_status == 'pending' %}{% trans "Pending" %}
+            {% if order.is_pre_order %}{% trans "Pre-order" %}
+            {% elif order.order_status == 'pending' %}{% trans "Pending" %}
             {% elif order.order_status == 'confirmed' %}{% trans "Confirmed" %}
             {% elif order.order_status == 'preparing' %}{% trans "Preparing" %}
             {% elif order.order_status == 'shipped' %}{% trans "Completed" %}
@@ -1312,8 +1320,8 @@
               <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
               <td>
                 {% if item.product_variant %}
-                  {% if item.variant_label %}
-                    <div class="od-variant-name">{{ item.variant_label }}</div>
+                  {% if item.variant_lines %}
+                    <div class="od-variant-name">{% for line in item.variant_lines %}<span>{{ line }}</span>{% endfor %}</div>
                     <span class="mono od-variant-sku">{{ item.product_variant.variant_sku }}</span>
                   {% else %}
                     <span class="mono">{{ item.product_variant.variant_sku }}</span>

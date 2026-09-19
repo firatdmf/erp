@@ -57,8 +57,12 @@
   /* Reserved rolls list (flat, retail) / grouped-by-product (non-retail) */
   .pk-empty{text-align:center;color:var(--pk-gray);font-size:13px;padding:26px 10px;}
   .pk-empty i{font-size:26px;display:block;margin-bottom:8px;opacity:.4;}
+  /* Every listed roll opens its card on a tap — see openRollCard — so a
+     row is a control and says so. A draggable row keeps the grab cursor:
+     it still drags, and the more specific rule below wins. */
   .pk-row{border:1px solid var(--pk-line);border-radius:9px;padding:8px 10px;margin-bottom:7px;
-    animation:pkIn .18s ease;background:#fff;}
+    animation:pkIn .18s ease;background:#fff;cursor:pointer;}
+  .pk-row:hover{border-color:#9AA3AC;}
   .pk-row.flash{border-color:var(--pk-amber);box-shadow:0 0 0 3px rgba(245,158,11,.18);}
   .pk-row[draggable="true"]{cursor:grab;}
   .pk-row[draggable="true"]:active{cursor:grabbing;}
@@ -299,8 +303,9 @@
   .pks-tile.hero .val{font-size:26px;}
   .pks-tile.hero .val .u{color:rgba(255,255,255,.75);font-size:13px;}
   .pks-actions{display:flex;gap:10px;margin-top:18px;}
+  /* Also worn by an <a> — "Edit roll" leaves the page, so it is a link. */
   .pks-act{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 14px;
-    border-radius:12px;font:700 13px var(--pk-font);cursor:pointer;border:0;}
+    border-radius:12px;font:700 13px var(--pk-font);cursor:pointer;border:0;text-decoration:none;}
   .pks-act.primary{background:linear-gradient(135deg,#0D9488,#0F766E);color:#fff;
     box-shadow:0 6px 18px rgba(13,148,136,.35);}
   .pks-act.primary:hover{filter:brightness(1.08);}
@@ -371,22 +376,7 @@
       <div class="pk-card-b">
         <div id="pkList">
           {% for r in reservations %}
-          <div class="pk-row" data-id="{{ r.id }}"
-               data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity }}">
-            <div class="pk-row-top">
-              <div>
-                <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
-                <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
-                <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
-              </div>
-            </div>
-            <div class="pk-row-cut" data-cut="{{ r.id }}" data-quantity="{{ r.quantity|floatformat:2 }}" data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }}">
-              <span class="pk-cut-view">
-                <span class="pk-cut-val">{{ r.quantity|floatformat:2 }} m{% if r.quantity < r.stock_item.quantity_remaining|default:r.stock_item.quantity %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-                <span class="pk-avail">/ {{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }} m</span>
-              </span>
-            </div>
-          </div>
+          {% include "operating/partials/_pack_roll_row.html" with r=r %}
           {% endfor %}
         </div>
         <div class="pk-empty" id="pkEmpty" {% if reservations %}style="display:none;"{% endif %}>
@@ -435,23 +425,7 @@
             </div>
             <div class="pk-pgroup-rolls" data-order-item-id="{{ it.pk }}" ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDropUnassign(event)">
               {% for r in reservations %}{% if r.order_item_id == it.pk and not r.pack_id %}
-              <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
-                   data-order-item-id="{{ it.pk }}" data-assigned-pack=""
-                   data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity }}">
-                <div class="pk-row-top">
-                  <div>
-                    <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
-                    <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
-                    <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
-                  </div>
-                </div>
-                <div class="pk-row-cut" data-cut="{{ r.id }}" data-quantity="{{ r.quantity|floatformat:2 }}" data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }}">
-                  <span class="pk-cut-view">
-                    <span class="pk-cut-val">{{ r.quantity|floatformat:2 }} m{% if r.quantity < r.stock_item.quantity_remaining|default:r.stock_item.quantity %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-                    <span class="pk-avail">/ {{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }} m</span>
-                  </span>
-                </div>
-              </div>
+              {% include "operating/partials/_pack_roll_row.html" with r=r oiid=it.pk drag=1 %}
               {% endif %}{% endfor %}
               <div class="pk-pgroup-empty" data-empty-hint>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu kalem için top yok.{% else %}No rolls on this line.{% endif %}</div>
             </div>
@@ -468,23 +442,7 @@
             </div>
             <div class="pk-pgroup-rolls" data-order-item-id="">
               {% for r in unassigned_reservations %}
-              <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
-                   data-order-item-id="" data-assigned-pack=""
-                   data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity }}">
-                <div class="pk-row-top">
-                  <div>
-                    <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
-                    <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
-                    <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
-                  </div>
-                </div>
-                <div class="pk-row-cut" data-cut="{{ r.id }}" data-quantity="{{ r.quantity|floatformat:2 }}" data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }}">
-                  <span class="pk-cut-view">
-                    <span class="pk-cut-val">{{ r.quantity|floatformat:2 }} m{% if r.quantity < r.stock_item.quantity_remaining|default:r.stock_item.quantity %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-                    <span class="pk-avail">/ {{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }} m</span>
-                  </span>
-                </div>
-              </div>
+              {% include "operating/partials/_pack_roll_row.html" with r=r drag=1 %}
               {% endfor %}
             </div>
           </div>
@@ -531,23 +489,7 @@
           </div>
           <div class="pk-pack-body" data-pack-body>
             {% for r in reservations %}{% if r.pack_id == p.pk %}
-            <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
-                 data-order-item-id="{{ r.order_item_id }}" data-assigned-pack="{{ p.pk }}"
-                 data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity }}">
-              <div class="pk-row-top">
-                <div>
-                  <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
-                  <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
-                  <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
-                </div>
-              </div>
-              <div class="pk-row-cut" data-cut="{{ r.id }}" data-quantity="{{ r.quantity|floatformat:2 }}" data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }}">
-                <span class="pk-cut-view">
-                  <span class="pk-cut-val">{{ r.quantity|floatformat:2 }} m{% if r.quantity < r.stock_item.quantity_remaining|default:r.stock_item.quantity %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-                  <span class="pk-avail">/ {{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }} m</span>
-                </span>
-              </div>
-            </div>
+            {% include "operating/partials/_pack_roll_row.html" with r=r oiid=r.order_item_id packid=p.pk drag=1 %}
             {% endif %}{% endfor %}
             {% for it in untracked_items %}{% if it.pack_id == p.pk %}
             <div class="pk-row pk-citem" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ it.pk }}" data-assigned-pack="{{ p.pk }}">
@@ -609,16 +551,20 @@
 
 <div class="pk-toast" id="pkToast"></div>
 
-{% if not shipped %}
 <!-- SCAN POPUP — one camera for the whole screen. Opened bare from the
      "Add a roll" card, or from a package's "Scan here", in which case
-     every roll read here goes straight into that package. -->
+     every roll read here goes straight into that package. It also opens
+     with no camera at all when a roll already on the screen is tapped,
+     to show that roll the way a scan shows it — which is why the shell
+     is here even on a shipped order, where nothing may be scanned but
+     the rolls still want reading. -->
 <div class="pks-overlay" id="pkScanModal">
   <div class="pks-shell">
     <div class="pks-head">
       <div class="pks-title"><i class="fa fa-barcode"></i> <span id="pkScanTitle"></span></div>
       <button type="button" class="pks-close" id="pkScanClose"><i class="fa fa-xmark"></i></button>
     </div>
+    {% if not shipped %}
     <div id="pkScanStage">
     <div class="pks-cam">
       <video id="pkVideo" playsinline muted autoplay></video>
@@ -637,10 +583,10 @@
       <div class="pks-log" id="pkScanLog"></div>
     </div>
     </div>
+    {% endif %}
     <div class="pks-result" id="pkScanResult" hidden></div>
   </div>
 </div>
-{% endif %}
 
 <script>
 (function(){
@@ -686,13 +632,19 @@
     return m.toFixed(2) + ' m' + (partial ? ' <small>(' + t('kısmi','partial') + ')</small>' : '');
   }
 
+  // Must stay attribute-for-attribute with partials/_pack_roll_row.html —
+  // a row added by a scan is tapped for its card exactly like one the
+  // server drew, so it has to carry the same data.
   function rowHtml(res){
     var rem = (res.roll_remaining != null ? res.roll_remaining : (res.roll_meters || 0));
     var m = Number(res.quantity || 0);
     var draggable = (PACK_MODE && !SHIPPED) ? ' draggable="true"' : '';
     return ''+
-      '<div class="pk-row"'+draggable+' data-id="'+res.id+'" data-remaining="'+rem+'"'+
-        ' data-order-item-id="'+(res.order_item_id||'')+'" data-assigned-pack="'+(res.pack_id||'')+'">'+
+      '<div class="pk-row"'+draggable+' data-id="'+res.id+'" data-remaining="'+Number(rem).toFixed(2)+'"'+
+        ' data-order-item-id="'+(res.order_item_id||'')+'" data-assigned-pack="'+(res.pack_id||'')+'"'+
+        ' data-barcode="'+esc(res.barcode||'')+'" data-name="'+esc(res.product_name||'')+'"'+
+        ' data-sku="'+esc(res.sku||'')+'" data-warehouse="'+esc(res.warehouse||'')+'"'+
+        ' data-roll-url="'+esc(res.roll_url||'')+'">'+
         '<div class="pk-row-top"><div>'+
           '<div class="pk-row-name">'+esc(res.product_name)+'</div>'+
           '<div class="pk-row-meta">'+esc(res.sku||'—')+(res.warehouse?(' · '+esc(res.warehouse)):'')+'</div>'+
@@ -1456,6 +1408,57 @@
           t('Yeni top okut','Scan another') + '</button>' +
       '</div></div>');
   }
+
+  // ── a roll already on the screen ──────────────────────────────────
+  // Tapping any listed roll puts up the same card a scan puts up. A
+  // barcode typed in wrong is only ever caught by LOOKING at the roll,
+  // and by then the roll is already in a group or a sack, past the
+  // scanner. Nothing is fetched: every figure the scan card shows is
+  // already on the row, and a fresh lookup by barcode could even answer
+  // with a different roll sharing the code — the opposite of what a
+  // packer checking this one roll is asking.
+  function openRollCard(row){
+    if (!scanModal) return;
+    var cut = row.querySelector('.pk-row-cut');
+    var qty = Number((cut && cut.dataset.quantity) || 0);
+    var rem = Number(row.dataset.remaining || 0);
+    var pack = row.closest('.pk-pack');
+    var where = pack ? (t('Paket #','Package #') + (pack.dataset.packNumber || ''))
+                     : t('Pakete atanmamış','Not in a package');
+    var url = row.dataset.rollUrl || '';
+    var title = document.getElementById('pkScanTitle');
+    if (title) title.textContent = t('Top','Roll');
+    showResult('<div class="pks-rc">' +
+      '<span class="pks-status ok"><i class="fa fa-barcode"></i>' +
+        t('Siparişteki top','Roll on this order') + '</span>' +
+      '<div class="pks-chip"><i class="fa fa-barcode"></i>' + esc(row.dataset.barcode || '—') + '</div>' +
+      '<div class="pks-name">' + esc(row.dataset.name || '') + '</div>' +
+      (row.dataset.sku ? '<div><span class="pks-sku">' + esc(row.dataset.sku) + '</span></div>' : '') +
+      (row.dataset.warehouse ? '<div class="pks-where">' + esc(row.dataset.warehouse) + '</div>' : '') +
+      '<div class="pks-tiles">' +
+        tile(t('Bu siparişe ayrılan','Reserved for this order'), qty.toFixed(2), 'm', true) +
+        tile(t('Topta kalan','Left on the roll'), rem.toFixed(2), 'm') +
+        tile(t('Şu an','Currently'), where, '') +
+      '</div>' +
+      '<div class="pks-actions">' +
+        '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-xmark"></i>' +
+          t('Kapat','Close') + '</button>' +
+        (url ? '<a class="pks-act primary" href="' + esc(url) + '"><i class="fa fa-pen"></i>' +
+          t('Topu düzenle','Edit roll') + '</a>' : '') +
+      '</div></div>');
+    scanModal.classList.add('show');
+  }
+
+  document.addEventListener('click', function(e){
+    if (!e.target || !e.target.closest) return;
+    if (scanModal && scanModal.classList.contains('show')) return;   // the card is up
+    // Every control a row carries does its own thing; only the card
+    // itself is a plain tap.
+    if (e.target.closest('button, a, input, label, .pk-menu')) return;
+    var row = e.target.closest('.pk-row:not(.pk-citem)');
+    if (!row || !row.hasAttribute('data-name')) return;
+    openRollCard(row);
+  });
 
   var previewBusy = false;
   function pkScanPreview(code){

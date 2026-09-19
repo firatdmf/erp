@@ -299,6 +299,8 @@
   .np-tops { display: flex; flex-direction: column; gap: 7px; }
   .np-top { display: flex; align-items: center; gap: 8px; }
   .np-top-no { font: 600 11px var(--font-sans); color: var(--gray-500); min-width: 42px; }
+  /* Shown only once the row stacks and .np-tops-head goes — see the 640px block. */
+  .np-top-cap { display: none; }
   .np-top-qty { flex: 1; height: 36px; }
   .np-top-unit { font: 600 12px var(--font-sans); color: var(--gray-600); min-width: 30px; }
   .np-top-bc { flex: 1.3; height: 36px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; }
@@ -388,6 +390,104 @@
   .np-summary .np-sum-money { font-weight: 700; color: var(--nejum-teal-700, #005354); }
   .np-summary .np-sum-sale { font-weight: 700; color: #0E6E4A; }
   .np-summary .np-sum-pending { font-weight: 600; color: #8B5A00; }
+
+  /* ─────────────────────────────────────────────────────────────
+     On a phone
+
+     Everything above lays this page out as a desk instrument: fields
+     side by side, each captioned once above its column. That arithmetic
+     collapses on a 390px screen. A roll row spends its width on a 42px
+     label, a unit, a state glyph and a remove button before any input
+     gets a pixel, which left the quantity box around 40px wide and the
+     barcode around 50 — not enough to read back what you just typed.
+     And every control sat under 16px, the size below which iOS zooms
+     the page on focus, so typing also threw the field off-screen.
+
+     Two breakpoints, each for its own reason:
+       1024px — where the mobile shell hides the desktop chrome and the
+                input becomes a thumb: 16px type, 44px targets.
+        640px — where side-by-side rows stop fitting at all and become
+                stacks.
+     ───────────────────────────────────────────────────────────── */
+  @media (max-width: 1024px) {
+    /* 16px is not a taste call: below it, iOS Safari zooms the viewport
+       on focus and does not zoom back out. */
+    .gr .np-input, .gr .np-select,
+    .gr .np-variant-row .np-input,
+    .gr .np-price-pair .np-input, .gr .np-price-pair .np-select,
+    .gr .np-top-qty, .gr .np-top-bc,
+    .gr .np-fx-row input {
+      font-size: 16px;
+      height: 44px;
+    }
+    .gr .np-input.np-notes { height: 76px; padding-top: 12px; }
+    /* "USD" at 16px needs more than the desktop 84px. */
+    .gr .np-price-pair .np-select { flex: 0 0 96px; width: 96px; }
+    .gr .np-attr-add { height: 40px; font-size: 15px; }
+    .gr .np-sup-chip { height: 44px; }
+    /* Tap targets: search hits, variant chips and the icon buttons. */
+    .gr .np-sup-opt, .gr .np-ac-item { padding: 12px 10px; font-size: 14px; }
+    .gr .np-existing-variants .np-ev-chip { padding: 6px 10px; font-size: 13px; }
+    .gr .np-mini-x, .gr .np-top-lock { width: 36px; height: 36px; }
+    .gr .np-seg-btn { padding: 10px 16px; font-size: 13.5px; }
+    .gr .np-add-top { padding: 11px; font-size: 13px; }
+    .gr .np-add-variant, .gr .np-add-product { padding: 13px; font-size: 13.5px; }
+    .gr .np-fx-pub { height: 40px; }
+
+    /* The action bar sticks to the bottom of the viewport — which on a
+       phone is exactly where the shell's fixed quick-bar already is (72px
+       tall, z-index 100 against this bar's 30). Save was underneath it. */
+    .gr .gr-bar { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  }
+
+  @media (max-width: 640px) {
+    /* main already contributes 14px of gutter on the mobile shell. */
+    .gr { padding: 4px 0 120px; }
+    .gr-title { font-size: 22px; }
+    .gr-title code { font-size: 19px; }
+    .gr-sub { font-size: 12.5px; }
+    .gr-sec { padding: 16px 12px; }
+    .gr-sec-h { flex-wrap: wrap; row-gap: 2px; }
+    .gr .np-product-card, .gr .np-variant { padding: 10px; }
+
+    /* Every side-by-side row becomes a stack. */
+    .gr .np-row, .gr .np-main-row, .gr .np-variant-row { flex-wrap: wrap; }
+    .gr .np-row > *, .gr .np-main-row > *, .gr .np-variant-row > * { flex: 1 1 100%; }
+    .gr .np-v-attrs, .gr .np-v-attrs .np-col { flex: 1 1 100%; }
+    .gr .np-price-row > .np-col { flex: 1 1 100%; }
+
+    /* A roll reads as its own little card: which one it is, then how much
+       and in what unit, then the code it will carry. The captions above
+       the list cannot line up with a stack, so they go — the unit sits
+       beside the quantity and the barcode shows the code it will mint. */
+    .gr .np-tops-head { display: none; }
+    .gr .np-top {
+      flex-wrap: wrap; gap: 8px; padding: 10px;
+      border: 1px solid #E8EDF2; border-radius: 10px; background: #FBFDFD;
+    }
+    .gr .np-top { gap: 6px 8px; }
+    .gr .np-top-cap {
+      display: block; flex: 1 1 100%; margin: 2px 0 -2px;
+      font: 700 10px var(--font-sans); letter-spacing: 0.05em;
+      text-transform: uppercase; color: var(--gray-500);
+    }
+    .gr .np-top-no       { order: 1; flex: 1 1 100%; min-width: 0; }
+    .gr .np-cap-qty      { order: 2; }
+    .gr .np-top-qty      { order: 3; flex: 1 1 110px; }
+    .gr .np-top-unit     { order: 4; flex: 0 0 auto; }
+    .gr .np-top .np-mini-x, .gr .np-top .np-top-lock { order: 5; }
+    .gr .np-cap-bc       { order: 6; }
+    .gr .np-top-bc       { order: 7; flex: 1 1 calc(100% - 24px); }
+    .gr .np-top-bc-state { order: 8; flex: 0 0 16px; }
+
+    /* The buttons get a row to themselves instead of three of them
+       sharing a line with the running total. */
+    .gr .gr-bar { padding: 10px 12px; gap: 8px; }
+    .gr .gr-bar .np-summary { flex: 1 1 100%; }
+    .gr .gr-actions { width: 100%; margin-left: 0; }
+    .gr .gr-actions .gr-btn { flex: 1 1 0; min-height: 44px; padding: 11px 10px; font-size: 13.5px; }
+    .gr .gr-hint-locked { flex: 1 1 100%; justify-content: center; }
+  }
 </style>
 {% endblock %}
 
@@ -716,12 +816,15 @@
     'color': '{% trans "Color" context "attribute" %}', 'model': '{% trans "Model" context "attribute" %}',
     'size': '{% trans "Size" context "attribute" %}', 'size per panel': '{% trans "Size per panel" context "attribute" %}',
     'header': '{% trans "Header" context "attribute" %}', 'fabric': '{% trans "Fabric" context "attribute" %}',
-    'yarn': '{% trans "Yarn" context "attribute" %}'
+    'yarn': '{% trans "Yarn" context "attribute" %}',
+    // Fabric width is stored as a bare number ("155"); the unit lives in the
+    // label so every roll is measured the same way.
+    'width': '{% trans "Width (cm)" context "attribute" %}'
   };
   const NP_ATTR_HINTS = {
     'color': '{% trans "e.g. White" %}', 'model': '{% trans "e.g. V-106" %}',
     'size': '{% trans "e.g. 130 x 210 cm" %}', 'size per panel': '{% trans "e.g. 130 x 210 cm" %}',
-    'header': '{% trans "e.g. grommet" %}'
+    'header': '{% trans "e.g. grommet" %}', 'width': '{% trans "e.g. 155" %}'
   };
   function npAttrKey(n) { return String(n || '').toLowerCase().split(/\s+/).filter(Boolean).join(' '); }
   function npAttrLabel(n) {
@@ -1688,10 +1791,17 @@
     row.className = 'np-top';
     row.innerHTML =
       '<span class="np-top-no">' + npPackOf(vEl.closest('.np-product-card')).label + ' ' + n + '</span>' +
+      // Each field carries its own caption as well as the one over the
+      // column. The column captions (NP_TOPS_HEAD) can only line up while
+      // the row is a row; on a phone it stacks, so these take over and the
+      // head hides itself. Only one of the two is ever visible — see the
+      // .np-top-cap rules.
+      '<span class="np-top-cap np-cap-qty">{% trans "Quantity" %}</span>' +
       '<input class="np-input np-top-qty" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
       '<span class="np-top-unit">' + unitShort(vEl.closest('.np-product-card')) + '</span>' +
       // Blank = mint one from the account prefix at save. Filled = this stock item
       // arrived already labelled and keeps the code printed on it.
+      '<span class="np-top-cap np-cap-bc">{% trans "Barcode" %}</span>' +
       '<input class="np-input np-top-bc" type="text" maxlength="64" spellcheck="false"' +
       ' placeholder="' + NP_BC_AUTO + '" oninput="npBarcodeInput(this)">' +
       '<span class="np-top-bc-state" aria-live="polite"></span>' +

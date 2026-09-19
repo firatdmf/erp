@@ -1,0 +1,43 @@
+{% comment %}One roll on the packing screen, wherever rolls are listed: under its
+product group, inside a package, or in the flat retail list. All four
+lists show the same card and all four have to carry the same data
+attributes — the figures the JS adds up, and everything the roll card
+popup reads when the row is tapped — so the markup lives here once.
+
+The numeric attributes are written with stringformat, NOT floatformat:
+floatformat localizes, so with Turkish active a reserved 13.00 m came
+out as "13,00" and every Number() over it was NaN. That is what made a
+package header say "NaN m". What is DISPLAYED still goes through
+floatformat — a Turkish reader should read a Turkish number.
+
+Callers pass: r (the reservation), and optionally oiid (the order line
+the roll sits under), packid (the package it is in) and drag.{% endcomment %}
+<div class="pk-row"{% if drag and not shipped %} draggable="true"{% endif %}
+     data-id="{{ r.id }}"
+     data-order-item-id="{{ oiid|default_if_none:'' }}"
+     data-assigned-pack="{{ packid|default_if_none:'' }}"
+     data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|default_if_none:0|stringformat:'.2f' }}"
+     data-barcode="{{ r.stock_item.barcode|default:'' }}"
+     data-name="{{ r.warehouse_product.name }}"
+     data-sku="{{ r.warehouse_product.sku|default:'' }}"
+     data-warehouse="{% if r.warehouse_product.warehouse_id %}{{ r.warehouse_product.warehouse.name }}{% endif %}"
+     {% comment %}Where the roll is corrected: its product's page, opened straight
+     on this roll's edit box. Empty when there is no roll behind the row
+     to open, and the card then simply offers no way in.{% endcomment %}
+     data-roll-url="{% if r.warehouse_product.warehouse_id and r.stock_item_id %}{% url 'operating:warehouse_product_detail' r.warehouse_product.warehouse_id r.warehouse_product_id %}?roll={{ r.stock_item_id }}{% endif %}">
+  <div class="pk-row-top">
+    <div>
+      <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
+      <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
+      <span class="pk-row-bc">{{ r.stock_item.barcode|default:'—' }}</span>
+    </div>
+  </div>
+  <div class="pk-row-cut" data-cut="{{ r.id }}"
+       data-quantity="{{ r.quantity|default_if_none:0|stringformat:'.2f' }}"
+       data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|default_if_none:0|stringformat:'.2f' }}">
+    <span class="pk-cut-view">
+      <span class="pk-cut-val">{{ r.quantity|floatformat:2 }} m{% if r.quantity < r.stock_item.quantity_remaining|default:r.stock_item.quantity %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
+      <span class="pk-avail">/ {{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }} m</span>
+    </span>
+  </div>
+</div>

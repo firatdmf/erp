@@ -222,6 +222,17 @@ NAV_SECTIONS = [
         "icon": "sticky-note",
         "url": "notes:index",
     },
+    # Settings used to be a top-bar button, which put it on a different
+    # surface from every other destination; it is a page like any other,
+    # so it is a tile like any other. The drawer picks it up through
+    # MOBILE_LINKS_SECTION, which is why it no longer needs its own
+    # hand-written "Account" section there.
+    {
+        "key": "settings",
+        "label": _("Settings"),
+        "icon": "settings",
+        "url": "user_settings",
+    },
 ]
 
 

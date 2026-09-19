@@ -782,6 +782,14 @@ class ProductVariantAttribute(models.Model):
 
 class ProductVariantAttributeValue(models.Model):
     class Meta:
+        # A variant's attributes read the same way everywhere. Without an
+        # ordering the m2m came back in whatever order Postgres happened to
+        # return the through rows, so one variant showed "color / width" and
+        # the next "width / color" on the same product page — a list nobody
+        # can scan down. Ordering here rather than at each call site is what
+        # keeps the product page, the purchase line, the catalog and
+        # full_name/attribute_summary telling the same story.
+        ordering = ["product_variant_attribute__name", "product_variant_attribute_value"]
         unique_together = (
             "product_variant_attribute",
             "product_variant_attribute_value",

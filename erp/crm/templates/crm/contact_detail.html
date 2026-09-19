@@ -375,6 +375,8 @@
     white-space: nowrap; width: fit-content;
   }
   .ord-status-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .ord-status.pre_order     { color: #6D28D9; background: #EDE9FE; }
+  .ord-status.pre_order     .ord-status-dot { background: #8B5CF6; }
   .ord-status.pending       { color: #B27500; background: #FEF3C7; }
   .ord-status.pending       .ord-status-dot { background: #F59E0B; }
   .ord-status.scheduled, .ord-status.preparing { color: #1565C0; background: #DBEAFE; }
@@ -867,7 +869,7 @@
                   <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
                 </div>
                 {% with disp_status=o.order_status %}
-                <span class="ord-status {{ disp_status }}">
+                <span class="ord-status {% if o.is_pre_order %}pre_order{% else %}{{ disp_status }}{% endif %}">
                   <span class="ord-status-dot"></span>
                   {% comment %} The customer-facing order_status, matching
                      order_list and order_detail — including their relabel of
@@ -877,7 +879,7 @@
                      now, so the .po file supplies the translation. Reading
                      `status` here meant an order set to Shipped still showed
                      "Pending" whenever its items had not been moved on. {% endcomment %}
-                  {% if disp_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ o.get_order_status_display }}{% endif %}
+                  {% if disp_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ o.status_label }}{% endif %}
                 </span>
                 {% endwith %}
                 <div class="od-order-total">

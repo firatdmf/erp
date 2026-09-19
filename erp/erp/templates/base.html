@@ -33,11 +33,10 @@
   <link rel="stylesheet" href="{% static 'erp/css/product_autocomplete.css' %}?v=1" />
 
   {% comment %}
-    Nejum design system overlay — only loaded when the active brand
-    opts in via UI_THEME in its env profile (set UI_THEME=nejum in
-    .env.<brand>). Loaded after base.css so its overrides win.
-    Demfirat (no UI_THEME set) gets the original ERP look untouched.
-    Removing UI_THEME from the profile + restart reverts the look.
+    Nejum design system overlay, loaded after base.css so its overrides
+    win. Still written as a UI_THEME branch, but the sidebar it styles is
+    no longer optional: the pre-theme navbar was deleted, so clearing
+    UI_THEME now yields an unstyled sidebar rather than the old look.
   {% endcomment %}
   {% if UI_THEME == "nejum" %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -246,25 +245,6 @@
         padding-bottom: 6rem !important;
       }
 
-      /* Mobile: Bottom navbar */
-      .navbar {
-        width: 100% !important;
-        height: auto !important;
-        bottom: 0 !important;
-        top: auto !important;
-        left: 0 !important;
-        border-right: none !important;
-        border-top: 1px solid #e2e8f0 !important;
-        position: fixed !important;
-      }
-
-      .navbar-nav {
-        flex-direction: row !important;
-        justify-content: space-around !important;
-        width: 100% !important;
-        padding: 0.5rem 0 !important;
-      }
-
       .logo {
         display: none !important;
       }
@@ -283,33 +263,6 @@
         display: flex !important;
         flex-direction: row !important;
         margin-top: 0 !important;
-      }
-
-      /* Mobile: Dropdown menus - CENTERED above bottom navbar */
-      .nav-item #addExpanded,
-      #marketingExpanded,
-      #operatingExpanded,
-      #accountingExpanded,
-      #currentAccountExpanded {
-        position: fixed !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        bottom: 5rem !important;
-        top: auto !important;
-        width: calc(100vw - 2rem) !important;
-        max-width: 340px !important;
-        max-height: 50vh !important;
-        overflow-y: auto !important;
-        z-index: 99999 !important;
-      }
-
-      /* Mobile: Remove hover bridge */
-      #addButton::after,
-      #marketingButton::after,
-      #operatingButton::after,
-      #accountingButton::after,
-      #currentAccountButton::after {
-        display: none !important;
       }
 
       /* Mobile: Sidebar modals full width */
@@ -362,26 +315,6 @@
         font-size: 0.875rem !important;
       }
 
-      /* Mobile: Search Overlay Responsive */
-      .navbar .overlay {
-        padding-top: 2rem !important;
-        align-items: flex-start !important;
-        z-index: 999999 !important;
-      }
-
-      .navbar .overlay .overlayContent {
-        width: 95% !important;
-        max-width: 100% !important;
-        padding: 1.5rem !important;
-        max-height: 85vh !important;
-        overflow-y: auto !important;
-        margin-top: 1rem !important;
-      }
-
-      .navbar .overlay #searchInput {
-        font-size: 16px !important;
-        /* Prevent zoom on iOS */
-      }
     }
 
   </style>
@@ -469,18 +402,18 @@
     </div>
 
     <div class="top-bar-right">
-      <a href="{% url 'operating:warehouse_list' %}" class="top-bar-btn" id="topBarWarehousesBtn" title="{% trans 'My Warehouses' %}">
-        <i class="fas fa-warehouse"></i>
-        <span class="top-bar-btn-label">{% trans "My Warehouses" %}</span>
-      </a>
 {% if not is_sales_rep %}      <a href="{% url 'accounts:legacy_purchase_order_list' %}" class="top-bar-btn" id="topBarPurchasesBtn" title="{% trans 'Purchases' %}">
         <i class="fas fa-truck"></i>
         <span class="top-bar-btn-label">{% trans "Purchases" %}</span>
       </a>
 {% endif %}
-      <a href="{% url 'operating:order_list' %}" class="top-bar-btn" id="topBarSalesBtn" title="{% trans 'Sales' %}">
+      <a href="{% url 'operating:warehouse_list' %}" class="top-bar-btn" id="topBarWarehousesBtn" title="{% trans 'Warehouse' %}">
+        <i class="fas fa-warehouse"></i>
+        <span class="top-bar-btn-label">{% trans "Warehouse" %}</span>
+      </a>
+      <a href="{% url 'operating:order_list' %}" class="top-bar-btn" id="topBarOrdersBtn" title="{% trans 'Orders' %}">
         <i class="fas fa-cart-shopping"></i>
-        <span class="top-bar-btn-label">{% trans "Sales" %}</span>
+        <span class="top-bar-btn-label">{% trans "Orders" %}</span>
       </a>
       <div class="favorites-container">
         <button class="top-bar-btn" onclick="toggleFavorites()" id="topBarFavoritesBtn" title="{% trans 'Favorites' %}">
@@ -530,531 +463,23 @@
           </div>
         </div>
       </div>
-      <a href="{% url 'user_settings' %}" class="top-bar-btn" title="{% trans 'Settings' %}">
-        <i class="fas fa-cog"></i>
-        <span class="top-bar-btn-label">{% trans "Settings" %}</span>
-      </a>
     </div>
   </div>
 
   {% with member=user.member %}
-  {% if UI_THEME == "nejum" %}
-    {% include "components/_sidebar_nejum.html" %}
-    {% if user.is_authenticated %}
-      {% include "components/_mobile_shell.html" %}
-    {% endif %}
+  {% comment %}
+    The navigation, unconditionally. This used to sit behind
+    {% if UI_THEME == "nejum" %} with a <nav class="navbar"> fallback
+    underneath for any brand that had not opted into the theme. No brand
+    ever did — demfirat is the only profile and it has UI_THEME=nejum —
+    so the fallback rendered nowhere while still collecting menu entries
+    that the real sidebar never showed. It is gone, and with it the
+    guard: there is no second navigation to fall back to.
+  {% endcomment %}
+  {% include "components/_sidebar_nejum.html" %}
+  {% if user.is_authenticated %}
+    {% include "components/_mobile_shell.html" %}
   {% endif %}
-  <nav class="navbar"{% if UI_THEME == "nejum" %} style="display:none !important"{% endif %}>
-    <ul class="navbar-nav">
-      <!-- Logo in sidebar -->
-      <li class="logo">
-        <a href="{% url 'index' %}" class="nav-link">
-          <span id="nejum_logo_text" class="link-text logo-text">nejum</span>
-        </a>
-      </li>
-
-      <li class="nav-item" id="addButton">
-        <a href="#add" class="nav-link">
-          <i class="fas fa-plus fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Add</span>
-        </a>
-        <div id="addExpanded">
-          <div class="add-menu-header">
-            <i class="fas fa-plus-circle" aria-hidden="true"></i>
-            <h2>{% trans "Add new records" %}</h2>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Add a single record" %}</h3>
-            <ul>
-              <li>
-                <a href="#" onclick="openMainContactSidebar(); return false;">
-                  <i class="fas fa-user" aria-hidden="true"></i>
-                  <span>Contact</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openCompanySidebar(); return false;">
-                  <i class="fas fa-building" aria-hidden="true"></i>
-                  <span>Company</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openTaskSidebar(); return false;">
-                  <i class="fas fa-check-circle" aria-hidden="true"></i>
-                  <span>Task</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'marketing:product_create' %}">
-                  <i class="fas fa-tag" aria-hidden="true"></i>
-                  <span>Product</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openOrderSidebar(); return false;">
-                  <i class="fas fa-shopping-cart" aria-hidden="true"></i>
-                  <span>Order</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'marketing:blog_create' %}">
-                  <i class="fas fa-newspaper" aria-hidden="true"></i>
-                  <span>Blog</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openAddSupplierSidebar(); return false;">
-                  <i class="fas fa-truck" aria-hidden="true"></i>
-                  <span>Supplier</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-        <div class="nav-separator-in-add">
-          <div class="nav-separator-line"></div>
-        </div>
-      </li>
-      <li class="nav-item">
-        <a href="{% url 'index' %}" class="nav-link">
-          <i class="fas fa-home fa-2x" aria-hidden="true"></i>
-          {% comment %} <i class="fas fa-table-columns fa-2x" aria-hidden="true"></i> {% endcomment %}
-          <span class="link-text">Home</span>
-        </a>
-      </li>
-      <li class="nav-item" id="teamButton">
-        <a href="#team" class="nav-link">
-          <i class="fas fa-users fa-2x" aria-hidden="true"></i>
-          <span class="link-text">My Team</span>
-        </a>
-        <div id="teamExpanded" style="top: 135px !important; max-height: 90vh !important; overflow-y: auto !important;">
-          <div class="add-menu-header">
-            <i class="fas fa-users" aria-hidden="true"></i>
-            <h2>{% trans "My Team" %}</h2>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Team Management" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'team:team_list' %}">
-                  <i class="fas fa-list" aria-hidden="true"></i>
-                  <span>Team Members</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'team:team_tasks' %}">
-                  <i class="fas fa-tasks" aria-hidden="true"></i>
-                  <span>Assign Tasks</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'team:team_messages' %}">
-                  <i class="fas fa-comments" aria-hidden="true"></i>
-                  <span>Messages</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'team:team_roles' %}">
-                  <i class="fas fa-shield-alt" aria-hidden="true"></i>
-                  <span>Manage Roles</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'team:team_meetings' %}">
-                  <i class="fas fa-video" aria-hidden="true"></i>
-                  <span>Schedule Meetings</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </li>
-      {% comment %} <li class="nav-item">
-        <a href="{% url 'crm:index' %}" class="nav-link">
-          <i class="fas fa-users fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Contacts</span>
-        </a>
-      </li> {% endcomment %}
-      <li class="nav-item" id="accountingButton">
-        <a href="#accounting" class="nav-link">
-          <i class="fa-solid fa-money-bill fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Accounting</span>
-        </a>
-        <div id="accountingExpanded"
-          style="top: 195px !important; max-height: 90vh !important; overflow-y: auto !important;">
-          <div class="add-menu-header">
-            <i class="fas fa-money-bill" aria-hidden="true"></i>
-            <h2>{% trans "Accounting" %}</h2>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Books" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'accounting:index' %}">
-                  <i class="fas fa-book" aria-hidden="true"></i>
-                  <span>View Books</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openBookSidebar(); return false;">
-                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                  <span>Create Book</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Reports" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'accounting:sales_dashboard' %}">
-                  <i class="fas fa-chart-bar" aria-hidden="true"></i>
-                  <span>Sales Dashboard</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </li>
-
-      {# ============================== CURRENT ACCOUNT ============================== #}
-      <li class="nav-item" id="currentAccountButton">
-        <a href="#current-account" class="nav-link">
-          <i class="fa-solid fa-id-card-clip fa-2x" aria-hidden="true"></i>
-          <span class="link-text">{% trans "Accounts" context "sidebar" %}</span>
-        </a>
-        <div id="currentAccountExpanded"
-          style="top: 225px !important; max-height: 90vh !important; overflow-y: auto !important;">
-          <div class="add-menu-header">
-            <i class="fa-solid fa-id-card-clip" aria-hidden="true"></i>
-            <h2>{% trans "Current Account" %}</h2>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Accounts" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'accounts:legacy_list' %}">
-                  <i class="fas fa-id-card" aria-hidden="true"></i>
-                  <span>{% trans "All Accounts" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'accounts:legacy_create' %}">
-                  <i class="fas fa-user-plus" aria-hidden="true"></i>
-                  <span>{% trans "New Account" %}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Collection / Payment" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'accounts:legacy_payment_list' %}">
-                  <i class="fas fa-wallet" aria-hidden="true"></i>
-                  <span>{% trans "All Payments" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'accounts:legacy_payment_create' %}">
-                  <i class="fas fa-hand-holding-dollar" aria-hidden="true"></i>
-                  <span>{% trans "New Collection / Payment" %}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Check / Promissory Note" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'accounts:legacy_check_list' %}">
-                  <i class="fas fa-scroll" aria-hidden="true"></i>
-                  <span>{% trans "Portfolio" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'accounts:legacy_check_create' %}">
-                  <i class="fas fa-file-circle-plus" aria-hidden="true"></i>
-                  <span>{% trans "New Check / Note" %}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Reports" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'accounts:legacy_report_index' %}">
-                  <i class="fas fa-chart-pie" aria-hidden="true"></i>
-                  <span>{% trans "Report Center" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'accounts:legacy_report_trial_balance' %}">
-                  <i class="fas fa-table" aria-hidden="true"></i>
-                  <span>{% trans "Trial Balance" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'accounts:legacy_report_credit_limit' %}">
-                  <i class="fas fa-shield-halved" aria-hidden="true"></i>
-                  <span>{% trans "Credit Limit" %}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Help" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'accounts:help' %}">
-                  <i class="fas fa-circle-question" aria-hidden="true"></i>
-                  <span>📘 {% trans "User Guide" %}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </li>
-
-      <li class="nav-item" id="marketingButton">
-        <a href="#marketing" class="nav-link">
-          {% comment %} <i class="fas fa-cogs fa-2x" aria-hidden="true"></i> {% endcomment %}
-          <i class="fa-solid fa-bullseye fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Marketing</span>
-        </a>
-        <div id="marketingExpanded"
-          style="top: 255px !important; max-height: 90vh !important; overflow-y: auto !important;">
-          <div class="add-menu-header">
-            <i class="fas fa-bullseye" aria-hidden="true"></i>
-            <h2>{% trans "Marketing" %}</h2>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Products" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'marketing:product_create' %}">
-                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                  <span>Create Product</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'marketing:product_list' %}">
-                  <i class="fas fa-list" aria-hidden="true"></i>
-                  <span>Product List</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'marketing:product_group_list' %}">
-                  <i class="fas fa-layer-group" aria-hidden="true"></i>
-                  <span>{% trans "Product groups" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'marketing:product_group_create' %}">
-                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                  <span>{% trans "Add product group" %}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Customers" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'crm:company_list' %}">
-                  <i class="fas fa-building" aria-hidden="true"></i>
-                  <span>Companies</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'crm:contact_list' %}">
-                  <i class="fas fa-users" aria-hidden="true"></i>
-                  <span>Contacts</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Blog" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'marketing:blog_create' %}">
-                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                  <span>Create Blog Post</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'marketing:blog_list' %}">
-                  <i class="fas fa-newspaper" aria-hidden="true"></i>
-                  <span>Blog List</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Mail" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'marketing:dashboard' %}">
-                  <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
-                  <span>{% trans "Automatic Mail System" %}</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'marketing:my_emails' %}">
-                  <i class="fas fa-inbox" aria-hidden="true"></i>
-                  <span>{% trans "My Emails" %}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </li>
-      <li class="nav-item" id="operatingButton">
-        <a href="#operating" class="nav-link">
-          <i class="fas fa-cogs fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Operating</span>
-        </a>
-        <div id="operatingExpanded"
-          style="top: 315px !important; max-height: 90vh !important; overflow-y: auto !important;">
-          <div class="add-menu-header">
-            <i class="fas fa-cogs" aria-hidden="true"></i>
-            <h2>{% trans "Operating" %}</h2>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "QR Operations" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'operating:scan_order_item_unit' %}">
-                  <i class="fas fa-qrcode" aria-hidden="true"></i>
-                  <span>QR Scan</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'operating:scan_order_item_unit_pack' %}">
-                  <i class="fa-solid fa-box" aria-hidden="true"></i>
-                  <span>QR Scan Pack</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Raw Materials" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'operating:raw_material_good_list' %}">
-                  <i class="fas fa-list" aria-hidden="true"></i>
-                  <span>Raw Material List</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openRawMaterialSidebar(); return false;">
-                  <i class="fas fa-cube" aria-hidden="true"></i>
-                  <span>Create Raw Material Good</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openRawMaterialReceiptSidebar(); return false;">
-                  <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
-                  <span>Create Raw Material Good Receipt</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openRawMaterialItemSidebar(); return false;">
-                  <i class="fas fa-plus-square" aria-hidden="true"></i>
-                  <span>Create Raw Material Good Item</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Orders" %}</h3>
-            <ul>
-              <li>
-                <a href="#" onclick="openOrderSidebar(); return false;">
-                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                  <span>Create Order</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'operating:order_list' %}">
-                  <i class="fas fa-list" aria-hidden="true"></i>
-                  <span>Order List</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Warehouse" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'operating:warehouse_list' %}">
-                  <i class="fas fa-warehouse" aria-hidden="true"></i>
-                  <span>My Warehouses</span>
-                </a>
-              </li>
-              {% if is_brand_admin %}
-              <li>
-                <a href="{% url 'operating:create_warehouse' %}">
-                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                  <span>Add Warehouse</span>
-                </a>
-              </li>
-              {% endif %}
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Purchasing" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'operating:purchase_request_list' %}">
-                  <i class="fas fa-file-alt" aria-hidden="true"></i>
-                  <span>Purchase Requests</span>
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'operating:purchase_order_list' %}">
-                  <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
-                  <span>Purchase Orders</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div class="add-menu-section">
-            <h3>{% trans "Suppliers" %}</h3>
-            <ul>
-              <li>
-                <a href="{% url 'crm:supplier_list' %}">
-                  <i class="fas fa-truck" aria-hidden="true"></i>
-                  <span>Supplier List</span>
-                </a>
-              </li>
-              <li>
-                <a href="#" onclick="openAddSupplierSidebar(); return false;">
-                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                  <span>Add Supplier</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </li>
-      <li class="nav-item">
-        <a href="{% url 'operating:order_analytics' %}" class="nav-link">
-          <i class="fas fa-chart-line fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Analytics</span>
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="{% url 'notes:index' %}" class="nav-link">
-          <i class="fas fa-sticky-note fa-2x" aria-hidden="true"></i>
-          <span class="link-text">Notes</span>
-        </a>
-      </li>
-
-    </ul>
-  </nav>
   <main>
     {% if messages %}
     <div class="nj-flash" id="njFlash">
@@ -1880,199 +1305,12 @@
       event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
     });
 
-    // Preserve navbar scroll position across page navigations
-    (function () {
-      const navbar = document.querySelector('.navbar');
-
-      // Restore scroll position if it exists
-      const savedScrollPos = sessionStorage.getItem('navbarScrollPos');
-      if (savedScrollPos !== null && navbar) {
-        navbar.scrollTop = parseInt(savedScrollPos);
-        sessionStorage.removeItem('navbarScrollPos');
-      }
-
-      // Save scroll position before navigating away
-      window.addEventListener('beforeunload', function () {
-        if (navbar) {
-          sessionStorage.setItem('navbarScrollPos', navbar.scrollTop);
-        }
-      });
-    })();
-
-
-    // Unified menu system
+    {% comment %}What is left of the old "unified menu system": the
+    hover-open logic for the navbar's Add/Marketing/Operating flyouts went
+    with the navbar, and the search overlay it also drove had already lost
+    its markup to the command palette. The date default is unrelated and
+    stays.{% endcomment %}
     document.addEventListener('DOMContentLoaded', function () {
-      const addButton = document.getElementById('addButton');
-      const addExpanded = document.getElementById('addExpanded');
-      const marketingButton = document.getElementById('marketingButton');
-      const marketingExpanded = document.getElementById('marketingExpanded');
-      const operatingButton = document.getElementById('operatingButton');
-      const operatingExpanded = document.getElementById('operatingExpanded');
-
-      // Search overlay functionality
-      const searchButton = document.getElementById('searchButton');
-      const searchOverlay = document.getElementById('searchOverlay');
-      const searchInput = document.getElementById('searchInput');
-
-      if (searchButton && searchOverlay) {
-        // Open search overlay when search button is clicked
-        searchButton.addEventListener('click', function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          searchOverlay.style.display = 'flex';
-          // Focus on search input after a short delay to allow overlay to render
-          setTimeout(() => {
-            if (searchInput) searchInput.focus();
-          }, 100);
-        });
-
-        // Close search overlay when clicking outside the overlay content
-        searchOverlay.addEventListener('click', function (e) {
-          if (e.target === searchOverlay) {
-            searchOverlay.style.display = 'none';
-            if (searchInput) searchInput.value = '';
-          }
-        });
-
-        // Close search overlay when pressing ESC key
-        document.addEventListener('keydown', function (e) {
-          if (e.key === 'Escape' && searchOverlay.style.display === 'flex') {
-            searchOverlay.style.display = 'none';
-            if (searchInput) searchInput.value = '';
-          }
-        });
-      }
-
-      let hoverTimeout;
-      let marketingHoverTimeout;
-      let operatingHoverTimeout;
-      let isMenuOpen = false;
-      let isMarketingMenuOpen = false;
-      let isOperatingMenuOpen = false;
-
-      // Tüm menüleri kapat (sadece görünümü gizle, bayrakları dokunma)
-      function closeAllMenus(except) {
-        if (except !== 'add' && addExpanded) {
-          addExpanded.style.display = 'none';
-        }
-        if (except !== 'marketing' && marketingExpanded) {
-          marketingExpanded.style.display = 'none';
-        }
-        if (except !== 'operating' && operatingExpanded) {
-          operatingExpanded.style.display = 'none';
-        }
-      }
-
-      // Add menu
-      if (addButton && addExpanded) {
-        addButton.addEventListener('mouseenter', function () {
-          clearTimeout(hoverTimeout);
-          clearTimeout(marketingHoverTimeout);
-          clearTimeout(operatingHoverTimeout);
-          closeAllMenus('add');
-          // Position menu at button's vertical position
-          const rect = addButton.getBoundingClientRect();
-          addExpanded.style.top = rect.top + 'px';
-          addExpanded.style.display = 'block';
-          isMenuOpen = true;
-        });
-
-        addExpanded.addEventListener('mouseenter', function () {
-          clearTimeout(hoverTimeout);
-          isMenuOpen = true;
-        });
-
-        addButton.addEventListener('mouseleave', function () {
-          isMenuOpen = false;
-          hoverTimeout = setTimeout(function () {
-            if (!isMenuOpen) {
-              addExpanded.style.display = 'none';
-            }
-          }, 150);
-        });
-
-        addExpanded.addEventListener('mouseleave', function () {
-          isMenuOpen = false;
-          hoverTimeout = setTimeout(function () {
-            addExpanded.style.display = 'none';
-          }, 150);
-        });
-      }
-
-      // Marketing menu
-      if (marketingButton && marketingExpanded) {
-        marketingButton.addEventListener('mouseenter', function () {
-          clearTimeout(hoverTimeout);
-          clearTimeout(marketingHoverTimeout);
-          clearTimeout(operatingHoverTimeout);
-          closeAllMenus('marketing');
-          // Position menu at button's vertical position with offset
-          const rect = marketingButton.getBoundingClientRect();
-          const offset = 80; // Move menu up by 80px
-          marketingExpanded.style.top = (rect.top - offset) + 'px';
-          marketingExpanded.style.display = 'block';
-          isMarketingMenuOpen = true;
-        });
-
-        marketingExpanded.addEventListener('mouseenter', function () {
-          clearTimeout(marketingHoverTimeout);
-          isMarketingMenuOpen = true;
-        });
-
-        marketingButton.addEventListener('mouseleave', function () {
-          isMarketingMenuOpen = false;
-          marketingHoverTimeout = setTimeout(function () {
-            if (!isMarketingMenuOpen) {
-              marketingExpanded.style.display = 'none';
-            }
-          }, 150);
-        });
-
-        marketingExpanded.addEventListener('mouseleave', function () {
-          isMarketingMenuOpen = false;
-          marketingHoverTimeout = setTimeout(function () {
-            marketingExpanded.style.display = 'none';
-          }, 150);
-        });
-      }
-
-      // Operating menu
-      if (operatingButton && operatingExpanded) {
-        operatingButton.addEventListener('mouseenter', function () {
-          clearTimeout(hoverTimeout);
-          clearTimeout(marketingHoverTimeout);
-          clearTimeout(operatingHoverTimeout);
-          closeAllMenus('operating');
-          // Position menu at button's vertical position with offset
-          const rect = operatingButton.getBoundingClientRect();
-          const offset = 290; // Move menu up by 290px
-          operatingExpanded.style.top = (rect.top - offset) + 'px';
-          operatingExpanded.style.display = 'block';
-          isOperatingMenuOpen = true;
-        });
-
-        operatingExpanded.addEventListener('mouseenter', function () {
-          clearTimeout(operatingHoverTimeout);
-          isOperatingMenuOpen = true;
-        });
-
-        operatingButton.addEventListener('mouseleave', function () {
-          isOperatingMenuOpen = false;
-          operatingHoverTimeout = setTimeout(function () {
-            if (!isOperatingMenuOpen) {
-              operatingExpanded.style.display = 'none';
-            }
-          }, 150);
-        });
-
-        operatingExpanded.addEventListener('mouseleave', function () {
-          isOperatingMenuOpen = false;
-          operatingHoverTimeout = setTimeout(function () {
-            operatingExpanded.style.display = 'none';
-          }, 150);
-        });
-      }
-
       // Set today's date on page load
       const today = new Date().toISOString().split('T')[0];
       const dueDateField = document.getElementById('id_due_date');

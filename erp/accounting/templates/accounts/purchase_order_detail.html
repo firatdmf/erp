@@ -55,6 +55,14 @@
   .po-item-meta { font: 500 12px var(--font-sans); color: var(--gray-500); margin-bottom: 10px; }
   .po-item-meta b { color: var(--gray-700); }
 
+  /* What was bought, one fact per row: the SKU, then each attribute under
+     its own name. A run-on line hid which value belonged to which
+     attribute, which is exactly what a receiver checks the goods against. */
+  .po-spec { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0 0 12px; }
+  .po-spec dt { font: 600 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); align-self: center; }
+  .po-spec dd { margin: 0; font: 600 12.5px var(--font-sans); color: var(--gray-700); }
+  .po-spec dd.sku { font-family: var(--font-mono); }
+
   .po-rolls-h { font: 700 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); margin: 10px 0 6px; display:flex; align-items:center; gap: 6px; }
   /* Print button sits in the rolls header, right-aligned: it belongs to
      the rolls of THIS line, and the header is the only line-level row. */
@@ -167,8 +175,17 @@
     </div>
     <div class="po-item-meta">
       <b>{{ it.quantity|floatformat:2 }} {{ it.unit }}</b> × {{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }}
-      {% if it.variant %} · <span style="font-family:var(--font-mono);">{{ it.variant.variant_sku }}</span>{% endif %}
     </div>
+    {% if it.variant %}
+    <dl class="po-spec">
+      <dt>{% trans "SKU" %}</dt>
+      <dd class="sku">{{ it.variant.variant_sku }}</dd>
+      {% for v in it.variant.product_variant_attribute_values.all %}
+      <dt>{{ v.product_variant_attribute.name|capfirst }}</dt>
+      <dd>{{ v.product_variant_attribute_value }}</dd>
+      {% endfor %}
+    </dl>
+    {% endif %}
 
     <div class="po-rolls-h">
       <i data-lucide="layers"></i> {% trans "Physical rolls received" %}

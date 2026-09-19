@@ -208,26 +208,64 @@ class index(View):
         return render(request, "operating/index.html", context)
 
 
-def _order_item_variant_label(it):
-    """Human-readable label for an order line's variant. Auto-minted
-    variant SKUs (KZL000344, MRK0011, …) mean nothing to staff — the
-    warehouse product's own name ("2086 GÜMÜŞ ABEYA") is what they
-    recognize, so prefer it (minus the redundant base title), then the
-    variant's attribute values, then None (caller falls back to SKU)."""
+def _variant_attribute_values(variant):
+    """A variant's attribute value rows, always in the same order.
+
+    The values are a plain many-to-many with no ordering of its own, so
+    the database was free to hand them back in whatever order it liked —
+    one line read "cactus_green / 160 x 200 cm" and the next
+    "100 x 200 cm / cappuccino", for the same two attributes. Sorting by
+    the ATTRIBUTE's name (`color` before `size`) fixes the column in
+    place, so a reader scanning down a table compares like with like.
+
+    The rows come back rather than the bare strings: what a value reads
+    like depends on which attribute it belongs to (see
+    attributes.display_value), and only the row still knows that.
+    """
+    if variant is None:
+        return []
+    values = [av for av in variant.product_variant_attribute_values.all()
+              if (av.product_variant_attribute_value or "").strip()]
+    values.sort(key=lambda av: ((av.product_variant_attribute.name or "").lower(),
+                                av.product_variant_attribute_value))
+    return values
+
+
+def _order_item_variant_lines(it):
+    """The variant of an order line, as the pieces it is made of — one
+    warehouse product name, or one entry per attribute value. The order
+    page prints each on its own line, which is the only way a value that
+    is itself a phrase ("160 x 200 cm") stays readable in a narrow
+    column; callers wanting a single string join them.
+
+    Attribute values are spelled for a reader ("Cactus green", "250 cm")
+    rather than as stored. A warehouse product's name is NOT: it is a
+    name someone typed ("2086 GÜMÜŞ ABEYA"), not a slug to tidy up.
+    """
+    from marketing.attributes import display_value
     v = it.product_variant
     if v is None:
-        return None
+        return []
     wps = list(v.warehouse_products.all())
     if wps and (wps[0].name or "").strip():
         label = wps[0].name.strip()
         title = (getattr(it.product, "title", "") or "").strip()
         if title and label.lower().startswith(title.lower()):
             label = label[len(title):].strip(" -·/") or label
-        return label
-    vals = [av.product_variant_attribute_value
-            for av in v.product_variant_attribute_values.all()
-            if (av.product_variant_attribute_value or "").strip()]
-    return " / ".join(vals) if vals else None
+        return [label]
+    return [display_value(av.product_variant_attribute.name,
+                          av.product_variant_attribute_value)
+            for av in _variant_attribute_values(v)]
+
+
+def _order_item_variant_label(it):
+    """Human-readable label for an order line's variant. Auto-minted
+    variant SKUs (KZL000344, MRK0011, …) mean nothing to staff — the
+    warehouse product's own name ("2086 GÜMÜŞ ABEYA") is what they
+    recognize, so prefer it (minus the redundant base title), then the
+    variant's attribute values, then None (caller falls back to SKU)."""
+    lines = _order_item_variant_lines(it)
+    return " / ".join(lines) if lines else None
 
 
 def _order_profit_snapshot(order, user):
@@ -319,7 +357,8 @@ class OrderDetail(DetailView):
         ).prefetch_related(
             "items__product", "items__product_variant",
             "items__product_variant__warehouse_products",
-            "items__product_variant__product_variant_attribute_values",
+            "items__product_variant__product_variant_attribute_values"
+            "__product_variant_attribute",
         )
 
     def get_context_data(self, **kwargs):
@@ -424,7 +463,7 @@ class OrderDetail(DetailView):
             it.item_reservations = by_item.get(it.pk, [])
             it.scanned_meters = sum((r.quantity or _D("0") for r in it.item_reservations), _D("0"))
             it.scanned_count = len(it.item_reservations)
-            it.variant_label = _order_item_variant_label(it)
+            it.variant_lines = _order_item_variant_lines(it)
         # Every item-less reservation, pack or no pack — in this layout
         # nothing else renders them, so filtering pack'd ones out (as the
         # pack screen does) would make them invisible here.
@@ -1270,11 +1309,25 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
         short_lines.append(_line_short_label(order_item, moved[0], moved[1]))
 
 
+def _roll_edit_url(wp, stock_item_id):
+    """The page where one roll is corrected: its product's page, opened
+    straight on that roll's edit box. The packing screen hands it to the
+    packer who has just spotted a wrong barcode on a roll in front of
+    them, so the fix is one tap away from the sack."""
+    if not (wp and wp.warehouse_id and stock_item_id):
+        return ""
+    return "%s?roll=%s" % (
+        reverse("operating:warehouse_product_detail", args=[wp.warehouse_id, wp.pk]),
+        stock_item_id,
+    )
+
+
 def _reservation_payload(r):
     wp = r.warehouse_product
     return {
         "id": r.id,
         "stock_item_id": r.stock_item_id,
+        "roll_url": _roll_edit_url(wp, r.stock_item_id),
         "barcode": (r.stock_item.barcode if r.stock_item else None),
         "product_id": r.warehouse_product_id,
         "product_name": (wp.name if wp else ""),
@@ -3868,10 +3921,11 @@ class OrderList(ListView):
         # the gross_profit() helper reads cost from those — without
         # prefetching, each order row would fire two extra queries per
         # line item. `current account` joins for the same reason: the customer cell
-        # names the account a retail order posts to.
-        qs = (
+        # names the account a retail order posts to. `currency` joins
+        # because every row prints its total's code and symbol.
+        qs = Order.with_pre_order_flag(
             Order.objects
-            .select_related('contact', 'company', 'web_client', 'current_account')
+            .select_related('contact', 'company', 'web_client', 'current_account', 'currency')
             .prefetch_related('items__product', 'items__product_variant')
             .order_by("-created_at")
         )
@@ -4089,11 +4143,8 @@ def _variant_label(variant):
     them the same way the warehouse variant picker does. A product with
     no variants prints a dash: it is not that the variant is unknown,
     it is that there is only one of it."""
-    if variant is None:
-        return "-"
-    values = [v.product_variant_attribute_value
-              for v in variant.product_variant_attribute_values.all()
-              if v.product_variant_attribute_value]
+    values = [av.product_variant_attribute_value
+              for av in _variant_attribute_values(variant)]
     if not values:
         return "-"
     return " / ".join(v.replace("_", " ").strip().title() for v in values)

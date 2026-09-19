@@ -584,3 +584,106 @@ def posting_preview():
                          "parked": kind in PARKED_CONTRA_BY_TYPE}
                   for kind, code in ALL_CONTRA_BY_TYPE.items()},
     }
+
+
+# ---------------------------------------------------------------------------
+# Stock leaving the shelves
+#
+# A sale has two halves: the customer owes the money, and the goods are gone.
+# The ledger only ever recorded the first, so Ergene's stock account still
+# held the figure a backfill photographed at cutover while the shelves moved
+# underneath it, and every sale showed its revenue against no cost at all.
+#
+# Keyed on StockMovement, the row the warehouse already writes for every
+# change in stock: it names the item, the metres and the reason, so the
+# entry can be valued at what that very roll cost rather than at an average
+# nobody would recognise.
+#
+# Only stock going OUT posts here, plus the "in" that undoes one. Stock
+# ARRIVING is deliberately left alone: intake writes a purchase invoice,
+# whose current-account movement already debits 1300, and posting the stock
+# row as well would count every purchase twice. Stock that arrives with no
+# purchase behind it raises the shelves and not the ledger — which is the
+# gap the reconciliation reports, and the next job.
+# ---------------------------------------------------------------------------
+COST_OF_GOODS_SOLD = "5000"
+INVENTORY = "1300"
+
+
+def stock_unit_cost(item, product=None):
+    """What one unit of this stock cost, or None when nothing says.
+
+    The same precedence the balance sheet values stock at
+    (services_ledger._inventory_value), so the cost taken out on a sale is
+    the cost that was carried: the item's own stamp first, because it
+    cannot move, then the purchase line it arrived on, then the product's
+    current cost for items received before the stamp existed.
+
+    None means uncosted. Nothing is posted for those rather than a zero
+    being invented — the balance sheet counts them the same way, and the
+    unvalued count beside it is what says how much stock that is.
+    """
+    if item is not None:
+        if item.unit_cost_base is not None:
+            return Decimal(item.unit_cost_base)
+        line = item.purchase_invoice_item
+        if line is not None and line.unit_price is not None:
+            return Decimal(line.unit_price)
+        product = product or item.product
+    if product is not None and product.cost_usd is not None:
+        return Decimal(product.cost_usd)
+    return None
+
+
+def lines_for_stock_movement(movement):
+    """The two lines this stock movement implies, balanced.
+
+    Out of the warehouse: the cost of what left becomes cost of goods sold.
+    Back in, when it is an order being unshipped or edited, the same cost
+    goes back on the shelf. Anything else — an arrival, a correction, a
+    transfer between two products — returns no lines; see the note above.
+    """
+    kind = movement.movement_type
+    is_return = kind == "in" and movement.order_id is not None
+    if kind != "out" and not is_return:
+        return []
+
+    quantity = abs(Decimal(movement.quantity or 0))
+    if quantity == ZERO:
+        return []
+    unit = stock_unit_cost(movement.stock_item, movement.product)
+    if unit is None:
+        return []
+    value = (quantity * unit).quantize(Decimal("0.01"))
+    if value == ZERO:
+        return []
+
+    memo = (movement.reason or "")[:300]
+    if is_return:
+        return [debit(INVENTORY, value, memo=memo),
+                credit(COST_OF_GOODS_SOLD, value, memo=memo)]
+    return [debit(COST_OF_GOODS_SOLD, value, memo=memo),
+            credit(INVENTORY, value, memo=memo)]
+
+
+@transaction.atomic
+def post_stock_movement(movement, *, reference=""):
+    """Make the ledger say what this stock movement did. Idempotent.
+
+    Returns the entry, or None for a movement that belongs in no entry.
+    """
+    lines = lines_for_stock_movement(movement)
+    unpost(movement)
+    if not lines:
+        return None
+    book = movement.product.warehouse.accounting_book
+    if book is None:                      # a shelf owned by nobody posts nothing
+        return None
+    return post_entry(
+        book=book,
+        date=movement.created_at.date(),
+        description=(movement.reason or movement.get_movement_type_display())[:300],
+        lines=lines,
+        source=movement,
+        reference=reference or (movement.reference or "")[:60],
+    )

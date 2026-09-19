@@ -31,10 +31,15 @@ Two things this must never do:
   for the same source rather than adding to it, so a re-save, a resync and
   a repeated backfill all converge on one entry.
 
+Stock is here too: the cost of what leaves the shelves becomes cost of
+goods sold as it goes, so a sale no longer shows its revenue against no
+cost at all.
+
 What still does NOT post live: cash rows whose source is a transfer or a
 currency exchange, which move cash on both legs and need an entry shaped by
-hand, and Payment's own cash row, which is deliberately left to the
-current-account movement that already carries it.
+hand; Payment's own cash row, which is deliberately left to the
+current-account movement that already carries it; and stock ARRIVING,
+which is the purchase invoice's job (see services_posting).
 """
 import logging
 
@@ -96,6 +101,28 @@ def unpost_movement_from_ledger(sender, instance, **kwargs):
     """
     from .services_posting import unpost
     _safely(f"movement {instance.pk}", unpost, instance)
+
+
+# ---------------------------------------------------------------------------
+# Stock leaving the shelves
+#
+# Sender by name, so the accounting app does not import the warehouse at
+# start-up; it is the warehouse that depends on accounting, not the other
+# way round.
+# ---------------------------------------------------------------------------
+@receiver(post_save, sender="operating.StockMovement")
+def post_stock_movement_to_ledger(sender, instance, raw=False, **kwargs):
+    """Take the cost of goods sold out of stock as the goods leave."""
+    if raw:
+        return
+    from .services_posting import post_stock_movement
+    _safely(f"stock movement {instance.pk}", post_stock_movement, instance)
+
+
+@receiver(post_delete, sender="operating.StockMovement")
+def unpost_stock_movement_from_ledger(sender, instance, **kwargs):
+    from .services_posting import unpost
+    _safely(f"stock movement {instance.pk}", unpost, instance)
 
 
 # ---------------------------------------------------------------------------

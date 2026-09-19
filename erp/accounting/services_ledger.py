@@ -586,17 +586,14 @@ def reconcile(book, date_to=None):
             "ledger": balance("1300"),
             "subsidiary": inventory,
             "subsidiary_label": "Stock on the shelves, at cost",
-            # Deliberately does not claim a direction. Two unposted
-            # effects pull opposite ways: goods leaving on a sale never
-            # relieve stock, which holds the ledger up, and stock arriving
-            # without a purchase invoice never raises it, which holds it
-            # down. On Ergene the second is the larger and the ledger reads
-            # 50,168.45 BELOW the shelves, so a note asserting the first
-            # would have been a guess printed as a fact.
-            "note": "Cost of goods sold is not posted, so goods leaving on "
-                    "a sale never relieve stock; and stock that arrives "
-                    "without a purchase invoice never raises it. The two "
-                    "pull opposite ways and the difference can run either.",
+            # Goods leaving now relieve stock as they go (services_posting
+            # .post_stock_movement), so what is left of this gap is stock
+            # that ARRIVED without a purchase invoice behind it, plus the
+            # history that predates the posting.
+            "note": "Stock that arrives without a purchase invoice raises "
+                    "the shelves and not the ledger. Goods leaving on a "
+                    "sale do relieve stock, but only since that posting "
+                    "began: anything older is still in this difference.",
         },
     ]
     for row in rows:

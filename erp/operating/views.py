@@ -3849,11 +3849,10 @@ class OrderList(ListView):
         # the gross_profit() helper reads cost from those — without
         # prefetching, each order row would fire two extra queries per
         # line item. `current account` joins for the same reason: the customer cell
-        # names the account a retail order posts to. `currency` joins
-        # because every row prints its total's code and symbol.
-        qs = Order.with_pre_order_flag(
+        # names the account a retail order posts to.
+        qs = (
             Order.objects
-            .select_related('contact', 'company', 'web_client', 'current_account', 'currency')
+            .select_related('contact', 'company', 'web_client', 'current_account')
             .prefetch_related('items__product', 'items__product_variant')
             .order_by("-created_at")
         )

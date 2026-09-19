@@ -240,18 +240,13 @@ def stamp_order_currency(order, account=None, *, save=True):
         return order
 
     order.currency = currency
-    base = getattr(settings, "BASE_CURRENCY_CODE", "USD")
-    if currency.code.upper() != base.upper():
-        from accounting.services import get_exchange_rate
-        on = order.order_date or (order.created_at.date() if order.created_at else None)
-        try:
-            order.currency_rate = get_exchange_rate(currency.code, base, on_date=on)
-        except Exception:
-            # No rate today is not a reason to lose the order: the ledger
-            # falls back to the published rate for its date.
-            order.currency_rate = None
+    # No rate yet, on purpose. An open order is a commitment, not a
+    # receivable: what it is worth to the book is what it would be worth
+    # today, so it follows the published rate until the order completes
+    # and Order.freeze_billable_quantities stamps the rate it is recorded
+    # at for good. See Order.rate_to_base.
     if save and order.pk:
-        order.save(update_fields=["currency", "currency_rate"])
+        order.save(update_fields=["currency"])
     return order
 
 

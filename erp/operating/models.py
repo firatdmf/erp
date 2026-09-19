@@ -664,8 +664,15 @@ class Order(models.Model):
         The opt-in hook CurrentAccountMovement.entered_rate() looks for
         (see its docstring): stating it here is what keeps a euro order's
         balance from being counted as dollars at par.
+
+        The same rate the order states everywhere else — today's while it
+        is open, the stamped one once it has completed — so the balance
+        and the order page never disagree about what the sale is worth.
+        An order in base says nothing and lets the ledger be.
         """
-        return self.currency_rate
+        if not self.currency_id:
+            return None
+        return self.rate_to_base()
 
     def rate_to_base(self):
         """What one unit of this order's currency is worth in base.
@@ -674,10 +681,22 @@ class Order(models.Model):
         customer's currency and RECORDED to the book in base. This is the
         one number that carries a figure across that line.
 
-        The rate the order was raised at wins — a sale is worth what it
-        was worth on the day, and a later rate move must not restate it.
-        Only an order that never stored one asks for the published rate,
-        and a base-currency order needs no rate at all.
+        It floats while the order is open and freezes when the order
+        completes, because those are two different things:
+
+          * an OPEN order is a commitment — nothing delivered, nothing
+            billed. What it is worth to the book is what it would be
+            worth today, so it follows the published rate and the
+            dashboards move with the market;
+          * a COMPLETED order is a receivable the customer holds a
+            document for. The rate is stamped at that moment (see
+            freeze_billable_quantities, which freezes the quantities in
+            the same breath — the ship is the moment of truth), and a
+            later rate move must never restate a sale already made.
+
+        A payment is its own event at its own rate; the gap between it and
+        the frozen rate is an FX gain or loss on the receivable, not a
+        reason to rewrite the sale.
         """
         from decimal import Decimal
 
@@ -696,7 +715,10 @@ class Order(models.Model):
             rate = Decimal("1")
         else:
             from accounting.services import get_exchange_rate
-            published = get_exchange_rate(self.currency_code, base, on_date=self.order_date)
+            # Today's while the order is open; for one already completed
+            # that somehow never got a stamp, the closest thing to its day.
+            on = self.order_date if self.billed_quantities_frozen_at else None
+            published = get_exchange_rate(self.currency_code, base, on_date=on)
             rate = Decimal(str(published)) if published else Decimal("1")
         self._rate_to_base = rate
         return rate
@@ -917,10 +939,18 @@ class Order(models.Model):
         live = self.compute_billable_line_quantities()
         self.billed_line_quantities = {str(k): str(v) for k, v in live.items()}
         self.billed_quantities_frozen_at = timezone.now()
+        # The rate the sale is recorded at, settled in the same breath
+        # as the quantities and for the same reason: this is the moment
+        # the customer gets a document, and neither what was sold nor
+        # what it was worth may drift afterwards. An order already in
+        # base needs no rate at all.
+        if self.currency_id and not self.currency_rate:
+            self.currency_rate = self.rate_to_base()
         if save:
             type(self).objects.filter(pk=self.pk).update(
                 billed_line_quantities=self.billed_line_quantities,
                 billed_quantities_frozen_at=self.billed_quantities_frozen_at,
+                currency_rate=self.currency_rate,
             )
         return self.billed_line_quantities
 
@@ -929,10 +959,15 @@ class Order(models.Model):
         floor and its lines are live again."""
         self.billed_line_quantities = None
         self.billed_quantities_frozen_at = None
+        # Nothing was delivered after all, so what the order is worth is a
+        # live question again — the same reasoning as the quantities.
+        self.currency_rate = None
+        self._rate_to_base = None
         if save:
             type(self).objects.filter(pk=self.pk).update(
                 billed_line_quantities=None,
                 billed_quantities_frozen_at=None,
+                currency_rate=None,
             )
 
     def compute_billable_line_quantities(self, as_of=None):
@@ -1105,6 +1140,48 @@ class Order(models.Model):
         if rev <= 0:
             return None
         return (self.gross_profit() / Decimal(str(rev)) * Decimal("100")).quantize(Decimal("0.1"))
+
+    # ── Pre-orders ────────────────────────────────────────────────
+    # An order whose goods were bought in for it (a purchase with
+    # `for_order` set) and whose purchase is still a draft is waiting on
+    # stock nobody owns yet — the supplier has not shipped, the rolls do
+    # not exist, nothing can be packed. "Pending" reads as if the order
+    # were merely unstarted; the shop floor needs to see that this one is
+    # sold ahead of the goods. Confirming the purchase (the rolls arrive
+    # and get reserved for the order) ends the pre-order by itself.
+
+    @classmethod
+    def with_pre_order_flag(cls, qs=None):
+        """Annotate `has_draft_purchase` so a list of orders can label its
+        pre-orders without a query per row."""
+        from django.db.models import Exists, OuterRef
+        from accounting.models_accounts import Invoice
+
+        qs = cls.objects.all() if qs is None else qs
+        return qs.annotate(has_draft_purchase=Exists(
+            Invoice.objects.filter(for_order=OuterRef("pk"),
+                                   type="purchase", status="draft")
+        ))
+
+    @property
+    def is_pre_order(self):
+        """Open, and the purchase it was bought against is still a draft."""
+        if (self.order_status or "pending") != "pending":
+            return False
+        flag = getattr(self, "has_draft_purchase", None)
+        if flag is None:
+            flag = self.supplier_purchases.filter(type="purchase",
+                                                  status="draft").exists()
+        return bool(flag)
+
+    @property
+    def status_label(self):
+        """The order's status as every screen names it — the choice label,
+        except that a pending order still waiting on its purchase is a
+        pre-order."""
+        if self.is_pre_order:
+            return _("Pre-order")
+        return self.get_order_status_display()
 
     def get_client(self):
         if self.contact:

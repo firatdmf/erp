@@ -48,15 +48,41 @@ class OrderCurrencyTest(TestCase):
         return order
 
     # ── What the order is in ────────────────────────────────────────
-    def test_it_takes_the_customers_currency_and_the_rate_of_the_day(self):
+    def test_it_takes_the_customers_currency_and_no_rate_while_it_is_open(self):
         order = self._order()
-        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
-            stamp_order_currency(order, self.account)
+        stamp_order_currency(order, self.account)
         order.refresh_from_db()
         self.assertEqual(order.currency, self.eur)
-        self.assertEqual(order.currency_rate, Decimal("1.08"))
         self.assertEqual(order.currency_code, "EUR")
         self.assertEqual(order.currency_symbol, "€")
+        # An open order is a commitment, not a receivable: it is worth what
+        # it would be worth today, so no rate is nailed down yet.
+        self.assertIsNone(order.currency_rate)
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.15")):
+            self.assertEqual(order.rate_to_base(), Decimal("1.15"))
+
+    def test_completing_the_order_stamps_the_rate_it_is_recorded_at(self):
+        order = self._order()
+        stamp_order_currency(order, self.account)
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.15")):
+            order.freeze_billable_quantities()
+        order.refresh_from_db()
+        self.assertEqual(order.currency_rate, Decimal("1.15000000"))
+        # The market moves; a sale already made does not.
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.30")):
+            self.assertEqual(order.rate_to_base(), Decimal("1.15000000"))
+            self.assertEqual(order.total_value_base(), Decimal("1610.00"))  # 1400 × 1.15
+
+    def test_un_shipping_lets_the_rate_float_again(self):
+        order = self._order()
+        stamp_order_currency(order, self.account)
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.15")):
+            order.freeze_billable_quantities()
+        order.release_billable_freeze()
+        order.refresh_from_db()
+        self.assertIsNone(order.currency_rate)
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.30")):
+            self.assertEqual(order.rate_to_base(), Decimal("1.30"))
 
     def test_an_order_with_no_currency_is_still_dollars(self):
         order = self._order()
@@ -79,6 +105,7 @@ class OrderCurrencyTest(TestCase):
         order = self._order()
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
+            order.freeze_billable_quantities()
         # Something later stamps it again — a customer swapped on the order
         # screen, a re-post, a backfill. The price on the line has not
         # changed, so what it is in must not change either.
@@ -95,6 +122,7 @@ class OrderCurrencyTest(TestCase):
         order = self._order()
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
+            order.freeze_billable_quantities()
             post_order_movement(order, member=self.member)
 
         mv = CurrentAccountMovement.objects.get(current_account=self.account,
@@ -118,6 +146,7 @@ class OrderCurrencyTest(TestCase):
         order = self._order()
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
+            order.freeze_billable_quantities()
         order.refresh_from_db()
         self.assertEqual(order.total_value(), Decimal("1400.00"))       # shown: €
         self.assertEqual(order.total_value_base(), Decimal("1512.00"))  # booked: $
@@ -135,6 +164,7 @@ class OrderCurrencyTest(TestCase):
         order = self._order(price="2.00", qty="100")
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
+            order.freeze_billable_quantities()
         order.refresh_from_db()
         line = order.items.get()
         # $1.08 is €1.00, so a €2.00 price earns €1.00 — not €0.92, which is
@@ -148,6 +178,7 @@ class OrderCurrencyTest(TestCase):
         order = self._order()
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
+            order.freeze_billable_quantities()
         order.refresh_from_db()
         self.assertEqual(order.build_snapshot()["currency_code"], "EUR")
         order.original_snapshot = order.build_snapshot()
@@ -160,6 +191,7 @@ class OrderCurrencyTest(TestCase):
         order = self._order()
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
+            order.freeze_billable_quantities()
         doc = build_order_doc(order)
         self.assertEqual(doc.currency_code, "EUR")
         self.assertEqual(doc.currency_symbol, "€")

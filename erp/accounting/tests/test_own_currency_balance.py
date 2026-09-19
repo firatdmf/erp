@@ -1,6 +1,7 @@
 # to run this test, use the command:
 # python manage.py test accounting.test_own_currency_balance
 
+from datetime import date
 from decimal import Decimal
 from unittest import mock
 
@@ -32,6 +33,17 @@ class OwnCurrencyBase(TestCase):
             default_currency=self.try_)
         CurrencyExchangeRate.objects.create(
             from_currency="USD", to_currency="TRY", rate=Decimal("48.495000"), date="2026-09-11")
+        # The page asks what the balance is worth TODAY, so the pair it asks
+        # for has to be on the table — otherwise every page test reaches for
+        # the rate API and waits for it to fail.
+        self.today_rate("0.02062000")
+
+    def today_rate(self, rate):
+        """Set (or move) today's TRY→USD rate."""
+        services._RATE_MEMO.clear()
+        CurrencyExchangeRate.objects.update_or_create(
+            from_currency="TRY", to_currency="USD", date=date.today(),
+            defaults={"rate": Decimal(rate)})
 
     def lira(self, amount, rate="0.02062000", **kw):
         amount = Decimal(amount)
@@ -104,8 +116,55 @@ class AccountPageTest(OwnCurrencyBase):
         self.dollars("40.00")
         response = self.page()
         self.assertContains(response, "₺270.20")
-        self.assertNotContains(response, "$5.57")
         self.assertEqual(response.context["own_balance_label"], "We Owe")
+
+    def test_the_books_figure_sits_under_the_accounts_own(self):
+        """The lira are what the supplier is owed; the dollars are what the
+        book carries — the figure the account lists add up and the credit
+        limit is compared against. Both, rather than a trip to another page."""
+        self.lira("-4210.00")
+        self.lira("2000.00")
+        self.dollars("40.00")
+        response = self.page()
+        self.assertContains(response, "₺270.20")
+        self.assertContains(response, '<div class="alt"')
+        self.assertContains(response, "$5.57")
+
+    def test_the_two_sides_disagreeing_says_which_way_the_book_reads(self):
+        """A balance near zero can be owed in lira and owing in dollars.
+        Then the second figure carries its own label rather than an
+        unsigned number under the first one's."""
+        self.lira("-4210.00", rate="0.01000000")   # -42.10 in the book
+        self.dollars("50.00")                      # +2,424.75 in lira
+        response = self.page()
+        self.assertEqual(response.context["own_balance_label"], "We Owe")
+        self.assertContains(response, "₺1,785.25")
+        self.assertContains(response, "$7.90 in the book's currency · Owes Us")
+
+    def test_todays_worth_shows_only_once_the_rate_has_moved(self):
+        """Unmoved, it would repeat the line above it to the cent."""
+        self.lira("-4210.00")                      # -86.81 in the book
+        response = self.page()
+        self.assertIsNone(response.context["today_balance"])
+        self.today_rate("0.02500000")              # lira up against the dollar
+        response = self.page()
+        self.assertEqual(response.context["today_balance"], Decimal("-105.25"))
+        self.assertContains(response, "≈ $105.25 at today's 0.025</div>")
+
+    def test_no_rate_today_leaves_the_books_figure_to_stand_alone(self):
+        self.lira("-4210.00")
+        with mock.patch("accounting.services.get_exchange_rate", return_value=None):
+            response = self.page()
+        self.assertIsNone(response.context["today_balance"])
+
+    def test_a_dollar_account_states_one_figure_only(self):
+        """Its balance already is the book's, so there is nothing to add."""
+        self.account.default_currency = self.usd
+        self.account.save()
+        self.dollars("40.00")
+        response = self.page()
+        self.assertContains(response, "$40.00")
+        self.assertNotContains(response, '<div class="alt"')
 
     def test_the_running_column_walks_back_in_lira(self):
         self.lira("-4210.00")

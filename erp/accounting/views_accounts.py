@@ -344,20 +344,6 @@ class CurrentAccountList(View):
         except (EmptyPage, PageNotAnInteger):
             page = paginator.page(1)
 
-        # What that balance is worth at today's rate, beside the figure the
-        # book carries — and, now, the gap between them named as the gain or
-        # loss it is, with a way to record it. One source for both readings
-        # (services_fx), so the line under the balance and the FX panel can
-        # never quote different numbers.
-        from accounting.services_fx import fx_position
-
-        fx = fx_position(current_account)
-        today_balance = today_rate = None
-        if fx and not fx.get("unavailable"):
-            today_rate = fx["rate"]
-            if fx["base_at_rate"] != current_account.cached_balance:
-                today_balance = fx["base_at_rate"]
-
         ctx = {
             "current_accounts":          page.object_list,
             "page":           page,
@@ -1151,11 +1137,27 @@ class CurrentAccountDetail(View):
 
         # Orders attached to this current account — newest first. Items prefetched
         # so gross_profit() can run cheaply in the template if needed.
-        recent_orders = (
+        from operating.models import Order
+
+        recent_orders = Order.with_pre_order_flag(
             current_account.orders.select_related("contact", "company", "web_client")
             .prefetch_related("items__product", "items__product_variant")
-            .order_by("-created_at")[:20]
-        )
+            .order_by("-created_at")
+        )[:20]
+
+        # What that balance is worth at today's rate, beside the figure the
+        # book carries — and, now, the gap between them named as the gain or
+        # loss it is, with a way to record it. One source for both readings
+        # (services_fx), so the line under the balance and the FX panel can
+        # never quote different numbers.
+        from accounting.services_fx import fx_position
+
+        fx = fx_position(current_account)
+        today_balance = today_rate = None
+        if fx and not fx.get("unavailable"):
+            today_rate = fx["rate"]
+            if fx["base_at_rate"] != current_account.cached_balance:
+                today_balance = fx["base_at_rate"]
 
         ctx = {
             "current_account":     current_account,

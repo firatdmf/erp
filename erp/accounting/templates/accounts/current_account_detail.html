@@ -122,6 +122,10 @@
   .cd-balance .amount.pos { color: #B23B12; }
   .cd-balance .amount.neg { color: #0E6E4A; }
   .cd-balance .sub { font: 600 12.5px var(--font-sans); color: var(--gray-600); margin-top: 6px; }
+  /* The same balance in the book's own currency, under one read in the
+     account's — the hero's answer to the cd-fx line on a converted row. */
+  .cd-balance .alt { font: 500 12px var(--font-mono); color: var(--gray-500); margin-top: 6px; }
+  .cd-balance .alt + .alt { margin-top: 2px; }
   .cd-balance .warn { display:inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 10px; background: #FEE4E2; color: #B23B12; border-radius: 999px; font: 600 11.5px var(--font-sans); }
   .cd-balance .warn i { width: 12px; height: 12px; }
 
@@ -241,6 +245,7 @@
   }
   .cd-tbl .ord-st i { width: 11px; height: 11px; }
   .cd-tbl .ord-st-pending   { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+  .cd-tbl .ord-st-preorder  { background: #EDE9FE; color: #5B21B6; border: 1px solid #DDD6FE; }
   .cd-tbl .ord-st-done      { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
   .cd-tbl .ord-st-cancelled { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
 
@@ -431,7 +436,7 @@
                 {% elif o.order_status == "shipped" or o.order_status == "in_transit" or o.order_status == "out_for_delivery" or o.order_status == "delivered" %}
                   <span class="ord-st ord-st-done"><i data-lucide="check-circle"></i>{{ o.get_order_status_display }}</span>
                 {% else %}
-                  <span class="ord-st ord-st-pending" title="{% trans 'Pending order — already reflected on the balance' %}"><i data-lucide="clock"></i>{% trans "Pending" %} · {{ o.get_order_status_display }}</span>
+                  <span class="ord-st {% if o.is_pre_order %}ord-st-preorder{% else %}ord-st-pending{% endif %}" title="{% trans 'Pending order — already reflected on the balance' %}"><i data-lucide="clock"></i>{% trans "Pending" %} · {{ o.status_label }}</span>
                 {% endif %}
               </td>
               <td class="num">{{ o.items.count }}</td>

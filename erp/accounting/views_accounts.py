@@ -1145,11 +1145,10 @@ class CurrentAccountDetail(View):
             .order_by("-created_at")
         )[:20]
 
-        # What that balance is worth at today's rate, beside the figure the
-        # book carries — and, now, the gap between them named as the gain or
-        # loss it is, with a way to record it. One source for both readings
-        # (services_fx), so the line under the balance and the FX panel can
-        # never quote different numbers.
+        # What the balance is worth at today's rate, beside the figure the
+        # book carries. Both lines and the FX panel under them read from the
+        # one fx_position call, so they cannot quote different numbers, and
+        # the second is left off where it would only repeat the first.
         from accounting.services_fx import fx_position
 
         fx = fx_position(current_account)

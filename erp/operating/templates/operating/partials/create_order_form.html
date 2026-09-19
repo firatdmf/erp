@@ -218,6 +218,13 @@
       <input type="hidden" id="customer-type" name="customer_type">
       <input type="hidden" id="customer-pk" name="customer_pk">
 
+      <!-- What this order will be priced in. An order is kept in its
+           customer's own currency, so the prices typed below are in it —
+           said out loud here, because a price typed in one currency and
+           read as another is the mistake this exists to stop. -->
+      <div id="co-currency-note" style="display:none; margin:8px 0 2px; padding:8px 10px;
+           border-radius:8px; font-size:12.5px; line-height:1.4;"></div>
+
       <!-- CRM Customer Search — the only customer source now. -->
       <div id="co-customer-picker">
         <div id="co-crm-fields">
@@ -556,7 +563,7 @@
     <div id="co-total-amount"
          style="font:800 22px 'Inter',sans-serif; color:#0F1419;
                 font-variant-numeric: tabular-nums; letter-spacing:-.3px;">
-      $0.00
+      <span data-cur-symbol>$</span>0.00
     </div>
   </div>
 
@@ -896,11 +903,68 @@
     document.getElementById('co-retail-pick').style.display = 'none';
     var sum3 = document.getElementById('co-sum-3');
     if (sum3) sum3.textContent = name;
+    coCurrencyFor(type, pk, name);
     coRefreshSteps();
     coAdvanceTo(2);
   }
 
+  // The currency this customer is billed in, from the account their order
+  // will be raised against in this book — one answer, shared with the
+  // purchase form (operating:customer_currency).
+  var CO_CUR = { symbol: '{{ base_currency_symbol|default:"$"|escapejs }}',
+                 code: '{{ base_currency_code|default:"USD"|escapejs }}', is_base: true };
+  var CO_CURRENCY_URL = "{% url 'operating:customer_currency' %}";
+
+  function coCurrencyNote(html, warn) {
+    var el = document.getElementById('co-currency-note');
+    if (!el) return;
+    if (!html) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    el.style.background = warn ? '#FEF3C7' : '#F1F5F9';
+    el.style.border = '1px solid ' + (warn ? '#FDE68A' : '#E2E8EE');
+    el.style.color = warn ? '#92400E' : '#334155';
+    el.innerHTML = html;
+  }
+
+  function coCurrencyFor(type, pk, name) {
+    if (type === 'retail' || !pk) { coCurrencyNote(''); return; }
+    var book = (document.querySelector('[name="book"]') || {}).value || '';
+    fetch(CO_CURRENCY_URL + '?book=' + encodeURIComponent(book) +
+          '&type=' + encodeURIComponent(type) + '&pk=' + encodeURIComponent(pk),
+          { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || d.error) { coCurrencyNote(''); return; }
+        CO_CUR = d;
+        coRepriceLabels();
+        if (d.is_base) {
+          coCurrencyNote('<i class="fas fa-circle-info"></i> ' +
+            '{% trans "Prices are in" %} <b>' + d.currency + '</b>.');
+        } else {
+          // Not base: say it loudly, and say what it means for the book.
+          coCurrencyNote('<i class="fas fa-triangle-exclamation"></i> ' +
+            '<b>' + (d.account || name) + '</b> {% trans "is billed in" %} <b>' + d.currency + '</b> — ' +
+            '{% trans "type the prices below in" %} ' + d.currency + ' (' + d.symbol + '). ' +
+            '{% trans "The order is recorded to the book in" %} ' + d.base + ' ' +
+            '{% trans "at the rate of the day, fixed when the order completes." %}', true);
+        }
+      }).catch(function () { coCurrencyNote(''); });
+  }
+
+  // Every figure the form prints follows the customer's currency.
+  function coRepriceLabels() {
+    document.querySelectorAll('[data-cur-symbol]').forEach(function (el) {
+      el.textContent = CO_CUR.symbol;
+    });
+    if (typeof coUpdateTotals === 'function') { try { coUpdateTotals(); } catch (e) {} }
+    var amt = document.getElementById('co-total-amount');
+    if (amt && /^[^0-9]*0\.00$/.test(amt.textContent.trim())) {
+      amt.textContent = CO_CUR.symbol + '0.00';
+    }
+  }
+
   function coClearCustomerSelection() {
+    coCurrencyNote('');
     document.getElementById('customer-type').value = '';
     document.getElementById('customer-pk').value = '';
     var searchInput = document.getElementById('co-customer-search');
@@ -1308,7 +1372,7 @@
         '<span style="flex:1;min-width:0;font-size:11.5px;font-weight:700;color:#0F766E;' +
           'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(b.name) + '</span>' +
         '<span style="font-size:11px;color:#5B8C86;white-space:nowrap;">' +
-          '{% trans "of" %} $' + total.toFixed(2) + '</span>' +
+          '{% trans "of" %} ' + CO_CUR.symbol + total.toFixed(2) + '</span>' +
         '<input type="number" class="form-input" style="width:110px;flex:0 0 auto;background:#FFF;" ' +
           'name="deposit_amount_' + b.key + '" data-book-key="' + b.key + '" ' +
           'min="0" step="0.01" placeholder="0.00" value="' +
@@ -2238,7 +2302,7 @@
     }
     if (f==='quantity'||f==='price') {
       const t = document.getElementById('co-itotal-'+i);
-      if (t) t.textContent = '$'+(orderItems[i].quantity*orderItems[i].price).toFixed(2);
+      if (t) t.textContent = CO_CUR.symbol+(orderItems[i].quantity*orderItems[i].price).toFixed(2);
       updateTotal();
     }
     // Mark / unmark the row for stock violation, and refresh the submit
@@ -2306,7 +2370,7 @@
       sum += q * p;
       topCount += (it.existingRolls || []).length + (it.rolls || []).length;
     });
-    amtEl.textContent = '$' + sum.toFixed(2);
+    amtEl.textContent = CO_CUR.symbol + sum.toFixed(2);
     if (cntEl) cntEl.textContent = orderItems.length;
     if (topsEl) topsEl.textContent = topCount;
   }

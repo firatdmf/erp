@@ -2634,6 +2634,18 @@ def order_customer_card_view(request, pk):
     })
 
 
+def base_currency_facts():
+    """The book's own currency, for a form that prices before it knows the
+    customer's. Replaced the moment one is picked (customer_currency)."""
+    from django.conf import settings as _s
+    from accounting.models import CurrencyCategory
+
+    code = getattr(_s, "BASE_CURRENCY_CODE", "USD")
+    cur = CurrencyCategory.objects.filter(code=code).first()
+    return {"base_currency_code": code,
+            "base_currency_symbol": (cur.symbol if (cur and cur.symbol) else "$")}
+
+
 def _base_currency_symbol():
     """The symbol for figures the BOOK holds — what everything converts to."""
     from django.conf import settings as _s
@@ -2950,6 +2962,7 @@ class OrderCreate(View):
         return render(request, template, {
             "form": form,
             "deposit_cash_boxes": _deposit_cash_boxes(),
+            **base_currency_facts(),
         })
 
     def _settle_book(self, request):
@@ -3414,12 +3427,18 @@ class OrderEdit(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context.update(base_currency_facts())
+        # An order being edited already knows what it is priced in, so the
+        # form states that rather than the book's own currency.
+        context["base_currency_symbol"] = self.object.currency_symbol
+        context["base_currency_code"] = self.object.currency_code
         items = (self.object.items.all()
                  .select_related("product", "product_variant")
                  .prefetch_related(
                      "stock_reservations__stock_item__product__warehouse",
                      "product_variant__warehouse_products",
-                     "product_variant__product_variant_attribute_values",
+                     "product_variant__product_variant_attribute_values"
+                     "__product_variant_attribute",
                  ))
         context["order_items"] = items
         # JSON-safe payload for the JS to hydrate order_data with.

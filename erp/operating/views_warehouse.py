@@ -2559,40 +2559,74 @@ def catalog_product_variants(request, pk, product_id):
     return JsonResponse({"results": results, "product": _product_facts(product, invoice)})
 
 
-@login_required
-def warehouse_customer_currency(request, pk):
-    """The currency a customer's order out of this warehouse's book is kept in.
+def customer_currency_facts(book_id, customer_type, customer_pk):
+    """What a customer's order in this book is priced in.
 
-    A purchase bought for a customer creates their order in the warehouse's
-    book, against the account get_or_create_current_account_for_order picks
-    there — the company's, else the contact's. The order's prices are
-    billed in that account's currency, so the goods-receipt page shows it
-    beside every sale price. A customer with no account there yet gets one
-    in the default currency, which is what this answers for them."""
+    The order is raised against the account get_or_create_current_account_
+    for_order picks in that book — the company's, else the contact's — and
+    an order is priced in its customer's own currency. A customer with no
+    account there yet gets one in the default currency, which is what this
+    answers for them.
+
+    Shared by both screens that price goods for a customer: the order form
+    and a purchase bought for one. Neither should have its own idea of what
+    a customer is billed in.
+    """
+    from django.conf import settings as _s
     from accounting.models_accounts import CurrentAccount
     from accounting.services_accounts import _resolve_currency
     from crm.models import Company, Contact
 
-    warehouse = get_object_or_404(Warehouse, pk=pk)
-    customer_pk = request.GET.get("pk") or ""
-    if not customer_pk.isdigit():
-        return JsonResponse({"error": "pk required"}, status=400)
-    if request.GET.get("type") == "company":
+    if not str(customer_pk or "").isdigit():
+        return None
+    if customer_type == "company":
         contact, company = None, Company.objects.filter(pk=int(customer_pk)).first()
     else:
         contact = Contact.objects.filter(pk=int(customer_pk)).first()
         company = getattr(contact, "company", None) if contact else None
     if contact is None and company is None:
-        return JsonResponse({"error": "not found"}, status=404)
+        return None
 
-    accounts = (CurrentAccount.objects.filter(book_id=warehouse.accounting_book_id)
+    accounts = (CurrentAccount.objects.filter(book_id=book_id)
                 .select_related("default_currency"))
     account = (accounts.filter(company=company) if company else
                accounts.filter(contact=contact)).first()
     currency = (account.default_currency if account and account.default_currency_id
                 else _resolve_currency())
-    return JsonResponse({"currency": currency.code,
-                         "account": account.name if account else None})
+    base = getattr(_s, "BASE_CURRENCY_CODE", "USD")
+    return {
+        "currency": currency.code,
+        "symbol": currency.symbol or currency.code,
+        "account": account.name if account else None,
+        # Said plainly, because a price typed in one currency and read as
+        # another is the whole class of mistake this exists to stop.
+        "is_base": currency.code.upper() == base.upper(),
+        "base": base,
+    }
+
+
+@login_required
+def customer_currency(request):
+    """`customer_currency_facts` for the order form: ?book=&type=&pk=."""
+    facts = customer_currency_facts(request.GET.get("book"),
+                                    request.GET.get("type"),
+                                    request.GET.get("pk"))
+    if facts is None:
+        return JsonResponse({"error": "not found"}, status=404)
+    return JsonResponse(facts)
+
+
+@login_required
+def warehouse_customer_currency(request, pk):
+    """`customer_currency_facts` for a purchase bought for a customer: the
+    order is created in the receiving warehouse's book."""
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    facts = customer_currency_facts(warehouse.accounting_book_id,
+                                    request.GET.get("type"),
+                                    request.GET.get("pk"))
+    if facts is None:
+        return JsonResponse({"error": "not found"}, status=404)
+    return JsonResponse(facts)
 
 
 @login_required

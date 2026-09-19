@@ -40,6 +40,7 @@ from . import (
     views_check,
     views_invoice,
     views_payment,
+    views_fx,
     views_purchase,
     views_report,
 )
@@ -80,6 +81,7 @@ urlpatterns = [
     scoped("accounts/new/",              views.CurrentAccountCreate.as_view(),         "create"),
     scoped("accounts/new/crm-search/",   views.CurrentAccountCreateCrmSearch.as_view(), "create_crm_search"),
     scoped("accounts/statement/",        views.CurrentAccountStatementAll.as_view(),   "statement_all"),
+    scoped("accounts/fx/",               views_fx.FxReport.as_view(),                  "fx_report"),
     scoped("accounts/retail/",           views.RetailCurrentAccountRedirect.as_view(), "retail"),
 
     scoped("purchases/",                 views_purchase.PurchaseOrderList.as_view(), "purchase_order_list"),
@@ -144,6 +146,7 @@ urlpatterns = [
     owned("accounts/purchases/<int:pk>/invoice/excel/", views_invoice.purchase_invoice_excel, "purchase_invoice_excel", Invoice),
     owned("accounts/purchases/<int:pk>/edit/", views_purchase.GoodsReceipt.as_view(), "goods_receipt_edit", Invoice),
     path("accounts/purchases/<int:pk>/cancel/",  views_purchase.PurchaseCancel.as_view(),       name="purchase_cancel"),
+    path("accounts/<int:pk>/fx/post/",   views_fx.FxPost.as_view(),                    name="fx_post"),
 
     owned("accounts/payments/<int:pk>/", views_payment.PaymentDetail.as_view(), "payment_detail", Payment),
     owned("accounts/payments/<int:pk>/edit/", views_payment.PaymentEdit.as_view(), "payment_edit", Payment),

@@ -220,11 +220,16 @@ class PurchaseForCustomerTest(TestCase):
     # ── Around it ───────────────────────────────────────────────────
     # ── The sale price is in the customer's currency ────────────────
     def _currency(self, customer_type, pk, warehouse=None):
+        """The currency and account the endpoint names, which is what this
+        screen asks it. It answers more than that now — a symbol, and
+        whether it is the book's own currency, both for the order form's
+        warning — so this picks out the two keys these tests are about."""
         r = self.client.get(
             reverse("operating:warehouse_customer_currency", args=[(warehouse or self.wh).pk]),
             {"type": customer_type, "pk": pk})
         self.assertEqual(r.status_code, 200, r.content)
-        return r.json()
+        d = r.json()
+        return {"currency": d["currency"], "account": d["account"]}
 
     def test_a_customer_with_an_account_prices_in_its_currency(self):
         try_ = CurrencyCategory.objects.create(code="TRY", name="Lira", symbol="₺")

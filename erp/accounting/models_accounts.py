@@ -465,7 +465,10 @@ class CurrentAccount(models.Model):
         currency = self.own_currency
         if currency is None:
             return None
-        live = self.movements.live()
+        # An FX revaluation is a base-side entry by definition — it says
+        # what the balance is worth to the book, not what the customer
+        # owes — so it is left out of the figure that answers the latter.
+        live = self.movements.live().exclude(movement_type="fx_adjustment")
         total = (live.filter(currency_id=currency.pk).aggregate(s=Sum("amount"))["s"]
                  or Decimal("0.00"))
         for movement in live.exclude(currency_id=currency.pk).only("amount", "amount_base", "account_rate", "currency", "date"):
@@ -534,6 +537,12 @@ class CurrentAccountMovement(models.Model):
         # "adjustment" it could only ever be parked in Suspense.
         ("write_off",        _("Bad Debt Written Off")),
         ("adjustment",       _("Offset / Adjustment")),
+        # The book's valuation of a foreign-currency balance, brought up to
+        # date. It moves what the balance is WORTH in base and never what
+        # the customer owes: they owe the same euros before and after. Its
+        # own type so "how much did the rate move us this year" is one line
+        # (5900) rather than a search through adjustments.
+        ("fx_adjustment",    _("Exchange Rate Difference")),
         ("check_in",         _("Check/Note Received")),
         ("check_out",        _("Check/Note Given")),
         # Import markers, stamped by migration 0086's backfill on rows

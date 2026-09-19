@@ -55,6 +55,10 @@ CONTRA_BY_TYPE = {
     "check_in":         "1400",
     "check_out":        "2100",
     "interest":         "4900",
+    # The rate moved; the customer owes the same. Its own line, because
+    # folding it into operating expenses hides the difference between
+    # "we spent more" and "the lira moved" (see STANDARD_CHART 5900).
+    "fx_adjustment":    "5900",
 }
 
 # The types whose other leg nobody has decided, parked rather than guessed.

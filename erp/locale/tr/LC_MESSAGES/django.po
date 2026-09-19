@@ -2126,6 +2126,9 @@ msgstr "Kaldır"
 msgid "Pending"
 msgstr "Bekliyor"
 
+msgid "Pre-order"
+msgstr "Ön sipariş"
+
 msgid "Approved"
 msgstr "Onaylandı"
 
@@ -5607,6 +5610,28 @@ msgstr "Vadesi Geçen Portföydeki"
 
 msgid "Owes Us"
 msgstr "Bize Borçlu"
+
+#, python-format
+msgid "%(sym)s%(amount)s in the book's currency"
+msgstr "%(sym)s%(amount)s defter para biriminde"
+
+msgid ""
+"The same entries in the book's currency, each at the rate on its own date. "
+"This is the figure the account lists and the credit limit use."
+msgstr ""
+"Aynı hareketler defterin para biriminde, her biri kendi tarihindeki kurdan. "
+"Cari hesap listelerinin ve kredi limitinin kullandığı tutar budur."
+
+#, python-format
+msgid "≈ %(sym)s%(amount)s at today's %(rate)s"
+msgstr "≈ %(sym)s%(amount)s bugünkü %(rate)s kurundan"
+
+msgid ""
+"What the balance above is worth at today's rate. A reading, not a posting: "
+"the book still carries the figure on the line above."
+msgstr ""
+"Yukarıdaki bakiyenin bugünkü kurla değeri. Kayıt değil, yalnızca bir okuma: "
+"defter bir üstteki satırdaki tutarı taşımaya devam eder."
 
 msgid "Partially Paid"
 msgstr "Kısmi Ödendi"
@@ -9880,6 +9905,10 @@ msgctxt "attribute"
 msgid "Yarn"
 msgstr "İplik"
 
+msgctxt "attribute"
+msgid "Width (cm)"
+msgstr "En (cm)"
+
 msgid "e.g. V-106"
 msgstr "ör. V-106"
 
@@ -9888,6 +9917,9 @@ msgstr "ör. 130 x 210 cm"
 
 msgid "e.g. grommet"
 msgstr "ör. halkalı"
+
+msgid "e.g. 155"
+msgstr "ör. 155"
 
 msgid "New attribute…"
 msgstr "Yeni özellik…"
@@ -10191,3 +10223,71 @@ msgstr "Depo yalnızca bir yönetici tarafından açılabilir."
 #. The empty warehouse list, seen by someone who may not open one.
 msgid "An administrator opens a warehouse; ask for one and it will appear here."
 msgstr "Depoyu bir yönetici açar; istediğinizde burada görünür."
+
+msgid "Exchange Rate Difference"
+msgstr "Kur farkı"
+
+msgid "Exchange rate differences"
+msgstr "Kur farkları"
+
+msgid "Exchange differences"
+msgstr "Kur farkları"
+
+msgid "Exchange gain"
+msgstr "Kur kazancı"
+
+msgid "Exchange loss"
+msgstr "Kur zararı"
+
+msgid "Owed"
+msgstr "Borç"
+
+msgid "Carried by the book"
+msgstr "Defterdeki değeri"
+
+msgid "Record the difference"
+msgstr "Farkı kaydet"
+
+msgid "Worth today"
+msgstr "Bugünkü değeri"
+
+msgid "Carried at"
+msgstr "Defterdeki"
+
+msgid "Difference"
+msgstr "Fark"
+
+msgid "Across the book"
+msgstr "Defter geneli"
+
+msgid ""
+"Posted to 5900 Foreign Exchange Gain/Loss, dated today. What the customer "
+"owes does not move."
+msgstr ""
+"Bugün tarihiyle 5900 Kur Farkı Gelir/Gideri hesabına işlenir. Müşterinin "
+"borcu değişmez."
+
+msgid ""
+"Record this difference? It changes what the book carries, not what the "
+"customer owes."
+msgstr ""
+"Bu fark kaydedilsin mi? Defterdeki değeri değiştirir, müşterinin borcunu "
+"değiştirmez."
+
+msgid "Prices are in"
+msgstr "Fiyatlar şu para biriminde:"
+
+msgid "is billed in"
+msgstr "şu para biriminde faturalanır:"
+
+msgid "type the prices below in"
+msgstr "aşağıdaki fiyatları şu para biriminde girin:"
+
+msgid "The order is recorded to the book in"
+msgstr "Sipariş deftere şu para biriminde kaydedilir:"
+
+msgid "at the rate of the day, fixed when the order completes."
+msgstr "günün kuruyla; sipariş tamamlandığında kur sabitlenir."
+
+msgid "What the rate has done to every account that trades in another currency"
+msgstr "Farklı para biriminde çalışan her hesapta kurun etkisi"

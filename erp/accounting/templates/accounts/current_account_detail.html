@@ -254,6 +254,19 @@
   .cd-stat-row .l { color: var(--gray-600); }
   .cd-stat-row .v { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 </style>
+<style>
+  .fx-panel { margin-top:10px; padding:10px 12px; border:1px solid #E2E8EE; border-radius:10px;
+              background:#F8FAFC; font-size:12.5px; max-width:340px; }
+  .fx-panel .fx-row { display:flex; justify-content:space-between; gap:12px; padding:2px 0; color:var(--gray-600); }
+  .fx-panel .fx-row b { color:#0F1419; font-variant-numeric: tabular-nums; }
+  .fx-panel .fx-diff { border-top:1px solid #E2E8EE; margin-top:6px; padding-top:6px; }
+  .fx-panel .fx-diff b.pos { color:#0E6E4A; }
+  .fx-panel .fx-diff b.neg { color:#B91C1C; }
+  .fx-panel .fx-btn { margin-top:8px; width:100%; border:1px solid #CBD5E1; background:#fff;
+                      border-radius:8px; padding:7px 10px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .fx-panel .fx-btn:hover { border-color:#94A3B8; }
+  .fx-panel .fx-note { margin-top:6px; font-size:11px; color:var(--gray-500); line-height:1.4; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -323,6 +336,36 @@
               {{ cur.symbol|default:cur.code }}{{ own_balance|absval|money }}
             </div>
             <div class="sub">{{ own_balance_label }}</div>
+            {% comment %}
+              The account reads in its own currency; the book still carries
+              it in the base one, and that is the figure every account list,
+              the credit limit and the balance sheet use. Printed here so the
+              page need not be left to find it. It is NOT this balance at
+              today's rate — each entry converted at the rate on its own
+              date, the same walk own_currency_balance makes the other way.
+            {% endcomment %}
+            <div class="alt" title="{% trans "The same entries in the book's currency, each at the rate on its own date. This is the figure the account lists and the credit limit use." %}">{% blocktrans with sym=current_account.display_currency_symbol amount=current_account.absolute_balance|money %}{{ sym }}{{ amount }} in the book's currency{% endblocktrans %}{% if current_account.balance_label != own_balance_label %} · {{ current_account.balance_label }}{% endif %}</div>
+            {% if today_balance is not None %}
+            <div class="alt" title="{% trans "What the balance above is worth at today's rate. A reading, not a posting: the book still carries the figure on the line above." %}">{% blocktrans with sym=current_account.display_currency_symbol amount=today_balance|absval|money rate=today_rate|format_rate %}≈ {{ sym }}{{ amount }} at today's {{ rate }}{% endblocktrans %}</div>
+            {% endif %}
+            {% if fx and not fx.unavailable and fx.difference != 0 %}
+            <div class="fx-panel">
+              <div class="fx-row"><span>{% trans "Owed" %}</span><b>{{ fx.symbol }}{{ fx.own_balance|money }}</b></div>
+              <div class="fx-row"><span>{% trans "Carried by the book" %}</span><b>{{ fx.base_code }} {{ fx.base_balance|money }}</b></div>
+              <div class="fx-row"><span>{% blocktrans with rate=fx.rate|format_rate %}Worth at {{ rate }}{% endblocktrans %}</span><b>{{ fx.base_code }} {{ fx.base_at_rate|money }}</b></div>
+              <div class="fx-row fx-diff">
+                <span>{% if fx.difference > 0 %}{% trans "Exchange gain" %}{% else %}{% trans "Exchange loss" %}{% endif %}</span>
+                <b class="{% if fx.difference > 0 %}pos{% else %}neg{% endif %}">{% if fx.difference > 0 %}+{% endif %}{{ fx.base_code }} {{ fx.difference|money }}</b>
+              </div>
+              <form method="post" action="{% url 'accounts:fx_post' current_account.pk %}"
+                    onsubmit="return confirm('{% trans "Record this difference? It changes what the book carries, not what the customer owes." %}');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="fx-btn">{% trans "Record the difference" %}</button>
+              </form>
+              <div class="fx-note">{% trans "Posted to 5900 Foreign Exchange Gain/Loss, dated today. What the customer owes does not move." %}</div>
+            </div>
+            {% endif %}
             {% endwith %}
           {% else %}
           <div class="amount {% if current_account.cached_balance > 0 %}pos{% elif current_account.cached_balance < 0 %}neg{% endif %}">

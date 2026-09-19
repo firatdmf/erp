@@ -1,5 +1,6 @@
 import traceback
 from decimal import Decimal
+from functools import lru_cache
 
 from django.core.validators import MinValueValidator
 from django.db import models, transaction
@@ -394,6 +395,27 @@ class OrderNumberSequence(models.Model):
             return number
 
 
+@lru_cache(maxsize=1)
+def _dollar_labels():
+    """How an order that carries no currency of its own is printed.
+
+    Orders raised before the `currency` column existed were all entered
+    under the dollar convention, so they read as USD (see the field's
+    own comment). Looking that row up per order cost one query per row on
+    every list that prints a total — 571 of them on a 44-order page, which
+    is what made the list take half a minute against a remote database.
+    Cached for the process, like _base_currency_symbol() in
+    accounting.models_accounts, which caches the same kind of answer for
+    the same reason. Falls back to a bare "$" so a missing
+    CurrencyCategory row degrades to a label rather than a 500.
+    """
+    from django.apps import apps
+
+    cur = (apps.get_model("accounting", "CurrencyCategory").objects
+           .filter(code="USD").first())
+    return ("USD", (cur.symbol if (cur and cur.symbol) else "$"))
+
+
 class Order(models.Model):
     # Who raised this record. Stamped automatically on first save by
     # erp.ownership.stamp_creator, from the request-scoped user. NULL on
@@ -623,28 +645,18 @@ class Order(models.Model):
     )
 
     @property
-    def order_currency(self):
-        """The currency this order is in, never None.
-
-        NULL means an order raised before orders carried one, which by the
-        convention of the time was dollars.
-        """
-        from accounting.models import CurrencyCategory
-
-        if self.currency_id:
-            return self.currency
-        return CurrencyCategory.objects.filter(code="USD").first()
-
-    @property
     def currency_code(self):
-        cur = self.order_currency
-        return (cur.code if cur else "USD")
+        """The code this order's figures are quoted in, never None."""
+        if self.currency_id:
+            return self.currency.code
+        return _dollar_labels()[0]
 
     @property
     def currency_symbol(self):
         """What to print in front of this order's figures."""
-        cur = self.order_currency
-        return (cur.symbol if (cur and cur.symbol) else "$")
+        if self.currency_id:
+            return self.currency.symbol or "$"
+        return _dollar_labels()[1]
 
     def ledger_exchange_rate(self):
         """The rate the ledger converts this order's movement at.
@@ -671,13 +683,23 @@ class Order(models.Model):
 
         if self.currency_rate:
             return Decimal(str(self.currency_rate))
+        # Held on the instance: every line asks for this rate to state its
+        # cost in the order's currency, so a list of orders would otherwise
+        # look the published rate up once per line rather than once per
+        # order.
+        cached = getattr(self, "_rate_to_base", None)
+        if cached is not None:
+            return cached
         from django.conf import settings as _s
         base = getattr(_s, "BASE_CURRENCY_CODE", "USD")
         if self.currency_code.upper() == base.upper():
-            return Decimal("1")
-        from accounting.services import get_exchange_rate
-        rate = get_exchange_rate(self.currency_code, base, on_date=self.order_date)
-        return Decimal(str(rate)) if rate else Decimal("1")
+            rate = Decimal("1")
+        else:
+            from accounting.services import get_exchange_rate
+            published = get_exchange_rate(self.currency_code, base, on_date=self.order_date)
+            rate = Decimal(str(published)) if published else Decimal("1")
+        self._rate_to_base = rate
+        return rate
 
     def to_base(self, amount):
         """`amount`, stated in this order's currency, as the book sees it."""

@@ -18,7 +18,10 @@ entry is simply
 
     python manage.py sweep_fx --apply
 
-and the command itself decides that today is the last day of the month.
+and the command itself decides that today is the last day of the month —
+by the book's clock (settings.TIME_ZONE), not the server's, which are
+three hours apart and disagree about the date for the last three hours of
+every UTC day.
 Pass --force to record on some other day, --date to state the day, and
 --book to limit it to one book.
 
@@ -27,11 +30,12 @@ Safe to re-run — a second run on the same day finds the gap already
 closed, and skips an account that already carries an entry for that date.
 """
 from calendar import monthrange
-from datetime import date as _date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 
 from accounting.models import Book
 from accounting.models_accounts import CurrentAccountMovement, CurrentAccount
@@ -57,7 +61,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         when = options.get("date")
         try:
-            day = (datetime.strptime(when, "%Y-%m-%d").date() if when else _date.today())
+            # The book's own day, not the server's. Railway runs in UTC and
+            # the book keeps Istanbul time, so between 21:00 and midnight
+            # UTC the two disagree about the date — and on the 30th that is
+            # the difference between sweeping the month and skipping it.
+            day = (datetime.strptime(when, "%Y-%m-%d").date() if when
+                   else timezone.localdate())
         except ValueError:
             raise CommandError("--date must look like 2026-09-30.")
 

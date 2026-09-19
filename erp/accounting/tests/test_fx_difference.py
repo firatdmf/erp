@@ -150,6 +150,16 @@ class FxScreensTest(TestCase):
         self.assertContains(r, "Exchange gain")
         self.assertContains(r, "Record the difference")
 
+    def test_the_report_explains_what_happens_if_nobody_records_it(self):
+        from django.urls import reverse
+
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.20")):
+            r = self.client.get(reverse("accounts:fx_report", kwargs={"book_id": self.book.pk}))
+        self.assertContains(r, "What happens if a difference is never recorded")
+        self.assertContains(r, "We Owe")           # the residual, named
+        self.assertContains(r, "5900")             # where the loss belongs
+        self.assertContains(r, "Month end is swept automatically")
+
     def test_the_book_report_lists_it(self):
         from django.urls import reverse
 
@@ -185,3 +195,90 @@ class FxScreensTest(TestCase):
         self.assertTrue(any("Nothing to record" in m for m in messages), messages)
         self.assertEqual(
             CurrentAccountMovement.objects.filter(movement_type="fx_adjustment").count(), 1)
+
+
+class FxSweepTest(TestCase):
+    """The month-end sweep: the same posting the button makes, for every
+    account at once, on the day the period ends."""
+
+    def setUp(self):
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.eur = CurrencyCategory.objects.create(code="EUR", name="Euro", symbol="€")
+        self.book = Book.objects.create(name="Laleli Fabric")
+        self.euroland = CurrentAccount.objects.create(
+            book=self.book, code="ACC-EUR", name="Euroland", type="customer",
+            default_currency=self.eur)
+        self.dollarland = CurrentAccount.objects.create(
+            book=self.book, code="ACC-USD", name="Dollarland", type="customer",
+            default_currency=self.usd)
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.10")):
+            CurrentAccountMovement.objects.create(
+                current_account=self.euroland, book=self.book, date="2026-09-01",
+                amount=Decimal("1000.00"), currency=self.eur,
+                movement_type="invoice_sale", description="Sale")
+
+    def _run(self, **opts):
+        from io import StringIO
+        from django.core.management import call_command
+
+        out = StringIO()
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.20")):
+            call_command("sweep_fx", stdout=out, **opts)
+        return out.getvalue()
+
+    def test_an_ordinary_day_does_nothing(self):
+        out = self._run(date="2026-09-15", apply=True)
+        self.assertIn("not a month end", out)
+        self.assertFalse(CurrentAccountMovement.objects.filter(
+            movement_type="fx_adjustment").exists())
+
+    def test_it_says_what_it_would_record_and_writes_nothing(self):
+        out = self._run(date="2026-09-30")
+        self.assertIn("Euroland", out)
+        self.assertIn("Would record 1 difference(s)", out)
+        self.assertIn("Nothing was written", out)
+        self.assertFalse(CurrentAccountMovement.objects.filter(
+            movement_type="fx_adjustment").exists())
+
+    def test_apply_records_on_the_last_day_of_the_month(self):
+        out = self._run(date="2026-09-30", apply=True)
+        self.assertIn("Recorded 1 difference(s)", out)
+        mv = CurrentAccountMovement.objects.get(movement_type="fx_adjustment")
+        self.assertEqual(mv.amount, Decimal("100.00"))
+        self.assertEqual(str(mv.date), "2026-09-30")
+
+        self.euroland.refresh_from_db()
+        self.assertEqual(self.euroland.own_currency_balance(), Decimal("1000.00"))
+        self.assertEqual(self.euroland.cached_balance, Decimal("1200.00"))
+
+    def test_running_it_twice_records_once(self):
+        self._run(date="2026-09-30", apply=True)
+        # The first run closed the gap, so the second finds nothing to take.
+        out = self._run(date="2026-09-30", apply=True)
+        self.assertIn("Recorded 0 difference(s)", out)
+        self.assertEqual(CurrentAccountMovement.objects.filter(
+            movement_type="fx_adjustment").count(), 1)
+
+    def test_a_second_run_after_the_rate_moved_again_still_records_once(self):
+        """The guard the count above cannot show: the rate moving again on
+        the same day would otherwise let a second entry onto the same date,
+        and month end is one entry per account by definition."""
+        from io import StringIO
+        from django.core.management import call_command
+
+        self._run(date="2026-09-30", apply=True)
+        out = StringIO()
+        with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.40")):
+            call_command("sweep_fx", date="2026-09-30", apply=True, stdout=out)
+        self.assertIn("already recorded", out.getvalue())
+        self.assertEqual(CurrentAccountMovement.objects.filter(
+            movement_type="fx_adjustment").count(), 1)
+
+    def test_a_base_currency_account_is_never_touched(self):
+        self._run(date="2026-09-30", apply=True)
+        self.assertFalse(CurrentAccountMovement.objects.filter(
+            current_account=self.dollarland).exists())
+
+    def test_force_records_on_any_day(self):
+        out = self._run(date="2026-09-15", apply=True, force=True)
+        self.assertIn("Recorded 1 difference(s)", out)

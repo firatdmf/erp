@@ -11,8 +11,34 @@
     </div>
     <h1 style="font:800 22px var(--font-sans); margin:2px 0 6px;">{% trans "Exchange rate differences" %}</h1>
     <p style="font-size:13px; color:var(--gray-600); max-width:70ch; line-height:1.5;">
-      {% blocktrans with base=report.base_code %}Every account that trades in something other than {{ base }}. Each was recorded at the rate of its own day, so what the book carries drifts from what the balance is worth as the rate moves. Recording a difference changes what the book carries — never what the customer owes.{% endblocktrans %}
+      {% blocktrans with base=report.base_code %}Every account that trades in something other than {{ base }}. Each movement was recorded at the rate of its own day, so what the book carries drifts from what the balance is worth as the rate moves. Recording a difference changes what the book carries — never what the customer owes.{% endblocktrans %}
     </p>
+
+    <details style="margin-top:12px; background:#F8FAFC; border:1px solid #E2E8EE; border-radius:10px; padding:10px 14px;">
+      <summary style="cursor:pointer; font-weight:600; font-size:13px;">
+        {% trans "What happens if a difference is never recorded" %}
+      </summary>
+      <div style="font-size:12.5px; color:var(--gray-600); line-height:1.6; margin-top:8px; max-width:78ch;">
+        <p style="margin:0 0 8px;">
+          {% blocktrans with base=report.base_code %}Nothing goes wrong with what the customer owes: that figure is in their own currency and is always right. What drifts is the book's side of it.{% endblocktrans %}
+        </p>
+        <p style="margin:0 0 8px;">
+          {% blocktrans %}Take a €1,000 sale booked when the euro was 1.10 — the book carries $1,100. The customer pays in full months later at 1.25, and that payment leaves the book at $1,250. They now owe €0, and the book is left carrying −$150 — an account that reads “We Owe” for money nobody owes anybody.{% endblocktrans %}
+        </p>
+        <p style="margin:0 0 8px;">
+          {% blocktrans %}Left alone those residuals pile up: Accounts Receivable stops reconciling against what customers actually owe, and a real exchange loss sits hidden inside the receivable instead of reaching 5900, where it can be read as what it is.{% endblocktrans %}
+        </p>
+        <p style="margin:0;">
+          {% blocktrans %}Recording early costs nothing. Each new movement is booked at its own rate, and this page simply shows whatever the rate has done since.{% endblocktrans %}
+        </p>
+      </div>
+    </details>
+
+    <div style="margin-top:10px; background:#F1F5F9; border:1px solid #E2E8EE; border-radius:10px;
+                padding:10px 14px; font-size:12.5px; color:#334155; line-height:1.6; max-width:78ch;">
+      <b>{% trans "Month end is swept automatically." %}</b>
+      {% blocktrans %}On the last day of each month every account below is recorded in one go, so the residuals never accumulate. The button on each row is for taking a difference sooner — after a customer settles, say — and the sweep then finds nothing left to take.{% endblocktrans %}
+    </div>
   </div>
 
   {% if report.rows %}

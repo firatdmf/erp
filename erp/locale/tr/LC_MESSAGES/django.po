@@ -10291,3 +10291,9 @@ msgstr "günün kuruyla; sipariş tamamlandığında kur sabitlenir."
 
 msgid "What the rate has done to every account that trades in another currency"
 msgstr "Farklı para biriminde çalışan her hesapta kurun etkisi"
+
+msgid "What happens if a difference is never recorded"
+msgstr "Fark hiç kaydedilmezse ne olur"
+
+msgid "Month end is swept automatically."
+msgstr "Ay sonu otomatik olarak işlenir."

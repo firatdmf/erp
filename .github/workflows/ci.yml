@@ -94,8 +94,9 @@ jobs:
       - name: Test
         # Every app keeps its tests in an <app>/tests/ package, so a plain
         # app label loads them all. The labels are listed rather than left
-        # to a bare `manage.py test` because test_req.py in this directory
-        # is not importable and fails discovery before it reaches the apps.
+        # to a bare `manage.py test` so discovery cannot wander into
+        # whatever else happens to sit in this directory: a stray
+        # test_req.py once broke it before it reached the first app.
         working-directory: erp
         run: |
           python manage.py test \

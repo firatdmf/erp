@@ -578,6 +578,35 @@ msgstr "Geçmişi temizle"
 msgid "Search for something..."
 msgstr "Birşey aramaya başla..."
 
+msgctxt "topbar"
+msgid "Accounts"
+msgstr "Cariler"
+
+msgid "Add expense"
+msgstr "Gider ekle"
+
+msgid "Transfer"
+msgstr "Virman"
+
+msgid "Currency exchange"
+msgstr "Döviz alım satım"
+
+msgid "All transactions"
+msgstr "Tüm işlemler"
+
+msgid "Amount to convert"
+msgstr "Çevrilecek tutar"
+
+msgid "Convert from"
+msgstr "Şu para biriminden"
+
+msgid "Convert to"
+msgstr "Şu para birimine"
+
+msgid "Swap currencies"
+msgstr "Para birimlerini değiştir"
+
+
 msgid "Notifications"
 msgstr "Bildirimler"
 
@@ -10303,3 +10332,19 @@ msgstr "Fark hiç kaydedilmezse ne olur"
 
 msgid "Month end is swept automatically."
 msgstr "Ay sonu otomatik olarak işlenir."
+
+# Order adjustments — charges and discounts on an order
+msgid "Charges & discounts"
+msgstr "Ek ücretler ve indirimler"
+
+msgid "Delivery, packing, a discount — enter a discount as a negative amount."
+msgstr "Nakliye, paketleme, indirim — indirimi eksi tutar olarak girin."
+
+msgid "Add line"
+msgstr "Satır ekle"
+
+msgid "e.g. Delivery"
+msgstr "örn. Nakliye"
+
+msgid "Goods"
+msgstr "Mal bedeli"

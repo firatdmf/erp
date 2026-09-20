@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load l10n %}
 {% load static %}
 
 {% block css %}
@@ -553,6 +554,7 @@
     font: 700 10.5px var(--font-sans); color: #005354; background: #E5F1F0;
     border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
   .od-scan-chip.muted { color: #64748B; background: #F4F7FB; font-weight: 600; }
+  .od-scan-chip.warn { color: #92400E; background: #FEF3C7; }
   .od-tops-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .od-top-pill {
     display: inline-flex; align-items: center; gap: 7px;
@@ -1314,6 +1316,14 @@
                     {% else %}
                       <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% trans "not tracked" %}{% if item.pack_id %} · {% trans "Pack" %} #{{ item.pack.pack_number }}{% endif %}</span>
                     {% endif %}
+                    {% comment %}Added here rather than on the supplier
+                       purchase that made this order — so nobody buys it
+                       in believing the purchase already covers it.{% endcomment %}
+                    {% if item.not_on_purchase %}
+                    <span class="od-scan-chip warn"
+                          title="{% trans 'Added on the order — no supplier purchase lists this item. It is not on order from anyone.' %}">
+                      <i class="fa fa-triangle-exclamation"></i> {% trans "not on the purchase" %}</span>
+                    {% endif %}
                   </div>
                 </div>
               </td>
@@ -1446,8 +1456,19 @@
         <div class="od-totals{% if order.order_status == 'cancelled' %} od-totals-cancelled{% endif %}">
           <div class="od-tot-row">
             <span>{% trans "Subtotal" %}</span>
-            <span data-order-total>{{ order.currency_symbol }}{{ order.total_value|floatformat:2 }}</span>
+            <span data-order-subtotal>{{ order.currency_symbol }}{{ order.lines_total|floatformat:2 }}</span>
           </div>
+          {% comment %}Delivery, packing, a discount: what the deal adds
+             to or takes off the goods, each on its own row and each in
+             the grand total below. See operating.OrderAdjustment.{% endcomment %}
+          {% for adj in order.adjustments.all %}
+          <div class="od-tot-row">
+            <span>{{ adj.label }}</span>
+            <span{% if adj.amount < 0 %} style="color:#0E6E4A;"{% endif %}>
+              {% if adj.amount < 0 %}−{{ order.currency_symbol }}{{ adj.amount|floatformat:2|cut:"-" }}{% else %}{{ order.currency_symbol }}{{ adj.amount|floatformat:2 }}{% endif %}
+            </span>
+          </div>
+          {% endfor %}
           <div class="od-tot-row total">
             <span>{% trans "Grand total" %}</span>
             <span data-order-total>{{ order.currency_symbol }}{{ order.total_value|floatformat:2 }}</span>
@@ -1909,6 +1930,12 @@
   // Every figure the scripts below rewrite is in it, so the symbol
   // has to travel with them: they overwrite what the server rendered.
   const ORDER_CUR = "{{ order.currency_symbol|escapejs }}";
+  // Delivery, a discount — they are in the grand total but not in any
+  // line, so the scripts that rebuild the total from the rows have to
+  // add them back. Localisation is turned off around the number below:
+  // the active locale would otherwise hand Turkish a comma for its
+  // decimal point, and Number() would read that as NaN.
+  const ORDER_ADJUSTMENTS = Number("{% localize off %}{{ order.adjustments_total|default_if_none:0 }}{% endlocalize %}") || 0;
 
   // Status picker: each stage button + the legacy mini buttons update
   // the hidden input and submit. The carrier/tracking inputs ride
@@ -2221,9 +2248,14 @@
           }
         }
       });
-      // Update order totals display
-      document.querySelectorAll('[data-order-total]').forEach(el => {
+      // Update order totals display — the rows add up to the subtotal,
+      // and the grand total is that plus whatever the deal adjusted.
+      document.querySelectorAll('[data-order-subtotal]').forEach(el => {
         el.textContent = ORDER_CUR + orderTotal.toFixed(2);
+      });
+      const grandTotal = Math.max(0, orderTotal + ORDER_ADJUSTMENTS);
+      document.querySelectorAll('[data-order-total]').forEach(el => {
+        el.textContent = ORDER_CUR + grandTotal.toFixed(2);
       });
       
       // Update cost, profit, margin
@@ -2602,8 +2634,13 @@
           }
         }
         if (latestTotal !== null) {
+          // The server's figure is already net of the adjustments; the
+          // subtotal above it is that minus them.
           document.querySelectorAll('[data-order-total]').forEach(el => {
             el.textContent = ORDER_CUR + Number(latestTotal).toFixed(2);
+          });
+          document.querySelectorAll('[data-order-subtotal]').forEach(el => {
+            el.textContent = ORDER_CUR + (Number(latestTotal) - ORDER_ADJUSTMENTS).toFixed(2);
           });
         }
         // Structural change → reload so the new line's stock items section, scan

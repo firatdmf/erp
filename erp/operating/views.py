@@ -42,6 +42,7 @@ import tempfile
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.html import escape
 from .models import (
+    OrderAdjustment,
     OrderItem,
     OrderStockReservation,
 )  # if it's not already in __init__.py
@@ -359,6 +360,9 @@ class OrderDetail(DetailView):
             "items__product_variant__warehouse_products",
             "items__product_variant__product_variant_attribute_values"
             "__product_variant_attribute",
+            # Delivery, discounts: read by the totals block and by every
+            # money method on the page.
+            "adjustments",
         )
 
     def get_context_data(self, **kwargs):
@@ -374,10 +378,25 @@ class OrderDetail(DetailView):
         ctx["scan_shortfall"] = short_amount
         ctx["scan_shortfall_rows"] = short_rows
         ctx["supplier_purchases"] = self._supplier_purchases()
+        # An order created by a purchase is that purchase's mirror — its
+        # lines were written on the purchase form and are kept in step from
+        # there (order_purchases.sync_customer_order). A line added on the
+        # order afterwards is not in the mirror: nobody has been asked to
+        # supply it, and it would otherwise only be noticed when the
+        # delivery arrived short. The lines with a purchase behind them are
+        # the ones the purchase plans name.
+        from .order_purchases import plan_variant_skus
+        purchased_skus = set()
+        for purchase in ctx["supplier_purchases"]:
+            purchased_skus |= plan_variant_skus(purchase.intake_plan)
+        has_purchase = bool(ctx["supplier_purchases"])
         # Attach available-stock metadata to each item so the template
         # can show "Stok: N" next to the qty input and compute the max
         # the user can bump it to (current qty + remaining stock).
         for it in self.object.items.all():
+            it.not_on_purchase = has_purchase and (
+                (getattr(it.product_variant, "variant_sku", "") or "").lower()
+                not in purchased_skus)
             if it.product_variant_id and it.product_variant:
                 stock = it.product_variant.live_quantity
             elif it.product_id and it.product:
@@ -2779,6 +2798,13 @@ def build_order_print_rows(order):
         items.append(it)
         total += line_total
         total_qty += qty
+    # Delivery, a discount: in the total, and printed as their own rows
+    # under this order's lines (order_print.html walks
+    # g.order.adjustments). Without them the sheet and the invoice
+    # raised from the same order would quote the customer two figures.
+    total += order.adjustments_total()
+    if total < 0:
+        total = Decimal("0.00")
     return items, total, total_qty, all_pack_ids
 
 
@@ -2987,6 +3013,54 @@ class OrderPrintCombined(LoginRequiredMixin, View):
             # in render_to_response for exactly that reason.
             "is_pdf": False,
         })
+
+
+def save_order_adjustments(order, raw):
+    """Replace `order`'s adjustment lines from the form's JSON.
+
+    `raw` is what the form posts as adjustments_json: a list of
+    {"label", "amount"}. A row with no label or a zero amount is dropped
+    — the form leaves an empty pair behind whenever someone clicks Add
+    and thinks better of it, and a blank ₺0.00 line on an invoice is
+    worse than no line.
+
+    Replaced wholesale rather than matched up row by row: these are two
+    small fields with no history of their own, and the alternative is an
+    id round-trip that can only go wrong. `None` means the form did not
+    carry the field at all (an older page, another endpoint), which must
+    leave what the order already has alone — not silently clear it.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    if raw is None:
+        return
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw or "[]")
+        except ValueError:
+            return
+    if not isinstance(raw, list):
+        return
+
+    rows = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        label = (entry.get("label") or "").strip()[:120]
+        try:
+            amount = Decimal(str(entry.get("amount") or "0").replace(",", "."))
+        except (InvalidOperation, ValueError):
+            continue
+        amount = amount.quantize(Decimal("0.01"))
+        if not label or amount == 0:
+            continue
+        rows.append((label, amount))
+
+    order.adjustments.all().delete()
+    OrderAdjustment.objects.bulk_create([
+        OrderAdjustment(order=order, label=label, amount=amount, position=i)
+        for i, (label, amount) in enumerate(rows)
+    ])
 
 
 class OrderCreate(View):
@@ -3298,6 +3372,11 @@ class OrderCreate(View):
             if _moved and short_lines is not None:
                 short_lines.append(
                     _line_short_label(order_item, _moved[0], _moved[1]))
+
+        # Delivery, a discount — saved with the goods, because the
+        # snapshot and the ledger movement that _finalise_order takes
+        # next both have to include them.
+        save_order_adjustments(order, request.POST.get("adjustments_json"))
 
         # Generate QR code
         generate_machine_qr_for_order(order)
@@ -3852,6 +3931,12 @@ class OrderEdit(UpdateView):
                     )
                 self.object.save()
 
+                # Delivery, a discount — replaced before the movement
+                # below is re-posted, so the account follows the edit in
+                # the same step the lines do.
+                save_order_adjustments(
+                    self.object, self.request.POST.get("adjustments_json"))
+
                 # ── NO warehouse stock movement on edit ───────────────
                 # Editing an Açık/Paketleniyor order never touches
                 # warehouse rolls. Physical stock is only cut at ship
@@ -3926,7 +4011,10 @@ class OrderList(ListView):
         qs = Order.with_pre_order_flag(
             Order.objects
             .select_related('contact', 'company', 'web_client', 'current_account', 'currency')
-            .prefetch_related('items__product', 'items__product_variant')
+            .prefetch_related('items__product', 'items__product_variant',
+                              # Every row's total is net of them, so without
+                              # this the list fires one more query per order.
+                              'adjustments')
             .order_by("-created_at")
         )
         # One book's orders. An Order carries no book of its own; the

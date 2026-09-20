@@ -558,7 +558,9 @@ class PurchaseOrderSave(View):
                 # is the account page's own answer to "who do we buy from" that
                 # goes stale otherwise.
                 mark_as_supplier(current_account)
-        except _SaveRefused as exc:
+        except (_SaveRefused, CustomerOrderError) as exc:
+            # CustomerOrderError reaches here from put_plan_in_catalog — a
+            # row with no sale price, refused before the order is touched.
             return JsonResponse({"success": False, "error": str(exc)}, status=400)
         except IntakeError as exc:
             return JsonResponse(exc.payload, status=exc.status)

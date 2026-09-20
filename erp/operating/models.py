@@ -455,6 +455,7 @@ class Order(models.Model):
     
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     notes = models.TextField(blank=True, null=True)
+
     qr_code_url = models.URLField(blank=True, null=True)
     
     # Payment Information (for web orders)
@@ -771,13 +772,35 @@ class Order(models.Model):
                 .select_related("current_account__book")
                 .order_by("current_account__book__name", "pk"))
 
-    def total_value(self):
-        """Sum of the line amounts. subtotal() has already rounded each
-        line to cents, so this total equals what you get adding up the
-        amounts printed next to the lines — on the page, in the Excel
-        export, and on the invoice."""
+    def lines_total(self):
+        """Sum of the line amounts, BEFORE any discount. subtotal() has
+        already rounded each line to cents, so this equals what you get
+        adding up the amounts printed next to the lines — on the page, in
+        the Excel export, and on the invoice."""
         from decimal import Decimal
         return sum((item.subtotal() for item in self.items.all()), Decimal("0.00"))
+
+    def adjustments_total(self):
+        """The order's adjustment lines, summed — see OrderAdjustment.
+        Positive for what they add (delivery), negative for what they
+        take off (a discount), so one sum covers both."""
+        from decimal import Decimal
+        return sum((a.amount or Decimal("0.00") for a in self.adjustments.all()),
+                   Decimal("0.00"))
+
+    @staticmethod
+    def _floor_at_zero(total):
+        """No order bills a negative amount. A discount bigger than the
+        goods would otherwise post a receivable the wrong way round and
+        credit the customer for shopping here."""
+        from decimal import Decimal
+        return total if total > 0 else Decimal("0.00")
+
+    def total_value(self):
+        """What the order comes to: its product lines plus its
+        adjustments. The one number the order screen, the invoice and the
+        customer's account all show — see billable_value()."""
+        return self._floor_at_zero(self.lines_total() + self.adjustments_total())
 
         # Now whenever an OrderItem is added, updated, or deleted, the overall Order.status will update automatically.
 
@@ -1055,7 +1078,10 @@ class Order(models.Model):
             total += ((it.price or Decimal("0")) * qty).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
-        return total
+        # Adjustments are part of the deal, so they reach what the
+        # account is owed as well as what the invoice prints — a delivery
+        # fee is owed, a discount is not.
+        return self._floor_at_zero(total + self.adjustments_total())
 
     def build_snapshot(self):
         """A frozen JSON copy of this order's state, called ONCE right
@@ -1115,15 +1141,26 @@ class Order(models.Model):
             # show what the customer originally agreed could not say it.
             "currency_code": self.currency_code,
             "items": items,
+            # Delivery, discounts and the like, frozen with the rest: the
+            # total above is net of them, so without these the tab shows
+            # a figure its own lines don't add up to.
+            "adjustments": [{"label": a.label, "amount": _f(a.amount)}
+                            for a in self.adjustments.all()],
         }
 
     def gross_profit(self):
-        """Sum of every item's (price - cost) × quantity. Internal-only
-        metric — NEVER include in customer-facing PDFs/invoices.
-        For list views, pre-fetch items with select_related('product',
-        'product_variant') to avoid N+1 queries."""
+        """Sum of every item's (price - cost) × quantity, plus the order's
+        adjustments. Internal-only metric — NEVER include in customer-facing
+        PDFs/invoices. For list views, pre-fetch items with
+        select_related('product', 'product_variant') to avoid N+1
+        queries."""
         from decimal import Decimal
-        return sum((it.gross_profit() for it in self.items.all()), Decimal("0.00"))
+        earned = sum((it.gross_profit() for it in self.items.all()), Decimal("0.00"))
+        # Adjustments are revenue: a discount is revenue given away, a
+        # delivery fee is revenue charged. The fee's own cost (the
+        # courier) is an expense in the book, not a cost on this order —
+        # so a charge reads as profit here until that expense is entered.
+        return earned + self.adjustments_total()
 
     def total_cost(self):
         """Sum of every item's unit_cost × quantity. Counterpart to
@@ -1469,6 +1506,50 @@ class OrderItem(models.Model):
         if self.product_variant:
             return f"{self.product.title} [{self.product_variant.variant_sku}] - {self.quantity} pcs"
         return f"{self.product.title} - {self.quantity} pcs"
+
+
+class OrderAdjustment(models.Model):
+    """A line on the order that isn't a product: a label and an amount.
+
+    Delivery, packing, a partnership discount — everything the deal adds
+    to or takes off the goods. Positive adds, negative takes off, so one
+    kind of row covers both and the invoice can print them in the order
+    they were agreed.
+
+    Not an OrderItem with no product: an item is something picked,
+    scanned, shipped and costed, and every one of those paths would have
+    had to learn to skip a line that is only money. Not a field on the
+    order either — there is usually more than one (freight AND packing),
+    and a single box would force them into one label.
+
+    The amount is in the ORDER's currency, like its line prices, and it
+    reaches everything that reads the order's money: the order page, the
+    invoice and its Excel, and what the customer's account says they owe
+    (Order.billable_value → post_order_movement).
+    """
+
+    class Meta:
+        ordering = ["position", "pk"]
+
+    order = models.ForeignKey(Order, related_name="adjustments",
+                              on_delete=models.CASCADE)
+    label = models.CharField(
+        max_length=120,
+        help_text="What it is called on the invoice, e.g. “Delivery” or "
+                  "“Partnership discount”.")
+    amount = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        help_text="In the order's currency. Positive adds to the total, "
+                  "negative takes off.")
+    # Where it sits among the others — the order they were agreed in is
+    # the order they print in, and pk alone would reshuffle a row that
+    # was deleted and re-added.
+    position = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.label}: {self.amount}"
 
 
 # This will be created when the machining starts

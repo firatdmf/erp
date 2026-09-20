@@ -2930,6 +2930,11 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
 
     fabric_cat = _default_fabric_category()
     resolved = []
+    # Typed main SKUs already claimed by an earlier card of THIS batch.
+    # Product.sku is unique, so two cards naming the same code can't both
+    # be created — and the second one only found out by hitting the
+    # database constraint, which left the save with no answer to give.
+    typed_skus = {}
     for i, p_in in enumerate(products_in, start=1):
         # Product group (category) — panel sends the chosen id; anything
         # missing/invalid falls back to fabric (kumaş), the house default.
@@ -2988,6 +2993,17 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
                               f"“{clash.title}” ürününde kullanılıyor — ana ürünü "
                               f"“Mevcut”tan seçin ya da başka bir SKU yazın."},
                     status=400)
+            first = typed_skus.get(desired_sku.upper())
+            if first is not None:
+                raise IntakeError(
+                    {"success": False,
+                     "error": str(_lz("Products %(first)d and %(second)d are both "
+                                      "given the SKU “%(sku)s”. A SKU names one "
+                                      "product — give each its own, or enter them "
+                                      "as one product with two variants.")
+                                  % {"first": first, "second": i, "sku": desired_sku})},
+                    status=400)
+            typed_skus[desired_sku.upper()] = i
 
         resolved.append({
             "main_product": main_product, "base_name": base_name,
@@ -3097,9 +3113,12 @@ def _intake_main_product(item, prefix, *, invoice=None):
                 with transaction.atomic():   # savepoint
                     main_product = _mint_main(desired_sku)
             except IntegrityError:
-                raise RuntimeError(
-                    f"“{desired_sku}” SKU'su bu sırada başka bir ürüne "
-                    f"verildi — tekrar deneyin.")
+                raise IntakeError(
+                    {"success": False,
+                     "error": str(_lz("The SKU “%(sku)s” was given to another "
+                                      "product just now — try again.")
+                                  % {"sku": desired_sku})},
+                    status=409)
         else:
             sku_mint = _product_sku_minter(prefix)
             for _attempt in range(8):
@@ -3115,7 +3134,11 @@ def _intake_main_product(item, prefix, *, invoice=None):
                     main_product = None
                     continue
             if main_product is None:
-                raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
+                raise IntakeError(
+                    {"success": False,
+                     "error": str(_lz("A unique product SKU could not be minted — "
+                                      "try again."))},
+                    status=409)
     else:
         if not main_product.category_id and category:
             # Existing main product with no group yet — backfill it so

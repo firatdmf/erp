@@ -77,6 +77,12 @@
                   </tr>
                   {% endfor %}
                   <tr><td colspan="2" style="padding:8px 0 0;border-top:1px solid #E2E8EE;"></td></tr>
+                  {% for adj in order_adjustments %}
+                  <tr>
+                    <td style="padding:4px 0;color:#475569;">{{ adj.label }}</td>
+                    <td align="right" style="padding:4px 0;color:#475569;">{% if adj.amount < 0 %}−{{ currency_symbol|default:"$" }}{{ adj.amount|floatformat:2|cut:"-" }}{% else %}{{ currency_symbol|default:"$" }}{{ adj.amount|floatformat:2 }}{% endif %}</td>
+                  </tr>
+                  {% endfor %}
                   <tr>
                     <td style="padding:8px 0;font-weight:600;">Total</td>
                     <td align="right" style="padding:8px 0;font-weight:800;font-size:16px;color:#0F1419;">{{ currency_symbol|default:"$" }}{{ order_total|default:0|floatformat:2 }}</td>

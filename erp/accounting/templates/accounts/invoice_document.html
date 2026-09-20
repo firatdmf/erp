@@ -208,6 +208,11 @@
     font-variant-numeric: tabular-nums;
     font-weight: 800;
   }
+  /* The steps that lead to the amount to be paid — the goods' subtotal,
+     then delivery or a discount. They sit lighter than the figure they
+     add up to, so the eye still lands on what is owed. */
+  table.doc-items tfoot tr.sub td { font-weight: 600; background: #FAFBFD; }
+  table.doc-items tfoot tr.sub td.value { font-weight: 700; }
 
   /* ── Totals + tax breakdown ───────────────────────────── */
   .doc-bottom {
@@ -358,6 +363,8 @@
       font-weight: 700 !important;
     }
     table.doc-items tfoot td.value { font-weight: 800 !important; }
+    table.doc-items tfoot tr.sub td { font-weight: 600 !important; }
+    table.doc-items tfoot tr.sub td.value { font-weight: 700 !important; }
     /* Title bar — outlined heading instead of dark band */
     .doc-titlebar {
       background: white !important;
@@ -505,6 +512,22 @@
         {% endfor %}
       </tbody>
       <tfoot>
+        {% comment %}Delivery, packing, a discount — shown as their own
+           rows, with the goods' own subtotal above them, so the figure
+           to be paid can be followed from the lines above it. Hidden
+           entirely when the order has none, which is most of them.{% endcomment %}
+        {% if doc.adjustments %}
+        <tr class="sub">
+          <td colspan="6" class="label">{% trans "Subtotal" %}</td>
+          <td class="value">{{ doc.currency_symbol }}{{ doc.subtotal|money }}</td>
+        </tr>
+        {% for adj in doc.adjustments %}
+        <tr class="sub">
+          <td colspan="6" class="label">{{ adj.label }}</td>
+          <td class="value">{% if adj.is_credit %}−{% endif %}{{ doc.currency_symbol }}{{ adj.magnitude|money }}</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
         <tr>
           <td colspan="6" class="label">{% trans "Amount to be Paid" %} ({{ doc.currency_code }})</td>
           <td class="value">{{ doc.currency_symbol }}{{ doc.total|money }}</td>

@@ -358,8 +358,17 @@ def build_order_workbook(order):
 
     # ── Totals ──
     paid = _dec(getattr(order, "paid_amount", 0))
-    grand = _dec(total)
-    rows = [("Total", grand, True)]
+    # Delivery, a discount — in the total, but in no line above, so they
+    # are listed between the goods and the figure they add up to.
+    adjustments = list(order.adjustments.all())
+    grand = _dec(total) + sum(_dec(a.amount) for a in adjustments)
+    if grand < 0:
+        grand = 0.0
+    rows = []
+    if adjustments:
+        rows.append(("Subtotal", _dec(total), False))
+        rows += [(a.label, _dec(a.amount), False) for a in adjustments]
+    rows.append(("Total", grand, True))
     if paid:
         rows += [("Paid", paid, False), ("Balance", grand - paid, True)]
     for lbl, val, strong in rows:

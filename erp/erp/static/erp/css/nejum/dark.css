@@ -113,6 +113,23 @@
   border-color: #2A3038 !important;
   color: #9AA5AD !important;
 }
+[data-theme="dark"] .global-top-bar .fx-mini {
+  background: #1A1F26 !important;
+  border-color: #2A3038 !important;
+}
+[data-theme="dark"] .global-top-bar .fx-mini-amt {
+  color: #E6ECEF !important;
+  background: #11161C !important;
+  border-color: #33393F !important;
+}
+[data-theme="dark"] .global-top-bar .fx-mini-amt:focus {
+  border-color: var(--nejum-teal-400, #33A3A3) !important;
+}
+[data-theme="dark"] .global-top-bar .fx-mini-out { color: var(--nejum-teal-200, #99D6D6) !important; }
+[data-theme="dark"] .global-top-bar .fx-mini-out.is-stale { color: #6B757E !important; }
+[data-theme="dark"] .global-top-bar .fx-mini-ccy { color: #9AA5AD !important; }
+[data-theme="dark"] .global-top-bar .fx-mini-ccy option { background: #1A1F26 !important; color: #E6ECEF !important; }
+[data-theme="dark"] .global-top-bar .fx-mini-swap { color: #6B757E !important; }
 [data-theme="dark"] .global-top-bar .brand-name { color: #F1F5F8 !important; }
 [data-theme="dark"] .global-top-bar .user-name-pill {
   background: rgba(0, 128, 128, 0.18) !important;
@@ -120,7 +137,7 @@
   border-color: rgba(0, 128, 128, 0.32) !important;
 }
 
-/* Top bar action buttons (favorites, notifications, settings, sign out) */
+/* Top bar action buttons (menus, notifications, settings, sign out) */
 [data-theme="dark"] .global-top-bar .top-bar-btn {
   color: #C5CDD3 !important;
 }
@@ -232,7 +249,7 @@
 }
 
 /* ---------- FAVORITES DROPDOWN ---------- */
-[data-theme="dark"] .global-top-bar .favorites-dropdown {
+[data-theme="dark"] .global-top-bar .topbar-menu-dropdown {
   background: #1A1F26 !important;
   border: 1px solid #2A3038 !important;
   box-shadow:
@@ -240,24 +257,24 @@
     0 8px 16px rgba(0, 0, 0, 0.40),
     0 24px 48px rgba(0, 0, 0, 0.50) !important;
 }
-[data-theme="dark"] .global-top-bar .favorites-header {
+[data-theme="dark"] .global-top-bar .topbar-menu-header {
   border-bottom-color: #262C34 !important;
 }
-[data-theme="dark"] .global-top-bar .favorites-header h3 {
+[data-theme="dark"] .global-top-bar .topbar-menu-header h3 {
   color: #F1F5F8 !important;
 }
-[data-theme="dark"] .global-top-bar .favorites-item {
+[data-theme="dark"] .global-top-bar .topbar-menu-item {
   color: #E6ECEF !important;
 }
-[data-theme="dark"] .global-top-bar .favorites-item:hover {
+[data-theme="dark"] .global-top-bar .topbar-menu-item:hover {
   background: rgba(0, 128, 128, 0.12) !important;
   color: var(--nejum-teal-200, #99D6D6) !important;
 }
-[data-theme="dark"] .global-top-bar .favorites-item-icon {
+[data-theme="dark"] .global-top-bar .topbar-menu-item-icon {
   background: #232930 !important;
   color: #C5CDD3 !important;
 }
-[data-theme="dark"] .global-top-bar .favorites-item:hover .favorites-item-icon {
+[data-theme="dark"] .global-top-bar .topbar-menu-item:hover .topbar-menu-item-icon {
   background: rgba(0, 128, 128, 0.20) !important;
   color: var(--nejum-teal-300, #66C2C2) !important;
 }

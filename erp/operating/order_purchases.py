@@ -5,6 +5,8 @@ a supplier. The purchase form names the customer and a sale price per
 variant, and saving the purchase creates the customer's order alongside it
 (accounting.Invoice.for_order). This module is everything that link means:
 
+  * check_sale_prices —   what the customer pays is what the order line is
+                          billed at, so no row may leave it blank;
   * put_plan_in_catalog — a draft purchase normally leaves no trace outside
                           its own document, but an order line must point at
                           a catalog product, so a purchase bought for a
@@ -62,6 +64,49 @@ def _decimal(value):
         return Decimal("0")
 
 
+def _row_quantity(v_in):
+    """What one plan row brings in, over all its tops."""
+    return sum((_decimal(t.get("qty")) for t in (v_in.get("tops") or [])),
+               Decimal("0"))
+
+
+def _plan_row_label(p_in, v_in, idx):
+    """How a plan row is named when the plan is refused — from what was
+    typed, because the catalog rows it would become don't exist yet."""
+    from .views_warehouse import _row_label
+
+    mp = p_in.get("main_product") or {}
+    product = (mp.get("name") or mp.get("title") or "").strip()
+    row = _row_label(v_in) or (v_in.get("sku") or "").strip()
+    return " ".join(part for part in (product, row) if part) or \
+        _("Row %(n)d") % {"n": idx}
+
+
+def check_sale_prices(plan):
+    """Refuse a purchase bought for a customer that doesn't say what the
+    customer pays for one of its rows.
+
+    The sale price IS the order line's price — an empty box billed the
+    customer 0.00, and nothing downstream says so: the order reads as a
+    gift, and it is only questioned once the goods have arrived. The
+    purchase price can't stand in for it, being the supplier's and usually
+    in another currency.
+
+    Rows with no quantity are not on the order, so they are not asked for.
+    """
+    missing = [
+        _plan_row_label(p_in, v_in, idx)
+        for p_in in (plan.get("products") or [])
+        for idx, v_in in enumerate(p_in.get("variants") or [], start=1)
+        if _row_quantity(v_in) > 0 and _decimal(v_in.get("sale_price")) <= 0
+    ]
+    if missing:
+        raise CustomerOrderError(
+            _("A purchase bought for a customer needs the price the customer "
+              "is charged on every item. Missing on: %(rows)s")
+            % {"rows": ", ".join(missing)})
+
+
 def put_plan_in_catalog(plan):
     """Create the catalog products and variants a draft purchase names, and
     rewrite `plan` in place to point at them — each card as an existing
@@ -71,7 +116,9 @@ def put_plan_in_catalog(plan):
 
     Returns one {"product", "variant", "quantity", "sale_price"} per variant
     row that has a quantity. Raises IntakeError on the same validation
-    failures a receipt would.
+    failures a receipt would, and CustomerOrderError on a row that names no
+    sale price — checked here, before any catalog row is written, because
+    every path that makes a customer order comes through this function.
     """
     from .catalog_sync import CatalogSyncConflict, sync_roll_to_catalog
     from .views_warehouse import (
@@ -81,6 +128,7 @@ def put_plan_in_catalog(plan):
         _intake_variants,
     )
 
+    check_sale_prices(plan)
     products_in = plan.get("products") or []
     account = _intake_account(plan)
     prefix = _intake_prefix(plan, account.name)
@@ -98,8 +146,7 @@ def put_plan_in_catalog(plan):
         seen = set()
         rows = _intake_variants(item, main_product)
         for idx, (v_in, v) in enumerate(zip(p_in.get("variants") or [], rows), start=1):
-            qty = sum((_decimal(t.get("qty")) for t in (v.get("tops") or [])),
-                      Decimal("0"))
+            qty = _row_quantity(v)
             if not _row_label(v) and not (v.get("sku") or "").strip() and qty <= 0:
                 continue
             ident = _intake_variant_identity(main_product, item["base_name"], v, idx, seen)
@@ -114,8 +161,11 @@ def put_plan_in_catalog(plan):
             except CatalogSyncConflict as exc:
                 raise IntakeError({"success": False, "error": f"{ident['sku']}: {exc}"},
                                   status=400)
-            if item["has_variants"]:
-                v_in["sku"] = variant.variant_sku
+            # Stamped on every row, including a card with no variants —
+            # its implicit variant is the product itself, and a plan that
+            # doesn't name it leaves plan_variant_skus blind to the line it
+            # put on the order (see there).
+            v_in["sku"] = variant.variant_sku
             if qty > 0:
                 lines.append({"product": main_product, "variant": variant,
                               "quantity": qty,

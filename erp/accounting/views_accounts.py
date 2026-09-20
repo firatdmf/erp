@@ -1141,7 +1141,9 @@ class CurrentAccountDetail(View):
 
         recent_orders = Order.with_pre_order_flag(
             current_account.orders.select_related("contact", "company", "web_client")
-            .prefetch_related("items__product", "items__product_variant")
+            .prefetch_related("items__product", "items__product_variant",
+                              # Each order's total is net of these.
+                              "adjustments")
             .order_by("-created_at")
         )[:20]
 

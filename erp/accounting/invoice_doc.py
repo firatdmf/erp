@@ -47,6 +47,24 @@ class Line:
 
 
 @dataclass
+class Adjustment:
+    """A non-product line: delivery, packing, a discount. Positive adds
+    to the total, negative takes off — see operating.OrderAdjustment."""
+    label: str
+    amount: Decimal
+
+    @property
+    def is_credit(self):
+        return self.amount < 0
+
+    @property
+    def magnitude(self):
+        """The amount without its sign, so a printout can render a
+        discount as “−€240.00” rather than “€-240.00”."""
+        return abs(self.amount)
+
+
+@dataclass
 class InvoiceDoc:
     kind: str                  # "sales" | "purchase"
     number: str                # the order / PO number — invoices have none of their own
@@ -58,10 +76,23 @@ class InvoiceDoc:
     lines: list
     notes: str = ""
     book: object = None
+    adjustments: list = field(default_factory=list)
+
+    @property
+    def subtotal(self):
+        """The goods alone, before delivery or any discount."""
+        return sum((l.total for l in self.lines), Decimal("0.00"))
+
+    @property
+    def adjustments_total(self):
+        return sum((a.amount for a in self.adjustments), Decimal("0.00"))
 
     @property
     def total(self):
-        return sum((l.total for l in self.lines), Decimal("0.00"))
+        """What is to be paid: the goods, plus whatever the deal added or
+        took off. Never negative — see Order._floor_at_zero."""
+        total = self.subtotal + self.adjustments_total
+        return total if total > 0 else Decimal("0.00")
 
     @property
     def filename(self):
@@ -171,6 +202,8 @@ def build_order_doc(order):
         lines=lines,
         notes=order.notes or "",
         book=book,
+        adjustments=[Adjustment(label=a.label, amount=_money(a.amount))
+                     for a in order.adjustments.all()],
     )
 
 

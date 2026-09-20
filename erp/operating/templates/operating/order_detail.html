@@ -553,6 +553,7 @@
     font: 700 10.5px var(--font-sans); color: #005354; background: #E5F1F0;
     border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
   .od-scan-chip.muted { color: #64748B; background: #F4F7FB; font-weight: 600; }
+  .od-scan-chip.warn { color: #92400E; background: #FEF3C7; }
   .od-tops-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .od-top-pill {
     display: inline-flex; align-items: center; gap: 7px;
@@ -1313,6 +1314,14 @@
                       {% endif %}
                     {% else %}
                       <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% trans "not tracked" %}{% if item.pack_id %} · {% trans "Pack" %} #{{ item.pack.pack_number }}{% endif %}</span>
+                    {% endif %}
+                    {% comment %}Added here rather than on the supplier
+                       purchase that made this order — so nobody buys it
+                       in believing the purchase already covers it.{% endcomment %}
+                    {% if item.not_on_purchase %}
+                    <span class="od-scan-chip warn"
+                          title="{% trans 'Added on the order — no supplier purchase lists this item. It is not on order from anyone.' %}">
+                      <i class="fa fa-triangle-exclamation"></i> {% trans "not on the purchase" %}</span>
                     {% endif %}
                   </div>
                 </div>

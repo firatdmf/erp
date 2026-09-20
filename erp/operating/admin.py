@@ -9,12 +9,17 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ['product', 'product_variant', 'quantity', 'price', 'description']
 
 
+class OrderAdjustmentInline(admin.TabularInline):
+    model = OrderAdjustment
+    extra = 0
+
+
 class OrderAdmin(admin.ModelAdmin):
     list_display = ['order_number', 'get_customer_name', 'is_guest_order', 'order_status', 'payment_status', 'paid_amount', 'created_at']
     list_filter = ['is_guest_order', 'order_status', 'payment_status', 'status', 'created_at']
     search_fields = ['order_number', 'guest_email', 'guest_first_name', 'guest_last_name', 'web_client__first_name', 'web_client__last_name']
     readonly_fields = ['order_number', 'created_at', 'updated_at']
-    inlines = [OrderItemInline]
+    inlines = [OrderItemInline, OrderAdjustmentInline]
     
     fieldsets = (
         ('Order Information', {

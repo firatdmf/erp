@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n %}{% load l10n %}
 {% get_current_language as LANGUAGE_CODE %}
 <style>
 .co-section-header{display:flex;align-items:center;gap:10px;padding:12px 0;cursor:pointer;user-select:none;font-weight:600;font-size:.875rem;color:var(--text-primary);border-bottom:1px solid var(--border-color)}
@@ -542,6 +542,29 @@
     </div>
   </div>
 
+  <!-- Lines that are not products: delivery, packing, a discount.
+       A label and an amount, positive to add and negative to take off —
+       they land on the order total, on the invoice and on what the
+       customer's account says they owe (operating.OrderAdjustment). -->
+  <div id="co-adjustments" style="margin-top:10px; padding:12px 14px;
+       background:#FFF; border:1px solid #E2E8EE; border-radius:10px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div>
+        <div style="font:600 11px 'Inter',sans-serif; color:#475569; text-transform:uppercase; letter-spacing:.08em;">
+          {% trans "Charges & discounts" %}
+        </div>
+        <div style="font:500 11.5px 'Inter',sans-serif; color:#94A3B8; margin-top:2px;">
+          {% trans "Delivery, packing, a discount — enter a discount as a negative amount." %}
+        </div>
+      </div>
+      <button type="button" class="ord-btn" style="white-space:nowrap;" onclick="coAddAdjustment()">
+        <i class="fas fa-plus"></i> {% trans "Add line" %}
+      </button>
+    </div>
+    <div id="co-adj-rows" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;"></div>
+  </div>
+  <input type="hidden" id="co-adjustments-input" name="adjustments_json">
+
   <!-- Read-only order total summary — server-of-truth value computed
        in JS from orderItems; the user cannot edit it directly, they
        change qty/price on each product card and this updates live. -->
@@ -559,6 +582,8 @@
         <span style="margin:0 4px;color:#CBD5E1;">·</span>
         <span id="co-total-tops">0</span> {% trans "rolls" %}
       </div>
+      {# Only worth saying when something moved the total off the goods. #}
+      <div id="co-total-breakdown" style="display:none; font:500 11.5px 'Inter',sans-serif; color:#64748B; margin-top:2px;"></div>
     </div>
     <div id="co-total-amount"
          style="font:800 22px 'Inter',sans-serif; color:#0F1419;
@@ -1074,6 +1099,67 @@
   // unticked stock item still reads as "reserved" — by this very order — and
   // could never be re-picked.
   const CO_ORDER_ID = {% if order %}{{ order.pk }}{% else %}null{% endif %};
+
+  // ── Charges & discounts ──────────────────────────────────────────
+  // Rows of {label, amount} that ride along with the order. Editing one
+  // reopens the form with the rows it already has, so the amounts are
+  // rendered unlocalised — a Turkish decimal comma would come back as
+  // NaN.
+  let orderAdjustments = [
+    {% for adj in order.adjustments.all %}
+    { label: "{{ adj.label|escapejs }}", amount: "{% localize off %}{{ adj.amount }}{% endlocalize %}" },
+    {% endfor %}
+  ];
+
+  window.coAddAdjustment = function () {
+    orderAdjustments.push({ label: '', amount: '' });
+    coRenderAdjustments();
+    const rows = document.querySelectorAll('#co-adj-rows .co-adj-label');
+    if (rows.length) rows[rows.length - 1].focus();
+  };
+
+  window.coRemoveAdjustment = function (i) {
+    orderAdjustments.splice(i, 1);
+    coRenderAdjustments();
+    updateTotal();
+  };
+
+  window.coAdjustmentChanged = function (i, field, value) {
+    if (!orderAdjustments[i]) return;
+    orderAdjustments[i][field] = value;
+    updateTotal();
+  };
+
+  function coAdjustmentsTotal() {
+    return orderAdjustments.reduce(function (sum, a) {
+      const n = parseFloat(String(a.amount).replace(',', '.'));
+      return sum + (isFinite(n) ? n : 0);
+    }, 0);
+  }
+
+  function coRenderAdjustments() {
+    const box = document.getElementById('co-adj-rows');
+    if (!box) return;
+    box.innerHTML = orderAdjustments.map(function (a, i) {
+      return '<div style="display:flex; gap:6px; align-items:center;">' +
+        '<input type="text" class="form-input co-adj-label" style="flex:1;" ' +
+               'placeholder="{% filter escapejs %}{% trans "e.g. Delivery" %}{% endfilter %}" ' +
+               'value="' + coEsc(a.label) + '" ' +
+               'oninput="coAdjustmentChanged(' + i + ', \'label\', this.value)">' +
+        '<input type="number" step="0.01" class="form-input" style="width:120px; text-align:right;" ' +
+               'placeholder="0.00" value="' + coEsc(a.amount) + '" onwheel="this.blur()" ' +
+               'oninput="coAdjustmentChanged(' + i + ', \'amount\', this.value)">' +
+        '<button type="button" class="ord-btn" title="{% filter escapejs %}{% trans "Remove" %}{% endfilter %}" ' +
+               'onclick="coRemoveAdjustment(' + i + ')"><i class="fas fa-times"></i></button>' +
+        '</div>';
+    }).join('');
+  }
+
+  function coEsc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];
+    });
+  }
   function coOrderParam() { return CO_ORDER_ID ? ('&order=' + CO_ORDER_ID) : ''; }
 
   // Off by default: an order almost always draws on one book, and
@@ -2370,9 +2456,23 @@
       sum += q * p;
       topCount += (it.existingRolls || []).length + (it.rolls || []).length;
     });
-    amtEl.textContent = CO_CUR.symbol + sum.toFixed(2);
+    const adj = coAdjustmentsTotal();
+    // Floored, like the server does: no order bills a negative amount.
+    amtEl.textContent = CO_CUR.symbol + Math.max(0, sum + adj).toFixed(2);
     if (cntEl) cntEl.textContent = orderItems.length;
     if (topsEl) topsEl.textContent = topCount;
+    const bd = document.getElementById('co-total-breakdown');
+    if (bd) {
+      if (adj) {
+        bd.style.display = '';
+        bd.textContent = '{% filter escapejs %}{% trans "Goods" %}{% endfilter %} ' +
+          CO_CUR.symbol + sum.toFixed(2) + '  ·  ' +
+          (adj < 0 ? '−' + CO_CUR.symbol + Math.abs(adj).toFixed(2)
+                   : '+' + CO_CUR.symbol + adj.toFixed(2));
+      } else {
+        bd.style.display = 'none';
+      }
+    }
   }
 
   // Deposit / Total / Remaining row was removed in favor of the
@@ -2468,6 +2568,8 @@
     // Include `item_id` for items that came from the server (edit
     // mode) so the backend updates them instead of creating dupes.
     // New items (no existing_item_id) get added as fresh OrderItems.
+    const adjInput = document.getElementById('co-adjustments-input');
+    if (adjInput) adjInput.value = JSON.stringify(orderAdjustments);
     document.getElementById('product_json_input').value = JSON.stringify(orderItems.map(function(it){
       // The outsourced METRES are already carried by the line's quantity
       // (quantity − reserved stock items), so they're re-derived on the next
@@ -2584,6 +2686,9 @@
   }
 
   renderProducts();
+  // Edit mode opens with whatever charges and discounts the order
+  // already carries; a new order opens with none.
+  coRenderAdjustments();
 
   // Edit mode: reconcile each hydrated item's quantity against its
   // already-saved reservations (legacy items with none keep their DB

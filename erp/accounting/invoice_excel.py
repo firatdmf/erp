@@ -115,11 +115,24 @@ def build_invoice_workbook(doc):
     # ── Total ──
     r += 1
     lc1, lc2, vc = NCOLS - 2, NCOLS - 1, NCOLS
-    cell(ws, r, lc1, "TOTAL", font=F_TOTAL, border=GRID, align=RIGHT)
-    merge(ws, r, lc1, lc2)
-    merge_border(ws, r, lc1, lc2, GRID)
-    cell(ws, r, vc, _dec(doc.total), font=F_TOTAL, border=GRID, align=RIGHT, fmt=money)
-    r += 1
+
+    def _foot(label, amount, font):
+        """One row of the closing block, laid out like the TOTAL row."""
+        nonlocal r
+        cell(ws, r, lc1, label, font=font, border=GRID, align=RIGHT)
+        merge(ws, r, lc1, lc2)
+        merge_border(ws, r, lc1, lc2, GRID)
+        cell(ws, r, vc, _dec(amount), font=font, border=GRID, align=RIGHT, fmt=money)
+        r += 1
+
+    # Delivery, packing, a discount — each on its own row above the
+    # total, with the goods' subtotal first so the figure can be
+    # followed. Omitted when the order carries none.
+    if doc.adjustments:
+        _foot("SUBTOTAL", doc.subtotal, F_VAL)
+        for adj in doc.adjustments:
+            _foot(adj.label.upper(), adj.amount, F_VAL)
+    _foot("TOTAL", doc.total, F_TOTAL)
 
     # ── Notes ──
     if doc.notes:

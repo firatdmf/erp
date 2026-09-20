@@ -77,18 +77,28 @@ def _ensure_pdf_fonts():
 
 
 def _order_lines_and_total(order):
-    """Return (items_with_line_total, total) computed safely (quantity is
-    nullable, so guard the multiply)."""
+    """Return (items_with_line_total, adjustments, subtotal, total)
+    computed safely (quantity is nullable, so guard the multiply).
+
+    The adjustments come back beside the figures because the mail has to
+    show them: a total that the lines above it don't add up to is the
+    customer's first question, and the invoice they get later quotes the
+    same net figure (Order.total_value)."""
     items = []
-    total = Decimal("0.00")
+    subtotal = Decimal("0.00")
     for it in order.items.all().select_related("product", "product_variant"):
         qty = it.quantity or Decimal("0")
         price = it.price or Decimal("0")
         it.line_total_calc = (qty * price).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP)
         items.append(it)
-        total += it.line_total_calc
-    return items, total
+        subtotal += it.line_total_calc
+    adjustments = list(order.adjustments.all())
+    total = subtotal + sum((a.amount or Decimal("0.00") for a in adjustments),
+                           Decimal("0.00"))
+    if total < 0:
+        total = Decimal("0.00")
+    return items, adjustments, subtotal, total
 
 
 def _html_to_text(html):
@@ -221,7 +231,7 @@ def _render_order_pdf(order):
         # The order's own print header wins, else the ledger book's
         # brand name — the same name the invoice for this order signs.
         brand = brand_name_for()
-        items, total = _order_lines_and_total(order)
+        items, adjustments, _subtotal, total = _order_lines_and_total(order)
         CW = A4[0] - 30 * mm   # content width (15mm margins)
 
         def par(text, size=9.5, bold=False, color=INK, align=0, upper=False):
@@ -351,6 +361,13 @@ def _render_order_pdf(order):
                 par(money(it.price), align=2),
                 par(money(it.line_total_calc), align=2),
             ])
+        # Delivery, a discount — each above the total it is part of, so
+        # the attached PDF reads like the invoice for the same order.
+        for adj in adjustments:
+            amount = adj.amount or 0
+            shown = (f"−{money(abs(amount))}" if amount < 0 else money(amount))
+            rows.append([par(""), par(""), par(""),
+                         par(adj.label, align=2), par(shown, align=2)])
         rows.append([par(""), par(""), par(""),
                      par(_("Total"), 11, bold=True, align=2),
                      par(money(total), 11, bold=True, align=2)])
@@ -424,7 +441,8 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
         # Precompute line totals + grand total safely (quantity is
         # nullable) so the templates never call order.total_value()/
         # it.subtotal() and crash on a NULL quantity.
-        order_items, order_total = _order_lines_and_total(order)
+        order_items, order_adjustments, order_subtotal, order_total = \
+            _order_lines_and_total(order)
         from accounting.services_accounts import brand_name_for
         brand_name = brand_name_for()
         brand_email = brand("BRAND_EMAIL")
@@ -440,6 +458,8 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
             "carrier": order.get_carrier_display() if order.carrier else "",
             "order_items": order_items,
             "order_total": order_total,
+            "order_subtotal": order_subtotal,
+            "order_adjustments": order_adjustments,
             "currency_symbol": _currency_symbol(order),
             "BRAND_NAME": brand_name,
             "BRAND_EMAIL": brand_email,

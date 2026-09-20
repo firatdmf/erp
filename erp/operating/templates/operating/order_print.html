@@ -334,6 +334,15 @@
         <td class="num">{{ order_currency_symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
       </tr>
       {% endfor %}
+      {% comment %}What the deal added or took off this order — delivery,
+         packing, a discount. They are in the Total below, so they print
+         here rather than being a figure the columns cannot explain.{% endcomment %}
+      {% for adj in g.order.adjustments.all %}
+      <tr>
+        <td colspan="5"><div class="pname">{{ adj.label }}</div></td>
+        <td class="num">{% if adj.amount < 0 %}−{{ order_currency_symbol }}{{ adj.amount|floatformat:"2u"|intcomma:False|cut:"-" }}{% else %}{{ order_currency_symbol }}{{ adj.amount|floatformat:"2u"|intcomma:False }}{% endif %}</td>
+      </tr>
+      {% endfor %}
       {% endfor %}
       {% if not order_items %}
       <tr><td colspan="6" style="text-align: center; color: #6B7280; padding: 18pt;">{% trans "No items." %}</td></tr>

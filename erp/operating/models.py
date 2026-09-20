@@ -1993,6 +1993,24 @@ class WarehouseProductItem(models.Model):
     # lets NULLs repeat) for a roll whose label was never captured.
     barcode = models.CharField(max_length=64, blank=True, null=True, unique=True)
     lot_number = models.CharField(max_length=64, blank=True, null=True)
+    # The code the MANUFACTURER printed on this roll, kept exactly as it
+    # was scanned. Most of our mills barcode at roll level, so this is a
+    # serial: it names this physical roll and says nothing about which
+    # product it is (that is SupplierItem, keyed on their article number).
+    #
+    # Worth storing even though we mint our own `barcode` above, because
+    # it is the only language we share with the supplier about one roll.
+    # When they write "lot 4471, roll 8691234000123 was off-shade", this
+    # column is what turns that sentence into a row.
+    #
+    # NOT unique: two suppliers can print the same digits, and a mill
+    # restarting its counter each year will reissue its own. Indexed so a
+    # scan can find it; ambiguity is resolved by the purchase behind the
+    # roll, which names the supplier.
+    supplier_barcode = models.CharField(
+        max_length=64, blank=True, null=True, db_index=True,
+        help_text="The supplier's own code for this roll, as printed",
+    )
     status = models.CharField(
         max_length=16, choices=STATUS_CHOICES, default="in_stock", db_index=True,
     )

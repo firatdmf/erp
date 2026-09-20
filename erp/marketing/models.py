@@ -695,6 +695,143 @@ def _warehouse_product_model():
     return WarehouseProduct
 
 
+# ============================================================
+# SUPPLIER CROSS-REFERENCE
+# ============================================================
+class SupplierItem(models.Model):
+    """What ONE supplier calls one of our variants.
+
+    The same fabric is bought from more than one mill, and each of them
+    names it their own way: their article number on the quotation and the
+    invoice, sometimes a GTIN on the carton. `Product.supplier_account` is
+    a single FK and so could only ever hold the last one somebody set —
+    it cannot say "we buy N1464T-PETROL from both Karven and Deneme, at
+    these two prices". This table is that statement, one row per
+    (supplier, variant) pair.
+
+    Keyed on the supplier's SKU, NOT on a barcode. Most of our mills
+    barcode at ROLL level: the code on the label is a serial, different on
+    every roll, so it identifies a physical thing and can never say which
+    PRODUCT arrived. Their article number is the stable one. A
+    product-level GTIN goes in `supplier_barcode` when a supplier happens
+    to have one — plenty don't, which is why it is optional and the SKU
+    is not.
+
+    The roll serial lives on WarehouseProductItem.supplier_barcode
+    instead; see that field for why the two are kept apart.
+    """
+
+    current_account = models.ForeignKey(
+        "accounting.CurrentAccount",
+        related_name="supplier_items",
+        on_delete=models.CASCADE,
+        help_text="Who sells it to us — the account the purchase is billed to",
+    )
+    variant = models.ForeignKey(
+        ProductVariant,
+        related_name="supplier_items",
+        on_delete=models.CASCADE,
+        help_text="What it is in OUR catalog",
+    )
+
+    # ── Their names for it ────────────────────────────────────────
+    supplier_sku = models.CharField(
+        max_length=SKU_MAX_LENGTH, db_index=True,
+        help_text="Their article number, as printed on their invoice",
+    )
+    # Longer than our own 14-char barcode columns on purpose: a supplier
+    # code is whatever they print, and a GS1-128 carton string carries
+    # application identifiers around the GTIN rather than the bare digits.
+    supplier_barcode = models.CharField(
+        max_length=64, blank=True, null=True, db_index=True,
+        help_text="Their PRODUCT-level barcode/GTIN, if they have one. "
+                  "Not a roll serial — those go on the stock item.",
+    )
+    supplier_description = models.CharField(
+        max_length=255, blank=True,
+        help_text="How the line reads on their invoice, for reconciliation",
+    )
+
+    # ── How their unit relates to ours ────────────────────────────
+    # They sell a box of 12 and we stock singles; they quote yards and we
+    # hold metres. Without this every price comparison below is a lie and
+    # a scanned quantity lands wrong. 1 means "same unit as ours".
+    supplier_unit = models.CharField(
+        max_length=20, blank=True,
+        help_text="The unit they sell in (box, yard, roll…). Blank = ours.",
+    )
+    qty_per_supplier_unit = models.DecimalField(
+        max_digits=12, decimal_places=4, default=Decimal("1"),
+        validators=[MinValueValidator(Decimal("0.0001"))],
+        help_text="How much of OUR unit one of THEIR units is",
+    )
+
+    # ── What it last cost from them ───────────────────────────────
+    # A hint for the next purchase order and the raw material of "who is
+    # cheapest for this". Stamped from the purchase, never authoritative:
+    # the ledger's answer is WarehouseProductItem.unit_cost_base.
+    last_unit_price = models.DecimalField(
+        max_digits=12, decimal_places=4, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text="Their price per THEIR unit, when we last bought it",
+    )
+    last_purchased_at = models.DateField(null=True, blank=True)
+    lead_time_days = models.PositiveIntegerField(null=True, blank=True)
+    minimum_order_qty = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+
+    # Which supplier we buy this from by default. Advisory — it picks the
+    # row a fresh purchase order line starts from; it never stops anyone
+    # buying the same variant from someone else.
+    is_preferred = models.BooleanField(default=False)
+
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Supplier item"
+        verbose_name_plural = "Supplier items"
+        ordering = ["-is_preferred", "supplier_sku"]
+        constraints = [
+            # One supplier's article number means exactly one thing. The
+            # reverse is deliberately NOT constrained: the same variant
+            # may appear once per supplier, which is the whole point.
+            models.UniqueConstraint(
+                fields=["current_account", "supplier_sku"],
+                name="marketing_supplieritem_unique_sku_per_account",
+            ),
+            # Same for a product-level GTIN, when there is one. NULLs
+            # repeat freely, so suppliers without barcodes are unaffected.
+            models.UniqueConstraint(
+                fields=["current_account", "supplier_barcode"],
+                name="marketing_supplieritem_unique_barcode_per_account",
+            ),
+            # A variant is listed at most once per supplier — two rows
+            # would make "their price for this" ambiguous.
+            models.UniqueConstraint(
+                fields=["current_account", "variant"],
+                name="marketing_supplieritem_unique_variant_per_account",
+            ),
+            models.CheckConstraint(
+                check=models.Q(qty_per_supplier_unit__gt=0),
+                name="marketing_supplieritem_qty_per_unit_positive",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["variant", "-is_preferred"]),
+        ]
+
+    def __str__(self):
+        return f"{self.current_account} · {self.supplier_sku} → {self.variant.variant_sku}"
+
+    def to_our_quantity(self, supplier_quantity):
+        """Their quantity, restated in our unit of measure."""
+        return Decimal(str(supplier_quantity)) * self.qty_per_supplier_unit
+
+
 # Example: Size and Color Attributes
 # Make this unique and do get or create when creating the product variant
 # ============================================================

@@ -1742,6 +1742,12 @@ msgstr "Product Files"
 msgid "Products Table"
 msgstr "Products Table"
 
+msgid "Gross profit"
+msgstr "Bürüt Kar"
+
+msgid "Gross profit shown reflects $0 cost — set product/variant cost to get real margin."
+msgstr "Gösterilen bürüt kar $0 maliyete göredir — gerçek marj için ürün/varyant maliyetini girin."
+
 msgid "Profit"
 msgstr "Profit"
 

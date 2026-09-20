@@ -205,8 +205,16 @@
   .wh-searchby-btn:not(.active):hover { background: #F4F7FB; }
 
   /* ── FILTER PANEL ─────────────────────────────────────────
-     A drawer at every width (see FILTER DRAWER below), opened from the
-     sliders icon inside the search box, so the search gets the whole row. */
+     Wide screens: display:contents dissolves the wrapper, so its groups are
+     direct flex children of the toolbar and every filter is simply open.
+     From 1024px down it becomes a real drawer (see FILTER DRAWER below) —
+     stacked, these controls bury the results. */
+  .wh-filters { display: contents; }
+  .wh-filters-grp { display: contents; }
+  .wh-filters-lbl, .wh-filters-head, .wh-filters-foot { display: none; }
+  .wh-filters-sort { display: contents; }
+  .od-toolbar > .wh-filters #whChips { flex: 1 1 100%; margin-bottom: 0; }
+  .wh-filter-btn, .wh-filters-scrim { display: none; }
   .wh-empty-toggle {
     display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
     user-select: none; font: 500 13px var(--font-sans); color: var(--gray-700);
@@ -218,11 +226,11 @@
     margin-bottom: 14px;
   }
   .od-search {
-    position: relative; flex: 1 1 100%; min-width: 0;
+    position: relative; flex: 1 1 480px; max-width: 640px; min-width: 260px;
   }
   .od-search input {
     width: 100%; box-sizing: border-box;
-    padding: 13px 52px 13px 42px;
+    padding: 13px 16px 13px 42px;
     background: white; border: 1.5px solid #E0E6EE;
     border-radius: 12px; outline: none;
     font: 500 14.5px var(--font-sans); color: var(--ink);
@@ -406,7 +414,9 @@
     margin-left: 6px; font: 700 9.5px var(--font-sans); color: #8B5A00;
     background: #FEF3C7; border-radius: 4px; padding: 1px 5px; vertical-align: middle;
   }
-  .wh-roll-lot { margin-left: 6px; font-size: 10.5px; color: var(--gray-500); }
+  /* Lot sits on its own line under the barcode: with a "2nd" badge also on
+     the barcode line, an inline lot pushed past the column and wrapped badly. */
+  .wh-roll-lot { display: block; margin-top: 2px; font-size: 10.5px; color: var(--gray-500); overflow-wrap: anywhere; }
   .wh-roll-m { font-weight: 800; font-variant-numeric: tabular-nums; color: #0F1419; }
   .wh-roll-cost { font-variant-numeric: tabular-nums; color: var(--gray-600, #55636F); white-space: nowrap; }
   .wh-roll-of { margin-left: 5px; font-size: 10.5px; color: var(--gray-500); }
@@ -649,13 +659,21 @@
       margin-left: 20px; border-left: 4px solid #16a394; border-radius: 0 0 10px 0;
     }
   }
-  /* ── FILTER DRAWER ──
-     Every filter lives off screen until asked for, at every width: inline,
-     the toggles and sort chips squeezed the search box, and stacked on a
-     phone they pushed the results ~200px down. The only trace left in the
-     toolbar is the sliders icon inside the search box. `@media all` just
-     keeps the block's shape from when it was phones-only. */
-  @media all {
+  /* ── FILTER DRAWER (tablets and phones) ──
+     The toolbar stacks from 1024px down, which puts ~260px of controls
+     between the search box and the first result — you type and the results
+     are off screen. Below this width every filter lives off screen until
+     asked for, and the only trace in the toolbar is the sliders icon inside
+     the search box. Wider than this the filters are simply open (see FILTER
+     PANEL above). */
+  @media (max-width: 1024px) {
+    /* Undo the desktop display:contents — the rules below give the panel,
+       its head, groups and foot a box of their own again; the sort group is
+       the one that has no display of its own further down. */
+    .wh-filters-sort { display: block; }
+    .od-toolbar { flex-wrap: nowrap; align-items: center; }
+    .od-search { flex: 1 1 auto; min-width: 0; max-width: none; }
+    .od-search input { padding-right: 52px; }
     .wh-filter-btn {
       position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
       display: inline-flex; align-items: center; justify-content: center;
@@ -1421,8 +1439,9 @@
                    hx-include="#whSortInput, #whViewInput, #whShowEmptyInput, #whReservedOnlyInput, #whSearchByInput"
                    hx-sync="this:replace"
                    name="search">
-            {% comment %}The filters open as a drawer from this icon, so the
-            search box keeps the whole row.{% endcomment %}
+            {% comment %}Tablets and phones only (hidden above 1024px): there
+            the filters open as a drawer from this icon, so the search box
+            keeps the whole row.{% endcomment %}
             <button type="button" class="wh-filter-btn" id="whFilterBtn"
                     onclick="openWhFilters()" aria-controls="whFilters" aria-expanded="false"
                     title="{% trans 'Filters' %}" aria-label="{% trans 'Filters' %}">
@@ -1433,8 +1452,8 @@
 
           {% comment %}The hidden fields carry filter state into every HTMX
           request (hx-include targets them by id), so they live OUTSIDE the
-          panel below — that panel becomes a fixed drawer on phones, and what
-          the request depends on must not move with it.{% endcomment %}
+          panel below — that panel becomes a fixed drawer from 1024px down,
+          and what the request depends on must not move with it.{% endcomment %}
           <input type="hidden" id="whSearchByInput" name="search_by" value="{{ search_by|default:'text' }}">
           <input type="hidden" id="whViewInput" name="view" value="{{ view_mode|default:'variants' }}">
           <input type="hidden" id="whShowEmptyInput" name="show_empty" value="{% if show_empty %}1{% endif %}">
@@ -2247,7 +2266,7 @@
     whSyncFilterCount();
   }
 
-  {% comment %}FILTER DRAWER (phones). The same controls the wide layout
+  {% comment %}FILTER DRAWER (tablets and phones). The same controls the wide layout
   shows inline; here they wait behind a button so the search box sits right
   above the results. While the drawer is open the HTMX refresh is HELD — a
   filter change mid-edit would yank the list around under the user's thumb —

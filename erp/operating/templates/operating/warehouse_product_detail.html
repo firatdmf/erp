@@ -202,6 +202,14 @@
     background: #F4F7FB; padding: 3px 8px; border-radius: 6px;
     display: inline-block;
   }
+  /* Lot sits on its own line under the barcode — beside a "2nd" badge an
+     inline lot ran past the cell and wrapped badly. The checkbox sits outside
+     the stacked column, and the 8px matches the barcode chip's own padding,
+     so the lot starts under the barcode's first digit. */
+  .roll-code-cell { display: flex; align-items: flex-start; }
+  .roll-code-cell > .roll-cb { margin-top: 2px; }   /* line the box up with the chip's text */
+  .roll-code-stack { min-width: 0; }
+  .roll-lot { margin-top: 2px; padding-left: 8px; font-size: 11px; color: var(--gray-500); overflow-wrap: anywhere; }
   .roll-meters { font-weight: 800; font-variant-numeric: tabular-nums; color: #0F1419; }
   .roll-bar {
     margin-top: 4px;
@@ -695,16 +703,20 @@
             <tr id="roll-row-{{ r.pk }}">
               <td><b>{{ r.pk }}</b></td>
               <td>
-                <input type="checkbox" class="roll-cb" value="{{ r.pk }}" onchange="rollPickChanged()" aria-label="{% blocktrans with n=product.item_noun %}Select {{ n }}{% endblocktrans %}">
-                {% if r.barcode %}
-                  <span class="roll-barcode">{{ r.barcode }}</span>
-                {% else %}
-                  <span style="color:#C5CCD3;">—</span>
-                {% endif %}
-                {% if r.is_second %}
-                  <span class="roll-2nd-badge" data-tip="{% blocktrans with n=product.item_noun %}Factory second — imperfect {{ n }}, not first quality.{% endblocktrans %}">2nd</span>
-                {% endif %}
-                {% if r.lot_number %}<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">Lot: {{ r.lot_number }}</div>{% endif %}
+                <div class="roll-code-cell">
+                  <input type="checkbox" class="roll-cb" value="{{ r.pk }}" onchange="rollPickChanged()" aria-label="{% blocktrans with n=product.item_noun %}Select {{ n }}{% endblocktrans %}">
+                  <div class="roll-code-stack">
+                    {% if r.barcode %}
+                      <span class="roll-barcode">{{ r.barcode }}</span>
+                    {% else %}
+                      <span style="color:#C5CCD3;">—</span>
+                    {% endif %}
+                    {% if r.is_second %}
+                      <span class="roll-2nd-badge" data-tip="{% blocktrans with n=product.item_noun %}Factory second — imperfect {{ n }}, not first quality.{% endblocktrans %}">2nd</span>
+                    {% endif %}
+                    {% if r.lot_number %}<div class="roll-lot">Lot: {{ r.lot_number }}</div>{% endif %}
+                  </div>
+                </div>
               </td>
               <td>
                 <div class="roll-meters">

@@ -452,3 +452,128 @@ class ClosingThePeriod(TestCase):
         entry, _ = close_period(self.book, date_to="2026-12-31")
         self.assertIsNone(entry)
         self.assertEqual(self._b()["3200"], kept)
+
+
+class AWarehouseOpenedAfterTheCutover(TestCase):
+    """Ergene's remaining gap, in miniature.
+
+    The book-wide cutover photographs the warehouses that exist when it
+    runs. A second warehouse loaded five days later is invisible to it, so
+    the shelves hold stock that account 1300 has never heard of — and
+    nothing posts it later, because it arrived without a purchase invoice
+    to carry it in.
+    """
+
+    def setUp(self):
+        from io import StringIO
+        from operating.models import (StockMovement, Warehouse,
+                                      WarehouseProduct, WarehouseProductItem)
+        self.StringIO = StringIO
+        self.usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(
+            name="Ergene Fabric", base_currency=self.usd)
+        ensure_chart()
+
+        def shelves(name, metres, cost):
+            wh = Warehouse.objects.create(name=name, accounting_book=self.book)
+            wp = WarehouseProduct.objects.create(
+                warehouse=wh, name=name, sku=name[:3], quantity=Decimal("0"),
+                cost_usd=cost)
+            item = WarehouseProductItem.objects.create(
+                product=wp, quantity=metres, quantity_remaining=metres,
+                barcode=f"BC-{name}", status="in_stock", unit_cost_base=cost)
+            StockMovement.objects.create(
+                product=wp, stock_item=item, movement_type="in",
+                quantity=metres, reference=f"{name}-IMPORT")
+            return wh
+
+        # The order here is the whole point, so it follows the real one.
+        # 100m x 4.00 = 400.00 is all that stands when the cutover runs, so
+        # the entry it writes is book-wide and names no warehouse — which is
+        # why nothing later can tell from the description that Fabrika is
+        # already covered, and the guard has to work it out from the money.
+        from accounting.services_posting import post_opening_inventory
+        self.fabrika = shelves("Fabrika", Decimal("100"), Decimal("4.00"))
+        post_opening_inventory(self.book, date="2026-09-03", reference="CUTOVER")
+
+        # 50m x 3.00 = 150.00, arriving five days later and never posted.
+        self.readymade = shelves("Readymade", Decimal("50"), Decimal("3.00"))
+
+    def _run(self, *args, **kw):
+        from django.core.management import call_command
+        out = self.StringIO()
+        call_command("post_warehouse_opening_inventory",
+                     "--book", str(self.book.pk), *args, stdout=out, **kw)
+        return out.getvalue()
+
+    def _inventory(self):
+        return {r["code"]: r["balance"]
+                for r in balance_sheet(self.book)["trial_balance"]["rows"]}["1300"]
+
+    def test_the_gap_is_the_unposted_warehouse(self):
+        from accounting.services_ledger import _inventory_value
+        shelves, _n, _q = _inventory_value(self.book)
+        self.assertEqual(shelves - self._inventory(), Decimal("150.00"))
+
+    def test_a_dry_run_writes_nothing(self):
+        before = JournalEntry.objects.count()
+        self._run("--warehouse", str(self.readymade.pk), "--date", "2026-09-08")
+        self.assertEqual(JournalEntry.objects.count(), before)
+        self.assertEqual(self._inventory(), Decimal("400.00"))
+
+    def test_applying_makes_the_ledger_match_the_shelves(self):
+        from accounting.services_ledger import _inventory_value
+        self._run("--warehouse", str(self.readymade.pk),
+                  "--date", "2026-09-08", "--apply")
+        shelves, _n, _q = _inventory_value(self.book)
+        self.assertEqual(self._inventory(), shelves)
+        self.assertEqual(self._inventory(), Decimal("550.00"))
+
+    def test_it_still_balances(self):
+        self._run("--warehouse", str(self.readymade.pk),
+                  "--date", "2026-09-08", "--apply")
+        gl = balance_sheet(self.book)
+        self.assertTrue(gl["balanced"])
+        self.assertEqual(gl["assets"], gl["liabilities_plus_equity"])
+
+    def test_the_credit_goes_to_opening_equity_by_default(self):
+        self._run("--warehouse", str(self.readymade.pk),
+                  "--date", "2026-09-08", "--apply")
+        b = {r["code"]: r["balance"]
+             for r in balance_sheet(self.book)["trial_balance"]["rows"]}
+        self.assertEqual(b["3100"], Decimal("550.00"))     # 400 cutover + 150
+
+    def test_stock_still_owed_for_can_credit_a_payable_instead(self):
+        self._run("--warehouse", str(self.readymade.pk), "--date", "2026-09-08",
+                  "--contra", "2000", "--apply")
+        b = {r["code"]: r["balance"]
+             for r in balance_sheet(self.book)["trial_balance"]["rows"]}
+        self.assertEqual(b["2000"], Decimal("150.00"))
+        self.assertEqual(b["3100"], Decimal("400.00"))
+
+    def test_running_it_twice_does_not_double_post(self):
+        self._run("--warehouse", str(self.readymade.pk),
+                  "--date", "2026-09-08", "--apply")
+        entries = JournalEntry.objects.count()
+        self._run("--warehouse", str(self.readymade.pk),
+                  "--date", "2026-09-08", "--apply")
+        self.assertEqual(JournalEntry.objects.count(), entries)
+        self.assertEqual(self._inventory(), Decimal("550.00"))
+
+    def test_it_refuses_a_warehouse_the_cutover_already_covered(self):
+        """The one way this could do damage. Posting Fabrika again would
+        put 1300 above the stock that exists, so it must not run."""
+        from django.core.management.base import CommandError
+        with self.assertRaises(CommandError) as caught:
+            self._run("--warehouse", str(self.fabrika.pk), "--date", "2026-09-08")
+        self.assertIn("ABOVE the stock that exists", str(caught.exception))
+        self.assertEqual(self._inventory(), Decimal("400.00"))
+
+    def test_it_refuses_a_warehouse_belonging_to_another_book(self):
+        from django.core.management.base import CommandError
+        from operating.models import Warehouse
+        other = Book.objects.create(name="Laleli Fabric", base_currency=self.usd)
+        theirs = Warehouse.objects.create(name="Laleli", accounting_book=other)
+        with self.assertRaises(CommandError):
+            self._run("--warehouse", str(theirs.pk), "--date", "2026-09-08")

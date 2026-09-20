@@ -455,8 +455,13 @@ def subsidiary_equation(book):
     }
 
 
-def _inventory_value(book):
+def _inventory_value(book, warehouse=None):
     """(value, unvalued roll count, unvalued metres) for a book's stock.
+
+    `warehouse` narrows the same figure to one set of shelves. The book-wide
+    answer is the sum of its warehouses, so scoping here is what lets a
+    warehouse opened after the cutover be put on the books on its own
+    without re-photographing the ones already posted.
 
     Stock belongs to whoever owns the shelves it sits on. Warehouse
     .accounting_book is required on every warehouse that holds stock (only
@@ -492,6 +497,8 @@ def _inventory_value(book):
             .filter(product__warehouse__accounting_book=book,
                     status__in=("in_stock", "partial"))
             .exclude(quantity_remaining=None))
+    if warehouse is not None:
+        live = live.filter(product__warehouse=warehouse)
 
     unit_cost = Coalesce(F("unit_cost_base"),
                          F("purchase_invoice_item__unit_price"),

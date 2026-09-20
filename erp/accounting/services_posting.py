@@ -299,7 +299,8 @@ def post_movement(movement, *, reference=""):
 
 
 @transaction.atomic
-def post_opening_inventory(book, *, date, reference=""):
+def post_opening_inventory(book, *, date, reference="", warehouse=None,
+                           contra="3100"):
     """Put the stock standing in this book's warehouses on the books.
 
     Valued exactly as the balance sheet values it — each item at what it
@@ -308,18 +309,28 @@ def post_opening_inventory(book, *, date, reference=""):
 
     The contra is Opening Balance Equity, not a purchase: this stock was
     bought before the ledger existed and there is no payable left to
-    record against it.
+    record against it. Pass `contra="2000"` for stock that IS still owed
+    for — goods received against a supplier invoice nobody has entered.
+
+    `warehouse` posts one warehouse's stock instead of the whole book's,
+    for shelves that were opened after the cutover was photographed and so
+    are missing from it. The description names the warehouse, which is
+    both how a reader tells the entries apart and how the caller knows not
+    to post the same shelves twice.
     """
     from .services_ledger import _inventory_value
 
-    value, unvalued_count, unvalued_qty = _inventory_value(book)
+    value, unvalued_count, unvalued_qty = _inventory_value(book, warehouse)
     if value <= ZERO:
         return None, unvalued_count, unvalued_qty
+    description = ("Opening inventory" if warehouse is None
+                   else f"Opening inventory — {warehouse.name}")
+    memo = "Stock on hand at cutover"
     entry = post_entry(
         book=book, date=date,
-        description="Opening inventory",
-        lines=[debit("1300", value, memo="Stock on hand at cutover"),
-               credit("3100", value, memo="Stock on hand at cutover")],
+        description=description,
+        lines=[debit("1300", value, memo=memo),
+               credit(contra, value, memo=memo)],
         reference=reference,
     )
     return entry, unvalued_count, unvalued_qty

@@ -296,6 +296,7 @@
   .np-v-match.new { background: #FEF3C7; color: #8B5A00; border-color: #F5D78B; }
   .np-v-match.bad { background: #FDF3F2; color: #8C2D0E; border-color: #F0C9C2; }
   .np-v-sku.bad { border-color: #C0392B; background: #FDF3F2; }
+  .np-v-sale.bad { border-color: #C0392B; background: #FDF3F2; }
   .np-tops { display: flex; flex-direction: column; gap: 7px; }
   .np-top { display: flex; align-items: center; gap: 8px; }
   .np-top-no { font: 600 11px var(--font-sans); color: var(--gray-500); min-width: 42px; }
@@ -669,7 +670,7 @@
               <button type="button" class="np-sup-clear" onclick="npCustClear()"
                       title="{% trans 'Change customer' %}">&times;</button>
             </div>
-            <div class="np-hint">{% trans "Saving creates the customer's order; receiving reserves the items for it." %}</div>
+            <div class="np-hint">{% trans "Saving creates the customer's order; receiving reserves the items for it. Every item then needs the price the customer is charged." %}</div>
           {% endif %}
         </div>
         <div class="np-field">
@@ -2521,7 +2522,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(payload),
-    }).then(function (r) { return r.json(); })
+    }).then(npReadJson)
       .then(function (d) {
         if (d && d.success) {
           (d.warnings || []).forEach(function (w) { console.warn('catalog:', w); });
@@ -2541,8 +2542,8 @@
           alert(msg);
           npUnbusy(btn);
         }
-      }).catch(function () {
-        alert('{% trans "Network error." %}');
+      }).catch(function (err) {
+        npFailed(err);
         npUnbusy(btn);
       });
   }
@@ -2626,6 +2627,21 @@
       return;
     }
 
+    // What the customer is charged. Mandatory on a purchase bought for
+    // one — it is the price their order line is billed at, and the server
+    // refuses the save without it; checked here so the batch that was
+    // typed in isn't lost to a round trip, and the row is pointed at.
+    const forCustomer = npCustMode();
+    const missingSale = [];
+    document.querySelectorAll('#npProducts .np-v-sale.bad')
+      .forEach(function (el) { el.classList.remove('bad'); });
+    function npNeedsSale(scope, tops) {
+      if (!forCustomer || !tops.length) return;
+      const el = scope.querySelector('.np-v-sale');
+      const n = parseFloat(((el && el.value) || '').replace(',', '.'));
+      if (el && !(isFinite(n) && n > 0)) missingSale.push(el);
+    }
+
     const products = [];
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i];
@@ -2649,6 +2665,7 @@
           const priceEl = v.querySelector('.np-v-price');
           const curEl = v.querySelector('.np-v-cur');
           const tops = npCollectTops(v);
+          npNeedsSale(v, tops);
           if (attrs.length || sku || tops.length) variants.push({
             name: npRowLabel(v), attributes: attrs, sku: sku, tops: tops,
             price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
@@ -2661,6 +2678,7 @@
         const block = card.querySelector('.np-no-variant');
         const tops = npCollectTops(block);
         if (!tops.length) { alert(label + ': {% trans "Enter at least one quantity." %}'); return; }
+        npNeedsSale(block, tops);
         const priceEl = block.querySelector('.np-nv-price');
         const curEl = block.querySelector('.np-v-cur');
         variants.push({ name: '', sku: '', tops: tops, price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
@@ -2673,6 +2691,15 @@
                       category_id: (catSel && catSel.value) || null,
                       unit: npUnitOf(card),
                       pack_type: npPackOf(card).value || null });
+    }
+
+    if (missingSale.length) {
+      missingSale.forEach(function (el) { el.classList.add('bad'); });
+      alert('{% filter escapejs %}{% trans "Enter the sale price the customer is charged for every item — it is what their order is billed at." %}{% endfilter %}');
+      (missingSale[0].closest('.np-variant') || missingSale[0])
+        .scrollIntoView({ behavior: 'smooth', block: 'center' });
+      missingSale[0].focus();
+      return;
     }
 
     const sel = document.getElementById('npSupplier');
@@ -2714,6 +2741,24 @@
     return payload;
   }
 
+  // A save that comes back as anything but JSON — a server error page, a
+  // dropped connection — used to report itself as "Network error", which
+  // sends the operator to check their wifi for a bug in the save. These two
+  // separate the cases and name the status, so the next failure says where
+  // to look. Nothing was written either way: the save is one transaction.
+  function npReadJson(r) {
+    if (((r.headers.get('content-type') || '').indexOf('json') === -1)) {
+      throw new Error('{% filter escapejs %}{% trans "The server could not complete the save" %}{% endfilter %}' +
+                      ' (HTTP ' + r.status + '). ' +
+                      '{% filter escapejs %}{% trans "Nothing was saved — the server log says why." %}{% endfilter %}');
+    }
+    return r.json();
+  }
+  function npFailed(err) {
+    alert((err && err.message) ||
+          '{% filter escapejs %}{% trans "Network error." %}{% endfilter %}');
+  }
+
   function npBusy(btn, label) {
     btn._npOrig = btn.innerHTML;
     btn.disabled = true;
@@ -2735,11 +2780,11 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(payload),
-    }).then(function (r) { return r.json(); })
+    }).then(npReadJson)
       .then(function (d) {
         if (d && d.success) { window.location.href = d.detail_url; }
         else { alert((d && d.error) || '{% trans "Could not save." %}'); npUnbusy(btn); }
-      }).catch(function () { alert('{% trans "Network error." %}'); npUnbusy(btn); });
+      }).catch(function (err) { npFailed(err); npUnbusy(btn); });
   };
 
   // Receive: for a saved order, store any edits first and then confirm it,
@@ -2756,7 +2801,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(payload),
-    }).then(function (r) { return r.json(); })
+    }).then(npReadJson)
       .then(function (d) {
         if (!d || !d.success) {
           alert((d && d.error) || '{% trans "Could not save." %}');
@@ -2766,7 +2811,7 @@
         return fetch(GR_CONFIRM_TPL.replace('/0/', '/' + d.invoice_id + '/'), {
           method: 'POST',
           headers: { 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
-        }).then(function (r) { return r.json(); })
+        }).then(npReadJson)
           .then(function (c) {
             if (c && c.success) {
               (c.warnings || []).forEach(function (w) { console.warn('intake:', w); });
@@ -2782,7 +2827,7 @@
               npUnbusy(btn);
             }
           });
-      }).catch(function () { alert('{% trans "Network error." %}'); npUnbusy(btn); });
+      }).catch(function (err) { npFailed(err); npUnbusy(btn); });
   };
 
   // Receive straight away, without the order step — the delivery is already
@@ -2799,7 +2844,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(payload)
-    }).then(function (r) { return r.json(); })
+    }).then(npReadJson)
       .then(function (d) {
         if (d && d.success) {
           const list = d.created || [];
@@ -2823,8 +2868,8 @@
           alert((d && d.error) || '{% trans "Could not save." %}');
           btn.disabled = false; btn.innerHTML = orig;
         }
-      }).catch(function () {
-        alert('{% trans "Network error." %}');
+      }).catch(function (err) {
+        npFailed(err);
         btn.disabled = false; btn.innerHTML = orig;
       });
   };

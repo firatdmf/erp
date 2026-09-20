@@ -89,6 +89,59 @@ class ManualAddMainProductSkuTest(TestCase):
         # Nothing was written.
         self.assertFalse(WarehouseProduct.objects.filter(warehouse=self.warehouse).exists())
 
+    def test_two_cards_in_one_batch_cannot_share_a_typed_code(self):
+        """Product.sku is unique, so the second card could never be created.
+        It used to find that out from the database constraint, and the save
+        came back as a server error the page could only call a network
+        error — with the whole typed-in delivery still on screen."""
+        r = self.client.post(
+            reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
+            data=json.dumps({
+                "current_account_id": self.current_account.pk, "unit": "mt",
+                "products": [
+                    {"main_product": {"mode": "new", "name": "GREK", "sku": "GREK"},
+                     "has_variants": True,
+                     "variants": [{"name": "White", "sku": "", "price": "3.50",
+                                   "currency": "USD", "tops": [{"qty": 30}]}]},
+                    {"main_product": {"mode": "new", "name": "GREK 2", "sku": "GREK"},
+                     "has_variants": True,
+                     "variants": [{"name": "Earth", "sku": "", "price": "3.50",
+                                   "currency": "USD", "tops": [{"qty": 20}]}]},
+                ],
+            }), content_type="application/json")
+        self.assertEqual(r.status_code, 400, r.content[:500])
+        error = r.json()["error"]
+        self.assertIn("GREK", error)
+        self.assertIn("1", error)          # it names both cards
+        self.assertIn("2", error)
+        self.assertFalse(Product.objects.filter(sku="GREK").exists())
+        self.assertFalse(WarehouseProduct.objects.filter(warehouse=self.warehouse).exists())
+
+    def test_two_cards_may_both_take_the_previewed_auto_code(self):
+        """The page previews the same next code on every new card at once,
+        so the batch arrives with it twice. That one IS advisory: the second
+        card takes the code after it."""
+        r = self.client.post(
+            reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
+            data=json.dumps({
+                "current_account_id": self.current_account.pk, "unit": "mt",
+                "barcode_prefix": "KRV",
+                "products": [
+                    {"main_product": {"mode": "new", "name": "GREK", "sku": "KRV001"},
+                     "has_variants": True,
+                     "variants": [{"name": "White", "sku": "", "price": "3.50",
+                                   "currency": "USD", "tops": [{"qty": 30}]}]},
+                    {"main_product": {"mode": "new", "name": "PARIS", "sku": "KRV001"},
+                     "has_variants": True,
+                     "variants": [{"name": "Earth", "sku": "", "price": "3.50",
+                                   "currency": "USD", "tops": [{"qty": 20}]}]},
+                ],
+            }), content_type="application/json")
+        self.assertEqual(r.status_code, 200, r.content[:500])
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual(
+            sorted(Product.objects.values_list("sku", flat=True)), ["KRV001", "KRV002"])
+
     def test_picking_the_existing_product_does_not_clash_with_itself(self):
         """Existing mode sends the picked product's own SKU back (the saved
         order redisplays from it). That must not read as a duplicate."""

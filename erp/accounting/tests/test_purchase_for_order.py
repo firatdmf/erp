@@ -144,6 +144,46 @@ class PurchaseForCustomerTest(TestCase):
         self.assertFalse(Order.objects.exists())
         self.assertFalse(Product.objects.exists())
 
+    # ── The customer's price has to be stated ───────────────────────
+    def test_a_row_without_a_sale_price_is_refused(self):
+        """The sale price IS the order line's price, so a blank box opened
+        the customer's order at 0.00 and said nothing about it."""
+        r = self._save(self._plan(variants=[self._variant(sale="")]))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("K24644 G07", r.json()["error"])      # it names the row
+        self.assertFalse(Invoice.objects.exists())
+        self.assertFalse(Order.objects.exists())
+        self.assertFalse(Product.objects.exists())          # nor a catalog row
+
+    def test_a_zero_sale_price_is_refused_too(self):
+        r = self._save(self._plan(variants=[self._variant(sale="0")]))
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Order.objects.exists())
+
+    def test_a_row_with_no_quantity_is_not_asked_for_one(self):
+        """It is not going on the order, so it has nothing to be billed at."""
+        r = self._save(self._plan(variants=[
+            self._variant(),
+            self._variant(name="G08", sku="K24644.G08", tops=(), sale=""),
+        ]))
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Order.objects.get().items.count(), 1)
+
+    def test_a_purchase_for_stock_needs_no_sale_price(self):
+        """Nobody is being billed — the rule is the customer order's."""
+        r = self._save(self._plan(customer=False, variants=[self._variant(sale="")]))
+        self.assertEqual(r.status_code, 200, r.content)
+
+    def test_an_edit_that_blanks_the_price_leaves_the_order_as_it_was(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        r = self._save(self._plan(variants=[self._variant(tops=(40,), sale="")],
+                                  customer=False, product=Product.objects.get()),
+                       pk=inv_id)
+        self.assertEqual(r.status_code, 400)
+        line = Order.objects.get().items.get()
+        self.assertEqual(line.quantity, Decimal("55.00"))
+        self.assertEqual(line.price, Decimal("5.00"))
+
     # ── Editing the draft keeps the order in step ───────────────────
     def test_editing_the_draft_updates_the_order(self):
         inv_id = self._save(self._plan(variants=[
@@ -273,6 +313,27 @@ class PurchaseForCustomerTest(TestCase):
         [p] = r.context["supplier_purchases"]
         self.assertEqual(p.pk, inv_id)
         self.assertContains(r, "Awaiting delivery")
+
+    def test_a_line_added_on_the_order_says_no_purchase_covers_it(self):
+        """Nobody has been asked to supply it — without the chip that only
+        shows up when the delivery arrives short."""
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        extra = OrderItem.objects.create(order=order, product=Product.objects.get(),
+                                         quantity=Decimal("3"), price=Decimal("9"))
+        r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
+        flagged = {it.pk: it.not_on_purchase for it in r.context["order_items_sorted"]}
+        self.assertTrue(flagged.pop(extra.pk))
+        self.assertFalse(any(flagged.values()))
+        self.assertContains(r, "not on the purchase")
+
+    def test_an_order_with_no_live_purchase_flags_nothing(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
+        self.assertFalse(any(it.not_on_purchase for it in r.context["order_items_sorted"]))
+        self.assertNotContains(r, "not on the purchase")
 
     def test_the_form_reopens_with_the_customer(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]

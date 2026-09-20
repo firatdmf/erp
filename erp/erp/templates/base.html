@@ -341,7 +341,28 @@
             <circle cx="20" cy="20" r="1.6" class="clock-pin"/>
           </svg>
         </div>
-        <span class="header-date">{% now 'l, j F Y' %}</span>
+        <div class="header-stack">
+          <span class="header-date">{% now 'l, j F Y' %}</span>
+{% if fx_currencies %}
+          <div class="fx-mini" id="fxMini">
+            <input type="text" class="fx-mini-amt" id="fxMiniAmount" value="1"
+                   inputmode="decimal" autocomplete="off"
+                   aria-label="{% trans 'Amount to convert' %}">
+            <select class="fx-mini-ccy" id="fxMiniFrom" aria-label="{% trans 'Convert from' %}">
+              {% for code in fx_currencies %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
+            </select>
+            <button type="button" class="fx-mini-swap" id="fxMiniSwap"
+                    title="{% trans 'Swap currencies' %}" aria-label="{% trans 'Swap currencies' %}">
+              <i class="fas fa-arrow-right-arrow-left"></i>
+            </button>
+            <output class="fx-mini-out" id="fxMiniResult" for="fxMiniAmount">—</output>
+            <select class="fx-mini-ccy" id="fxMiniTo" aria-label="{% trans 'Convert to' %}">
+              {% for code in fx_currencies %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
+            </select>
+          </div>
+          <script id="fxMiniDefaults" type="application/json">{"from": "USD", "to": "{{ current_book.effective_base_currency.code|default:'TRY' }}"}</script>
+{% endif %}
+        </div>
       {% else %}
         <span class="welcome-text">{% blocktrans with first=user.first_name last=user.last_name %}Welcome, {{ first }} {{ last }}!{% endblocktrans %}</span>
         <span class="header-date">{% now 'F j, Y' %}</span>
@@ -415,33 +436,45 @@
         <i class="fas fa-cart-shopping"></i>
         <span class="top-bar-btn-label">{% trans "Orders" %}</span>
       </a>
-      <div class="favorites-container">
-        <button class="top-bar-btn" onclick="toggleFavorites()" id="topBarFavoritesBtn" title="{% trans 'Favorites' %}">
-          <i class="far fa-star"></i>
-          <span class="top-bar-btn-label">{% trans "Favorites" %}</span>
-        </button>
-        <div class="favorites-dropdown" id="favoritesDropdown">
-          <div class="favorites-header">
-            <h3>{% trans "Favorites" %}</h3>
-          </div>
-          <div class="favorites-list">
-            <a href="{% url 'operating:order_list' %}" class="favorites-item">
-              <span class="favorites-item-icon"><i class="fas fa-list"></i></span>
-              <span class="favorites-item-label">{% trans "Order list" %}</span>
-            </a>
-{% if not is_sales_rep %}
-            <a class="favorites-item" href="{% if current_book %}{% url 'operating:create_order_page' current_book.pk %}{% else %}{% url 'operating:order_list' %}{% endif %}">
-              <span class="favorites-item-icon"><i class="fas fa-cart-plus"></i></span>
-              <span class="favorites-item-label">{% trans "Create order" %}</span>
-            </a>
-            <a href="{% url 'accounts:legacy_list' %}" class="favorites-item">
-              <span class="favorites-item-icon"><i class="fas fa-id-card"></i></span>
-              <span class="favorites-item-label">{% trans "All Accounts" %}</span>
-            </a>
+{% if not is_sales_rep %}      <a href="{% url 'accounts:legacy_list' %}" class="top-bar-btn" id="topBarAccountsBtn" title="{% trans 'Accounts' %}">
+        <i class="fas fa-id-card"></i>
+        <span class="top-bar-btn-label">{% trans "Accounts" context "topbar" %}</span>
+      </a>
 {% endif %}
+{% if not is_sales_rep %}      <div class="topbar-menu-container">
+        <button class="top-bar-btn" onclick="toggleTransactionsMenu()" id="topBarTransactionsBtn" title="{% trans 'Transactions' %}">
+          <i class="fas fa-right-left"></i>
+          <span class="top-bar-btn-label">{% trans "Transactions" %}</span>
+        </button>
+        <div class="topbar-menu-dropdown" id="transactionsMenu">
+          <div class="topbar-menu-header">
+            <h3>{% trans "Transactions" %}</h3>
+          </div>
+          <div class="topbar-menu-list">
+            <a href="{% url 'accounting:go_add_expense' %}" class="topbar-menu-item">
+              <span class="topbar-menu-item-icon"><i class="fas fa-arrow-down"></i></span>
+              <span class="topbar-menu-item-label">{% trans "Add expense" %}</span>
+            </a>
+            <a href="{% url 'accounting:go_transfer' %}" class="topbar-menu-item">
+              <span class="topbar-menu-item-icon"><i class="fas fa-shuffle"></i></span>
+              <span class="topbar-menu-item-label">{% trans "Transfer" %}</span>
+            </a>
+            <a href="{% url 'accounting:go_currency_exchange' %}" class="topbar-menu-item">
+              <span class="topbar-menu-item-icon"><i class="fas fa-arrow-right-arrow-left"></i></span>
+              <span class="topbar-menu-item-label">{% trans "Currency exchange" %}</span>
+            </a>
+            <a href="{% url 'accounting:go_expenses' %}" class="topbar-menu-item">
+              <span class="topbar-menu-item-icon"><i class="fas fa-receipt"></i></span>
+              <span class="topbar-menu-item-label">{% trans "Expenses" %}</span>
+            </a>
+            <a href="{% url 'accounting:go_transactions' %}" class="topbar-menu-item">
+              <span class="topbar-menu-item-icon"><i class="fas fa-list"></i></span>
+              <span class="topbar-menu-item-label">{% trans "All transactions" %}</span>
+            </a>
           </div>
         </div>
       </div>
+{% endif %}
       <div class="notification-container">
         <button class="top-bar-btn" onclick="toggleNotifications()" id="topBarNotificationBell">
           <i class="far fa-bell"></i>
@@ -3586,39 +3619,151 @@
         }
       });
 
-      // Favorites dropdown (desktop) + favorites bottom sheet (mobile) —
-      // one shared toggle drives whichever surface the current viewport
-      // shows; the other is inert (hidden by CSS), so touching both
-      // classList states on every call is harmless.
-      let favoritesDropdownOpen = false;
-      function toggleFavorites() {
-        const dropdown = document.getElementById('favoritesDropdown');
-        const mSheet = document.getElementById('mobileFavSheet');
-        const mOverlay = document.getElementById('mobileFavOverlay');
-        if (!dropdown && !mSheet) return;
-        favoritesDropdownOpen = !favoritesDropdownOpen;
-        if (dropdown) dropdown.classList.toggle('show', favoritesDropdownOpen);
-        if (mSheet) mSheet.classList.toggle('is-open', favoritesDropdownOpen);
-        if (mOverlay) mOverlay.classList.toggle('is-open', favoritesDropdownOpen);
-        if (favoritesDropdownOpen) {
+      // Mini currency converter under the date. Rates come from the same
+      // endpoint the payment form uses, so the bar and the books quote the
+      // same published number. One fetch per pair per page; the result is
+      // greyed while a fetch is in flight so a stale figure never reads as
+      // the current one.
+      (function () {
+        const box = document.getElementById('fxMini');
+        if (!box) return;
+        const amountEl = document.getElementById('fxMiniAmount');
+        const fromEl   = document.getElementById('fxMiniFrom');
+        const toEl     = document.getElementById('fxMiniTo');
+        const outEl    = document.getElementById('fxMiniResult');
+        const swapEl   = document.getElementById('fxMiniSwap');
+        const RATE_URL = '{% url "accounts:fx_rate_lookup" %}';
+        const rates = {};
+        let pending = null;
+
+        function pick(sel, code) {
+          if (!code) return;
+          const opt = Array.prototype.find.call(sel.options, o => o.value === code);
+          if (opt) sel.value = code;
+        }
+
+        // Last pair the reader chose, else the book's own currency.
+        let defaults = { from: 'USD', to: 'TRY' };
+        try {
+          const raw = document.getElementById('fxMiniDefaults');
+          if (raw) defaults = JSON.parse(raw.textContent);
+        } catch (e) { /* fall through to the literals above */ }
+        try {
+          const saved = JSON.parse(localStorage.getItem('fxMiniPair') || 'null');
+          if (saved && saved.from && saved.to) defaults = saved;
+        } catch (e) { /* storage blocked or empty — use the defaults */ }
+        pick(fromEl, defaults.from);
+        pick(toEl, defaults.to);
+        if (fromEl.value === toEl.value && toEl.options.length > 1) {
+          // A pair that converts to itself tells the reader nothing.
+          toEl.selectedIndex = (fromEl.selectedIndex + 1) % toEl.options.length;
+        }
+
+        function remember() {
+          try {
+            localStorage.setItem('fxMiniPair',
+              JSON.stringify({ from: fromEl.value, to: toEl.value }));
+          } catch (e) { /* not worth interrupting anyone over */ }
+        }
+
+        function show(rate) {
+          const amount = parseFloat((amountEl.value || '').replace(',', '.'));
+          if (!isFinite(amount) || rate == null) { outEl.textContent = '—'; return; }
+          outEl.textContent = (amount * rate).toLocaleString(document.documentElement.lang || 'en',
+            { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function render() {
+          const key = fromEl.value + '>' + toEl.value;
+          if (fromEl.value === toEl.value) { rates[key] = 1; }
+          if (key in rates) {
+            outEl.classList.remove('is-stale');
+            show(rates[key]);
+            return;
+          }
+          outEl.classList.add('is-stale');
+          if (pending === key) return;
+          pending = key;
+          fetch(RATE_URL + '?from=' + encodeURIComponent(fromEl.value)
+                         + '&to=' + encodeURIComponent(toEl.value),
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+              rates[key] = data.rate ? parseFloat(data.rate) : null;
+              if (pending === key) pending = null;
+              if (fromEl.value + '>' + toEl.value === key) {
+                outEl.classList.remove('is-stale');
+                show(rates[key]);
+              }
+            })
+            .catch(() => {
+              if (pending === key) pending = null;
+              outEl.classList.remove('is-stale');
+              outEl.textContent = '—';
+            });
+        }
+
+        let typing = null;
+        amountEl.addEventListener('input', function () {
+          clearTimeout(typing);
+          typing = setTimeout(render, 200);
+        });
+        fromEl.addEventListener('change', function () { remember(); render(); });
+        toEl.addEventListener('change', function () { remember(); render(); });
+        swapEl.addEventListener('click', function () {
+          const a = fromEl.value;
+          fromEl.value = toEl.value;
+          toEl.value = a;
+          remember();
+          render();
+        });
+        render();
+      })();
+
+      // Transactions menu — the one dropdown in the top bar besides the
+      // notification bell, so the two close each other.
+      let transactionsMenuOpen = false;
+      function toggleTransactionsMenu() {
+        const menu = document.getElementById('transactionsMenu');
+        if (!menu) return;
+        transactionsMenuOpen = !transactionsMenuOpen;
+        menu.classList.toggle('show', transactionsMenuOpen);
+        if (transactionsMenuOpen) {
           const notif = document.getElementById('notificationDropdown');
           if (notif) { notif.classList.remove('active'); notificationDropdownOpen = false; }
         }
       }
       document.addEventListener('click', function (e) {
-        if (!favoritesDropdownOpen) return;
-        const container = document.querySelector('.favorites-container');
+        if (!transactionsMenuOpen) return;
+        const container = document.querySelector('.topbar-menu-container');
+        if (container && container.contains(e.target)) return;
+        const menu = document.getElementById('transactionsMenu');
+        if (menu) menu.classList.remove('show');
+        transactionsMenuOpen = false;
+      });
+
+      // Favorites bottom sheet — mobile only. The desktop top bar used to
+      // carry a matching dropdown; it was replaced by direct buttons, so
+      // this now drives the one remaining surface.
+      let favSheetOpen = false;
+      function toggleFavorites() {
+        const mSheet = document.getElementById('mobileFavSheet');
+        const mOverlay = document.getElementById('mobileFavOverlay');
+        if (!mSheet) return;
+        favSheetOpen = !favSheetOpen;
+        mSheet.classList.toggle('is-open', favSheetOpen);
+        if (mOverlay) mOverlay.classList.toggle('is-open', favSheetOpen);
+      }
+      document.addEventListener('click', function (e) {
+        if (!favSheetOpen) return;
         const mSheet = document.getElementById('mobileFavSheet');
         const mTrigger = document.getElementById('mobileFavTrigger');
-        const insideDesktop = container && container.contains(e.target);
-        const insideMobile = (mSheet && mSheet.contains(e.target)) || (mTrigger && mTrigger.contains(e.target));
-        if (!insideDesktop && !insideMobile) {
-          const dropdown = document.getElementById('favoritesDropdown');
-          if (dropdown) dropdown.classList.remove('show');
+        const inside = (mSheet && mSheet.contains(e.target)) || (mTrigger && mTrigger.contains(e.target));
+        if (!inside) {
           if (mSheet) mSheet.classList.remove('is-open');
           const mOverlay = document.getElementById('mobileFavOverlay');
           if (mOverlay) mOverlay.classList.remove('is-open');
-          favoritesDropdownOpen = false;
+          favSheetOpen = false;
         }
       });
 

@@ -402,7 +402,7 @@ body > main {
    ============================================================ */
 .global-top-bar {
   display: grid !important;
-  grid-template-columns: minmax(180px, 1fr) minmax(280px, 560px) minmax(180px, 1fr) !important;
+  grid-template-columns: minmax(160px, 1fr) minmax(200px, 560px) max-content !important;
   align-items: center !important;
   gap: 18px !important;
   height: 64px !important;
@@ -497,6 +497,104 @@ body { padding-top: 64px !important; }
   border-radius: var(--radius-pill, 999px) !important;
   white-space: nowrap !important;
 }
+/* Date pill + mini converter, stacked in the left column */
+.global-top-bar .header-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+/* Mini currency converter — one line, sized like the date pill above it.
+   Reads a rate from accounts:fx_rate_lookup, the same endpoint the payment
+   form uses, so it shows the published rate and nothing invented. */
+.global-top-bar .fx-mini {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  padding: 1px 6px !important;
+  background: var(--gray-50, #F8FAFB) !important;
+  border: 1px solid var(--border-subtle, #E8ECEF) !important;
+  border-radius: var(--radius-pill, 999px) !important;
+  max-width: 100% !important;
+}
+.global-top-bar .fx-mini-amt,
+.global-top-bar .fx-mini-out {
+  font: 500 11.5px var(--font-mono, 'JetBrains Mono') !important;
+  color: var(--gray-800, #1B2128) !important;
+  background: transparent !important;
+  border: 0 !important;
+  outline: none !important;
+  padding: 2px 0 !important;
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+.global-top-bar .fx-mini-amt {
+  width: 72px !important;
+  flex: 0 0 72px !important;
+  padding: 2px 6px !important;
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-subtle, #E8ECEF) !important;
+  border-radius: var(--radius-sm, 6px) !important;
+}
+.global-top-bar .fx-mini-amt:focus {
+  border-color: var(--nejum-teal-600, #006B6B) !important;
+}
+.global-top-bar .fx-mini-out {
+  min-width: 72px !important;
+  color: var(--nejum-teal-700, #005354) !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}
+.global-top-bar .fx-mini-out.is-stale {
+  color: var(--gray-400, #9AA3AC) !important;
+}
+.global-top-bar .fx-mini-ccy {
+  font: 600 10.5px var(--font-sans, 'Plus Jakarta Sans') !important;
+  color: var(--gray-600, #4B5563) !important;
+  background: transparent !important;
+  border: 0 !important;
+  outline: none !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  text-align: center !important;
+}
+.global-top-bar .fx-mini-ccy:hover {
+  color: var(--nejum-teal-600, #006B6B) !important;
+}
+.global-top-bar .fx-mini-swap {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 16px !important;
+  height: 16px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  color: var(--gray-400, #9AA3AC) !important;
+  font-size: 8px !important;
+  cursor: pointer !important;
+  flex: 0 0 16px !important;
+}
+.global-top-bar .fx-mini-swap:hover {
+  background: rgba(0, 128, 128, 0.10) !important;
+  color: var(--nejum-teal-600, #006B6B) !important;
+}
+@media (max-width: 1600px) {
+  .global-top-bar {
+    grid-template-columns: minmax(160px, 1fr) minmax(200px, 440px) max-content !important;
+  }
+}
+/* The left column is 1fr and gives way to the search box and the buttons
+   first; below this there is no room for a second line under the date. */
+@media (max-width: 1365px) {
+  .global-top-bar .fx-mini { display: none !important; }
+}
+
 /* Brand label + user pill (Nejum theme) */
 .global-top-bar .brand-name {
   font: 800 14px var(--font-sans, 'Plus Jakarta Sans') !important;
@@ -635,11 +733,11 @@ body { padding-top: 64px !important; }
   min-width: 0 !important;
 }
 .global-top-bar .notification-container,
-.global-top-bar .favorites-container {
-  width: 64px !important;
+.global-top-bar .topbar-menu-container {
+  width: auto !important;
   height: 48px !important;
-  flex: 0 1 64px !important;
-  min-width: 44px !important;
+  flex: 0 0 auto !important;
+  min-width: 64px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -649,7 +747,7 @@ body { padding-top: 64px !important; }
 }
 
 /* Favorites dropdown — premium */
-.global-top-bar .favorites-dropdown {
+.global-top-bar .topbar-menu-dropdown {
   position: absolute !important;
   top: calc(100% + 10px) !important;
   right: 0 !important;
@@ -670,28 +768,28 @@ body { padding-top: 64px !important; }
               transform 200ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)) !important;
   z-index: 9999 !important;
 }
-.global-top-bar .favorites-dropdown.show {
+.global-top-bar .topbar-menu-dropdown.show {
   opacity: 1 !important;
   visibility: visible !important;
   transform: translateY(0) !important;
 }
-.global-top-bar .favorites-header {
+.global-top-bar .topbar-menu-header {
   padding: 8px 12px 6px !important;
   border-bottom: 1px solid var(--border-subtle, #EDF0F2) !important;
   margin-bottom: 6px !important;
 }
-.global-top-bar .favorites-header h3 {
+.global-top-bar .topbar-menu-header h3 {
   margin: 0 !important;
   font: 600 13px var(--font-sans, 'Plus Jakarta Sans'), sans-serif !important;
   color: var(--gray-700, #374151) !important;
   letter-spacing: 0.01em !important;
 }
-.global-top-bar .favorites-list {
+.global-top-bar .topbar-menu-list {
   display: flex !important;
   flex-direction: column !important;
   gap: 2px !important;
 }
-.global-top-bar .favorites-item {
+.global-top-bar .topbar-menu-item {
   display: flex !important;
   align-items: center !important;
   gap: 10px !important;
@@ -703,11 +801,11 @@ body { padding-top: 64px !important; }
   transition: background 150ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
               color 150ms !important;
 }
-.global-top-bar .favorites-item:hover {
+.global-top-bar .topbar-menu-item:hover {
   background: var(--gray-50, #F8FAFB) !important;
   color: var(--nejum-teal-600, #006B6B) !important;
 }
-.global-top-bar .favorites-item-icon {
+.global-top-bar .topbar-menu-item-icon {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -720,11 +818,11 @@ body { padding-top: 64px !important; }
   flex: 0 0 28px !important;
   transition: background 150ms, color 150ms !important;
 }
-.global-top-bar .favorites-item:hover .favorites-item-icon {
+.global-top-bar .topbar-menu-item:hover .topbar-menu-item-icon {
   background: rgba(0, 128, 128, 0.10) !important;
   color: var(--nejum-teal-600, #006B6B) !important;
 }
-.global-top-bar .favorites-item-label {
+.global-top-bar .topbar-menu-item-label {
   flex: 1 !important;
 }
 .global-top-bar .top-bar-btn {
@@ -733,11 +831,11 @@ body { padding-top: 64px !important; }
   align-items: center !important;
   justify-content: center !important;
   gap: 4px !important;
-  width: 64px !important;
+  width: auto !important;
   height: 48px !important;
-  padding: 4px 4px !important;
-  flex: 0 1 64px !important;
-  min-width: 44px !important;
+  padding: 4px 10px !important;
+  flex: 0 0 auto !important;
+  min-width: 64px !important;
   border-radius: var(--radius-sm, 6px) !important;
   background: transparent !important;
   border: 1px solid transparent !important;
@@ -772,7 +870,8 @@ body { padding-top: 64px !important; }
 .global-top-bar .notification-dot {
   position: absolute !important;
   top: 2px !important;
-  right: 18px !important;
+  left: calc(50% + 2px) !important;
+  right: auto !important;
   min-width: 16px !important;
   height: 16px !important;
   padding: 0 4px !important;

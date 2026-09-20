@@ -350,6 +350,8 @@ TEMPLATES = [
                 "erp.context_processors.all_members",
                 "erp.context_processors.ui_theme",
                 "erp.context_processors.role_flags",
+                # Currency codes for the top bar's mini converter.
+                "erp.context_processors.fx_mini",
                 # Which book the reader is in — the sidebar prints it and
                 # every book-scoped link is built from it.
                 "accounting.book_scope.current_book",

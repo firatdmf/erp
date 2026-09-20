@@ -143,3 +143,29 @@ def role_flags(request):
         "is_sales_rep": is_sales_rep(user),
         "is_brand_admin": _is_admin(user),
     }
+
+
+def fx_mini(request):
+    """Currency codes for the top bar's mini converter.
+
+    A handful of rows that change about never, so it is cached like the
+    other chrome lookups rather than queried on every page. Anonymous
+    requests get an empty list and the widget is not drawn — the top bar
+    itself is signed-in chrome.
+    """
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return {"fx_currencies": []}
+    codes = cache.get("fx_mini_currencies")
+    if codes is None:
+        try:
+            from accounting.models import CurrencyCategory
+            codes = list(
+                CurrencyCategory.objects
+                .order_by("code")
+                .values_list("code", flat=True)
+            )
+        except Exception:
+            codes = []
+        cache.set("fx_mini_currencies", codes, 300)
+    return {"fx_currencies": codes}

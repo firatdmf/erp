@@ -727,7 +727,11 @@ def post_order_movement(order, *, member=None):
 
     if existing:
         # Update in place — keeps the movement's id stable and avoids
-        # phantom rows in the ledger UI.
+        # phantom rows in the ledger UI. A changed customer moves the row
+        # with it; left behind, it kept billing the old account.
+        previous_account = (existing.current_account
+                            if existing.current_account_id != current_account.pk else None)
+        existing.current_account = current_account
         existing.amount = total
         existing.currency = currency
         existing.book = book
@@ -737,6 +741,8 @@ def post_order_movement(order, *, member=None):
         # Force amount_base recompute on save.
         existing.amount_base = Decimal("0")
         existing.save()
+        if previous_account:
+            previous_account.recompute_balance(save=True)
         return existing
 
     return CurrentAccountMovement.objects.create(

@@ -22,19 +22,27 @@
   .qf-ac-row small { display:block; color:#94A3B8; font-size:11px; }
   .qf-chip { display:inline-flex; align-items:center; gap:8px; padding:7px 12px; background:#E5F1F0; color:#005354; border-radius:999px; font:700 12.5px var(--font-sans); }
   .qf-chip button { border:0; background:transparent; color:inherit; cursor:pointer; font-size:14px; }
-  .qf-lines { width:100%; border-collapse:collapse; }
+  /* Fixed columns: a line's amount growing by a digit must not push the
+     inputs beside it around. */
+  .qf-lines { width:100%; border-collapse:collapse; table-layout:fixed; }
+  .qf-lines col.c-qty { width:110px; } .qf-lines col.c-unit { width:80px; }
+  .qf-lines col.c-price { width:120px; } .qf-lines col.c-amount { width:150px; }
+  .qf-lines col.c-x { width:30px; }
   .qf-lines th { text-align:left; font:700 10.5px var(--font-sans); text-transform:uppercase; letter-spacing:.06em; color:#6B7280; padding:6px 6px; }
   .qf-lines td { padding:5px 6px; vertical-align:top; }
   .qf-lines .qf-in { height:36px; }
   .qf-num { text-align:right; }
-  .qf-x { width:32px; height:36px; border:1px solid #FCA5A5; background:#FEF2F2; color:#B91C1C; border-radius:8px; cursor:pointer; }
+  .qf-amount, #qf-total { font-variant-numeric: tabular-nums; }
+  .qf-amount-cell { padding-top:12px !important; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .qf-x { height:36px; padding:0 4px; border:0; background:none; color:#DC2626; font-size:20px; line-height:1; cursor:pointer; }
+  .qf-x:hover { color:#991B1B; }
   .qf-add { display:inline-flex; align-items:center; gap:6px; margin-top:8px; padding:8px 12px; border:1px dashed #9CC5C0; background:#F6FAFA; color:#005354; border-radius:9px; font:700 12.5px var(--font-sans); cursor:pointer; }
   .qf-total { display:flex; justify-content:flex-end; gap:12px; margin-top:12px; font:800 15px var(--font-sans); }
   .qf-bar { position:sticky; bottom:0; display:flex; justify-content:flex-end; gap:10px; padding:12px 0; background:rgba(255,255,255,.94); backdrop-filter:blur(8px); border-top:1px solid #EEF2F6; }
   .qf-btn { padding:10px 18px; border-radius:10px; border:1px solid #E0E6EE; background:#fff; font:700 13px var(--font-sans); cursor:pointer; }
   .qf-btn.primary { background:linear-gradient(180deg,#16897D,#0F6B62); border-color:#0F6B62; color:#fff; }
   .qf-err { display:none; margin-bottom:12px; padding:10px 14px; border-radius:10px; background:#FEF2F2; border:1px solid #FCA5A5; color:#B91C1C; font-weight:600; }
-  @media (max-width: 640px) { .qf { padding: 12px 12px 120px; } .qf-lines thead { display:none; } .qf-lines tr { display:grid; grid-template-columns: 1fr 1fr; gap:6px; padding:8px 0; border-bottom:1px solid #F1F5F9; } .qf-lines td { padding:0; } .qf-lines td:first-child { grid-column: 1 / -1; } }
+  @media (max-width: 640px) { .qf { padding: 12px 12px 120px; } .qf-lines { table-layout:auto; } .qf-lines colgroup, .qf-lines thead { display:none; } .qf-lines tr { display:grid; grid-template-columns: 1fr 1fr; gap:6px; padding:8px 0; border-bottom:1px solid #F1F5F9; } .qf-lines td { padding:0; } .qf-lines td:first-child { grid-column: 1 / -1; } }
 </style>
 {% endblock %}
 {% block content %}
@@ -45,21 +53,23 @@
 
   <div class="qf-card">
     <h3>{% trans "Customer" %}</h3>
-    <input type="hidden" id="qf-cust-type" value="{{ quote.customer_type|default:'' }}">
-    <input type="hidden" id="qf-cust-pk" value="{% if quote.company_id %}{{ quote.company_id }}{% elif quote.contact_id %}{{ quote.contact_id }}{% endif %}">
-    <div id="qf-cust-picked" style="margin-bottom:10px; {% if not quote.contact_id and not quote.company_id %}display:none;{% endif %}">
-      <span class="qf-chip"><i class="fa fa-user"></i> <span id="qf-cust-name">{% if quote.contact_id or quote.company_id %}{{ quote.get_client }}{% endif %}</span>
+    {% with cq=quote|default:prefill %}
+    <input type="hidden" id="qf-cust-type" value="{{ cq.customer_type|default:'' }}">
+    <input type="hidden" id="qf-cust-pk" value="{% if cq.company_id %}{{ cq.company_id }}{% elif cq.contact_id %}{{ cq.contact_id }}{% endif %}">
+    <div id="qf-cust-picked" style="margin-bottom:10px; {% if not cq.contact_id and not cq.company_id %}display:none;{% endif %}">
+      <span class="qf-chip"><i class="fa fa-user"></i> <span id="qf-cust-name">{% if cq.contact_id or cq.company_id %}{{ cq.get_client }}{% endif %}</span>
         <button type="button" onclick="qfClearCustomer()" title="{% trans 'Change' %}">×</button></span>
     </div>
     <div class="qf-grid">
-      <div class="qf-f qf-ac" id="qf-cust-search-wrap" {% if quote.contact_id or quote.company_id %}style="display:none;"{% endif %}>
+      <div class="qf-f qf-ac" id="qf-cust-search-wrap" {% if cq.contact_id or cq.company_id %}style="display:none;"{% endif %}>
         <span class="qf-l">{% trans "Find in CRM" %}</span>
         <input class="qf-in" id="qf-cust-search" placeholder="{% trans 'Type a contact or company name…' %}" autocomplete="off">
         <div class="qf-ac-list" id="qf-cust-results"></div>
       </div>
-      <div class="qf-f"><span class="qf-l">{% trans "Or a name (not in CRM yet)" %}</span><input class="qf-in" id="qf-cust-free" value="{{ quote.customer_name|default:'' }}"></div>
-      <div class="qf-f"><span class="qf-l">{% trans "Phone" %}</span><input class="qf-in" id="qf-cust-phone" value="{{ quote.customer_phone|default:'' }}"></div>
-      <div class="qf-f"><span class="qf-l">{% trans "Email" %}</span><input class="qf-in" id="qf-cust-email" type="email" value="{{ quote.customer_email|default:'' }}"></div>
+      <div class="qf-f"><span class="qf-l">{% trans "Or a name (not in CRM yet)" %}</span><input class="qf-in" id="qf-cust-free" value="{{ cq.customer_name|default:'' }}"></div>
+      <div class="qf-f"><span class="qf-l">{% trans "Phone" %}</span><input class="qf-in" id="qf-cust-phone" value="{{ cq.customer_phone|default:'' }}"></div>
+      <div class="qf-f"><span class="qf-l">{% trans "Email" %}</span><input class="qf-in" id="qf-cust-email" type="email" value="{{ cq.customer_email|default:'' }}"></div>
+    {% endwith %}
     </div>
     <div style="font-size:11.5px; color:#6B7280; margin-top:8px;"><i class="fa fa-circle-info"></i> {% trans "A quote for a name only can be printed; turning it into an order needs a CRM customer." %}</div>
   </div>
@@ -79,11 +89,12 @@
   <div class="qf-card">
     <h3>{% trans "Lines" %}</h3>
     <table class="qf-lines">
-      <thead><tr><th style="width:44%;">{% trans "Product or description" %}</th><th class="qf-num">{% trans "Quantity" %}</th><th>{% trans "Unit" %}</th><th class="qf-num">{% trans "Unit price" %}</th><th class="qf-num">{% trans "Amount" %}</th><th></th></tr></thead>
+      <colgroup><col><col class="c-qty"><col class="c-unit"><col class="c-price"><col class="c-amount"><col class="c-x"></colgroup>
+      <thead><tr><th>{% trans "Product or description" %}</th><th class="qf-num">{% trans "Quantity" %}</th><th>{% trans "Unit" %}</th><th class="qf-num">{% trans "Unit price" %}</th><th class="qf-num">{% trans "Amount" %}</th><th></th></tr></thead>
       <tbody id="qf-rows"></tbody>
     </table>
     <button type="button" class="qf-add" onclick="qfAddRow()"><i class="fa fa-plus"></i> {% trans "Add line" %}</button>
-    <div class="qf-total"><span style="color:#6B7280; font-weight:600;">{% trans "Total" %}</span><span id="qf-total">0.00</span></div>
+    <div class="qf-total"><span style="color:#6B7280; font-weight:600;">{% trans "Total" %}</span><span id="qf-total"></span></div>
   </div>
 
   <div class="qf-card">
@@ -96,6 +107,7 @@
   </div>
 </div>
 
+{{ currency_signs|json_script:"qf-signs" }}
 <script>
 (function () {
   const CUST_URL = "{% url 'crm:customer_autocomplete' %}";
@@ -106,6 +118,45 @@
   const rows = document.getElementById('qf-rows');
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  // Amounts are written the way the page's language writes numbers —
+  // 1,234.50 in English, 1.234,50 in Turkish — behind the sign of the
+  // currency the quote is priced in.
+  const FMT = new Intl.NumberFormat(document.documentElement.lang || 'en',
+                                    { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const SIGNS = JSON.parse(document.getElementById('qf-signs').textContent);
+  const BASE_CODE = "{{ base_currency_code|escapejs }}";
+  const ACCOUNT_CURRENCY_URL = "{% url 'operating:customer_currency' %}";
+  const currencySel = document.getElementById('qf-currency');
+  const accountOption = currencySel.querySelector('option[value=""]');
+  const accountOptionLabel = accountOption.textContent;
+  // What "Customer's account currency" comes to for the customer and book
+  // picked now; null until known. A quote for a name only, or a customer
+  // with no account in the book, is priced in the base currency — the same
+  // fallback the server applies when it saves.
+  let accountCode = null;
+
+  function currencyCode() { return currencySel.value || accountCode || BASE_CODE; }
+  function money(a) {
+    const sign = SIGNS[currencyCode()] || currencyCode();
+    // A sign made of letters (TL, CHF) reads as a word, so it gets a space.
+    return sign + (/[A-Za-z]$/.test(sign) ? '\u00a0' : '') + FMT.format(a);
+  }
+  async function refreshAccountCurrency() {
+    const type = document.getElementById('qf-cust-type').value;
+    const pk = document.getElementById('qf-cust-pk').value;
+    const book = document.getElementById('qf-book').value;
+    accountCode = null;
+    if (type && pk && book) {
+      try {
+        const r = await fetch(ACCOUNT_CURRENCY_URL + '?book=' + encodeURIComponent(book) +
+                              '&type=' + encodeURIComponent(type) + '&pk=' + encodeURIComponent(pk));
+        if (r.ok) accountCode = (await r.json()).currency || null;
+      } catch (e) { /* falls back to the base currency */ }
+    }
+    accountOption.textContent = accountOptionLabel + ' (' + (accountCode || BASE_CODE) + ')';
+    qfRecalc();
+  }
+  document.getElementById('qf-book').addEventListener('change', refreshAccountCurrency);
   function num(v) { const n = parseFloat(String(v || '').replace(',', '.')); return isNaN(n) ? 0 : n; }
 
   // ── Customer ────────────────────────────────────────────────────
@@ -132,6 +183,7 @@
       document.getElementById('qf-cust-search-wrap').style.display = 'none';
       document.getElementById('qf-cust-free').value = '';
       custResults.style.display = 'none';
+      refreshAccountCurrency();
       return;
     }
     const create = e.target.closest('.customer-ac-create');
@@ -148,6 +200,7 @@
     document.getElementById('qf-cust-picked').style.display = 'none';
     document.getElementById('qf-cust-search-wrap').style.display = '';
     custSearch.focus();
+    refreshAccountCurrency();
   };
 
   // ── Lines ───────────────────────────────────────────────────────
@@ -162,9 +215,9 @@
         '<div class="qf-picked" style="font-size:11px; color:#0B5F60; margin-top:3px; ' + (data.sku ? '' : 'display:none;') + '"><i class="fa fa-tag"></i> <span>' + esc(data.sku || '') + '</span></div>' +
       '</div></td>' +
       '<td><input class="qf-in qf-qty qf-num" type="number" inputmode="decimal" step="0.01" min="0" value="' + esc(data.quantity || '') + '" oninput="qfRecalc()"></td>' +
-      '<td><input class="qf-in qf-unit" value="' + esc(data.unit || '') + '" style="width:70px;"></td>' +
+      '<td><input class="qf-in qf-unit" value="' + esc(data.unit || '') + '"></td>' +
       '<td><input class="qf-in qf-price qf-num" type="number" inputmode="decimal" step="0.01" min="0" value="' + esc(data.price || '') + '" oninput="qfRecalc()"></td>' +
-      '<td class="qf-num" style="padding-top:12px; font-weight:700; white-space:nowrap;"><span class="qf-amount">0.00</span></td>' +
+      '<td class="qf-num qf-amount-cell"><span class="qf-amount"></span></td>' +
       '<td><button type="button" class="qf-x" title="{% trans "Remove" %}" onclick="this.closest(\'tr\').remove(); qfRecalc();">×</button></td>';
     rows.appendChild(tr);
     const desc = tr.querySelector('.qf-desc'), sku = tr.querySelector('.qf-sku');
@@ -203,10 +256,10 @@
     let total = 0;
     rows.querySelectorAll('tr').forEach(tr => {
       const a = num(tr.querySelector('.qf-qty').value) * num(tr.querySelector('.qf-price').value);
-      tr.querySelector('.qf-amount').textContent = a.toFixed(2);
+      tr.querySelector('.qf-amount').textContent = money(a);
       total += a;
     });
-    document.getElementById('qf-total').textContent = total.toFixed(2);
+    document.getElementById('qf-total').textContent = money(total);
   };
   document.addEventListener('click', (e) => { if (!e.target.closest('.qf-ac')) rows.querySelectorAll('.qf-prod-results').forEach(l => l.style.display = 'none'); });
 
@@ -249,6 +302,7 @@
   };
 
   if (initial.length) initial.forEach(qfAddRow); else qfAddRow();
+  refreshAccountCurrency();
 })();
 </script>
 {% endblock %}

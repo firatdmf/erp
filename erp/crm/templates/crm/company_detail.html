@@ -179,9 +179,10 @@
 
   /* ATTACH-ITEM BUTTONS */
   .od-attach-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
   }
   .od-attach-btn {
+    text-decoration: none;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 6px; padding: 14px 10px; background: white; border: 1px dashed #D6DDE5;
     border-radius: 10px; font: 600 12.5px var(--font-sans); color: var(--gray-700);
@@ -731,6 +732,10 @@
               <i class="fa fa-user"></i>
               <span>{% trans "Contact" %}</span>
             </button>
+            <a class="od-attach-btn attach-option-btn" href="{% url 'marketing:quote_create' %}?company={{ company.id }}">
+              <i class="fa fa-file-signature"></i>
+              <span>{% trans "Quote" %}</span>
+            </a>
           </div>
 
           <!-- Note Attach Section -->

@@ -158,6 +158,19 @@ def _resolve_lines(data):
     return lines
 
 
+def _prefill_customer(request):
+    """An unsaved quote naming the customer a new quote was started for,
+    or None. The CRM contact and company pages open the form with
+    ?contact=<id> or ?company=<id>, so the quote starts out theirs."""
+    for kind, model in (("company", Company), ("contact", Contact)):
+        pk = (request.GET.get(kind) or "").strip()
+        if pk.isdigit():
+            found = model.objects.filter(pk=int(pk)).first()
+            if found is not None:
+                return Quote(**{kind: found})
+    return None
+
+
 @method_decorator(login_required, name="dispatch")
 class QuoteForm(View):
     template_name = "marketing/quote_form.html"
@@ -184,10 +197,17 @@ class QuoteForm(View):
                     "unit": it.unit, "price": str(it.price),
                 })
         current_book = getattr(request, "book", None)
+        currencies = list(CurrencyCategory.objects.order_by("code"))
+        base = _base_currency()
         return render(request, self.template_name, {
+            # The sign each amount on the form is written with. A currency
+            # with no symbol of its own is written with its code.
+            "currency_signs": {c.code: c.symbol or c.code for c in currencies},
+            "base_currency_code": base.code if base else "",
             "quote": quote,
+            "prefill": None if quote else _prefill_customer(request),
             "items_json": json.dumps(items),
-            "currencies": CurrencyCategory.objects.order_by("code"),
+            "currencies": currencies,
             "my_books": _books_for(request),
             "default_book_id": (quote.book_id if quote else
                                 (current_book.pk if current_book else None)),
@@ -261,7 +281,14 @@ def quote_detail(request, pk):
 
 @login_required
 def quote_print(request, pk):
-    return render(request, "marketing/quote_print.html", _quote_page_context(request, pk))
+    from erp.nejum_credit import brand_color, credit_html
+    context = _quote_page_context(request, pk)
+    # Signed like the order sheet: the house's name in the house's colour,
+    # and the Nejum credit for the quote's own book, which may trade
+    # under a name of its own.
+    context["brand_color"] = brand_color()
+    context["nejum_credit_html"] = credit_html(context["quote"].book)
+    return render(request, "marketing/quote_print.html", context)
 
 
 # ── Status / conversion ──────────────────────────────────────────────

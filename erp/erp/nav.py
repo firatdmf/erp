@@ -163,6 +163,10 @@ NAV_SECTIONS = [
                 {"label": _("Product groups"),   "icon": "layers",      "url": "marketing:product_group_list"},
                 {"label": _("Add product group"), "icon": "plus-circle", "url": "marketing:product_group_create"},
             ]},
+            {"title": _("QUOTES"), "items": [
+                {"label": _("Create quote"), "icon": "plus-circle", "url": "marketing:quote_create"},
+                {"label": _("Quotes"),       "icon": "file-text",   "url": "marketing:quote_list"},
+            ]},
             {"title": _("CUSTOMERS"), "items": [
                 {"label": _("Companies"), "icon": "building-2", "url": "crm:company_list"},
                 {"label": _("Contacts"),  "icon": "users",      "url": "crm:contact_list"},

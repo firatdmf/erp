@@ -10348,3 +10348,180 @@ msgstr "örn. Nakliye"
 
 msgid "Goods"
 msgstr "Mal bedeli"
+
+msgid "A line needs a product or a description."
+msgstr "Bir satırda ürün ya da açıklama olmalı."
+
+msgid "A quote for a name only can be printed; turning it into an order needs a CRM customer."
+msgstr "Yalnızca isimle verilen teklif yazdırılabilir; siparişe dönüştürmek için CRM müşterisi gerekir."
+
+msgid "A quote that was accepted or declined can't be edited."
+msgstr "Kabul ya da reddedilmiş bir teklif düzenlenemez."
+
+msgid "Accepted"
+msgstr "Kabul edildi"
+
+msgid "Accepted — create order"
+msgstr "Kabul edildi — sipariş oluştur"
+
+msgid "Add at least one line with a quantity."
+msgstr "Miktarı olan en az bir satır ekleyin."
+
+msgid "Back to quotes"
+msgstr "Tekliflere dön"
+
+msgid "Became order"
+msgstr "Siparişe dönüştü"
+
+msgid "Create an order from this quote? The customer's account is charged for it."
+msgstr "Bu tekliften sipariş oluşturulsun mu? Müşterinin cari hesabına yansıtılır."
+
+#: erp/nav.py
+msgid "Create quote"
+msgstr "Teklif oluştur"
+
+
+msgid "Created from quote %(number)s"
+msgstr "%(number)s teklifinden oluşturuldu"
+
+msgid "Customer's account currency"
+msgstr "Müşterinin hesap para birimi"
+
+msgid "Declined"
+msgstr "Reddedildi"
+
+msgid "Edit quote"
+msgstr "Teklifi düzenle"
+
+msgid "Expired"
+msgstr "Süresi doldu"
+
+msgid "Find in CRM"
+msgstr "CRM'de ara"
+
+msgid "Invalid data."
+msgstr "Geçersiz veri."
+
+msgid "Lead time, what the price includes, payment terms…"
+msgstr "Teslim süresi, fiyata dahil olanlar, ödeme koşulları…"
+
+msgid "Line %(n)s"
+msgstr "Satır %(n)s"
+
+msgid "Lines"
+msgstr "Satırlar"
+
+msgid "Mark as sent"
+msgstr "Gönderildi olarak işaretle"
+
+msgid "Mark this quote as declined?"
+msgstr "Bu teklif reddedildi olarak işaretlensin mi?"
+
+msgid "New quote"
+msgstr "Yeni teklif"
+
+msgid "No catalog product has the SKU %(sku)s."
+msgstr "%(sku)s SKU'lu bir katalog ürünü yok."
+
+msgid "No quotes yet."
+msgstr "Henüz teklif yok."
+
+msgid "Notes on the quote"
+msgstr "Teklif notları"
+
+msgid "Notes printed on the quote"
+msgstr "Teklifte basılacak notlar"
+
+msgid "Number or customer"
+msgstr "Numara ya da müşteri"
+
+msgid "Only an open quote can become an order."
+msgstr "Yalnızca açık bir teklif siparişe dönüşebilir."
+
+msgid "Or a name (not in CRM yet)"
+msgstr "Ya da bir isim (henüz CRM'de değil)"
+
+msgid "Order saved but its account could not be linked: %(error)s"
+msgstr "Sipariş kaydedildi ama cari hesabı bağlanamadı: %(error)s"
+
+msgid "Pick a CRM customer — the order's account needs one."
+msgstr "CRM'den bir müşteri seçin — siparişin cari hesabı için gerekli."
+
+msgid "Pick the book this quote belongs to."
+msgstr "Bu teklifin ait olduğu defteri seçin."
+
+msgid "Prepared for"
+msgstr "Hazırlanan"
+
+msgid "Prices are valid until %(date)s."
+msgstr "Fiyatlar %(date)s tarihine kadar geçerlidir."
+
+msgid "Product or description"
+msgstr "Ürün ya da açıklama"
+
+msgid "QUOTE"
+msgstr "TEKLİF"
+
+#: erp/nav.py
+msgid "QUOTES"
+msgstr "TEKLİFLER"
+
+msgid "Quote"
+msgstr "Teklif"
+
+msgid "Quote %(number)s marked %(status)s."
+msgstr "%(number)s teklifi %(status)s olarak işaretlendi."
+
+msgid "Quote %(quote)s became order %(order)s."
+msgstr "%(quote)s teklifi %(order)s siparişine dönüştü."
+
+msgid "Quotes"
+msgstr "Teklifler"
+
+msgid "Reopen as draft"
+msgstr "Taslak olarak yeniden aç"
+
+msgid "Save quote"
+msgstr "Teklifi kaydet"
+
+msgid "Say who the quote is for — a CRM customer or a name."
+msgstr "Teklifin kime olduğunu belirtin — bir CRM müşterisi ya da bir isim."
+
+msgid "Search the catalog, or type a description"
+msgstr "Katalogda arayın ya da bir açıklama yazın"
+
+msgid "See why below"
+msgstr "Nedenini aşağıda görün"
+
+msgid "Sent"
+msgstr "Gönderildi"
+
+msgid "The customer picked was not found."
+msgstr "Seçilen müşteri bulunamadı."
+
+msgid "The quote has no lines."
+msgstr "Teklifte satır yok."
+
+msgid "These lines name no catalog product: %(lines)s"
+msgstr "Bu satırlar bir katalog ürünü göstermiyor: %(lines)s"
+
+msgid "This is a quotation, not an invoice."
+msgstr "Bu bir tekliftir, fatura değildir."
+
+msgid "This quote became order %(number)s and stays accepted."
+msgstr "Bu teklif %(number)s siparişine dönüştü ve kabul edilmiş olarak kalır."
+
+msgid "This quote can't become an order yet:"
+msgstr "Bu teklif henüz siparişe dönüşemez:"
+
+msgid "Type a contact or company name…"
+msgstr "Kişi ya da firma adı yazın…"
+
+msgid "Unknown status."
+msgstr "Bilinmeyen durum."
+
+msgid "Valid until"
+msgstr "Geçerlilik"
+
+msgid "When the customer accepts, press “Accepted — create order”: the order is raised with these lines and prices, and the quote is closed."
+msgstr "Müşteri kabul ettiğinde “Kabul edildi — sipariş oluştur”a basın: sipariş bu satır ve fiyatlarla açılır, teklif kapanır."

@@ -605,6 +605,9 @@
               <button type="button" onclick="openAttachSection('file')">
                 <i class="fa fa-paperclip"></i>{% trans "File" %}
               </button>
+              <button type="button" onclick="window.location.href='{% url 'marketing:quote_create' %}?contact={{ contact.id }}'">
+                <i class="fa fa-file-signature"></i>{% trans "Quote" %}
+              </button>
             </div>
           </div>
         </div>

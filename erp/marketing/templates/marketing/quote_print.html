@@ -1,57 +1,207 @@
-{% load i18n %}<!doctype html>
-<html>
+{% load i18n %}{% get_current_language as LANG %}<!doctype html>
+{# The language matters to the page itself: the uppercase headings follow it, and Turkish uppercases i to İ. #}
+<html lang="{{ LANG }}">
 <head>
   <meta charset="utf-8">
   <title>{% trans "Quote" %} {{ quote.number }}</title>
   <style>
-    @page { size: A4 portrait; margin: 0; }
-    body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; color: #0F1419; margin: 0; padding: 18mm 16mm; }
-    .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0F1419; padding-bottom: 10px; margin-bottom: 16px; }
-    .brand { font-size: 18pt; font-weight: 800; }
-    .doc { text-align: right; }
-    .doc .t { font-size: 16pt; font-weight: 800; letter-spacing: .04em; }
-    .doc .n { font-size: 11pt; color: #374151; margin-top: 2px; }
-    .meta { display: flex; gap: 24px; margin-bottom: 18px; }
-    .meta .b { flex: 1; }
-    .meta .l { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .08em; color: #6B7280; }
-    .meta .v { font-size: 11pt; font-weight: 700; margin-top: 2px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #6B7280; border-bottom: 1px solid #0F1419; padding: 6px 4px; }
-    td { padding: 7px 4px; border-bottom: 1px solid #E5E7EB; vertical-align: top; }
-    .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .sku { font-size: 8.5pt; color: #6B7280; }
-    .total td { border-bottom: 0; border-top: 2px solid #0F1419; font-weight: 800; font-size: 12pt; }
-    .notes { margin-top: 18px; font-size: 10pt; white-space: pre-line; }
-    .foot { margin-top: 28px; font-size: 9pt; color: #6B7280; }
-    @media screen { body { max-width: 800px; margin: 20px auto; box-shadow: 0 0 0 1px #E5E7EB; } }
+    /* The order sheet's look (operating/order_print.html): same page,
+       type, header, cards, item table and footer, so a quote and the
+       order it becomes read as one family of documents. */
+    @page {
+      size: letter portrait;
+      /* Zero margin so the browser adds no header or footer of its own
+         (URL, page number, date); the body padding gives the room. */
+      margin: 0;
+    }
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 12.0pt;
+      color: #0F1419;
+      line-height: 1.3;
+      padding: 10mm 12mm 9mm 12mm;
+      margin: 0;
+    }
+    @media print {
+      html, body { margin: 0 !important; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    @media screen { body { max-width: 216mm; margin: 16px auto; box-shadow: 0 0 0 1px #E2E8EE; box-sizing: border-box; } }
+
+    /* Header */
+    .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 7pt; margin-bottom: 10pt; }
+    .hdr td { vertical-align: top; }
+    .hdr .brand { font-size: 16.0pt; font-weight: bold; line-height: 1.25; max-width: 105mm; }
+    .hdr .num { font-size: 13.33pt; font-weight: bold; color: #0F1419; margin-top: 2pt; }
+    .hdr .date { font-size: 10.67pt; color: #4B5563; text-align: right; }
+    .hdr .kind { display: inline-block; margin-top: 4pt; padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold;
+                 letter-spacing: 1pt; background: #E0F2F1; color: #0B5F60; }
+
+    h3 { font-size: 10.0pt; color: #6B7280; letter-spacing: 1.2pt; text-transform: uppercase; margin: 9pt 0 4pt; font-weight: bold; }
+
+    /* Customer / terms cards */
+    .twocol { width: 100%; }
+    .twocol td { width: 50%; vertical-align: top; padding-right: 8pt; }
+    .twocol td:last-child { padding-right: 0; padding-left: 8pt; }
+    .card { background: #FAFBFD; border: 1px solid #E2E8EE; padding: 8.75pt 11.25pt; }
+    .card .name { font-size: 13.33pt; font-weight: bold; color: #0F1419; }
+    .card .role { font-size: 9.33pt; color: #147F74; font-weight: bold; letter-spacing: 0.8pt; text-transform: uppercase; margin-top: 1pt; }
+    .card .line { font-size: 11.33pt; color: #374151; margin-top: 3pt; }
+    .card .line b { color: #6B7280; font-weight: bold; }
+
+    /* Items table — fixed columns, so a long product title wraps
+       instead of pushing the numbers across the sheet. */
+    table.items { width: 100%; border-collapse: collapse; margin-top: 4pt; table-layout: fixed; }
+    table.items col.c-no     { width: 5%; }
+    table.items col.c-item   { width: 47%; }
+    table.items col.c-qty    { width: 16%; }
+    table.items col.c-price  { width: 16%; }
+    table.items col.c-amount { width: 16%; }
+    table.items thead th {
+      background: #FAFBFD;
+      border-top: 1px solid #E2E8EE;
+      border-bottom: 1px solid #E2E8EE;
+      padding: 3.75pt 5.0pt;
+      font-size: 8.67pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8pt;
+      color: #6B7280;
+      text-align: left;
+    }
+    table.items thead th.num { text-align: right; }
+    table.items thead th, table.items tbody td { overflow-wrap: break-word; }
+    table.items tbody td {
+      padding: 2.5pt 5.0pt;
+      border-bottom: 1px solid #EEF1F5;
+      vertical-align: top;
+      font-size: 10.0pt;
+      line-height: 1.25;
+    }
+    table.items tbody td.num { text-align: right; font-weight: bold; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    table.items tbody td.no { color: #6B7280; }
+    table.items .pname { font-weight: bold; color: #0F1419; }
+    table.items .pdesc { color: #4B5563; font-size: 8.67pt; margin-top: 1pt; }
+    table.items .sku { font-family: "Courier", monospace; font-size: 0.8em; font-weight: normal; color: #4B5563; }
+    /* The total is a row of the body, not a <tfoot>, which would repeat
+       at the foot of every printed page as if it were that page's total. */
+    table.items tbody tr.grand { break-inside: avoid; page-break-inside: avoid; }
+    table.items tbody tr.grand td { border-top: 2px solid #0F1419; border-bottom: none; padding-top: 5pt; font-size: 13.33pt; font-weight: bold; }
+    table.items tbody tr.grand td.lbl { text-align: right; color: #374151; }
+
+    /* Notes */
+    .notes { padding: 7.5pt 11.25pt; border-left: 3pt solid #147F74; background: #F8FAFA; font-size: 10.67pt; color: #374151; white-space: pre-line; }
+    .terms { margin-top: 9pt; font-size: 10.0pt; color: #4B5563; }
+
+    /* Footer */
+    .foot { margin-top: 9pt; padding-top: 6pt; border-top: 1px solid #E2E8EE; font-size: 9.33pt; color: #6B7280; width: 100%; }
+    .foot td { vertical-align: top; }
+    .foot .right { text-align: right; }
+    /* The credit: its own line under the footer, pinned to the foot of
+       every sheet when printed. Colours come from the markup — see
+       erp/nejum_credit.py. */
+    .nejum { margin-top: 7pt; text-align: center; font-size: 7.5pt; }
+    @media print { .nejum { position: fixed; bottom: 3mm; left: 0; right: 0; margin: 0; } }
   </style>
 </head>
-<body onload="window.print()">
-  <div class="head">
-    <div class="brand">{{ brand_line }}</div>
-    <div class="doc"><div class="t">{% trans "QUOTE" %}</div><div class="n">{{ quote.number }}</div></div>
-  </div>
-  <div class="meta">
-    <div class="b"><div class="l">{% trans "Prepared for" %}</div><div class="v">{{ quote.get_client }}</div>
-      {% if quote.customer_phone %}<div>{{ quote.customer_phone }}</div>{% endif %}{% if quote.customer_email %}<div>{{ quote.customer_email }}</div>{% endif %}</div>
-    <div class="b"><div class="l">{% trans "Date" %}</div><div class="v">{{ quote.date|date:"d.m.Y" }}</div></div>
-    <div class="b"><div class="l">{% trans "Valid until" %}</div><div class="v">{{ quote.valid_until|date:"d.m.Y"|default:"—" }}</div></div>
-    <div class="b"><div class="l">{% trans "Currency" %}</div><div class="v">{{ quote.currency.code|default:"USD" }}</div></div>
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>{% trans "Item" %}</th><th class="num">{% trans "Quantity" %}</th><th class="num">{% trans "Unit price" %}</th><th class="num">{% trans "Amount" %}</th></tr></thead>
+<body>
+
+  <!-- HEADER -->
+  <table class="hdr" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>
+        <div class="brand" style="color: {{ brand_color }};">{{ brand_line|default:"Nejum ERP" }}</div>
+        <div class="num">{% trans "Quote" %} {{ quote.number }}</div>
+      </td>
+      <td align="right">
+        <div class="date">{{ quote.date|date:"d M Y" }}</div>
+        <div class="kind">{% trans "QUOTE" %}</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- CUSTOMER + TERMS -->
+  <table class="twocol" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>
+        <h3>{% trans "Prepared for" %}</h3>
+        <div class="card">
+          <div class="name">{{ quote.get_client|capfirst }}</div>
+          {% if quote.company_id %}
+            <div class="role">{% trans "Company" %}</div>
+            {% with email=quote.company.email.0|default:"" phone=quote.company.phone.0|default:"" %}
+            {% if quote.customer_email or email %}<div class="line"><b>{% trans "Email" %}:</b> {{ quote.customer_email|default:email }}</div>{% endif %}
+            {% if quote.customer_phone or phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ quote.customer_phone|default:phone }}</div>{% endif %}
+            {% endwith %}
+            {% if quote.company.address %}<div class="line"><b>{% trans "Address" %}:</b> {{ quote.company.address }}</div>{% endif %}
+          {% elif quote.contact_id %}
+            <div class="role">{% trans "Contact" %}</div>
+            {% with email=quote.contact.email.0|default:"" phone=quote.contact.phone.0|default:"" %}
+            {% if quote.customer_email or email %}<div class="line"><b>{% trans "Email" %}:</b> {{ quote.customer_email|default:email }}</div>{% endif %}
+            {% if quote.customer_phone or phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ quote.customer_phone|default:phone }}</div>{% endif %}
+            {% endwith %}
+          {% else %}
+            {% if quote.customer_email %}<div class="line"><b>{% trans "Email" %}:</b> {{ quote.customer_email }}</div>{% endif %}
+            {% if quote.customer_phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ quote.customer_phone }}</div>{% endif %}
+          {% endif %}
+        </div>
+      </td>
+      <td>
+        <h3>{% trans "Quote" %}</h3>
+        <div class="card">
+          <div class="line"><b>{% trans "Date" %}:</b> {{ quote.date|date:"d M Y" }}</div>
+          <div class="line"><b>{% trans "Valid until" %}:</b> {{ quote.valid_until|date:"d M Y"|default:"—" }}</div>
+          <div class="line"><b>{% trans "Currency" %}:</b> {{ quote.currency.code|default:"USD" }}</div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- ITEMS -->
+  <h3>{% trans "Items" %}</h3>
+  <table class="items" cellspacing="0" cellpadding="0">
+    <colgroup><col class="c-no"><col class="c-item"><col class="c-qty"><col class="c-price"><col class="c-amount"></colgroup>
+    <thead>
+      <tr><th>#</th><th>{% trans "Item" %}</th><th class="num">{% trans "Quantity" %}</th><th class="num">{% trans "Unit price" %}</th><th class="num">{% trans "Amount" %}</th></tr>
+    </thead>
     <tbody>
     {% for it in items %}
-      <tr><td>{{ it.line_no }}</td>
-        <td>{{ it.label }}{% if it.product_id and it.sku %}<div class="sku">{{ it.sku }}</div>{% endif %}{% if it.product_id and it.description %}<div class="sku">{{ it.description }}</div>{% endif %}</td>
-        <td class="num">{{ it.quantity|floatformat:"-2" }} {{ it.unit }}</td>
-        <td class="num">{{ symbol }}{{ it.price|floatformat:2 }}</td>
-        <td class="num">{{ symbol }}{{ it.line_total|floatformat:2 }}</td></tr>
+      <tr>
+        <td class="no">{{ it.line_no }}</td>
+        <td>
+          <div class="pname">{{ it.label }}</div>
+          {% if it.product_id and it.sku %}<div class="sku">{{ it.sku }}</div>{% endif %}
+          {% if it.product_id and it.description %}<div class="pdesc">{{ it.description }}</div>{% endif %}
+        </td>
+        <td class="num">{{ it.quantity|floatformat:"-2g" }} {{ it.unit }}</td>
+        <td class="num">{{ symbol }}{{ it.price|floatformat:"2g" }}</td>
+        <td class="num">{{ symbol }}{{ it.line_total|floatformat:"2g" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" style="text-align: center; color: #6B7280; padding: 18pt;">{% trans "No items." %}</td></tr>
     {% endfor %}
-      <tr class="total"><td colspan="4" class="num">{% trans "Total" %}</td><td class="num">{{ symbol }}{{ total|floatformat:2 }}</td></tr>
+      <tr class="grand"><td colspan="4" class="lbl">{% trans "Total" %}</td><td class="num">{{ symbol }}{{ total|floatformat:"2g" }}</td></tr>
     </tbody>
   </table>
-  {% if quote.notes %}<div class="notes">{{ quote.notes }}</div>{% endif %}
-  <div class="foot">{% if quote.valid_until %}{% blocktrans with date=quote.valid_until|date:"d.m.Y" %}Prices are valid until {{ date }}.{% endblocktrans %}{% endif %} {% trans "This is a quotation, not an invoice." %}</div>
+
+  {% if quote.notes %}
+  <h3>{% trans "Notes" %}</h3>
+  <div class="notes">{{ quote.notes }}</div>
+  {% endif %}
+
+  <div class="terms">{% if quote.valid_until %}{% blocktrans with date=quote.valid_until|date:"d M Y" %}Prices are valid until {{ date }}.{% endblocktrans %} {% endif %}{% trans "This is a quotation, not an invoice." %}</div>
+
+  <!-- FOOTER -->
+  <table class="foot" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>{{ brand_line|default:"Nejum ERP" }} · {% trans "Quote" %} {{ quote.number }}</td>
+      <td class="right">{% now "d M Y · H:i" %}</td>
+    </tr>
+  </table>
+  {% if nejum_credit_html %}<div class="nejum">{{ nejum_credit_html }}</div>{% endif %}
+
+  <script>
+    window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 250); });
+  </script>
 </body>
 </html>

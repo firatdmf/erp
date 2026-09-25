@@ -19,7 +19,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
-from crm.models import Contact
+from crm.models import Company, Contact
 from marketing.models import Product, ProductVariant
 from marketing.models import Quote
 from operating.models import Order, OrderChange
@@ -100,6 +100,52 @@ class QuoteTest(TestCase):
         r = self._save(self._body(customer=None, customer_name="Walk-in Ali", customer_phone="555"))
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(Quote.objects.get().get_client(), "Walk-in Ali")
+
+    def test_a_new_quote_can_start_with_a_crm_customer(self):
+        company = Company.objects.create(name="Euroland")
+        url = reverse("marketing:quote_create")
+        page = self.client.get(url + f"?contact={self.customer.pk}")
+        self.assertContains(page, 'id="qf-cust-type" value="contact"')
+        self.assertContains(page, f'id="qf-cust-pk" value="{self.customer.pk}"')
+        self.assertContains(page, "Nick Greece")
+        page = self.client.get(url + f"?company={company.pk}")
+        self.assertContains(page, 'id="qf-cust-type" value="company"')
+        self.assertContains(page, "Euroland")
+        # The form knows each currency's sign, to write amounts with.
+        self.assertContains(page, '<script id="qf-signs" type="application/json">')
+        self.assertContains(page, '"EUR": "\\u20ac"')
+        # Still a new quote: it saves to the create URL, not an edit one.
+        self.assertContains(page, f'const SAVE_URL = "{url}"')
+
+    def test_an_unknown_customer_leaves_the_form_blank(self):
+        page = self.client.get(reverse("marketing:quote_create") + "?contact=999999")
+        self.assertContains(page, 'id="qf-cust-type" value=""')
+
+    def test_the_crm_pages_offer_a_quote(self):
+        company = Company.objects.create(name="Euroland")
+        create = reverse("marketing:quote_create")
+        page = self.client.get(reverse("crm:contact_detail", args=[self.customer.pk]))
+        self.assertContains(page, f"{create}?contact={self.customer.pk}")
+        page = self.client.get(reverse("crm:company_detail", args=[company.pk]))
+        self.assertContains(page, f"{create}?company={company.pk}")
+
+    def test_quotes_sit_in_the_marketing_menu_not_the_top_bar(self):
+        page = self.client.get(reverse("marketing:quote_list"))
+        self.assertNotContains(page, "topBarQuotesBtn")
+        from erp.nav import NAV_SECTIONS
+        marketing = next(s for s in NAV_SECTIONS if s["key"] == "marketing")
+        urls = [i["url"] for g in marketing["groups"] for i in g["items"]]
+        self.assertIn("marketing:quote_list", urls)
+        self.assertIn("marketing:quote_create", urls)
+
+    def test_the_print_is_signed_like_the_order_sheet(self):
+        from erp.nejum_credit import brand_color, credit_html
+        quote = Quote.objects.get(pk=self._save().json()["quote_id"])
+        page = self.client.get(reverse("marketing:quote_print", args=[quote.pk]))
+        self.assertContains(page, f'<div class="brand" style="color: {brand_color()};">')
+        credit = credit_html(self.book)
+        if credit:  # empty when the brand has the credit turned off
+            self.assertContains(page, f'<div class="nejum">{credit}</div>', html=False)
 
     def test_the_pages_render(self):
         quote = Quote.objects.get(pk=self._save().json()["quote_id"])

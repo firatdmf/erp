@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block css %}
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  .qd { --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif; --ink:#0F1419; padding: 22px 28px 80px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 1000px; }
+  .qd-back { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#fff; border:1px solid #E0E6EE; border-radius:8px; font:600 12.5px var(--font-sans); color:#4B5563; text-decoration:none; cursor:pointer; }
+  .qd-back.primary { background:linear-gradient(180deg,#16897D,#0F6B62); border-color:#0F6B62; color:#fff; }
+  .qd-back.danger { color:#B91C1C; border-color:#FCA5A5; }
+  .qd-back[disabled] { opacity:.45; cursor:not-allowed; }
+  .qd-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin:14px 0 18px; }
+  .qd-eyebrow { font:700 11px var(--font-sans); text-transform:uppercase; letter-spacing:.08em; color:#6B7280; }
+  .qd-title { margin:2px 0 0; font:800 24px var(--font-sans); }
+  .qd-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .qd-badge { display:inline-block; padding:3px 10px; border-radius:999px; font:700 11px var(--font-sans); }
+  .qd-badge.draft { background:#F1F5F9; color:#475569; } .qd-badge.sent { background:#DBEAFE; color:#1D4ED8; }
+  .qd-badge.accepted { background:#D1FAE5; color:#065F46; } .qd-badge.declined { background:#FEE2E2; color:#B91C1C; }
+  .qd-badge.expired { background:#FEF3C7; color:#8B5A00; }
+  .qd-info { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-bottom:18px; }
+  .qd-card { background:#fff; border:1px solid #E2E8EE; border-radius:12px; padding:12px 14px; }
+  .qd-card-l { font:700 10.5px var(--font-sans); text-transform:uppercase; letter-spacing:.06em; color:#6B7280; }
+  .qd-card-v { font:700 14px var(--font-sans); margin-top:3px; }
+  .qd-table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #E2E8EE; border-radius:12px; overflow:hidden; }
+  .qd-table th { text-align:left; font:700 10.5px var(--font-sans); text-transform:uppercase; letter-spacing:.06em; color:#6B7280; padding:10px 12px; background:#F8FAFC; border-bottom:1px solid #E2E8EE; }
+  .qd-table td { padding:11px 12px; border-bottom:1px solid #F1F5F9; }
+  .qd-num { text-align:right; font-variant-numeric: tabular-nums; white-space:nowrap; }
+  .qd-total td { font:800 14px var(--font-sans); background:#F8FAFC; }
+  .qd-note { margin-top:12px; padding:10px 14px; border-radius:10px; font-size:12.5px; line-height:1.45; }
+  .qd-note.warn { background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; }
+  .qd-note.ok { background:#ECFDF5; border:1px solid #A7F3D0; color:#065F46; }
+  @media (max-width: 640px) { .qd { padding: 12px 12px 80px; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="qd">
+  <a class="qd-back" href="{% url 'marketing:quote_list' %}"><i class="fa fa-arrow-left"></i> {% trans "Back to quotes" %}</a>
+
+  <div class="qd-head">
+    <div>
+      <div class="qd-eyebrow">{% trans "Quote" %}{% if quote.book %} · {{ quote.book.name }}{% endif %}</div>
+      <h1 class="qd-title">{{ quote.number }}</h1>
+    </div>
+    <div class="qd-actions">
+      <span class="qd-badge {{ quote.status_key }}">{{ quote.status_label }}</span>
+      <a class="qd-back" href="{% url 'marketing:quote_print' quote.pk %}" target="_blank" rel="noopener"><i class="fa fa-print"></i> {% trans "Print" %}</a>
+      {% if quote.can_edit %}
+        <a class="qd-back" href="{% url 'marketing:quote_edit' quote.pk %}"><i class="fa fa-pen"></i> {% trans "Edit" %}</a>
+        {% if quote.status == 'draft' %}
+        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="status" value="sent">
+          <button type="submit" class="qd-back"><i class="fa fa-paper-plane"></i> {% trans "Mark as sent" %}</button></form>
+        {% endif %}
+        <form method="post" action="{% url 'marketing:quote_convert' quote.pk %}" style="display:inline;"
+              onsubmit="return confirm('{% trans "Create an order from this quote? The customer's account is charged for it." %}');">{% csrf_token %}
+          <button type="submit" class="qd-back primary" {% if blockers %}disabled title="{% trans 'See why below' %}"{% endif %}><i class="fa fa-check"></i> {% trans "Accepted — create order" %}</button></form>
+        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}" style="display:inline;"
+              onsubmit="return confirm('{% trans "Mark this quote as declined?" %}');">{% csrf_token %}<input type="hidden" name="status" value="declined">
+          <button type="submit" class="qd-back danger"><i class="fa fa-ban"></i> {% trans "Declined" %}</button></form>
+      {% elif quote.status == 'declined' %}
+        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="status" value="draft">
+          <button type="submit" class="qd-back"><i class="fa fa-rotate-left"></i> {% trans "Reopen as draft" %}</button></form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="qd-info">
+    <div class="qd-card"><div class="qd-card-l">{% trans "Customer" %}</div>
+      <div class="qd-card-v">{{ quote.get_client }}</div>
+      {% if quote.customer_phone or quote.customer_email %}<div style="font-size:12px; color:#6B7280; margin-top:2px;">{{ quote.customer_phone }}{% if quote.customer_phone and quote.customer_email %} · {% endif %}{{ quote.customer_email }}</div>{% endif %}
+    </div>
+    <div class="qd-card"><div class="qd-card-l">{% trans "Date" %}</div><div class="qd-card-v">{{ quote.date|date:"d.m.Y" }}</div></div>
+    <div class="qd-card"><div class="qd-card-l">{% trans "Valid until" %}</div><div class="qd-card-v">{{ quote.valid_until|date:"d.m.Y"|default:"—" }}</div></div>
+    <div class="qd-card"><div class="qd-card-l">{% trans "Total" %}</div><div class="qd-card-v">{{ symbol }}{{ total|floatformat:2 }}</div></div>
+    {% if quote.order %}
+    <div class="qd-card"><div class="qd-card-l">{% trans "Became order" %}</div>
+      <div class="qd-card-v"><a href="{% url 'operating:order_detail' quote.order.pk %}" style="color:#0B5F60;">{{ quote.order.order_number }}</a></div></div>
+    {% endif %}
+  </div>
+
+  <table class="qd-table">
+    <thead><tr><th>#</th><th>{% trans "Item" %}</th><th class="qd-num">{% trans "Quantity" %}</th><th class="qd-num">{% trans "Unit price" %}</th><th class="qd-num">{% trans "Amount" %}</th></tr></thead>
+    <tbody>
+    {% for it in items %}
+      <tr>
+        <td style="color:#94A3B8;">{{ it.line_no }}</td>
+        <td><b>{{ it.label }}</b>{% if it.sku and it.product_id %}<div style="font-size:11px; color:#94A3B8;">{{ it.sku }}</div>{% endif %}{% if it.product_id and it.description %}<div style="font-size:12px; color:#6B7280;">{{ it.description }}</div>{% endif %}</td>
+        <td class="qd-num">{{ it.quantity|floatformat:"-2" }} {{ it.unit }}</td>
+        <td class="qd-num">{{ symbol }}{{ it.price|floatformat:2 }}</td>
+        <td class="qd-num">{{ symbol }}{{ it.line_total|floatformat:2 }}</td>
+      </tr>
+    {% endfor %}
+      <tr class="qd-total"><td colspan="4" style="text-align:right;">{% trans "Total" %}</td><td class="qd-num">{{ symbol }}{{ total|floatformat:2 }}</td></tr>
+    </tbody>
+  </table>
+
+  {% if quote.notes %}
+  <div class="qd-card" style="margin-top:12px;"><div class="qd-card-l">{% trans "Notes on the quote" %}</div><div style="margin-top:6px; white-space:pre-line;">{{ quote.notes }}</div></div>
+  {% endif %}
+
+  {% if quote.can_edit %}
+    {% if blockers %}
+    <div class="qd-note warn" id="qd-blockers"><i class="fa fa-circle-info"></i> {% trans "This quote can't become an order yet:" %}
+      <ul style="margin:6px 0 0 18px; padding:0;">{% for why in blockers %}<li>{{ why }}</li>{% endfor %}</ul>
+    </div>
+    {% else %}
+    <div class="qd-note ok"><i class="fa fa-circle-check"></i> {% trans "When the customer accepts, press “Accepted — create order”: the order is raised with these lines and prices, and the quote is closed." %}</div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

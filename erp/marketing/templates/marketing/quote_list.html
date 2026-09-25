@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block css %}
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  .qt { --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif; --ink:#0F1419; padding: 22px 28px 80px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 1120px; }
+  .qt-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .qt-head h1 { margin:0; font:800 22px var(--font-sans); }
+  .qt-btn { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:9px; border:1px solid #E0E6EE; background:#fff; font:600 12.5px var(--font-sans); color:#374151; text-decoration:none; cursor:pointer; }
+  .qt-btn.primary { background:linear-gradient(180deg,#16897D,#0F6B62); border-color:#0F6B62; color:#fff; }
+  .qt-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .qt-filters input, .qt-filters select { height:36px; padding:0 10px; border:1px solid #DDE3EA; border-radius:8px; font:500 13px var(--font-sans); }
+  .qt-table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #E2E8EE; border-radius:12px; overflow:hidden; }
+  .qt-table th { text-align:left; font:700 10.5px var(--font-sans); text-transform:uppercase; letter-spacing:.06em; color:#6B7280; padding:10px 12px; background:#F8FAFC; border-bottom:1px solid #E2E8EE; }
+  .qt-table td { padding:11px 12px; border-bottom:1px solid #F1F5F9; vertical-align:middle; }
+  .qt-table tr:last-child td { border-bottom:0; }
+  .qt-table a { color:#0B5F60; font-weight:700; text-decoration:none; }
+  .qt-num { font-variant-numeric: tabular-nums; text-align:right; }
+  .qt-badge { display:inline-block; padding:2px 9px; border-radius:999px; font:700 10.5px var(--font-sans); }
+  .qt-badge.draft { background:#F1F5F9; color:#475569; } .qt-badge.sent { background:#DBEAFE; color:#1D4ED8; }
+  .qt-badge.accepted { background:#D1FAE5; color:#065F46; } .qt-badge.declined { background:#FEE2E2; color:#B91C1C; }
+  .qt-badge.expired { background:#FEF3C7; color:#8B5A00; }
+  .qt-empty { padding:40px; text-align:center; color:#94A3B8; }
+  @media (max-width: 640px) { .qt { padding: 12px 12px 80px; } .qt-table th:nth-child(5), .qt-table td:nth-child(5) { display:none; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="qt">
+  <div class="qt-head">
+    <h1>{% trans "Quotes" %}</h1>
+    <a class="qt-btn primary" href="{% url 'marketing:quote_create' %}"><i class="fa fa-plus"></i> {% trans "New quote" %}</a>
+  </div>
+  <form method="get" class="qt-filters">
+    <input type="search" name="q" value="{{ q }}" placeholder="{% trans 'Number or customer' %}">
+    <select name="status" onchange="this.form.submit()">
+      <option value="">{% trans "All statuses" %}</option>
+      {% for k, label in status_choices %}<option value="{{ k }}" {% if status == k %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button class="qt-btn" type="submit"><i class="fa fa-search"></i> {% trans "Search" %}</button>
+  </form>
+  <table class="qt-table">
+    <thead><tr>
+      <th>{% trans "Quote" %}</th><th>{% trans "Date" %}</th><th>{% trans "Customer" %}</th>
+      <th class="qt-num">{% trans "Total" %}</th><th>{% trans "Valid until" %}</th><th>{% trans "Status" %}</th><th>{% trans "Order" %}</th>
+    </tr></thead>
+    <tbody>
+    {% for qo in quotes %}
+      <tr>
+        <td><a href="{% url 'marketing:quote_detail' qo.pk %}">{{ qo.number }}</a>{% if qo.book %}<div style="font-size:11px; color:#94A3B8;">{{ qo.book.name }}</div>{% endif %}</td>
+        <td>{{ qo.date|date:"d.m.Y" }}</td>
+        <td>{{ qo.get_client }}</td>
+        <td class="qt-num">{{ qo.currency.symbol|default:qo.currency.code }}{{ qo.total|floatformat:2 }}</td>
+        <td>{{ qo.valid_until|date:"d.m.Y"|default:"—" }}</td>
+        <td><span class="qt-badge {{ qo.status_key }}">{{ qo.status_label }}</span></td>
+        <td>{% if qo.order %}<a href="{% url 'operating:order_detail' qo.order.pk %}">{{ qo.order.order_number }}</a>{% else %}—{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="qt-empty">{% trans "No quotes yet." %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

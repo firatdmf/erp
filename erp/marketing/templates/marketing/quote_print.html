@@ -1,0 +1,57 @@
+{% load i18n %}<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{% trans "Quote" %} {{ quote.number }}</title>
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; color: #0F1419; margin: 0; padding: 18mm 16mm; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0F1419; padding-bottom: 10px; margin-bottom: 16px; }
+    .brand { font-size: 18pt; font-weight: 800; }
+    .doc { text-align: right; }
+    .doc .t { font-size: 16pt; font-weight: 800; letter-spacing: .04em; }
+    .doc .n { font-size: 11pt; color: #374151; margin-top: 2px; }
+    .meta { display: flex; gap: 24px; margin-bottom: 18px; }
+    .meta .b { flex: 1; }
+    .meta .l { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .08em; color: #6B7280; }
+    .meta .v { font-size: 11pt; font-weight: 700; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #6B7280; border-bottom: 1px solid #0F1419; padding: 6px 4px; }
+    td { padding: 7px 4px; border-bottom: 1px solid #E5E7EB; vertical-align: top; }
+    .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .sku { font-size: 8.5pt; color: #6B7280; }
+    .total td { border-bottom: 0; border-top: 2px solid #0F1419; font-weight: 800; font-size: 12pt; }
+    .notes { margin-top: 18px; font-size: 10pt; white-space: pre-line; }
+    .foot { margin-top: 28px; font-size: 9pt; color: #6B7280; }
+    @media screen { body { max-width: 800px; margin: 20px auto; box-shadow: 0 0 0 1px #E5E7EB; } }
+  </style>
+</head>
+<body onload="window.print()">
+  <div class="head">
+    <div class="brand">{{ brand_line }}</div>
+    <div class="doc"><div class="t">{% trans "QUOTE" %}</div><div class="n">{{ quote.number }}</div></div>
+  </div>
+  <div class="meta">
+    <div class="b"><div class="l">{% trans "Prepared for" %}</div><div class="v">{{ quote.get_client }}</div>
+      {% if quote.customer_phone %}<div>{{ quote.customer_phone }}</div>{% endif %}{% if quote.customer_email %}<div>{{ quote.customer_email }}</div>{% endif %}</div>
+    <div class="b"><div class="l">{% trans "Date" %}</div><div class="v">{{ quote.date|date:"d.m.Y" }}</div></div>
+    <div class="b"><div class="l">{% trans "Valid until" %}</div><div class="v">{{ quote.valid_until|date:"d.m.Y"|default:"—" }}</div></div>
+    <div class="b"><div class="l">{% trans "Currency" %}</div><div class="v">{{ quote.currency.code|default:"USD" }}</div></div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>{% trans "Item" %}</th><th class="num">{% trans "Quantity" %}</th><th class="num">{% trans "Unit price" %}</th><th class="num">{% trans "Amount" %}</th></tr></thead>
+    <tbody>
+    {% for it in items %}
+      <tr><td>{{ it.line_no }}</td>
+        <td>{{ it.label }}{% if it.product_id and it.sku %}<div class="sku">{{ it.sku }}</div>{% endif %}{% if it.product_id and it.description %}<div class="sku">{{ it.description }}</div>{% endif %}</td>
+        <td class="num">{{ it.quantity|floatformat:"-2" }} {{ it.unit }}</td>
+        <td class="num">{{ symbol }}{{ it.price|floatformat:2 }}</td>
+        <td class="num">{{ symbol }}{{ it.line_total|floatformat:2 }}</td></tr>
+    {% endfor %}
+      <tr class="total"><td colspan="4" class="num">{% trans "Total" %}</td><td class="num">{{ symbol }}{{ total|floatformat:2 }}</td></tr>
+    </tbody>
+  </table>
+  {% if quote.notes %}<div class="notes">{{ quote.notes }}</div>{% endif %}
+  <div class="foot">{% if quote.valid_until %}{% blocktrans with date=quote.valid_until|date:"d.m.Y" %}Prices are valid until {{ date }}.{% endblocktrans %}{% endif %} {% trans "This is a quotation, not an invoice." %}</div>
+</body>
+</html>

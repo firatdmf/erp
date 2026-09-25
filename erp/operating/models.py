@@ -345,6 +345,9 @@ class OrderNumberSequence(models.Model):
     generator did, reading MAX and adding one outside any lock.
     """
 
+    # Which row holds which series. ORD has always been pk=1.
+    SERIES_ROW = {"ORD": 1, "QUO": 2}
+
     prefix  = models.CharField(max_length=10, default="ORD")
     padding = models.PositiveSmallIntegerField(default=6)
     next_seq = models.PositiveIntegerField(default=1)
@@ -365,8 +368,9 @@ class OrderNumberSequence(models.Model):
                 f"{str(self.next_seq).zfill(self.padding)}")
 
     @classmethod
-    def take(cls):
-        """The next order number, consumed. Never returns the same twice.
+    def take(cls, prefix="ORD"):
+        """The next number in `prefix`'s series, consumed. Never returns
+        the same twice. One row per series: orders take ORD, quotes QUO.
 
         Shaped like every other document this business issues —
         COL-2026-000101, INV-2026-000108, PUR-2026-000105 — so an order
@@ -382,7 +386,13 @@ class OrderNumberSequence(models.Model):
         from django.db import transaction
         from django.utils import timezone
         with transaction.atomic():
-            row, _ = cls.objects.get_or_create(pk=1)
+            # One fixed row per series, found by primary key: two callers
+            # arriving at an empty table both try to insert pk=1, one wins
+            # and get_or_create hands the other that same row. Looking the
+            # row up by prefix instead let both insert their own, and the
+            # two rows then counted the same number twice.
+            row, _ = cls.objects.get_or_create(
+                pk=cls.SERIES_ROW[prefix], defaults={"prefix": prefix})
             locked = cls.objects.select_for_update().get(pk=row.pk)
             year = timezone.now().year
             if locked.seq_year != year:

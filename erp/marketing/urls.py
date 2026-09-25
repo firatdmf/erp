@@ -4,6 +4,7 @@ from . import api_stock_update
 from . import views_csv_stock
 from . import views_product_groups
 from . import views_catalog
+from . import views_quotes
 app_name = "marketing"
 
 
@@ -28,6 +29,15 @@ urlpatterns = [
     # through WeasyPrint. Copy is still hardcoded pending real product data.
     path("catalog/preview/", views_catalog.catalog_preview, name="catalog_preview"),
     path("catalog/pdf/", views_catalog.catalog_download, name="catalog_pdf"),
+    # Quotes — a price given before there is an order (views_quotes).
+    path("quotes/", views_quotes.quote_list, name="quote_list"),
+    path("quotes/new/", views_quotes.QuoteForm.as_view(), name="quote_create"),
+    path("quotes/product-search/", views_quotes.quote_product_search, name="quote_product_search"),
+    path("quotes/<int:pk>/", views_quotes.quote_detail, name="quote_detail"),
+    path("quotes/<int:pk>/edit/", views_quotes.QuoteForm.as_view(), name="quote_edit"),
+    path("quotes/<int:pk>/print/", views_quotes.quote_print, name="quote_print"),
+    path("quotes/<int:pk>/status/", views_quotes.quote_status, name="quote_status"),
+    path("quotes/<int:pk>/convert/", views_quotes.quote_convert, name="quote_convert"),
     # path("product_file_create/",views.ProductFileCreate.as_view(),name="product_file_create"),
     # below are for api routes
     path("api/get_product_categories",views.get_product_categories,name="get_product_categories"),

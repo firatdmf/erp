@@ -13,7 +13,8 @@
 {% elif event == 'shipped' or event == 'in_transit' or event == 'out_for_delivery' %}
 {% trans "Your order is on its way!" %}{% if carrier %}
 {% trans "Carrier" %}: {{ carrier }}{% endif %}{% if tracking_number %}
-{% trans "Tracking number" %}: {{ tracking_number }}{% endif %}
+{% trans "Tracking or receipt number" %}: {{ tracking_number }}{% endif %}{% if cargo_receipts_attached %}
+{% if cargo_receipts_attached == 1 %}The carrier's receipt is attached to this email.{% else %}The carrier's receipts are attached to this email.{% endif %}{% endif %}
 {% elif event == 'delivered' %}
 {% trans "Your order has been delivered." %}
 {% elif event == 'cancelled' %}

@@ -317,7 +317,10 @@ STOCK_DEDUCT_STATUSES = frozenset({
     "shipped", "in_transit", "out_for_delivery", "delivered",
 })
 
-# Carrier (shipping company) choices
+# The carriers the list started with — the seed for the Carrier table
+# (migration 0099), not the list itself: that lives in the table now, so
+# a carrier typed on the order page joins it. "other" stays for the orders
+# that were saved under it, but is no longer offered.
 CARRIER_CHOICES = [
     ("yurtici", "Yurtiçi Kargo"),
     ("mng", "MNG Kargo"),
@@ -326,6 +329,88 @@ CARRIER_CHOICES = [
     ("ups", "UPS"),
     ("other", "Diğer"),
 ]
+
+
+def _fold_carrier(text):
+    """Case- and Turkish-accent-blind form of a carrier name, so "yurtici",
+    "YURTİÇİ" and "Yurtiçi Kargo" are one carrier, not three."""
+    import unicodedata
+    t = (text or "").strip().replace("İ", "i").replace("I", "ı").lower().replace("ı", "i")
+    t = unicodedata.normalize("NFD", t)
+    return " ".join("".join(ch for ch in t if not unicodedata.combining(ch)).split())
+
+
+class Carrier(models.Model):
+    """A shipping company an order can go out with.
+
+    Orders store the `code`; the page shows the `name`. The list grows
+    from the order page: a name typed there that matches no carrier is
+    added on save and offered from then on (see `resolve`).
+    """
+
+    code = models.SlugField(max_length=50, unique=True)
+    name = models.CharField(max_length=100)
+    # Off = kept so orders already saved under it still read right, but
+    # not offered for new ones.
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="carriers_added",
+    )
+
+    class Meta:
+        ordering = ["pk"]
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def choices(cls):
+        """(code, name) for the carriers offered on the order pages."""
+        return list(cls.objects.filter(is_active=True).values_list("code", "name"))
+
+    @classmethod
+    def label_for(cls, code):
+        """The name to show for a stored code — the code itself when no
+        carrier carries it, so nothing an order says is ever hidden."""
+        if not code:
+            return ""
+        return cls.objects.filter(code=code).values_list("name", flat=True).first() or code
+
+    @classmethod
+    def resolve(cls, value, user=None):
+        """The code to store for what the order page posted.
+
+        `value` is a known code (picked from the list) or a name the
+        operator typed. A name matching a carrier already on the list —
+        ignoring case and accents — is that carrier; any other name is
+        added as a new one. Blank gives None.
+        """
+        from django.utils.text import slugify
+
+        value = " ".join((value or "").split())[:100]
+        if not value:
+            return None
+        found = cls.objects.filter(code=value).first()
+        if found:
+            return found.code
+        key = _fold_carrier(value)
+        for c in cls.objects.all():
+            if _fold_carrier(c.name) == key or _fold_carrier(c.code) == key:
+                if not c.is_active:
+                    c.is_active = True
+                    c.save(update_fields=["is_active"])
+                return c.code
+        base = slugify(key)[:44] or "carrier"
+        code, n = base, 2
+        while cls.objects.filter(code=code).exists():
+            code, n = f"{base}-{n}", n + 1
+        cls.objects.create(
+            code=code, name=value,
+            created_by=user if getattr(user, "is_authenticated", False) else None,
+        )
+        return code
 
 
 # Create your models here.
@@ -564,9 +649,10 @@ class Order(models.Model):
         default=False,
         help_text="Send transactional emails to the customer for this order."
     )
+    # A Carrier.code — kept as plain text rather than a foreign key so the
+    # orders saved before the table existed keep their value untouched.
     carrier = models.CharField(
         max_length=50,
-        choices=CARRIER_CHOICES,
         null=True,
         blank=True,
         help_text="Kargo şirketi"
@@ -654,6 +740,12 @@ class Order(models.Model):
         max_digits=16, decimal_places=8, null=True, blank=True,
         help_text="Rate from this order's currency to base, as at the order date.",
     )
+
+    def get_carrier_display(self):
+        """The carrier's name. Django wrote this method while the field had
+        fixed choices; the list is a table now (Carrier), so it is written
+        out here and the pages and emails that call it read the same."""
+        return Carrier.label_for(self.carrier)
 
     @property
     def currency_code(self):
@@ -1560,6 +1652,47 @@ class OrderAdjustment(models.Model):
 
     def __str__(self):
         return f"{self.label}: {self.amount}"
+
+
+class OrderCargoReceipt(models.Model):
+    """A photo or PDF of the carrier's receipt, attached when the order
+    is handed to cargo — the proof it left, beside the carrier and
+    tracking number the order already keeps.
+
+    More than one per order: a shipment split across parcels comes with
+    a receipt each, and a phone photo and the carrier's emailed PDF of
+    the same slip are both worth keeping. The file lives on the CDN;
+    this row is where it went and who put it there.
+    """
+
+    ALLOWED_TYPES = {
+        "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+        "image/heic": "heic", "image/heif": "heif", "application/pdf": "pdf",
+    }
+    MAX_BYTES = 15 * 1024 * 1024
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+
+    order = models.ForeignKey(Order, related_name="cargo_receipts",
+                              on_delete=models.CASCADE)
+    file_url = models.URLField(max_length=500)
+    # What it was called on the device it came from, so the list reads
+    # "kargo-fisi.pdf" rather than a CDN hash.
+    file_name = models.CharField(max_length=255, blank=True)
+    content_type = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="cargo_receipts",
+    )
+
+    @property
+    def is_pdf(self):
+        return self.content_type == "application/pdf"
+
+    def __str__(self):
+        return f"{self.file_name or self.file_url} · order #{self.order_id}"
 
 
 # This will be created when the machining starts

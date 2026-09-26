@@ -63,6 +63,7 @@ from django.db import models
 
 
 from marketing.models import Product, ProductVariant
+from django.utils.translation import gettext as _gettext
 
 
 from crm.models import Contact, Company
@@ -88,6 +89,82 @@ def generate_machine_qr_for_order(order):
 
     order.qr_code_url = url
     order.save(update_fields=["qr_code_url"])
+
+
+def carrier_choices_for(order):
+    """The carriers to offer on an order's page: every active one, plus
+    the one the order already has if that has since been switched off —
+    a <select> drops a value it has no option for, and the next save
+    would quietly clear it."""
+    from .models import Carrier
+
+    choices = Carrier.choices()
+    if order.carrier and order.carrier not in {code for code, _ in choices}:
+        choices.append((order.carrier, order.get_carrier_display()))
+    return choices
+
+
+def save_cargo_receipts(order, files, user=None):
+    """Upload the cargo receipt photos / PDFs picked on the order page.
+
+    Returns (saved, rejected): the receipts stored, and the names of the
+    files that were not — the wrong kind of file, too big, or refused by
+    the CDN. One bad file never costs the others, and never the status
+    change they rode in with: the order has shipped either way.
+    """
+    import os
+    import uuid
+    from marketing.utils.bunny_storage import upload_to_bunny
+    from .models import OrderCargoReceipt
+
+    by_ext = {ext: ct for ct, ext in OrderCargoReceipt.ALLOWED_TYPES.items()}
+    by_ext["jpeg"] = "image/jpeg"
+    saved, rejected = [], []
+    for f in files:
+        name = os.path.basename(f.name or "")
+        ext = os.path.splitext(name)[1].lstrip(".").lower()
+        # The browser's type first; a phone that sends octet-stream still
+        # says what it is in the extension.
+        ctype = (f.content_type or "").lower()
+        if ctype not in OrderCargoReceipt.ALLOWED_TYPES:
+            ctype = by_ext.get(ext, "")
+        if not ctype or f.size > OrderCargoReceipt.MAX_BYTES:
+            rejected.append(name)
+            continue
+        # A photo is stored as a JPEG sized for its print (receipt_images):
+        # small enough to mail, and HEIC turned into something every browser
+        # and mail client opens. A PDF, or a photo Pillow can't read, goes
+        # up as it came.
+        if ctype.startswith("image/"):
+            from .receipt_images import optimize_receipt_image
+            jpeg = optimize_receipt_image(f)
+            if jpeg is not None:
+                f, ctype, name = jpeg, jpeg.content_type, jpeg.name
+        path = (f"operating/orders/{order.pk}/cargo/"
+                f"{uuid.uuid4().hex}.{OrderCargoReceipt.ALLOWED_TYPES[ctype]}")
+        try:
+            url = upload_to_bunny(f, path, content_type=ctype)
+        except Exception:
+            rejected.append(name)
+            continue
+        saved.append(OrderCargoReceipt.objects.create(
+            order=order, file_url=url, file_name=name[:255], content_type=ctype,
+            created_by=user if user and user.is_authenticated else None,
+        ))
+    return saved, rejected
+
+
+def discard_cargo_receipts(receipts):
+    """Take back receipts stored for a status change that was then
+    refused — the row and, as far as the CDN allows, the file."""
+    from marketing.utils.bunny_storage import delete_from_bunny
+
+    for r in receipts:
+        try:
+            delete_from_bunny(r.file_url)
+        except Exception:
+            pass  # an orphaned CDN file is harmless; the row is what the page shows
+        r.delete()
 
 
 def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
@@ -456,7 +533,7 @@ class OrderDetail(DetailView):
             for i, k in enumerate(primary)
         ]
         ctx["status_choices"]  = ORDER_STATUS_CHOICES
-        ctx["carrier_choices"] = CARRIER_CHOICES
+        ctx["carrier_choices"] = carrier_choices_for(self.object)
         ctx["is_terminal"] = current in {"cancelled", "returned"}
         ctx["shipped"] = current in _SHIPPED_CLASS
 
@@ -819,6 +896,25 @@ class OrderDetail(DetailView):
                                        "guest_email", "guest_phone", "updated_at"])
             return JsonResponse({"ok": True})
 
+        # ── Remove a cargo receipt ──────────────────────────────
+        if action == "delete_cargo_receipt":
+            from .models import OrderCargoReceipt
+            from django.utils.translation import gettext as _g
+            if hide_cost:
+                messages.error(request, _g("You can't change this order's cargo receipts."))
+                return redirect("operating:order_detail", pk=order.pk)
+            receipt = OrderCargoReceipt.objects.filter(
+                order=order, pk=request.POST.get("receipt_id") or 0).first()
+            if receipt:
+                try:
+                    from marketing.utils.bunny_storage import delete_from_bunny
+                    delete_from_bunny(receipt.file_url)
+                except Exception:
+                    pass  # an orphaned CDN file is harmless; the row is what the page shows
+                receipt.delete()
+                messages.success(request, _g("Cargo receipt removed."))
+            return redirect("operating:order_detail", pk=order.pk)
+
         if action != "update_status":
             return self.get(request, *args, **kwargs)
 
@@ -841,6 +937,17 @@ class OrderDetail(DetailView):
             messages.error(request, _g("Enter a reason to cancel the order."))
             return redirect("operating:order_detail", pk=order.pk)
 
+        # Cargo receipts ride in with Complete order or Save, and are stored
+        # BEFORE the status change: completing the order emails the customer
+        # from inside it (signals.email_customer_on_status_change), and the
+        # receipt goes out with that email. A refused change takes them back
+        # out below, so it still leaves nothing behind. A sales rep's change
+        # is refused outright, so theirs never reach the CDN at all.
+        receipt_files = request.FILES.getlist("cargo_receipts")
+        new_receipts, rejected = [], []
+        if receipt_files and not cancelling and not is_sales_rep(request.user):
+            new_receipts, rejected = save_cargo_receipts(order, receipt_files, request.user)
+
         # All status changes funnel through the single atomic helper so
         # the ship gate (cargo required) + the reservation → stock-out
         # conversion can never be bypassed or partially applied.
@@ -850,8 +957,9 @@ class OrderDetail(DetailView):
             require_cargo_for_ship=not skip_cargo,
         )
         if not ok:
+            discard_cargo_receipts(new_receipts)
             if code == "cargo_required":
-                messages.error(request, "Siparişi tamamlamak (Gönderildi) için kargo şirketi ve takip numarası gerekli.")
+                messages.error(request, _gettext("Enter carrier and tracking or receipt number to complete the order."))
             elif code == "insufficient_reservation":
                 from .views_warehouse import reservation_shortfall_message
                 messages.error(request, reservation_shortfall_message(order))
@@ -877,6 +985,13 @@ class OrderDetail(DetailView):
                    "entry was removed."),
             )
             return redirect("operating:order_detail", pk=order.pk)
+
+        if rejected:
+            messages.warning(
+                request,
+                _g("These files were not attached — only images or PDFs up to 15 MB: %(names)s")
+                % {"names": ", ".join(rejected)},
+            )
 
         now_shipped = order.order_status in _SHIPPED_CLASS
         if now_shipped and not was_shipped:
@@ -2434,7 +2549,7 @@ def order_pack_complete(request, pk):
 # ---------------------------------------------------------------------------
 _CHANGE_FIELD_TR = {
     "order_status": "Sipariş durumu", "carrier": "Kargo şirketi",
-    "tracking_number": "Takip numarası", "notes": "Notlar",
+    "tracking_number": "Takip veya fiş numarası", "notes": "Notlar",
     "print_header": "Yazdırma başlığı", "ettn": "ETTN",
     "guest_first_name": "Misafir adı", "guest_last_name": "Misafir soyadı",
     "guest_email": "Misafir e-posta", "guest_phone": "Misafir telefon",
@@ -2456,7 +2571,8 @@ def _decorate_order_changes(changes):
     from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
     is_tr = (translation.get_language() or "").startswith("tr")
     status_map = {k: str(v) for k, v in ORDER_STATUS_CHOICES}
-    carrier_map = dict(CARRIER_CHOICES)
+    from .models import Carrier
+    carrier_map = dict(Carrier.objects.values_list("code", "name"))
 
     def val_display(c, v):
         if v is None:
@@ -6233,7 +6349,7 @@ def update_order_status(request, order_id):
         )
         if not ok:
             if code == "cargo_required":
-                return JsonResponse({'error': 'Kargo şirketi ve takip numarası gerekli'}, status=400)
+                return JsonResponse({'error': _gettext("Enter carrier and tracking or receipt number to complete the order.")}, status=400)
             if code == "insufficient_reservation":
                 from .views_warehouse import reservation_shortfall_message
                 return JsonResponse({'error': reservation_shortfall_message(order)}, status=400)
@@ -6595,15 +6711,7 @@ class WebOrderStatusEdit(View):
             ("returned", "Returned"),
         ]
         
-        # English carrier choices
-        carrier_choices_en = [
-            ("yurtici", "Yurtiçi Kargo"),
-            ("mng", "MNG Kargo"),
-            ("aras", "Aras Kargo"),
-            ("ptt", "PTT Kargo"),
-            ("ups", "UPS"),
-            ("other", "Other"),
-        ]
+        carrier_choices_en = carrier_choices_for(order)
         
         context = {
             'order': order,
@@ -6635,15 +6743,7 @@ class WebOrderStatusEdit(View):
             ("returned", "Returned"),
         ]
         
-        # English carrier choices
-        carrier_choices_en = [
-            ("yurtici", "Yurtiçi Kargo"),
-            ("mng", "MNG Kargo"),
-            ("aras", "Aras Kargo"),
-            ("ptt", "PTT Kargo"),
-            ("ups", "UPS"),
-            ("other", "Other"),
-        ]
+        carrier_choices_en = carrier_choices_for(order)
         
         # Get form data
         new_status = request.POST.get('order_status')
@@ -6659,7 +6759,7 @@ class WebOrderStatusEdit(View):
         )
         if not ok:
             if code == "cargo_required":
-                messages.error(request, "Siparişi tamamlamak için kargo şirketi ve takip numarası gerekli.")
+                messages.error(request, _gettext("Enter carrier and tracking or receipt number to complete the order."))
             elif code == "insufficient_reservation":
                 from .views_warehouse import reservation_shortfall_message
                 messages.error(request, reservation_shortfall_message(order))

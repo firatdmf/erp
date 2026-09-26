@@ -415,6 +415,43 @@ def _render_order_pdf(order):
     return (f"{label}.pdf", buf.getvalue())
 
 
+# Gmail refuses a message over 25 MB, and base64 grows a file by a third.
+# Receipts past this total stay on the order page rather than sink the
+# whole shipped email.
+CARGO_RECEIPT_EMAIL_BUDGET = 15 * 1024 * 1024
+
+
+def _cargo_receipt_attachments(order):
+    """The order's cargo receipts as (filename, bytes, content type), read
+    back from the CDN, for the shipped email. A receipt that can't be
+    fetched, or doesn't fit the budget, is left out — never the email."""
+    import os
+    import requests
+
+    out, total = [], 0
+    for n, r in enumerate(order.cargo_receipts.all(), start=1):
+        try:
+            resp = requests.get(r.file_url, timeout=20)
+            resp.raise_for_status()
+        except Exception as exc:
+            print(f"[order_email] order #{order.pk}: cargo receipt {r.pk} not fetched: {exc}")
+            continue
+        data = resp.content
+        if total + len(data) > CARGO_RECEIPT_EMAIL_BUDGET:
+            print(f"[order_email] order #{order.pk}: cargo receipt {r.pk} left out — over the size budget")
+            continue
+        total += len(data)
+        ext = os.path.splitext(r.file_url)[1] or ".jpg"
+        # A phone camera names every shot "image.jpg"; number them so the
+        # customer's mail client doesn't show three of the same name.
+        name = r.file_name or f"cargo-receipt{ext}"
+        if sum(1 for o in order.cargo_receipts.all() if o.file_name == r.file_name) > 1:
+            stem, e = os.path.splitext(name)
+            name = f"{stem}-{n}{e}"
+        out.append((name, data, r.content_type or "application/octet-stream"))
+    return out
+
+
 def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
     """Send a transactional email for `event` to the order's customer.
 
@@ -447,9 +484,14 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
         brand_name = brand_name_for()
         brand_email = brand("BRAND_EMAIL")
 
+        # The carrier's receipt goes out with the shipped email — the
+        # customer's proof the parcel left, beside the tracking number.
+        receipts = _cargo_receipt_attachments(order) if event == "shipped" else []
+
         # Render subject + HTML body. Per-event templates first, fall
         # back to a generic one so adding a new status doesn't crash.
         ctx = {
+            "cargo_receipts_attached": len(receipts),
             "order": order,
             "customer_name": _resolve_customer_name(order),
             "event": event,
@@ -530,6 +572,7 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
         #    EmailAccount, so it works without SMTP creds.
         if _send_via_gmail_oauth(
             to_email, subject, html_body, pdf_name, pdf_bytes,
+            extra_attachments=receipts,
             text_body=text_body, from_name=brand_name,
             reply_to=brand_email or None, list_unsubscribe=unsubscribe,
         ):
@@ -561,6 +604,8 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
         msg.attach_alternative(html_body, "text/html")
         if pdf_bytes:
             msg.attach(pdf_name or "order.pdf", pdf_bytes, "application/pdf")
+        for name, data, ctype in receipts:
+            msg.attach(name, data, ctype)
         try:
             msg.send(fail_silently=False)
         except Exception as exc:
@@ -576,7 +621,7 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
 
 def _send_via_gmail_oauth(to_email, subject, html_body, pdf_name, pdf_bytes,
                           text_body="", from_name="", reply_to=None,
-                          list_unsubscribe=None):
+                          list_unsubscribe=None, extra_attachments=None):
     """Send through a connected Google account that has the gmail.send
     scope, using OAuth.
 
@@ -629,9 +674,11 @@ def _send_via_gmail_oauth(to_email, subject, html_body, pdf_name, pdf_bytes,
 
         service = build("gmail", "v1", credentials=c)
 
-        attachments = None
+        attachments = []
         if pdf_bytes:
-            attachments = [(pdf_name or "order.pdf", pdf_bytes, "application/pdf")]
+            attachments.append((pdf_name or "order.pdf", pdf_bytes, "application/pdf"))
+        attachments.extend(extra_attachments or [])
+        attachments = attachments or None
 
         # Branded From display name; the address stays the connected
         # mailbox, keeping DKIM/SPF aligned. Extra headers improve

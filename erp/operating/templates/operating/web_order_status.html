@@ -583,9 +583,9 @@
             </div>
 
             <div class="form-group full-width">
-                <label class="form-label">{% trans "Tracking Number" %}</label>
+                <label class="form-label">{% trans "Tracking or Receipt Number" %}</label>
                 <input type="text" name="tracking_number" class="form-input"
-                    value="{{ order.tracking_number|default:'' }}" placeholder="Enter tracking number...">
+                    value="{{ order.tracking_number|default:'' }}" placeholder="{% trans 'Enter tracking or receipt number...' %}">
             </div>
         </div>
 

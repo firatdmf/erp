@@ -2017,8 +2017,8 @@ msgstr "Total Balance"
 msgid "Total Price"
 msgstr "Total Price"
 
-msgid "Tracking Number"
-msgstr "Tracking Number"
+msgid "Tracking or Receipt Number"
+msgstr "Takip veya Fiş Numarası"
 
 msgid "Transaction #"
 msgstr "Transaction #"
@@ -6771,8 +6771,8 @@ msgstr "Aşamayı seçin ve kargo bilgilerini ekleyin — anında kaydedilir."
 msgid "Carrier"
 msgstr "Kargo Firması"
 
-msgid "Tracking number"
-msgstr "Takip Numarası"
+msgid "Tracking or receipt number"
+msgstr "Takip veya fiş numarası"
 
 msgid "e.g. 1234567890"
 msgstr "örn. 1234567890"
@@ -9357,8 +9357,8 @@ msgstr "Tamamı yine de faturalanır"
 msgid "Total scanned"
 msgstr "Toplam okutulan"
 
-msgid "Enter carrier and tracking number to complete the order."
-msgstr "Siparişi tamamlamak için kargo şirketi ve takip numarası girin."
+msgid "Enter carrier and tracking or receipt number to complete the order."
+msgstr "Siparişi tamamlamak için kargo şirketi ve takip veya fiş numarası girin."
 
 msgid "The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?"
 msgstr "Sipariş tamamlanacak ve paketlemede rezerve edilen toplar stoktan düşülecek. Onaylıyor musunuz?"
@@ -10531,3 +10531,52 @@ msgstr "Sokak, şehir, ülke, telefon — etikette yazılacağı gibi"
 
 msgid "new — saved with the order"
 msgstr "yeni — siparişle birlikte kaydedilir"
+
+#: operating/templates/operating/order_detail.html
+msgid "Cargo receipt"
+msgstr "Kargo fişi"
+
+#: operating/templates/operating/order_detail.html
+msgid "Receipt"
+msgstr "Fiş"
+
+#: operating/templates/operating/order_detail.html
+msgid "Attach a photo or PDF of the receipt"
+msgstr "Fişin fotoğrafını veya PDF'ini ekleyin"
+
+#: operating/templates/operating/order_detail.html
+msgid "Remove this cargo receipt?"
+msgstr "Bu kargo fişi kaldırılsın mı?"
+
+#: operating/views.py
+msgid "You can't change this order's cargo receipts."
+msgstr "Bu siparişin kargo fişlerini değiştiremezsiniz."
+
+#: operating/views.py
+msgid "Cargo receipt removed."
+msgstr "Kargo fişi kaldırıldı."
+
+#: operating/views.py
+#, python-format
+msgid "These files were not attached — only images or PDFs up to 15 MB: %(names)s"
+msgstr "Şu dosyalar eklenmedi — yalnızca 15 MB'a kadar görsel veya PDF: %(names)s"
+
+#: operating/templates/operating/order_detail.html
+msgid "Take photo"
+msgstr "Fotoğraf çek"
+
+#: operating/templates/operating/order_detail.html
+msgid "Photos taken:"
+msgstr "Çekilen fotoğraf:"
+
+#: operating/templates/operating/order_detail.html
+msgid "Search carrier..."
+msgstr "Kargo firması ara..."
+
+#: operating/templates/operating/order_detail.html
+msgid "Change carrier"
+msgstr "Kargo firmasını değiştir"
+
+#: operating/templates/operating/web_order_status.html
+msgid "Enter tracking or receipt number..."
+msgstr "Takip veya fiş numarası girin..."

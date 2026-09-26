@@ -313,6 +313,88 @@
   .od-ship-meta {
     font: 500 11.5px var(--font-sans); color: var(--gray-600);
   }
+  /* Carrier combobox — drawn like the order form's customer picker. */
+  .od-cbx { position: relative; }
+  .od-cbx-box[hidden], .od-cbx-chip[hidden], .od-cbx-list[hidden] { display: none; }
+  .od-cbx-box input { width: 100%; box-sizing: border-box; }
+  .od-cbx-list {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40;
+    list-style: none; margin: 0; padding: 4px;
+    background: white; border: 1px solid #DDE3EA; border-radius: 10px;
+    box-shadow: 0 10px 26px rgba(15,20,25,.13); max-height: 236px; overflow-y: auto;
+  }
+  .od-cbx-list li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: 7px; cursor: pointer;
+    font: 600 13px var(--font-sans); color: #0F1419;
+  }
+  .od-cbx-list li i { color: #147F74; font-size: 12px; }
+  .od-cbx-list li.active, .od-cbx-list li:hover { background: #EFF6F5; }
+  .od-cbx-list li.add { color: #0B5F60; border-top: 1px solid #EEF1F5; }
+  .od-cbx-list li.add:first-child { border-top: 0; }
+  .od-cbx-chip {
+    display: flex; align-items: center; gap: 8px; height: 38px; box-sizing: border-box;
+    padding: 0 6px 0 11px; border: 1px solid #BFE0DB; background: #EFF6F5; border-radius: 7px;
+    font: 700 13px var(--font-sans); color: #0B5F60;
+  }
+  .od-cbx-chip i { color: #147F74; }
+  .od-cbx-chip > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od-cbx-clear {
+    flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 6px; cursor: pointer;
+    background: transparent; color: #0B5F60; padding: 0; position: relative;
+  }
+  .od-cbx-clear::before, .od-cbx-clear::after {
+    content: ''; position: absolute; top: 50%; left: 50%; width: 11px; height: 1.8px;
+    background: currentColor; border-radius: 2px;
+  }
+  .od-cbx-clear::before { transform: translate(-50%,-50%) rotate(45deg); }
+  .od-cbx-clear::after { transform: translate(-50%,-50%) rotate(-45deg); }
+  .od-cbx-clear:hover { background: #DCEBE9; }
+  [data-theme="dark"] .od-cbx-list { background: #1A2228; border-color: #2A353D; }
+  [data-theme="dark"] .od-cbx-list li { color: #E6ECEF; }
+  [data-theme="dark"] .od-cbx-list li.active, [data-theme="dark"] .od-cbx-list li:hover { background: rgba(102,194,194,.12); }
+  [data-theme="dark"] .od-cbx-chip { background: rgba(102,194,194,.10); border-color: rgba(102,194,194,.35); color: #66C2C2; }
+  .od-rcpt { grid-column: 1 / -1; }
+  .od-rcpt-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .od-rcpt-item {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 4px 4px 4px; background: white;
+    border: 1px solid #DDE3E7; border-radius: 8px; max-width: 100%;
+  }
+  .od-rcpt-open {
+    display: flex; align-items: center; gap: 8px; min-width: 0;
+    color: #0F1419; text-decoration: none; font: 500 12.5px var(--font-sans);
+  }
+  .od-rcpt-open:hover .od-rcpt-name { text-decoration: underline; }
+  .od-rcpt-thumb {
+    width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+    background: #F3F4F6;
+  }
+  .od-rcpt-thumb.pdf {
+    display: flex; align-items: center; justify-content: center;
+    background: #FEE2E2; color: #B91C1C; font-size: 16px;
+  }
+  .od-rcpt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od-rcpt-del {
+    border: 0; background: none; color: var(--gray-500); cursor: pointer;
+    width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+  }
+  .od-rcpt-del:hover { background: #FEE2E2; color: #B91C1C; }
+  .od-rcpt-pick {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    padding: 9px 11px; border: 1px dashed #C9D2D8; border-radius: 7px;
+    background: white; font: 500 13px var(--font-sans); color: var(--gray-600);
+  }
+  .od-rcpt-pick:hover { border-color: var(--nejum-teal-500, #147F74); color: var(--nejum-teal-600, #0F766E); }
+  .od-ship .od-rcpt-pick input { display: none; }
+  .od-rcpt-pick.has-files { border-style: solid; color: #0F1419; }
+  .od-rcpt-picks { display: flex; gap: 8px; }
+  .od-rcpt-file { flex: 1; min-width: 0; }
+  .od-rcpt-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od-rcpt-cam { display: none; flex-shrink: 0; font-weight: 600; color: var(--nejum-teal-600, #0F766E); }
+  @media (pointer: coarse) { .od-rcpt-cam { display: flex; } }
+  .od-rcpt-shots { font: 500 12px var(--font-sans); color: var(--gray-600); }
+  .od-rcpt-shots i { color: var(--nejum-teal-600, #0F766E); margin-right: 4px; }
   .od-ship-meta i { margin-right: 4px; color: var(--nejum-teal-600); }
 
   /* Collapsible "more statuses" */
@@ -1089,7 +1171,7 @@
           <span class="od-card-sub">{% trans "Pick the stage and add shipping info — saved inline." %}</span>
         </div>
 
-        <form method="post" action="{% url 'operating:order_detail' order.pk %}" id="od-status-form">
+        <form method="post" action="{% url 'operating:order_detail' order.pk %}" id="od-status-form" enctype="multipart/form-data">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_status">
           <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}">
@@ -1150,20 +1232,73 @@
             </label>
             {% endif %}
             <div class="od-ship-grid" id="od-ship-grid" {% if order.is_retail_order and not order.carrier and not order.tracking_number %}style="display:none;"{% endif %}>
-              <label class="od-ship-f">
-                <span class="od-ship-l">{% trans "Carrier" %}</span>
-                <select name="carrier">
+              <div class="od-ship-f">
+                <label class="od-ship-l" for="od-carrier-search">{% trans "Carrier" %}</label>
+                {% comment %}A combobox over the fixed carrier list: type to filter, pick, and the pick shows as a chip whose × gives the field back — the customer picker on the order form, without the server round-trip. The <select> stays underneath as the value the form posts and the complete-order check reads.{% endcomment %}
+                <select name="carrier" id="od-carrier-select" hidden>
                   <option value="">{% trans "— Select —" %}</option>
                   {% for code, label in carrier_choices %}
                   <option value="{{ code }}" {% if order.carrier == code %}selected{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </select>
-              </label>
+                <div class="od-cbx" id="od-carrier-cbx">
+                  <div class="od-cbx-box" {% if order.carrier %}hidden{% endif %}>
+                    <input type="text" id="od-carrier-search" autocomplete="off"
+                           placeholder="{% trans 'Search carrier...' %}"
+                           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="od-carrier-list">
+                    <ul class="od-cbx-list" id="od-carrier-list" role="listbox" hidden></ul>
+                  </div>
+                  <div class="od-cbx-chip" {% if not order.carrier %}hidden{% endif %}>
+                    <i class="fa fa-truck"></i>
+                    <span>{{ order.get_carrier_display|default:'' }}</span>
+                    <button type="button" class="od-cbx-clear" title="{% trans 'Change carrier' %}" aria-label="{% trans 'Change carrier' %}"></button>
+                  </div>
+                </div>
+              </div>
               <label class="od-ship-f">
-                <span class="od-ship-l">{% trans "Tracking number" %}</span>
+                <span class="od-ship-l">{% trans "Tracking or receipt number" %}</span>
                 <input type="text" name="tracking_number" value="{{ order.tracking_number|default:'' }}"
                        placeholder="{% trans 'e.g. 1234567890' %}">
               </label>
+              <div class="od-ship-f od-rcpt">
+                <span class="od-ship-l">{% trans "Cargo receipt" %}</span>
+                {% with receipts=order.cargo_receipts.all %}
+                {% if receipts %}
+                <div class="od-rcpt-list">
+                  {% for r in receipts %}
+                  <div class="od-rcpt-item">
+                    <a href="{{ r.file_url }}" target="_blank" rel="noopener" class="od-rcpt-open" title="{{ r.file_name }}">
+                      {% if r.is_pdf %}<span class="od-rcpt-thumb pdf"><i class="fa fa-file-pdf"></i></span>
+                      {% else %}<img class="od-rcpt-thumb" src="{{ r.file_url }}" alt="" loading="lazy">{% endif %}
+                      <span class="od-rcpt-name">{{ r.file_name|default:_("Receipt")|truncatechars:28 }}</span>
+                    </a>
+                    {% if not is_sales_rep %}
+                    <button type="submit" form="od-rcpt-del-{{ r.pk }}" class="od-rcpt-del"
+                            title="{% trans 'Remove' %}" aria-label="{% trans 'Remove' %}"><i class="fa fa-xmark"></i></button>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
+                {% if not is_sales_rep %}
+                <div class="od-rcpt-picks">
+                  {% comment %}Phones only: a PDF-or-image picker can't open the camera on Android, so a second input asks for the rear camera outright. Each shot moves into its own hidden input (see the JS) so a second photo doesn't replace the first.{% endcomment %}
+                  <label class="od-rcpt-pick od-rcpt-cam">
+                    <input type="file" name="cargo_receipts" id="od-rcpt-cam" accept="image/*" capture="environment">
+                    <i class="fa fa-camera"></i>
+                    <span>{% trans "Take photo" %}</span>
+                  </label>
+                  <label class="od-rcpt-pick od-rcpt-file">
+                    <input type="file" name="cargo_receipts" id="od-rcpt-input" multiple
+                           accept="image/*,application/pdf,.pdf,.heic,.heif">
+                    <i class="fa fa-paperclip"></i>
+                    <span id="od-rcpt-picked" data-empty="{% trans 'Attach a photo or PDF of the receipt' %}">{% trans "Attach a photo or PDF of the receipt" %}</span>
+                  </label>
+                </div>
+                <div class="od-rcpt-shots" id="od-rcpt-shots" hidden></div>
+                {% endif %}
+              </div>
             </div>
             <div class="od-ship-actions">
               <span class="od-ship-meta">
@@ -1190,6 +1325,13 @@
             </div>
           </div>
         </form>
+        {% for r in order.cargo_receipts.all %}
+        <form method="post" action="{% url 'operating:order_detail' order.pk %}" id="od-rcpt-del-{{ r.pk }}" class="od-rcpt-del-form" hidden>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="delete_cargo_receipt">
+          <input type="hidden" name="receipt_id" value="{{ r.pk }}">
+        </form>
+        {% endfor %}
 
         {% if order.order_status == 'cancelled' %}
         <div class="od-cancelled-note">
@@ -1947,7 +2089,7 @@
     const carrierSel  = statusForm.querySelector('[name="carrier"]');
     const trackingInp = statusForm.querySelector('[name="tracking_number"]');
     const SHIPPED = ['shipped', 'in_transit', 'out_for_delivery', 'delivered'];
-    const NEED_CARGO_MSG = '{% trans "Enter carrier and tracking number to complete the order." %}';
+    const NEED_CARGO_MSG = '{% trans "Enter carrier and tracking or receipt number to complete the order." %}';
     const CONFIRM_SHIP = '{% trans "The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?" %}';
 
     // Retail-only: the "shipped by carrier" tick toggles the carrier/tracking
@@ -2111,6 +2253,148 @@
       statusInput.value = s;
       statusForm.submit();
     }
+    // Carrier combobox. Filtering ignores case and Turkish accents, so
+    // "yurtici" finds "Yurtiçi Kargo" and "IS" doesn't miss an "iş".
+    (function () {
+      const sel = document.getElementById('od-carrier-select');
+      const root = document.getElementById('od-carrier-cbx');
+      if (!sel || !root) return;
+      const box = root.querySelector('.od-cbx-box');
+      const input = document.getElementById('od-carrier-search');
+      const list = document.getElementById('od-carrier-list');
+      const chip = root.querySelector('.od-cbx-chip');
+      const ADD_LABEL = '{% trans "Add" %}';
+      const fold = (t) => (t || '').toLocaleLowerCase('tr').replace(/ı/g, 'i')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const options = Array.from(sel.options).filter(o => o.value)
+        .map(o => ({ value: o.value, label: o.text, key: fold(o.text + ' ' + o.value) }));
+      let shown = [], active = -1;
+
+      function render() {
+        const typed = input.value.trim().replace(/\s+/g, ' ');
+        const q = fold(typed);
+        shown = options.filter(o => !q || o.key.includes(q));
+        // A carrier that isn't on the list: offer to add it. It posts as the
+        // typed name, and the server adds it to the list on save (or reuses
+        // one whose name only differs in case or accents).
+        if (q && !options.some(o => fold(o.label) === q)) {
+          shown.push({ value: typed, label: typed, isNew: true });
+        }
+        active = shown.length ? 0 : -1;
+        list.innerHTML = '';
+        if (!shown.length) { close(); return; }
+        shown.forEach((o, i) => {
+          const li = document.createElement('li');
+          li.id = 'od-carrier-opt-' + i;
+          li.setAttribute('role', 'option');
+          if (o.isNew) {
+            li.className = 'add';
+            li.innerHTML = '<i class="fa fa-plus"></i>';
+            li.appendChild(document.createTextNode(ADD_LABEL + ' “' + o.label + '”'));
+          } else {
+            li.innerHTML = '<i class="fa fa-truck"></i>';
+            li.appendChild(document.createTextNode(o.label));
+          }
+          // mousedown, not click: it lands before the input's blur closes the list.
+          li.addEventListener('mousedown', (e) => { e.preventDefault(); pick(o); });
+          list.appendChild(li);
+        });
+        highlight();
+        list.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+      }
+      function highlight() {
+        list.querySelectorAll('li[role="option"]').forEach((li, i) => {
+          li.classList.toggle('active', i === active);
+          li.setAttribute('aria-selected', i === active ? 'true' : 'false');
+        });
+        const cur = document.getElementById('od-carrier-opt-' + active);
+        if (cur) { cur.scrollIntoView({ block: 'nearest' }); input.setAttribute('aria-activedescendant', cur.id); }
+        else input.removeAttribute('aria-activedescendant');
+      }
+      function close() {
+        list.hidden = true;
+        input.setAttribute('aria-expanded', 'false');
+      }
+      function pick(o) {
+        if (o.isNew && !Array.from(sel.options).some(opt => opt.value === o.value)) {
+          sel.add(new Option(o.label, o.value));
+        }
+        sel.value = o.value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        chip.querySelector('span').textContent = o.label;
+        chip.hidden = false; box.hidden = true;
+        input.value = ''; close();
+      }
+      chip.querySelector('.od-cbx-clear').addEventListener('click', () => {
+        sel.value = '';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        chip.hidden = true; box.hidden = false;
+        input.focus();
+      });
+      input.addEventListener('focus', render);
+      input.addEventListener('input', render);
+      input.addEventListener('blur', close);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (list.hidden) return render();
+          if (!shown.length) return;
+          active = (active + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length;
+          highlight();
+        } else if (e.key === 'Enter') {
+          // Never submit the status form from here — Enter picks.
+          e.preventDefault();
+          if (!list.hidden && shown[active]) pick(shown[active]);
+        } else if (e.key === 'Escape') {
+          if (!list.hidden) { e.stopPropagation(); close(); }
+        }
+      });
+    })();
+
+    // Cargo receipt picker: say what was picked, since the input is hidden.
+    const rcptInput = document.getElementById('od-rcpt-input');
+    const rcptPicked = document.getElementById('od-rcpt-picked');
+    if (rcptInput && rcptPicked) {
+      rcptInput.addEventListener('change', () => {
+        const names = Array.from(rcptInput.files).map(f => f.name);
+        rcptPicked.textContent = names.length ? names.join(', ') : rcptPicked.dataset.empty;
+        rcptPicked.parentElement.classList.toggle('has-files', names.length > 0);
+      });
+    }
+    // Camera: a capture input holds one shot, and the next shot would
+    // replace it. So each filled input is parked in the (hidden) shots box —
+    // still inside the form, still posting as cargo_receipts — and a fresh
+    // empty one takes its place for the next photo.
+    const rcptCam = document.getElementById('od-rcpt-cam');
+    const rcptShots = document.getElementById('od-rcpt-shots');
+    if (rcptCam && rcptShots) {
+      const SHOTS_LABEL = '{% trans "Photos taken:" %}';
+      const note = document.createElement('span');
+      rcptShots.appendChild(note);
+      let shots = 0;
+      const onShot = (e) => {
+        const filled = e.target;
+        if (!filled.files.length) return;
+        const fresh = filled.cloneNode();
+        fresh.value = '';
+        fresh.addEventListener('change', onShot);
+        filled.parentElement.insertBefore(fresh, filled);
+        filled.removeAttribute('id');
+        filled.hidden = true;
+        rcptShots.insertBefore(filled, note);
+        shots += 1;
+        note.innerHTML = '<i class="fa fa-camera"></i>' + SHOTS_LABEL + ' ' + shots;
+        rcptShots.hidden = false;
+      };
+      rcptCam.addEventListener('change', onShot);
+    }
+    document.querySelectorAll('.od-rcpt-del').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        if (!confirm('{% trans "Remove this cargo receipt?" %}')) e.preventDefault();
+      });
+    });
+
     document.querySelectorAll('.od-stage[data-status], .od-stage-mini[data-status], .od-spk-btn[data-status], #od-complete-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();

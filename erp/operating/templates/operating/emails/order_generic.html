@@ -44,11 +44,14 @@
                     <td>
                       {% if carrier %}<div style="font-size:12px;color:#0F766E;text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Carrier</div>
                       <div style="font-size:15px;font-weight:700;color:#0F1419;margin-top:2px;">{{ carrier }}</div>{% endif %}
-                      {% if tracking_number %}<div style="font-size:12px;color:#0F766E;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-top:10px;">Tracking number</div>
+                      {% if tracking_number %}<div style="font-size:12px;color:#0F766E;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-top:10px;">Tracking or receipt number</div>
                       <div style="font-size:16px;font-weight:800;font-family:Menlo,Consolas,monospace;color:#0F1419;margin-top:2px;">{{ tracking_number }}</div>{% endif %}
                     </td>
                   </tr>
                 </table>
+                {% endif %}
+                {% if cargo_receipts_attached %}
+                <p style="margin:0 0 16px;">{% if cargo_receipts_attached == 1 %}The carrier's receipt is attached to this email.{% else %}The carrier's receipts are attached to this email.{% endif %}</p>
                 {% endif %}
               {% elif event == 'delivered' %}
                 <p style="margin:0 0 16px;">Your order has been delivered. We hope you're happy with it — please let us know if there's anything we can do.</p>

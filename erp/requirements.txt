@@ -96,6 +96,10 @@ Pillow>=10.4.0
 # Not required on Pillow >= 11.3, which decodes AVIF natively.
 pillow-avif-plugin==1.5.5
 pillow-avif-plugin>=1.4.1
+# Reads the HEIC photos an iPhone takes, so a cargo receipt shot on one is
+# turned into a JPEG every browser and mail client can open
+# (operating/receipt_images.py). The wheels bundle libheif — no apt package.
+pillow-heif>=0.18
 proglog==0.1.12
 proto-plus==1.27.1
 protobuf==4.23.4

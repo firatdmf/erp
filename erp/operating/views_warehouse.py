@@ -5991,7 +5991,6 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
 
     valid_statuses = {k for k, _ in ORDER_STATUS_CHOICES}
-    valid_carriers = {k for k, _ in CARRIER_CHOICES}
     old_status = order.order_status
 
     changing = bool(new_status) and new_status in valid_statuses and new_status != old_status
@@ -6004,7 +6003,10 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     if carrier is not None:
         c = (carrier or "").strip()
         if c:
-            order.carrier = c if c in valid_carriers else None
+            # A code picked from the list, or a name typed in — which
+            # joins the list if it's a carrier we haven't seen.
+            from .models import Carrier
+            order.carrier = Carrier.resolve(c, user=user)
     if tracking is not None:
         tstr = (tracking or "").strip()
         if tstr:

@@ -351,12 +351,12 @@ def _order_profit_snapshot(order, user):
     OrderDetail.post and the pack-reserve endpoints so any change that
     shifts billed value can refresh the UI without a reload.
 
-    None for a sales rep, whose page draws no cost or profit to refresh:
-    what the order cost us is the margin, and that is not the role's to
-    read. Taking the user here, rather than at each call site, is what
-    keeps a new endpoint from forgetting."""
-    from erp.roles import is_sales_rep
-    if is_sales_rep(user):
+    None for anyone without the view_profit grant, whose page draws no
+    cost or profit to refresh: what the order cost us is the margin.
+    Taking the user here, rather than at each call site, is what keeps a
+    new endpoint from forgetting."""
+    from erp.roles import may_see_profit
+    if not may_see_profit(user):
         return None
     try:
         tc = float(order.total_cost() or 0)

@@ -1,9 +1,10 @@
 """A sales rep reads an order's prices, never what it cost us.
 
 Cost, COGS and profit are the margin. The order page draws them for
-staff; for a sales rep it draws none of them, and the edit endpoints
-that refresh them without a reload send none back either — hiding the
-rows while the JSON still carried the numbers would hide nothing.
+a member holding the view_profit grant; for a sales rep, who does not,
+it draws none of them, and the edit endpoints that refresh them without
+a reload send none back either — hiding the rows while the JSON still
+carried the numbers would hide nothing.
 """
 from decimal import Decimal
 from unittest.mock import patch
@@ -40,12 +41,16 @@ class OrderCostIsHiddenFromSalesRep(TestCase):
         self.user.member.books.add(book)
         self.user.member.default_book = book
         self.user.member.save()
+        self.view_profit, _ = Permission.objects.get_or_create(name="view_profit")
+        self.user.member.permissions.add(self.view_profit)
         self.client.force_login(self.user)
         self.url = reverse("operating:order_detail", kwargs={"pk": self.order.pk})
 
     def _make_rep(self):
+        """The role as it is granted: sales_rep, and no view_profit."""
         perm, _ = Permission.objects.get_or_create(name="sales_rep")
         self.user.member.permissions.add(perm)
+        self.user.member.permissions.remove(self.view_profit)
 
     def test_staff_still_see_cost_and_profit(self):
         resp = self.client.get(self.url)

@@ -92,13 +92,16 @@
   /* Two product lines a row on wide screens, like the packages below,
      each its own height. A line with many rolls scrolls inside itself
      after about three rows instead of pushing the packages down — so a
-     roll dragged from here has less far to go. Phones keep one column
-     and no inner scroll: a scroll box inside a page is fiddly by thumb. */
+     roll dragged from here has less far to go. The scroll is NOT
+     contained: once a card is at its end the wheel carries on down the
+     page, otherwise the bottom of the page is unreachable from over a
+     card. Phones keep one column and no inner scroll: a scroll box
+     inside a page is fiddly by thumb. */
   @media(min-width:1100px){
     #pkGroups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;}
     #pkGroups .pk-pgroup{margin-bottom:0;}
     #pkGroups > .pk-empty{grid-column:1/-1;}
-    #pkGroups .pk-pgroup-rolls{max-height:330px;overflow-y:auto;overscroll-behavior:contain;}
+    #pkGroups .pk-pgroup-rolls{max-height:330px;overflow-y:auto;}
   }
 
   /* Wherever rolls are listed, they flow across the available width —
@@ -219,15 +222,14 @@
      and drop does not fire on touch at all, so on the tablets used on
      the packing floor this button is the ONLY way to fill a package. */
   .pk-row-actions{display:flex;align-items:center;gap:4px;flex-shrink:0;}
-  .pk-move{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;cursor:pointer;
-    border:1.5px solid var(--pk-line);background:#fff;color:var(--pk-gray);border-radius:8px;
-    padding:4px 8px;font:700 11px var(--pk-font);white-space:nowrap;}
+  /* An icon only, in and out of a package: the rolls flow in narrow
+     cards, and a worded chip ran past the card's edge. The title says
+     what it does; the ::before pads the tap target without the size. */
+  .pk-move{position:relative;display:inline-flex;align-items:center;justify-content:center;
+    width:22px;height:22px;padding:0;flex-shrink:0;cursor:pointer;
+    border:1px solid var(--pk-line);background:#fff;color:var(--pk-gray);border-radius:6px;font-size:10px;}
+  .pk-move::before{content:'';position:absolute;inset:-6px;}
   .pk-move:hover{border-color:var(--pk-teal);color:var(--pk-teal-700);}
-  /* In a package the move button is an icon only — the card already
-     says which package; the button is just the way to another. */
-  .pk-move.has-pack{position:relative;width:20px;height:20px;padding:0;justify-content:center;gap:0;
-    border-width:1px;border-radius:6px;font-size:10px;}
-  .pk-move.has-pack::before{content:'';position:absolute;inset:-6px;}
   .pk-menu{position:fixed;z-index:90;min-width:216px;max-width:min(300px,92vw);
     max-height:min(360px,58vh);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#fff;border:1.5px solid var(--pk-line);
     border-radius:12px;box-shadow:0 14px 34px rgba(15,20,25,.18);padding:6px;font-family:var(--pk-font);}
@@ -403,7 +405,7 @@
     .pk-title{font-size:18px;}
     .pk-row-cut{gap:6px 8px;}
     .pks-cam{max-height:38vh;}
-    .pk-move{padding:5px 9px;font-size:11.5px;}
+    .pk-move{width:26px;height:26px;font-size:12px;}
   }
 </style>
 {% endblock %}
@@ -1459,22 +1461,19 @@
           mv = document.createElement('button');
           mv.type = 'button';
           mv.className = 'pk-move';
-          mv.innerHTML = '<i class="fa fa-box"></i><span data-move-label></span>';
+          mv.innerHTML = '<i class="fa fa-box"></i>';
           actions.insertBefore(mv, actions.firstChild);
         }
         var pack = packEl(row.dataset.assignedPack || '');
-        var lbl = mv.querySelector('[data-move-label]');
         var ico = mv.querySelector('i');
-        // Inside a package the card already says which one, so the button
-        // is only the way to another — an icon, not a repeat of the number.
+        // Icon only either way; the icon and the title say which move
+        // this is — into a package, or on to another one.
         if (pack){
-          mv.classList.add('has-pack'); lbl.textContent = '';
           if (ico) ico.className = 'fa fa-arrow-right-arrow-left';
           mv.title = t('Başka pakete taşı','Move to another package');
         } else {
-          mv.classList.remove('has-pack'); lbl.textContent = t('Pakete at','To package');
           if (ico) ico.className = 'fa fa-box';
-          mv.title = t('Pakete taşı','Move to package');
+          mv.title = t('Pakete at','To package');
         }
       });
     };

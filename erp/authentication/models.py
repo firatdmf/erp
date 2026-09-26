@@ -26,6 +26,15 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "Sales rep (read-only)",
         "Can view stock quantities, prices and sales. Cannot change anything.",
     ),
+    # What an order cost us and what we made on it is the margin. Held as
+    # a grant of its own rather than implied by "not a sales rep", so a
+    # role can be given or refused the numbers without touching what
+    # else it may do. Seeded to every existing non-rep member in
+    # migration 0021; a new member has to be granted it.
+    "view_profit": (
+        "See cost and profit",
+        "Can see cost of goods, gross profit and margin on orders and analytics.",
+    ),
 }
 
 # Convert dictionary to list of tuples for name choices

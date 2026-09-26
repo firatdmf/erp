@@ -18,6 +18,7 @@ headers. The wrapper swallows `book_id` and hands the view
 """
 from functools import wraps
 
+from django.contrib.auth.views import redirect_to_login
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
@@ -31,9 +32,17 @@ def book_scoped(view):
     404 rather than 403 for a book the member is not assigned: whether a
     given book exists is not something an unassigned member should be
     able to probe by watching the status code change.
+
+    A visitor who is not signed in at all is sent to sign in first, the
+    way @login_required would: the views behind these guards are mostly
+    plain ListView/DetailView with no login mixin of their own, so
+    without this the anonymous answer was the same 404 — a broken page
+    in place of the sign-in form.
     """
     @wraps(view)
     def wrapper(request, *args, book_id=None, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
         book = get_object_or_404(Book, pk=book_id)
         member = getattr(request.user, "member", None)
         if not member_can_use_book(member, book):
@@ -70,6 +79,8 @@ def book_guarded(view, model, book_path="book"):
     """
     @wraps(view)
     def wrapper(request, *args, pk=None, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
         obj = get_object_or_404(model, pk=pk)
         book = obj
         for step in book_path.split("."):

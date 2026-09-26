@@ -47,6 +47,7 @@ import re
 from decimal import ROUND_CEILING, Decimal
 
 SALES_REP = "sales_rep"
+VIEW_PROFIT = "view_profit"
 
 
 # Paths any signed-in member may reach whatever their role: the shell
@@ -280,39 +281,61 @@ def may_write(path):
             or any(pattern.match(path) for pattern in WRITE_PATTERNS))
 
 
+def _member_and_user(actor):
+    """(member, user) for a User OR a Member, or (None, None).
+
+    The order pipeline calls apply_order_status_change with a Member in
+    one place and request.user everywhere else, and a check that
+    silently answered False for one of them would be a hole exactly
+    where it matters.
+    """
+    if actor is None:
+        return None, None
+    # A Member has `.permissions`; a User reaches it through `.member`.
+    if hasattr(actor, "permissions"):
+        return actor, getattr(actor, "user", None)
+    if not getattr(actor, "is_authenticated", False):
+        return None, None
+    return getattr(actor, "member", None), actor
+
+
+def _has_permission(member, name):
+    try:
+        return member.permissions.filter(name=name).exists()
+    except Exception:
+        return False
+
+
 def is_sales_rep(actor):
     """True for a Member carrying the sales_rep permission.
-
-    `actor` may be a User OR a Member: the order pipeline calls
-    apply_order_status_change with a Member in one place and
-    request.user everywhere else, and a check that silently answered
-    False for one of them would be a hole exactly where it matters.
 
     Superusers are never sales reps however they are flagged — an admin
     locked out of their own install by a stray permission row would have
     no way back in.
     """
-    if actor is None:
+    member, user = _member_and_user(actor)
+    if member is None or getattr(user, "is_superuser", False):
         return False
+    return _has_permission(member, SALES_REP)
 
-    # A Member has `.permissions`; a User reaches it through `.member`.
-    if hasattr(actor, "permissions"):
-        member = actor
-        user = getattr(actor, "user", None)
-    else:
-        if not getattr(actor, "is_authenticated", False):
-            return False
-        member = getattr(actor, "member", None)
-        user = actor
 
+def may_see_profit(actor):
+    """Whether this member may read what an order cost us and what we
+    made on it: COGS, gross profit, margin.
+
+    A grant (the view_profit permission), not the absence of a role, so
+    the numbers can be given to or taken from anyone in one place —
+    Django admin → Members. Superusers always may; nobody else without
+    the row. The per-unit cost a sales rep is shown a marked-up price in
+    place of (sales_rep_price) stays on the role: that is a substitution,
+    not a hide.
+    """
+    member, user = _member_and_user(actor)
     if member is None:
         return False
     if getattr(user, "is_superuser", False):
-        return False
-    try:
-        return member.permissions.filter(name=SALES_REP).exists()
-    except Exception:
-        return False
+        return True
+    return _has_permission(member, VIEW_PROFIT)
 
 
 def may_read(path):

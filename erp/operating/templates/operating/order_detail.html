@@ -1662,7 +1662,7 @@
             <span style="font-weight:700;">{{ total_scanned_count }} {% trans "tops" %} · {{ total_scanned_meters|floatformat:"-2" }} m</span>
           </div>
           {% endif %}
-          {% if not is_sales_rep %}
+          {% if may_see_profit %}
           {% with tc=order.total_cost gp=order.gross_profit gm=order.gross_margin_pct %}
           <div class="od-tot-row" style="margin-top:6px; padding:8px 10px; background:#FFFBEB; border:1px dashed #FDE68A; border-radius:8px; color:#92400E;">
             <span style="display:inline-flex; align-items:center; gap:6px;">

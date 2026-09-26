@@ -127,7 +127,7 @@ def all_members(request):
 
 
 def role_flags(request):
-    """`is_sales_rep` and `is_brand_admin` for the templates.
+    """`is_sales_rep`, `may_see_profit` and `is_brand_admin` for the templates.
 
     Only used to hide chrome a member cannot use (the top bar's
     Purchases button and the "Create order" favorite for a read-only
@@ -135,12 +135,13 @@ def role_flags(request):
     itself is the view's job — ReadOnlyRoleMiddleware for the role, see
     erp/roles.py, and operating.views_warehouse._is_admin for the rest.
     """
-    from erp.roles import is_sales_rep
+    from erp.roles import is_sales_rep, may_see_profit
     from operating.views_warehouse import _is_admin
 
     user = getattr(request, "user", None)
     return {
         "is_sales_rep": is_sales_rep(user),
+        "may_see_profit": may_see_profit(user),
         "is_brand_admin": _is_admin(user),
     }
 

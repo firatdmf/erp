@@ -2572,8 +2572,11 @@
     // client or plain guest info, which this picker can't represent.
     var custType = (document.getElementById('customer-type').value || '').trim();
     var custPk = (document.getElementById('customer-pk').value || '').trim();
+    // A customer typed into the "create new" panel has no id yet — it is
+    // made with the order — but is a customer all the same.
+    var custNew = ((document.getElementById('new-customer-json') || {}).value || '').trim();
     if (this.dataset.mode !== 'edit'
-        && !(custType === 'retail' || ((custType === 'contact' || custType === 'company') && custPk))) {
+        && !(custType === 'retail' || ((custType === 'contact' || custType === 'company') && (custPk || custNew)))) {
       showToast('{% trans "Pick a customer before saving the order" %}', 'error');
       coToggle(3);
       var custSearch = document.getElementById('co-customer-search');

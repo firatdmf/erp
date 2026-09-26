@@ -10612,3 +10612,24 @@ msgstr "Bu siparişin toplarını paketlere koyun: bir paketin <b>Buraya okut</b
 #: operating/templates/operating/order_pack_scan.html
 msgid "New package"
 msgstr "Yeni paket"
+
+msgid "Attach contacts"
+msgstr "Kişi ekle"
+
+msgid "Remove all contacts"
+msgstr "Tüm kişileri kaldır"
+
+msgid "created with the company when you save"
+msgstr "kaydettiğinizde şirketle birlikte oluşturulur"
+
+msgid "Created with the company when you save"
+msgstr "Kaydettiğinizde şirketle birlikte oluşturulur"
+
+msgid "Create “%s” as a new contact"
+msgstr "“%s” adında yeni kişi oluştur"
+
+msgid "new — saved with the company"
+msgstr "yeni — şirketle birlikte kaydedilir"
+
+msgid "Add to list"
+msgstr "Listeye ekle"

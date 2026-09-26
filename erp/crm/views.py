@@ -260,6 +260,20 @@ class CompanyCreate(generic.edit.CreateView):
 
     # success_url = "/crm/company_list/"
 
+    def _is_ajax(self):
+        return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def form_invalid(self, form):
+        # The sidebar posts over fetch and reads JSON; handed the page
+        # instead, it could only say "an error occurred". It gets the
+        # field errors, and the first message to show.
+        if self._is_ajax():
+            from django.http import JsonResponse
+            errors = {field: errs.get_json_data() for field, errs in form.errors.items()}
+            first = next((e["message"] for errs in errors.values() for e in errs), "")
+            return JsonResponse({"success": False, "error": first, "errors": errors}, status=400)
+        return super().form_invalid(form)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["model_type"] = "company"
@@ -285,15 +299,21 @@ class CompanyCreate(generic.edit.CreateView):
             # Now save (signal will check _enable_email_campaign flag)
             self.object.save()
             
-            # Attach contact if selected
-            contact_id = form.cleaned_data.get("contact_id")
-            if contact_id:
-                try:
-                    contact = Contact.objects.get(pk=contact_id)
-                    contact.company = self.object
-                    contact.save()
-                except Contact.DoesNotExist:
-                    pass
+            # Attach the contacts picked in the sidebar — every one of
+            # them: a company has many. `contact_id` is the old single pick.
+            contact_pks = list(form.cleaned_data.get("contact_ids") or [])
+            if form.cleaned_data.get("contact_id"):
+                contact_pks.append(form.cleaned_data["contact_id"])
+            if contact_pks:
+                Contact.objects.filter(pk__in=contact_pks).update(company=self.object)
+            # ...and the ones typed in who did not exist yet. ArrayFields:
+            # a blank must be [] rather than [""].
+            for person in form.cleaned_data.get("new_contacts_json") or []:
+                Contact.objects.create(
+                    name=person["name"], company=self.object,
+                    email=[person["email"]] if person["email"] else [],
+                    phone=[person["phone"]] if person["phone"] else [],
+                )
             
             # Save the note if it exists
             note_content = form.cleaned_data.get("note_content")

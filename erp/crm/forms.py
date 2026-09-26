@@ -301,11 +301,58 @@ class ContactUpdateForm(ModelForm):
 
 
 class CompanyForm(ModelForm):
-    # Contact selector field
+    # Contact selector field. `contact_ids` is what the sidebar posts now —
+    # a company has many contacts, so it attaches several at once, as a
+    # comma-separated list of pks. `contact_id` stays for a stale tab
+    # still posting one.
     contact_id = forms.IntegerField(
         required=False,
         widget=forms.HiddenInput(attrs={"id": "selected_contact_id"})
     )
+    contact_ids = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "selected_contact_ids"})
+    )
+
+    def clean_name(self):
+        """One company per name, whatever its case. The column's unique
+        constraint only stops an exact repeat, so "WOODLINE" beside
+        "Woodline" got through and the list filled with doubles."""
+        from django.utils.translation import gettext as _
+        name = (self.cleaned_data.get("name") or "").strip()
+        taken = Company.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            taken = taken.exclude(pk=self.instance.pk)
+        if name and taken.exists():
+            raise forms.ValidationError(_("A company with this name already exists."))
+        return name
+
+    def clean_contact_ids(self):
+        raw = self.cleaned_data.get("contact_ids") or ""
+        return [int(x) for x in raw.split(",") if x.strip().isdigit()]
+
+    # Contacts typed into the sidebar who are not in CRM yet: made with
+    # the company, so a sidebar closed halfway leaves nothing behind.
+    new_contacts_json = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "new_contacts_json"})
+    )
+
+    def clean_new_contacts_json(self):
+        import json
+        raw = self.cleaned_data.get("new_contacts_json") or ""
+        try:
+            rows = json.loads(raw) if raw else []
+        except ValueError:
+            return []
+        people = []
+        for row in rows if isinstance(rows, list) else []:
+            name = (row.get("name") or "").strip() if isinstance(row, dict) else ""
+            if name:
+                people.append({"name": name,
+                               "email": (row.get("email") or "").strip(),
+                               "phone": (row.get("phone") or "").strip()})
+        return people
     
     # Hidden fields to store JSON arrays
     emails_data = forms.CharField(

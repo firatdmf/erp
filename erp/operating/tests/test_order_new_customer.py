@@ -61,3 +61,12 @@ class TheNewCustomerIsSavedWithTheOrder(TestCase):
         resp = self._post(new_customer_json=json.dumps({"name": "  "}))
         self.assertFalse(resp.json()["ok"])
         self.assertEqual(Contact.objects.count(), 0)
+
+    def test_a_company_that_exists_is_not_made_twice(self):
+        Company.objects.create(name="Trial Ltd")
+        resp = self._post(customer_type="company",
+                          new_customer_json=json.dumps({"name": "trial ltd"}))
+        self.assertFalse(resp.json()["ok"])
+        self.assertIn("already exists", resp.json()["error"])
+        self.assertEqual(Company.objects.count(), 1)
+        self.assertEqual(Order.objects.count(), 0)

@@ -3268,6 +3268,17 @@ class OrderCreate(View):
         # record yet: it is made below, with the order, so abandoning the
         # form leaves nothing behind.
         new_customer = _pending_new_customer(request)
+        # A company is one company: a name already in CRM, in any case,
+        # is not made again — the search above finds it to link to.
+        if new_customer and customer_type == "company" and not customer_pk \
+                and Company.objects.filter(name__iexact=new_customer["name"]).exists():
+            from django.utils.translation import gettext as _
+            msg = _("A company named %(name)s already exists — search for it above and link to it instead.") \
+                % {"name": new_customer["name"]}
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": str(msg)})
+            messages.error(request, msg)
+            return render(request, self.page_template, {"form": OrderForm(request.POST)})
 
         # A customer is mandatory. An order saved without one has no current account
         # to bill, prints with a blank Customer card, and can't be fixed

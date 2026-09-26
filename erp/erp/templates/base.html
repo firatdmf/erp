@@ -234,6 +234,25 @@
     .selected-contact.active {
       display: flex;
     }
+    /* Several picks stack, one row each, instead of sharing one row. */
+    .selected-contact.multi { flex-direction: column; align-items: stretch; gap: 8px; }
+    .selected-contact.multi .selected-contact-row { display: flex; align-items: center; gap: 12px; }
+    .selected-contact .pending-mark { font-weight: 600; font-size: 11px; color: #147F74; background: #EFF6F5; border: 1px solid #BFE0DB; border-radius: 5px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+    /* The search's "create" row and the inline box it opens. */
+    .contact-result-item.create .contact-avatar { background: #EFF6F5; color: #147F74; }
+    .company-new-contact { margin-top: 8px; padding: 12px; border: 1px dashed #CBD5E1; border-radius: 8px; background: #F8FAFC; display: flex; flex-direction: column; gap: 8px; }
+    .company-new-contact[hidden] { display: none; }
+    .company-new-contact-h { font-weight: 600; font-size: 13px; color: #111827; display: flex; align-items: center; gap: 8px; }
+    .company-new-contact-h small { font-weight: 500; color: #6b7280; }
+    .company-new-contact-row { display: flex; gap: 8px; }
+    .company-new-contact-row .form-input { flex: 1; min-width: 0; }
+    /* Small and outlined, unlike the form's own Save button: this adds
+       a person to the list, it does not save anything. */
+    .company-new-contact-row.actions { justify-content: flex-start; align-items: center; }
+    .company-new-contact-add { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #fff; border: 1px solid #147F74; color: #147F74; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .company-new-contact-add:hover { background: #EFF6F5; }
+    .company-new-contact-cancel { padding: 6px 10px; background: none; border: 0; color: #6b7280; font-size: 13px; cursor: pointer; }
+    .company-new-contact-cancel:hover { color: #111827; text-decoration: underline; }
 
     /* ===== MOBILE RESPONSIVE FIXES ===== */
     @media (max-width: 768px) {
@@ -857,23 +876,42 @@
           <!-- Contact attachment -->
           <div id="companyContactSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fas fa-user"></i> {% trans "Attach a contact" %}</span>
+              <span><i class="fas fa-user"></i> {% trans "Attach contacts" %}</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('companyContact', {clear: true})">
-                {% trans "Remove this contact" %}
+                {% trans "Remove all contacts" %}
               </button>
             </div>
             <div class="contact-selector-wrapper">
               <div class="contact-search-box">
                 <input type="text" id="company_contact_search" class="form-input" placeholder="{% trans 'Search contacts...' %}"
                   autocomplete="off" />
-                <button type="button" class="add-contact-icon-btn" onclick="openContactSidebarFromCompany()"
-                  title="{% trans 'Add new contact' %}">
-                  <i class="fas fa-plus"></i>
-                </button>
               </div>
               <div id="company_contact_results" class="contact-results"></div>
-              <div id="company_selected_contact" class="selected-contact"></div>
-              <input type="hidden" name="contact_id" id="company_contact_id" value="">
+              <!-- A contact who is not in CRM yet: typed here, listed with
+                   the others, and created with the company when it is
+                   saved — no second sidebar over the first, no alert. -->
+              <div id="company_new_contact" class="company-new-contact" hidden>
+                <div class="company-new-contact-h">
+                  <i class="fas fa-user-plus"></i> {% trans "New contact" %}
+                  <small>{% trans "created with the company when you save" %}</small>
+                </div>
+                <input type="text" id="company_nc_name" class="form-input" placeholder="{% trans 'Full name' %}" autocomplete="off">
+                <div class="company-new-contact-row">
+                  <input type="email" id="company_nc_email" class="form-input" placeholder="{% trans 'Email' %}" autocomplete="off">
+                  <input type="text" id="company_nc_phone" class="form-input" placeholder="{% trans 'Phone' %}" autocomplete="off">
+                </div>
+                <div class="company-new-contact-row actions">
+                  {# Not the form's Save: this only puts the person on the list. #}
+                  <button type="button" class="company-new-contact-add" onclick="addCompanyNewContact()">
+                    <i class="fas fa-user-plus"></i> {% trans "Add to list" %}
+                  </button>
+                  <button type="button" class="company-new-contact-cancel" onclick="hideCompanyNewContact()">{% trans "Cancel" %}</button>
+                </div>
+              </div>
+              {# One row per attached contact; a company has many. #}
+              <div id="company_selected_contact" class="selected-contact multi"></div>
+              <input type="hidden" name="contact_ids" id="company_contact_ids" value="">
+              <input type="hidden" name="new_contacts_json" id="company_new_contacts_json" value="">
             </div>
           </div>
 
@@ -1914,8 +1952,22 @@
             btnText.style.display = 'inline';
             btnSpinner.style.display = 'none';
             submitBtn.disabled = false;
-            // Show errors
-            alert('{% trans "Error" %}: ' + (data.error || '{% trans "Failed to create company" %}'));
+            // A name already taken is said under the name, where the
+            // live check says it; anything else in the toast.
+            const nameErr = data.errors && data.errors.name && data.errors.name[0];
+            if (nameErr) {
+              const box = document.getElementById('company_name_error');
+              const input = document.getElementById('id_company_name');
+              box.innerHTML = '<div class="error-message" style="color: #ef4444; font-size: 13px; margin-top: 4px;">' +
+                '<i class="fas fa-exclamation-circle"></i> </div>';
+              box.querySelector('.error-message').append(nameErr.message);
+              input.style.borderColor = '#ef4444';
+              input.focus();
+              return;
+            }
+            toastMessage.textContent = data.error || '{% trans "Failed to create company" %}';
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 4000);
           }
         })
         .catch(error => {
@@ -1940,6 +1992,7 @@
       document.getElementById('companyTaskSection').style.display = 'none';
       // Clear contact selection
       removeCompanyContact();
+      document.getElementById('company_new_contact').hidden = true;
       resetFormTracking();
     }
 
@@ -2218,9 +2271,12 @@
        values so a user who flips between Note and Task doesn't lose
        what they typed. The "Remove this note/task" buttons (with the
        explicit `clear:true` arg) are the only path that wipes data. */
+    // The company's contacts are not in its group: they are part of the
+    // company being made, not an alternative to a note or a task, so
+    // opening either must not fold the people already attached away.
     const ATTACH_GROUPS = {
       mainContact: ['mainContactNote', 'mainContactTask'],
-      company:     ['companyContact', 'companyNote', 'companyTask']
+      company:     ['companyNote', 'companyTask']
     };
     function _attachGroupFor(type) {
       for (const key in ATTACH_GROUPS) {
@@ -2267,6 +2323,7 @@
           section.querySelectorAll('input, textarea').forEach(input => {
             input.value = '';
           });
+          if (type === 'companyContact') removeCompanyContact();
           // For multi-item lists, also wipe out the dynamic rows.
           section.querySelectorAll('.multi-item-list').forEach(list => {
             list.innerHTML = '';
@@ -2400,7 +2457,10 @@
     const companyContactSearch = document.getElementById('company_contact_search');
     const companyContactResults = document.getElementById('company_contact_results');
     const companySelectedContact = document.getElementById('company_selected_contact');
-    const companyContactId = document.getElementById('company_contact_id');
+    const companyContactIds = document.getElementById('company_contact_ids');
+    // The contacts picked so far — a company has many, so picking one
+    // adds to the list rather than replacing the last pick.
+    let companyContacts = [];
 
     if (companyContactSearch) {
       companyContactSearch.addEventListener('input', function () {
@@ -2419,6 +2479,21 @@
             .then(html => {
               companyContactResults.innerHTML = html;
               companyContactResults.classList.add('active');
+
+              // Nobody by that name: offer to make them, right here.
+              if (!companyContactResults.querySelector('.contact-result-item')) {
+                const row = document.createElement('div');
+                row.className = 'contact-result-item create';
+                row.innerHTML = '<div class="contact-avatar"><i class="fas fa-plus"></i></div>' +
+                  '<div class="contact-info"><div class="contact-name"></div>' +
+                  '<div class="contact-details">{% trans "Created with the company when you save" %}</div></div>';
+                row.querySelector('.contact-name').textContent =
+                  '{% trans "Create “%s” as a new contact" %}'.replace('%s', query);
+                row.addEventListener('click', () => showCompanyNewContact(query));
+                companyContactResults.innerHTML = '';
+                companyContactResults.appendChild(row);
+                return;
+              }
 
               // Add click handlers to results
               document.querySelectorAll('#company_contact_results .contact-result-item').forEach(item => {
@@ -2440,41 +2515,85 @@
     }
 
     function selectCompanyContact(id, name, email, company) {
-      companyContactId.value = id;
       companyContactSearch.value = '';
       companyContactResults.classList.remove('active');
       companyContactResults.innerHTML = '';
-
-      companySelectedContact.innerHTML = `
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 600; color: #111827; font-size: 15px;">${name}</div>
-            <div style="font-size: 13px; color: #6b7280; margin-top: 2px;">${email}${company ? ' • ' + company : ''}</div>
-          </div>
-          <button type="button" style="
-            padding: 6px 12px;
-            background: #fef2f2;
-            color: #dc2626;
-            border: 1px solid #fecaca;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-          " onclick="removeCompanyContact()" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
-            <i class="fas fa-times"></i>
-            {% trans "Remove" %}
-          </button>
-        `;
-      companySelectedContact.classList.add('active');
+      if (!companyContacts.some(c => String(c.id) === String(id))) {
+        companyContacts.push({ id: String(id), name: name || '', email: email || '', company: company || '' });
+      }
+      renderCompanyContacts();
+      companyContactSearch.focus();
     }
 
-    function removeCompanyContact() {
-      companyContactId.value = '';
-      companySelectedContact.classList.remove('active');
-      companySelectedContact.innerHTML = '';
+    // ── A contact who is not in CRM yet ──
+    // Held in the list with the others and posted as new_contacts_json;
+    // CompanyCreate makes them with the company, so closing the sidebar
+    // leaves nothing behind.
+    let companyNewSeq = 0;
+    function showCompanyNewContact(name) {
+      companyContactResults.classList.remove('active');
+      companyContactResults.innerHTML = '';
+      companyContactSearch.value = '';
+      const box = document.getElementById('company_new_contact');
+      box.hidden = false;
+      document.getElementById('company_nc_name').value = name || '';
+      document.getElementById('company_nc_email').value = '';
+      document.getElementById('company_nc_phone').value = '';
+      document.getElementById(name ? 'company_nc_email' : 'company_nc_name').focus();
+    }
+    function hideCompanyNewContact() {
+      document.getElementById('company_new_contact').hidden = true;
+      companyContactSearch.focus();
+    }
+    function addCompanyNewContact() {
+      const name = document.getElementById('company_nc_name').value.trim();
+      if (!name) { document.getElementById('company_nc_name').focus(); return; }
+      companyContacts.push({
+        id: 'new:' + (++companyNewSeq), name: name, pending: true,
+        email: document.getElementById('company_nc_email').value.trim(),
+        phone: document.getElementById('company_nc_phone').value.trim(),
+        company: '',
+      });
+      renderCompanyContacts();
+      hideCompanyNewContact();
+    }
+
+    function renderCompanyContacts() {
+      const esc = (v) => String(v || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+      companyContactIds.value = companyContacts.filter(c => !c.pending).map(c => c.id).join(',');
+      document.getElementById('company_new_contacts_json').value = JSON.stringify(
+        companyContacts.filter(c => c.pending).map(c => ({ name: c.name, email: c.email, phone: c.phone })));
+      companySelectedContact.innerHTML = companyContacts.map(c => `
+          <div class="selected-contact-row">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; color: #111827; font-size: 15px;">${esc(c.name)}${c.pending ? '<span class="pending-mark">{% trans "new — saved with the company" %}</span>' : ''}</div>
+              <div style="font-size: 13px; color: #6b7280; margin-top: 2px;">${esc(c.email || c.phone)}${c.company ? ' • ' + esc(c.company) : ''}</div>
+            </div>
+            <button type="button" style="
+              padding: 6px 12px;
+              background: #fef2f2;
+              color: #dc2626;
+              border: 1px solid #fecaca;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 13px;
+              font-weight: 500;
+              transition: all 0.2s ease;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            " onclick="removeCompanyContact('${esc(c.id)}')" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
+              <i class="fas fa-times"></i>
+              {% trans "Remove" %}
+            </button>
+          </div>`).join('');
+      companySelectedContact.classList.toggle('active', companyContacts.length > 0);
+    }
+
+    // One contact by id; every contact when called without one.
+    function removeCompanyContact(id) {
+      companyContacts = (id === undefined) ? [] : companyContacts.filter(c => c.id !== String(id));
+      renderCompanyContacts();
     }
 
     // Contact Sidebar Functions (Nested from Company)

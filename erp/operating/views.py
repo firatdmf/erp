@@ -2544,6 +2544,7 @@ def order_changes(request, pk):
 # returns the rendered card HTML so HTMX can swap it into the page without
 # any client-side reload.
 # ---------------------------------------------------------------------------
+@login_required
 def order_customer_card_view(request, pk):
     from .models import Order
     from crm.models import Contact, Company
@@ -2822,6 +2823,7 @@ def order_has_delivery_info(order):
     )
 
 
+@method_decorator(login_required, name="dispatch")
 class OrderPrint(DetailView):
     """Printable order view.
 
@@ -3063,6 +3065,10 @@ def save_order_adjustments(order, raw):
     ])
 
 
+# Behind the sign-in like every other order page: served open, the form
+# handed out the book names, the product search and the roll list to
+# anyone who asked.
+@method_decorator(login_required, name="dispatch")
 class OrderCreate(View):
     """The one place an order is created, wearing either of two faces.
 
@@ -6509,6 +6515,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
         return render(request, self.template_name, context)
 
 
+@method_decorator(login_required, name="dispatch")
 class WebOrderStatusEdit(View):
     """
     Dedicated view for updating shipping status of web orders.

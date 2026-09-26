@@ -324,11 +324,12 @@
 
       <!-- Delivery Address — CRM/B2B path only, and folded away until
            asked for. Most orders are collected or shipped to an address
-           the customer's record already carries, so five empty fields
-           were the first thing between picking a customer and picking
-           what they are buying. The button is the whole disclosure; the
-           fields themselves are unchanged, so anything already filled in
-           still posts exactly as it did. -->
+           the customer's record already carries, so an empty address was
+           the first thing between picking a customer and picking what
+           they are buying. One box, not five: the address is typed the
+           way it is read, on the label — street, city, country, phone —
+           and posts as `delivery_address`; the printed order and the
+           detail page print it as one block. -->
       <div id="co-delivery-fields">
         <button type="button" id="co-delivery-add" class="co-disclosure"
                 onclick="coToggleDelivery(true)">
@@ -343,21 +344,8 @@
                     onclick="coToggleDelivery(false)"
                     title="{% trans 'Remove delivery address' %}">&times;</button>
           </label>
-          <input type="text" name="delivery_address_title" class="form-input" placeholder="{% trans 'Address title (Home, Work...)' %}">
-        </div>
-        <div class="form-group">
-          <textarea name="delivery_address" class="form-textarea" placeholder="{% trans 'Full address' %}" rows="2"></textarea>
-        </div>
-        <div class="co-row">
-          <div class="form-group">
-            <input type="text" name="delivery_city" class="form-input" placeholder="{% trans 'City' %}">
-          </div>
-          <div class="form-group">
-            <input type="text" name="delivery_country" class="form-input" placeholder="{% trans 'Country' %}" value="Turkey">
-          </div>
-        </div>
-        <div class="form-group">
-          <input type="text" name="delivery_phone" class="form-input" placeholder="{% trans 'Phone' %}">
+          <textarea name="delivery_address" class="form-textarea" rows="3"
+                    placeholder="{% trans 'Street, city, country, phone — as it should read on the label' %}"></textarea>
         </div>
         </div>
       </div>
@@ -827,11 +815,7 @@
     body.hidden = !open;
     add.hidden = !!open;
     if (!open) {
-      body.querySelectorAll('input, textarea').forEach(function (el) {
-        // Country is a default, not something the user typed; putting it
-        // back keeps the reopened form identical to a fresh one.
-        el.value = (el.name === 'delivery_country') ? 'Turkey' : '';
-      });
+      body.querySelectorAll('input, textarea').forEach(function (el) { el.value = ''; });
     } else {
       var first = body.querySelector('input, textarea');
       if (first) first.focus();
@@ -845,9 +829,7 @@
     if (!body) return;
     var filled = Array.prototype.some.call(
       body.querySelectorAll('input, textarea'),
-      function (el) {
-        return el.name !== 'delivery_country' && (el.value || '').trim() !== '';
-      });
+      function (el) { return (el.value || '').trim() !== ''; });
     if (filled) coToggleDelivery(true);
   }
 
@@ -967,8 +949,9 @@
   // The currency this customer is billed in, from the account their order
   // will be raised against in this book — one answer, shared with the
   // purchase form (operating:customer_currency).
-  var CO_CUR = { symbol: '{{ base_currency_symbol|default:"$"|escapejs }}',
-                 code: '{{ base_currency_code|default:"USD"|escapejs }}', is_base: true };
+  var CO_BASE = { symbol: '{{ base_currency_symbol|default:"$"|escapejs }}',
+                  code: '{{ base_currency_code|default:"USD"|escapejs }}', is_base: true };
+  var CO_CUR = CO_BASE;
   var CO_CURRENCY_URL = "{% url 'operating:customer_currency' %}";
 
   function coCurrencyNote(html, warn) {
@@ -983,7 +966,14 @@
   }
 
   function coCurrencyFor(type, pk, name) {
-    if (type === 'retail' || !pk) { coCurrencyNote(''); return; }
+    if (type === 'retail' || !pk) {
+      // Nobody's account to follow: back to the book's own currency,
+      // otherwise a retail sale after a euro customer stayed in euros.
+      CO_CUR = CO_BASE;
+      coRepriceLabels();
+      coCurrencyNote('');
+      return;
+    }
     var book = (document.querySelector('[name="book"]') || {}).value || '';
     fetch(CO_CURRENCY_URL + '?book=' + encodeURIComponent(book) +
           '&type=' + encodeURIComponent(type) + '&pk=' + encodeURIComponent(pk),
@@ -1012,15 +1002,14 @@
     document.querySelectorAll('[data-cur-symbol]').forEach(function (el) {
       el.textContent = CO_CUR.symbol;
     });
-    if (typeof coUpdateTotals === 'function') { try { coUpdateTotals(); } catch (e) {} }
-    var amt = document.getElementById('co-total-amount');
-    if (amt && /^[^0-9]*0\.00$/.test(amt.textContent.trim())) {
-      amt.textContent = CO_CUR.symbol + '0.00';
-    }
+    // Redraw what was already priced: the total row, and every card's
+    // line total, which is printed with the symbol at render time.
+    updateTotal();
+    if (orderItems.length) renderProducts();
   }
 
   function coClearCustomerSelection() {
-    coCurrencyNote('');
+    coCurrencyFor('', '', '');
     document.getElementById('customer-type').value = '';
     document.getElementById('customer-pk').value = '';
     var searchInput = document.getElementById('co-customer-search');
@@ -1529,7 +1518,7 @@
         </div>
         <div class="co-row">
           <div class="form-group"><label>{% trans "Unit Price" %}${item.is_cost_price ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
-          <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">$${(item.quantity*item.price).toFixed(2)}</div></div>
+          <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${(item.quantity*item.price).toFixed(2)}</div></div>
         </div>
         ${rollSectionHtml(item, i)}
         ${manualEntrySectionHtml(item, i)}

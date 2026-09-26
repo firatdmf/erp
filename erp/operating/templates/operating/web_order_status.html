@@ -636,7 +636,7 @@
                     Address
                 </div>
                 <div class="address-content">
-                    {{ order.delivery_address }}<br>
+                    {{ order.delivery_address|linebreaksbr }}<br>
                     {{ order.delivery_city }}{% if order.delivery_country %}, {{ order.delivery_country }}{% endif %}
                 </div>
                 {% if order.delivery_phone %}

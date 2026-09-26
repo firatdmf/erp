@@ -1800,7 +1800,8 @@
         <div class="od-card-h"><h3>{% trans "Delivery address" %}</h3></div>
         <div class="od-addr">
           {% if order.delivery_address_title %}<div class="od-addr-name">{{ order.delivery_address_title }}</div>{% endif %}
-          <div>{{ order.delivery_address }}</div>
+          {# Typed as it reads on the label, line by line — keep the lines. #}
+          <div>{{ order.delivery_address|linebreaksbr }}</div>
           <div>{{ order.delivery_city }}{% if order.delivery_country %} · {{ order.delivery_country }}{% endif %}</div>
           {% if order.delivery_phone %}<div>{{ order.delivery_phone }}</div>{% endif %}
         </div>

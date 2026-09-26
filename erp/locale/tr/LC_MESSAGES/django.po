@@ -10525,3 +10525,6 @@ msgstr "Geçerlilik"
 
 msgid "When the customer accepts, press “Accepted — create order”: the order is raised with these lines and prices, and the quote is closed."
 msgstr "Müşteri kabul ettiğinde “Kabul edildi — sipariş oluştur”a basın: sipariş bu satır ve fiyatlarla açılır, teklif kapanır."
+
+msgid "Street, city, country, phone — as it should read on the label"
+msgstr "Sokak, şehir, ülke, telefon — etikette yazılacağı gibi"

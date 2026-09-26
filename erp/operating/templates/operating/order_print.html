@@ -263,7 +263,7 @@
           {% if order.delivery_address or order.delivery_city %}
             {% if order.delivery_address_title %}<div class="name">{{ order.delivery_address_title }}</div>{% endif %}
             <div class="role">{% trans "Delivery" %}</div>
-            {% if order.delivery_address %}<div class="line">{{ order.delivery_address }}</div>{% endif %}
+            {% if order.delivery_address %}<div class="line">{{ order.delivery_address|linebreaksbr }}</div>{% endif %}
             {% if order.delivery_city or order.delivery_country %}<div class="line">{{ order.delivery_city|default:"" }}{% if order.delivery_city and order.delivery_country %}, {% endif %}{{ order.delivery_country|default:"" }}</div>{% endif %}
             {% if order.delivery_phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.delivery_phone }}</div>{% endif %}
           {% elif order.billing_address %}

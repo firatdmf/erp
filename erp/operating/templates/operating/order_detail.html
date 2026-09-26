@@ -387,14 +387,25 @@
   }
   .od-rcpt-pick:hover { border-color: var(--nejum-teal-500, #147F74); color: var(--nejum-teal-600, #0F766E); }
   .od-ship .od-rcpt-pick input { display: none; }
-  .od-rcpt-pick.has-files { border-style: solid; color: #0F1419; }
   .od-rcpt-picks { display: flex; gap: 8px; }
   .od-rcpt-file { flex: 1; min-width: 0; }
   .od-rcpt-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .od-rcpt-cam { display: none; flex-shrink: 0; font-weight: 600; color: var(--nejum-teal-600, #0F766E); }
   @media (pointer: coarse) { .od-rcpt-cam { display: flex; } }
-  .od-rcpt-shots { font: 500 12px var(--font-sans); color: var(--gray-600); }
-  .od-rcpt-shots i { color: var(--nejum-teal-600, #0F766E); margin-right: 4px; }
+  .od-rcpt-shots[hidden] { display: none; }
+  .od-rcpt-shots { display: flex; flex-direction: column; gap: 6px; }
+  .od-rcpt-pending-l { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .od-rcpt-pending { display: flex; flex-wrap: wrap; gap: 8px; }
+  .od-rcpt-item.pending { border-style: dashed; border-color: #9FCFC8; }
+  .od-rcpt-item.pending .od-rcpt-name { max-width: 180px; font: 500 12.5px var(--font-sans); color: #0F1419; }
+  .od-rcpt-item.pending span.od-rcpt-thumb:not(.pdf) {
+    display: flex; align-items: center; justify-content: center; color: var(--gray-500);
+  }
+  .od-rcpt-hint { display: none; font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .od-rcpt-hint i { margin-right: 5px; }
+  /* Paste is a keyboard thing — say so where there is one. */
+  @media (pointer: fine) { .od-rcpt-hint { display: block; } }
+  .od-rcpt-picks.pasted .od-rcpt-file { border-color: var(--nejum-teal-500, #147F74); background: #EFF6F5; transition: background .2s; }
   .od-ship-meta i { margin-right: 4px; color: var(--nejum-teal-600); }
 
   /* Collapsible "more statuses" */
@@ -1293,10 +1304,14 @@
                     <input type="file" name="cargo_receipts" id="od-rcpt-input" multiple
                            accept="image/*,application/pdf,.pdf,.heic,.heif">
                     <i class="fa fa-paperclip"></i>
-                    <span id="od-rcpt-picked" data-empty="{% trans 'Attach a photo or PDF of the receipt' %}">{% trans "Attach a photo or PDF of the receipt" %}</span>
+                    <span>{% trans "Attach a photo or PDF of the receipt" %}</span>
                   </label>
                 </div>
-                <div class="od-rcpt-shots" id="od-rcpt-shots" hidden></div>
+                <div class="od-rcpt-shots" id="od-rcpt-shots" hidden>
+                  <div class="od-rcpt-pending-l">{% trans "Uploaded when you save or complete the order:" %}</div>
+                  <div class="od-rcpt-pending" id="od-rcpt-pending"></div>
+                </div>
+                <div class="od-rcpt-hint"><i class="fa fa-paste"></i>{% trans "Or copy an image and paste it here (⌘V / Ctrl+V)." %}</div>
                 {% endif %}
               </div>
             </div>
@@ -2352,42 +2367,115 @@
       });
     })();
 
-    // Cargo receipt picker: say what was picked, since the input is hidden.
-    const rcptInput = document.getElementById('od-rcpt-input');
-    const rcptPicked = document.getElementById('od-rcpt-picked');
-    if (rcptInput && rcptPicked) {
-      rcptInput.addEventListener('change', () => {
-        const names = Array.from(rcptInput.files).map(f => f.name);
-        rcptPicked.textContent = names.length ? names.join(', ') : rcptPicked.dataset.empty;
-        rcptPicked.parentElement.classList.toggle('has-files', names.length > 0);
-      });
-    }
-    // Camera: a capture input holds one shot, and the next shot would
-    // replace it. So each filled input is parked in the (hidden) shots box —
-    // still inside the form, still posting as cargo_receipts — and a fresh
-    // empty one takes its place for the next photo.
-    const rcptCam = document.getElementById('od-rcpt-cam');
+    // Cargo receipts waiting to upload. Three ways in — the picker, the
+    // phone camera, a paste — and every file ends up in a hidden input of
+    // its own inside the form, posting as cargo_receipts. The picker and
+    // camera inputs are emptied after each use (their files copied out),
+    // so a second pick adds to the first instead of replacing it, and any
+    // one file can be taken off again. The previews are drawn from the
+    // parked inputs. Without DataTransfer (a very old browser) none of this
+    // runs, and the picker and camera post their files as they are.
+    const rcptField = document.querySelector('.od-rcpt');
     const rcptShots = document.getElementById('od-rcpt-shots');
-    if (rcptCam && rcptShots) {
-      const SHOTS_LABEL = '{% trans "Photos taken:" %}';
-      const note = document.createElement('span');
-      rcptShots.appendChild(note);
-      let shots = 0;
-      const onShot = (e) => {
-        const filled = e.target;
-        if (!filled.files.length) return;
-        const fresh = filled.cloneNode();
-        fresh.value = '';
-        fresh.addEventListener('change', onShot);
-        filled.parentElement.insertBefore(fresh, filled);
-        filled.removeAttribute('id');
-        filled.hidden = true;
-        rcptShots.insertBefore(filled, note);
-        shots += 1;
-        note.innerHTML = '<i class="fa fa-camera"></i>' + SHOTS_LABEL + ' ' + shots;
-        rcptShots.hidden = false;
-      };
-      rcptCam.addEventListener('change', onShot);
+    if (rcptField && rcptShots && window.DataTransfer) {
+      const pending = document.getElementById('od-rcpt-pending');
+      const REMOVE = '{% trans "Remove" %}';
+      let previewUrls = [];
+
+      function park(files) {
+        if (!files.length) return;
+        const dt = new DataTransfer();
+        files.forEach(f => dt.items.add(f));
+        const input = document.createElement('input');
+        input.type = 'file'; input.name = 'cargo_receipts'; input.hidden = true;
+        input.className = 'od-rcpt-parked';
+        input.files = dt.files;
+        rcptShots.insertBefore(input, pending);
+        renderPending();
+      }
+
+      function unpark(input, index) {
+        const dt = new DataTransfer();
+        Array.from(input.files).forEach((f, i) => { if (i !== index) dt.items.add(f); });
+        if (dt.files.length) input.files = dt.files; else input.remove();
+        renderPending();
+      }
+
+      function renderPending() {
+        previewUrls.forEach(u => URL.revokeObjectURL(u));
+        previewUrls = [];
+        pending.innerHTML = '';
+        const parked = Array.from(rcptShots.querySelectorAll('input.od-rcpt-parked'));
+        parked.forEach(input => Array.from(input.files).forEach((f, i) => {
+          const item = document.createElement('div');
+          item.className = 'od-rcpt-item pending';
+          let thumb;
+          if (f.type === 'application/pdf') {
+            thumb = document.createElement('span');
+            thumb.className = 'od-rcpt-thumb pdf';
+            thumb.innerHTML = '<i class="fa fa-file-pdf"></i>';
+          } else {
+            thumb = document.createElement('img');
+            thumb.className = 'od-rcpt-thumb';
+            thumb.alt = '';
+            const url = URL.createObjectURL(f);
+            previewUrls.push(url);
+            thumb.src = url;
+            // HEIC won't draw outside Safari; it is converted on upload.
+            thumb.onerror = () => {
+              const icon = document.createElement('span');
+              icon.className = 'od-rcpt-thumb';
+              icon.innerHTML = '<i class="fa fa-image"></i>';
+              thumb.replaceWith(icon);
+            };
+          }
+          const name = document.createElement('span');
+          name.className = 'od-rcpt-name';
+          name.textContent = f.name;
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'od-rcpt-del';
+          del.title = REMOVE; del.setAttribute('aria-label', REMOVE);
+          del.innerHTML = '<i class="fa fa-xmark"></i>';
+          del.addEventListener('click', () => unpark(input, i));
+          item.append(thumb, name, del);
+          pending.appendChild(item);
+        }));
+        rcptShots.hidden = !parked.length;
+      }
+
+      [document.getElementById('od-rcpt-input'), document.getElementById('od-rcpt-cam')].forEach(src => {
+        if (!src) return;
+        src.removeAttribute('name');  // its files post from the parked copy
+        src.addEventListener('change', () => { park(Array.from(src.files)); src.value = ''; });
+      });
+
+      // Paste: an image copied anywhere (a screenshot, a photo in an email,
+      // the carrier's page) and pasted on this page joins the receipts. A
+      // paste that carries text into a text field (a tracking number) stays
+      // a text paste.
+      const PASTE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
+                            'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' };
+      let pastedCount = 0;
+      document.addEventListener('paste', (e) => {
+        // Hidden for a retail order sold over the counter: nothing to attach to.
+        if (!rcptField.offsetParent || !e.clipboardData) return;
+        const files = Array.from(e.clipboardData.files || []).filter(f => PASTE_TYPES[f.type]);
+        if (!files.length) return;
+        const t = e.target;
+        const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName));
+        if (typing && (e.clipboardData.getData('text/plain') || '').trim()) return;
+        e.preventDefault();
+        // A clipboard image is always "image.png" — name it for where it
+        // came from, and so the next one doesn't clash.
+        park(files.map(f => new File([f], 'pasted-receipt-' + (++pastedCount) + '.' + PASTE_TYPES[f.type],
+                                     { type: f.type })));
+        const picks = rcptField.querySelector('.od-rcpt-picks');
+        if (picks) {
+          picks.classList.add('pasted');
+          setTimeout(() => picks.classList.remove('pasted'), 900);
+        }
+      });
     }
     document.querySelectorAll('.od-rcpt-del').forEach(btn => {
       btn.addEventListener('click', (e) => {

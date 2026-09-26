@@ -128,6 +128,17 @@ class CargoReceiptOnCompletion(_AnOrderToComplete, TestCase):
         html = self.client.get(self.url).content.decode()
         self.assertIn('id="od-rcpt-cam" accept="image/*" capture="environment"', html)
 
+    def test_the_page_says_an_image_can_be_pasted(self, upload):
+        # The paste itself happens in the browser; what reaches the server is
+        # one more file under cargo_receipts, like a camera shot.
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("paste it here", html)
+        self.assertIn("document.addEventListener('paste'", html)
+
+    def test_a_pasted_image_posts_like_any_other_file(self, upload):
+        self._complete(_jpg("pasted-receipt-1.jpg"))
+        self.assertEqual(self.order.cargo_receipts.get().file_name, "pasted-receipt-1.jpg")
+
     def test_camera_shots_and_picked_files_post_together(self, upload):
         # Each camera shot is its own input under the same name.
         self._complete(_jpg("image.jpg"), _jpg("image.jpg"), _pdf())

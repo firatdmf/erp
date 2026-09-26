@@ -10566,10 +10566,6 @@ msgid "Take photo"
 msgstr "Fotoğraf çek"
 
 #: operating/templates/operating/order_detail.html
-msgid "Photos taken:"
-msgstr "Çekilen fotoğraf:"
-
-#: operating/templates/operating/order_detail.html
 msgid "Search carrier..."
 msgstr "Kargo firması ara..."
 
@@ -10580,3 +10576,11 @@ msgstr "Kargo firmasını değiştir"
 #: operating/templates/operating/web_order_status.html
 msgid "Enter tracking or receipt number..."
 msgstr "Takip veya fiş numarası girin..."
+
+#: operating/templates/operating/order_detail.html
+msgid "Or copy an image and paste it here (⌘V / Ctrl+V)."
+msgstr "Ya da bir görseli kopyalayıp buraya yapıştırın (⌘V / Ctrl+V)."
+
+#: operating/templates/operating/order_detail.html
+msgid "Uploaded when you save or complete the order:"
+msgstr "Siparişi kaydettiğinizde veya tamamladığınızda yüklenir:"

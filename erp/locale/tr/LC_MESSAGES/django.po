@@ -10600,3 +10600,15 @@ msgstr "Ya da bir görseli kopyalayıp buraya yapıştırın (⌘V / Ctrl+V)."
 #: operating/templates/operating/order_detail.html
 msgid "Uploaded when you save or complete the order:"
 msgstr "Siparişi kaydettiğinizde veya tamamladığınızda yüklenir:"
+
+#: operating/templates/operating/order_pack_scan.html
+msgid "All rolls are in packages."
+msgstr "Tüm toplar paketlerde."
+
+#: operating/templates/operating/order_pack_scan.html
+msgid "Put this order's rolls into packages: open a package's <b>Scan here</b> to scan barcodes, or type or paste one or several; <b>drag</b> rolls onto a package; or use a roll's <b>To package</b> button. Drag a roll out of its package to take it out, and drag a package by its grip to change its number. Which rolls and how many metres are settled on the order screen; stock is deducted only when the order ships."
+msgstr "Bu siparişin toplarını paketlere koyun: bir paketin <b>Buraya okut</b> düğmesiyle barkod okutun ya da bir veya birkaç barkodu yazın veya yapıştırın; topları bir pakete <b>sürükleyin</b>; ya da topun <b>Pakete at</b> düğmesini kullanın. Bir topu paketten çıkarmak için paketin dışına sürükleyin; paketin numarasını değiştirmek için paketi tutamağından sürükleyin. Toplar ve metreleri sipariş ekranında belirlenir; stok ancak sipariş gönderildiğinde düşer."
+
+#: operating/templates/operating/order_pack_scan.html
+msgid "New package"
+msgstr "Yeni paket"

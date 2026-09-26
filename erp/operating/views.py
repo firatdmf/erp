@@ -1529,13 +1529,12 @@ def order_pack_scan(request, pk):
     )
     items = list(order.items.all().select_related("product", "product_variant", "pack"))
 
-    packs = []
-    if not order.is_retail_order:
-        # Auto-create Pack #1 the first time this order's packing screen
-        # is opened — same convention as OrderPackingList.
-        if not order.packs.exists():
-            Pack.objects.create(order=order, pack_number=1)
-        packs = list(order.packs.order_by("pack_number"))
+    # Auto-create Pack #1 the first time this order's packing screen is
+    # opened — same convention as OrderPackingList. Retail orders pack
+    # exactly like every other order.
+    if not order.packs.exists():
+        Pack.objects.create(order=order, pack_number=1)
+    packs = list(order.packs.order_by("pack_number"))
 
     # Split into lines that have a physical stock item to scan ("tracked" — a
     # warehouse/roll match exists) vs. lines that never can (bought-and-
@@ -1563,7 +1562,6 @@ def order_pack_scan(request, pk):
 
     return render(request, "operating/order_pack_scan.html", {
         "order": order,
-        "items": items,
         "tracked_items": tracked_items,
         "untracked_items": untracked_items,
         "reservations": reservations,

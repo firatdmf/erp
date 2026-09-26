@@ -38,12 +38,6 @@
   .pk-card-h .pk-sub{font-size:12px;color:var(--pk-gray);font-weight:600;}
   .pk-card-b{padding:14px 16px;}
 
-  /* Order items reference list (retail-only flat layout) */
-  .pk-item{display:flex;align-items:center;justify-content:space-between;gap:10px;
-    padding:9px 0;border-bottom:1px dashed var(--pk-line);}
-  .pk-item:last-child{border-bottom:0;}
-  .pk-item-name{font-weight:600;font-size:13.5px;}
-  .pk-item-sku{font-size:11.5px;color:var(--pk-gray);font-family:ui-monospace,monospace;}
   .pk-item-qty{font-weight:700;font-size:13px;color:var(--pk-teal-700);white-space:nowrap;}
 
   .pk-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;
@@ -54,7 +48,7 @@
   .pk-btn.ghost:hover{border-color:#9AA3AC;}
   .pk-btn:disabled{opacity:.5;cursor:not-allowed;}
 
-  /* Reserved rolls list (flat, retail) / grouped-by-product (non-retail) */
+  /* Empty states */
   .pk-empty{text-align:center;color:var(--pk-gray);font-size:13px;padding:26px 10px;}
   .pk-empty i{font-size:26px;display:block;margin-bottom:8px;opacity:.4;}
   /* Every listed roll opens its card on a tap — see openRollCard — so a
@@ -86,7 +80,7 @@
   .pk-cut-val{font-weight:700;color:var(--pk-ink);}
   .pk-avail{color:var(--pk-gray);}
 
-  /* Product groups (non-retail: scanned stock items sorted under their line) */
+  /* Product groups (scanned stock items sorted under their line) */
   .pk-pgroup{border:1.5px solid var(--pk-line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
   .pk-pgroup-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#FAFCFB;
     border-bottom:1px solid var(--pk-line);}
@@ -95,6 +89,17 @@
   .pk-pgroup-qty{margin-left:auto;font-weight:700;font-size:12.5px;color:var(--pk-teal-700);white-space:nowrap;}
   .pk-pgroup-rolls{padding:10px 12px;min-height:40px;}
   .pk-pgroup-empty{font-size:12px;color:var(--pk-gray);padding:4px 0;}
+  /* Two product lines a row on wide screens, like the packages below,
+     each its own height. A line with many rolls scrolls inside itself
+     after about three rows instead of pushing the packages down — so a
+     roll dragged from here has less far to go. Phones keep one column
+     and no inner scroll: a scroll box inside a page is fiddly by thumb. */
+  @media(min-width:1100px){
+    #pkGroups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;}
+    #pkGroups .pk-pgroup{margin-bottom:0;}
+    #pkGroups > .pk-empty{grid-column:1/-1;}
+    #pkGroups .pk-pgroup-rolls{max-height:330px;overflow-y:auto;overscroll-behavior:contain;}
+  }
 
   /* Wherever rolls are listed, they flow across the available width —
      a six-roll package is two rows, not six, so far more packages fit
@@ -106,7 +111,7 @@
   .pk-pack-body [data-empty-hint],.pk-pgroup-rolls [data-empty-hint],
   #pkUntrackedList [data-empty-hint]{grid-column:1/-1;}
 
-  /* Packages (non-retail: drag scanned stock items here) */
+  /* Packages (drag scanned stock items here) */
   .pk-packs-h{display:flex;align-items:center;gap:10px;}
   .pk-packs-h .pk-badge{padding:2px 8px;border-radius:999px;background:#F4F7FB;color:var(--pk-gray);
     font:700 11px var(--pk-font);}
@@ -122,13 +127,23 @@
   .pk-icon-btn:hover{border-color:#9AA3AC;color:var(--pk-ink);}
   .pk-icon-btn.on{background:var(--pk-teal-50);border-color:#BFE0DD;color:var(--pk-teal-700);}
   .pk-packs{padding:12px;display:flex;flex-direction:column;gap:12px;}
+  /* "New package" at the end of the list, in a package's own shape. */
+  .pk-add-tile{display:flex;align-items:center;justify-content:center;gap:8px;min-height:56px;cursor:pointer;
+    border:1.5px dashed #BFE0DD;border-radius:12px;background:#fff;color:var(--pk-teal-700);
+    font:700 13px var(--pk-font);}
+  .pk-add-tile:hover{border-color:var(--pk-teal);background:var(--pk-teal-50);}
   /* Two packages a row once there is room for two (a landscape tablet
-     and up). Each keeps its own height — a 2-roll sack beside a 20-roll
-     one is not stretched to match. Three was ruled out: the rolls inside
-     would be squeezed to one a line. */
+     and up), the pair the same height: the shorter one stretches, its
+     extra room inside its own card — where it is also more to drop on.
+     Nothing scrolls inside a package; what is in the sack stays in view.
+     A folded package keeps to its one line. Three columns was ruled out:
+     the rolls inside would be squeezed to one a line. */
   @media(min-width:1100px){
-    .pk-packs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;}
-    .pk-packs > [data-no-packs]{grid-column:1/-1;}
+    .pk-packs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;}
+    .pk-packs > [data-no-packs],.pk-packs > .pk-add-tile{grid-column:1/-1;}
+    .pk-packs > .pk-pack{display:flex;flex-direction:column;}
+    .pk-packs > .pk-pack > [data-pack-body]{flex:1 1 auto;}
+    .pk-packs > .pk-pack.is-collapsed{align-self:start;}
   }
 
   /* Collapsing — a folded package is one line, so with eight sacks open
@@ -394,13 +409,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="pk-wrap{% if not order.is_retail_order %} pk-wide{% endif %}"
+<div class="pk-wrap pk-wide"
      data-add-url="{% url 'operating:order_pack_reserve_add' order.pk %}"
      data-assign-pack-url="{% url 'operating:order_pack_reserve_assign_pack' order.pk %}"
      data-assign-item-url="{% url 'operating:order_pack_assign_item' order.pk %}"
      data-pack-crud-url="{% url 'operating:order_packing_list' order.pk %}"
-     data-shipped="{{ shipped|yesno:'1,0' }}"
-     data-pack-mode="{% if not order.is_retail_order %}1{% else %}0{% endif %}">
+     data-shipped="{{ shipped|yesno:'1,0' }}">
 
   <div class="pk-top">
     <a class="pk-back" href="{% url 'operating:order_detail' order.pk %}">
@@ -410,7 +424,7 @@
       {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketleme — Top Okut{% else %}Packing — Scan rolls{% endif %}
       <small>{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</small>
     </h1>
-    {% if not order.is_retail_order and not shipped %}
+    {% if not shipped %}
     <a href="{% url 'operating:order_packing_list' order.pk %}" class="pk-back" style="margin-left:auto;">
       <i class="fa fa-box"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Çeki listesi{% else %}Packing List{% endif %}
     </a>
@@ -426,60 +440,14 @@
   <div class="pk-banner">
     <i class="fa fa-circle-info"></i>
     <div>
-      {% if order.is_retail_order %}
-        {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu siparişin <b>topları</b> aşağıda. Toplar ve metreleri <b>sipariş ekranında</b> belirlenir — burada değiştirilmez. <b>Stok ancak sipariş gönderildiğinde düşer.</b>{% else %}This order's <b>rolls</b> are listed below. Which rolls and how many metres are settled on the <b>order screen</b> — they aren't changed here. <b>Stock is deducted only when the order ships.</b>{% endif %}
-      {% else %}
-        {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu siparişin toplarını paketlere dağıtın: <b>sürükleyip bırakın</b>, topun <b>paket düğmesinden</b> seçin, ya da paketin <b>“Buraya okut”</b> düğmesiyle barkodu okutun. Hangi çuvalda ne var böylece görülür. Toplar ve metreleri sipariş ekranında belirlenir; stok ancak sipariş gönderildiğinde düşer.{% else %}Spread this order's rolls across the packages: <b>drag them</b>, pick a package from the roll's <b>package button</b>, or scan the barcode with a package's <b>“Scan here”</b>. So it's visible which sack holds what. Which rolls and how many metres are settled on the order screen; stock is deducted only when the order ships.{% endif %}
-      {% endif %}
+      {% trans "Put this order's rolls into packages: open a package's <b>Scan here</b> to scan barcodes, or type or paste one or several; <b>drag</b> rolls onto a package; or use a roll's <b>To package</b> button. Drag a roll out of its package to take it out, and drag a package by its grip to change its number. Which rolls and how many metres are settled on the order screen; stock is deducted only when the order ships." %}
     </div>
   </div>
   {% endif %}
 
-  <div class="pk-grid{% if not order.is_retail_order %} pk-grid-stack{% endif %}">
+  <div class="pk-grid pk-grid-stack">
 
-    {% if order.is_retail_order %}
-    <!-- LEFT: reserved rolls (flat — retail) -->
-    <div class="pk-card">
-      <div class="pk-card-h">
-        <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Mevcut toplar{% else %}Available rolls{% endif %}</h3>
-        <span class="pk-sub"><span id="pkCount">0</span> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top · <span id="pkTotal">0</span> m rezerv{% else %}rolls · <span id="pkTotal">0</span> m reserved{% endif %}</span>
-      </div>
-      <div class="pk-card-b">
-        <div id="pkList">
-          {% for r in reservations %}
-          {% include "operating/partials/_pack_roll_row.html" with r=r %}
-          {% endfor %}
-        </div>
-        <div class="pk-empty" id="pkEmpty" {% if reservations %}style="display:none;"{% endif %}>
-          <i class="fa fa-barcode"></i>
-          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu kalem için top yok.{% else %}No rolls on this line.{% endif %}
-        </div>
-      </div>
-    </div>
-
-    <!-- RIGHT: order products -->
-    <div class="pk-card">
-      <div class="pk-card-h">
-        <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Sipariş ürünleri{% else %}Order products{% endif %}</h3>
-        <span class="pk-sub">{{ items|length }}</span>
-      </div>
-      <div class="pk-card-b">
-        {% for it in items %}
-        <div class="pk-item">
-          <div>
-            <div class="pk-item-name">{{ it.display_name }}</div>
-            <div class="pk-item-sku">{{ it.display_sku|default:'—' }}</div>
-          </div>
-          <div class="pk-item-qty">{{ it.quantity|floatformat:2 }} m</div>
-        </div>
-        {% empty %}
-        <div class="pk-empty" style="padding:14px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişte ürün yok.{% else %}No products.{% endif %}</div>
-        {% endfor %}
-      </div>
-    </div>
-
-    {% else %}
-    <!-- LEFT: scanned tops grouped by product (non-retail) -->
+    <!-- Available rolls, grouped by product -->
     <div class="pk-card">
       <div class="pk-card-h">
         <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Mevcut toplar{% else %}Available rolls{% endif %}</h3>
@@ -487,6 +455,7 @@
       </div>
       <div class="pk-card-b">
         <div id="pkGroups">
+          <div class="pk-empty" data-all-packed hidden style="padding:14px;"><i class="fa fa-circle-check" style="color:var(--pk-teal);"></i> {% trans "All rolls are in packages." %}</div>
           {% for it in tracked_items %}
           <div class="pk-pgroup">
             <div class="pk-pgroup-h">
@@ -581,12 +550,16 @@
           <i class="fa fa-box-open"></i>
           {% if LANGUAGE_CODE|slice:":2" == "tr" %}Henüz paket yok — “Yeni Paket” ile başlayın.{% else %}No packages yet — start one with “New package”.{% endif %}
         </div>
+        {% if not shipped %}
+        <button type="button" class="pk-add-tile" data-add-pack-tile>
+          <i class="fa fa-plus"></i> {% trans "New package" %}
+        </button>
+        {% endif %}
       </div>
     </div>
-    {% endif %}
   </div>
 
-  {% if not order.is_retail_order and untracked_items %}
+  {% if untracked_items %}
   <!-- Products in this order with no warehouse/barcode presence at all
        (bought-and-resold trade goods entered straight into Products) —
        nothing to scan for these, but staff still need to physically pack
@@ -685,19 +658,16 @@
       ASSIGN_PACK = wrap.dataset.assignPackUrl, ASSIGN_ITEM = wrap.dataset.assignItemUrl,
       PACK_CRUD = wrap.dataset.packCrudUrl;
   var SHIPPED = wrap.dataset.shipped === '1';
-  var PACK_MODE = wrap.dataset.packMode === '1';
 
-  // Flat list (retail) or the union of every group/pack body (non-retail)
-  // — used for count/total refresh and for locating rows by id.
+  // Every roll row, wherever it sits (a product group or a package) —
+  // used for count/total refresh and for locating rows by id.
   // Excludes .pk-citem (untracked/catalog-item rows) — those aren't
   // physical stock items, so they don't belong in the roll count/metre total
   // or the "at least one scan" gate. They're regrouped separately below.
   function allRows(){ return document.querySelectorAll('.pk-row:not(.pk-citem)'); }
   function allCatalogRows(){ return document.querySelectorAll('.pk-citem'); }
 
-  var listEl = document.getElementById('pkList');           // retail only
-  var groupsEl = document.getElementById('pkGroups');        // non-retail only
-  var emptyEl = document.getElementById('pkEmpty');
+  var groupsEl = document.getElementById('pkGroups');
   var toastEl = document.getElementById('pkToast');
   var toastT = null;
 
@@ -737,7 +707,7 @@
   function rowHtml(res){
     var rem = (res.roll_remaining != null ? res.roll_remaining : (res.roll_meters || 0));
     var m = Number(res.quantity || 0);
-    var draggable = (PACK_MODE && !SHIPPED) ? ' draggable="true"' : '';
+    var draggable = !SHIPPED ? ' draggable="true"' : '';
     return ''+
       '<div class="pk-row"'+draggable+' data-id="'+res.id+'" data-remaining="'+Number(rem).toFixed(2)+'"'+
         ' data-order-item-id="'+(res.order_item_id||'')+'" data-assigned-pack="'+(res.pack_id||'')+'"'+
@@ -759,16 +729,15 @@
       '</div>';
   }
 
-  // Set up inside the PACK_MODE block below; pkRegroup calls it so a
+  // Set up inside the packages block below; pkRegroup calls it so a
   // freshly added row or package gets its "to package" button and its
   // fold caret, and so the button always names the package the row is
   // actually in.
   var pkSyncChrome = null;
 
-  // ── non-retail: keep every row physically inside its correct group/
-  //    pack container, and refresh empty-state hints + per-pack counts.
+  // ── keep every row physically inside its correct group/pack
+  //    container, and refresh empty-state hints + per-pack counts.
   function pkRegroup(){
-    if (!PACK_MODE) return;
     allRows().forEach(function(row){
       var packId = row.dataset.assignedPack;
       var target;
@@ -793,6 +762,24 @@
       var hasRows = container.querySelectorAll('.pk-row').length > 0;
       if (hint) hint.style.display = hasRows ? 'none' : '';
     });
+    // A product line whose rolls have all gone into packages leaves the
+    // list — dropping anywhere outside a package takes a roll out, so an
+    // empty group is no longer needed as a place to drop one back. It
+    // returns the moment one of its rolls comes out. A line with no rolls
+    // at all stays, saying so: that is something the packer should see.
+    var loose = 0;
+    document.querySelectorAll('#pkGroups .pk-pgroup').forEach(function(group){
+      var box = group.querySelector('.pk-pgroup-rolls'); if (!box) return;
+      var here = box.querySelectorAll('.pk-row').length;
+      var oid = box.dataset.orderItemId || '';
+      var anywhere = oid
+        ? [].filter.call(allRows(), function(r){ return (r.dataset.orderItemId || '') === oid; }).length
+        : here;
+      loose += here;
+      group.hidden = !here && (anywhere > 0 || !oid);
+    });
+    var allPacked = document.querySelector('[data-all-packed]');
+    if (allPacked) allPacked.hidden = !(loose === 0 && allRows().length > 0);
     // Per-package header: how many stock items, how many metres they carry, and
     // how many untracked lines sit beside them. Metres come from each
     // row's data-meters — the reserved (possibly partially cut) length,
@@ -828,19 +815,14 @@
     var c1=document.getElementById('pkCount'), tt=document.getElementById('pkTotal');
     if (c1) c1.textContent = n;
     if (tt) tt.textContent = tot.toFixed(2);
-    if (emptyEl) emptyEl.style.display = n ? 'none' : '';
     pkRegroup();
   }
 
   function addRow(res, flash){
     var tmp = document.createElement('div'); tmp.innerHTML = rowHtml(res).trim();
     var el = tmp.firstChild;
-    if (PACK_MODE){
-      var target = document.querySelector('.pk-pgroup-rolls[data-order-item-id="'+(res.order_item_id||'')+'"]') || groupsEl;
-      target.insertBefore(el, target.firstChild);
-    } else {
-      listEl.insertBefore(el, listEl.firstChild);
-    }
+    var target = document.querySelector('.pk-pgroup-rolls[data-order-item-id="'+(res.order_item_id||'')+'"]') || groupsEl;
+    target.insertBefore(el, target.firstChild);
     if (flash){ el.classList.add('flash'); setTimeout(function(){ el.classList.remove('flash'); }, 900); }
     refreshCount();
     return el;
@@ -850,7 +832,7 @@
   // The package currently armed for scanning, set by the pack-mode code
   // below. Every scan while it is set lands straight in that package.
   var scanIntoPackId = '';
-  var pkArmPack = null;                 // assigned in the PACK_MODE block
+  var pkArmPack = null;                 // assigned in the packages block
 
   // While the popup is open the packer is looking at IT, not at the page
   // behind it — so each scan reports into the popup as well as toasting.
@@ -926,8 +908,9 @@
 
   refreshCount();
 
-  // ══════════════════════ packages (non-retail only) ════════════════
-  if (PACK_MODE){
+  // ══════════════════════ packages ═══════════════════════════════════
+  // A block of its own so its helpers stay local to it.
+  {
     function pkFetchCrud(payload){
       var body = new URLSearchParams(payload); body.append('csrfmiddlewaretoken', CSRF);
       return fetch(PACK_CRUD, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}, body:body})
@@ -991,7 +974,9 @@
             '<button type="button" class="pk-pack-del" onclick="pkDeletePack(' + data.pack.id + ')"><i class="fa fa-trash"></i></button>' +
           '</div>' +
           '<div class="pk-pack-body" data-pack-body><div class="pk-drop-hint" data-empty-hint>' + t('Topları buraya sürükleyin','Drag rolls here') + '</div></div>';
-        document.getElementById('packsList').appendChild(wrapEl);
+        // Before the "New package" tile, which always stays last.
+        var list = document.getElementById('packsList');
+        list.insertBefore(wrapEl, list.querySelector('[data-add-pack-tile]'));
         document.getElementById('packsCount').textContent = document.querySelectorAll('.pk-pack').length;
         pkRegroup();
         return wrapEl;
@@ -999,13 +984,25 @@
     }
 
     var addPackBtn = document.getElementById('pkAddPackBtn');
-    if (addPackBtn) addPackBtn.addEventListener('click', function(){
+    // The header button, or the tile at the end of the list — the same
+    // thing, so a long list needn't be scrolled back up.
+    function onNewPack(){
+      // Only makes the package — no scanner. Several sacks are often set up
+      // in a row, and on a desktop the rolls go in by dragging; the camera
+      // is one tap away on the toast, or on the package's own "Scan here".
       createPack().then(function(el){
         if (!el) return;
-        try{ el.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(e){}
-        if (pkArmPack) pkArmPack(el.dataset.packId);   // straight to filling it
+        var id = el.dataset.packId, n = el.dataset.packNumber || '';
+        flashPack(id);
+        toast(t('Paket #' + n + ' oluşturuldu.', 'Package #' + n + ' created.'), '', {
+          label: t('Buna okut', 'Scan into it'),
+          run: function(){ if (pkArmPack) pkArmPack(id); }
+        });
       });
-    });
+    }
+    if (addPackBtn) addPackBtn.addEventListener('click', onNewPack);
+    var addPackTile = document.querySelector('[data-add-pack-tile]');
+    if (addPackTile) addPackTile.addEventListener('click', onNewPack);
 
     function relabelPacks(numbers){
       Object.keys(numbers || {}).forEach(function(id){

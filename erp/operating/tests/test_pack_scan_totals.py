@@ -289,3 +289,21 @@ class ScanningStraightIntoAPackage(TestCase):
         resp = self._scan(pack_id=other.pk)
         self.assertEqual(resp.status_code, 404)
         self.assertFalse(OrderStockReservation.objects.filter(stock_item=self.stock_item).exists())
+
+
+class RetailOrdersPackTheSameWay(TestCase):
+    """A retail order used to get a flat roll list and no packages. It now
+    gets the same packing screen as every other order."""
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def test_retail_order_gets_packages(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        order = Order.objects.create(order_number="DK0000293", is_retail_order=True)
+        self.client.force_login(User.objects.create_superuser("packer", "p@a.b", "pw"))
+
+        resp = self.client.get(reverse("operating:order_pack_scan", kwargs={"pk": order.pk}))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(list(order.packs.values_list("pack_number", flat=True)), [1])
+        self.assertContains(resp, 'id="packsList"')
+        self.assertContains(resp, 'id="pkGroups"')

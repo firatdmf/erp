@@ -6,6 +6,9 @@ from unittest.mock import patch
 class PackTestCase(TestCase):
     def setUp(self):
         self.client = Client()
+        # Pages are behind the sign-in (erp.middleware.LoginWallMiddleware).
+        from django.contrib.auth import get_user_model
+        self.client.force_login(get_user_model().objects.create_user("packer", password="pw"))
         # Create a test product
         self.product = Product.objects.create(
             title="Test Product",

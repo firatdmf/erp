@@ -26,6 +26,9 @@ class PackingListColumns(TestCase):
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def setUp(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        # The printed list is behind the sign-in (LoginWallMiddleware).
+        self.client.force_login(
+            User.objects.create_superuser("lister", "l@t.com", "pw"))
         fabric = ProductCategory.objects.create(name="fabric")
         self.colour = ProductVariantAttribute.objects.create(name="colour")
         # Group names are stored slugged; the printed column un-slugs them.

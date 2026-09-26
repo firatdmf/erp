@@ -231,6 +231,10 @@ MIDDLEWARE = [
     # Request-scoped current user for the order audit trail (must come
     # after AuthenticationMiddleware so request.user is resolved).
     "operating.audit.CurrentUserMiddleware",
+    # Sends anyone not signed in to the sign-in page, for every page that
+    # is not the storefront's API or the sign-in itself. Needs
+    # request.user, so after AuthenticationMiddleware.
+    "erp.middleware.LoginWallMiddleware",
     # Holds read-only roles (sales rep) to stock + sales. Must come after
     # AuthenticationMiddleware — it needs request.user — and before the
     # view runs, so a blocked write never reaches a model.

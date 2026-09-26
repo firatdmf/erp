@@ -14,7 +14,11 @@ class OrderPagesNeedLogin(TestCase):
     def test_the_order_form(self):
         url = reverse("operating:create_order") + "?book=1"
         self.assert_sent_to_sign_in(url)
-        self.assert_sent_to_sign_in(url, HTTP_HX_REQUEST="true")
+        # The drawer asks for the form through htmx; the sign-in wall
+        # moves the whole window rather than redirecting the fragment.
+        resp = self.client.get(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp["HX-Redirect"].startswith(settings.LOGIN_URL))
 
     def test_an_orders_pages(self):
         # No order needs to exist: the sign-in check comes before the lookup.

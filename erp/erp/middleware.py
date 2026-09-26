@@ -124,3 +124,83 @@ class ReadOnlyRoleMiddleware(MiddlewareMixin):
             f"<h1>Read-only account</h1><p>{message}</p>"
             "<p><a href='/'>Back</a></p>"
         )
+
+
+def public(view):
+    """Marks a view as open to anonymous visitors — see LoginWallMiddleware.
+
+    Same attribute Django 5.1's ``login_not_required`` sets, so the two can
+    be swapped once the project is on it.
+    """
+    view.login_required = False
+    return view
+
+
+class LoginWallMiddleware(MiddlewareMixin):
+    """Every page is behind the sign-in unless it says otherwise.
+
+    The guard used to be per view, and a view that forgot it served its
+    page to whoever asked — or crashed, since the templates assume a
+    signed-in member. Runs after URL resolution (process_view) so it
+    can read the view itself, and sends the visitor to the sign-in with
+    ``next`` set, the way ``login_required`` does.
+
+    What stays open, because it has to be:
+
+    * the sign-in and its neighbours (sign-up, sign-out, password reset,
+      the Google sign-in dance), and the admin, which has its own door;
+    * the storefront's API — every path with an ``api/`` segment, and
+      every ``csrf_exempt`` view, which is what an endpoint meant for a
+      browser on another site looks like here. Those keep whatever guard
+      they have today; this wall is for the ERP's own pages;
+    * a view marked ``@public`` (erp.middleware.public).
+    """
+
+    PUBLIC_PREFIXES = (
+        "/authentication/signin",
+        "/authentication/signup/",
+        "/authentication/signout/",
+        "/authentication/home/",
+        "/authentication/index",
+        "/authentication/google-oauth/",
+        "/accounts/",        # django.contrib.auth.urls: password reset et al.
+        "/admin/",
+        "/i18n/",
+        "/static/",
+        "/media/",
+        "/__debug__/",
+    )
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            return None
+        if self._is_public(request.path, view_func):
+            return None
+        return self._to_sign_in(request)
+
+    @classmethod
+    def _is_public(cls, path, view_func):
+        if path.startswith(cls.PUBLIC_PREFIXES):
+            return True
+        if "/api/" in path:
+            return True
+        if getattr(view_func, "csrf_exempt", False):
+            return True
+        return getattr(view_func, "login_required", True) is False
+
+    @staticmethod
+    def _to_sign_in(request):
+        from django.contrib.auth.views import redirect_to_login
+        from django.http import HttpResponse
+
+        redirect = redirect_to_login(request.get_full_path())
+        # An htmx fragment request cannot follow a redirect into the
+        # sign-in page — it would swap the sign-in form into a corner of
+        # a page that no longer belongs to anyone. HX-Redirect moves the
+        # whole window instead.
+        if request.headers.get("HX-Request") == "true":
+            response = HttpResponse(status=200)
+            response["HX-Redirect"] = redirect["Location"]
+            return response
+        return redirect

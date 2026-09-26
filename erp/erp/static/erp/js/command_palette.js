@@ -329,7 +329,7 @@ function renderCmdResults(menuResults, dbResults) {
                     <i class="fas fa-compass"></i> Navigation
                 </div>
                 ${menuResults.map(item => `
-                    <div class="result-item" onclick="window.location.href='${item.url}'">
+                    <a class="result-item" href="${item.url}">
                         <div class="result-item-icon menu">
                             <i class="fas ${item.icon}"></i>
                         </div>
@@ -337,7 +337,7 @@ function renderCmdResults(menuResults, dbResults) {
                             <div class="result-item-name">${item.name}</div>
                             <div class="result-item-meta">${item.category}</div>
                         </div>
-                    </div>
+                    </a>
                 `).join('')}
             </div>
         `;
@@ -364,7 +364,7 @@ function renderCmdResults(menuResults, dbResults) {
         html += `
             <div class="result-group">
                 <div class="result-group-title">
-                    <i class="fas ${icon}"></i> ${type}s
+                    <i class="fas ${icon}"></i> ${type === 'Company' ? 'Companies' : type + 's'}
                 </div>
                 ${items.map(item => {
                     const useThumb = item.image && type === 'Product';
@@ -372,13 +372,13 @@ function renderCmdResults(menuResults, dbResults) {
                         ? `<div class="result-item-thumb"><img src="${item.image}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-box\\'></i>'"></div>`
                         : `<div class="result-item-icon ${cssClass}"><i class="fas ${item.icon}"></i></div>`;
                     return `
-                    <div class="result-item" onclick="window.location.href='${item.url}'">
+                    <a class="result-item" href="${item.url}">
                         ${leading}
                         <div class="result-item-info">
                             <div class="result-item-name">${item.name}</div>
                             <div class="result-item-meta">${item.detail || ''}</div>
                         </div>
-                    </div>
+                    </a>
                     `;
                 }).join('')}
             </div>

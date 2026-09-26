@@ -10577,6 +10577,22 @@ msgstr "Kargo firmasını değiştir"
 msgid "Enter tracking or receipt number..."
 msgstr "Takip veya fiş numarası girin..."
 
+#: operating/templates/operating/order_pack_scan.html
+msgid "Change the package order?"
+msgstr "Paket sırası değiştirilsin mi?"
+
+#: operating/templates/operating/order_pack_scan.html
+msgid "These packages will be renumbered. Their contents move with them."
+msgstr "Bu paketlerin numarası değişecek. İçindekiler paketle birlikte taşınır."
+
+#: operating/templates/operating/order_pack_scan.html
+msgid "Labels already printed for these packages will carry the wrong number — reprint them."
+msgstr "Bu paketler için basılmış etiketler artık yanlış numarayı taşır — yeniden basın."
+
+#: operating/templates/operating/order_pack_scan.html
+msgid "Enter a barcode — or several, one per line"
+msgstr "Barkodu elle girin — birden çoksa her satıra bir tane"
+
 #: operating/templates/operating/order_detail.html
 msgid "Or copy an image and paste it here (⌘V / Ctrl+V)."
 msgstr "Ya da bir görseli kopyalayıp buraya yapıştırın (⌘V / Ctrl+V)."

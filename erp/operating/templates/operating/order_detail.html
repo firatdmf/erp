@@ -1873,10 +1873,14 @@
       </section>
       {% endif %}
 
-      {% if order.current_account_id or order.status != 'completed' %}
-      <!-- DOCUMENTS — the invoice (a printout, plus its Excel) and the
-           production sheet, all built from this order each time they're
-           opened; nothing is stored. -->
+      {% with has_packs=order.packs.exists %}
+      {% if order.current_account_id or order.status != 'completed' or has_packs %}
+      <!-- DOCUMENTS — the invoice (a printout, plus its Excel), the
+           production sheet and the packing list, all built from this order
+           each time they're opened; nothing is stored. The packing list is
+           the printout of what the pack screen put in each package, so it
+           shows only once there are packages — opening it on an order with
+           none would create Pack #1 as a side effect. -->
       <section class="od-card">
         <div class="od-card-h"><h3>{% trans "Documents" %}</h3></div>
         <div class="od-docs">
@@ -1893,9 +1897,15 @@
             <i class="fa fa-industry"></i>{% trans "Production" %}
           </a>
           {% endif %}
+          {% if has_packs %}
+          <a href="{% url 'operating:order_packing_list' order.pk %}" class="ord-btn ghost">
+            <i class="fa fa-box"></i>{% trans "Packing list" %}
+          </a>
+          {% endif %}
         </div>
       </section>
       {% endif %}
+      {% endwith %}
 
       {% if order.current_account %}
       <!-- CURRENT ACCOUNT — internal ledger snapshot -->

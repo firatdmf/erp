@@ -60,7 +60,6 @@
   .pk-pack-actions { display: flex; gap: 4px; }
   .pk-pack-btn { background: transparent; border: 1px solid transparent; color: var(--gray-500); cursor: pointer; padding: 5px 8px; border-radius: 6px; transition: all 140ms; text-decoration: none; display: inline-flex; align-items: center; }
   .pk-pack-btn:hover { color: var(--nejum-teal-700); background: var(--nejum-teal-50); border-color: var(--nejum-teal-300); }
-  .pk-pack-btn.danger:hover { color: #B91C1C; background: #FEF2F2; border-color: #FCA5A5; }
 
   .pk-rolls { padding: 4px 0; }
   .pk-roll-row { display: flex; align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px solid #F4F7FB; }
@@ -128,11 +127,6 @@
           <a class="pk-pack-btn" href="{% url 'operating:pack_pdf' p.pk %}" target="_blank" title="{% trans 'Print this package (PDF)' %}">
             <i class="fa fa-file-pdf-o"></i>
           </a>
-          {% if not shipped %}
-          <button type="button" class="pk-pack-btn danger" title="{% trans 'Delete package' %}" onclick="pkDeletePack({{ p.pk }})">
-            <i class="fa fa-trash"></i>
-          </button>
-          {% endif %}
         </div>
       </div>
       <div class="pk-rolls">
@@ -157,25 +151,4 @@
   </div>
 </div>
 
-<script>
-  const CSRF = '{{ csrf_token }}';
-  const ORDER_URL = "{% url 'operating:order_packing_list' order.pk %}";
-
-  function pkFetch(payload) {
-    const body = new URLSearchParams(payload);
-    return fetch(ORDER_URL, {
-      method: 'POST',
-      headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
-      body,
-    }).then(r => r.json());
-  }
-
-  function pkDeletePack(packId) {
-    if (!confirm('{% trans "Delete this package? Its rolls go back to unassigned." %}')) return;
-    pkFetch({ action: 'delete_pack', pack_id: packId }).then(data => {
-      if (!data.ok) { alert(data.error || 'Failed'); return; }
-      window.location.reload();
-    });
-  }
-</script>
 {% endblock %}

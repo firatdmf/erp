@@ -122,6 +122,14 @@
   .pk-icon-btn:hover{border-color:#9AA3AC;color:var(--pk-ink);}
   .pk-icon-btn.on{background:var(--pk-teal-50);border-color:#BFE0DD;color:var(--pk-teal-700);}
   .pk-packs{padding:12px;display:flex;flex-direction:column;gap:12px;}
+  /* Two packages a row once there is room for two (a landscape tablet
+     and up). Each keeps its own height — a 2-roll sack beside a 20-roll
+     one is not stretched to match. Three was ruled out: the rolls inside
+     would be squeezed to one a line. */
+  @media(min-width:1100px){
+    .pk-packs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;}
+    .pk-packs > [data-no-packs]{grid-column:1/-1;}
+  }
 
   /* Collapsing — a folded package is one line, so with eight sacks open
      every drop target still fits on one screen and nothing has to be
@@ -135,6 +143,39 @@
     transition:transform 140ms;}
   .pk-pack.is-collapsed .pk-pack-caret{transform:rotate(-90deg);}
   .pk-pack-h:hover .pk-pack-caret{color:var(--pk-ink);}
+
+  /* Reordering — the grip carries the whole package, rolls and all, and
+     the numbers follow where it is dropped. Pointer events, not HTML5
+     drag, so it works from a finger on the packing-floor tablets too. */
+  .pk-pack-grip{flex-shrink:0;cursor:grab;touch-action:none;color:#9AA3AC;padding:4px 6px;
+    margin:-4px 0 -4px -4px;border-radius:6px;font-size:13px;}
+  .pk-pack-grip:hover{color:var(--pk-ink);background:#F4F7FB;}
+  .pk-pack.is-lifted{position:relative;z-index:5;border-color:var(--pk-teal);
+    box-shadow:0 14px 34px rgba(15,20,25,.18);}
+  body.pk-reordering,body.pk-reordering *{cursor:grabbing !important;user-select:none;}
+  /* The confirmation a drop waits on: nothing is renumbered until the
+     packer has read which package becomes which. */
+  .pk-reo-overlay{position:fixed;inset:0;z-index:96;display:flex;align-items:center;justify-content:center;
+    background:rgba(15,20,25,.45);padding:16px;}
+  .pk-reo-overlay[hidden]{display:none;}
+  .pk-reo{width:100%;max-width:400px;max-height:90vh;display:flex;flex-direction:column;background:#fff;
+    border-radius:16px;box-shadow:0 24px 60px rgba(15,20,25,.3);font-family:var(--pk-font);color:var(--pk-ink);}
+  .pk-reo-h{padding:16px 18px 6px;font-size:16px;font-weight:800;}
+  .pk-reo-sub{padding:0 18px 10px;color:var(--pk-gray);font-size:12.5px;line-height:1.5;}
+  .pk-reo-list{padding:0 18px;overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:6px;}
+  .pk-reo-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--pk-line);
+    border-radius:10px;font-size:13px;font-weight:600;}
+  .pk-reo-row .from{color:var(--pk-gray);text-decoration:line-through;}
+  .pk-reo-row .to{color:var(--pk-teal-700);font-weight:800;}
+  .pk-reo-row .what{margin-left:auto;color:var(--pk-gray);font-size:12px;white-space:nowrap;}
+  .pk-reo-warn{margin:10px 18px 0;padding:9px 11px;border-radius:10px;background:#FFFBEB;border:1px solid #FDE68A;
+    color:#92400E;font-size:12px;line-height:1.45;}
+  .pk-reo-actions{display:flex;gap:10px;padding:14px 18px 16px;}
+  .pk-reo-actions button{flex:1;padding:11px 12px;border-radius:10px;font:700 13px var(--pk-font);cursor:pointer;}
+  .pk-reo-actions .ghost{background:#fff;border:1.5px solid var(--pk-line);color:var(--pk-ink);}
+  .pk-reo-actions .primary{background:linear-gradient(180deg,var(--pk-teal),var(--pk-teal-600));
+    border:1px solid var(--pk-teal-700);color:#fff;}
+  .pk-reo-actions .primary:disabled{opacity:.6;cursor:not-allowed;}
 
   /* Scanning into a package — the packer has one sack open at a time, so
      arming a package sends every following scan straight into it instead
@@ -153,6 +194,11 @@
   body.pk-dragging .pk-pgroup-rolls.is-target,
   body.pk-dragging #pkUntrackedList.is-target{outline:2px dashed var(--pk-teal);outline-offset:-4px;border-radius:9px;}
   .pk-row.is-dragging{opacity:.45;}
+  /* A packed row carried past its package's border: it is on its way out,
+     and says so before it is dropped. */
+  .pk-row.is-leaving{position:relative;opacity:.55;outline:2px dashed var(--pk-red);outline-offset:-2px;}
+  .pk-row.is-leaving::after{content:attr(data-leaving-label);position:absolute;top:6px;right:8px;
+    padding:2px 7px;border-radius:999px;background:#FEE2E2;color:var(--pk-red);font:700 10.5px var(--pk-font);}
 
   /* Click-to-assign — the way out of dragging altogether. HTML5 drag
      and drop does not fire on touch at all, so on the tablets used on
@@ -162,9 +208,13 @@
     border:1.5px solid var(--pk-line);background:#fff;color:var(--pk-gray);border-radius:8px;
     padding:4px 8px;font:700 11px var(--pk-font);white-space:nowrap;}
   .pk-move:hover{border-color:var(--pk-teal);color:var(--pk-teal-700);}
-  .pk-move.has-pack{background:var(--pk-teal-50);border-color:#BFE0DD;color:var(--pk-teal-700);}
+  /* In a package the move button is an icon only — the card already
+     says which package; the button is just the way to another. */
+  .pk-move.has-pack{position:relative;width:20px;height:20px;padding:0;justify-content:center;gap:0;
+    border-width:1px;border-radius:6px;font-size:10px;}
+  .pk-move.has-pack::before{content:'';position:absolute;inset:-6px;}
   .pk-menu{position:fixed;z-index:90;min-width:216px;max-width:min(300px,92vw);
-    max-height:min(360px,58vh);overflow-y:auto;background:#fff;border:1.5px solid var(--pk-line);
+    max-height:min(360px,58vh);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#fff;border:1.5px solid var(--pk-line);
     border-radius:12px;box-shadow:0 14px 34px rgba(15,20,25,.18);padding:6px;font-family:var(--pk-font);}
   .pk-menu[hidden]{display:none;}
   .pk-menu-h{padding:6px 9px 7px;font:700 10.5px var(--pk-font);color:var(--pk-gray);
@@ -199,10 +249,18 @@
   .pk-pack.is-target .pk-drop-hint{color:var(--pk-teal-700);border-color:var(--pk-teal);border-style:solid;background:var(--pk-teal-50);}
 
   /* Toast */
-  .pk-toast{position:fixed;left:50%;top:20px;transform:translateX(-50%) translateY(-16px);
+  /* Bottom right, out of the way of the packages being worked on; on a
+     phone it spans the bottom edge instead of hugging a corner. */
+  .pk-toast{position:fixed;right:20px;bottom:20px;transform:translateY(16px);
     background:var(--pk-ink);color:#fff;padding:11px 16px;border-radius:11px;font-size:13.5px;font-weight:600;
-    z-index:80;opacity:0;pointer-events:none;transition:all .22s;max-width:92vw;text-align:center;}
-  .pk-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+    z-index:80;opacity:0;pointer-events:none;transition:all .22s;max-width:min(420px,calc(100vw - 32px));text-align:left;
+    box-shadow:0 10px 28px rgba(15,20,25,.22);}
+  .pk-toast.show{opacity:1;transform:translateY(0);}
+  @media(max-width:600px){.pk-toast{left:16px;right:16px;bottom:16px;max-width:none;}}
+  /* A toast that carries an action (Undo) has to take clicks. */
+  .pk-toast.has-action.show{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+  .pk-toast-act{background:none;border:0;padding:0;color:#5EEAD4;font:800 13.5px var(--pk-font);
+    cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
   .pk-toast.err{background:var(--pk-red);}
   .pk-toast.warn{background:var(--pk-amber);}
 
@@ -244,11 +302,16 @@
   .pks-dot{width:7px;height:7px;border-radius:50%;background:#2DD4BF;flex-shrink:0;
     animation:pksPulse 1.4s ease-in-out infinite;}
   @keyframes pksPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
-  .pks-body{padding:14px 16px 16px;overflow-y:auto;}
+  /* The shell is capped at 94vh and clips. The stage wrapping camera and
+     body has to be a shrinkable flex item too, or it grows with the log
+     and the body's own scroll never engages — rows just fall off the
+     bottom. */
+  #pkScanStage{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+  #pkScanStage[hidden]{display:none;}
+  .pks-body{padding:14px 16px 16px;overflow-y:auto;flex:1 1 auto;min-height:0;}
   .pks-or{display:flex;align-items:center;gap:12px;margin:0 0 12px;}
   .pks-or::before,.pks-or::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.12);}
   .pks-or span{color:#94A3B8;font:700 11px var(--pk-font);text-transform:uppercase;letter-spacing:.06em;}
-  .pks-manual{display:flex;gap:8px;}
   .pks-input{flex:1;min-width:0;box-sizing:border-box;padding:12px 14px;border-radius:12px;
     border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#fff;
     font:600 14px var(--pk-font);outline:none;}
@@ -258,6 +321,14 @@
     border:0;background:linear-gradient(135deg,#0D9488,#0F766E);color:#fff;font:700 13px var(--pk-font);
     cursor:pointer;white-space:nowrap;box-shadow:0 6px 18px rgba(13,148,136,.30);}
   .pks-btn:hover{filter:brightness(1.08);}
+  .pks-btn:disabled{opacity:.6;cursor:not-allowed;}
+  /* One box for one barcode or many. A handheld scanner ends every read
+     with Enter, so Enter is a new line here, not a submit; the box grows
+     with what is in it, up to a point, and then scrolls. */
+  .pks-manual textarea.pks-input{display:block;width:100%;height:48px;min-height:48px;max-height:180px;
+    resize:none;overflow-y:auto;font-family:ui-monospace,monospace;line-height:1.5;}
+  .pks-manual-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;}
+  .pks-manual-hint{color:#94A3B8;font:600 12px var(--pk-font);}
   /* What has gone in since the popup opened — the packer's running tally
      of this sack, so they can look away from the shelf and still know. */
   .pks-log{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
@@ -273,7 +344,7 @@
 
   /* What the scan found, held until it is confirmed. Nothing has been
      written at this point — the roll is only being shown. */
-  .pks-result{padding:18px 18px 20px;color:#fff;overflow-y:auto;}
+  .pks-result{padding:18px 18px 20px;color:#fff;overflow-y:auto;flex:1 1 auto;min-height:0;}
   .pks-result[hidden]{display:none;}
   .pks-rc{text-align:center;}
   .pks-status{display:inline-flex;align-items:center;gap:8px;padding:7px 16px;border-radius:999px;
@@ -551,6 +622,19 @@
 
 <div class="pk-toast" id="pkToast"></div>
 
+<div class="pk-reo-overlay" id="pkReoModal" hidden>
+  <div class="pk-reo" role="dialog" aria-modal="true" aria-labelledby="pkReoTitle">
+    <div class="pk-reo-h" id="pkReoTitle">{% trans "Change the package order?" %}</div>
+    <div class="pk-reo-sub">{% trans "These packages will be renumbered. Their contents move with them." %}</div>
+    <div class="pk-reo-list" id="pkReoList"></div>
+    <div class="pk-reo-warn"><i class="fa fa-triangle-exclamation"></i> {% trans "Labels already printed for these packages will carry the wrong number — reprint them." %}</div>
+    <div class="pk-reo-actions">
+      <button type="button" class="ghost" id="pkReoCancel">{% trans "Cancel" %}</button>
+      <button type="button" class="primary" id="pkReoOk">{% trans "Confirm" %}</button>
+    </div>
+  </div>
+</div>
+
 <!-- SCAN POPUP — one camera for the whole screen. Opened bare from the
      "Add a roll" card, or from a package's "Scan here", in which case
      every roll read here goes straight into that package. It also opens
@@ -576,9 +660,12 @@
     <div class="pks-body">
       <div class="pks-or"><span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}ya da{% else %}or{% endif %}</span></div>
       <div class="pks-manual">
-        <input type="text" id="pkScanManual" class="pks-input" autocomplete="off" inputmode="text" enterkeyhint="done"
-               placeholder="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Barkodu elle gir…{% else %}Enter barcode manually…{% endif %}">
-        <button type="button" class="pks-btn" id="pkScanAdd"><i class="fa fa-plus"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Ekle{% else %}Add{% endif %}</button>
+        <textarea id="pkScanManual" class="pks-input" rows="1" autocomplete="off" spellcheck="false"
+                  placeholder="{% trans 'Enter a barcode — or several, one per line' %}"></textarea>
+        <div class="pks-manual-foot">
+          <span class="pks-manual-hint" id="pkScanCount"></span>
+          <button type="button" class="pks-btn" id="pkScanAdd"><i class="fa fa-plus"></i> <span id="pkScanAddLbl"></span></button>
+        </div>
       </div>
       <div class="pks-log" id="pkScanLog"></div>
     </div>
@@ -616,10 +703,22 @@
 
   function t(tr, en){ return TR ? tr : en; }
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-  function toast(msg, kind){
+  // ``action`` ({label, run}) adds a button — Undo — and keeps the toast
+  // up long enough to reach it.
+  function toast(msg, kind, action){
     toastEl.textContent = msg; toastEl.className = 'pk-toast show' + (kind ? ' ' + kind : '');
+    if (action){
+      toastEl.classList.add('has-action');
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'pk-toast-act'; b.textContent = action.label;
+      b.addEventListener('click', function(){
+        toastEl.className = 'pk-toast';
+        action.run();
+      });
+      toastEl.appendChild(b);
+    }
     if (toastT) clearTimeout(toastT);
-    toastT = setTimeout(function(){ toastEl.className = 'pk-toast'; }, 2600);
+    toastT = setTimeout(function(){ toastEl.className = 'pk-toast'; }, action ? 6000 : 2600);
   }
   function post(url, data){
     var body = new URLSearchParams(data); body.append('csrfmiddlewaretoken', CSRF);
@@ -765,11 +864,13 @@
                     '<span class="nm">' + esc(name || '') + '</span>' +
                     (meters != null ? '<span class="m">' + Number(meters).toFixed(2) + ' m</span>' : '');
     log.insertBefore(row, log.firstChild);
-    while (log.children.length > 8) log.removeChild(log.lastChild);
+    while (log.children.length > 200) log.removeChild(log.lastChild);
   }
 
   var addBusy = false;
-  function addBarcode(code, meters){
+  function addBarcode(code, meters, quiet){
+    // A list run reports once, on its own summary card, not per roll.
+    var say = quiet ? function(){} : toast;
     code = (code||'').toString().trim();
     if (!code || addBusy) return Promise.resolve();
     addBusy = true;
@@ -789,7 +890,8 @@
                         'This roll does not belong to this order — it cannot go in a package.')
                 : d.kind === 'not_found' ? t('Top bulunamadı.','Roll not found.')
                 :                          (d.error || t('Eklenemedi.','Could not add.'));
-        toast(msg, 'err');
+        d.reason = msg;
+        say(msg, 'err');
         scanLogAdd('err', code, msg, null);
         return d;
       }
@@ -800,10 +902,10 @@
           // it there — the roll is in the packer's hand, going in.
           if (ex) ex.dataset.assignedPack = d.reservation.pack_id || '';
           pkRegroup();
-          toast(t('Top pakete kondu.','Roll placed in this package.'));
+          say(t('Top pakete kondu.','Roll placed in this package.'));
           scanLogAdd('', code, t('pakete kondu','placed in this package'), d.reservation.quantity);
         } else {
-          toast(t('Bu top zaten bu pakette.','This roll is already in this package.'), 'warn');
+          say(t('Bu top zaten bu pakette.','This roll is already in this package.'), 'warn');
           scanLogAdd('warn', code, t('zaten bu pakette','already in this package'), d.reservation.quantity);
         }
         return d;
@@ -812,12 +914,13 @@
       }
       var el = addRow(d.reservation, true);
       if (el) el.scrollIntoView({block:'center', behavior:'smooth'});
-      if (d.capped) toast(t('Girilen metre topta kalanla sınırlandı.','Metres capped to what remains on the roll.'), 'warn');
-      else if (d.reservation.pack_id) toast(t('Top pakete eklendi.','Roll added to the package.'));
-      else toast(t('Top eklendi.','Roll added.'));
+      if (d.capped) say(t('Girilen metre topta kalanla sınırlandı.','Metres capped to what remains on the roll.'), 'warn');
+      else if (d.reservation.pack_id) say(t('Top pakete eklendi.','Roll added to the package.'));
+      else say(t('Top eklendi.','Roll added.'));
       scanLogAdd('', code, d.reservation.product_name, d.reservation.quantity);
       return d;
-    }).catch(function(){ toast(t('Ağ hatası.','Network error.'), 'err'); })
+    }).catch(function(){ say(t('Ağ hatası.','Network error.'), 'err');
+                      return {ok:false, reason:t('Ağ hatası.','Network error.')}; })
       .finally(function(){ addBusy = false; });
   }
 
@@ -904,6 +1007,16 @@
       });
     });
 
+    function relabelPacks(numbers){
+      Object.keys(numbers || {}).forEach(function(id){
+        var p = document.querySelector('.pk-pack[data-pack-id="'+id+'"]'); if (!p) return;
+        var n = String(numbers[id]);
+        p.dataset.packNumber = n;
+        var num = p.querySelector('.pk-pack-num'); if (num) num.textContent = n;
+        var ttl = p.querySelector('.pk-pack-title'); if (ttl) ttl.textContent = t('Paket','Package') + ' #' + n;
+      });
+    }
+
     window.pkDeletePack = function(packId){
       if (!confirm(t('Bu paketi silmek istiyor musunuz? İçindeki toplar atanmamış duruma döner.','Delete this package? Its rolls will become unassigned.'))) return;
       pkFetchCrud({action:'delete_pack', pack_id: packId}).then(function(data){
@@ -913,6 +1026,7 @@
         if (el) el.remove();
         writeCollapsed(readCollapsed().filter(function(id){ return id !== String(packId); }));
         if (scanIntoPackId === String(packId)) scanIntoPackId = '';
+        relabelPacks(data.numbers);   // the server renumbers what is left to 1..N
         document.getElementById('packsCount').textContent = document.querySelectorAll('.pk-pack').length;
         pkRegroup();
       });
@@ -921,16 +1035,19 @@
     // Drag & drop
     var dragResId = null;
     var dragKind = 'reservation';
+    var dragRow = null, dragSrcPack = '';   // the row in the air, and the package it left
     document.addEventListener('dragstart', function(e){
       var citem = e.target.closest('.pk-citem[draggable="true"]');
       if (citem){
         dragResId = citem.dataset.id; dragKind = 'item';
+        dragRow = citem; dragSrcPack = citem.dataset.assignedPack || '';
         e.dataTransfer.effectAllowed = 'move';
         return;
       }
       var row = e.target.closest('.pk-row[draggable="true"]');
       if (!row) return;
       dragResId = row.dataset.id; dragKind = 'reservation';
+      dragRow = row; dragSrcPack = row.dataset.assignedPack || '';
       e.dataTransfer.effectAllowed = 'move';
     });
     window.pkDragOver = function(e){ e.preventDefault(); e.currentTarget.classList.add('is-target'); e.dataTransfer.dropEffect = 'move'; };
@@ -939,20 +1056,37 @@
       e.preventDefault();
       e.currentTarget.classList.remove('is-target');
       if (!dragResId) return;
-      if (dragKind === 'item') assignItemToPack(dragResId, e.currentTarget.dataset.packId);
-      else assignToPack(dragResId, e.currentTarget.dataset.packId);
+      // Dropped back where it came from: nothing to do.
+      if (dragSrcPack && dragSrcPack === e.currentTarget.dataset.packId){ dragResId = null; return; }
+      doAssign(dragKind, dragResId, e.currentTarget.dataset.packId);
       dragResId = null;
     };
-    // Dropping back onto a product group (or #pkUntrackedList) unassigns
-    // (removes from pack).
+    // Dropping onto a product group (or #pkUntrackedList) is one of the
+    // "outside a package" drops — the document handler below takes it out,
+    // after the confirmation, like a drop anywhere else.
     window.pkDropUnassign = function(e){
       e.preventDefault();
       e.currentTarget.classList.remove('is-target');
-      if (!dragResId) return;
-      if (dragKind === 'item') assignItemToPack(dragResId, '');
-      else assignToPack(dragResId, '');
-      dragResId = null;
     };
+
+    // Out of a package by dragging: the row is marked the moment the
+    // pointer crosses its package's border (and unmarked if it comes back
+    // in); letting go anywhere that isn't a package takes it out, with
+    // Undo on the toast like a move. Over another package it is a move.
+    document.addEventListener('dragover', function(e){
+      if (!dragResId || !dragRow || !dragSrcPack) return;
+      var outside = !(e.target && e.target.closest && e.target.closest('.pk-pack'));
+      dragRow.dataset.leavingLabel = t('Çıkarılıyor','Taking out');
+      dragRow.classList.toggle('is-leaving', outside);
+      if (outside){ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+    });
+    document.addEventListener('drop', function(e){
+      if (!dragResId || !dragRow || !dragSrcPack) return;
+      if (e.target && e.target.closest && e.target.closest('.pk-pack')) return;
+      e.preventDefault();
+      doAssign(dragKind, dragResId, '');
+      dragResId = null;
+    });
 
     // Light up every package while a row is in the air, and let a drag
     // that reaches the top or bottom edge scroll — of the packages
@@ -969,7 +1103,8 @@
       document.body.classList.remove('pk-dragging');
       document.querySelectorAll('.pk-row.is-dragging').forEach(function(el){ el.classList.remove('is-dragging'); });
       document.querySelectorAll('.is-target').forEach(function(el){ el.classList.remove('is-target'); });
-      dragResId = null;
+      document.querySelectorAll('.pk-row.is-leaving').forEach(function(el){ el.classList.remove('is-leaving'); });
+      dragResId = null; dragRow = null; dragSrcPack = '';
     });
     var EDGE = 90, STEP = 24;
     document.addEventListener('dragover', function(e){
@@ -1002,7 +1137,16 @@
 
     function buildMenu(row){
       var cur = row.dataset.assignedPack || '';
-      var html = '<div class="pk-menu-h">' + t('Pakete taşı','Move to package') + '</div>';
+      var html = '';
+      // Taking a roll out is first, above the packages: with many of them
+      // the list scrolls, and "out" must never be the one you scroll to.
+      if (cur){
+        html += '<button type="button" class="pk-menu-i danger" data-pick="">' +
+                  '<span class="pk-pack-num" style="background:#FEE2E2;color:#DC2626;"><i class="fa fa-arrow-turn-up"></i></span>' +
+                  '<span>' + t('Paketten çıkar','Take out of package') + '</span>' +
+                '</button><div class="pk-menu-sep"></div>';
+      }
+      html += '<div class="pk-menu-h">' + t('Pakete taşı','Move to package') + '</div>';
       var packs = document.querySelectorAll('.pk-pack');
       if (!packs.length){
         html += '<div class="pk-menu-h" style="text-transform:none;letter-spacing:0;">' +
@@ -1023,12 +1167,6 @@
                 '<span class="pk-pack-num"><i class="fa fa-plus"></i></span>' +
                 '<span>' + t('Yeni pakete koy','Put in a new package') + '</span>' +
               '</button>';
-      if (cur){
-        html += '<button type="button" class="pk-menu-i danger" data-pick="">' +
-                  '<span class="pk-pack-num" style="background:#FEE2E2;color:#DC2626;"><i class="fa fa-arrow-turn-up"></i></span>' +
-                  '<span>' + t('Paketten çıkar','Take out of package') + '</span>' +
-                '</button>';
-      }
       menuEl.innerHTML = html;
     }
 
@@ -1044,11 +1182,29 @@
     }
 
     function doAssign(kind, id, packId){
+      // Where it was, for Undo. Neither a move nor a take-out is confirmed
+      // first — both are fully reversible — so a wrong one is one click to
+      // send back instead.
+      var row = document.querySelector((kind === 'item' ? '.pk-citem' : '.pk-row:not(.pk-citem)') + '[data-id="'+id+'"]');
+      var prev = row ? (row.dataset.assignedPack || '') : null;
       var p = (kind === 'item') ? assignItemToPack(id, packId) : assignToPack(id, packId);
-      p.then(function(pid){
-        if (pid === false) return;
-        if (pid){ flashPack(pid); toast(t('Pakete taşındı.','Moved into the package.')); }
-        else toast(t('Paketten çıkarıldı.','Taken out of the package.'));
+      return p.then(function(pid){
+        if (pid === false) return pid;
+        var undo = (prev !== null && String(prev) !== String(pid)) ? {
+          label: t('Geri al','Undo'),
+          run: function(){
+            var back = (kind === 'item') ? assignItemToPack(id, prev) : assignToPack(id, prev);
+            back.then(function(b){
+              if (b === false) return;
+              if (b) flashPack(b);
+              toast(b ? t('Önceki pakete geri kondu.','Put back in its previous package.')
+                      : t('Pakete atanmamış duruma geri döndü.','Back to not in a package.'));
+            });
+          }
+        } : null;
+        if (pid){ flashPack(pid); toast(t('Pakete taşındı.','Moved into the package.'), '', undo); }
+        else toast(t('Paketten çıkarıldı.','Taken out of the package.'), '', undo);
+        return pid;
       });
     }
 
@@ -1077,7 +1233,12 @@
     });
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeMenu(); });
     window.addEventListener('resize', closeMenu);
-    window.addEventListener('scroll', closeMenu, true);
+    // The page scrolling away from the button closes the menu; the menu's
+    // own list scrolling (a long order's packages) must not.
+    window.addEventListener('scroll', function(e){
+      if (e.target && e.target.nodeType === 1 && menuEl.contains(e.target)) return;
+      closeMenu();
+    }, true);
 
     // ── folding ─────────────────────────────────────────────────────
     var foldAllBtn = document.getElementById('pkCompactBtn');
@@ -1111,11 +1272,123 @@
     // delete button, which lives there too.
     document.addEventListener('click', function(e){
       if (!e.target || !e.target.closest) return;
-      if (e.target.closest('.pk-pack-del')) return;
+      if (e.target.closest('.pk-pack-del, .pk-pack-grip')) return;
       var h = e.target.closest('.pk-pack-h'); if (!h) return;
       var pack = h.closest('.pk-pack'); if (!pack) return;
       setCollapsed(pack, !pack.classList.contains('is-collapsed'));
     });
+
+    // ── reordering packages ─────────────────────────────────────────
+    // The package follows the pointer through the list; letting go sends
+    // the new order and every card takes the number it now stands at. A
+    // refusal puts the cards back where they were.
+    var reo = null;
+    function packIds(){ return allPacks().map(function(p){ return p.dataset.packId; }); }
+    document.addEventListener('pointerdown', function(e){
+      var grip = e.target && e.target.closest && e.target.closest('.pk-pack-grip');
+      if (!grip || e.button > 0) return;
+      var pack = grip.closest('.pk-pack'); if (!pack) return;
+      e.preventDefault();
+      try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+      reo = {pack: pack, pointer: e.pointerId, before: packIds()};
+      pack.classList.add('is-lifted');
+      document.body.classList.add('pk-reordering');
+      closeMenu();
+    });
+    document.addEventListener('pointermove', function(e){
+      if (!reo || e.pointerId !== reo.pointer) return;
+      // The moment the pointer crosses into another package, the held one
+      // takes its place — behind it when coming from above or the left,
+      // in front of it when coming from below or the right. Works the same
+      // in one column or two.
+      //
+      // Packages differ in height, so after a swap the pointer can still be
+      // inside the package just stepped over, now shifted into the held
+      // one's old spot. That package is ignored until the pointer leaves
+      // it, or the two would swap back and forth under a still cursor.
+      var over = null;
+      allPacks().forEach(function(p){
+        if (p === reo.pack) return;
+        var r = p.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) over = p;
+      });
+      if (reo.passed && over !== reo.passed) reo.passed = null;
+      if (over && over !== reo.passed){
+        var list = over.parentNode;
+        var forward = !!(reo.pack.compareDocumentPosition(over) & Node.DOCUMENT_POSITION_FOLLOWING);
+        list.insertBefore(reo.pack, forward ? over.nextSibling : over);
+        reo.passed = over;
+      }
+      if (e.clientY < EDGE) window.scrollBy(0, -STEP);
+      else if (window.innerHeight - e.clientY < EDGE) window.scrollBy(0, STEP);
+    });
+    function endReorder(e){
+      if (!reo || e.pointerId !== reo.pointer) return;
+      var pack = reo.pack, before = reo.before, after = packIds();
+      reo = null;
+      pack.classList.remove('is-lifted');
+      document.body.classList.remove('pk-reordering');
+      if (after.join(',') === before.join(',')) return;
+      function putBack(){
+        var list = document.getElementById('packsList'), noPacks = list.querySelector('[data-no-packs]');
+        before.forEach(function(id){
+          var p = packEl(id); if (p) list.insertBefore(p, noPacks);
+        });
+      }
+      confirmReorder(after).then(function(ok){
+        if (!ok){ putBack(); return; }
+        return pkFetchCrud({action:'reorder_packs', pack_ids: after.join(',')}).then(function(data){
+          if (!data.ok){
+            putBack();
+            toast(data.error || t('Sıralanamadı.','Could not reorder.'), 'err');
+            return;
+          }
+          relabelPacks(data.numbers);
+          pkRegroup();
+          toast(t('Paketler yeniden numaralandı.','Packages renumbered.'));
+        }).catch(function(){ putBack(); toast(t('Ağ hatası.','Network error.'),'err'); });
+      });
+    }
+
+    // Lists every package whose number the drop would change — old number
+    // struck through, new one beside it, and what is inside — and resolves
+    // true only on Confirm. The cards still wear their old numbers here;
+    // they are relabelled only once the server has agreed.
+    var reoModal = document.getElementById('pkReoModal'), reoList = document.getElementById('pkReoList');
+    var reoResolve = null;
+    function confirmReorder(order){
+      var rows = '';
+      order.forEach(function(id, i){
+        var p = packEl(id); if (!p) return;
+        var from = p.dataset.packNumber, to = String(i + 1);
+        if (from === to) return;
+        var rolls = (p.querySelector('[data-count]') || {}).textContent || '0';
+        var meters = (p.querySelector('[data-meters]') || {}).textContent || '0.00';
+        rows += '<div class="pk-reo-row">' +
+          '<span class="from">' + t('Paket','Package') + ' #' + esc(from) + '</span>' +
+          '<i class="fa fa-arrow-right" style="color:var(--pk-gray);font-size:11px;"></i>' +
+          '<span class="to">#' + esc(to) + '</span>' +
+          '<span class="what">' + esc(rolls) + ' ' + t('top','rolls') + ' · ' + esc(meters) + ' m</span></div>';
+      });
+      if (!rows) return Promise.resolve(false);
+      reoList.innerHTML = rows;
+      reoModal.hidden = false;
+      document.getElementById('pkReoOk').focus();
+      return new Promise(function(resolve){ reoResolve = resolve; });
+    }
+    function closeReo(ok){
+      if (!reoResolve) return;
+      reoModal.hidden = true;
+      var r = reoResolve; reoResolve = null; r(ok);
+    }
+    document.getElementById('pkReoOk').addEventListener('click', function(){ closeReo(true); });
+    document.getElementById('pkReoCancel').addEventListener('click', function(){ closeReo(false); });
+    reoModal.addEventListener('click', function(e){ if (e.target === reoModal) closeReo(false); });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape' && reoResolve) closeReo(false);
+    });
+    document.addEventListener('pointerup', endReorder);
+    document.addEventListener('pointercancel', endReorder);
 
     // ── scanning into a package ─────────────────────────────────────
     // Opening the popup unfolds the package too, so closing it leaves
@@ -1144,6 +1417,13 @@
           caret.className = 'pk-pack-caret';
           caret.innerHTML = '<i class="fa fa-chevron-down"></i>';
           h.insertBefore(caret, h.firstChild);
+        }
+        if (!SHIPPED && !h.querySelector('.pk-pack-grip')){
+          var grip = document.createElement('span');
+          grip.className = 'pk-pack-grip';
+          grip.title = t('Sırayı değiştirmek için sürükleyin','Drag to change the order');
+          grip.innerHTML = '<i class="fa fa-grip-vertical"></i>';
+          h.insertBefore(grip, h.firstChild);
         }
         if (!SHIPPED && !h.querySelector('.pk-pack-scan')){
           var scanBtn = document.createElement('button');
@@ -1185,11 +1465,20 @@
           mv.innerHTML = '<i class="fa fa-box"></i><span data-move-label></span>';
           actions.insertBefore(mv, actions.firstChild);
         }
-        mv.title = t('Pakete taşı','Move to package');
         var pack = packEl(row.dataset.assignedPack || '');
         var lbl = mv.querySelector('[data-move-label]');
-        if (pack){ mv.classList.add('has-pack'); lbl.textContent = '#' + (pack.dataset.packNumber || ''); }
-        else { mv.classList.remove('has-pack'); lbl.textContent = t('Pakete at','To package'); }
+        var ico = mv.querySelector('i');
+        // Inside a package the card already says which one, so the button
+        // is only the way to another — an icon, not a repeat of the number.
+        if (pack){
+          mv.classList.add('has-pack'); lbl.textContent = '';
+          if (ico) ico.className = 'fa fa-arrow-right-arrow-left';
+          mv.title = t('Başka pakete taşı','Move to another package');
+        } else {
+          mv.classList.remove('has-pack'); lbl.textContent = t('Pakete at','To package');
+          if (ico) ico.className = 'fa fa-box';
+          mv.title = t('Pakete taşı','Move to package');
+        }
       });
     };
 
@@ -1284,6 +1573,7 @@
     startCam();
     var inp = document.getElementById('pkScanManual');
     if (inp){ inp.value=''; }
+    resetList();
   };
   function closeScan(){
     if (!scanModal) return;
@@ -1314,12 +1604,16 @@
     if (resultEl){ resultEl.hidden = true; resultEl.innerHTML = ''; }
     if (stageEl) stageEl.hidden = false;
     scanPaused = false;
+    // Back to the scanner: the camera comes back with it (a no-op when
+    // it is already running, or before the popup is showing).
+    if (stageEl && scanModal && scanModal.classList.contains('show')) startCam();
     camDebounce = {val:'', t:0};          // the same top may be re-read
-    // Cleared but deliberately NOT focused: on a phone, focusing the field
-    // throws the on-screen keyboard over the camera every time the packer
-    // taps "Scan again". The camera is the default; the keyboard comes up
-    // only when they actually tap the manual field.
-    if (scanManual){ scanManual.value=''; }
+    // The box keeps what is in it — a mistyped barcode, or the ones a
+    // list could not place — and is deliberately NOT focused: on a phone,
+    // focusing throws the on-screen keyboard over the camera every time
+    // the packer taps "Scan again". The keyboard comes up only when they
+    // actually tap the box.
+    syncManual();
   }
   function showResult(html){
     if (!resultEl) return;
@@ -1327,6 +1621,9 @@
     // result card isn't read through half a screen of keys.
     if (scanManual){ try{ scanManual.blur(); }catch(e){} }
     if (stageEl) stageEl.hidden = true;
+    // The camera keeps running, hidden, while a card is up — scanPaused
+    // stops it reading — so "Scan another" is instant. It stops only when
+    // the popup closes.
     resultEl.innerHTML = html;
     resultEl.hidden = false;
     scanPaused = true;
@@ -1409,6 +1706,41 @@
       '</div></div>');
   }
 
+  // After a list: one card in place of the scanner, the way a single
+  // roll gets its "Added" card — how many went in, how many were there
+  // already, and each refused barcode with the reason. Refused ones wait
+  // in the list box, so "Fix refused" goes straight back to them.
+  function renderListDone(added, already, refused){
+    var pack = scanIntoPackId ? document.querySelector('.pk-pack[data-pack-id="'+scanIntoPackId+'"]') : null;
+    var num = pack ? (pack.dataset.packNumber||'') : '';
+    var bad = refused.length, total = added + already + bad;
+    var head = bad ? t(total+' barkoddan '+bad+' tanesi eklenemedi', bad+' of '+total+' barcodes refused')
+             : num ? t('Liste Paket #'+num+'\'e eklendi','List added to Package #'+num)
+             :       t('Liste eklendi','List added');
+    var html = '<div class="pks-rc">' +
+      '<span class="pks-status ' + (bad?'warn':'ok') + '"><i class="fa fa-' + (bad?'triangle-exclamation':'circle-check') + '"></i>' +
+        esc(head) + '</span>' +
+      '<div class="pks-tiles">' +
+        tile(t('Eklendi','Added'), added, '', true) +
+        tile(t('Zaten pakette','Already in the package'), already, '') +
+        tile(t('Eklenemedi','Refused'), bad, '') +
+      '</div>' +
+      (pack ? '<div class="pks-tiles">' +
+        tile(t('Paket toplamı','Package total'), (pack.querySelector('[data-meters]')||{}).textContent || '0.00', 'm') +
+        tile(t('Paketteki top','Rolls in package'), (pack.querySelector('[data-count]')||{}).textContent || '0', '') +
+      '</div>' : '') +
+      (bad ? '<div class="pks-log" style="margin-top:14px;text-align:left;">' + refused.map(function(r){
+          return '<div class="pks-log-row err"><code>' + esc(r.code) + '</code><span class="nm" style="white-space:normal;color:inherit;">' +
+                 esc(r.reason) + '</span></div>';
+        }).join('') + '</div>' : '') +
+      '<div class="pks-actions">' +
+        '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-check"></i>' + t('Bitir','Done') + '</button>' +
+        '<button type="button" class="pks-act primary" data-scan-back><i class="fa fa-' + (bad?'pen':'barcode') + '"></i>' +
+          (bad ? t('Eklenemeyenleri düzelt','Fix refused') : t('Devam et','Add more')) + '</button>' +
+      '</div></div>';
+    showResult(html);
+  }
+
   // ── a roll already on the screen ──────────────────────────────────
   // Tapping any listed roll puts up the same card a scan puts up. A
   // barcode typed in wrong is only ever caught by LOOKING at the roll,
@@ -1461,7 +1793,11 @@
   });
 
   var previewBusy = false;
-  function pkScanPreview(code){
+  // ``place`` (a camera read, or one typed barcode, into a package): no
+  // confirm step — a roll that isn't in the package yet goes straight in.
+  // Placing only ever moves a roll the order already holds between
+  // packages, so a wrong one is fixed from its package button on the page.
+  function pkScanPreview(code, place){
     code = (code||'').toString().trim();
     if (!code || previewBusy) return;
     previewBusy = true;
@@ -1478,9 +1814,40 @@
         renderRefused(msg, code);
         return;
       }
-      renderFound(d, code);
+      if (!place || !scanIntoPackId || d.in_target){ renderFound(d, code); return; }
+      var was = {packNumber: d.pack_number};
+      return addBarcode(code, null, true).then(function(a){
+        if (!a || !a.ok){ renderRefused((a && a.reason) || t('Eklenemedi.','Could not add.'), code); return; }
+        if (scanManual && scanManual.value.trim() === code){ scanManual.value = ''; syncManual(); }
+        renderPlaced(a.reservation || d.reservation || {}, code, was);
+      });
     }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); })
       .finally(function(){ previewBusy = false; });
+  }
+
+  // The card after a read has already placed the roll: the same details
+  // the found card shows, with where it came from.
+  function renderPlaced(r, code, was){
+    var num = targetPackNumber();
+    var from = was.packNumber ? (t('Paket #','Package #') + was.packNumber) : t('Pakete atanmamış','Not in a package');
+    showResult('<div class="pks-rc">' +
+      '<span class="pks-status ok"><i class="fa fa-circle-check"></i>' +
+        (num ? t('Paket #'+num+'\'e eklendi','Added to Package #'+num) : t('Eklendi','Added')) + '</span>' +
+      '<div class="pks-chip"><i class="fa fa-barcode"></i>' + esc(code) + '</div>' +
+      '<div class="pks-name">' + esc(r.product_name||'') + '</div>' +
+      (r.sku ? '<div><span class="pks-sku">' + esc(r.sku) + '</span></div>' : '') +
+      (r.warehouse ? '<div class="pks-where">' + esc(r.warehouse) + '</div>' : '') +
+      '<div class="pks-tiles">' +
+        tile(t('Bu siparişe ayrılan','Reserved for this order'), Number(r.quantity||0).toFixed(2), 'm', true) +
+        tile(t('Topta kalan','Left on the roll'),
+             (r.roll_remaining != null ? Number(r.roll_remaining).toFixed(2) : '—'), 'm') +
+        tile(t('Önceden','Was'), from, '') +
+      '</div>' +
+      '<div class="pks-actions">' +
+        '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-check"></i>' + t('Bitir','Done') + '</button>' +
+        '<button type="button" class="pks-act primary" data-scan-back><i class="fa fa-barcode"></i>' +
+          t('Yeni top okut','Scan another') + '</button>' +
+      '</div></div>');
   }
 
   document.addEventListener('click', function(e){
@@ -1493,19 +1860,86 @@
     ok.disabled = true;
     addBarcode(code).then(function(d){
       if (!d || !d.ok){ ok.disabled = false; return; }
+      if (scanManual && scanManual.value.trim() === code){ scanManual.value = ''; syncManual(); }
       renderAdded(code, (d.reservation||{}).product_name);
     });
   });
 
-  function doScanManual(){
+  // ── the barcode box ───────────────────────────────────────────────
+  // One barcode reads first and waits on the found card, exactly like a
+  // camera scan. Several go straight in, one after another — the packer
+  // has the list in front of them already — and end on a summary card;
+  // whatever was refused is left in the box to be corrected and resent.
+  var scanCount = document.getElementById('pkScanCount'), scanAddLbl = document.getElementById('pkScanAddLbl');
+  var listBusy = false;
+  var listProgress = null;              // {added, total} of the run in flight or just finished
+  function manualCodes(){
+    var seen = {}, out = [];
+    (scanManual ? scanManual.value : '').split(/[\s,;]+/).forEach(function(c){
+      c = c.trim(); if (c && !seen[c]){ seen[c] = 1; out.push(c); }
+    });
+    return out;
+  }
+  function fitManual(){
     if (!scanManual) return;
-    var v = (scanManual.value||'').trim(); if (!v){ scanManual.focus(); return; }
-    pkScanPreview(v);
+    scanManual.style.height = 'auto';
+    scanManual.style.height = Math.min(scanManual.scrollHeight + 2, 180) + 'px';
+  }
+  function syncManual(){
+    if (!scanManual) return;
+    fitManual();
+    var n = manualCodes().length, num = targetPackNumber();
+    // During a run, and after it until the box is edited, the hint says
+    // how far the list got rather than how long it is.
+    if (scanCount) scanCount.textContent = listProgress
+      ? t(listProgress.added + '/' + listProgress.total + ' eklendi',
+          listProgress.added + '/' + listProgress.total + ' added')
+      : n > 1 ? n + ' ' + t('barkod','barcodes') : '';
+    if (scanAddLbl) scanAddLbl.textContent = n > 1
+      ? (num ? t('Tümünü Paket #'+num+'\'e ekle','Add all to Package #'+num) : t('Tümünü ekle','Add all'))
+      : t('Ekle','Add');
+    if (scanAdd) scanAdd.disabled = listBusy;
+  }
+  function resetList(){
+    listProgress = null;
+    if (scanManual) scanManual.value = '';
+    syncManual();
+  }
+  if (scanManual){
+    scanManual.addEventListener('input', function(){ listProgress = null; syncManual(); });
+    // Enter is a new line (a handheld scanner sends one after each read);
+    // Ctrl/⌘+Enter sends the box from the keyboard.
+    scanManual.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); doScanManual(); }
+    });
   }
   if (scanAdd) scanAdd.addEventListener('click', doScanManual);
-  if (scanManual) scanManual.addEventListener('keydown', function(e){
-    if (e.key==='Enter'){ e.preventDefault(); doScanManual(); }
-  });
+
+  function doScanManual(){
+    if (!scanManual || listBusy) return;
+    var codes = manualCodes();
+    if (!codes.length){ scanManual.focus(); return; }
+    if (codes.length === 1){ pkScanPreview(codes[0], true); return; }   // exactly like a camera read
+    var failed = [], refused = [], added = 0, already = 0;
+    listProgress = {added: 0, total: codes.length};
+    listBusy = true; syncManual();
+    codes.reduce(function(chain, code){
+      return chain.then(function(){
+        return addBarcode(code, null, true).then(function(d){
+          if (!d || !d.ok){ failed.push(code); refused.push({code:code, reason:(d && d.reason) || t('Eklenemedi.','Could not add.')}); }
+          else if (d.duplicate && !d.moved) already++;   // was in this package before the list
+          else added++;
+          listProgress.added = added; syncManual();
+        });
+      });
+    }, Promise.resolve()).then(function(){
+      listBusy = false;
+      scanManual.value = failed.join('\n');
+      syncManual();
+      renderListDone(added, already, refused);
+    });
+  }
+
   function onDecode(code){
     var now = (window.performance&&performance.now)?performance.now():Date.now();
     code = (code||'').toString().trim();
@@ -1515,7 +1949,7 @@
     camDebounce = {val:code, t:now};
     beep();
     var hit=document.getElementById('pkHit'); if(hit){ hit.textContent = code; }
-    pkScanPreview(code);   // show the roll; nothing is written until confirm
+    pkScanPreview(code, true);   // into a package: placed at once, no confirm
   }
   function camLoop(){
     if (!camRunning) return;

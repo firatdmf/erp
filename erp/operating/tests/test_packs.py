@@ -87,3 +87,49 @@ class PackTestCase(TestCase):
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertTrue(response['Content-Disposition'].startswith('attachment;'))
 
+
+    @patch('marketing.utils.bunny_storage.upload_to_bunny')
+    def test_delete_renumbers_remaining_packs(self, mock_upload):
+        """Deleting a package closes the gap — the rest run 1..N again, and
+        the next one added follows on from N, not from the highest number
+        the order ever had."""
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        url = reverse("operating:order_packing_list", args=[self.order.pk])
+        p1, p2, p3 = (Pack.objects.create(order=self.order, pack_number=n) for n in (1, 2, 3))
+
+        r = self.client.post(url, {"action": "delete_pack", "pack_id": p2.pk})
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(r.json()["numbers"], {str(p1.pk): 1, str(p3.pk): 2})
+        p3.refresh_from_db()
+        self.assertEqual((p3.pack_number, p3.code, p3.qr_code_url), (2, "PK-DK0000008-2", None))
+
+        # Delete down to the last package: it becomes #1, and a new one is #2.
+        self.client.post(url, {"action": "delete_pack", "pack_id": p1.pk})
+        p3.refresh_from_db()
+        self.assertEqual(p3.pack_number, 1)
+        r = self.client.post(url, {"action": "add_pack"})
+        self.assertEqual(r.json()["pack"]["number"], 2)
+
+    @patch('marketing.utils.bunny_storage.upload_to_bunny')
+    def test_reorder_packs_renumbers_in_dropped_order(self, mock_upload):
+        """Dragging packages into a new order numbers them by where they
+        now stand, carrying their contents — a straight swap included,
+        which would trip unique (order, pack_number) if written through."""
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        url = reverse("operating:order_packing_list", args=[self.order.pk])
+        p1, p2, p3 = (Pack.objects.create(order=self.order, pack_number=n) for n in (1, 2, 3))
+        packed = PackedOrderItem.objects.create(pack=p3, order_item=self.order_item)
+
+        r = self.client.post(url, {"action": "reorder_packs", "pack_ids": f"{p3.pk},{p1.pk},{p2.pk}"})
+        self.assertEqual(r.json(), {"ok": True, "numbers": {str(p3.pk): 1, str(p1.pk): 2, str(p2.pk): 3}})
+        p3.refresh_from_db()
+        self.assertEqual((p3.pack_number, p3.code, p3.qr_code_url), (1, "PK-DK0000008-1", None))
+        packed.refresh_from_db()
+        self.assertEqual(packed.pack_id, p3.pk)
+
+        # A list that misses a package (a stale screen) changes nothing.
+        r = self.client.post(url, {"action": "reorder_packs", "pack_ids": f"{p1.pk},{p2.pk}"})
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(
+            list(self.order.packs.order_by("pack_number").values_list("pk", flat=True)),
+            [p3.pk, p1.pk, p2.pk])

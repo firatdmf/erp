@@ -4536,10 +4536,63 @@ class OrderPackingList(View):
             # Refuse to delete the last remaining pack.
             if order.packs.count() <= 1:
                 return JsonResponse({"ok": False, "error": "Cannot delete the only pack"}, status=400)
-            pack.delete()  # SET_NULL releases its stock_reservations back to unassigned
-            return JsonResponse({"ok": True})
+            with transaction.atomic():
+                pack.delete()  # SET_NULL releases its stock_reservations back to unassigned
+                numbers = _renumber_packs(order)
+            return JsonResponse({"ok": True, "numbers": numbers})
+
+        if action == "reorder_packs":
+            try:
+                ids = [int(x) for x in (request.POST.get("pack_ids") or "").split(",") if x.strip()]
+            except ValueError:
+                return JsonResponse({"ok": False, "error": "Bad pack_ids"}, status=400)
+            with transaction.atomic():
+                current = set(order.packs.select_for_update().values_list("pk", flat=True))
+                # Every package, each once — a stale screen that missed an
+                # add or delete must not leave a package unnumbered.
+                if len(ids) != len(current) or set(ids) != current:
+                    return JsonResponse({"ok": False, "error": "Paket listesi güncel değil — sayfayı yenileyin."}, status=409)
+                numbers = _renumber_packs(order, ids)
+            return JsonResponse({"ok": True, "numbers": numbers})
 
         return JsonResponse({"ok": False, "error": "Unknown action"}, status=400)
+
+
+def _renumber_packs(order, ordered_ids=None):
+    """Number an order's packages 1..N — in their current order, or in
+    ``ordered_ids`` when the packer has dragged them into a new one.
+
+    Called after a delete to close the gap it leaves: without this,
+    deleting #2 of three left #1 and #3, and since the last package can't
+    be deleted, clearing them all left a lone #5 that new packages then
+    counted on from.
+
+    A package whose number changes gets its code rewritten and its QR
+    cleared — the old QR carries the old number, which
+    process_qr_payload_pack looks packages up by — and the label PDF
+    draws a fresh one the next time it is printed.
+
+    Returns {pack_id: pack_number} for every package, for the screen to
+    relabel its cards without a reload."""
+    from django.utils import timezone
+
+    packs = list(order.packs.order_by("pack_number"))
+    if ordered_ids is not None:
+        by_id = {p.pk: p for p in packs}
+        packs = [by_id[i] for i in ordered_ids]
+    moving = [(n, p) for n, p in enumerate(packs, start=1) if p.pack_number != n]
+    if moving:
+        # Step every moving package aside first: a swap written straight
+        # through would collide on unique_together (order, pack_number).
+        top = max(p.pack_number for p in packs)
+        for k, (_, p) in enumerate(moving, start=1):
+            Pack.objects.filter(pk=p.pk).update(pack_number=top + k)
+        order_num = order.order_number or f"ORD{order.pk}"
+        now = timezone.now()
+        for n, p in moving:
+            Pack.objects.filter(pk=p.pk).update(
+                pack_number=n, code=f"PK-{order_num}-{n}", qr_code_url=None, updated_at=now)
+    return {p.pk: n for n, p in enumerate(packs, start=1)}
 
 
 # below is for receiving goods

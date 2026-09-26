@@ -10528,3 +10528,6 @@ msgstr "Müşteri kabul ettiğinde “Kabul edildi — sipariş oluştur”a bas
 
 msgid "Street, city, country, phone — as it should read on the label"
 msgstr "Sokak, şehir, ülke, telefon — etikette yazılacağı gibi"
+
+msgid "new — saved with the order"
+msgstr "yeni — siparişle birlikte kaydedilir"

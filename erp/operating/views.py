@@ -3065,6 +3065,30 @@ def save_order_adjustments(order, raw):
     ])
 
 
+def _pending_new_customer(request):
+    """The new customer the order form is carrying, or None.
+
+    The form's "create new" panel no longer writes to CRM on its own; it
+    posts `new_customer_json` and the customer is made with the order.
+    """
+    raw = request.POST.get("new_customer_json")
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    name = (data.get("name") or "").strip()
+    if not name:
+        return None
+    return {
+        "name": name,
+        "phone": (data.get("phone") or "").strip(),
+        "email": (data.get("email") or "").strip(),
+        "address": (data.get("address") or "").strip(),
+    }
+
+
 # Behind the sign-in like every other order page: served open, the form
 # handed out the book names, the product search and the roll list to
 # anyone who asked.
@@ -3126,14 +3150,19 @@ class OrderCreate(View):
 
         customer_pk = request.POST.get("customer_pk")
         customer_type = request.POST.get("customer_type")
+        # A customer typed into the form's "create new" panel. Not a CRM
+        # record yet: it is made below, with the order, so abandoning the
+        # form leaves nothing behind.
+        new_customer = _pending_new_customer(request)
 
         # A customer is mandatory. An order saved without one has no current account
         # to bill, prints with a blank Customer card, and can't be fixed
         # from the order page afterwards — so refuse it at the door
         # instead of creating a record nobody can attach a client to.
         # "retail" is a valid pick (the shared Perakende current account), a CRM
-        # contact/company needs its pk.
-        if not (customer_type == "retail" or (customer_type in {"contact", "company"} and customer_pk)):
+        # contact/company needs its pk — or the details to make one.
+        if not (customer_type == "retail"
+                or (customer_type in {"contact", "company"} and (customer_pk or new_customer))):
             from django.utils.translation import gettext as _
             msg = _("Pick a customer before saving the order.")
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -3184,6 +3213,12 @@ class OrderCreate(View):
                 split_group = uuid4() if len(groups) > 1 else None
                 created = []
                 with transaction.atomic():
+                    if new_customer and not customer_pk:
+                        # Inside the transaction on purpose: an order that
+                        # fails to save takes its new customer with it.
+                        from crm.views import create_quick_customer
+                        customer_pk = create_quick_customer(
+                            kind=customer_type, **new_customer).pk
                     for book, book_items in groups:
                         _o, _stayed = self._create_one_order(
                             request,

@@ -1304,23 +1304,32 @@ def quick_create_customer(request):
     address = (request.POST.get("address") or "").strip()
 
     kind = (request.POST.get("kind") or "contact").strip().lower()
-    model = Company if kind == "company" else Contact
+    obj = create_quick_customer(kind=kind, name=name, phone=phone, email=email,
+                                address=address)
+    return JsonResponse({
+        "ok": True,
+        "id": obj.pk,
+        "name": obj.name,
+        "type": "company" if isinstance(obj, Company) else "contact",
+    })
 
-    # Both models keep phone/email as ArrayFields, so a blank one has to
-    # be an empty list rather than [""] — an array holding one empty
-    # string reads as "has a phone number" everywhere downstream.
-    obj = model.objects.create(
+
+def create_quick_customer(*, kind, name, phone="", email="", address=""):
+    """The record quick_create_customer makes, for callers that make it
+    themselves — the order form saves its new customer with the order,
+    so the two are created together or not at all.
+
+    Both models keep phone/email as ArrayFields, so a blank one has to
+    be an empty list rather than [""] — an array holding one empty
+    string reads as "has a phone number" everywhere downstream.
+    """
+    model = Company if kind == "company" else Contact
+    return model.objects.create(
         name=name,
         phone=[phone] if phone else [],
         email=[email] if email else [],
         address=address,
     )
-    return JsonResponse({
-        "ok": True,
-        "id": obj.pk,
-        "name": obj.name,
-        "type": "company" if model is Company else "contact",
-    })
 
 
 @login_required

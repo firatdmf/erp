@@ -220,6 +220,9 @@
 
       <input type="hidden" id="customer-type" name="customer_type">
       <input type="hidden" id="customer-pk" name="customer_pk">
+      {# A customer typed into the "create new" panel rides along here and #}
+      {# is made with the order — nothing reaches CRM until the order does. #}
+      <input type="hidden" id="new-customer-json" name="new_customer_json">
 
       <!-- What this order will be priced in. An order is kept in its
            customer's own currency, so the prices typed below are in it —
@@ -251,9 +254,11 @@
           </div>
 
           <!-- Inline "+ create new" — shown when the search has no match.
-               Creates a plain CRM Contact (name/phone/email/address only —
-               no tax/currency fields; those live on the current account that's
-               auto-created behind the scenes once the order is saved). -->
+               Takes a plain contact or company (name/phone/email/address
+               only — no tax/currency fields; those live on the current
+               account). Nothing is written yet: the details travel with
+               the form and the CRM record is made when the order is
+               saved, so a form closed halfway leaves no customer behind. -->
           <div id="co-new-customer-panel" style="display:none; margin-top:10px; padding:12px; background:#F8FAFC; border:1px solid #E2E8EE; border-radius:8px;">
             <div class="form-group">
               <label>{% trans "Customer type" %}</label>
@@ -847,8 +852,11 @@
     if (step <= 1) return true;
     var type = (document.getElementById('customer-type') || {}).value || '';
     var pk = (document.getElementById('customer-pk') || {}).value || '';
+    // A customer typed into the "create new" panel has no pk yet — the
+    // record is made with the order — but is a customer all the same.
+    var pending = (document.getElementById('new-customer-json') || {}).value || '';
     var hasCustomer = (type === 'retail')
-      || ((type === 'contact' || type === 'company') && !!pk);
+      || ((type === 'contact' || type === 'company') && (!!pk || !!pending));
     if (step === 2) return hasCustomer;
     // Step 3 wants a line to deposit against, on a NEW order — any line
     // will do, since whether its stock items add up is the save's
@@ -943,7 +951,16 @@
     if (sum3) sum3.textContent = name;
     coCurrencyFor(type, pk, name);
     coRefreshSteps();
+    coCustomerChosen();
+  }
+
+  // A CRM customer is chosen: fold the step away so the products, the
+  // next thing to do, are what is on screen. The header keeps the
+  // name, and a click on it brings the step back.
+  function coCustomerChosen() {
     coAdvanceTo(2);
+    var done = document.getElementById('co-step-3');
+    if (done) done.classList.remove('active');
   }
 
   // The currency this customer is billed in, from the account their order
@@ -1010,11 +1027,18 @@
 
   function coClearCustomerSelection() {
     coCurrencyFor('', '', '');
+    document.getElementById('new-customer-json').value = '';
     document.getElementById('customer-type').value = '';
     document.getElementById('customer-pk').value = '';
     var searchInput = document.getElementById('co-customer-search');
     if (searchInput) searchInput.value = '';
     coHideCustomerChip();
+    // Changing the customer: the customer step comes back so the next
+    // pick has somewhere to go, and the products stay as they are —
+    // the lines already picked are not in question, only who they are
+    // for. The gate is not re-run here on purpose.
+    var cust = document.getElementById('co-step-3');
+    if (cust) cust.classList.add('active');
     if (searchInput) searchInput.focus();
     var sum3 = document.getElementById('co-sum-3');
     if (sum3) sum3.textContent = '';
@@ -1024,6 +1048,7 @@
     isRetailOrder = true;
     document.getElementById('customer-type').value = 'retail';
     document.getElementById('customer-pk').value = '';
+    document.getElementById('new-customer-json').value = '';
     var label = '{% trans "Retail Sale" %}';
     coShowCustomerChip('fa-cash-register', label, coClearRetail);
     document.getElementById('co-retail-customer-toggle').style.display = 'block';
@@ -1035,6 +1060,8 @@
     if (sum3) sum3.textContent = label;
     renderProducts();
     coRefreshSteps();
+    // Products open, but the customer step stays open too: the optional
+    // "enter customer details" has just appeared there.
     coAdvanceTo(2);
   };
 
@@ -1048,8 +1075,18 @@
     document.getElementById('co-delivery-fields').style.display = '';
     var sum3 = document.getElementById('co-sum-3');
     if (sum3) sum3.textContent = '';
+    // As for a cleared client: the customer step comes back for the next
+    // pick and the products stay as they are. The redraw below re-runs
+    // the gate, which would lock and fold them, so their state is put
+    // back afterwards.
+    var prod = document.getElementById('co-step-2');
+    var prodOpen = prod && prod.classList.contains('active');
     renderProducts();
-    coRefreshSteps();
+    if (prod && prodOpen) { prod.classList.add('active'); prod.classList.remove('co-locked'); }
+    var cust = document.getElementById('co-step-3');
+    if (cust) cust.classList.add('active');
+    var searchInput = document.getElementById('co-customer-search');
+    if (searchInput) searchInput.focus();
   }
 
   window.coRetailCustomerToggle = function (checked) {
@@ -1071,21 +1108,19 @@
     var phone = document.getElementById('co-nc-phone').value || '';
     var email = document.getElementById('co-nc-email').value || '';
     var address = document.getElementById('co-nc-address').value || '';
-    var fd = new FormData();
-    fd.append('kind', kind);
-    fd.append('name', name);
-    fd.append('phone', phone);
-    fd.append('email', email);
-    fd.append('address', address);
-    fd.append('csrfmiddlewaretoken', document.querySelector('#createOrderForm [name=csrfmiddlewaretoken]').value);
-    fetch('{% url "crm:quick_create_customer" %}', { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (!d.ok) { showToast(d.error || '{% trans "Could not be created" %}', 'error'); return; }
-        coApplyCustomerSelection(d.type || 'contact', d.id, d.name);
-        window.coCancelCreateCustomer();
-      })
-      .catch(function () { showToast('{% trans "Could not be created" %}', 'error'); });
+    // Held in the form, not sent to CRM: the record is made with the
+    // order (OrderCreate.post), so nothing is left behind by a form
+    // that is closed instead of saved.
+    document.getElementById('new-customer-json').value = JSON.stringify(
+      { name: name, phone: phone, email: email, address: address });
+    coApplyCustomerSelection(kind === 'company' ? 'company' : 'contact', '', name);
+    var chipName = document.querySelector('#co-customer-selected > span');
+    if (chipName) {
+      chipName.innerHTML = esc(name) +
+        ' <small style="font-weight:600;font-size:10.5px;color:#147F74;background:#fff;border:1px solid #BFE0DB;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle;">' +
+        '{% trans "new — saved with the order" %}</small>';
+    }
+    window.coCancelCreateCustomer();
   };
 
   window.coCancelCreateCustomer = function () {

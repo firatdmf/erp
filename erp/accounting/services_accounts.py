@@ -250,6 +250,86 @@ def stamp_order_currency(order, account=None, *, save=True):
     return order
 
 
+class SplitCurrencyClash(ValueError):
+    """An order split across books would end up in two currencies."""
+
+
+def existing_customer_account(*, book, company=None, contact=None, retail=False):
+    """The account a customer already has in `book`, or None — found, never
+    made. Same precedence as get_or_create_current_account_for_order: the
+    company (the contact's own company included), then the contact; a
+    retail order's is the book's shared retail account."""
+    if retail:
+        return CurrentAccount.objects.filter(book=book, code=RETAIL_CURRENT_ACCOUNT_CODE).first()
+    company = company or (getattr(contact, "company", None) if contact else None)
+    if company:
+        return CurrentAccount.objects.filter(book=book, company=company).first()
+    if contact:
+        return CurrentAccount.objects.filter(book=book, contact=contact).first()
+    return None
+
+
+def _split_clash(account, currency):
+    from django.utils.translation import gettext as _
+    return SplitCurrencyClash(_(
+        "%(account)s in %(book)s is in %(account_currency)s and already has "
+        "transactions, but this order is in %(order_currency)s. An order split "
+        "across books must be in one currency, so the %(book)s lines can't be "
+        "added to it."
+    ) % {
+        "account": account.name, "book": account.book.name,
+        "account_currency": account.default_currency.code,
+        "order_currency": currency.code,
+    })
+
+
+def check_split_currency(account, currency):
+    """Raise SplitCurrencyClash when `account` — the customer's account in
+    another book of a split order — is in a different currency and can no
+    longer change (it has transactions). An account that can still change
+    is fine: align_split_account_currency moves it over when the half is
+    settled. Checked before anything is written, so a split that cannot
+    stand in one currency never starts."""
+    if account is None or currency is None or account.default_currency_id == currency.pk:
+        return
+    if account.currency_is_locked:
+        raise _split_clash(account, currency)
+
+
+def align_split_account_currency(account, currency):
+    """Put a split order's account in the order's currency.
+
+    Every half of a split order is in ONE currency — the lead order's — so
+    the halves' totals mean the same thing side by side and the customer is
+    billed in the currency they were quoted in. An account made for the
+    split (new ones default to dollars) or one never used is switched; one
+    with transactions cannot be and raises SplitCurrencyClash, which the
+    callers have already ruled out with check_split_currency."""
+    if account is None or currency is None or account.default_currency_id == currency.pk:
+        return account
+    if account.currency_is_locked:
+        raise _split_clash(account, currency)
+    account.default_currency = currency
+    account.save(update_fields=["default_currency"])
+    return account
+
+
+def split_lead_currency(accounts, lead_account=None):
+    """The one currency a split order will be in: the lead order's account's,
+    else — the customer has no account in the lead book yet — that of an
+    account elsewhere that can no longer change (it would otherwise block
+    the split for nothing), else any existing one, else dollars."""
+    if lead_account is not None:
+        return lead_account.default_currency
+    others = [a for a in accounts if a is not None]
+    for a in others:
+        if a.currency_is_locked:
+            return a.default_currency
+    if others:
+        return others[0].default_currency
+    return _resolve_currency()
+
+
 def get_or_create_current_account_for_order(order, *, member=None, book=None) -> CurrentAccount | None:
     """Find (or create) the current account for an order's customer.
 

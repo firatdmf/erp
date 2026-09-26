@@ -2031,13 +2031,34 @@ def _append_lines_to_order(target, book, lines, user, failed_barcodes,
         )
 
 
-def _settle_sibling(request, sibling, book, member):
+def _split_currency_at_edit(order, foreign_groups):
+    """The currency an edited order's other-book lines must go in: the
+    edited order's own. Raises SplitCurrencyClash, before anything is
+    written, when the customer's account in one of those books cannot be
+    in it."""
+    from accounting.services_accounts import (
+        existing_customer_account, check_split_currency, _resolve_currency,
+    )
+    if not foreign_groups:
+        return None
+    account = getattr(order, "current_account", None)
+    currency = (order.currency if order.currency_id
+                else getattr(account, "default_currency", None)) or _resolve_currency()
+    for book, _lines in foreign_groups:
+        check_split_currency(existing_customer_account(
+            book=book, company=order.company, contact=order.contact,
+            retail=order.is_retail_order), currency)
+    return currency
+
+
+def _settle_sibling(request, sibling, book, member, currency=None):
     """Give a spun-off order the account, movement and QR a created order
     gets. Best-effort on the ledger, like every other posting path here: a
     sync hiccup warns rather than losing goods already promised."""
     from accounting.services_accounts import (
         get_or_create_current_account_for_order, post_order_movement,
-        get_or_create_retail_current_account,
+        get_or_create_retail_current_account, align_split_account_currency,
+        stamp_order_currency,
     )
     try:
         if sibling.is_retail_order:
@@ -2048,6 +2069,11 @@ def _settle_sibling(request, sibling, book, member):
         if account and sibling.current_account_id != account.pk:
             sibling.current_account = account
             sibling.save(update_fields=["current_account"])
+        # The split order's one currency — the edited order's — on the
+        # account and then on the half. Without this a spun-off half was
+        # left with no currency at all and read as dollars.
+        align_split_account_currency(account, currency)
+        stamp_order_currency(sibling, account)
         post_order_movement(sibling, member=member)
     except Exception as _e:
         messages.warning(request, f"Order saved, but its current account could not be updated: {_e}")
@@ -2102,6 +2128,49 @@ def _wrong_book_error(book, request):
              "you save.") % {"book": book.name}
 
 
+def _working_book(request, member, allowed=None):
+    """The book the order form was opened in, which is where an untagged
+    line belongs — and a split order's lead. Narrowed the same way every
+    other book parameter is: the browser may pick among the member's
+    books, never past them."""
+    from accounting.services_accounts import member_books, get_default_book
+
+    if allowed is None:
+        allowed = {b.pk: b for b in member_books(member)}
+    asked = (request.POST.get("book") or "").strip()
+    working = allowed.get(int(asked)) if asked.isdigit() else None
+    return working or get_default_book(member)
+
+
+def _split_currency_at_create(request, member, groups, customer_type, customer_pk):
+    """The one currency a new split order will be in, after checking every
+    book's account can take it. None for an order that is not split, or a
+    customer being made with it (no accounts anywhere yet).
+
+    Raises SplitCurrencyClash before anything is written."""
+    from accounting.services_accounts import (
+        existing_customer_account, split_lead_currency, check_split_currency,
+    )
+    if len(groups) < 2:
+        return None
+    company = contact = None
+    if customer_type == "company" and customer_pk:
+        company = Company.objects.filter(pk=customer_pk).first()
+    elif customer_type == "contact" and customer_pk:
+        contact = Contact.objects.filter(pk=customer_pk).first()
+    retail = customer_type == "retail"
+    if not (company or contact or retail):
+        return None
+    working = _working_book(request, member)
+    accounts = {book.pk: existing_customer_account(
+                    book=book, company=company, contact=contact, retail=retail)
+                for book, _lines in groups}
+    currency = split_lead_currency(accounts.values(), accounts.get(working.pk))
+    for account in accounts.values():
+        check_split_currency(account, currency)
+    return currency
+
+
 def _split_items_by_book(items, request, member):
     """Group submitted order lines by the book whose shelf each came from.
 
@@ -2120,14 +2189,7 @@ def _split_items_by_book(items, request, member):
     from accounting.services_accounts import member_books, get_default_book
 
     allowed = {b.pk: b for b in member_books(member)}
-
-    # The book the form was opened in, which is where an untagged line
-    # belongs. Narrowed the same way every other book parameter is: the
-    # browser may pick among the member's books, never past them.
-    asked = (request.POST.get("book") or "").strip()
-    working = allowed.get(int(asked)) if asked.isdigit() else None
-    if working is None:
-        working = get_default_book(member)
+    working = _working_book(request, member, allowed)
 
     grouped = {}
     for line in items:
@@ -3324,6 +3386,9 @@ class OrderCreate(View):
         # back together by a shared split_group.
         try:
             groups = _split_items_by_book(product_json_input or [], request, member)
+            # One currency for every half, or no split at all.
+            split_currency = _split_currency_at_create(
+                request, member, groups, customer_type, customer_pk)
         except ValueError as _e:
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 return JsonResponse({"ok": False, "error": str(_e)})
@@ -3394,7 +3459,8 @@ class OrderCreate(View):
                         )
 
                 for order, book, _stayed in created:
-                    self._finalise_order(request, order, book=book, member=member)
+                    self._finalise_order(request, order, book=book, member=member,
+                                         split_currency=split_currency)
 
                 if len(created) > 1:
                     messages.success(
@@ -3560,7 +3626,7 @@ class OrderCreate(View):
 
         return order, order_stayed_open
 
-    def _finalise_order(self, request, order, *, book, member):
+    def _finalise_order(self, request, order, *, book, member, split_currency=None):
         """Snapshot, current-account link and deposit for one saved order.
 
         Runs OUTSIDE the creating transaction, exactly as it always has:
@@ -3600,6 +3666,12 @@ class OrderCreate(View):
             if current_account and order.current_account_id != current_account.pk:
                 order.current_account = current_account
                 order.save(update_fields=["current_account"])
+            # A split order is in one currency across its books: each
+            # half's account is put in it (checked possible before the
+            # orders were made) before the half takes its currency.
+            if split_currency is not None:
+                from accounting.services_accounts import align_split_account_currency
+                align_split_account_currency(current_account, split_currency)
             # What the order is priced in — the customer's own currency,
             # settled here at the one moment the order is raised, before
             # anything posts against it.
@@ -3947,6 +4019,7 @@ class OrderEdit(UpdateView):
                 # a name bound only inside the branch would not be there.
                 edit_member = getattr(self.request.user, "member", None)
                 foreign_groups = []
+                split_currency = None
                 if product_json_input:
                     try:
                         product_json_input = json.loads(product_json_input)
@@ -3983,6 +4056,11 @@ class OrderEdit(UpdateView):
                         # this one is finished, further down.
                         product_json_input, foreign_groups = _take_foreign_book_lines(
                             self.object, product_json_input, edit_member)
+                        # Lines for another book only go if that book's
+                        # order can be in this order's currency — raised
+                        # here, the whole edit rolls back untouched.
+                        split_currency = _split_currency_at_edit(
+                            self.object, foreign_groups)
 
                         # Unticked stock items go back to the pool BEFORE any line
                         # reserves, so a stock item moved between lines in one save
@@ -4073,7 +4151,8 @@ class OrderEdit(UpdateView):
                     _append_lines_to_order(
                         sibling, _book, _lines, self.request.user, failed_barcodes,
                         short_lines=short_lines)
-                    _settle_sibling(self.request, sibling, _book, edit_member)
+                    _settle_sibling(self.request, sibling, _book, edit_member,
+                                    currency=split_currency)
                     spun_off.append((sibling, _book, is_new))
 
                 if failed_barcodes:
@@ -4118,7 +4197,13 @@ class OrderEdit(UpdateView):
                         get_or_create_current_account_for_order, post_order_movement,
                     )
                     member = getattr(self.request.user, "member", None)
-                    current_account = get_or_create_current_account_for_order(self.object, member=member)
+                    # In the order's own book. Left to the editor's default
+                    # book, editing one half of a split order from the other
+                    # book moved it onto an account in the wrong book.
+                    own_book = getattr(self.object.current_account, "book", None) \
+                        if self.object.current_account_id else None
+                    current_account = get_or_create_current_account_for_order(
+                        self.object, member=member, book=own_book)
                     if current_account and self.object.current_account_id != current_account.pk:
                         self.object.current_account = current_account
                         self.object.save(update_fields=["current_account"])

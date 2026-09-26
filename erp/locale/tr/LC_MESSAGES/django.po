@@ -10633,3 +10633,8 @@ msgstr "yeni — şirketle birlikte kaydedilir"
 
 msgid "Add to list"
 msgstr "Listeye ekle"
+
+#: accounting/services_accounts.py
+#, python-format
+msgid "%(account)s in %(book)s is in %(account_currency)s and already has transactions, but this order is in %(order_currency)s. An order split across books must be in one currency, so the %(book)s lines can't be added to it."
+msgstr "%(book)s defterindeki %(account)s hesabı %(account_currency)s cinsinden ve üzerinde hareket var, ancak bu sipariş %(order_currency)s cinsinden. Defterlere bölünen bir sipariş tek para biriminde olmalı, bu yüzden %(book)s satırları bu siparişe eklenemez."

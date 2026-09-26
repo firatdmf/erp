@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load i18n %}
 {% load static %}
+{% load accounts_tags %}
 
 {% block title %}{% trans "Sales Analytics" %} · Nejum{% endblock %}
 
@@ -400,26 +401,26 @@
   </form>
 
   <!-- KPI cards -->
-  <div class="an-kpis{% if is_sales_rep %} an-kpis--two{% endif %}">
+  <div class="an-kpis{% if not may_see_profit %} an-kpis--two{% endif %}">
     <div class="an-kpi">
       <div class="an-kpi-top">
         <span class="an-kpi-label">{% trans "Revenue" %}</span>
         <span class="an-kpi-icon"><i class="fa fa-dollar-sign"></i></span>
       </div>
-      <div class="an-kpi-value">${{ summary.total_revenue|floatformat:2 }}</div>
-      <div class="an-kpi-meta">{{ summary.total_orders }} {% trans "orders" %}</div>
+      <div class="an-kpi-value">${{ summary.total_revenue|money }}</div>
+      <div class="an-kpi-meta">{{ summary.total_orders|money:0 }} {% trans "orders" %}</div>
     </div>
 
-    {% if not is_sales_rep %}{# profit and COGS are the margin; not the role's to read #}
+    {% if may_see_profit %}{# profit and COGS are the margin: a grant, see erp.roles.may_see_profit #}
     <div class="an-kpi profit {% if summary.total_profit < 0 %}neg{% endif %}">
       <div class="an-kpi-top">
         <span class="an-kpi-label">{% trans "Profit" %}</span>
         <span class="an-kpi-icon"><i class="fa fa-arrow-trend-up"></i></span>
       </div>
-      <div class="an-kpi-value">${{ summary.total_profit|floatformat:2 }}</div>
+      <div class="an-kpi-value">${{ summary.total_profit|money }}</div>
       <div class="an-kpi-meta">
         {% trans "Margin" %}
-        <b class="{% if summary.margin_pct < 0 %}neg{% else %}pos{% endif %}">{{ summary.margin_pct }}%</b>
+        <b class="{% if summary.margin_pct < 0 %}neg{% else %}pos{% endif %}">{{ summary.margin_pct|floatformat:"-1" }}%</b>
       </div>
     </div>
 
@@ -428,7 +429,7 @@
         <span class="an-kpi-label">{% trans "Cost (COGS)" %}</span>
         <span class="an-kpi-icon"><i class="fa fa-box"></i></span>
       </div>
-      <div class="an-kpi-value">${{ summary.total_cost|floatformat:2 }}</div>
+      <div class="an-kpi-value">${{ summary.total_cost|money }}</div>
       <div class="an-kpi-meta">{% trans "Goods sold" %}</div>
     </div>
     {% endif %}
@@ -438,7 +439,7 @@
         <span class="an-kpi-label">{% trans "Avg order" %}</span>
         <span class="an-kpi-icon"><i class="fa fa-receipt"></i></span>
       </div>
-      <div class="an-kpi-value">${{ summary.avg_order|floatformat:2 }}</div>
+      <div class="an-kpi-value">${{ summary.avg_order|money }}</div>
       <div class="an-kpi-meta">{% trans "per order" %}</div>
     </div>
   </div>
@@ -465,20 +466,20 @@
           <span class="an-channel-dot" style="background:#F59E0B;"></span>
           <div>
             <div class="an-channel-name">{% trans "Web sales" %}</div>
-            <div class="an-channel-sub">{{ web_split.orders }} {% trans "orders" %}</div>
+            <div class="an-channel-sub">{{ web_split.orders|money:0 }} {% trans "orders" %}</div>
           </div>
           <div class="an-channel-val">
-            <div class="big">${{ web_split.revenue|floatformat:2 }}</div>
+            <div class="big">${{ web_split.revenue|money }}</div>
           </div>
         </div>
         <div class="an-channel-row">
           <span class="an-channel-dot" style="background:#147F74;"></span>
           <div>
             <div class="an-channel-name">{% trans "Manual sales" %}</div>
-            <div class="an-channel-sub">{{ manual_split.orders }} {% trans "orders" %}</div>
+            <div class="an-channel-sub">{{ manual_split.orders|money:0 }} {% trans "orders" %}</div>
           </div>
           <div class="an-channel-val">
-            <div class="big">${{ manual_split.revenue|floatformat:2 }}</div>
+            <div class="big">${{ manual_split.revenue|money }}</div>
           </div>
         </div>
       </div>
@@ -512,8 +513,8 @@
               <div class="an-prod-name">{{ p.product__title|default:"—"|truncatechars:36 }}</div>
               {% if p.product__sku %}<div class="an-prod-sku">{{ p.product__sku }}</div>{% endif %}
             </td>
-            <td class="num">{{ p.qty|floatformat:"-2" }}</td>
-            <td class="num"><b>${{ p.revenue|floatformat:2 }}</b></td>
+            <td class="num">{{ p.qty|floatformat:"-2g" }}</td>
+            <td class="num"><b>${{ p.revenue|money }}</b></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -554,14 +555,14 @@
               {% if c.current_account %}
                 <span class="an-cust-account" onclick="event.preventDefault(); window.location='{% url 'accounts:detail' c.current_account.pk %}';" title="{% trans 'Open current account' %}">
                   <i class="fa fa-wallet"></i>{{ c.current_account.code }} ·
-                  <span class="bal {% if c.current_account.balance > 0 %}owe{% elif c.current_account.balance < 0 %}credit{% endif %}">{{ c.current_account.symbol }}{{ c.current_account.abs_balance|floatformat:2 }} {{ c.current_account.label }}</span>
+                  <span class="bal {% if c.current_account.balance > 0 %}owe{% elif c.current_account.balance < 0 %}credit{% endif %}">{{ c.current_account.symbol }}{{ c.current_account.abs_balance|money }} {{ c.current_account.label }}</span>
                 </span>
               {% endif %}
             </div>
           </div>
           <div class="an-cust-spent">
-            <div class="amt">${{ c.spent|floatformat:2 }}</div>
-            <div class="ord">{{ c.orders }} {% trans "orders" %}</div>
+            <div class="amt">${{ c.spent|money }}</div>
+            <div class="ord">{{ c.orders|money:0 }} {% trans "orders" %}</div>
           </div>
         {% if c.kind == 'company' or c.kind == 'contact' %}</a>{% else %}</span>{% endif %}
         {% endfor %}

@@ -6266,7 +6266,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
 
     def get(self, request):
         from django.utils import timezone
-        from django.db.models import Sum, Count, F, Value, DecimalField
+        from django.db.models import Sum, Count, F, Value, DecimalField, Case, When
         from django.db.models.functions import Coalesce, Round, TruncDate, TruncWeek, TruncMonth
         from accounting.models import CurrentAccount
         from datetime import datetime, time
@@ -6362,8 +6362,22 @@ class OrderAnalytics(LoginRequiredMixin, View):
         #    revenue side converts — which is also why this no longer
         #    mirrors OrderItem.unit_cost(), whose job is to state a cost in
         #    the ORDER's currency for the order page.
-        order_rate = Coalesce(F("order__currency_rate"), Value(Decimal("1")),
-                              output_field=DEC)
+        #
+        #    A stamped currency_rate only exists once an order completes; an
+        #    open order in a foreign currency floats at today's published
+        #    rate (Order.rate_to_base). Those have no column to read, so they
+        #    are asked one by one and fed in as literals — falling back to 1
+        #    would count an open euro order's euros as dollars.
+        floating = {}
+        for o in (base_orders.filter(currency__isnull=False, currency_rate__isnull=True)
+                  .select_related("currency")):
+            floating.setdefault(o.rate_to_base(), []).append(o.pk)
+        order_rate = Case(
+            When(order__currency_rate__isnull=False, then=F("order__currency_rate")),
+            *[When(order_id__in=ids, then=Value(rate)) for rate, ids in floating.items()],
+            default=Value(Decimal("1")),
+            output_field=DecimalField(max_digits=16, decimal_places=8),
+        )
         line_rev = Round(F("quantity") * F("price") * order_rate, 2, output_field=DEC)
         line_cost = Round(F("quantity") * unit_cost_expr, 2, output_field=DEC)
 

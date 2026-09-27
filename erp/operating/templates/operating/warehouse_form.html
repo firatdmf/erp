@@ -249,7 +249,7 @@
       </div>
       <div class="wh-form-field" id="wh-book-field">
         <label>{% trans "Accounting book" %} <span style="color:#ef4444;">*</span></label>
-        <select name="accounting_book">
+        <select name="accounting_book" required>
           <option value="">{% trans "— Select a book —" %}</option>
           {% for book in books %}
             <option value="{{ book.pk }}" {% if warehouse.accounting_book_id == book.pk %}selected{% endif %}>{{ book.name }}</option>
@@ -280,7 +280,11 @@
     // A combined warehouse owns no stock, so it takes no book — its
     // members each have their own.
     var book = document.getElementById('wh-book-field');
-    if (book) book.style.display = (combined && combined.checked) ? 'none' : '';
+    if (book) {
+      book.style.display = (combined && combined.checked) ? 'none' : '';
+      // A hidden required field would block the submit it never shows.
+      book.querySelector('select').required = !(combined && combined.checked);
+    }
   }
   whKindToggle();
 </script>

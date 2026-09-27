@@ -68,6 +68,20 @@ class WarehouseNeedsABook(TestCase):
         self.assertIn("Ergene Fabric", html)
         self.assertNotIn("Laleli Fabric", html)
 
+    def test_both_forms_mark_the_book_required(self):
+        """The server refuses a missing book either way; the forms say so
+        up front instead of offering a "none" that only fails on submit."""
+        import re
+        for name in ("operating:create_warehouse", "operating:create_warehouse_partial"):
+            html = self.client.get(reverse(name)).content.decode()
+            select = re.search(r'<select name="accounting_book"[^>]*>', html).group(0)
+            self.assertIn("required", select, name)
+            self.assertNotIn("— None —", html, name)
+
+    def test_the_sidebar_preselects_a_members_only_book(self):
+        html = self.client.get(reverse("operating:create_warehouse_partial")).content.decode()
+        self.assertIn(f'<option value="{self.ergene.pk}" selected>', html)
+
     def test_a_book_holding_stock_cannot_be_deleted(self):
         """PROTECT, not SET_NULL — there is no null to fall back to, and
         a book must not be deleted out from under its warehouses."""

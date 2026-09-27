@@ -454,7 +454,7 @@
           <div class="cd-sect-h">
             <span class="ico"><i data-lucide="list"></i></span>
             <h3>{% trans "Recent Movements" %}</h3>
-            <a href="{% url 'accounts:statement' current_account.pk %}" class="all">{% trans "Full Statement" %} →</a>
+            <a href="{% url 'accounts:statement' current_account.pk %}" class="all">{% if movement_count > movements_shown %}{% blocktrans with shown=movements_shown total=movement_count %}Showing latest {{ shown }} of {{ total }}{% endblocktrans %} · {% endif %}{% trans "Full Statement" %} →</a>
           </div>
         </div>
         {% if movements %}

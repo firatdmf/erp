@@ -1,5 +1,13 @@
 {% extends 'base.html' %}
-{% load i18n todo_filters todo_tags crm_tags static %}
+{% load i18n todo_filters todo_tags crm_tags static accounts_tags %}
+{% comment %}
+Supplier detail. Built on contact_detail.html so the two read the same:
+the same Attached items card (tasks and files), the same always-open
+note composer over the history, the same Account history card. What
+differs is the trade: a supplier has Purchase history where a customer
+has Order history, and a Linked entities card pointing at the contact
+or company record it doubles as.
+{% endcomment %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -74,7 +82,7 @@
   .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
   .ord-btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 8px; }
 
-  /* TITLE BADGES */
+  /* TITLE BADGES (job title / company chips inline w/ title) */
   .od-chip {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 5px 11px; border-radius: 999px;
@@ -110,7 +118,9 @@
   /* GRID */
   .od-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: flex-start; }
   .od-left, .od-right { display: flex; flex-direction: column; gap: 16px; }
-  .od-right { position: sticky; top: 16px; }
+  /* Not sticky: the right column now carries the order and ledger lists,
+     so pinning it would put its lower half out of reach. */
+  .od-right { position: static; }
 
   /* CARDS */
   .od-card {
@@ -126,7 +136,7 @@
   .od-card-sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; }
   .od-card-action { margin-left: auto; }
 
-  /* DETAIL LIST */
+  /* DETAIL LIST (right column info) */
   .od-detail-list { display: flex; flex-direction: column; gap: 10px; }
   .od-dt { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .od-dt span.k { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
@@ -160,27 +170,106 @@
   .od-cust-n { font: 700 14px var(--font-sans); color: #0F1419; }
   .od-cust-c { font: 500 12px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
 
-  /* LINKED ENTITY ROW */
-  .od-linked-row {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 12px; background: #F8FAFC;
-    border: 1px solid #E2E8EE; border-radius: 10px;
-    text-decoration: none; color: inherit; transition: all 140ms;
-  }
-  .od-linked-row + .od-linked-row { margin-top: 8px; }
-  .od-linked-row:hover { border-color: var(--nejum-teal-500); background: white; }
-  .od-linked-avatar {
-    width: 36px; height: 36px; border-radius: 50%; color: white; flex-shrink: 0;
-    display: inline-flex; align-items: center; justify-content: center;
-    font: 700 12.5px var(--font-sans); letter-spacing: 0.04em;
-    background: linear-gradient(135deg, var(--nejum-teal-500), var(--nejum-teal-700));
-  }
-  .od-linked-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .od-linked-n { font: 700 13px var(--font-sans); color: var(--ink); }
-  .od-linked-k { font: 600 10.5px var(--font-sans); color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; }
-
-  /* ATTACH */
+  /* ATTACH SECTION */
   .od-attach-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ATTACHED ITEMS CARD (grouped, collapsible) */
+  .od-section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin: 8px 4px 4px;
+  }
+  .od-section-head .od-section-title { margin: 0; }
+  .od-attach-menu { position: relative; }
+  .od-caret { font-size: 10px; }
+  .od-attach-dropdown {
+    position: absolute; right: 0; top: calc(100% + 6px); min-width: 190px;
+    background: white; border: 1px solid #E2E8EE; border-radius: 11px;
+    box-shadow: 0 14px 34px rgba(15,23,31,0.14); padding: 6px; z-index: 40;
+  }
+  .od-attach-dropdown button {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 8px 10px; border: 0; background: transparent; border-radius: 8px;
+    font: 600 12.5px var(--font-sans); color: var(--gray-700);
+    cursor: pointer; text-align: left;
+  }
+  .od-attach-dropdown button i { color: var(--nejum-teal-600); width: 13px; }
+  .od-attach-dropdown button:hover { background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+
+  .od-attached-card { padding: 0; overflow: hidden; }
+  .od-attached-card .od-attach-panel { margin: 14px 16px 0; }
+  .od-attach-group + .od-attach-group { border-top: 1px solid #E2E8EE; }
+  .od-group-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px; cursor: pointer; user-select: none;
+  }
+  .od-group-head:hover { background: #F8FAFC; }
+  .od-group-ico {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .od-group-ico.green { background: #DCFCE7; color: #166534; }
+  .od-group-ico.blue { background: #DBEAFE; color: #1D4ED8; }
+  .od-group-ico.amber { background: #FEF3C7; color: #92400E; }
+  .od-group-name { font: 700 13px var(--font-sans); color: var(--ink); }
+  .od-group-count { font: 500 12px var(--font-sans); color: var(--gray-500); }
+  .od-group-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .od-group-chev { margin-left: auto; color: var(--gray-400); font-size: 12px; transition: transform 140ms; }
+  .od-group-actions ~ .od-group-chev { margin-left: 10px; }
+  .od-group-body { padding: 0 16px 16px; }
+  .od-attach-group.collapsed .od-group-body { display: none; }
+  .od-attach-group.collapsed .od-group-chev { transform: rotate(-90deg); }
+
+  /* FILES */
+  .od-file-drop {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 18px 14px; margin-bottom: 12px; cursor: pointer;
+    border: 1.5px dashed #D3DBE4; border-radius: 12px; background: #F8FAFC;
+    text-align: center; transition: all 140ms; position: relative;
+  }
+  .od-file-drop:hover, .od-file-drop.over {
+    border-color: var(--nejum-teal-500); background: var(--nejum-teal-50);
+  }
+  .od-file-drop > i { color: var(--nejum-teal-600); font-size: 16px; margin-bottom: 2px; }
+  .od-file-drop-t { font: 600 12.5px var(--font-sans); color: var(--gray-700); }
+  .od-file-drop-s { font: 500 11px var(--font-sans); color: var(--gray-400); }
+  .od-file-drop-busy {
+    display: none; font: 600 12px var(--font-sans); color: var(--nejum-teal-700);
+    margin-top: 4px;
+  }
+  .od-file-drop.htmx-request .od-file-drop-busy { display: block; }
+  .od-file-list { display: flex; flex-direction: column; gap: 8px; }
+  .od-file {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; background: white;
+    border: 1px solid #E2E8EE; border-radius: 10px; transition: all 140ms;
+  }
+  .od-file:hover { border-color: #C5CCD3; box-shadow: 0 2px 6px rgba(15,23,31,0.05); }
+  .od-file-ico {
+    width: 30px; height: 30px; border-radius: 8px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #F1F5F9; color: var(--gray-600); font-size: 13px;
+  }
+  .od-file-body { flex: 1; min-width: 0; }
+  .od-file-name {
+    display: block; font: 600 13px var(--font-sans); color: var(--ink);
+    text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .od-file-name:hover { color: var(--nejum-teal-700); text-decoration: underline; }
+  .od-file-meta {
+    display: flex; align-items: center; gap: 7px; margin-top: 2px;
+    font: 500 11px var(--font-sans); color: var(--gray-500);
+  }
+  .od-file-actions { display: flex; gap: 4px; flex: none; }
+  .od-file-actions .od-icon-btn { text-decoration: none; }
+
+  /* Order/ledger rows sit in the narrow right column: stack the status
+     pill under the id instead of squeezing four columns into 360px. */
+  .od-card-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: -2px 0 12px; }
+  .od-card-tools .od-print-orders { margin-left: 0; }
+  .od-right .od-order-row { grid-template-columns: 1fr auto; gap: 6px 10px; padding: 11px 12px; }
+  .od-right .od-order-row > .ord-status { grid-column: 1 / -1; justify-self: start; }
+  .od-right .od-order-chev { display: none; }
   .od-attach-panel {
     margin-top: 14px; padding: 14px 16px;
     background: #F8FAFC; border: 1px solid #E2E8EE; border-radius: 12px;
@@ -201,6 +290,7 @@
   }
   .od-text-btn:hover { background: #E2E8EE; color: var(--ink); }
 
+  /* Style Django-rendered <p> fields inside the attach forms */
   .od-attach-panel form p { margin: 0 0 10px 0; }
   .od-attach-panel form p label {
     display: block; font: 600 11.5px var(--font-sans);
@@ -231,7 +321,89 @@
     margin-top: 12px; padding-top: 10px; border-top: 1px dashed #E2E8EE;
   }
 
-  /* TASKS */
+  /* TASKS LIST */
+  /* Order history — compact clickable rows linking to operating:order_detail */
+  .od-order-list { display: flex; flex-direction: column; gap: 8px; }
+  /* Each row carries a tick box: several of one customer's orders print
+     onto a single sheet (operating:order_print_combined). The box sits
+     OUTSIDE the row's anchor — inside it, ticking an order would
+     navigate away to that order instead. */
+  .od-order-pick { display: flex; align-items: center; gap: 10px; }
+  .od-order-pick > .od-order-row { flex: 1; min-width: 0; }
+  .od-order-check, .od-account-check {
+    flex: none; width: 15px; height: 15px; cursor: pointer;
+    accent-color: var(--nejum-teal-600);
+  }
+  .od-print-orders {
+    display: inline-flex; align-items: center; gap: 6px; margin-left: 10px;
+    padding: 5px 11px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--nejum-teal-500); background: white;
+    color: var(--nejum-teal-700); font: 600 11.5px var(--font-sans);
+    transition: all 140ms;
+  }
+  .od-print-orders:hover:not(:disabled) { background: #E6F4F1; }
+  .od-print-orders:disabled {
+    opacity: 0.45; cursor: default; border-color: #E2E8EE; color: var(--gray-500);
+  }
+  .od-order-row {
+    display: grid;
+    grid-template-columns: 1.4fr 130px 1fr 18px;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 140ms;
+  }
+  .od-order-row:hover {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 2px 6px rgba(15,23,31,0.05);
+    color: inherit;
+  }
+  .od-order-row:hover .od-order-chev { color: var(--nejum-teal-700); }
+  .od-order-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .od-order-num { font: 700 12.5px var(--font-mono); color: #0F1419; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .od-order-date { font: 500 11px var(--font-sans); color: var(--gray-500); }
+  .od-order-total { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; text-align: right; }
+  .od-order-total span { font-weight: 500; color: var(--gray-500); font-size: 11px; }
+  .od-order-chev { color: var(--gray-400); font-size: 13px; justify-self: end; }
+  /* The sum of every book's balance, beside the Account history title.
+     All balances are base currency, so they add up; crm.views._accounts_total. */
+  .od-account-total { font-weight: 500; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+
+  /* Order status pill — matches the order_list/order_detail color map */
+  .ord-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px 3px 8px;
+    border-radius: 999px;
+    font: 600 11px var(--font-sans);
+    white-space: nowrap; width: fit-content;
+  }
+  .ord-status-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .ord-status.pre_order     { color: #6D28D9; background: #EDE9FE; }
+  .ord-status.pre_order     .ord-status-dot { background: #8B5CF6; }
+  .ord-status.pending       { color: #B27500; background: #FEF3C7; }
+  .ord-status.pending       .ord-status-dot { background: #F59E0B; }
+  .ord-status.scheduled, .ord-status.preparing { color: #1565C0; background: #DBEAFE; }
+  .ord-status.scheduled .ord-status-dot, .ord-status.preparing .ord-status-dot { background: #3B82F6; }
+  .ord-status.in_production { color: #7E22CE; background: #F3E8FF; }
+  .ord-status.in_production .ord-status-dot { background: #A855F7; }
+  .ord-status.confirmed, .ord-status.delivered, .ord-status.shipped { color: #0E6E4A; background: #D1FAE5; }
+  .ord-status.confirmed .ord-status-dot, .ord-status.delivered .ord-status-dot, .ord-status.shipped .ord-status-dot { background: #10B981; }
+  .ord-status.completed     { color: #0F1419; background: #E5E7EB; }
+  .ord-status.completed     .ord-status-dot { background: #374151; }
+  .ord-status.cancelled, .ord-status.returned { color: #B23B3B; background: #FEE2E2; }
+  .ord-status.cancelled .ord-status-dot, .ord-status.returned .ord-status-dot { background: #EF4444; }
+
+  @media (max-width: 700px) {
+    .od-order-row { grid-template-columns: 1fr auto; gap: 8px; }
+    .od-order-row > .ord-status { grid-column: 1 / -1; }
+    .od-order-chev { display: none; }
+  }
+
   .od-task-list { display: flex; flex-direction: column; gap: 10px; }
   .od-task {
     display: flex; align-items: flex-start; gap: 14px;
@@ -266,8 +438,33 @@
   .od-icon-btn.ok:hover { border-color: #10B981; color: #0E6E4A; background: #F0FDF4; }
   .od-icon-btn.del:hover { border-color: #EF4444; color: #B23B3B; background: #FEF2F2; }
 
-  /* NOTES HISTORY (inline render) */
+  /* NOTES HISTORY OVERRIDES (history.css renders here) */
   #notesSection { display: contents; }
+
+  /* HISTORY CARD: always-open note composer + entries in one card */
+  .od-history-card { padding: 0; overflow: hidden; }
+  .od-history-card .detail-card { background: transparent; border: 0; border-radius: 0; }
+  .od-history-card .card-header { display: none; }
+  .od-history-card .notes-list { padding: 14px 16px 16px; }
+  .od-note-composer { padding: 16px 16px 14px; border-bottom: 1px solid #E2E8EE; }
+  .od-note-form { display: flex; flex-direction: column; gap: 12px; }
+  .od-note-input {
+    width: 100%; box-sizing: border-box; min-height: 84px; max-height: 320px;
+    padding: 11px 13px; border: 1px solid #E0E6EE; border-radius: 10px;
+    font: 500 13.5px var(--font-sans); color: var(--ink);
+    line-height: 1.55; resize: vertical; outline: none; background: white;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .od-note-input::placeholder { color: var(--gray-400); font-weight: 500; }
+  .od-note-input:focus {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .od-note-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .od-note-actions .ord-btn.primary:disabled {
+    opacity: 0.45; cursor: default; box-shadow: none;
+  }
+  .od-note-hint { font: 500 11.5px var(--font-sans); color: var(--gray-400); }
   .od-section-title {
     display: flex; align-items: center; gap: 10px; margin: 8px 4px 4px;
   }
@@ -276,46 +473,27 @@
     font: 700 11px var(--font-sans); color: var(--gray-600); margin: 0;
     letter-spacing: 0.10em; text-transform: uppercase;
   }
-  .od-history-list { display: flex; flex-direction: column; gap: 10px; }
-  .od-history-item {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 12px 14px; background: white;
-    border: 1px solid #E2E8EE; border-radius: 12px; transition: all 140ms;
-  }
-  .od-history-item:hover { border-color: #C5CCD3; box-shadow: 0 2px 6px rgba(15,23,31,0.05); }
-  .od-history-item.completed { background: #F0FDF4; border-color: #BBF7D0; }
-  .od-history-item.created  { background: #FEFCE8; border-color: #FDE047; opacity: 0.85; }
-  .od-history-content { flex: 1; min-width: 0; }
-  .od-history-meta {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap;
-  }
-  .od-history-date { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
-  .od-history-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px; border-radius: 999px;
-    font: 700 10.5px var(--font-sans); letter-spacing: 0.04em;
-    background: #DCFCE7; color: #166534;
-  }
-  .od-history-badge i { width: 10px; height: 10px; }
-  .od-history-badge.created-badge { background: #E0E7FF; color: #3730A3; }
-  .od-history-text {
-    margin: 0; font: 500 13px var(--font-sans); color: var(--ink);
-    line-height: 1.55; word-break: break-word;
-  }
-  .od-history-desc {
-    margin: 6px 0 0 0; font: 500 12.5px var(--font-sans); color: var(--gray-600);
-    line-height: 1.5;
-  }
-  .od-history-actions { display: flex; gap: 4px; flex-shrink: 0; margin-left: 10px; }
 
   /* COMMUNICATION TAB */
-  .od-comm-empty {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 10px; padding: 60px 20px; color: var(--gray-500);
+  .od-comm-head {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
   }
-  .od-comm-empty i { font-size: 28px; color: var(--gray-400); }
-  .od-comm-empty .empty-title { font: 700 14px var(--font-sans); color: var(--gray-700); }
-  .od-comm-empty .empty-sub { font: 500 12.5px var(--font-sans); color: var(--gray-500); }
+  .od-comm-toggle {
+    display: inline-flex; gap: 4px; padding: 4px; background: #F1F5F9;
+    border: 1px solid #E2E8EE; border-radius: 10px;
+  }
+  .comm-toggle-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; background: transparent; border: 1px solid transparent;
+    border-radius: 7px; font: 600 12px var(--font-sans);
+    color: var(--gray-600); cursor: pointer; transition: all 140ms;
+  }
+  .comm-toggle-btn:hover { color: var(--ink); }
+  .comm-toggle-btn.active {
+    background: white; color: var(--nejum-teal-700); border-color: #E0E6EE;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.05);
+  }
 
   /* TAB CONTENT VISIBILITY */
   .tab-content { display: none; }
@@ -329,7 +507,39 @@
   @media (max-width: 700px) {
     .od-head { flex-direction: column; align-items: stretch; }
   }
+
+  /* LINKED ENTITY ROW */
+  .od-linked-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; background: #F8FAFC;
+    border: 1px solid #E2E8EE; border-radius: 10px;
+    text-decoration: none; color: inherit; transition: all 140ms;
+  }
+  .od-linked-row + .od-linked-row { margin-top: 8px; }
+  .od-linked-row:hover { border-color: var(--nejum-teal-500); background: white; }
+  .od-linked-avatar {
+    width: 36px; height: 36px; border-radius: 50%; color: white; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 12.5px var(--font-sans); letter-spacing: 0.04em;
+    background: linear-gradient(135deg, var(--nejum-teal-500), var(--nejum-teal-700));
+  }
+  .od-linked-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .od-linked-n { font: 700 13px var(--font-sans); color: var(--ink); }
+  .od-linked-k { font: 600 10.5px var(--font-sans); color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* COMMUNICATION TAB — no mail integration for suppliers yet */
+  .od-comm-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 48px 20px; text-align: center; color: var(--gray-500);
+  }
+  .od-comm-empty i { font-size: 28px; color: var(--gray-400); margin-bottom: 6px; }
+  .od-comm-empty .empty-title { font: 700 14px var(--font-sans); color: var(--gray-700); }
+  .od-comm-empty .empty-sub { font: 500 12.5px var(--font-sans); color: var(--gray-500); }
 </style>
+{% endblock %}
+
+{% block js %}
+<script src="{% static 'crm/js/detailPages.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -374,23 +584,21 @@
             <i class="fa fa-envelope"></i>
             <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
           </span>
+          <span class="od-dot"></span>
         {% endif %}
         {% if supplier.phone %}
-          {% if supplier.email %}<span class="od-dot"></span>{% endif %}
           <span><i class="fa fa-phone"></i>{{ supplier.phone }}</span>
+          <span class="od-dot"></span>
         {% endif %}
         {% if supplier.country %}
-          {% if supplier.email or supplier.phone %}<span class="od-dot"></span>{% endif %}
           <span><i class="fa fa-map-pin"></i>{{ supplier.country }}</span>
+          <span class="od-dot"></span>
         {% endif %}
-        {% if supplier.address %}
-          {% if supplier.email or supplier.phone or supplier.country %}<span class="od-dot"></span>{% endif %}
-          <span><i class="fa fa-map"></i>{{ supplier.address }}</span>
-        {% endif %}
+        {% include "components/_record_creator.html" with obj=supplier %}
       </div>
     </div>
     <div class="od-head-r">
-      <a href="{% url 'crm:supplier_update' supplier.id %}" class="ord-btn ghost">
+      <a href="{% url 'crm:supplier_update' supplier.id %}" onclick="openEditSupplierSidebar(); return false;" class="ord-btn ghost">
         <i class="fa fa-edit"></i>{% trans "Edit" %}
       </a>
       {% trans "Are you sure you want to delete this supplier?" as confirm_delete_msg %}
@@ -422,89 +630,29 @@
       {# ============== LEFT ============== #}
       <div class="od-left">
 
-        <!-- TASKS -->
-        <section class="od-card">
-          <div class="od-card-h">
-            <i class="fa fa-check-circle card-ico"></i>
-            <h3>{% trans "Tasks" %}</h3>
+        <!-- ATTACHED ITEMS -->
+        <div class="od-section-head">
+          <div class="od-section-title">
+            <i class="fa fa-paperclip"></i>
+            <h3>{% trans "Attached items" %}</h3>
           </div>
-          <div id="tasksList" class="od-task-list">
-            {% for task in tasks|dictsortreversed:'due_date' %}
-              {% if not task.completed %}
-                <div class="od-task" id="task-{{ task.id }}">
-                  <div class="task-content" id="task-content-{{ task.id }}" style="flex:1; min-width:0;">
-                    <div class="od-task-body">
-                      <h3 class="od-task-name task-name">{{ task.name }}</h3>
-                      {% if task.description %}
-                        <p class="od-task-desc task-description">{{ task.description }}</p>
-                      {% endif %}
-                      <div class="od-task-meta task-meta">
-                        <span class="pill due task-due"><i class="fa fa-calendar"></i>{{ task.due_date|date:"M d, Y" }}</span>
-                        {% if task.due_date|days_since %}
-                          <span class="pill overdue task-overdue">{{ task.due_date|days_since }}</span>
-                        {% endif %}
-                        {% if task.member %}
-                          <span class="pill task-member"><i class="fa fa-user"></i>{{ task.member }}</span>
-                        {% endif %}
-                      </div>
-                    </div>
-                  </div>
-                  <div class="od-task-actions task-actions">
-                    <button type="button" class="od-icon-btn ok btn-icon-minimal" title="{% trans 'Complete' %}"
-                            onclick="confirmDelete('complete_task', {{ task.id }})">
-                      <i class="fa fa-check"></i>
-                    </button>
-                    <button type="button" class="od-icon-btn btn-icon-minimal" title="{% trans 'Edit' %}"
-                            onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"Y-m-d" }}')">
-                      <i class="fa fa-edit"></i>
-                    </button>
-                    <button type="button" class="od-icon-btn del btn-icon-minimal" title="{% trans 'Delete' %}"
-                            onclick="confirmDelete('delete_task', {{ task.id }})">
-                      <i class="fa fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              {% endif %}
-            {% empty %}
-              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "No tasks available." %}</p>
-            {% endfor %}
-          </div>
-        </section>
-
-        <!-- ATTACH AN ITEM -->
-        <section class="od-card attach-card">
-          <div class="od-card-h">
-            <i class="fa fa-paperclip card-ico"></i>
-            <h3>{% trans "Attach an item" %}</h3>
-          </div>
-          <div class="od-attach-bar attach-options">
-            <button type="button" class="ord-btn ghost sm attach-option-btn" onclick="toggleAttachSection('note')">
-              <i class="fa fa-file-text"></i>{% trans "Note" %}
+          <div class="od-attach-menu">
+            <button type="button" class="ord-btn ghost sm" id="attachMenuBtn" onclick="toggleAttachMenu(event)">
+              <i class="fa fa-plus"></i>{% trans "Attach an item" %}
+              <i class="fa fa-chevron-down od-caret"></i>
             </button>
-            <button type="button" class="ord-btn ghost sm attach-option-btn" onclick="toggleAttachSection('task')">
-              <i class="fa fa-check-circle"></i>{% trans "Task" %}
-            </button>
-          </div>
-
-          <!-- Note Attach Panel -->
-          <div id="attachNoteSection" class="od-attach-panel attach-form-section" style="display: none;">
-            <div class="od-attach-head attach-form-header">
-              <span><i class="fa fa-file-text"></i>{% trans "Add a note" %}</span>
-              <button type="button" class="od-text-btn btn-text" onclick="toggleAttachSection('note')">
-                {% trans "Cancel" %}
+            <div class="od-attach-dropdown" id="attachMenu" hidden>
+              <button type="button" onclick="openAttachSection('task')">
+                <i class="fa fa-check-circle"></i>{% trans "Task" %}
+              </button>
+              <button type="button" onclick="openAttachSection('file')">
+                <i class="fa fa-paperclip"></i>{% trans "File" %}
               </button>
             </div>
-            <form hx-post="{% url 'crm:supplier_detail' supplier.id %}?action=add_note" hx-swap="none" class="attach-form"
-                  hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('note'); htmx.ajax('GET', '/crm/supplier/{{ supplier.id }}/notes_partial/', {target: '#notesSection', swap: 'outerHTML'}); }">
-              {% csrf_token %}
-              {{ note_form.as_p }}
-              <div class="form-actions">
-                <button type="submit" class="ord-btn primary">
-                  <i class="fa fa-check"></i>{% trans "Add Note" %}
-                </button>
-              </div>
-            </form>
           </div>
+        </div>
+
+        <section class="od-card od-attached-card attach-card">
 
           <!-- Task Attach Panel -->
           <div id="attachTaskSection" class="od-attach-panel attach-form-section" style="display: none;">
@@ -516,7 +664,7 @@
             </div>
             <form hx-post="{% url 'crm:supplier_detail' supplier.id %}?action=add_task" hx-target="#tasksList"
                   hx-swap="innerHTML" class="attach-form"
-                  hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); }">
+                  hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); syncAttachedCounts(); }">
               {% csrf_token %}
               {{ task_form.as_p }}
               <div class="form-actions">
@@ -526,6 +674,97 @@
               </div>
             </form>
           </div>
+
+          <!-- Group: upcoming tasks -->
+          <div class="od-attach-group">
+            <div class="od-group-head" role="button" tabindex="0" aria-expanded="true"
+                 onclick="toggleAttachGroup(this)"
+                 onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAttachGroup(this); }">
+              <span class="od-group-ico green"><i class="fa fa-check-circle"></i></span>
+              <span class="od-group-name">{% trans "Upcoming tasks" %}</span>
+              <span class="od-group-count" id="grpTaskCount">({{ open_tasks|length }})</span>
+              <i class="fa fa-chevron-down od-group-chev"></i>
+            </div>
+            <div class="od-group-body">
+              <div id="tasksList" class="od-task-list">
+                {% for task in open_tasks|dictsortreversed:'due_date' %}
+                  <div class="od-task" id="task-{{ task.id }}">
+                    <div class="task-content" id="task-content-{{ task.id }}" style="flex:1; min-width:0;">
+                      <div class="od-task-body">
+                        <h3 class="od-task-name task-name">{{ task.name }}</h3>
+                        {% if task.description %}
+                          <p class="od-task-desc task-description">{{ task.description }}</p>
+                        {% endif %}
+                        <div class="od-task-meta task-meta">
+                          <span class="pill due task-due"><i class="fa fa-calendar"></i>{{ task.due_date|date:"M d, Y" }}</span>
+                          {% if task.due_date|days_since %}
+                            <span class="pill overdue task-overdue">{{ task.due_date|days_since }}</span>
+                          {% endif %}
+                          {% if task.member %}
+                            <span class="pill task-member"><i class="fa fa-user"></i>{{ task.member }}</span>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="od-task-actions task-actions">
+                      <button type="button" class="od-icon-btn ok btn-icon-minimal" title="{% trans 'Complete' %}"
+                              onclick="confirmDelete('complete_task', {{ task.id }})">
+                        <i class="fa fa-check"></i>
+                      </button>
+                      <button type="button" class="od-icon-btn btn-icon-minimal" title="{% trans 'Edit' %}"
+                              onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"Y-m-d" }}')">
+                        <i class="fa fa-edit"></i>
+                      </button>
+                      <button type="button" class="od-icon-btn del btn-icon-minimal" title="{% trans 'Delete' %}"
+                              onclick="confirmDelete('delete_task', {{ task.id }})">
+                        <i class="fa fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                {% empty %}
+                  <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "No tasks available." %}</p>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Group: files — collapsed until asked for, so the drop zone
+               does not take up the card on every visit -->
+          <div class="od-attach-group collapsed">
+            <div class="od-group-head" role="button" tabindex="0" aria-expanded="false"
+                 onclick="toggleAttachGroup(this)"
+                 onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAttachGroup(this); }">
+              <span class="od-group-ico blue"><i class="fa fa-paperclip"></i></span>
+              <span class="od-group-name">{% trans "Files" %}</span>
+              <span class="od-group-count" id="grpFileCount">({{ supplier.attachments.count }})</span>
+              <i class="fa fa-chevron-down od-group-chev"></i>
+            </div>
+            <div class="od-group-body">
+              <form id="attachUploadForm" class="od-file-drop"
+                    hx-post="{% url 'crm:upload_attachments' 'supplier' supplier.id %}"
+                    hx-encoding="multipart/form-data"
+                    hx-target="#attachmentsList" hx-swap="innerHTML"
+                    hx-trigger="change from:#attachFileInput"
+                    hx-on::after-request="this.reset(); syncAttachedCounts(); expandAttachGroup('attachmentsList');"
+                    ondragover="event.preventDefault(); this.classList.add('over');"
+                    ondragleave="this.classList.remove('over');"
+                    ondrop="dropAttachments(event, this);"
+                    onclick="document.getElementById('attachFileInput').click();">
+                {% csrf_token %}
+                <input type="file" name="files" id="attachFileInput" multiple hidden>
+                <i class="fa fa-cloud-upload-alt"></i>
+                <span class="od-file-drop-t">{% trans "Drop files here, or click to choose" %}</span>
+                <span class="od-file-drop-s">{% trans "Up to 25 MB per file · programs and scripts are not accepted" %}</span>
+                <span class="od-file-drop-busy htmx-indicator">
+                  <i class="fa fa-spinner fa-spin"></i> {% trans "Uploading…" %}
+                </span>
+              </form>
+              <div id="attachmentsList" class="od-file-list">
+                {% include "crm/components/_attachments.html" with attachments=supplier.attachments.all %}
+              </div>
+            </div>
+          </div>
+
         </section>
 
         <!-- NOTES HISTORY -->
@@ -533,64 +772,32 @@
           <i class="fa fa-history"></i>
           <h3>{% trans "History" %}</h3>
         </div>
-        <div id="notesSection">
-          <div class="od-card">
-            <div class="od-history-list notes-list">
-              {% for entry in history_entries %}
-                {% if entry.content %}
-                  <!-- Note Item -->
-                  <div class="od-history-item note-item" id="note-{{ entry.id }}">
-                    <div class="od-history-content note-content" id="note-content-{{ entry.id }}">
-                      <div class="od-history-meta note-meta">
-                        <span class="od-history-date note-date">{{ entry.created_at|date:"M d, Y - g:i A" }}</span>
-                      </div>
-                      <p class="od-history-text note-text">{{ entry.content }}</p>
-                    </div>
-                    <div class="od-history-actions note-actions">
-                      <button type="button" class="od-icon-btn btn-icon-minimal" title="{% trans 'Edit' %}"
-                              onclick="editNote({{ entry.id }}, `{{ entry.content|escapejs }}`)">
-                        <i class="fa fa-edit"></i>
-                      </button>
-                      <button type="button" class="od-icon-btn del btn-icon-minimal" title="{% trans 'Delete' %}"
-                              onclick="confirmDelete('delete_note', {{ entry.id }})">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-                {% elif entry.name %}
-                  <!-- Completed Task Item -->
-                  <div class="od-history-item completed completed-task-item">
-                    <div class="od-history-content note-content">
-                      <div class="od-history-meta note-meta">
-                        <span class="od-history-date note-date">{{ entry.completed_at|date:"M d, Y - g:i A" }}</span>
-                        <span class="od-history-badge note-badge"><i class="fa fa-check-circle"></i> {% trans "Completed" %}</span>
-                      </div>
-                      <p class="od-history-text note-text"><strong>{{ entry.name }}</strong></p>
-                      {% if entry.description %}
-                        <p class="od-history-desc note-description">{{ entry.description }}</p>
-                      {% endif %}
-                    </div>
-                  </div>
-                {% endif %}
-              {% empty %}
-                <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "No notes or history available." %}</p>
-              {% endfor %}
-
-              <!-- Created Entry -->
-              <div class="od-history-item created created-item">
-                <div class="od-history-content note-content">
-                  <div class="od-history-meta note-meta">
-                    <span class="od-history-date note-date">{{ supplier.created_at|date:"M d, Y - g:i A" }}</span>
-                    <span class="od-history-badge created-badge"><i class="fa fa-plus-circle"></i> {% trans "Created" %}</span>
-                  </div>
-                  <p class="od-history-text note-text">
-                    <strong>{{ supplier.company_name|default:supplier.contact_name }}</strong> {% trans "was added as a supplier" %}
-                  </p>
-                </div>
+        <section class="od-card od-history-card">
+          <div class="od-note-composer">
+            <form id="noteComposerForm" class="od-note-form"
+                  hx-post="{% url 'crm:supplier_detail' supplier.id %}?action=add_note"
+                  hx-swap="none"
+                  hx-on::after-request="if(event.detail.successful) { noteComposerSaved(); }">
+              {% csrf_token %}
+              <textarea name="content" id="noteComposerInput" class="od-note-input" rows="3"
+                        placeholder="{% blocktrans with name=supplier.company_name|default:supplier.contact_name %}Enter a note about {{ name }}{% endblocktrans %}"
+                        oninput="syncNoteComposer(this)"
+                        onkeydown="if((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (this.value.trim()) this.form.requestSubmit(); }"></textarea>
+              <div class="od-note-actions">
+                <button type="submit" class="ord-btn primary" id="noteComposerSubmit" disabled>
+                  <i class="fa fa-check"></i>{% trans "Save note" %}
+                </button>
+                <span class="od-note-hint">{% trans "Ctrl + Enter to save" %}</span>
               </div>
-            </div>
+            </form>
           </div>
-        </div>
+
+          {% comment %} The same block get_supplier_notes_partial swaps back
+             in after a save, so the list reads the same before and after. {% endcomment %}
+          <div id="notesSection">
+            {% include "crm/components/history.html" with company=None contact=None %}
+          </div>
+        </section>
       </div>
 
       {# ============== RIGHT ============== #}
@@ -667,13 +874,6 @@
               </div>
             {% endif %}
 
-            {% if supplier.created_at %}
-              <div class="od-dt-block">
-                <span class="k">{% trans "Created at" %}</span>
-                <div class="od-dt-stack"><span class="v-line">{{ supplier.created_at|date:"M d, Y" }}</span></div>
-              </div>
-            {% endif %}
-
             {% if not supplier.company_name and not supplier.contact_name and not supplier.email and not supplier.phone and not supplier.website and not supplier.address and not supplier.country %}
               <div class="od-empty-mute" style="padding: 4px 0;">{% trans "No additional information." %}</div>
             {% endif %}
@@ -686,7 +886,6 @@
             <i class="fa fa-link card-ico"></i>
             <h3>{% trans "Linked entities" %}</h3>
           </div>
-
           {% if supplier.linked_company or supplier.linked_contact %}
             {% if supplier.linked_company %}
               <a href="{% url 'crm:company_detail' supplier.linked_company.id %}" class="od-linked-row">
@@ -712,6 +911,104 @@
             </div>
           {% endif %}
         </section>
+
+        <!-- PURCHASE HISTORY — the supplier's side of Order history -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-shopping-bag card-ico"></i>
+            <h3>{% trans "Purchase history" %}</h3>
+            <span class="od-card-sub">{{ purchases|length }} {% blocktrans count counter=purchases|length %}purchase{% plural %}purchases{% endblocktrans %}</span>
+          </div>
+          <div class="od-order-list">
+            {% for inv in purchases %}
+              {% comment %} A purchase has its own page; a purchase return
+                 only has the old invoice address, which sends it on to
+                 the account it was posted to. {% endcomment %}
+              <a class="od-order-row"
+                 href="{% if inv.type == 'purchase' %}{% url 'accounts:purchase_order_detail' inv.pk %}{% else %}{% url 'accounts:invoice_detail' inv.pk %}{% endif %}">
+                <div class="od-order-id">
+                  <div class="od-order-num">{{ inv.display_number }}</div>
+                  <div class="od-order-date">{{ inv.date|date:"M d, Y" }} · {{ inv.book.name }}</div>
+                </div>
+                <span class="ord-status {{ inv.pill }}">
+                  <span class="ord-status-dot"></span>
+                  {% if inv.type == 'purchase_return' %}{{ inv.get_type_display }}{% else %}{{ inv.get_status_display }}{% endif %}
+                </span>
+                <div class="od-order-total">
+                  <span>{{ inv.currency.symbol|default:inv.currency.code }}</span>{{ inv.total|money }}
+                </div>
+                <i class="fa fa-chevron-right od-order-chev"></i>
+              </a>
+            {% empty %}
+              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
+                {% trans "No purchases yet from this supplier." %}
+              </p>
+            {% endfor %}
+          </div>
+        </section>
+
+        <!-- ACCOUNT HISTORY (every book, pickable) — not for sales reps -->
+        {% if not is_sales_rep %}
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-book card-ico"></i>
+            <h3>{% trans "Account history" %}{% if current_account_accounts %} <span class="od-account-total">({{ current_account_accounts.0.display_currency_symbol }}{{ current_account_total|money }})</span>{% endif %}</h3>
+            <span class="od-card-sub">{{ current_account_accounts|length }} {% blocktrans count counter=current_account_accounts|length %}account{% plural %}accounts{% endblocktrans %}</span>
+          </div>
+          {% comment %}
+            Pick accounts, print or export — the same gesture as on the
+            contact page. A supplier the factory and the wholesaler both
+            buy from holds one account per book; picking both gives the
+            one statement they would recognise. See
+            accounting.views_accounts.CurrentAccountStatementPrintCombined.
+          {% endcomment %}
+          {% if current_account_accounts %}
+            <div class="od-card-tools">
+              <button type="button" id="printAccountsBtn" class="od-print-orders" disabled
+                      onclick="printSelectedAccounts()"
+                      data-label-idle="{% trans 'Print selected' %}"
+                      data-label-picked="{% trans 'Print' %}">
+                <i class="fa fa-print"></i>
+                <span id="printAccountsLabel">{% trans "Print selected" %}</span>
+              </button>
+              <button type="button" id="excelAccountsBtn" class="od-print-orders" disabled
+                      onclick="excelSelectedAccounts()"
+                      data-label-idle="{% trans 'Excel' %}"
+                      data-label-picked="{% trans 'Excel' %}"
+                      title="{% trans 'Download the selected accounts as one statement' %}">
+                <i class="fa fa-file-excel"></i>
+                <span id="excelAccountsLabel">{% trans "Excel" %}</span>
+              </button>
+            </div>
+          {% endif %}
+          <div class="od-order-list">
+            {% for a in current_account_accounts %}
+              <div class="od-order-pick">
+                <input type="checkbox" class="od-account-check" value="{{ a.pk }}"
+                       onchange="syncAccountSelection()"
+                       aria-label="{% trans 'Include this account' %} {{ a.code }}">
+                <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
+                  <div class="od-order-id">
+                    <div class="od-order-num">{{ a.book.name }}</div>
+                    <div class="od-order-date">{{ a.code }}</div>
+                  </div>
+                  <span class="ord-status {% if a.cached_balance > 0 %}pending{% elif a.cached_balance < 0 %}cancelled{% else %}completed{% endif %}">
+                    <span class="ord-status-dot"></span>{{ a.balance_label }}
+                  </span>
+                  <div class="od-order-total">
+                    <span>{{ a.display_currency_symbol }}</span>{{ a.cached_balance|money }}
+                  </div>
+                  <i class="fa fa-chevron-right od-order-chev"></i>
+                </a>
+              </div>
+            {% empty %}
+              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
+                {% trans "No ledger account in any book yet." %}
+              </p>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -733,25 +1030,11 @@
   const taskOriginalHTML = {};
   const noteOriginalHTML = {};
 
-  // CSRF helper
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
-  }
-
   // Inline task editing
   function editTask(taskId, name, description, dueDate) {
     const contentDiv = document.getElementById(`task-content-${taskId}`);
+    const csrf = '{{ csrf_token }}';
+
     taskOriginalHTML[taskId] = contentDiv.innerHTML;
 
     contentDiv.innerHTML = `
@@ -841,12 +1124,17 @@
   // Inline note editing
   function editNote(noteId, currentContent) {
     const contentDiv = document.getElementById(`note-content-${noteId}`);
-    // Prefer the live DOM text — the onclick-baked arg is stale after
-    // the first save.
+    const csrf = '{{ csrf_token }}';
+
+    // The onclick attribute that invoked us was rendered server-side
+    // and never updates after a save, so it carries the original
+    // content. Prefer the live DOM text — that always reflects the
+    // most recent saveNote() result.
     const liveTextEl = contentDiv.querySelector('.note-text');
     if (liveTextEl) {
       currentContent = liveTextEl.textContent;
     }
+
     noteOriginalHTML[noteId] = contentDiv.innerHTML;
 
     contentDiv.innerHTML = `
@@ -906,9 +1194,111 @@
       });
   }
 
+  // Always-open note composer in the History section
+  function syncNoteComposer(el) {
+    document.getElementById('noteComposerSubmit').disabled = !el.value.trim();
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 320) + 'px';
+  }
+
+  function noteComposerSaved() {
+    const input = document.getElementById('noteComposerInput');
+    input.value = '';
+    input.style.height = '';
+    document.getElementById('noteComposerSubmit').disabled = true;
+    htmx.ajax('GET', '/crm/supplier/{{ supplier.id }}/notes_partial/', {target: '#notesSection', swap: 'outerHTML'});
+    input.focus();
+  }
+
+  // Attached items: "Attach an item" dropdown
+  function toggleAttachMenu(event) {
+    event.stopPropagation();
+    const menu = document.getElementById('attachMenu');
+    menu.hidden = !menu.hidden;
+  }
+
+  function openAttachSection(type) {
+    document.getElementById('attachMenu').hidden = true;
+    if (type === 'file') {
+      // The Files group starts collapsed, so open it first — otherwise the
+      // file the user is about to pick would arrive somewhere they cannot
+      // see, and only the count beside the header would move.
+      expandAttachGroup('attachmentsList');
+      document.getElementById('attachFileInput').click();
+      return;
+    }
+    const section = document.getElementById('attachTaskSection');
+    if (section) {
+      section.style.display = 'block';
+      section.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+  }
+
+  // Dropped files are handed to the hidden input, so the upload goes out
+  // through the same HTMX form as a click-to-choose upload.
+  function dropAttachments(event, form) {
+    event.preventDefault();
+    form.classList.remove('over');
+    const input = document.getElementById('attachFileInput');
+    input.files = event.dataTransfer.files;
+    if (input.files.length) input.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+
+  // A file the server refused (too large) comes back as an HX-Trigger on
+  // the swapped list, since a Django message would only surface later.
+  document.body.addEventListener('attachmentError', function (e) {
+    alert(e.detail.value);
+  });
+
+  function deleteAttachment(id) {
+    const row = document.getElementById(`attachment-${id}`);
+    fetch(`/crm/attachments/${id}/delete/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest'}
+    }).then(res => {
+      if (!res.ok || !row) return;
+      row.style.transition = 'all 0.25s ease';
+      row.style.opacity = '0';
+      row.style.transform = 'translateX(-16px)';
+      setTimeout(() => { row.remove(); syncAttachedCounts(); }, 250);
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    const menu = document.getElementById('attachMenu');
+    if (menu && !menu.hidden && !e.target.closest('.od-attach-menu')) {
+      menu.hidden = true;
+    }
+  });
+
+  // Attached items: collapsible groups
+  function toggleAttachGroup(head) {
+    const group = head.closest('.od-attach-group');
+    const collapsed = group.classList.toggle('collapsed');
+    head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+
+  // Open the group a given list belongs to, if it is closed.
+  function expandAttachGroup(id) {
+    const el = document.getElementById(id);
+    const group = el && el.closest('.od-attach-group');
+    if (!group || !group.classList.contains('collapsed')) return;
+    group.classList.remove('collapsed');
+    const head = group.querySelector('.od-group-head');
+    if (head) head.setAttribute('aria-expanded', 'true');
+  }
+
+  // The task list is swapped in by HTMX and pruned by the delete/complete
+  // handlers, so its group count has to be recomputed from the DOM.
+  function syncAttachedCounts() {
+    const tasks = document.getElementById('grpTaskCount');
+    if (tasks) tasks.textContent = '(' + document.querySelectorAll('#tasksList .od-task').length + ')';
+    const files = document.getElementById('grpFileCount');
+    if (files) files.textContent = '(' + document.querySelectorAll('#attachmentsList .od-file').length + ')';
+  }
+
   function toggleAttachSection(type) {
     const sections = {
-      'note': 'attachNoteSection',
       'task': 'attachTaskSection'
     };
 
@@ -1037,7 +1427,7 @@
             taskEl.style.transition = 'all 0.3s ease';
             taskEl.style.opacity = '0';
             taskEl.style.transform = 'translateX(-20px)';
-            setTimeout(() => taskEl.remove(), 300);
+            setTimeout(() => { taskEl.remove(); syncAttachedCounts(); }, 300);
           }
         } else if (action === 'complete_task' && data.success) {
           const taskEl = document.getElementById(`task-${id}`);
@@ -1045,20 +1435,20 @@
             taskEl.style.transition = 'all 0.3s ease';
             taskEl.style.opacity = '0';
             taskEl.style.transform = 'translateX(-20px)';
-            setTimeout(() => taskEl.remove(), 300);
+            setTimeout(() => { taskEl.remove(); syncAttachedCounts(); }, 300);
           }
 
           const notesList = document.querySelector('.notes-list');
           if (notesList && data.task) {
             const completedTaskHTML = `
-              <div class="od-history-item completed completed-task-item" style="opacity:0;transform:translateY(-10px);transition:all 0.3s ease;">
-                <div class="od-history-content note-content">
-                  <div class="od-history-meta note-meta">
-                    <span class="od-history-date note-date">${data.task.completed_at}</span>
-                    <span class="od-history-badge note-badge"><i class="fa fa-check-circle"></i> {% trans "Completed" %}</span>
+              <div class="note-item completed-task-item" style="opacity:0;transform:translateY(-10px);transition:all 0.3s ease;">
+                <div class="note-content">
+                  <div class="note-meta">
+                    <span class="note-date">${data.task.completed_at}</span>
+                    <span class="note-badge"><i class="fa fa-check-circle"></i> {% trans "Completed" %}</span>
                   </div>
-                  <p class="od-history-text note-text"><strong>${data.task.name}</strong></p>
-                  ${data.task.description ? `<p class="od-history-desc note-description">${data.task.description}</p>` : ''}
+                  <p class="note-text"><strong>${data.task.name}</strong></p>
+                  ${data.task.description ? `<p class="note-description">${data.task.description}</p>` : ''}
                 </div>
               </div>
             `;
@@ -1094,5 +1484,158 @@
       activeContent.classList.add('active');
     }
   }
+
+  // ── Account history: pick, print, export ────────────────────────────
+  // Deliberately its own selector and its own functions rather than
+  // sharing the order ones: both cards sit on this page, and a single
+  // `.od-order-check` query would have Print selected on one card
+  // silently carrying the other card's ticks.
+  function pickedAccountIds() {
+    return Array.from(document.querySelectorAll('.od-account-check:checked'))
+                .map(function (cb) { return cb.value; });
+  }
+
+  function syncAccountSelection() {
+    const btn = document.getElementById('printAccountsBtn');
+    if (!btn) return;
+    const n = pickedAccountIds().length;
+    btn.disabled = n === 0;
+    const xls = document.getElementById('excelAccountsBtn');
+    if (xls) xls.disabled = n === 0;
+    // Labels off data- attributes, not written into this script: they are
+    // translated, and a Turkish label carrying an apostrophe would
+    // otherwise close the JS string it sits in.
+    document.getElementById('printAccountsLabel').textContent =
+      n ? btn.dataset.labelPicked + ' (' + n + ')' : btn.dataset.labelIdle;
+    const xlsLabel = document.getElementById('excelAccountsLabel');
+    if (xls && xlsLabel) {
+      xlsLabel.textContent =
+        n ? xls.dataset.labelPicked + ' (' + n + ')' : xls.dataset.labelIdle;
+    }
+  }
+
+  function printSelectedAccounts() {
+    const ids = pickedAccountIds();
+    if (!ids.length) return;
+    window.open('{% url "accounts:statement_print_combined" %}?ids=' + ids.join(','),
+                '_blank');
+  }
+
+  // Navigates rather than opening a tab: the response is an attachment,
+  // so a new tab would open, take the download and sit there blank.
+  function excelSelectedAccounts() {
+    const ids = pickedAccountIds();
+    if (!ids.length) return;
+    window.location = '{% url "accounts:statement_excel_combined" %}?ids=' + ids.join(',');
+  }
+
+  /* ─── Edit-Supplier sidebar ──────────────────────────────────
+     The same panel as the contact page's: the form partial is
+     fetched over XHR into a slide-in, posted with fetch, and the
+     page reloads on success. Field errors are shown under their
+     fields; the model's "company or contact name" rule arrives as
+     a form-level error and is shown at the top. */
+  function openEditSupplierSidebar() {
+    var overlay = document.getElementById('editSupplierSidebarOverlay');
+    var body = document.getElementById('editSupplierSidebarBody');
+    if (!overlay || !body) return;
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-500);"><i class="fa fa-spinner fa-spin fa-2x"></i><div style="margin-top:12px;">{% trans "Loading…" %}</div></div>';
+    overlay.classList.add('active');
+    fetch('{% url "crm:supplier_update" supplier.id %}', {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        body.innerHTML = html;
+        // Scripts inserted via innerHTML do not run on their own; the
+        // partial's picker script has to.
+        body.querySelectorAll('script').forEach(function (s) {
+          var n = document.createElement('script');
+          if (s.src) n.src = s.src; else n.textContent = s.textContent;
+          document.body.appendChild(n).parentNode.removeChild(n);
+        });
+        var first = body.querySelector('input[name="company_name"]');
+        if (first) first.focus();
+      })
+      .catch(function () {
+        body.innerHTML = '<div style="padding:40px;color:#ef4444;text-align:center;">{% trans "Failed to load edit form." %}</div>';
+      });
+  }
+  function closeEditSupplierSidebar() {
+    var overlay = document.getElementById('editSupplierSidebarOverlay');
+    if (overlay) overlay.classList.remove('active');
+  }
+  function showEditSupplierErrors(errors) {
+    var form = document.getElementById('editSupplierForm');
+    if (!form) return;
+    form.querySelectorAll('.sf-field-error').forEach(function (el) {
+      el.textContent = ''; el.classList.remove('show');
+    });
+    var top = document.getElementById('editSupplierFormError');
+    var topMessages = [];
+    Object.keys(errors || {}).forEach(function (field) {
+      var messages = (errors[field] || []).map(function (e) { return e.message || String(e); });
+      var slot = form.querySelector('.sf-field-error[data-error-for="' + field + '"]');
+      if (slot) { slot.textContent = messages.join(' '); slot.classList.add('show'); }
+      else { topMessages = topMessages.concat(messages); }
+    });
+    if (top) {
+      top.textContent = topMessages.join(' ');
+      top.classList.toggle('show', topMessages.length > 0);
+    }
+  }
+  function submitEditSupplierForm(event) {
+    event.preventDefault();
+    var form = document.getElementById('editSupplierForm');
+    var btn = document.getElementById('editSupplierSubmitBtn');
+    var btnText = btn ? btn.querySelector('.btn-text') : null;
+    var btnSpinner = btn ? btn.querySelector('.btn-spinner') : null;
+    function idle() {
+      if (btnText) btnText.style.display = 'inline';
+      if (btnSpinner) btnSpinner.style.display = 'none';
+      if (btn) btn.disabled = false;
+    }
+    if (btnText) btnText.style.display = 'none';
+    if (btnSpinner) btnSpinner.style.display = 'inline-flex';
+    if (btn) btn.disabled = true;
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
+      .then(function (res) {
+        if (res.ok && res.body.success) {
+          window.location.href = res.body.redirect_url || window.location.pathname;
+          return;
+        }
+        idle();
+        if (res.body && res.body.errors) showEditSupplierErrors(res.body.errors);
+        else showEditSupplierErrors({__all__: [{message: (res.body && res.body.error) || '{% trans "Failed to save." %}'}]});
+      })
+      .catch(function () {
+        idle();
+        showEditSupplierErrors({__all__: [{message: '{% trans "Failed to save." %}'}]});
+      });
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeEditSupplierSidebar();
+  });
 </script>
+
+<!-- Edit Supplier Sidebar -->
+<div id="editSupplierSidebarOverlay" class="sidebar-overlay" onclick="closeEditSupplierSidebar()">
+  <div class="sidebar-modal" onclick="event.stopPropagation();">
+    <div class="sidebar-header">
+      <button class="sidebar-close" onclick="closeEditSupplierSidebar()">
+        <i class="fas fa-times"></i> {% trans "Close" %}
+      </button>
+      <div class="sidebar-title">
+        <i class="fas fa-truck"></i>
+        <h2>{% trans "Edit Supplier" %}</h2>
+      </div>
+    </div>
+    <div id="editSupplierSidebarBody" class="sidebar-content"></div>
+  </div>
+</div>
 {% endblock %}

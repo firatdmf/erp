@@ -288,7 +288,9 @@ def quote_print(request, pk):
     # under a name of its own.
     context["brand_color"] = brand_color()
     context["nejum_credit_html"] = credit_html(context["quote"].book)
-    return render(request, "marketing/quote_print.html", context)
+    from erp.pdf_render import document_response
+    return document_response(request, "marketing/quote_print.html", context,
+                             f"quote_{context['quote'].number}.pdf")
 
 
 # ── Status / conversion ──────────────────────────────────────────────

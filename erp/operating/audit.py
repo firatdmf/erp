@@ -64,6 +64,11 @@ def _log(order, action, field=None, item_label=None, old=None, new=None):
         pass  # never let auditing break the save
 
 
+# For code that has something to say the receivers can't see — e.g. that
+# a batch of item rows came from the order's purchase (order_purchases).
+log_change = _log
+
+
 # ────────────────────────────────────────────────────────────────────
 #  Order field changes
 # ────────────────────────────────────────────────────────────────────

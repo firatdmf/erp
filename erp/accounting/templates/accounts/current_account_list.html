@@ -257,6 +257,8 @@
     </div>
     <div class="ca-head-r">
       <a href="{% url 'accounts:help' %}" class="ca-btn ghost"><i data-lucide="help-circle"></i>{% trans "Help" %}</a>
+      <a href="{% url 'accounts:report_index' current_book.pk %}" class="ca-btn ghost"
+         title="{% trans 'Balance sheet, trial balance, chart of accounts and credit limits' %}"><i data-lucide="bar-chart-3"></i>{% trans "Reports" %}</a>
       <a href="{% url 'accounts:statement_all' current_book.pk %}" class="ca-btn ghost"><i data-lucide="printer"></i>{% trans "Print statement" %}</a>
       <a href="{% url 'accounts:fx_report' current_book.pk %}" class="ca-btn ghost"
          title="{% trans 'What the rate has done to every account that trades in another currency' %}"><i data-lucide="refresh-cw"></i>{% trans "Exchange differences" %}</a>

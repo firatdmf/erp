@@ -17,14 +17,45 @@ variant, and saving the purchase creates the customer's order alongside it
                           keep its lines in step while the draft is edited;
   * hold_received_rolls — when the purchase is received, its new rolls are
                           reserved for that order, so nobody packs them into
-                          a different one first.
+                          a different one first;
+  * mirror_item_on_purchases, drop_purchase_lines_from_order,
+    cancel_purchases_for_cancelled_order —
+                          the link runs both ways: a line changed or removed
+                          on the order changes the draft purchase, a purchase
+                          cancelled takes its lines off the order, and either
+                          document cancelled cancels the other when nothing
+                          is left on it. Each side's change log says what the
+                          other side did (operating.audit,
+                          accounting.purchase_audit).
 
 A reservation is the same soft hold the order form and the packing scan
 create (OrderStockReservation): nothing is cut until the order ships.
 """
+import copy
+import threading
+from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation
 
 from django.utils.translation import gettext as _
+
+# While one side is writing the other, the OrderItem receivers that
+# mirror the order onto its purchases stand down — otherwise a purchase
+# edit would write the order, whose items would write the purchase back.
+_sync_state = threading.local()
+
+
+@contextmanager
+def syncing():
+    prev = getattr(_sync_state, "active", False)
+    _sync_state.active = True
+    try:
+        yield
+    finally:
+        _sync_state.active = prev
+
+
+def is_syncing():
+    return getattr(_sync_state, "active", False)
 
 # Orders that can no longer take a hold: shipped ones have already cut their
 # stock, and a cancelled one never releases what it holds.
@@ -203,9 +234,11 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     if order is None:
         if customer is None:
             return None
-        order = Order(notes=_("Ordered in from %(supplier)s — purchase %(number)s")
-                      % {"supplier": invoice.current_account.name,
-                         "number": invoice.number})
+        # No note naming the supplier: notes print on the customer's copy
+        # of the order, and who we buy from is not theirs to read. The
+        # link lives on invoice.for_order, which the order page shows
+        # under "Supplier purchases".
+        order = Order()
         if customer._meta.model_name == "company":
             order.company = customer
         else:
@@ -222,27 +255,40 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
                       "changed — edit them on the order.")
                     % {"number": order.order_number or order.pk})
 
+    from .audit import log_change
+
     existing = {it.product_variant_id: it
                 for it in order.items.select_related("product_variant")}
     previous = {s.lower() for s in previous_skus}
     wanted = set()
-    for line in lines:
-        variant = line["variant"]
-        wanted.add(variant.pk)
-        item = existing.get(variant.pk)
-        qty = _as_line_decimal(line["quantity"])
-        price = _as_line_decimal(line["sale_price"])
-        if item is None:
-            OrderItem.objects.create(order=order, product=line["product"],
-                                     product_variant=variant,
-                                     quantity=qty, price=price)
-        elif item.quantity != qty or item.price != price:
-            item.quantity, item.price = qty, price
-            item.save(update_fields=["quantity", "price"])
-    for variant_id, item in existing.items():
-        sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
-        if variant_id not in wanted and sku in previous:
-            item.delete()
+    changed = 0
+    with syncing():
+        for line in lines:
+            variant = line["variant"]
+            wanted.add(variant.pk)
+            item = existing.get(variant.pk)
+            qty = _as_line_decimal(line["quantity"])
+            price = _as_line_decimal(line["sale_price"])
+            if item is None:
+                OrderItem.objects.create(order=order, product=line["product"],
+                                         product_variant=variant,
+                                         quantity=qty, price=price)
+                changed += 1
+            elif item.quantity != qty or item.price != price:
+                item.quantity, item.price = qty, price
+                item.save(update_fields=["quantity", "price"])
+                changed += 1
+        for variant_id, item in existing.items():
+            sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
+            if variant_id not in wanted and sku in previous:
+                item.delete()
+                changed += 1
+    if changed and not created:
+        # The item rows above are logged by operating.audit as they
+        # happen; this row says where they came from.
+        log_change(order, "field", field="purchase",
+                   new=_("%(count)s line(s) changed from purchase %(number)s")
+                   % {"count": changed, "number": invoice.number})
 
     if created:
         account = get_or_create_current_account_for_order(order, member=member, book=book)
@@ -339,3 +385,155 @@ def hold_received_rolls(invoice, *, user=None):
         held.append({"barcode": roll.barcode, "quantity": r.quantity,
                      "line": line.pk})
     return held
+
+
+# ── The order writes the purchase ────────────────────────────────────
+
+def _retops(v_in, quantity):
+    """Make a plan row's rolls add up to `quantity`. Less: trimmed from
+    the last roll back. More: one more roll for the difference. The rolls
+    are a guess until the goods arrive, and the receipt re-enters them."""
+    tops = [t for t in (v_in.get("tops") or []) if isinstance(t, dict)]
+    total = sum((_decimal(t.get("qty")) for t in tops), Decimal("0"))
+    if quantity > total:
+        tops.append({"qty": str(quantity - total), "barcode": ""})
+    elif quantity < total:
+        excess = total - quantity
+        while excess > 0 and tops:
+            last = tops[-1]
+            q = _decimal(last.get("qty"))
+            if q <= excess and len(tops) > 1:
+                tops.pop()
+                excess -= q
+            else:
+                last["qty"] = str(max(q - excess, Decimal("0")))
+                excess = Decimal("0")
+    v_in["tops"] = tops
+
+
+def _plan_has_rows(plan):
+    return any(_row_quantity(v) > 0
+               for p in (plan or {}).get("products") or []
+               for v in p.get("variants") or [])
+
+
+def _auth_user(user):
+    """apply_order_status_change is handed a Member from one call site and
+    a User from the rest; the purchase side wants the User."""
+    if user is None or hasattr(user, "is_authenticated"):
+        return user
+    return getattr(user, "user", None)
+
+
+def mirror_item_on_purchases(item, *, removed=False, user=None):
+    """A line changed on the order: put the same change on every draft
+    purchase that names its variant — quantity and sale price on an edit,
+    the row itself on a removal. A purchase left with nothing to buy is
+    cancelled. Lines the order adds on its own are NOT put on a purchase:
+    the order doesn't know a cost price, and they may well be stock.
+    Received purchases are stock now and are left alone."""
+    if is_syncing():
+        return
+    from accounting.purchase_audit import diff_plans
+    from accounting.views_purchase import cancel_purchase_invoice, rewrite_draft_plan
+    from .audit import log_change
+
+    order = item.order
+    variant = item.product_variant
+    sku = (variant.variant_sku if variant is not None else "").strip().lower()
+    if not sku:
+        return
+    for invoice in (order.supplier_purchases.filter(status="draft")
+                    .select_related("current_account")):
+        before = copy.deepcopy(invoice.intake_plan or {})
+        plan = copy.deepcopy(before)
+        hit = False
+        for p_in in plan.get("products") or []:
+            kept = []
+            for v_in in p_in.get("variants") or []:
+                if (v_in.get("sku") or "").strip().lower() != sku:
+                    kept.append(v_in)
+                    continue
+                hit = True
+                if removed:
+                    continue
+                v_in["sale_price"] = str(item.price)
+                _retops(v_in, _decimal(item.quantity))
+                kept.append(v_in)
+            p_in["variants"] = kept
+        if not hit:
+            continue
+        plan["products"] = [p for p in plan.get("products") or [] if p.get("variants")]
+        with syncing():
+            diff_plans(invoice, before, plan, origin="order", user=user)
+            if _plan_has_rows(plan):
+                rewrite_draft_plan(invoice, plan)
+            else:
+                # Nothing left to buy. The plan is kept as it was so the
+                # cancelled purchase still reads what it was for.
+                cancel_purchase_invoice(invoice.pk, user, origin="order", mirror_order=False)
+                log_change(order, "field", field="purchase",
+                           new=_("%(number)s cancelled — nothing left on it to buy")
+                           % {"number": invoice.number})
+
+
+def cancel_purchases_for_cancelled_order(order, *, user=None):
+    """The order is being cancelled: stock ordered in for it is no longer
+    wanted, so its draft purchases are cancelled with it. A received
+    purchase is stock on the shelf and stays."""
+    from accounting.views_purchase import cancel_purchase_invoice
+    from .audit import log_change
+
+    user = _auth_user(user)
+    for invoice in list(order.unreceived_purchases()):
+        with syncing():
+            cancel_purchase_invoice(invoice.pk, user, origin="order", mirror_order=False)
+        log_change(order, "field", field="purchase",
+                   new=_("%(number)s cancelled with the order") % {"number": invoice.number})
+
+
+def drop_purchase_lines_from_order(invoice, *, user=None):
+    """The purchase was cancelled on its own page: take the lines it put
+    on the customer's order off again, and cancel an order left empty.
+    Returns the sentence the purchase page shows about the order, or None
+    when there is nothing to say."""
+    from .audit import log_change
+    from .models import OrderChange
+    from .views_warehouse import apply_order_status_change
+
+    order = invoice.for_order
+    if order is None or not order_is_open(order):
+        return None
+    number = order.order_number or order.pk
+    if (order.order_status or "pending") != "pending" or \
+            order.stock_reservations.filter(consumed=False).exists():
+        # It has left "Open", or rolls are already held for it — the
+        # packing floor owns it now. Same rule as sync_customer_order.
+        return (_("Order %(number)s is already being packed, so its lines were left "
+                  "as they are — check it.") % {"number": number})
+    skus = plan_variant_skus(invoice.intake_plan)
+    removed = 0
+    with syncing():
+        for item in order.items.select_related("product_variant"):
+            sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
+            if sku in skus:
+                item.delete()
+                removed += 1
+        log_change(order, "field", field="purchase",
+                   new=_("%(number)s cancelled — %(count)s line(s) removed")
+                   % {"number": invoice.number, "count": removed})
+        if order.items.exists():
+            return (_("Its %(count)s line(s) were removed from order %(number)s, which "
+                      "stays open with what else is on it.")
+                    % {"count": removed, "number": number})
+        ok, _code = apply_order_status_change(order, "cancelled", user=user)
+    if not ok:
+        return (_("Order %(number)s has nothing left on it but could not be cancelled "
+                  "— cancel it on the order page.") % {"number": number})
+    OrderChange.objects.create(
+        order=order, action="field", field="cancel_reason",
+        new_value=_("Purchase %(number)s cancelled") % {"number": invoice.number},
+        created_by=user if getattr(user, "is_authenticated", False) else None,
+    )
+    return (_("Order %(number)s had nothing else on it and was cancelled too.")
+            % {"number": number})

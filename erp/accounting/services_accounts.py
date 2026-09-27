@@ -362,6 +362,17 @@ def get_or_create_current_account_for_order(order, *, member=None, book=None) ->
     return None
 
 
+def _crm_country(*records):
+    """The billing country a new account starts with: the CRM record's
+    own, else (for a contact) their company's, else blank. Blank, not
+    "TR" — a customer in Athens is not in Turkey by default."""
+    for record in records:
+        country = (getattr(record, "country", "") or "").strip()
+        if country:
+            return country
+    return ""
+
+
 def get_or_create_current_account_for_contact(contact, *, member=None, book=None) -> CurrentAccount:
     """Find (or create) the contact's current account — every B2B contact gets one
     so orders/invoices can post against it. Idempotent via the
@@ -378,6 +389,7 @@ def get_or_create_current_account_for_contact(contact, *, member=None, book=None
         book=book, contact=contact,
         name=getattr(contact, "name", "") or f"Contact #{contact.pk}",
         type="customer",
+        billing_country=_crm_country(contact, getattr(contact, "company", None)),
         default_currency=_resolve_currency(),
         created_by=member,
     )
@@ -397,6 +409,7 @@ def get_or_create_current_account_for_company(company, *, member=None, book=None
         book=book, company=company,
         name=getattr(company, "name", "") or f"Company #{company.pk}",
         type="customer",
+        billing_country=_crm_country(company),
         default_currency=_resolve_currency(),
         created_by=member,
     )
@@ -416,6 +429,7 @@ def get_or_create_current_account_for_supplier(supplier, *, member=None, book=No
         book=book, supplier=supplier,
         name=str(supplier) or f"Supplier #{supplier.pk}",
         type="supplier",
+        billing_country=_crm_country(supplier),
         default_currency=_resolve_currency(),
         created_by=member,
     )
@@ -791,7 +805,13 @@ def post_order_movement(order, *, member=None):
     # A cancelled order must never carry a receivable — item edits fire
     # the OrderItem sync signal regardless of status, and without this
     # guard such an edit would silently resurrect the reversed movement.
-    if total <= 0 or getattr(order, "order_status", "") == "cancelled":
+    # Goods bought from a supplier for this order and not received yet
+    # mean nothing has been sold: the customer is charged once they are
+    # in (perform_intake reposts). Every caller funnels through here, so
+    # an edit on the order page while the purchase is still a draft can't
+    # sneak the receivable back either.
+    if total <= 0 or getattr(order, "order_status", "") == "cancelled" \
+            or order.billing_waits_for_goods():
         if existing:
             existing.delete()
             current_account.recompute_balance(save=True)

@@ -801,6 +801,23 @@
   .od-prod-link { color: inherit; text-decoration: none; }
   .od-prod-link:hover .od-prod span:last-child { color: var(--nejum-teal-700); }
   .od-totals { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #E2E8EE; }
+  /* An order split across books: the combined name, the note saying which
+     half this page is, and a header over each half's lines. */
+  .od-title.od-title-split { font-size: 22px; }
+  .od-split-note { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px;
+    padding:7px 10px; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:7px;
+    font-size:11.5px; color:#0F766E; }
+  .od-split-note a { font-weight:700; color:#0F766E; text-decoration:underline; }
+  .od-half-h { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:18px 0 8px;
+    padding:8px 10px; background:#F4F7FB; border:1px solid #E2E8EE; border-radius:9px; font-size:12.5px; }
+  .od-half-h.is-this { margin-top:4px; }
+  .od-half-book { display:inline-flex; align-items:center; gap:6px; font-weight:800; color:#0F1419; }
+  .od-half-book i { color:var(--gray-500); font-size:11px; }
+  .od-half-tag { margin-left:auto; padding:2px 8px; border-radius:999px; background:#E5F1F0;
+    color:#005354; font-weight:700; font-size:11px; }
+  .od-half-open { margin-left:auto; font-weight:700; color:#005354; text-decoration:none; }
+  .od-half-open:hover { text-decoration:underline; }
+  .od-combined-total { border-top:2px solid #0F1419; }
   .od-tot-row { display: flex; justify-content: space-between; padding: 5px 8px; font: 500 12.5px var(--font-sans); color: var(--gray-700); }
   .od-tot-row.total {
     border-top: 1px solid #E2E8EE; margin-top: 6px; padding-top: 11px;
@@ -1072,14 +1089,14 @@
       <i class="fa fa-arrow-left"></i> {% trans "Back to orders" %}
     </a>
     <span class="od-sep">/</span>
-    <span class="od-crumb-here">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
+    <span class="od-crumb-here">{% if combined_number %}{{ combined_number }}{% elif order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
   </div>
 
   <!-- HEAD -->
   <div class="od-head">
     <div>
       <div class="od-head-row">
-        <h1 class="od-title">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</h1>
+        <h1 class="od-title{% if combined_number %} od-title-split{% endif %}">{% if combined_number %}{{ combined_number }}{% elif order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</h1>
 
         {% if order.web_client %}
           <span class="ord-kind b2c">B2C</span>
@@ -1111,32 +1128,27 @@
           </span>
         {% endif %}
       </div>
-      {% comment %}The other half (or thirds) of a request that spanned
-      books. Each is a real order billing its own business, so neither
-      may be folded into the other — but landing on one with no way to
-      reach the rest is how the others get forgotten.{% endcomment %}
-      {% with siblings=order.split_siblings %}
-        {% if siblings %}
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;
-                      padding:7px 10px;background:#ECFDF5;border:1px solid #A7F3D0;
-                      border-radius:7px;font-size:11.5px;color:#0F766E;">
-            <i class="fa fa-code-branch"></i>
-            <span>{% trans "Part of a request split across books" %} —
-              {% if order.current_account.book %}<strong>{{ order.current_account.book.name }}</strong>{% endif %}
-              {% trans "here" %};</span>
-            {% for s in siblings %}
-              <a href="{% url 'operating:order_detail' s.pk %}"
-                 style="font-weight:700;color:#0F766E;text-decoration:underline;">
-                {% if s.current_account.book %}{{ s.current_account.book.name }}{% else %}{% trans "other book" %}{% endif %}
-                (#{{ s.pk }})</a>{% if not forloop.last %}<span>·</span>{% endif %}
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
+      {% comment %}An order split across books: one order on this page, two
+      in the books. Each half bills its own book, so neither folds into the
+      other — the page shows which half this is and lists the others'
+      lines under Products.{% endcomment %}
+      {% if other_halves %}
+        <div class="od-split-note">
+          <i class="fa fa-code-branch"></i>
+          <span>{% blocktrans with book=this_book_name %}Split across books — you are on the <strong>{{ book }}</strong> half.{% endblocktrans %}</span>
+          {% for half in other_halves %}
+            <a href="#od-half-{{ half.pk }}">{{ half.book_name|default:_("other book") }} · {% if half.order_number %}{{ half.order_number }}{% else %}#{{ half.pk }}{% endif %}</a>
+          {% endfor %}
+        </div>
+      {% endif %}
       <div class="od-meta">
         <span><i class="fa fa-calendar"></i>{{ order.order_date|date:"d M Y" }}</span>
         <span class="od-dot"></span>
-        <span><i class="fa fa-user"></i>
+        {% comment %}The icon says WHICH KIND of customer, the way the
+        side menu does — people for a contact, a building for a company.
+        It was a single person on all of them, so a company order was
+        headed by the icon for an individual.{% endcomment %}
+        <span><i class="fa fa-{% if order.company %}building{% elif order.web_client %}globe{% else %}users{% endif %}"></i>
           {% if order.contact %}{{ order.contact.name|capfirst }}
           {% elif order.company %}{{ order.company.name|capfirst }}
           {% elif order.web_client %}{{ order.web_client.name|default:order.web_client.username }}
@@ -1236,6 +1248,13 @@
                 {% trans "No stock is deducted until <b>Complete order</b> is pressed. Cargo info is optional — saved if entered, but the order can complete without it." %}
               
             </div>
+            {% if billing_waits_for %}
+            <div id="od-complete-waits" style="font-size:12px; color:#92400E; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:8px 10px; margin-bottom:8px;">
+              <i class="fa fa-clock"></i>
+              {% trans "The order can be completed once the goods bought for it are received:" %}
+              {% for p in billing_waits_for %}<a href="{% url 'accounts:purchase_order_detail' p.pk %}" style="color:inherit; font-weight:700;">{{ p.number }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+            </div>
+            {% endif %}
             {% if order.is_retail_order %}
             <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#0F766E;margin-bottom:10px;cursor:pointer;">
               <input type="checkbox" id="od-has-cargo" {% if order.carrier or order.tracking_number %}checked{% endif %}>
@@ -1326,7 +1345,9 @@
                 </button>
                 {% if order.order_status == 'cancelled' %}
                 {% elif order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
-                <button type="button" id="od-complete-btn" class="ord-btn primary" data-status="shipped">
+                {% comment %}Goods bought for the order still on their way in: the funnel refuses 'shipped' (goods_not_received), so the button says why instead of failing.{% endcomment %}
+                <button type="button" id="od-complete-btn" class="ord-btn primary" data-status="shipped"
+                        {% if billing_waits_for %}disabled title="{% trans "Goods bought for this order haven't been received yet" %}"{% endif %}>
                   <i class="fa fa-truck-fast"></i> {% trans "Complete order" %}
                 </button>
                 {% else %}
@@ -1415,6 +1436,14 @@
         {% endif %}
 
         <div data-item-pane="current">
+
+        {% if other_halves %}
+        <div class="od-half-h is-this">
+          <span class="od-half-book"><i class="fa fa-book"></i>{{ this_book_name }}</span>
+          <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
+          <span class="od-half-tag">{% trans "This half" %}</span>
+        </div>
+        {% endif %}
 
         {% if order.order_status == 'cancelled' %}
         <div class="od-cancelled-banner">
@@ -1697,6 +1726,84 @@
           </div>
           {% endif %}
         </div>
+
+        {% if other_halves %}
+        {% comment %}The rest of the combined order, read-only here: each
+        half is edited, packed and billed as its own order. No cost column —
+        cost is its own book's business.{% endcomment %}
+        <div id="od-other-halves">
+          {% for half in other_halves %}
+          <div class="od-half-h" id="od-half-{{ half.pk }}">
+            <span class="od-half-book"><i class="fa fa-book"></i>{{ half.book_name|default:_("other book") }}</span>
+            <span class="mono">{% if half.order_number %}{{ half.order_number }}{% else %}#{{ half.pk }}{% endif %}</span>
+            {% if half.may_open %}
+            <a class="od-half-open" href="{% url 'operating:order_detail' half.pk %}">{% trans "Open this half" %} <i class="fa fa-arrow-right"></i></a>
+            {% endif %}
+          </div>
+          <div class="od-prods-scroll">
+          <table class="od-prods od-prods-half">
+            <thead>
+              <tr>
+                <th>{% trans "Product" %}</th>
+                <th>SKU</th>
+                <th>{% trans "Variant" %}</th>
+                <th class="num">{% trans "Qty" %}</th>
+                <th class="num">{% trans "Price" %}</th>
+                <th class="num">{% trans "Amount" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in half.page_items %}
+              <tr>
+                <td>
+                  <div class="od-prod"><span>{% if item.product %}{{ item.product.title }}{% else %}<span class="od-empty-mute">{% trans "(deleted product)" %}</span>{% endif %}</span></div>
+                  {% if item.scanned_count %}
+                  <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2" }} m</span>
+                  {% endif %}
+                </td>
+                <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
+                <td>
+                  {% if item.variant_lines %}
+                    <div class="od-variant-name">{% for line in item.variant_lines %}<span>{{ line }}</span>{% endfor %}</div>
+                  {% endif %}
+                  {% if item.product_variant %}<span class="mono od-variant-sku">{{ item.product_variant.variant_sku }}</span>{% elif not item.variant_lines %}<span class="od-empty-mute">—</span>{% endif %}
+                </td>
+                <td class="num">{{ item.quantity|default:0|floatformat:"-2" }}</td>
+                <td class="num">{{ half.currency_symbol }}{{ item.price|default:0|floatformat:2 }}</td>
+                <td class="num"><b>{{ half.currency_symbol }}{{ item.subtotal|floatformat:2 }}</b></td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="6" class="od-empty-mute" style="text-align:center; padding:14px;">{% trans "This order has no items yet" %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+          <div class="od-totals">
+            <div class="od-tot-row">
+              <span>{% trans "Subtotal" %}</span>
+              <span>{{ half.currency_symbol }}{{ half.lines_total|floatformat:2 }}</span>
+            </div>
+            {% for adj in half.adjustments.all %}
+            <div class="od-tot-row">
+              <span>{{ adj.label }}</span>
+              <span>{% if adj.amount < 0 %}−{{ half.currency_symbol }}{{ adj.amount|floatformat:2|cut:"-" }}{% else %}{{ half.currency_symbol }}{{ adj.amount|floatformat:2 }}{% endif %}</span>
+            </div>
+            {% endfor %}
+            <div class="od-tot-row total">
+              <span>{% trans "Grand total" %}</span>
+              <span>{{ half.currency_symbol }}{{ half.total_value|floatformat:2 }}</span>
+            </div>
+          </div>
+          {% endfor %}
+
+          <div class="od-totals od-combined-total">
+            <div class="od-tot-row total">
+              <span>{% trans "Combined total" %}</span>
+              <span>{% for symbol, total in combined_totals %}{{ symbol }}{{ total|floatformat:2 }}{% if not forloop.last %} + {% endif %}{% endfor %}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
         </div><!-- /data-item-pane="current" -->
 
         {% if order.original_snapshot %}
@@ -1934,6 +2041,14 @@
             </div>
           </div>
         </div>
+
+        {% if billing_waits_for %}
+        <div id="od-billing-waits" style="margin-top:10px; padding:9px 12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; font-size:12px; color:#92400E; line-height:1.4;">
+          <i class="fa fa-clock" style="margin-right:5px;"></i>
+          {% trans "Not billed yet — the customer is charged once the goods bought for this order are received:" %}
+          {% for p in billing_waits_for %}<a href="{% url 'accounts:purchase_order_detail' p.pk %}" style="color:inherit; font-weight:700;">{{ p.number }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+        </div>
+        {% endif %}
 
         {% if current_account_recent_movements %}
         <div style="margin-top:12px;">

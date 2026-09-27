@@ -97,6 +97,39 @@ class SavingAMovementPostsIt(_Books):
         self.assertEqual(b["1200"], Decimal("500.00"))
         self.assertEqual(b["1900"], Decimal("-500.00"))
 
+    def test_a_discount_we_give_is_a_smaller_sale(self):
+        self._mv("discount", "-40.00")
+        b = self._balances()
+        self.assertEqual(b["1200"], Decimal("-40.00"))
+        self.assertEqual(b["4000"], Decimal("-40.00"))
+
+    def test_a_discount_a_supplier_gives_us_is_income_not_a_sale(self):
+        """We owe the supplier less. That is not revenue from selling
+        anything, so it must not land on 4000."""
+        self._mv("discount", "40.00")
+        b = self._balances()
+        self.assertEqual(b["1200"], Decimal("40.00"))
+        self.assertEqual(b["4900"], Decimal("40.00"))
+        self.assertNotIn("4000", {k for k, v in b.items() if v})
+
+    def test_an_overpayment_kept_to_close_an_account_is_other_income(self):
+        """The customer overpaid and will not be refunded: debiting their
+        account back to zero is income, not a sale, and not Suspense."""
+        self._mv("balance_close", "12.40")
+        b = self._balances()
+        self.assertEqual(b["1200"], Decimal("12.40"))
+        self.assertEqual(b["4900"], Decimal("12.40"))
+        self.assertFalse(b.get("1900"))
+
+    def test_a_shortfall_let_go_to_close_an_account_is_an_operating_cost(self):
+        """Too small and too ordinary to count as bad debt."""
+        self._mv("balance_close", "-3.10")
+        b = self._balances()
+        self.assertEqual(b["1200"], Decimal("-3.10"))
+        self.assertEqual(b["5100"], Decimal("3.10"))
+        self.assertFalse(b.get("5200"))
+        self.assertFalse(b.get("1900"))
+
     def test_the_equation_holds_through_a_run_of_ordinary_work(self):
         for kind, amount in (("opening", "1000.00"), ("order_sale", "250.00"),
                              ("collection", "-400.00"), ("adjustment", "35.50"),

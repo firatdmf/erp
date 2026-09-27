@@ -191,9 +191,39 @@ class TheTypeSetsTheDirection(_Base):
         self.assertFalse(CurrentAccountMovement.objects.exists())
         self.assertContains(r, "Take Payment or Make Payment")
 
-    def test_a_discount_cannot_be_a_debit(self):
+    def test_a_discount_goes_either_way(self):
+        """One we give a customer is a credit; one a supplier gives us — we
+        owe them less — is a debit."""
+        self._create("discount", "credit")
         self._create("discount", "debit")
-        self.assertFalse(CurrentAccountMovement.objects.exists())
+        self.assertEqual(
+            sorted(CurrentAccountMovement.objects.values_list("amount", flat=True)),
+            [Decimal("-100.00"), Decimal("100.00")])
+
+    def test_the_preview_shows_a_supplier_discount_as_income(self):
+        r = self.client.get(reverse("accounts:movement_create",
+                                    kwargs={"pk": self.account.pk}))
+        rule = r.context["posting_preview"]["rules"]["discount"]
+        self.assertEqual(rule["code"], "4000")
+        self.assertEqual(rule["debit"]["code"], "4900")
+        self.assertNotIn("discount", r.context["fixed_directions"])
+
+    def test_a_balance_closing_difference_goes_either_way(self):
+        """Kept when a customer overpaid, let go when they underpaid."""
+        self._create("balance_close", "credit")
+        self._create("balance_close", "debit")
+        self.assertEqual(
+            sorted(CurrentAccountMovement.objects.values_list("amount", flat=True)),
+            [Decimal("-100.00"), Decimal("100.00")])
+
+    def test_the_preview_shows_where_a_balance_closing_difference_goes(self):
+        r = self.client.get(reverse("accounts:movement_create",
+                                    kwargs={"pk": self.account.pk}))
+        rule = r.context["posting_preview"]["rules"]["balance_close"]
+        self.assertEqual(rule["code"], "5100")
+        self.assertEqual(rule["debit"]["code"], "4900")
+        self.assertFalse(rule["parked"])
+        self.assertNotIn("balance_close", r.context["fixed_directions"])
 
     def test_trade_types_come_from_documents_not_this_form(self):
         r = self.client.get(reverse("accounts:movement_create",
@@ -246,16 +276,16 @@ class TheTypeSetsTheDirection(_Base):
         self.assertEqual(mv.movement_type, "adjustment")
 
     def test_an_old_row_that_went_the_other_way_can_still_be_edited(self):
-        """One discount on the live books is a debit. Opening it to fix its
-        description must not refuse to save."""
+        """An old write-off entered as a debit must still save when opened
+        to fix its description."""
         mv = CurrentAccountMovement.objects.create(
             current_account=self.account, book=self.book, date="2026-09-01",
             amount=Decimal("50.00"), currency=self.usd,
-            movement_type="discount", description="old")
+            movement_type="write_off", description="old")
         url = reverse("accounts:movement_edit",
                       kwargs={"pk": self.account.pk, "mv_pk": mv.pk})
         self.client.post(url, {
-            "date": "2026-09-01", "movement_type": "discount",
+            "date": "2026-09-01", "movement_type": "write_off",
             "currency": self.usd.pk, "direction": "debit",
             "amount": "50.00", "reference": "", "description": "fixed",
         })
@@ -346,3 +376,51 @@ class OpeningBalanceOnlyOnAnEmptyAccount(_Base):
         mv.refresh_from_db()
         self.assertEqual(mv.movement_type, "adjustment")
 
+
+
+class TheChartOfAccountsPage(_Base):
+    def _get(self):
+        return self.client.get(reverse("accounts:report_chart_of_accounts",
+                                       kwargs={"book_id": self.book.pk}))
+
+    def _row(self, r, code):
+        return next(row for g in r.context["groups"] for row in g["rows"]
+                    if row["code"] == code)
+
+    def test_every_standard_code_is_listed_under_its_type(self):
+        from accounting.services_ledger import STANDARD_CHART
+        r = self._get()
+        self.assertEqual(r.status_code, 200)
+        listed = {row["code"]: g["type"] for g in r.context["groups"] for row in g["rows"]}
+        for code, _name, kind, _c in STANDARD_CHART:
+            self.assertEqual(listed[code], kind)
+
+    def test_it_says_what_posts_to_each_code(self):
+        r = self._get()
+        sales = self._row(r, "4000")["feeds"]
+        self.assertIn("Sales Order", sales)
+        self.assertIn("Discount — credit", sales)
+        self.assertIn("Discount — debit", self._row(r, "4900")["feeds"])
+
+    def test_it_shows_this_books_balance(self):
+        CurrentAccountMovement.objects.create(
+            current_account=self.account, book=self.book, date="2026-09-01",
+            amount=Decimal("120.00"), currency=self.usd,
+            movement_type="order_sale", description="")
+        r = self._get()
+        self.assertEqual(self._row(r, "4000")["balance"], Decimal("120.00"))
+        self.assertEqual(self._row(r, "1200")["balance"], Decimal("120.00"))
+
+    def test_the_accounts_list_links_to_the_report_centre(self):
+        """The only way in used to be the help page. The Accounts button in
+        the top bar lands on this list, so Reports has to be reachable from
+        it."""
+        r = self.client.get(reverse("accounts:list", kwargs={"book_id": self.book.pk}))
+        self.assertContains(r, reverse("accounts:report_index",
+                                       kwargs={"book_id": self.book.pk}))
+
+    def test_the_report_centre_links_to_it(self):
+        r = self.client.get(reverse("accounts:report_index",
+                                    kwargs={"book_id": self.book.pk}))
+        self.assertContains(r, reverse("accounts:report_chart_of_accounts",
+                                       kwargs={"book_id": self.book.pk}))

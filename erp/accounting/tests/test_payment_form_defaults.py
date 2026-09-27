@@ -76,3 +76,53 @@ class PaymentFormDefaultsTest(TestCase):
             r'<select name="cash_account"[^>]*>(.*?)</select>', html, re.S
         ).group(1)
         self.assertNotIn('value="%d"' % stranger.pk, block)
+
+
+class PaymentFormTypeTest(TestCase):
+    """Which payment type the form opens on, given who the account is.
+
+    The account page's two buttons only say which way the money moves.
+    Money going out to a customer is a refund to them, not a payment to a
+    supplier; money coming in from a supplier is a refund from them.
+    """
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="pay_type_tester", password="pw"
+        )
+        self.client.force_login(self.user)
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Laleli Fabric")
+        self.user.member.books.add(self.book)
+
+    def account(self, kind):
+        return CurrentAccount.objects.create(
+            book=self.book, code="TST-%s" % kind, name=kind, type=kind,
+            default_currency=self.usd,
+        )
+
+    def selected_type(self, account, requested):
+        url = reverse("accounts:payment_create", kwargs={"book_id": self.book.pk})
+        html = self.client.get(url + "?account=%d&type=%s" % (account.pk, requested)).content.decode()
+        block = re.search(r'<select name="type"[^>]*>(.*?)</select>', html, re.S).group(1)
+        return [v for v, attrs in re.findall(r'<option value="([^"]+)"([^>]*)>', block) if "selected" in attrs]
+
+    def test_money_out_to_a_customer_is_a_refund(self):
+        self.assertEqual(self.selected_type(self.account("customer"), "payment"), ["refund_in"])
+
+    def test_money_in_from_a_customer_is_a_collection(self):
+        self.assertEqual(self.selected_type(self.account("customer"), "collection"), ["collection"])
+
+    def test_money_in_from_a_supplier_is_a_refund(self):
+        self.assertEqual(self.selected_type(self.account("supplier"), "collection"), ["refund_out"])
+
+    def test_money_out_to_a_supplier_is_a_payment(self):
+        self.assertEqual(self.selected_type(self.account("supplier"), "payment"), ["payment"])
+
+    def test_an_account_that_is_both_keeps_the_plain_type(self):
+        both = self.account("both")
+        self.assertEqual(self.selected_type(both, "payment"), ["payment"])
+        self.assertEqual(self.selected_type(both, "collection"), ["collection"])
+
+    def test_an_explicit_refund_type_is_kept(self):
+        self.assertEqual(self.selected_type(self.account("customer"), "refund_in"), ["refund_in"])

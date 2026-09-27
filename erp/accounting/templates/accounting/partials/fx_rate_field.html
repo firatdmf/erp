@@ -56,6 +56,11 @@
 
   var eqEl = extra.querySelector('.fx-eq');
   var totalEl = extra.querySelector('.fx-total');
+  // Grouped at rest, like the amount, on pages that load amount_input.js.
+  // Every assignment to totalEl.value below is followed by a refresh, since
+  // assigning .value fires nothing the overlay could listen for.
+  if (window.NejumAmount) NejumAmount.attach(totalEl);
+  function refreshTotal() { if (window.NejumAmount) NejumAmount.refresh(totalEl); }
   var noteEl = extra.querySelector('.fx-note');
   var resetBtn = extra.querySelector('.fx-reset');
   extra.querySelector('.fx-code').textContent = BASE.code;
@@ -80,9 +85,12 @@
     var a = amount();
     var cur = selectedCurrency();
     var code = (cur && cur.code) ? cur.code : '';
+    // The app's language where amount_input.js loaded — the amount box
+    // right above reads in it — and the browser's where it did not.
     var lhs = (a === null)
       ? '{% translate "amount" %}'
-      : a.toLocaleString(undefined, {maximumFractionDigits: 2});
+      : (window.NejumAmount ? NejumAmount.format(a)
+                            : a.toLocaleString(undefined, {maximumFractionDigits: 2}));
     eqEl.textContent = '\u00d7 ' + lhs + (code ? ' ' + code : '') + ' =';
   }
 
@@ -122,6 +130,7 @@
     var a = amount();
     // Blank, not 0.00, while there is no amount to multiply.
     totalEl.value = (rate > 0 && a !== null) ? (a * rate).toFixed(2) : '';
+    refreshTotal();
     syncEquation();
   }
 
@@ -172,6 +181,7 @@
       // submit a rate belonging to the currency it used to be in.
       rateEl.value = '';
       totalEl.value = '';
+      refreshTotal();
       userSet = false;
       lastKey = null;
       return;

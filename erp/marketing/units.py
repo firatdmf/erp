@@ -73,5 +73,11 @@ def pack_nouns(pack_type):
     return str(one), str(many)
 
 
+def pack_noun(pack_type, count):
+    """"roll" for one, "rolls" for any other count."""
+    one, many = pack_nouns(pack_type)
+    return one if count == 1 else many
+
+
 def quantity_label(unit):
     return str(QUANTITY_LABEL.get(unit, _("Quantity")))

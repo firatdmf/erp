@@ -93,6 +93,10 @@
                  cursor: pointer; white-space: nowrap; }
   .pf-fx-reset:hover { border-color: #B9C6D4; }
   .pf-fx-note { margin-left: .4rem; font-size: .74rem; font-weight: 400; color: #8A96A6; }
+  .pf-fx-diff { margin-top: .45rem; font-size: .8rem; line-height: 1.45; border-radius: 8px;
+                padding: .5rem .7rem; border: 1px solid; }
+  .pf-fx-diff.gain { color: #0E6E4A; background: #ECFDF5; border-color: #A7F3D0; }
+  .pf-fx-diff.loss { color: #B91C1C; background: #FEF2F2; border-color: #FECACA; }
   @media (max-width: 720px) {
     .pf-fx-grid { grid-template-columns: 1fr; }
     /* Kept on narrow screens: it names what is multiplied. */
@@ -305,6 +309,8 @@
                   </button>
                 </div>
                 <span class="hint">{% trans "Leave as fetched, or type the rate you actually got — either box updates the other." %}</span>
+                {# What a rate of your own does: the account settles at your figure, the money is worth the published one, and the gap is recorded on 5900. Filled by the script below, only when the two differ. #}
+                <div class="pf-fx-diff" id="fxDiff" hidden></div>
               </div>
             </div>
 
@@ -478,6 +484,63 @@ if (window.lucide) lucide.createIcons();
     // saved rate on an edit. While true, nothing fetched replaces it.
     var userSet = Boolean(rateEl.value);
     var lastKey = null;
+    // The published rate last fetched for the pair on screen, kept so a
+    // typed rate can be held against it. On an edit the saved snapshot
+    // is the starting point, so the notice shows before anything is
+    // touched — the same figure the server will use.
+    var published = {{ payment.published_rate|default:"null"|unlocalize }};
+    var diffEl = document.getElementById('fxDiff');
+    var typeEl = document.getElementById('paymentType');
+    var DIFF_TEXT = {
+      gain: '{% trans "At the published rate %(published)s this is worth %(worth)s %(base)s — %(diff)s %(base)s more than the %(settled)s %(base)s it settles. The difference is recorded as an exchange rate gain (5900)."|escapejs %}',
+      loss: '{% trans "At the published rate %(published)s this is worth %(worth)s %(base)s — %(diff)s %(base)s less than the %(settled)s %(base)s it settles. The difference is recorded as an exchange rate loss (5900)."|escapejs %}',
+      gainOut: '{% trans "At the published rate %(published)s this is worth %(worth)s %(base)s — %(diff)s %(base)s less than the %(settled)s %(base)s it settles. The difference is recorded as an exchange rate gain (5900)."|escapejs %}',
+      lossOut: '{% trans "At the published rate %(published)s this is worth %(worth)s %(base)s — %(diff)s %(base)s more than the %(settled)s %(base)s it settles. The difference is recorded as an exchange rate loss (5900)."|escapejs %}'
+    };
+
+    function money(v) { return v.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+    function fill(tpl, words) { return tpl.replace(/%\((\w+)\)s/g, function (_m, k) { return words[k]; }); }
+
+    // Money in for a collection or a supplier's refund — Payment.cash_sign.
+    function moneyIn() {
+      var t = typeEl ? typeEl.value : 'collection';
+      return t === 'collection' || t === 'refund_out';
+    }
+
+    // The gain (+) or loss (−) the typed rate makes, in base, or null when
+    // there is nothing to compare: no amount, no typed rate, no published
+    // rate, or a rate toward the account's currency rather than the book's
+    // (that one changes what the customer owes in their money, which the
+    // revaluation on the account page deals with, not this line).
+    function realised() {
+      var a = amount();
+      var typed = parseFloat(rateEl.value);
+      if (!applies() || target() !== BASE || !published || !(typed > 0) || a === null) return null;
+      var settled = Math.round(a * typed * 100) / 100;
+      var worth = Math.round(a * published * 100) / 100;
+      var gain = Math.round((moneyIn() ? (worth - settled) : (settled - worth)) * 100) / 100;
+      return {gain: gain, settled: settled, worth: worth, rate: published};
+    }
+
+    function announce() {
+      var r = realised();
+      var shown = r && r.gain !== 0;
+      if (diffEl) {
+        diffEl.hidden = !shown;
+        if (shown) {
+          var inward = moneyIn();
+          var tpl = r.gain > 0 ? (inward ? DIFF_TEXT.gain : DIFF_TEXT.gainOut)
+                               : (inward ? DIFF_TEXT.loss : DIFF_TEXT.lossOut);
+          diffEl.className = 'pf-fx-diff ' + (r.gain > 0 ? 'gain' : 'loss');
+          diffEl.textContent = fill(tpl, {
+            published: r.rate.toFixed(6), worth: money(r.worth), settled: money(r.settled),
+            diff: money(Math.abs(r.gain)), base: BASE.code
+          });
+        }
+      }
+      // The entry preview draws the 5900 line from this.
+      document.dispatchEvent(new CustomEvent('pf:fx', {detail: shown ? {gain: r.gain, code: BASE.code} : null}));
+    }
     // The currency pair the box was last filled for. A rate belongs to its
     // pair: 0.0206 typed for lira→dollar must not survive a switch to a
     // dollar payment, where the box now means dollar→lira.
@@ -524,6 +587,7 @@ if (window.lucide) lucide.createIcons();
       // Blank, not 0.00, while there is no amount to multiply.
       totalEl.value = (rate > 0 && a !== null) ? (a * rate).toFixed(2) : '';
       syncEquation();
+      announce();
     }
 
     function recalcRate() {
@@ -531,11 +595,12 @@ if (window.lucide) lucide.createIcons();
       var a = amount();
       rateEl.value = (total > 0 && a) ? (total / a).toFixed(6) : '';
       syncEquation();
+      announce();
     }
 
     function fetchRate(force) {
       if (!applies()) return;
-      if (userSet && !force) { recalcTotal(); return; }
+      if (userSet && !force) { refreshPublished(); recalcTotal(); return; }
 
       var opt = currencyEl.options[currencyEl.selectedIndex];
       var code = opt ? opt.textContent.trim() : '';
@@ -553,10 +618,12 @@ if (window.lucide) lucide.createIcons();
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (data.rate) {
-            rateEl.value = parseFloat(data.rate).toFixed(6);
+            published = parseFloat(data.rate);
+            rateEl.value = published.toFixed(6);
             userSet = false;
             noteEl.textContent = '{% trans "published rate for" %} ' + (data.date || '');
           } else {
+            published = null;
             // No source had it. An empty box the user can fill beats a
             // wrong number presented as authoritative.
             noteEl.textContent = '{% trans "no published rate — enter it" %}';
@@ -568,6 +635,26 @@ if (window.lucide) lucide.createIcons();
         });
     }
 
+    // The published rate for the pair and date on screen, without touching
+    // the rate box: what a typed rate is measured against once the date
+    // moves. Only the notice changes.
+    var lastPublishedKey = null;
+    function refreshPublished() {
+      var opt = currencyEl.options[currencyEl.selectedIndex];
+      var code = opt ? opt.textContent.trim() : '';
+      var key = code + '|' + target().code + '|' + (dateEl.value || '');
+      if (key === lastPublishedKey) return;
+      lastPublishedKey = key;
+      var url = '{% url "accounts:fx_rate_lookup" %}'
+        + '?from=' + encodeURIComponent(code)
+        + '&to=' + encodeURIComponent(target().code)
+        + '&date=' + encodeURIComponent(dateEl.value || '');
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (data) { published = data.rate ? parseFloat(data.rate) : null; announce(); })
+        .catch(function () {});
+    }
+
     function sync() {
       var opt = currencyEl.options[currencyEl.selectedIndex];
       var pair = (opt ? opt.value : '') + '>' + target().code;
@@ -576,6 +663,7 @@ if (window.lucide) lucide.createIcons();
         totalEl.value = '';
         userSet = false;
         lastKey = null;
+        published = null;
       }
       lastPair = pair;
       if (!applies()) {
@@ -586,6 +674,8 @@ if (window.lucide) lucide.createIcons();
         totalEl.value = '';
         userSet = false;
         lastKey = null;
+        published = null;
+        announce();
         return;
       }
       row.style.display = '';
@@ -609,6 +699,10 @@ if (window.lucide) lucide.createIcons();
     amountEl.addEventListener('change', recalcTotal);
     currencyEl.addEventListener('change', sync);
     dateEl.addEventListener('change', function () { fetchRate(false); });
+    if (typeEl) typeEl.addEventListener('change', announce);
+    // The preview draws itself first on load; it asks for the difference once
+    // it is listening.
+    document.addEventListener('pf:fx-ask', announce);
 
     sync();
     if (userSet) { noteEl.textContent = '{% trans "your rate" %}'; recalcTotal(); }
@@ -650,6 +744,11 @@ if (window.lucide) lucide.createIcons();
   }
   function needsBox() { return P.cash_methods.indexOf(methodSel.value) !== -1; }
 
+  // What the typed rate makes, as the rate script last announced it:
+  // {gain, code} or null. Drawn as the entry's third line.
+  var fx = null;
+  document.addEventListener('pf:fx', function (e) { fx = e.detail; draw(); });
+
   function draw() {
     var needs = needsBox();
     el('cashReq').hidden = !needs;
@@ -678,9 +777,14 @@ if (window.lucide) lucide.createIcons();
     }
     var text = esc(value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) +
                    ' ' + selectedText(curSel));
-    el('pfLedgerRows').innerHTML = moneyIn
+    var fxRow = '';
+    if (fx && fx.gain) {
+      var fxText = esc(Math.abs(fx.gain).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + fx.code);
+      fxRow = row(fx.gain > 0 ? T.credit : T.debit, P.fx, '', fxText);
+    }
+    el('pfLedgerRows').innerHTML = (moneyIn
       ? row(T.debit, other, extra, text) + row(T.credit, P.control, '', text)
-      : row(T.debit, P.control, '', text) + row(T.credit, other, extra, text);
+      : row(T.debit, P.control, '', text) + row(T.credit, other, extra, text)) + fxRow;
     el('pfLedgerTable').hidden = false;
     el('pfLedgerEmpty').hidden = true;
     el('pfLedgerParked').hidden = needs || isNote;
@@ -691,6 +795,7 @@ if (window.lucide) lucide.createIcons();
   [typeSel, methodSel, boxSel, amountIn, curSel].forEach(function (x) {
     if (x) { x.addEventListener('change', draw); x.addEventListener('input', draw); }
   });
+  document.dispatchEvent(new CustomEvent('pf:fx-ask'));
   form.querySelectorAll('button[type="submit"]').forEach(function (b) {
     b.addEventListener('click', function () { lastSubmitter = b; });
   });

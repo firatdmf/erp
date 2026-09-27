@@ -121,6 +121,7 @@
   .mf-ledger .num { text-align:right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .mf-ledger .side { font-weight: 700; white-space: nowrap; }
   .mf-ledger .code { font: 600 11.5px var(--font-mono); color: var(--gray-500); margin-right: 6px; }
+  .mf-ledger a.code { text-decoration: underline dotted; } .mf-ledger a.code:hover { color: var(--nejum-teal-700); }
   .mf-ledger .why { font: 400 12px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
   .mf-ledger .note { margin: 0; padding: 9px 14px; border-top:1px solid #EEF1F5; font: 500 12px var(--font-sans); color: var(--gray-600); }
   .mf-ledger .note.warn { background:#FFFBEB; color:#92400E; }
@@ -357,6 +358,7 @@
   (function () {
     var data = JSON.parse(document.getElementById('mfPostingPreview').textContent);
     var BASE = "{{ base_currency_code|escapejs }}";
+    var CHART = "{% url 'accounts:report_chart_of_accounts' current_account.book_id %}";
     var T = {
       debit: "{% trans 'Debit'|escapejs %}",
       credit: "{% trans 'Credit'|escapejs %}",
@@ -379,7 +381,8 @@
     }
     function row(side, acc, text) {
       return '<tr><td class="side">' + side + '</td>' +
-             '<td><span class="code">' + esc(acc.code) + '</span>' + esc(acc.name) +
+             '<td><a class="code" target="_blank" href="' + CHART + '#code-' + esc(acc.code) + '">' +
+             esc(acc.code) + '</a>' + esc(acc.name) +
              (acc.meaning ? '<div class="why">' + esc(acc.meaning) + '</div>' : '') + '</td>' +
              '<td class="num">' + text + '</td></tr>';
     }
@@ -401,7 +404,10 @@
       var cur = currencyCode();
       var text = esc(value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + cur);
       var control = data.control;
-      var other = {code: rule.code, name: rule.name, meaning: rule.meaning};
+      // A type whose other side depends on the direction (a discount)
+      // carries the debit one separately — see DEBIT_CONTRA_BY_TYPE.
+      var other = (dirEl.value === 'debit' && rule.debit) ||
+                  {code: rule.code, name: rule.name, meaning: rule.meaning};
       var html = dirEl.value === 'debit'
         ? row(T.debit, control, text) + row(T.credit, other, text)
         : row(T.debit, other, text) + row(T.credit, control, text);

@@ -12,7 +12,7 @@ from django.utils.translation import gettext as _
 from django.views import View
 
 from .models_accounts import CurrentAccount
-from .services_fx import book_fx_positions, fx_position, post_fx_difference
+from .services_fx import book_fx_positions, book_realised_fx, fx_position, post_fx_difference
 
 
 @method_decorator(login_required, name="dispatch")
@@ -25,8 +25,13 @@ class FxReport(View):
 
     def get(self, request):
         report = book_fx_positions(request.book)
+        # The other way a difference arises: not the rate moving under a
+        # balance, but a rate somebody typed on a payment. Already on 5900
+        # by the time it is listed here; this is the trace back to why.
+        realised = book_realised_fx(request.book)
         return render(request, self.template_name, {
             "report": report,
+            "realised": realised,
             "book": request.book,
         })
 

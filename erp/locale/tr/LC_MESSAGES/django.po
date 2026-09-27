@@ -5795,6 +5795,9 @@ msgstr "Satış İadesi"
 msgid "Bad Debt Written Off"
 msgstr "Tahsil Edilemeyen Alacak (Silindi)"
 
+msgid "Balance Closing Difference"
+msgstr "Bakiye Kapatma Farkı"
+
 msgid "What this does in the books"
 msgstr "Muhasebe kaydında ne olur"
 
@@ -7734,13 +7737,13 @@ msgstr "Satın alınan ürünler"
 
 #: current_account/templates/current_account/purchase_order_list.html
 #: current_account/templates/current_account/purchase_order_detail.html
-msgid "Physical rolls received"
-msgstr "Gelen fiziksel toplar"
+msgid "Physical %(noun)s received"
+msgstr "Gelen fiziksel %(noun)s"
 
 #: current_account/templates/current_account/purchase_order_list.html
 #: current_account/templates/current_account/purchase_order_detail.html
-msgid "No rolls linked to this line yet."
-msgstr "Bu kaleme henüz top bağlanmadı."
+msgid "No %(noun)s linked to this line yet."
+msgstr "Bu kaleme henüz %(noun)s bağlanmadı."
 
 #: current_account/templates/current_account/purchase_order_list.html
 #: current_account/templates/current_account/purchase_order_detail.html
@@ -7804,6 +7807,10 @@ msgstr "Tüm tedarikçiler"
 #: current_account/templates/current_account/purchase_order_detail.html
 msgid "All statuses"
 msgstr "Tüm durumlar"
+
+#: accounting/templates/accounts/purchase_order_list.html
+msgid "All except cancelled"
+msgstr "İptal edilenler hariç tümü"
 
 #: current_account/templates/current_account/purchase_order_list.html
 #: current_account/templates/current_account/purchase_order_detail.html
@@ -9090,11 +9097,11 @@ msgstr "Bu gider için kasa hareketi işlenmemiş."
 msgid "The account now holds %(balance)s %(code)s."
 msgstr "Hesapta şimdi %(balance)s %(code)s var."
 
-msgid "Print roll barcodes"
-msgstr "Top barkodlarını yazdır"
+msgid "Print %(noun)s barcodes"
+msgstr "Her %(noun)s için barkod yazdır"
 
-msgid "One label per roll on this line, as one PDF"
-msgstr "Bu satırdaki her top için bir etiket, tek PDF"
+msgid "One label per %(noun)s on this line, as one PDF"
+msgstr "Bu satırdaki her %(noun)s için bir etiket, tek PDF"
 
 msgid "Roll labels"
 msgstr "Top etiketleri"
@@ -9633,6 +9640,97 @@ msgstr "Tedarikçi alımları"
 msgid "Awaiting delivery"
 msgstr "Teslimat bekleniyor"
 
+msgid "Not billed yet — the customer is charged once the goods bought for this order are received:"
+msgstr "Henüz faturalanmadı — bu sipariş için alınan mallar teslim alındığında müşteriye yansıtılır:"
+
+msgid ""
+"This order can't be completed yet — goods bought for it from a supplier "
+"haven't been received. Receive the purchase first, or cancel it."
+msgstr ""
+"Bu sipariş henüz tamamlanamaz — tedarikçiden bu sipariş için alınan mallar "
+"teslim alınmadı. Önce alımı teslim alın ya da iptal edin."
+
+msgid "Goods bought for this order haven't been received yet"
+msgstr "Bu sipariş için alınan mallar henüz teslim alınmadı"
+
+msgid "The order can be completed once the goods bought for it are received:"
+msgstr "Sipariş, bu sipariş için alınan mallar teslim alındığında tamamlanabilir:"
+
+msgid "Purchase created"
+msgstr "Alım oluşturuldu"
+
+msgid "on the purchase"
+msgstr "alım üzerinde"
+
+msgid "from the customer order"
+msgstr "müşteri siparişinden"
+
+msgid "date"
+msgstr "tarih"
+
+msgid "delivery date"
+msgstr "teslim tarihi"
+
+msgid "supplier"
+msgstr "tedarikçi"
+
+msgid "warehouse"
+msgstr "depo"
+
+msgid "notes"
+msgstr "notlar"
+
+msgid "status"
+msgstr "durum"
+
+msgid "customer order"
+msgstr "müşteri siparişi"
+
+msgid "quantity"
+msgstr "miktar"
+
+msgid "sale price"
+msgstr "satış fiyatı"
+
+msgid "for order %(number)s"
+msgstr "%(number)s siparişi için"
+
+msgid "received into %(warehouse)s"
+msgstr "%(warehouse)s deposuna teslim alındı"
+
+msgid "%(count)s line(s) changed from purchase %(number)s"
+msgstr "%(number)s alımından %(count)s satır değişti"
+
+msgid "%(number)s cancelled — nothing left on it to buy"
+msgstr "%(number)s iptal edildi — alınacak bir şey kalmadı"
+
+msgid "%(number)s cancelled with the order"
+msgstr "%(number)s siparişle birlikte iptal edildi"
+
+msgid "Order %(number)s is already being packed, so its lines were left as they are — check it."
+msgstr "%(number)s siparişi zaten paketleniyor, bu yüzden satırları olduğu gibi bırakıldı — kontrol edin."
+
+msgid "%(number)s cancelled — %(count)s line(s) removed"
+msgstr "%(number)s iptal edildi — %(count)s satır çıkarıldı"
+
+msgid "Its %(count)s line(s) were removed from order %(number)s, which stays open with what else is on it."
+msgstr "%(count)s satırı %(number)s siparişinden çıkarıldı; sipariş kalan satırlarıyla açık."
+
+msgid "Order %(number)s has nothing left on it but could not be cancelled — cancel it on the order page."
+msgstr "%(number)s siparişinde bir şey kalmadı ama iptal edilemedi — sipariş sayfasından iptal edin."
+
+msgid "Purchase %(number)s cancelled"
+msgstr "%(number)s alımı iptal edildi"
+
+msgid "Order %(number)s had nothing else on it and was cancelled too."
+msgstr "%(number)s siparişinde başka bir şey kalmadığından o da iptal edildi."
+
+msgid "Purchase changes"
+msgstr "Alım değişiklikleri"
+
+msgid "No changes recorded for this purchase yet."
+msgstr "Bu alım için henüz değişiklik kaydı yok."
+
 msgid "reserved"
 msgstr "rezerve"
 
@@ -9665,9 +9763,6 @@ msgid "The customer picked for this purchase was not found."
 msgstr "Bu alım için seçilen müşteri bulunamadı."
 
 #, python-format
-msgid "Ordered in from %(supplier)s — purchase %(number)s"
-msgstr "%(supplier)s tedarikçisinden sipariş edildi — alım %(number)s"
-
 #, python-format
 msgid ""
 "Order %(number)s is already being packed, so its lines were not changed — "
@@ -10349,155 +10444,287 @@ msgstr "örn. Nakliye"
 msgid "Goods"
 msgstr "Mal bedeli"
 
-msgid "A line needs a product or a description."
-msgstr "Bir satırda ürün ya da açıklama olmalı."
+msgid "Chart of Accounts"
+msgstr "Hesap Planı"
 
-msgid "A quote for a name only can be printed; turning it into an order needs a CRM customer."
-msgstr "Yalnızca isimle verilen teklif yazdırılabilir; siparişe dönüştürmek için CRM müşterisi gerekir."
+msgid "Control"
+msgstr "Kontrol"
 
-msgid "A quote that was accepted or declined can't be edited."
-msgstr "Kabul ya da reddedilmiş bir teklif düzenlenemez."
+msgid "Normal side"
+msgstr "Normal bakiye"
 
-msgid "Accepted"
-msgstr "Kabul edildi"
+msgid "What posts here"
+msgstr "Buraya ne kaydedilir"
 
-msgid "Accepted — create order"
-msgstr "Kabul edildi — sipariş oluştur"
+msgid "Search code or name"
+msgstr "Kod veya ad ara"
 
-msgid "Add at least one line with a quantity."
-msgstr "Miktarı olan en az bir satır ekleyin."
+msgid "Ledger codes"
+msgstr "Defter kodları"
 
-msgid "Back to quotes"
-msgstr "Tekliflere dön"
+msgid "Should end up empty"
+msgstr "Sonunda boş kalmalı"
 
-msgid "Became order"
-msgstr "Siparişe dönüştü"
+msgid "Nothing posts here automatically"
+msgstr "Buraya otomatik kayıt yapılmaz"
 
-msgid "Create an order from this quote? The customer's account is charged for it."
-msgstr "Bu tekliften sipariş oluşturulsun mu? Müşterinin cari hesabına yansıtılır."
+msgid "Every ledger code — what it means, what posts to it and its balance"
+msgstr "Tüm defter kodları — ne anlama geldiği, buraya neyin kaydedildiği ve bakiyesi"
 
-#: erp/nav.py
-msgid "Create quote"
-msgstr "Teklif oluştur"
+msgid "Every code the general ledger posts to. Codes starting with 1 are assets, 2 liabilities, 3 equity, 4 revenue and 5 expenses. The balance is shown the way the account normally runs, so a negative figure means it holds the opposite of what it is for."
+msgstr "Genel defterin kayıt yaptığı tüm kodlar. 1 ile başlayan kodlar varlıklar, 2 yükümlülükler, 3 özkaynaklar, 4 gelirler ve 5 giderlerdir. Bakiye, hesabın normal çalıştığı yönde gösterilir; eksi bir rakam, hesabın amacının tersini taşıdığı anlamına gelir."
 
+msgid "Every current account movement"
+msgstr "Tüm cari hesap hareketleri"
 
-msgid "Created from quote %(number)s"
-msgstr "%(number)s teklifinden oluşturuldu"
+msgid "%(type)s — credit"
+msgstr "%(type)s — alacak"
 
-msgid "Customer's account currency"
-msgstr "Müşterinin hesap para birimi"
+msgid "%(type)s — debit"
+msgstr "%(type)s — borç"
 
-msgid "Declined"
-msgstr "Reddedildi"
+msgid "Capital put in"
+msgstr "Konulan sermaye"
 
-msgid "Edit quote"
-msgstr "Teklifi düzenle"
+msgid "Income received in cash"
+msgstr "Nakit alınan gelir"
 
-msgid "Expired"
-msgstr "Süresi doldu"
+msgid "Expense paid"
+msgstr "Ödenen gider"
 
-msgid "Find in CRM"
-msgstr "CRM'de ara"
+msgid "Owner withdrawal"
+msgstr "Ortak çekişi"
 
-msgid "Invalid data."
-msgstr "Geçersiz veri."
+msgid "Payment received by cheque or note"
+msgstr "Çek veya senetle alınan ödeme"
 
-msgid "Lead time, what the price includes, payment terms…"
-msgstr "Teslim süresi, fiyata dahil olanlar, ödeme koşulları…"
+msgid "Payment made by cheque or note"
+msgstr "Çek veya senetle yapılan ödeme"
 
-msgid "Line %(n)s"
-msgstr "Satır %(n)s"
+msgid "Payment by offset or other method"
+msgstr "Mahsup veya başka yöntemle ödeme"
 
-msgid "Lines"
-msgstr "Satırlar"
+msgid "Stock leaving the warehouse"
+msgstr "Depodan çıkan stok"
 
-msgid "Mark as sent"
-msgstr "Gönderildi olarak işaretle"
+msgid "Closing a period"
+msgstr "Dönem kapanışı"
 
-msgid "Mark this quote as declined?"
-msgstr "Bu teklif reddedildi olarak işaretlensin mi?"
+msgid "Moving credit balances out of receivables"
+msgstr "Alacaklı bakiyelerin alacaklardan aktarılması"
 
-msgid "New quote"
-msgstr "Yeni teklif"
+msgid "Equipment and other things the business owns for years."
+msgstr "İşletmenin yıllarca kullandığı ekipman ve diğer varlıklar."
 
-msgid "No catalog product has the SKU %(sku)s."
-msgstr "%(sku)s SKU'lu bir katalog ürünü yok."
+msgid "What the book owes suppliers."
+msgstr "Defterin tedarikçilere borcu."
 
-msgid "No quotes yet."
-msgstr "Henüz teklif yok."
+msgid "Money the owners put into the business."
+msgstr "Ortakların işletmeye koyduğu para."
 
-msgid "Notes on the quote"
-msgstr "Teklif notları"
+msgid "Profit kept from earlier periods."
+msgstr "Önceki dönemlerden kalan kâr."
 
-msgid "Notes printed on the quote"
-msgstr "Teklifte basılacak notlar"
+msgid "Money the owners took out of the business."
+msgstr "Ortakların işletmeden çektiği para."
 
-msgid "Number or customer"
-msgstr "Numara ya da müşteri"
+msgid "What the goods sold cost when they were bought."
+msgstr "Satılan malların alış maliyeti."
 
-msgid "Only an open quote can become an order."
-msgstr "Yalnızca açık bir teklif siparişe dönüşebilir."
+msgid "Running costs: rent, wages, freight and the like."
+msgstr "İşletme giderleri: kira, maaş, nakliye ve benzerleri."
 
-msgid "Or a name (not in CRM yet)"
-msgstr "Ya da bir isim (henüz CRM'de değil)"
+msgid "Gains and losses from exchange rates moving."
+msgstr "Kur değişimlerinden doğan kâr ve zararlar."
 
-msgid "Order saved but its account could not be linked: %(error)s"
-msgstr "Sipariş kaydedildi ama cari hesabı bağlanamadı: %(error)s"
+msgid "Cash and Bank"
+msgstr "Kasa ve Banka"
 
-msgid "Pick a CRM customer — the order's account needs one."
-msgstr "CRM'den bir müşteri seçin — siparişin cari hesabı için gerekli."
+msgid "Accounts Receivable"
+msgstr "Ticari Alacaklar"
 
-msgid "Pick the book this quote belongs to."
-msgstr "Bu teklifin ait olduğu defteri seçin."
+msgid "Notes Receivable"
+msgstr "Alacak Senetleri"
 
-msgid "Prepared for"
-msgstr "Hazırlanan"
+msgid "Fixed Assets"
+msgstr "Maddi Duran Varlıklar"
 
-msgid "Prices are valid until %(date)s."
-msgstr "Fiyatlar %(date)s tarihine kadar geçerlidir."
+msgid "Suspense"
+msgstr "Askı Hesabı"
 
-msgid "Product or description"
-msgstr "Ürün ya da açıklama"
+msgid "Inter-company Clearing"
+msgstr "Şirketler Arası Mahsup"
 
-msgid "QUOTE"
-msgstr "TEKLİF"
+msgid "Accounts Payable"
+msgstr "Ticari Borçlar"
 
-#: erp/nav.py
-msgid "QUOTES"
-msgstr "TEKLİFLER"
+msgid "Notes Payable"
+msgstr "Borç Senetleri"
 
-msgid "Quote"
-msgstr "Teklif"
+msgid "Share Capital"
+msgstr "Sermaye"
 
-msgid "Quote %(number)s marked %(status)s."
-msgstr "%(number)s teklifi %(status)s olarak işaretlendi."
+msgid "Opening Balance Equity"
+msgstr "Açılış Bakiyesi Özkaynağı"
 
-msgid "Quote %(quote)s became order %(order)s."
-msgstr "%(quote)s teklifi %(order)s siparişine dönüştü."
+msgid "Retained Earnings"
+msgstr "Geçmiş Yıllar Kârları"
+
+msgid "Dividends"
+msgstr "Kâr Payları"
+
+msgid "Other Income"
+msgstr "Diğer Gelirler"
+
+msgid "Cost of Goods Sold"
+msgstr "Satılan Malın Maliyeti"
+
+msgid "Operating Expenses"
+msgstr "Faaliyet Giderleri"
+
+msgid "Bad Debts Written Off"
+msgstr "Tahsil Edilemeyen Alacaklar"
+
+msgid "Foreign Exchange Gain/Loss"
+msgstr "Kur Farkı Kâr/Zararı"
+
+msgid "Asset"
+msgstr "Varlık"
+
+msgid "Summarises a subsidiary ledger (current accounts, cash accounts)."
+msgstr "Bir yardımcı defteri özetler (cari hesaplar, kasa hesapları)."
+
+#: accounting/templates/accounts/_current_account_statement_results.html
+msgid "Running balance"
+msgstr "Yürüyen bakiye"
+
+#: accounting/templates/accounts/_current_account_statement_results.html
+msgid "oldest to newest, one step per entry"
+msgstr "eskiden yeniye, her kayıt bir adım"
+
+#: accounting/templates/accounts/_current_account_statement_results.html
+msgid "Running balance after each entry"
+msgstr "Her kayıttan sonraki yürüyen bakiye"
+
+#: accounting/templates/accounts/_current_account_statement_results.html
+msgid "Show the full text"
+msgstr "Metnin tamamını göster"
+
+#: accounting/templates/accounts/current_account_detail.html
+#, python-format
+msgid "Showing latest %(shown)s of %(total)s"
+msgstr "%(total)s kaydın son %(shown)s tanesi gösteriliyor"
+
+#: accounting/templates/accounts/_current_account_statement_results.html
+msgid "due"
+msgstr "vade"
+
+msgid "Balance sheet, trial balance, chart of accounts and credit limits"
+msgstr "Bilanço, mizan, hesap planı ve kredi limitleri"
+
+#: accounting/services_posting.py
+#, python-format
+msgid "Exchange rate difference on %(ref)s: typed %(typed)s, published %(published)s"
+msgstr "%(ref)s üzerindeki kur farkı: girilen %(typed)s, yayımlanan %(published)s"
+
+#: accounting/services_posting.py
+msgid "Payment at a typed rate — its gap to the published rate"
+msgstr "Elle girilen kurla yapılan ödeme — yayımlanan kurla arasındaki fark"
+
+#: accounting/views_payment.py
+#, python-format
+msgid "Exchange rate gain of %(base)s %(amount)s recorded on %(number)s: %(qty)s %(currency)s is worth %(base)s %(worth)s at the published rate %(published)s and settled %(base)s %(settled)s at your rate %(typed)s."
+msgstr "%(number)s için %(base)s %(amount)s kur kârı kaydedildi: %(qty)s %(currency)s yayımlanan %(published)s kuruyla %(base)s %(worth)s ederken sizin %(typed)s kurunuzla %(base)s %(settled)s olarak kapandı."
+
+#: accounting/views_payment.py
+#, python-format
+msgid "Exchange rate loss of %(base)s %(amount)s recorded on %(number)s: %(qty)s %(currency)s is worth %(base)s %(worth)s at the published rate %(published)s and settled %(base)s %(settled)s at your rate %(typed)s."
+msgstr "%(number)s için %(base)s %(amount)s kur zararı kaydedildi: %(qty)s %(currency)s yayımlanan %(published)s kuruyla %(base)s %(worth)s ederken sizin %(typed)s kurunuzla %(base)s %(settled)s olarak kapandı."
+
+#: accounting/views_payment.py
+msgid "Posted to 5900 Foreign Exchange Gain/Loss — see the exchange rate differences."
+msgstr "5900 Kur Farkı Kâr/Zarar hesabına işlendi — kur farklarına bakın."
+
+#: accounting/templates/accounts/fx_report.html
+msgid "Differences from typed rates"
+msgstr "Elle girilen kurlardan doğan farklar"
+
+#: accounting/templates/accounts/fx_report.html
+#, python-format
+msgid "A payment taken at a rate you typed settles the account at one figure while the money was worth another at the published rate for that day. The gap is a gain or loss the book actually took, so it is recorded on 5900 the moment the payment is confirmed, and listed here. Every figure is in %(base)s."
+msgstr "Elle girdiğiniz bir kurla alınan ödeme hesabı bir tutarla kapatırken, para o günün yayımlanan kuruyla başka bir tutar eder. Aradaki fark defterin gerçekten üstlendiği bir kâr ya da zarardır; bu yüzden ödeme onaylandığı anda 5900'e kaydedilir ve burada listelenir. Tüm tutarlar %(base)s cinsindendir."
+
+#: accounting/templates/accounts/fx_report.html
+msgid "Settled at your rate"
+msgstr "Sizin kurunuzla kapanan"
+
+#: accounting/templates/accounts/fx_report.html
+msgid "Worth at published rate"
+msgstr "Yayımlanan kurla değeri"
+
+#: accounting/templates/accounts/fx_report.html
+msgid "Each difference is already on 5900 Foreign Exchange Gain/Loss, dated the payment. The account moved by what your rate settled; the cash box by what the money was worth. Editing the payment's rate re-records it."
+msgstr "Her fark, ödeme tarihiyle 5900 Kur Farkı Kâr/Zarar hesabında zaten yer alır. Hesap sizin kurunuzun kapattığı tutar kadar, kasa ise paranın değeri kadar hareket etti. Ödemenin kuru düzenlenirse fark yeniden kaydedilir."
+
+#: accounting/templates/accounts/fx_report.html
+msgid "No payment in this book has been taken at a rate other than the published one."
+msgstr "Bu defterde yayımlanan kurdan farklı bir kurla alınmış ödeme yok."
+
+#: accounting/templates/accounts/payment_form.html
+#, python-format
+msgid "At the published rate %(published)s this is worth %(worth)s %(base)s — %(diff)s %(base)s more than the %(settled)s %(base)s it settles. The difference is recorded as an exchange rate gain (5900)."
+msgstr "Yayımlanan %(published)s kuruyla bu tutar %(worth)s %(base)s eder — kapattığı %(settled)s %(base)s tutarından %(diff)s %(base)s fazla. Fark kur kârı (5900) olarak kaydedilir."
+
+#: accounting/templates/accounts/payment_form.html
+#, python-format
+msgid "At the published rate %(published)s this is worth %(worth)s %(base)s — %(diff)s %(base)s less than the %(settled)s %(base)s it settles. The difference is recorded as an exchange rate loss (5900)."
+msgstr "Yayımlanan %(published)s kuruyla bu tutar %(worth)s %(base)s eder — kapattığı %(settled)s %(base)s tutarından %(diff)s %(base)s eksik. Fark kur zararı (5900) olarak kaydedilir."
+
+#: accounting/templates/accounts/payment_form.html
+#, python-format
+msgid "At the published rate %(published)s this is worth %(worth)s %(base)s — %(diff)s %(base)s less than the %(settled)s %(base)s it settles. The difference is recorded as an exchange rate gain (5900)."
+msgstr "Yayımlanan %(published)s kuruyla bu tutar %(worth)s %(base)s eder — kapattığı %(settled)s %(base)s tutarından %(diff)s %(base)s eksik. Fark kur kârı (5900) olarak kaydedilir."
+
+#: accounting/templates/accounts/payment_form.html
+#, python-format
+msgid "At the published rate %(published)s this is worth %(worth)s %(base)s — %(diff)s %(base)s more than the %(settled)s %(base)s it settles. The difference is recorded as an exchange rate loss (5900)."
+msgstr "Yayımlanan %(published)s kuruyla bu tutar %(worth)s %(base)s eder — kapattığı %(settled)s %(base)s tutarından %(diff)s %(base)s fazla. Fark kur zararı (5900) olarak kaydedilir."
 
 msgid "Quotes"
 msgstr "Teklifler"
 
-msgid "Reopen as draft"
-msgstr "Taslak olarak yeniden aç"
+msgid "Quote"
+msgstr "Teklif"
 
-msgid "Save quote"
-msgstr "Teklifi kaydet"
+msgid "New quote"
+msgstr "Yeni teklif"
 
-msgid "Say who the quote is for — a CRM customer or a name."
-msgstr "Teklifin kime olduğunu belirtin — bir CRM müşterisi ya da bir isim."
+msgid "Number or customer"
+msgstr "Numara ya da müşteri"
 
-msgid "Search the catalog, or type a description"
-msgstr "Katalogda arayın ya da bir açıklama yazın"
+msgid "Valid until"
+msgstr "Geçerlilik"
 
-msgid "See why below"
-msgstr "Nedenini aşağıda görün"
+msgid "No quotes yet."
+msgstr "Henüz teklif yok."
 
 msgid "Sent"
 msgstr "Gönderildi"
 
-msgid "The customer picked was not found."
-msgstr "Seçilen müşteri bulunamadı."
+msgid "Accepted"
+msgstr "Kabul edildi"
+
+msgid "Declined"
+msgstr "Reddedildi"
+
+msgid "Expired"
+msgstr "Süresi doldu"
+
+msgid "Only an open quote can become an order."
+msgstr "Yalnızca açık bir teklif siparişe dönüşebilir."
+
+msgid "Pick a CRM customer — the order's account needs one."
+msgstr "CRM'den bir müşteri seçin — siparişin cari hesabı için gerekli."
 
 msgid "The quote has no lines."
 msgstr "Teklifte satır yok."
@@ -10505,26 +10732,142 @@ msgstr "Teklifte satır yok."
 msgid "These lines name no catalog product: %(lines)s"
 msgstr "Bu satırlar bir katalog ürünü göstermiyor: %(lines)s"
 
-msgid "This is a quotation, not an invoice."
-msgstr "Bu bir tekliftir, fatura değildir."
+msgid "Line %(n)s"
+msgstr "Satır %(n)s"
 
-msgid "This quote became order %(number)s and stays accepted."
-msgstr "Bu teklif %(number)s siparişine dönüştü ve kabul edilmiş olarak kalır."
+msgid "The customer picked was not found."
+msgstr "Seçilen müşteri bulunamadı."
 
-msgid "This quote can't become an order yet:"
-msgstr "Bu teklif henüz siparişe dönüşemez:"
+msgid "Say who the quote is for — a CRM customer or a name."
+msgstr "Teklifin kime olduğunu belirtin — bir CRM müşterisi ya da bir isim."
 
-msgid "Type a contact or company name…"
-msgstr "Kişi ya da firma adı yazın…"
+msgid "No catalog product has the SKU %(sku)s."
+msgstr "%(sku)s SKU'lu bir katalog ürünü yok."
+
+msgid "A line needs a product or a description."
+msgstr "Bir satırda ürün ya da açıklama olmalı."
+
+msgid "Add at least one line with a quantity."
+msgstr "Miktarı olan en az bir satır ekleyin."
+
+msgid "A quote that was accepted or declined can't be edited."
+msgstr "Kabul ya da reddedilmiş bir teklif düzenlenemez."
+
+msgid "Invalid data."
+msgstr "Geçersiz veri."
+
+msgid "Pick the book this quote belongs to."
+msgstr "Bu teklifin ait olduğu defteri seçin."
 
 msgid "Unknown status."
 msgstr "Bilinmeyen durum."
 
-msgid "Valid until"
-msgstr "Geçerlilik"
+msgid "This quote became order %(number)s and stays accepted."
+msgstr "Bu teklif %(number)s siparişine dönüştü ve kabul edilmiş olarak kalır."
+
+msgid "Quote %(number)s marked %(status)s."
+msgstr "%(number)s teklifi %(status)s olarak işaretlendi."
+
+msgid "Created from quote %(number)s"
+msgstr "%(number)s teklifinden oluşturuldu"
+
+msgid "Order saved but its account could not be linked: %(error)s"
+msgstr "Sipariş kaydedildi ama cari hesabı bağlanamadı: %(error)s"
+
+msgid "Quote %(quote)s became order %(order)s."
+msgstr "%(quote)s teklifi %(order)s siparişine dönüştü."
+
+msgid "Back to quotes"
+msgstr "Tekliflere dön"
+
+msgid "Mark as sent"
+msgstr "Gönderildi olarak işaretle"
+
+msgid "Create an order from this quote? The customer's account is charged for it."
+msgstr "Bu tekliften sipariş oluşturulsun mu? Müşterinin cari hesabına yansıtılır."
+
+msgid "See why below"
+msgstr "Nedenini aşağıda görün"
+
+msgid "Accepted — create order"
+msgstr "Kabul edildi — sipariş oluştur"
+
+msgid "Mark this quote as declined?"
+msgstr "Bu teklif reddedildi olarak işaretlensin mi?"
+
+msgid "Reopen as draft"
+msgstr "Taslak olarak yeniden aç"
+
+msgid "Became order"
+msgstr "Siparişe dönüştü"
+
+msgid "Notes on the quote"
+msgstr "Teklif notları"
+
+msgid "This quote can't become an order yet:"
+msgstr "Bu teklif henüz siparişe dönüşemez:"
 
 msgid "When the customer accepts, press “Accepted — create order”: the order is raised with these lines and prices, and the quote is closed."
 msgstr "Müşteri kabul ettiğinde “Kabul edildi — sipariş oluştur”a basın: sipariş bu satır ve fiyatlarla açılır, teklif kapanır."
+
+msgid "QUOTE"
+msgstr "TEKLİF"
+
+msgid "Prepared for"
+msgstr "Hazırlanan"
+
+msgid "Prices are valid until %(date)s."
+msgstr "Fiyatlar %(date)s tarihine kadar geçerlidir."
+
+msgid "This is a quotation, not an invoice."
+msgstr "Bu bir tekliftir, fatura değildir."
+
+msgid "Edit quote"
+msgstr "Teklifi düzenle"
+
+msgid "Find in CRM"
+msgstr "CRM'de ara"
+
+msgid "Type a contact or company name…"
+msgstr "Kişi ya da firma adı yazın…"
+
+msgid "Or a name (not in CRM yet)"
+msgstr "Ya da bir isim (henüz CRM'de değil)"
+
+msgid "A quote for a name only can be printed; turning it into an order needs a CRM customer."
+msgstr "Yalnızca isimle verilen teklif yazdırılabilir; siparişe dönüştürmek için CRM müşterisi gerekir."
+
+msgid "Customer's account currency"
+msgstr "Müşterinin hesap para birimi"
+
+msgid "Lines"
+msgstr "Satırlar"
+
+msgid "Product or description"
+msgstr "Ürün ya da açıklama"
+
+msgid "Notes printed on the quote"
+msgstr "Teklifte basılacak notlar"
+
+msgid "Lead time, what the price includes, payment terms…"
+msgstr "Teslim süresi, fiyata dahil olanlar, ödeme koşulları…"
+
+msgid "Save quote"
+msgstr "Teklifi kaydet"
+
+msgid "Search the catalog, or type a description"
+msgstr "Katalogda arayın ya da bir açıklama yazın"
+
+msgid "ID"
+msgstr "ID"
+
+#: erp/nav.py
+msgid "QUOTES"
+msgstr "TEKLİFLER"
+
+#: erp/nav.py
+msgid "Create quote"
+msgstr "Teklif oluştur"
 
 msgid "Street, city, country, phone — as it should read on the label"
 msgstr "Sokak, şehir, ülke, telefon — etikette yazılacağı gibi"
@@ -10638,3 +10981,28 @@ msgstr "Listeye ekle"
 #, python-format
 msgid "%(account)s in %(book)s is in %(account_currency)s and already has transactions, but this order is in %(order_currency)s. An order split across books must be in one currency, so the %(book)s lines can't be added to it."
 msgstr "%(book)s defterindeki %(account)s hesabı %(account_currency)s cinsinden ve üzerinde hareket var, ancak bu sipariş %(order_currency)s cinsinden. Defterlere bölünen bir sipariş tek para biriminde olmalı, bu yüzden %(book)s satırları bu siparişe eklenemez."
+
+#: operating/templates/operating/order_detail.html
+#, python-format
+msgid "Split across books — you are on the <strong>%(book)s</strong> half."
+msgstr "Defterlere bölünmüş sipariş — <strong>%(book)s</strong> kısmındasınız."
+
+#: operating/templates/operating/order_detail.html
+msgid "other book"
+msgstr "diğer defter"
+
+#: operating/templates/operating/order_detail.html
+msgid "This half"
+msgstr "Bu kısım"
+
+#: operating/templates/operating/order_detail.html
+msgid "Open this half"
+msgstr "Bu kısmı aç"
+
+#: operating/templates/operating/order_detail.html
+msgid "Combined total"
+msgstr "Birleşik toplam"
+
+#: operating/templates/operating/order_list.html
+msgid "Split with"
+msgstr "Bölündüğü defter:"

@@ -59,6 +59,19 @@
       font: 600 11pt Helvetica, Arial, sans-serif; padding: 6pt 12pt; border-radius: 6pt;
       border: 1px solid #E0E6EE; background: #fff; cursor: pointer; text-decoration: none; color: #374151;
     }
+    {% if is_pdf %}
+    /* Rendered to a PDF, so EVERY margin belongs to the page: one
+       figure, the same on all four sides and on every sheet.
+
+       It used to be the body's padding, which pads the start and the end
+       of the flow once — so page two began hard against the top edge
+       while page one had room, and the sides were padding while the top
+       and foot were something else. The HTML fallback keeps the padding
+       instead: margins there are where Chrome puts its own header and
+       footer. */
+    @page { margin: 14mm; }
+    body { padding: 0; }
+    {% endif %}
   </style>
 </head>
 <body>

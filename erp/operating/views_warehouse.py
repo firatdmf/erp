@@ -3587,6 +3587,12 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                 "total": float(inv.total or 0),
                 "currency": inv.currency.code,
             }
+            from accounting.purchase_audit import log_purchase
+            if invoice is None:
+                log_purchase(inv, "created", user=user,
+                             new=_("received into %(warehouse)s") % {"warehouse": warehouse.name})
+            else:
+                log_purchase(inv, "status", field="status", old="draft", new=inv.status, user=user)
             # Link each physical stock item back to the invoice line it was
             # received against — items are created in the same order
             # as purchase_lines, so zipping by line_no is exact.
@@ -3650,6 +3656,11 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                     "rolls match a line it still needs.")
                     % {"number": number})
         warnings.append(order_hold[1])
+        # The customer's bill was held back while this purchase was on its
+        # way (post_order_movement). Now it is in, so post it — unless
+        # another purchase for the same order is still to come.
+        from accounting.services_accounts import post_order_movement
+        post_order_movement(for_order, member=member)
 
     return {
         "created": created_list,
@@ -5826,6 +5837,12 @@ CANCEL_REQUIRES_REOPEN_MSG = gettext_lazy(
     "A completed order can't be cancelled directly. Use 'Re-open & Fix' "
     "first, then cancel it.")
 
+# Shown by every caller of apply_order_status_change that gets
+# 'goods_not_received' back.
+GOODS_NOT_RECEIVED_MSG = gettext_lazy(
+    "This order can't be completed yet — goods bought for it from a supplier "
+    "haven't been received. Receive the purchase first, or cancel it.")
+
 
 def order_reservation_shortfalls(order):
     """Items whose ACTIVE (unconsumed) roll reservations do NOT cover
@@ -5965,6 +5982,10 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
       * a completed (shipped-class) order can't be cancelled directly —
         undoing a finished sale takes two deliberate steps: "Re-open &
         Fix" back to packaging (the cut stock returns), then cancel. Refused with 'cancel_requires_reopen';
+      * an order with a supplier purchase still on its way (a draft
+        purchase bought for it — Order.unreceived_purchases) can't be
+        completed: the goods it sells aren't in yet. Refused with
+        'goods_not_received'; receive or cancel the purchase first;
       * 'cancelled' is TERMINAL — once an order is cancelled it can
         never move to any other status again (mirrors purchase invoices
         after PurchaseCancel). Its current account posting was reversed;
@@ -5978,7 +5999,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
 
     Returns (ok: bool, code: str|None). code is a machine-readable
     reason on failure: 'forbidden_sales_rep' | 'order_cancelled_terminal' |
-    'cancel_requires_reopen' | 'error:<detail>'."""
+    'cancel_requires_reopen' | 'goods_not_received' | 'error:<detail>'."""
     from erp.roles import is_sales_rep
 
     # Read the role before anything else: a refusal must leave the order
@@ -6016,6 +6037,9 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     leaving_ship = (old_status in SHIPPED_CLASS and new_status in valid_statuses
                     and new_status not in SHIPPED_CLASS and new_status != old_status)
     entering_cancelled = changing and new_status == "cancelled" and old_status != "cancelled"
+
+    if entering_ship and order.unreceived_purchases().exists():
+        return False, "goods_not_received"
 
     # NOTE: the "shipping needs cargo info" gate used to live here —
     # deliberately removed. Cargo is optional for every order; whatever
@@ -6075,6 +6099,11 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # the order, so there is nothing else to undo.
                 from accounting.services_accounts import reverse_order_movement
                 reverse_order_movement(order)
+                # Stock ordered in for this order is not wanted either:
+                # its draft purchases are cancelled with it (received
+                # ones are stock on the shelf and stay).
+                from .order_purchases import cancel_purchases_for_cancelled_order
+                cancel_purchases_for_cancelled_order(order, user=user)
             # Retail money leg — completion posts the sale + auto
             # collection to the shared "Perakende Satışları" account and
             # mirrors it into the Perakende defter; un-ship reverses

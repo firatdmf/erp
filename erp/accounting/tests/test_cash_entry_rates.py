@@ -73,25 +73,31 @@ class CashEntryRateTests(TestCase):
         self.assertEqual(entry.exchange_rate, Decimal("0.025"))
         self.assertEqual(entry.amount_in_base_currency, Decimal("5.00"))
 
-    # -- entered rate wins -------------------------------------------------
-    def test_a_rate_entered_on_the_payment_beats_the_published_one(self):
+    # -- entered rate: the account, not the kasa ----------------------------
+    def test_a_rate_entered_on_the_payment_settles_the_account_not_the_kasa(self):
+        """The typed rate says what the lira SETTLED; the published rate
+        says what the lira were WORTH. The account moves by the first, the
+        kasa carries the second, and the gap between them is a realised
+        exchange difference (services_fx.realised_fx)."""
         payment = Payment.objects.create(
             current_account=self.current_account, book=self.book, number="COL-1", type="collection",
             method="cash", status="draft", date=date(2026, 8, 17),
             amount=Decimal("200.00"), currency=self.try_,
             cash_account=self.lira,
-            exchange_rate=Decimal("0.030000"),   # what the teller actually got
+            exchange_rate=Decimal("0.030000"),   # what it settled at
         )
         with mock.patch("accounting.services.get_exchange_rate") as rate:
-            rate.return_value = Decimal("0.025")  # what the API says
+            rate.return_value = Decimal("0.025")  # what the lira were worth
             payment.confirm()
 
         entry = CashTransactionEntry.objects.get(
             content_type=ContentType.objects.get_for_model(Payment),
             content_pk=payment.pk,
         )
-        self.assertEqual(entry.exchange_rate, Decimal("0.030000"))
-        self.assertEqual(entry.amount_in_base_currency, Decimal("6.00"))
+        self.assertEqual(entry.exchange_rate, Decimal("0.025"))
+        self.assertEqual(entry.amount_in_base_currency, Decimal("5.00"))
+        self.assertEqual(payment.posted_movement.amount_base, Decimal("-6.00"))
+        self.assertEqual(payment.published_rate, Decimal("0.025"))
 
     def test_the_entered_rate_survives_a_later_save(self):
         """'Permanently' — re-saving must not quietly reconvert."""

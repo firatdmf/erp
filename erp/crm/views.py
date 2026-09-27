@@ -1567,10 +1567,55 @@ class SupplierCreate(generic.CreateView):
     success_url = reverse_lazy('crm:supplier_list')
 
 class SupplierUpdate(generic.UpdateView):
+    """The full-page form, and — when asked for over XHR — the slide-in
+    edit panel on the supplier detail page, the way ContactUpdate serves
+    the contact one: the partial on GET, JSON on POST."""
     model = Supplier
     form_class = SupplierForm
     template_name = "crm/supplier_form.html"
-    success_url = reverse_lazy('crm:supplier_list')
+
+    def _is_ajax(self):
+        return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def dispatch(self, request, *args, **kwargs):
+        """Admins edit anything; everyone else edits what they created.
+
+        Suppliers made before created_by existed are NULL and so are
+        admin-only — see erp.ownership.can_edit. The same rule as on
+        contacts and companies.
+        """
+        from erp.ownership import can_edit
+
+        obj = self.get_object()
+        if not can_edit(request.user, obj):
+            message = "You can only edit records you created."
+            if self._is_ajax():
+                return JsonResponse({"success": False, "error": message}, status=403)
+            messages.error(request, message)
+            return redirect("crm:supplier_detail", pk=obj.pk)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_template_names(self):
+        if self._is_ajax():
+            return ["crm/_supplier_edit_form.html"]
+        return [self.template_name]
+
+    def form_valid(self, form):
+        if self._is_ajax():
+            self.object = form.save()
+            return JsonResponse({"success": True, "redirect_url": self.get_success_url()})
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        if self._is_ajax():
+            errors = {field: errs.get_json_data() for field, errs in form.errors.items()}
+            return JsonResponse({"success": False, "errors": errors}, status=400)
+        return super().form_invalid(form)
+
+    def get_success_url(self):
+        # Back to the record that was edited, not the list: the sidebar
+        # opens from the detail page, and the full form links there too.
+        return reverse("crm:supplier_detail", kwargs={"pk": self.object.pk})
 
 class SupplierDelete(generic.DeleteView):
     model = Supplier
@@ -1631,6 +1676,47 @@ class SupplierDetail(generic.DetailView):
             hide_fields=True,
             current_member=current_member,
         )
+        # The Attached items card shows only the open ones, and needs a
+        # count for its group header.
+        context["open_tasks"] = context["tasks"].filter(completed=False)
+
+        # ── Purchase history ───────────────────────────────────
+        # What the contact page shows as Order history, seen from the
+        # other side of the counter: the purchases we have written
+        # against this supplier, in every book. A purchase is an
+        # Invoice(type=purchase) on one of the supplier's current
+        # accounts, so the link runs through the account.
+        from accounting.models_accounts import CurrentAccount, Invoice
+        purchases = list(
+            Invoice.objects.filter(
+                type__in=("purchase", "purchase_return"),
+                current_account__supplier=supplier,
+            )
+            .select_related("book", "currency")
+            .order_by("-date", "-id")[:25]
+        )
+        # The row's colour, in the order-status palette the card already
+        # has: money still to pay reads as pending, paid as done.
+        pill = {
+            "draft": "pending", "issued": "scheduled",
+            "partially_paid": "preparing", "paid": "completed",
+            "overdue": "cancelled", "cancelled": "cancelled",
+        }
+        for inv in purchases:
+            inv.pill = pill.get(inv.status, "pending")
+        context["purchases"] = purchases
+
+        # ── Ledger accounts across every book ─────────────────
+        # Same rule as ContactDetail: what we owe a supplier is not a
+        # sales rep's to read, and the account pages behind these rows
+        # are closed to the role anyway.
+        from erp.roles import is_sales_rep
+        context["current_account_accounts"] = accounts = [] if is_sales_rep(self.request.user) else list(
+            CurrentAccount.objects.filter(supplier=supplier)
+            .select_related("book", "default_currency")
+            .order_by("book__name")
+        )
+        context.update(_accounts_total(accounts))
         return context
 
     def post(self, request, *args, **kwargs):
@@ -1664,6 +1750,10 @@ class SupplierDetail(generic.DetailView):
                 if is_htmx:
                     current_member = request.user.member if hasattr(request.user, "member") else None
                     tasks = Task.objects.filter(supplier=supplier, member=current_member, completed=False).order_by("-due_date")
+                    # The same markup the page renders on load (the
+                    # .od-task rows in supplier_detail.html), so the
+                    # group count and the inline edit keep finding them.
+                    from django.utils.html import escape
                     html = ""
                     for t in tasks:
                         delta = (t.due_date - date.today()).days
@@ -1673,25 +1763,29 @@ class SupplierDetail(generic.DetailView):
                             days_display = "today"
                         else:
                             days_display = None
-                        overdue_html = f'<span class="task-overdue">{days_display}</span>' if days_display else ""
-                        html += f'''<div class="task-item od-task-row" id="task-{t.id}">
-                            <div class="task-content" id="task-content-{t.id}">
-                                <h3 class="task-name">{t.name}</h3>
-                                {f'<p class="task-description">{t.description}</p>' if t.description else ''}
-                                <div class="task-meta">
-                                    <span class="task-due">Due: {t.due_date.strftime("%b %d, %Y")}</span>
-                                    {overdue_html}
-                                    {f'<span class="task-member"><i class="fa fa-user"></i> {t.member}</span>' if t.member else ''}
+                        overdue_html = f'<span class="pill overdue task-overdue">{days_display}</span>' if days_display else ""
+                        member_html = f'<span class="pill task-member"><i class="fa fa-user"></i>{escape(str(t.member))}</span>' if t.member else ""
+                        desc_html = f'<p class="od-task-desc task-description">{escape(t.description)}</p>' if t.description else ""
+                        html += f'''<div class="od-task" id="task-{t.id}">
+                            <div class="task-content" id="task-content-{t.id}" style="flex:1; min-width:0;">
+                                <div class="od-task-body">
+                                    <h3 class="od-task-name task-name">{escape(t.name)}</h3>
+                                    {desc_html}
+                                    <div class="od-task-meta task-meta">
+                                        <span class="pill due task-due"><i class="fa fa-calendar"></i>{t.due_date.strftime("%b %d, %Y")}</span>
+                                        {overdue_html}
+                                        {member_html}
+                                    </div>
                                 </div>
                             </div>
-                            <div class="task-actions">
-                                <button type="button" class="od-icon-btn btn-icon-minimal ok" title="Complete" onclick="confirmDelete('complete_task', {t.id})"><i class="fa fa-check"></i></button>
-                                <button type="button" class="od-icon-btn btn-icon-minimal" title="Edit" onclick="editTask({t.id}, '{t.name}', '{t.description or ""}', '{t.due_date.strftime("%Y-%m-%d")}')"><i class="fa fa-edit"></i></button>
-                                <button type="button" class="od-icon-btn btn-icon-minimal del" title="Delete" onclick="confirmDelete('delete_task', {t.id})"><i class="fa fa-trash"></i></button>
+                            <div class="od-task-actions task-actions">
+                                <button type="button" class="od-icon-btn ok btn-icon-minimal" title="Complete" onclick="confirmDelete('complete_task', {t.id})"><i class="fa fa-check"></i></button>
+                                <button type="button" class="od-icon-btn btn-icon-minimal" title="Edit" onclick="editTask({t.id}, '{escape(t.name)}', '{escape(t.description or "")}', '{t.due_date.strftime("%Y-%m-%d")}')"><i class="fa fa-edit"></i></button>
+                                <button type="button" class="od-icon-btn del btn-icon-minimal" title="Delete" onclick="confirmDelete('delete_task', {t.id})"><i class="fa fa-trash"></i></button>
                             </div>
                         </div>'''
                     if not tasks:
-                        html = '<p class="empty-state">No tasks available.</p>'
+                        html = '<p class="od-empty-mute empty-state" style="padding: 8px 2px;">No tasks available.</p>'
                     return HttpResponse(html)
                 return redirect("crm:supplier_detail", pk=supplier.pk)
 

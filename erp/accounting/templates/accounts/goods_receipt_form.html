@@ -1270,7 +1270,7 @@
           '</div>' +
           NP_TOPS_HEAD +
           '<div class="np-tops np-nv-tops"></div>' +
-          '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-no-variant\').querySelector(\'.np-variant\'))"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>' +
+          '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-no-variant\').querySelector(\'.np-variant\'), true)"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>' +
         '</div>' +
       '</div>' +
       '<div class="np-variants-wrap">' +
@@ -1752,7 +1752,7 @@
       '</div>' +
       NP_TOPS_HEAD +
       '<div class="np-tops"></div>' +
-      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>';
+      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'), true)"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>';
     cardEl.querySelector('.np-variants').appendChild(el);
     npRenderRowAttrs(el, cardEl);
     npDefaultCurrencies(el);
@@ -1790,7 +1790,10 @@
     npSyncVariantChips(card);
   };
 
-  window.npAddTop = function (vEl) {
+  // focusQty: true when a person clicked the button — the cursor lands in
+  // the new row's quantity so typing can start at once. Rows added on
+  // the page's own initiative (a card's first row) leave focus alone.
+  window.npAddTop = function (vEl, focusQty) {
     const tops = vEl.querySelector('.np-tops');
     const n = tops.children.length + 1;
     const row = document.createElement('div');
@@ -1814,6 +1817,7 @@
       '<button type="button" class="np-mini-x" title="{% trans "Remove" %}" onclick="npRemoveTop(this)">' + NP_TRASH + '</button>';
     tops.appendChild(row);
     npSummaryUpdate();
+    if (focusQty) row.querySelector('.np-top-qty').focus();
   };
   // ── Hand-typed top barcodes ──────────────────────────────────────
   // Two ways a typed code can be wrong: it already exists in the system

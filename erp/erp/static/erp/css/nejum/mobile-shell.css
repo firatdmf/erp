@@ -74,6 +74,9 @@
     stroke: currentColor !important;
   }
   .m-icon-btn svg * { fill: none !important; stroke: currentColor !important; }
+  /* The magnifier fills less of its box than the bell beside it, so at
+     the same 22px it read as the smaller icon */
+  .m-search-btn svg { width: 26px; height: 26px; stroke-width: 1.8 !important; }
 
   /* CSS-drawn hamburger — three horizontal bars (no SVG dependency) */
   .m-hamburger-bars,
@@ -619,6 +622,8 @@
   }
   /* 16px stops iOS zooming the page when the input takes focus */
   body.m-search-open .global-top-bar .search-input { font-size: 16px !important; }
+  /* Sized with the input above — the desktop 13.5px reads as a speck here */
+  body.m-search-open .global-top-bar .search-icon { font-size: 17px !important; }
   body.m-search-open .global-top-bar .search-dropdown-panel {
     position: fixed !important;
     top: 60px !important;

@@ -76,7 +76,8 @@ class TheOrderInvoice(InvoiceDocBase):
         self.assertEqual(doc.total, Decimal("130.00"))
 
     def test_the_page_prints_it(self):
-        resp = self.client.get(reverse("operating:order_invoice", args=[self.order.pk]))
+        resp = self.client.get(reverse("operating:order_invoice", args=[self.order.pk]),
+                               {"html": "1"})
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "DK0000501")
         self.assertContains(resp, "Oleg Textiles")
@@ -84,10 +85,13 @@ class TheOrderInvoice(InvoiceDocBase):
         self.assertContains(resp, "130.00")
 
     def test_the_page_is_print_only(self):
+        # The address serves a PDF; this is the page behind it, which is
+        # a bare document — no app layout, no toolbar, no language picker
+        # — and still carries the print dialog for a host that cannot
+        # render a PDF.
         body = self.client.get(
-            reverse("operating:order_invoice", args=[self.order.pk])).content.decode()
-        # A bare document that opens the print dialog — no app layout, no
-        # toolbar, no language picker.
+            reverse("operating:order_invoice", args=[self.order.pk]),
+            {"html": "1"}).content.decode()
         self.assertIn("window.print()", body)
         self.assertNotIn("global-top-bar", body)
         self.assertNotIn("Download Excel", body)
@@ -96,7 +100,8 @@ class TheOrderInvoice(InvoiceDocBase):
     def test_it_prints_in_the_apps_language(self):
         from django.conf import settings as dj_settings
         self.client.cookies[dj_settings.LANGUAGE_COOKIE_NAME] = "tr"
-        resp = self.client.get(reverse("operating:order_invoice", args=[self.order.pk]))
+        resp = self.client.get(reverse("operating:order_invoice", args=[self.order.pk]),
+                               {"html": "1"})
         self.assertContains(resp, "<title>Fatura DK0000501</title>", html=False)
 
     def test_the_excel_download_carries_the_same_figures(self):
@@ -156,7 +161,8 @@ class ThePurchaseInvoice(InvoiceDocBase):
         self.assertEqual(doc.total, Decimal("132.00"))
 
     def test_the_page_and_the_download(self):
-        resp = self.client.get(reverse("accounts:purchase_invoice", args=[self.purchase.pk]))
+        resp = self.client.get(reverse("accounts:purchase_invoice", args=[self.purchase.pk]),
+                               {"html": "1"})
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "PURCHASE INVOICE")
         self.assertContains(resp, "Bursa Mill")
@@ -195,3 +201,24 @@ class TheOldInvoicePage(InvoiceDocBase):
         resp = self.client.get(reverse("accounts:invoice_detail", args=[old.pk]))
         self.assertRedirects(resp, reverse("operating:order_invoice", args=[self.order.pk]),
                              fetch_redirect_response=False)
+
+
+class PurchasePageTotals(InvoiceDocBase):
+    """The purchase page sums the goods beside the money: how much
+    arrived, on how many packs."""
+
+    def test_one_unit_prints_with_the_quantity(self):
+        InvoiceItem.objects.create(invoice=self.purchase, line_no=2, product=self.product,
+                                   description="Velvet Moss dyed", quantity=Decimal("30.50"),
+                                   unit="mt", unit_price=Decimal("2.00"), tax_rate=0)
+        resp = self.client.get(reverse("accounts:purchase_order_detail", args=[self.purchase.pk]))
+        self.assertContains(resp, "150.50 mt")
+        self.assertContains(resp, "0 rolls")
+
+    def test_mixed_units_print_a_bare_number(self):
+        InvoiceItem.objects.create(invoice=self.purchase, line_no=2, product=self.product,
+                                   description="Tassels", quantity=Decimal("6.00"),
+                                   unit="pcs", unit_price=Decimal("2.00"), tax_rate=0)
+        resp = self.client.get(reverse("accounts:purchase_order_detail", args=[self.purchase.pk]))
+        self.assertContains(resp, "126.00\n")
+        self.assertNotContains(resp, "126.00 mt")

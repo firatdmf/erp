@@ -4,6 +4,7 @@ Current-account reports (Phase 4).
     /accounting/accounts/reports/                → ReportIndex (landing page)
     /accounting/accounts/reports/trial-balance/  → TrialBalance    (current account mizan per book, period filter)
     /accounting/accounts/reports/credit-limit/   → CreditLimitReport
+    /accounting/books/<id>/reports/chart-of-accounts/ → ChartOfAccounts
 """
 from decimal import Decimal
 
@@ -16,6 +17,7 @@ from django.views import View
 
 from accounting.models import Book
 from .models import CurrentAccount, CurrentAccountMovement
+from .models_ledger import ChartAccount
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +193,28 @@ class CreditLimitReport(View):
             "filter_book": book_id,
             "books": Book.objects.all().order_by("name"),
         })
+
+
+@method_decorator(login_required, name="dispatch")
+class ChartOfAccounts(View):
+    """Every ledger code, what it means, what posts to it and its balance.
+
+    The codes turn up on the movement form's preview and on the balance
+    sheet with nothing to say what 4000 or 1900 is; this is where they are
+    looked up.
+    """
+    template_name = "accounts/report_chart_of_accounts.html"
+
+    def get(self, request):
+        from .services_posting import chart_of_accounts
+
+        rows = chart_of_accounts(request.book)
+        groups = []
+        for kind, label in ChartAccount.TYPES:
+            members = [r for r in rows if r["type"] == kind]
+            if members:
+                groups.append({"type": kind, "label": label, "rows": members})
+        return render(request, self.template_name, {"groups": groups})
 
 
 @method_decorator(login_required, name="dispatch")

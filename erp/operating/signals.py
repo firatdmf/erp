@@ -106,6 +106,43 @@ def sync_order_current_account_movement(sender, instance, **kwargs):
         pass
 
 
+@receiver(post_save, sender=OrderItem)
+def mirror_order_item_on_purchases(sender, instance, created, **kwargs):
+    """A line edited on the order is edited on the draft purchase bought
+    for it too (order_purchases.mirror_item_on_purchases). A NEW line is
+    not: the order can't say what it costs, and it may be stock."""
+    if created:
+        return
+    _mirror_item(instance, removed=False)
+
+
+@receiver(post_delete, sender=OrderItem)
+def mirror_order_item_removal_on_purchases(sender, instance, **kwargs):
+    from .audit import _orders_being_deleted
+    if instance.order_id in _orders_being_deleted():
+        return
+    if not Order.objects.filter(pk=instance.order_id).exists():
+        return
+    _mirror_item(instance, removed=True)
+
+
+def _mirror_item(item, *, removed):
+    from .order_purchases import is_syncing, mirror_item_on_purchases
+    if is_syncing():
+        return
+    try:
+        mirror_item_on_purchases(item, removed=removed)
+    except Exception as exc:
+        # The order edit must not be lost over this — but a purchase left
+        # out of step must not go unnoticed either, so the failure is
+        # written into the order's own log.
+        import traceback as _tb
+        _tb.print_exc()
+        from .audit import log_change
+        log_change(item.order_id, "field", field="purchase",
+                   new=f"NOT mirrored on the purchase: {exc}")
+
+
 @receiver(post_save, sender=OrderItemUnit)
 def sync_order_item_unit_status(sender, instance, **kwargs):
     print("this has been called for OrderItemUnit")

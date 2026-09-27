@@ -328,7 +328,7 @@
           </div>
           <div class="cf-f">
             <label>{% trans "Country" %}</label>
-            <input type="text" name="billing_country" maxlength="50" value="{{ current_account.billing_country|default:'TR' }}">
+            <input type="text" name="billing_country" maxlength="50" value="{{ current_account.billing_country|default:'' }}">
           </div>
         </div>
       </div>

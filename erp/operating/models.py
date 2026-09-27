@@ -1163,6 +1163,21 @@ class Order(models.Model):
             result[it.pk] = got + outsourced
         return result
 
+    def unreceived_purchases(self):
+        """Purchases bought for this order whose goods have not arrived yet
+        — a draft purchase is an order placed with the supplier, nothing
+        more. Cancelled ones are not waiting for anything."""
+        return self.supplier_purchases.filter(status="draft")
+
+    def billing_waits_for_goods(self):
+        """True while the customer must not be charged yet: the order is
+        still open and stock is on its way in from a supplier for it. The
+        sale is posted when the last such purchase is received. An order
+        that has shipped has sold whatever it sold, so it bills regardless
+        of what a lingering draft says."""
+        from .order_purchases import order_is_open
+        return order_is_open(self) and self.unreceived_purchases().exists()
+
     def billable_value(self):
         """The amount that reflects on the current account/invoice — price × ORDERED
         quantity per line, summed. Equals total_value() by construction:

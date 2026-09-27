@@ -19,17 +19,22 @@
          product and variant SKU under variant, rather than a column of
          its own crowding Unit and Amount toward the edge. */
       size: letter portrait;
-      /* Zero margin so the browser does NOT add its own header/footer
-         (URL + page number + date). We compensate with body padding
-         below to keep visual breathing room. */
-      margin: 0;
+      /* No margin at the sides or the top, so the browser adds no header
+         or footer of its own (URL + page number + date) — the body
+         padding below keeps the breathing room. The foot is the one
+         exception: 9mm belongs to the Nejum credit. */
+      margin: 0 0 9mm;
+      /* The bottom margin is the credit's, and nothing else is laid in
+         it — see .nejum below. A browser printing the HTML fallback
+         ignores the margin box and prints the credit once, at the end. */
+      @bottom-center { content: element(nejum); }
     }
     body {
       font-family: Helvetica, Arial, sans-serif;
       font-size: 12.0pt;
       color: #0F1419;
       line-height: 1.3;
-      padding: 10mm 12mm 9mm 12mm;
+      padding: 10mm 12mm 4mm 12mm;
       margin: 0;
     }
     /* Belt-and-braces: in browser print mode also hide any address
@@ -56,8 +61,17 @@
        above it. Scoped to .hdr, so the unrelated `.num` on the items table
        (right-aligned numeric columns) is untouched. */
     .hdr .num { font-size: 13.33pt; font-weight: bold; color: #0F1419; margin-top: 2pt; }
-    .hdr .date { font-size: 10.67pt; color: #4B5563; text-align: right; }
-    .hdr .kind { padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold; letter-spacing: 1pt; margin-left: 4pt; }
+    .hdr .date { font-size: 10.67pt; color: #4B5563; }
+    /* Date and badge as one right-hand stack: the stack is pushed to the
+       right edge, and inside it both line up on the LEFT, so the badge
+       sits squarely under the date. The badge used to be loose in the
+       cell — the cell was right-aligned only by the old align="right"
+       attribute, which the PDF renderer ignores, so it drifted to the
+       middle of the header instead of hanging under the date. */
+    .hdr td.meta { text-align: right; }
+    .hdr .stack { display: inline-block; text-align: left; }
+    .hdr .kinds { margin-top: 4pt; }
+    .hdr .kind { padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold; letter-spacing: 1pt; }
     .hdr .kind.b2b { background: #FEF3C7; color: #8B5A00; }
     .hdr .kind.b2c { background: #E0F2F1; color: #0B5F60; }
     .hdr .kind.web { background: #DBEAFE; color: #1E40AF; }
@@ -72,6 +86,14 @@
     .card { background: #FAFBFD; border: 1px solid #E2E8EE; padding: 8.75pt 11.25pt; }
     .card .name { font-size: 13.33pt; font-weight: bold; color: #0F1419; }
     .card .role { font-size: 9.33pt; color: #147F74; font-weight: bold; letter-spacing: 0.8pt; text-transform: uppercase; margin-top: 1pt; }
+    /* WHICH KIND of customer, as the icon the side menu uses for them —
+       lucide `users` for a contact, `building-2` for a company — instead
+       of the word CONTACT or COMPANY under the name. Drawn inline rather
+       than as <i data-lucide>, because nothing runs the script that
+       would swap that for an icon: this document is rendered to a PDF on
+       the server. Delivery and Billing keep their words; they are not
+       kinds of customer. */
+    .card .name .who { width: 11pt; height: 11pt; vertical-align: -1pt; margin-right: 4pt; }
     .card .line { font-size: 11.33pt; color: #374151; margin-top: 3pt; }
     .card .line b { color: #6B7280; font-weight: bold; }
 
@@ -88,9 +110,13 @@
     table.items { width: 100%; border-collapse: collapse; margin-top: 4pt;
                   table-layout: fixed; }
     table.items col.c-product { width: 26%; }
-    table.items col.c-variant { width: 26%; }
-    table.items col.c-type    { width: 12%; }
-    table.items col.c-qty     { width: 13%; }
+    table.items col.c-variant { width: 24%; }
+    table.items col.c-type    { width: 11%; }
+    /* Wide enough for the TOTAL's figure, which is the longest thing the
+       column ever holds and is set two points larger than the lines
+       above it: "1,513.00 m" at 13.33pt did not fit 13% and broke
+       between the figure and its unit. */
+    table.items col.c-qty     { width: 16%; }
     table.items col.c-unit    { width: 10%; }
     table.items col.c-amount  { width: 13%; }
     table.items thead th {
@@ -179,15 +205,39 @@
     .foot { margin-top: 9pt; padding-top: 6pt; border-top: 1px solid #E2E8EE; font-size: 9.33pt; color: #6B7280; width: 100%; }
     .foot td { vertical-align: top; }
     .foot .right { text-align: right; }
-    /* The credit: its own line under the footer, and pinned to the foot
-       of every sheet when printed. It sits inside the 9mm bottom padding
-       the body already reserves. Colours come from the markup — see
-       erp/nejum_credit.py. */
-    .nejum { margin-top: 7pt; text-align: center; font-size: 7.5pt; }
-    @media print { .nejum { position: fixed; bottom: 3mm; left: 0; right: 0; margin: 0; } }
+    /* The credit, at the foot of every sheet. It is a RUNNING element:
+       lifted out of the flow and drawn in the page's bottom margin (the
+       @page rule above puts it there), so the page ends where the margin
+       begins and the text can no longer be laid over it.
+
+       It used to be `position: fixed`, which does repeat on every page
+       but reserves no room for itself — on a document that ran past one
+       page the last lines and the credit were printed on top of each
+       other. Colours come from the markup — see erp/nejum_credit.py. */
+    .nejum { position: running(nejum); text-align: center; font-size: 7.5pt; }
+    {% if is_pdf %}
+    /* Rendered to a PDF, so EVERY margin belongs to the page: one
+       figure, the same on all four sides and on every sheet.
+
+       It used to be the body's padding, which pads the start and the end
+       of the flow once — so page two began hard against the top edge
+       while page one had room, and the sides were padding while the top
+       and foot were something else. The HTML fallback keeps the padding
+       instead: margins there are where Chrome puts its own header and
+       footer. */
+    @page { margin: 12mm; }
+    body { padding: 0; }
+    {% endif %}
   </style>
 </head>
 <body>
+  {% comment %}The Nejum credit, first thing in the body when this is
+  being rendered to a PDF: it is drawn in the page's bottom margin (see
+  .nejum), and a running element only appears from the page it is reached
+  on — left at the foot of the document it printed on the LAST page
+  alone. In the HTML fallback it stays where a reader expects it, under
+  the footer at the end.{% endcomment %}
+  {% if is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
 
   <!-- HEADER -->
   <table class="hdr" cellspacing="0" cellpadding="0">
@@ -209,12 +259,14 @@
           <div class="num">{% trans "Order" %} {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</div>
         {% endif %}
       </td>
-      <td align="right">
-        <div class="date">{% if combined %}{% if combined_from and combined_to and combined_from != combined_to %}{{ combined_from|date:"d M Y" }} – {{ combined_to|date:"d M Y" }}{% else %}{{ combined_to|date:"d M Y" }}{% endif %}{% else %}{{ order.order_date|date:"d M Y" }}{% endif %}</div>
-        <div style="margin-top: 4pt;">
-          {% if order.contact %}<span class="kind b2b">B2B</span>
-          {% elif order.company %}<span class="kind b2b">B2B</span>
-          {% elif order.web_client %}<span class="kind web">WEB</span>{% endif %}
+      <td class="meta">
+        <div class="stack">
+          <div class="date">{% if combined %}{% if combined_from and combined_to and combined_from != combined_to %}{{ combined_from|date:"d M Y" }} – {{ combined_to|date:"d M Y" }}{% else %}{{ combined_to|date:"d M Y" }}{% endif %}{% else %}{{ order.order_date|date:"d M Y" }}{% endif %}</div>
+          <div class="kinds">
+            {% if order.contact %}<span class="kind b2b">B2B</span>
+            {% elif order.company %}<span class="kind b2b">B2B</span>
+            {% elif order.web_client %}<span class="kind web">WEB</span>{% endif %}
+          </div>
         </div>
       </td>
     </tr>
@@ -234,23 +286,20 @@
       <td{% if not has_delivery_info %} class="full"{% endif %}>
         <div class="card">
           {% if order.contact %}
-            <div class="name">{{ order.contact.name|default:"—"|capfirst }}</div>
-            <div class="role">{% trans "Contact" %}</div>
+            <div class="name"><svg class="who" viewBox="0 0 24 24" fill="none" stroke="#147F74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>{{ order.contact.name|default:"—"|capfirst }}</div>
             {% if order.contact.email %}<div class="line"><b>{% trans "Email" %}:</b> {{ order.contact.email.0|default:order.contact.email }}</div>{% endif %}
             {% if order.contact.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.contact.phone.0|default:order.contact.phone }}</div>{% endif %}
             {% if order.contact.address %}<div class="line"><b>{% trans "Address" %}:</b> {{ order.contact.address }}</div>{% endif %}
             {% if order.contact.company %}<div class="line"><b>{% trans "Company" %}:</b> {{ order.contact.company }}</div>{% endif %}
           {% elif order.company %}
-            <div class="name">{{ order.company.name|default:"—"|capfirst }}</div>
-            <div class="role">{% trans "Company" %}</div>
+            <div class="name"><svg class="who" viewBox="0 0 24 24" fill="none" stroke="#147F74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>{{ order.company.name|default:"—"|capfirst }}</div>
             {% if order.company.email %}<div class="line"><b>{% trans "Email" %}:</b> {{ order.company.email }}</div>{% endif %}
             {% if order.company.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.company.phone }}</div>{% endif %}
             {% if order.company.address %}<div class="line"><b>{% trans "Address" %}:</b> {{ order.company.address }}</div>{% endif %}
             {% if order.company.tax_office %}<div class="line"><b>{% trans "Tax Office" %}:</b> {{ order.company.tax_office }}</div>{% endif %}
             {% if order.company.tax_number %}<div class="line"><b>{% trans "Tax No" %}:</b> {{ order.company.tax_number }}</div>{% endif %}
           {% elif order.web_client %}
-            <div class="name">{{ order.web_client.name|default:order.web_client.username|capfirst }}</div>
-            <div class="role">{% trans "Web Customer" %}</div>
+            <div class="name"><svg class="who" viewBox="0 0 24 24" fill="none" stroke="#147F74" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>{{ order.web_client.name|default:order.web_client.username|capfirst }}</div>
             {% if order.web_client.email %}<div class="line"><b>{% trans "Email" %}:</b> {{ order.web_client.email }}</div>{% endif %}
             {% if order.web_client.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.web_client.phone }}</div>{% endif %}
           {% endif %}
@@ -327,8 +376,8 @@
            the separator a comma, whatever locale the person printing has
            active — a Turkish session renders 4.577,91 for the same figure,
            and this document quotes dollars to a foreign customer. {% endcomment %}
-        <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}
-          {% if item.pack_count %}<div class="packs">{{ item.pack_count }} {% blocktrans count counter=item.pack_count %}pack{% plural %}packs{% endblocktrans %}</div>{% endif %}
+        <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }}
+          {% if item.pack_count %}<div class="packs">{{ item.pack_count }}&nbsp;{{ item.pack_noun }}</div>{% endif %}
         </td>
         <td class="num">{{ order_currency_symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
         <td class="num">{{ order_currency_symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
@@ -357,14 +406,14 @@
            stylesheet for why these are not a <tfoot>. -->
       <tr class="grand">
         <td class="lbl-left" colspan="3">{% trans "Total" %}</td>
-        <td class="val">{{ order_total_quantity|floatformat:"2u"|intcomma:False }}</td>
+        <td class="val">{{ order_total_quantity|floatformat:"2u"|intcomma:False }}{% if order_total_unit %}&nbsp;{{ order_total_unit }}{% endif %}</td>
         <td></td>
         <td class="val">{{ order_currency_symbol }}{{ order_total|floatformat:"2u"|intcomma:False }}{% if combined_mixed_currency %}<div class="packs">{% blocktrans with codes=combined_mixed_currency|join:", " %}converted from {{ codes }}{% endblocktrans %}</div>{% endif %}</td>
       </tr>
       {% if order_total_packs %}
       <tr class="sum">
         <td colspan="3"></td>
-        <td class="val">{{ order_total_packs }} {% blocktrans count counter=order_total_packs %}pack{% plural %}packs{% endblocktrans %}</td>
+        <td class="val">{{ order_total_packs }}&nbsp;{{ order_total_pack_noun }}</td>
         <td colspan="2"></td>
       </tr>
       {% endif %}
@@ -394,7 +443,7 @@
       <td class="right">{% now "d M Y · H:i" %}</td>
     </tr>
   </table>
-  {% if NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
+  {% if not is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
 
   {% if not is_pdf %}
     <script>

@@ -7,6 +7,7 @@ from . import warehouse_excel
 from accounting import views_invoice
 from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped
 from .models import Order, Warehouse
+from .split_orders import split_order_guarded
 from django.views.generic import TemplateView, RedirectView
 
 
@@ -74,7 +75,9 @@ urlpatterns = [
     path("orders/create", views.OrderCreate.as_view(), name="create_order"),
     path("orders/edit/<int:pk>/", book_guarded(views.OrderEdit.as_view(), Order, "current_account.book"), name="edit_order"),
     path("orders/web/<int:pk>/status/", views.WebOrderStatusEdit.as_view(), name="web_order_status"),
-    path("orders/<int:pk>/", book_guarded(views.OrderDetail.as_view(), Order, "current_account.book"), name="order_detail"),
+    # book_guarded, plus the split-order exception: a half in another book
+    # leads to the half the viewer may open, which shows the whole order.
+    path("orders/<int:pk>/", split_order_guarded(views.OrderDetail.as_view()), name="order_detail"),
     path("orders/<int:pk>/customer/", views.order_customer_card_view, name="order_customer_card"),
     path("orders/<int:pk>/print/", views.OrderPrint.as_view(), name="order_print"),
     # The order's invoice — a printout of the order, nothing stored.

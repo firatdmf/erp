@@ -107,17 +107,21 @@ class NejumCreditBase(TestCase):
 class TheCreditIsOn(NejumCreditBase):
 
     def test_the_printed_order(self):
-        """Its own line under the document's footer, pinned to the foot of
-        the page when printed — not folded into the footer itself."""
+        """Its own line under the document's footer, drawn in the page's
+        bottom margin — not folded into the footer itself, and not
+        position: fixed, which laid it over the last lines of a sheet
+        that ran past one page."""
         import re
-        resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]))
+        resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]),
+                               {"html": "1"})
         body = resp.content.decode()
         self.assertContains(resp, "is powered by")
         self.assertContains(resp, 'href="https://nejum.com"')
         foot = re.search(r'<table class="foot".*?</table>', body, re.S)
         self.assertNotIn("nejum", foot.group(0).lower())
         self.assertIn('<div class="nejum">', body)
-        self.assertRegex(body, r"@media print \{ \.nejum \{ position: fixed")
+        self.assertIn(".nejum { position: running(nejum);", body)
+        self.assertIn("@bottom-center { content: element(nejum); }", body)
 
     def test_the_packing_list_pdf(self):
         self.assertIn(LINE, self.pdf_strings(
@@ -174,7 +178,8 @@ class TheCreditIsOn(NejumCreditBase):
         self.assertIn(LINE, "".join(drawn))
 
     def test_the_invoice_never_carries_it(self):
-        resp = self.client.get(reverse("operating:order_invoice", args=[self.order.pk]))
+        resp = self.client.get(reverse("operating:order_invoice", args=[self.order.pk]),
+                               {"html": "1"})
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, "Nejum ·")
         self.assertNotIn(LINE, self.xlsx_values(
@@ -209,7 +214,8 @@ class TheCreditIsOn(NejumCreditBase):
 class TheCreditIsOff(NejumCreditBase):
 
     def test_no_document_carries_it(self):
-        resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]))
+        resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]),
+                               {"html": "1"})
         self.assertNotContains(resp, LINE)
         self.assertNotIn(LINE, self.pdf_strings(
             reverse("operating:order_packing_list_pdf", args=[self.order.pk])))

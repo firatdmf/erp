@@ -16,6 +16,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils.translation import gettext_noop
 
 from .services_ledger import ZERO, account, credit, debit, post_entry
 
@@ -42,6 +43,10 @@ CONTRA_BY_TYPE = {
     # customer did not pay — so it goes to its own expense line, where the
     # year's total of what was let go can be read off directly.
     "write_off":        "5200",
+    # A difference let go to close an account (a credit on a customer) is a
+    # cost of doing business; one kept (a debit) is income — see
+    # DEBIT_CONTRA_BY_TYPE.
+    "balance_close":    "5100",
     # Purchases land in stock, not in expense: the cost becomes COGS when
     # the goods leave, not when they arrive.
     "invoice_purchase": "1300",
@@ -59,6 +64,17 @@ CONTRA_BY_TYPE = {
     # folding it into operating expenses hides the difference between
     # "we spent more" and "the lira moved" (see STANDARD_CHART 5900).
     "fx_adjustment":    "5900",
+}
+
+# The other leg when the movement is a DEBIT, for the types whose contra
+# depends on which way they go. A discount we give a customer is a credit
+# and a smaller sale (4000 above). One a supplier gives us is a debit — we
+# owe them less — and not a sale at all, so it is income. Not 1300: by the
+# time a supplier settles on a discount the goods are often already sold,
+# and taking it off stock would leave the shelves valued below cost.
+DEBIT_CONTRA_BY_TYPE = {
+    "discount":         "4900",
+    "balance_close":    "4900",
 }
 
 # The types whose other leg nobody has decided, parked rather than guessed.
@@ -122,6 +138,10 @@ PAYMENT_NOTE_METHODS = frozenset({"check", "promissory_note"})
 NOTES_RECEIVABLE = "1400"
 NOTES_PAYABLE = "2100"
 SUSPENSE = "1900"
+# Where the gap between a payment's typed rate and the published one goes:
+# the account moves by what the money settled, the kasa by what the money
+# was worth, and this line takes the difference. See services_fx.realised_fx.
+FX_GAIN_LOSS = "5900"
 
 
 class NoRuleFor(ValidationError):
@@ -158,6 +178,8 @@ def lines_for_movement(movement):
     amount = Decimal(movement.amount_base or 0)
     if amount == ZERO:
         return []
+    if amount > ZERO:
+        contra = DEBIT_CONTRA_BY_TYPE.get(kind, contra)
 
     # A movement written by an equity record takes that record's contra, not
     # its type's. An expense a customer paid on the book's behalf is filed as
@@ -176,11 +198,46 @@ def lines_for_movement(movement):
                                               payment.cash_account)
 
     memo = movement.description or movement.get_movement_type_display()
+    if payment is not None:
+        from .services_fx import realised_fx
+        fx = realised_fx(payment, base_stated=abs(amount))
+        if fx and fx["difference"] != ZERO:
+            return _lines_with_realised_fx(movement, amount, contra, cash_account, memo, fx)
     if amount > ZERO:
         return [debit(CURRENT_ACCOUNT_CONTROL, amount, current_account=movement.current_account, memo=memo),
                 credit(contra, amount, cash_account=cash_account, memo=memo)]
     return [credit(CURRENT_ACCOUNT_CONTROL, -amount, current_account=movement.current_account, memo=memo),
             debit(contra, -amount, cash_account=cash_account, memo=memo)]
+
+
+def _lines_with_realised_fx(movement, amount, contra, cash_account, memo, fx):
+    """Three lines instead of two, for a payment taken at a typed rate.
+
+    The control leg is the movement as booked — what the person said the
+    money settled. The cash (or notes, or suspense) leg is what the money
+    was worth at the published rate, because a kasa holds the money, not
+    the agreement. The gap lands on 5900: a credit when the book gained,
+    a debit when it lost — the same side post_fx_difference's entries take,
+    so the line reads one way whichever route a difference arrived by.
+    """
+    from django.utils.translation import gettext as _g
+
+    gain = fx["difference"]
+    worth = fx["base_published"]
+    fx_memo = _g("Exchange rate difference on %(ref)s: typed %(typed)s, published %(published)s") % {
+        "ref": movement.reference or memo,
+        "typed": fx["stated_rate"].normalize(),
+        "published": fx["published_rate"].normalize(),
+    }
+    fx_line = (credit(FX_GAIN_LOSS, gain, memo=fx_memo) if gain > ZERO
+               else debit(FX_GAIN_LOSS, -gain, memo=fx_memo))
+    if amount > ZERO:
+        return [debit(CURRENT_ACCOUNT_CONTROL, amount, current_account=movement.current_account, memo=memo),
+                credit(contra, worth, cash_account=cash_account, memo=memo),
+                fx_line]
+    return [credit(CURRENT_ACCOUNT_CONTROL, -amount, current_account=movement.current_account, memo=memo),
+            debit(contra, worth, cash_account=cash_account, memo=memo),
+            fx_line]
 
 
 def payment_contra(method, money_in, cash_account=None):
@@ -535,13 +592,21 @@ def _account_meanings():
         "1200": _g("What this account owes the book — its balance."),
         "1300": _g("Stock bought and not yet sold."),
         "1400": _g("Cheques and notes received, not yet cashed."),
+        "1500": _g("Equipment and other things the business owns for years."),
         "1900": _g("Held here until somebody decides what this really was."),
         "1950": _g("The other book's half of an inter-company movement."),
+        "2000": _g("What the book owes suppliers."),
         "2100": _g("Cheques and notes given, not yet paid."),
+        "3000": _g("Money the owners put into the business."),
         "3100": _g("Balances carried over from before this system — not this year's trading."),
+        "3200": _g("Profit kept from earlier periods."),
+        "3300": _g("Money the owners took out of the business."),
         "4000": _g("This period's sales."),
         "4900": _g("Income that is not a sale."),
+        "5000": _g("What the goods sold cost when they were bought."),
+        "5100": _g("Running costs: rent, wages, freight and the like."),
         "5200": _g("A loss: a debt the book has given up on."),
+        "5900": _g("Gains and losses from exchange rates moving."),
     }
 
 
@@ -579,6 +644,8 @@ def payment_preview():
         "notes_in": describe(NOTES_RECEIVABLE),
         "notes_out": describe(NOTES_PAYABLE),
         "suspense": describe(SUSPENSE),
+        # Where a typed rate's gap to the published one goes.
+        "fx": describe(FX_GAIN_LOSS),
         "cash_methods": sorted(PAYMENT_CASH_METHODS),
         "note_methods": sorted(PAYMENT_NOTE_METHODS),
         # Payment.cash_sign is +1 for these: money comes to the book.
@@ -592,9 +659,103 @@ def posting_preview():
     return {
         "control": describe(CURRENT_ACCOUNT_CONTROL),
         "rules": {kind: {**describe(code),
-                         "parked": kind in PARKED_CONTRA_BY_TYPE}
+                         "parked": kind in PARKED_CONTRA_BY_TYPE,
+                         **({"debit": describe(DEBIT_CONTRA_BY_TYPE[kind])}
+                            if kind in DEBIT_CONTRA_BY_TYPE else {})}
                   for kind, code in ALL_CONTRA_BY_TYPE.items()},
     }
+
+
+# The standard chart's names, marked so the catalogue carries them. The
+# chart stores them in English and chart_of_accounts translates on the way
+# out; without these makemessages would drop the Turkish as unused.
+_CHART_NAMES = (
+    gettext_noop("Cash and Bank"), gettext_noop("Accounts Receivable"),
+    gettext_noop("Inventory"), gettext_noop("Notes Receivable"),
+    gettext_noop("Fixed Assets"), gettext_noop("Suspense"),
+    gettext_noop("Inter-company Clearing"), gettext_noop("Accounts Payable"),
+    gettext_noop("Notes Payable"), gettext_noop("Share Capital"),
+    gettext_noop("Opening Balance Equity"), gettext_noop("Retained Earnings"),
+    gettext_noop("Dividends"), gettext_noop("Sales"), gettext_noop("Other Income"),
+    gettext_noop("Cost of Goods Sold"), gettext_noop("Operating Expenses"),
+    gettext_noop("Bad Debts Written Off"), gettext_noop("Foreign Exchange Gain/Loss"),
+)
+
+
+def chart_of_accounts(book):
+    """Every line on the chart, what it means and what posts to it.
+
+    "What posts here" is read off the same tables lines_for_movement and
+    lines_for_cash_entry post by, so the page cannot describe a rule the
+    ledger does not follow. The flows that are code rather than a table —
+    stock leaving, closing a period, the payables split — are named by hand
+    alongside them.
+    """
+    from django.utils.translation import gettext as _g
+
+    from .models_accounts import CurrentAccountMovement
+    from .models_ledger import ChartAccount
+    from .services_ledger import STANDARD_CHART, trial_balance
+
+    labels = dict(CurrentAccountMovement.MOVEMENT_TYPES)
+    feeds = {}
+
+    def feed(code, text):
+        feeds.setdefault(code, [])
+        if text not in feeds[code]:
+            feeds[code].append(text)
+
+    feed(CURRENT_ACCOUNT_CONTROL, _g("Every current account movement"))
+    for kind, code in ALL_CONTRA_BY_TYPE.items():
+        if kind in ("legacy_ar", "legacy_ap"):
+            continue
+        label = str(labels.get(kind, kind))
+        if kind in DEBIT_CONTRA_BY_TYPE:
+            feed(code, _g("%(type)s — credit") % {"type": label})
+            feed(DEBIT_CONTRA_BY_TYPE[kind], _g("%(type)s — debit") % {"type": label})
+        else:
+            feed(code, label)
+    cash_sources = {
+        "equitycapital":  _g("Capital put in"),
+        "equityrevenue":  _g("Income received in cash"),
+        "equityexpense":  _g("Expense paid"),
+        "equitydivident": _g("Owner withdrawal"),
+    }
+    for model, code in CASH_CONTRA_BY_SOURCE.items():
+        feed(code, cash_sources.get(model, model))
+        feed(CASH_CONTROL, cash_sources.get(model, model))
+    feed(NOTES_RECEIVABLE, _g("Payment received by cheque or note"))
+    feed(NOTES_PAYABLE, _g("Payment made by cheque or note"))
+    feed(SUSPENSE, _g("Payment by offset or other method"))
+    feed(FX_GAIN_LOSS, _g("Payment at a typed rate — its gap to the published rate"))
+    feed(COST_OF_GOODS_SOLD, _g("Stock leaving the warehouse"))
+    feed(INVENTORY, _g("Stock leaving the warehouse"))
+    feed(RETAINED_EARNINGS, _g("Closing a period"))
+    feed("2000", _g("Moving credit balances out of receivables"))
+
+    balances = {r["code"]: r["balance"] for r in trial_balance(book=book)["rows"]}
+    meanings = _account_meanings()
+    type_labels = dict(ChartAccount.TYPES)
+    chart = {code: (name, kind, control) for code, name, kind, control in STANDARD_CHART}
+    for a in ChartAccount.objects.filter(is_active=True):
+        chart[a.code] = (a.name, a.type, a.is_control)
+
+    rows = []
+    for code in sorted(chart):
+        name, kind, control = chart[code]
+        rows.append({
+            "code": code,
+            "name": _g(name),
+            "type": kind,
+            "type_label": type_labels.get(kind, kind),
+            "normal": _g("Debit") if kind in ChartAccount.DEBIT_NORMAL else _g("Credit"),
+            "is_control": control,
+            "is_parked": code in PARKED_CONTRA_BY_TYPE.values(),
+            "meaning": meanings.get(code, ""),
+            "feeds": feeds.get(code, []),
+            "balance": balances.get(code, ZERO),
+        })
+    return rows
 
 
 # ---------------------------------------------------------------------------

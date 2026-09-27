@@ -12,6 +12,7 @@ stock items (rolls) arrived, and how much it cost.
     /accounting/accounts/purchases/new/       → GoodsReceipt (blank)
     /accounting/accounts/purchases/<id>/edit/ → GoodsReceipt (pre-filled)
 """
+import copy
 import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -24,15 +25,19 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, ngettext
 from django.views import View
 
 from .models import CurrencyCategory, Invoice, InvoiceItem
 from .models_accounts import CurrentAccount, CurrentAccountSettings
+from .purchase_audit import (
+    decorate_changes, diff_fields, diff_plans, log_purchase, snapshot_fields,
+)
 from .services_accounts import (
     _currency_by_code, convert_lines_to_currency, invoice_currency_for,
     mark_as_supplier, MixedCurrencyError,
 )
+from marketing import units
 from marketing.models import (
     Product, ProductVariant, ProductVariantAttribute, ProductVariantAttributeValue,
 )
@@ -81,9 +86,17 @@ class PurchaseOrderList(View):
         if supplier_id.isdigit():
             qs = qs.filter(current_account_id=int(supplier_id))
 
+        # No status chosen = the live list. A cancelled order is kept
+        # for the audit trail, not for reading, so it only shows when
+        # asked for by name or through "all"; the total follows the
+        # same rule, so a cancelled amount never sits in the sum.
         status = (request.GET.get("status") or "").strip()
-        if status:
+        if status == "all":
+            pass
+        elif status:
             qs = qs.filter(status=status)
+        else:
+            qs = qs.exclude(status="cancelled")
 
         invoices = list(qs[:500])
         for inv in invoices:
@@ -141,7 +154,11 @@ class PurchaseOrderDetail(View):
             .prefetch_related(
                 Prefetch(
                     "warehouse_stock_items",
-                    queryset=WarehouseProductItem.objects.select_related("product", "product__warehouse"),
+                    # The catalog product behind each stock row says what
+                    # the row is counted in ("m", "pcs") — fetched with it
+                    # so the rolls print their unit without a query each.
+                    queryset=WarehouseProductItem.objects.select_related(
+                        "product", "product__warehouse", "product__catalog_variant__product"),
                 ),
                 # The line spells out what was bought — SKU and every
                 # attribute behind it — so fetch the values once for the
@@ -156,6 +173,31 @@ class PurchaseOrderDetail(View):
             )
             .order_by("line_no")
         )
+        # A line is packed the way its product is: rolls of cloth, boxes of
+        # fitted sheets. The page names the stock items by that pack, so a
+        # receiver counting boxes is not told to count rolls.
+        for it in items:
+            rolls = it.warehouse_stock_items.all()
+            product = it.product or next(
+                (r.product.catalog_product for r in rolls if r.product_id), None)
+            pack_type = product.pack_type if product is not None else units.DEFAULT_PACK
+            it.pack_type = pack_type
+            it.pack_count = len(rolls)
+            it.pack_one, it.pack_many = units.pack_nouns(pack_type)
+            it.pack_noun = units.pack_noun(pack_type, it.pack_count)
+        # What the whole delivery comes to in goods, beside what it costs:
+        # so many metres on so many rolls. Only a unit every line shares
+        # is printed — metres and pieces added together are a bare number
+        # — and mixed packs are called the generic "packs". The pack is
+        # the product's, so an order still to be received says "0 rolls".
+        total_quantity = sum((it.quantity or 0) for it in items)
+        total_packs = sum(it.pack_count for it in items)
+        unit_set = {it.unit for it in items}
+        pack_set = {it.pack_type for it in items}
+        total_unit = unit_set.pop() if len(unit_set) == 1 else ""
+        total_pack_noun = (units.pack_noun(pack_set.pop(), total_packs)
+                           if len(pack_set) == 1 else
+                           ngettext("pack", "packs", total_packs))
         # The warehouse is recorded on the invoice from the order onward;
         # falling back to the rolls keeps purchases received before that
         # field existed editable. None = no stock left to trace back to this
@@ -164,9 +206,15 @@ class PurchaseOrderDetail(View):
         return render(request, self.template_name, {
             "invoice": invoice,
             "items": items,
+            "total_quantity": total_quantity,
+            "total_unit": total_unit,
+            "total_packs": total_packs,
+            "total_pack_noun": total_pack_noun,
             "warehouse_id": warehouse_id,
             "is_order": invoice.status == "draft",
             "can_confirm": can_confirm_purchase(request.user),
+            "changes": decorate_changes(
+                list(invoice.change_logs.select_related("created_by"))),
         })
 
 
@@ -425,6 +473,36 @@ def plan_lines(plan):
     return lines
 
 
+def rebuild_draft_items(invoice, lines):
+    """Replace a draft's invoice lines with `lines` and re-total it. A
+    draft has no rolls pointing at its items, so there is nothing to
+    preserve by editing in place."""
+    invoice.items.all().delete()
+    for i, line in enumerate(lines, start=1):
+        InvoiceItem.objects.create(
+            invoice=invoice, line_no=i,
+            description=line["description"], quantity=line["quantity"],
+            unit=line["unit"], unit_price=line["unit_price"],
+            discount_rate=Decimal("0"), tax_rate=Decimal("0"),
+        )
+    invoice.recompute_totals(save=True)
+    invoice.refresh_from_db()
+
+
+def rewrite_draft_plan(invoice, plan):
+    """Store `plan` on a draft purchase and rebuild its lines from it, the
+    way PurchaseOrderSave does — so a change pushed from the customer's
+    order (operating.order_purchases.mirror_item_on_purchases) lands
+    exactly as a save on the purchase form would."""
+    lines = convert_lines_to_currency(
+        plan_lines(plan), invoice_currency_for(invoice.current_account),
+        rates=plan.get("rates"), on_date=invoice.date,
+    )
+    invoice.intake_plan = plan
+    invoice.save(update_fields=["intake_plan", "updated_at"])
+    rebuild_draft_items(invoice, lines)
+
+
 class _SaveRefused(Exception):
     """Aborts a purchase save — and rolls back what it wrote — with a
     user-facing message."""
@@ -493,6 +571,10 @@ class PurchaseOrderSave(View):
                              "error": "Bu alım onaylanmış — sipariş olarak düzenlenemez."}, status=400)
                 else:
                     invoice = Invoice(type="purchase", status="draft")
+                # What the purchase said before this save — the log is the
+                # difference (purchase_audit).
+                before_plan = copy.deepcopy(invoice.intake_plan) if invoice.pk else None
+                before_fields = snapshot_fields(invoice)
 
                 # Same rule as the received alım: one currency, the account's
                 # own, and any line priced in another restated into it at the
@@ -544,20 +626,21 @@ class PurchaseOrderSave(View):
 
                 # Rebuilt from the plan every save — a draft has no rolls pointing
                 # at its items, so there is nothing to preserve by editing in place.
-                invoice.items.all().delete()
-                for i, line in enumerate(lines, start=1):
-                    InvoiceItem.objects.create(
-                        invoice=invoice, line_no=i,
-                        description=line["description"], quantity=line["quantity"],
-                        unit=line["unit"], unit_price=line["unit_price"],
-                        discount_rate=Decimal("0"), tax_rate=Decimal("0"),
-                    )
-                invoice.recompute_totals(save=True)
-                invoice.refresh_from_db()
+                rebuild_draft_items(invoice, lines)
                 # A draft order is already an intention to buy from them, and it
                 # is the account page's own answer to "who do we buy from" that
                 # goes stale otherwise.
                 mark_as_supplier(current_account)
+
+                if before_plan is None:
+                    log_purchase(invoice, "created", user=request.user,
+                                 new=(_("for order %(number)s")
+                                      % {"number": invoice.for_order.order_number or invoice.for_order.pk}
+                                      if invoice.for_order_id else None))
+                    diff_plans(invoice, {}, data, user=request.user)
+                else:
+                    diff_fields(invoice, before_fields, user=request.user)
+                    diff_plans(invoice, before_plan, data, user=request.user)
         except (_SaveRefused, CustomerOrderError) as exc:
             # CustomerOrderError reaches here from put_plan_in_catalog — a
             # row with no sale price, refused before the order is touched.
@@ -634,14 +717,15 @@ class PurchaseOrderConfirm(View):
 class PurchaseOrderPrint(View):
     """The order as a document the supplier can be sent.
 
-    Styled HTML the BROWSER prints (and "Save as PDF"), matching how the
-    sales order prints — same reason: xhtml2pdf can't reproduce this layout,
-    the browser can.
+    A PDF, rendered from the print template the same way the sales order
+    is — see erp.pdf_render. The template's own @media print rules hide
+    its toolbar, so the supplier's copy carries no Print button.
     """
     template_name = "accounts/purchase_order_print.html"
 
     def get(self, request, pk):
         from .services_accounts import brand_name_for
+        from erp.pdf_render import document_response
 
         invoice = get_object_or_404(
             Invoice.objects.select_related("current_account", "currency", "book"),
@@ -670,13 +754,13 @@ class PurchaseOrderPrint(View):
         for it in items:
             it.roll_count = rolls_by_line.get(it.line_no, 0)
 
-        return render(request, self.template_name, {
+        return document_response(request, self.template_name, {
             "invoice": invoice,
             "items": items,
             "warehouse": invoice.intake_warehouse,
             "brand_line": brand_name_for(invoice.book),
             "is_order": invoice.status == "draft",
-        })
+        }, f"purchase_{invoice.display_number}.pdf")
 
 
 class PurchaseCancelBlocked(Exception):
@@ -688,7 +772,7 @@ class PurchaseCancelBlocked(Exception):
         self.blockers = blockers or []
 
 
-def cancel_purchase_invoice(invoice_pk, user):
+def cancel_purchase_invoice(invoice_pk, user, *, origin="purchase", mirror_order=True):
     """Cancel a purchase invoice: hard-deletes every physical stock item it
     brought in (after confirming NONE has ever been reserved into a
     customer order — checked and acted on under a row lock in the SAME
@@ -755,7 +839,27 @@ def cancel_purchase_invoice(invoice_pk, user):
             wp.save(update_fields=["quantity", "updated_at"])
             _resync_wp_catalog(wp)
 
+        was = invoice.status
         invoice.cancel(user=user)
+        log_purchase(invoice, "status", field="status", old=was, new="cancelled",
+                     origin=origin, user=user)
+        invoice.order_note = None
+        if invoice.for_order_id:
+            # The order was raised for these goods: with the purchase
+            # gone, the lines it put there go too, and an order left with
+            # nothing on it is cancelled along with it. `mirror_order` is
+            # False when the ORDER side started this (its lines are
+            # already gone, or the order itself is being cancelled).
+            if mirror_order:
+                from operating.order_purchases import drop_purchase_lines_from_order
+                invoice.order_note = drop_purchase_lines_from_order(invoice, user=user)
+            # With this purchase gone nothing is on its way for the order,
+            # so the bill post_order_movement held back is due like any
+            # other open order's — or stays away, if a sibling purchase
+            # is still to come.
+            from accounting.services_accounts import post_order_movement
+            post_order_movement(invoice.for_order,
+                                member=getattr(user, "member", None))
         return invoice
 
 
@@ -786,13 +890,9 @@ class PurchaseCancel(View):
         except PurchaseCancelBlocked as exc:
             return JsonResponse({"success": False, "error": str(exc), "blocked": exc.blockers}, status=422)
 
-        # The customer's order was the client's request, not the purchase's
-        # — it may be filled another way, or carry a deposit. Say it is
-        # still there rather than cancelling it behind their back.
-        order = invoice.for_order
-        if order is not None and order.order_status not in {"cancelled", "returned"}:
-            messages.warning(request, _(
-                "Order %(number)s for this purchase is still open — cancel it on the "
-                "order page if the customer no longer needs it.")
-                % {"number": order.order_number or order.pk})
+        # What became of the customer's order — its lines removed, the
+        # order cancelled with the purchase, or left alone because it is
+        # being packed (drop_purchase_lines_from_order).
+        if getattr(invoice, "order_note", None):
+            messages.warning(request, invoice.order_note)
         return JsonResponse({"success": True, "invoice_id": invoice.pk})

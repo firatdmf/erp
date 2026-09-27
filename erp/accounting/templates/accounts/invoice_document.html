@@ -186,7 +186,10 @@
   table.doc-items .design-id { font: 700 10.5px var(--font-mono); color: var(--ink); text-align: center; }
   .roll-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
   .roll-chips .rc-lbl { font: 700 8.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-600, #4B5563); width: 100%; margin-bottom: 1px; }
-  .roll-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border: 1px solid var(--ink); border-radius: 4px; font: 500 9px var(--font-sans); }
+  /* nowrap: the chip sits in a narrow column, and without it the
+     quantity broke between the figure and its unit — "35.00" on one
+     line and "m" on the next, inside the chip's own border. */
+  .roll-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border: 1px solid var(--ink); border-radius: 4px; font: 500 9px var(--font-sans); white-space: nowrap; }
   .roll-chip code { font: 700 9px var(--font-mono); }
   table.doc-items .desc-multi { white-space: pre-line; }
 
@@ -395,6 +398,18 @@
       border-bottom: 1px solid #000 !important;
     }
   }
+{% if is_pdf %}
+/* Rendered to a PDF, so EVERY margin belongs to the page: one figure,
+   the same on all four sides and on every sheet.
+
+   It used to be .doc's padding, which pads the start and the end of the
+   flow once — so page two of a long invoice began hard against the top
+   edge while page one had room. The HTML fallback keeps the padding
+   instead: margins there are where Chrome puts its own header and
+   footer. */
+@page { margin: 12mm; }
+.doc { padding: 0; }
+{% endif %}
 </style>
 </head>
 <body>

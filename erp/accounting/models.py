@@ -1088,14 +1088,19 @@ class CashTransactionEntry(models.Model):
         1. A rate set on this entry — nothing overrides a rate already here.
         2. A rate entered on the source. Whoever recorded the transaction
            was there; a cash exchange at the döviz bürosu is not the
-           mid-market rate, and their figure beats any API's.
+           mid-market rate, and their figure beats any API's. A source
+           that keeps a separate rate for its cash side — a Payment, whose
+           typed rate says what the money settled rather than what it was
+           worth — is asked for that one (`cash_ledger_rate()`).
         3. The published rate for the day the money moved — not today's,
            which is a fact about a different day.
         """
         if self.exchange_rate:
             return self.exchange_rate
 
-        entered = getattr(self.content, "exchange_rate", None)
+        content = self.content
+        for_cash = getattr(content, "cash_ledger_rate", None)
+        entered = for_cash() if callable(for_cash) else getattr(content, "exchange_rate", None)
         if entered:
             return Decimal(entered)
 

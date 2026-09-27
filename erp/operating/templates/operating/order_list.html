@@ -150,7 +150,7 @@
   }
   .ord-list-head, .ord-row {
     display: grid;
-    grid-template-columns: 28px 90px 56px 200px 1.4fr 1fr 1fr{% if may_see_profit %} 110px{% endif %} 150px 24px;
+    grid-template-columns: 28px 56px 200px 1.4fr 1fr{% if may_see_profit %} 110px{% endif %} 150px 24px;
     gap: 16px;
     align-items: center;
     padding: 12px 18px;
@@ -223,19 +223,6 @@
     background: #DC2626; border-color: #DC2626; color: #fff;
   }
   .ord-bulk-bar .ord-btn.danger:hover { background: #B91C1C; border-color: #B91C1C; }
-  .ord-kind {
-    display: inline-flex; align-items: center; justify-content: center;
-    padding: 4px 0;
-    width: 42px;
-    border-radius: 6px;
-    font: 700 10px var(--font-sans);
-    letter-spacing: 0.10em;
-  }
-  .ord-kind.b2b { background: #FEF3C7; color: #8B5A00; box-shadow: inset 0 0 0 1px #F5D78B; }
-  .ord-kind.b2c { background: #E0F2F1; color: #0B5F60; box-shadow: inset 0 0 0 1px #B3DDD9; }
-  .ord-kind.int { background: #EEF1F5; color: var(--gray-700); box-shadow: inset 0 0 0 1px #D6DDE5; }
-  .ord-kind.retail { background: #FFE4E6; color: #9F1239; box-shadow: inset 0 0 0 1px #FECDD3; width: auto; justify-self: start; padding: 4px 8px; white-space: nowrap; }
-  .ord-kind.lg { padding: 5px 11px; width: auto; font-size: 11.5px; letter-spacing: 0.12em; }
   .ord-pk { font: 600 12px var(--font-mono); color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ord-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .ord-id .mono { font: 600 12.5px var(--font-mono); color: #0F1419; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -328,7 +315,7 @@
   .ord-empty p { font: 500 13px var(--font-sans); color: var(--gray-500); margin: 0 0 20px; }
 
   @media (max-width: 1100px) {
-    .ord-list-head, .ord-row { grid-template-columns: 28px 90px 48px 1.2fr 1.4fr 0.8fr 0.9fr{% if may_see_profit %} 0.8fr{% endif %} 130px 20px; }
+    .ord-list-head, .ord-row { grid-template-columns: 28px 48px 1.2fr 1.4fr 0.9fr{% if may_see_profit %} 0.8fr{% endif %} 130px 20px; }
   }
   /* ─── MOBILE: head/tabs stack, rows become cards ─────── */
   @media (max-width: 820px) {
@@ -343,19 +330,17 @@
     .ord-tabs-r { margin-left: 0; width: 100%; }
     .ord-search-input { width: 100%; }
 
-    /* Each row reflows from an 8-col grid into a compact stacked card. */
+    /* Each row reflows from the grid into a compact stacked card. */
     .ord-list-head { display: none; }
     .ord-row {
       display: flex; flex-wrap: wrap; align-items: center;
       gap: 6px 10px; padding: 13px 14px;
     }
     .ord-row > .ord-select { order: 1; flex: 0 0 auto; }
-    .ord-row > .ord-kind   { order: 2; flex: 0 0 auto; }
     .ord-row > .ord-pk     { order: 3; flex: 0 0 auto; }
     .ord-row > .ord-id     { order: 3; flex: 1 1 auto; min-width: 0; }
     .ord-row > .ord-status { order: 4; flex: 0 0 auto; margin-left: auto; }
     .ord-row > .ord-cust   { order: 5; flex: 1 1 100%; }
-    .ord-row > .ord-source { display: none; }   /* Source / Payment col */
     .ord-row > .ord-total  { order: 6; flex: 1 1 100%; text-align: left; }
     .ord-row > .ord-gross-cell { order: 7; flex: 1 1 100%; text-align: left; }
     .ord-total { font-size: 14px; }
@@ -434,11 +419,9 @@
         <label class="ord-select" title="{% trans 'Select all on this tab' %}">
           <input type="checkbox" class="ord-select-all">
         </label>
-        <span></span>
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
-        <span>{% trans "Source" %}</span>
         <span class="num">{% trans "Total" %}</span>
         {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
@@ -449,18 +432,10 @@
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
-        {% if order.web_client %}
-          <span class="ord-kind b2c">B2C</span>
-        {% elif order.is_retail_order %}
-          <span class="ord-kind retail">{% trans "Retail" %}</span>
-        {% elif order.contact or order.company %}
-          <span class="ord-kind b2b">B2B</span>
-        {% else %}
-          <span class="ord-kind int">INT</span>
-        {% endif %}
         <span class="ord-pk">{{ order.pk }}</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
+          {% if order.combined_number %}<span class="ord-split" title="{{ order.combined_number }}" style="display:inline-flex;align-items:center;gap:4px;margin-top:2px;padding:1px 7px;border-radius:999px;background:#ECFDF5;border:1px solid #A7F3D0;color:#0F766E;font-size:10.5px;font-weight:700;white-space:nowrap;"><i class="fa fa-code-branch"></i>{% trans "Split with" %} {{ order.split_other_books|join:", " }}</span>{% endif %}
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
@@ -515,13 +490,6 @@
             </div>
           {% endif %}
         </div>
-        <div class="ord-source">
-          {% if order.web_client %}
-            <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-globe" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "Website" %}</span>
-          {% else %}
-            <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-store" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "ERP" %}</span>
-          {% endif %}
-        </div>
         <div class="num ord-total">
           {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
         </div>
@@ -561,11 +529,9 @@
         <label class="ord-select" title="{% trans 'Select all on this tab' %}">
           <input type="checkbox" class="ord-select-all">
         </label>
-        <span></span>
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
-        <span>{% trans "Source" %}</span>
         <span class="num">{% trans "Total" %}</span>
         {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
@@ -576,10 +542,10 @@
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
-        <span class="ord-kind b2b">B2B</span>
         <span class="ord-pk">{{ order.pk }}</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
+          {% if order.combined_number %}<span class="ord-split" title="{{ order.combined_number }}" style="display:inline-flex;align-items:center;gap:4px;margin-top:2px;padding:1px 7px;border-radius:999px;background:#ECFDF5;border:1px solid #A7F3D0;color:#0F766E;font-size:10.5px;font-weight:700;white-space:nowrap;"><i class="fa fa-code-branch"></i>{% trans "Split with" %} {{ order.split_other_books|join:", " }}</span>{% endif %}
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
@@ -596,9 +562,6 @@
               <div class="ord-cust-c">{% trans "B2B · Company" %}</div>
             </div>
           {% endif %}
-        </div>
-        <div class="ord-source">
-          <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-store" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "ERP" %}</span>
         </div>
         <div class="num ord-total">
           {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
@@ -636,11 +599,9 @@
     <div class="ord-list">
       <div class="ord-list-head">
         <span></span>
-        <span></span>
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
-        <span>{% trans "Payment" %}</span>
         <span class="num">{% trans "Total" %}</span>
         {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
@@ -651,10 +612,10 @@
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
-        <span class="ord-kind b2c">B2C</span>
         <span class="ord-pk">{{ order.pk }}</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
+          {% if order.combined_number %}<span class="ord-split" title="{{ order.combined_number }}" style="display:inline-flex;align-items:center;gap:4px;margin-top:2px;padding:1px 7px;border-radius:999px;background:#ECFDF5;border:1px solid #A7F3D0;color:#0F766E;font-size:10.5px;font-weight:700;white-space:nowrap;"><i class="fa fa-code-branch"></i>{% trans "Split with" %} {{ order.split_other_books|join:", " }}</span>{% endif %}
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
@@ -667,13 +628,6 @@
             <div class="ord-cust-n">{{ order.web_client.name|default:order.web_client.username }}</div>
             <div class="ord-cust-c">{% trans "Web customer" %}</div>
           </div>
-        </div>
-        <div class="ord-source">
-          {% if order.payment_status %}
-            <span style="font: 600 11.5px var(--font-sans); color: var(--gray-700);">{{ order.get_payment_status_display }}</span>
-          {% else %}
-            <span style="color: var(--gray-400);">—</span>
-          {% endif %}
         </div>
         <div class="num ord-total">
           {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
@@ -713,11 +667,9 @@
         <label class="ord-select" title="{% trans 'Select all on this tab' %}">
           <input type="checkbox" class="ord-select-all">
         </label>
-        <span></span>
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
-        <span>{% trans "Source" %}</span>
         <span class="num">{% trans "Total" %}</span>
         {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
@@ -728,10 +680,10 @@
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
         </label>
-        <span class="ord-kind retail">{% trans "Retail" %}</span>
         <span class="ord-pk">{{ order.pk }}</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
+          {% if order.combined_number %}<span class="ord-split" title="{{ order.combined_number }}" style="display:inline-flex;align-items:center;gap:4px;margin-top:2px;padding:1px 7px;border-radius:999px;background:#ECFDF5;border:1px solid #A7F3D0;color:#0F766E;font-size:10.5px;font-weight:700;white-space:nowrap;"><i class="fa fa-code-branch"></i>{% trans "Split with" %} {{ order.split_other_books|join:", " }}</span>{% endif %}
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
@@ -742,9 +694,6 @@
             <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name }} {{ order.guest_last_name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
             <div class="ord-cust-c">{% trans "Retail" %}</div>
           </div>
-        </div>
-        <div class="ord-source">
-          <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-store" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "ERP" %}</span>
         </div>
         <div class="num ord-total">
           {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>

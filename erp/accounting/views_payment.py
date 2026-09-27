@@ -25,6 +25,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.html import format_html
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _, gettext as _g
 from django.views import View
@@ -264,6 +265,26 @@ def _fx_account_context(current_account):
 
 # Create
 # ---------------------------------------------------------------------------
+def _initial_payment_type(requested, current_account):
+    """The payment type the form should open on.
+
+    The links only say which way the money moves — "payment" for money
+    going out, "collection" for money coming in. Which type that is depends
+    on who the account is: money going out to a customer is a refund to
+    them, not a supplier payment, and money coming in from a supplier is a
+    refund from them, not a collection. A "both"/other account keeps the
+    plain type since either reading is possible.
+    """
+    if requested not in dict(Payment.PAYMENT_TYPES):
+        return "collection"
+    account_type = getattr(current_account, "type", None)
+    if account_type == "customer" and requested == "payment":
+        return "refund_in"
+    if account_type == "supplier" and requested == "collection":
+        return "refund_out"
+    return requested
+
+
 @method_decorator(login_required, name="dispatch")
 class PaymentCreate(View):
     template_name = "accounts/payment_form.html"
@@ -286,9 +307,7 @@ class PaymentCreate(View):
 
         # "Take Payment" / "Make Payment" land here with ?type= so the
         # form opens on the right side without the user re-picking it.
-        initial_type = request.GET.get("type")
-        if initial_type not in dict(Payment.PAYMENT_TYPES):
-            initial_type = "collection"
+        initial_type = _initial_payment_type(request.GET.get("type"), prefilled_current_account)
 
         return render(request, self.template_name, {
             "payment": None,
@@ -347,6 +366,7 @@ class PaymentCreate(View):
                 _confirm_or_warn(request, payment)
 
         messages.success(request, _g("Payment created: %(number)s") % {"number": payment.number})
+        _say_realised_fx(request, payment)
         return redirect("accounts:payment_detail", pk=payment.pk)
 
 
@@ -484,7 +504,41 @@ class PaymentEdit(View):
                 _confirm_or_warn(request, payment)
 
         messages.success(request, _g("Payment updated: %(number)s") % {"number": payment.number})
+        _say_realised_fx(request, payment)
         return redirect("accounts:payment_detail", pk=payment.pk)
+
+
+def _say_realised_fx(request, payment):
+    """Tell the person what the rate they typed did, in the book's money.
+
+    Said once, on the save that posted it: a typed rate settles the account
+    at one figure while the money was worth another, and the gap went to
+    5900 without anyone pressing a button. Nothing is said when the two
+    agree, which is every payment left at the published rate.
+    """
+    if payment.status != "confirmed":
+        return
+    fx = payment.realised_fx()
+    if not fx or fx["difference"] == 0:
+        return
+    report = reverse("accounts:fx_report", kwargs={"book_id": payment.book_id})
+    words = {
+        "amount": abs(fx["difference"]), "base": fx["base_code"], "number": payment.number,
+        "qty": payment.amount, "currency": fx["currency"],
+        "worth": fx["base_published"], "published": fx["published_rate"].normalize(),
+        "settled": fx["base_stated"], "typed": fx["stated_rate"].normalize(),
+    }
+    if fx["difference"] > 0:
+        text = _g("Exchange rate gain of %(base)s %(amount)s recorded on %(number)s: "
+                  "%(qty)s %(currency)s is worth %(base)s %(worth)s at the published rate "
+                  "%(published)s and settled %(base)s %(settled)s at your rate %(typed)s.") % words
+    else:
+        text = _g("Exchange rate loss of %(base)s %(amount)s recorded on %(number)s: "
+                  "%(qty)s %(currency)s is worth %(base)s %(worth)s at the published rate "
+                  "%(published)s and settled %(base)s %(settled)s at your rate %(typed)s.") % words
+    messages.info(request, format_html(
+        '{} <a href="{}">{}</a>', text, report,
+        _g("Posted to 5900 Foreign Exchange Gain/Loss — see the exchange rate differences.")))
 
 
 def _confirm_or_warn(request, payment):
@@ -519,6 +573,7 @@ class PaymentConfirm(View):
         try:
             payment.confirm(user=request.user)
             messages.success(request, _g("Payment confirmed: %(number)s") % {"number": payment.number})
+            _say_realised_fx(request, payment)
         except ValidationError as ve:
             messages.error(request, _g("Confirmation failed: %(error)s") % {"error": ve})
         return redirect("accounts:payment_detail", pk=payment.pk)

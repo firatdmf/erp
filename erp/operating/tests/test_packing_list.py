@@ -245,7 +245,8 @@ class BrandHeader(TestCase):
         signs with. It is a brand decision, not a styling detail, so a
         redesign of this stylesheet should have to say so out loud."""
         printed = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": self.order.pk})
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+            {"html": "1"},
         ).content.decode()
         brand_rule = re.search(r"\.hdr \.brand \{[^}]*\}", printed)
         self.assertIsNotNone(brand_rule, "the brand headline rule is gone")
@@ -253,7 +254,8 @@ class BrandHeader(TestCase):
 
     def _header(self, order):
         printed = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": order.pk})
+            reverse("operating:order_print", kwargs={"pk": order.pk}),
+            {"html": "1"},
         ).content.decode()
         header = re.search(r'<table class="hdr".*?</table>', printed, re.S)
         self.assertIsNotNone(header, "the print header is gone")
@@ -292,7 +294,8 @@ class BrandHeader(TestCase):
         self.book.save(update_fields=["brand_name"])
 
         printed = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": self.order.pk})
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+            {"html": "1"},
         ).content.decode()
         self.assertIn("KARVEN | Contract Textiles", printed)
         self.assertNotIn(self.LOCKUP, printed)
@@ -310,7 +313,8 @@ class BrandHeader(TestCase):
 
     def test_the_printable_order_defaults_to_the_lockup(self):
         resp = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": self.order.pk}))
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+            {"html": "1"})
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode()
         self.assertIn(self.LOCKUP, body)
@@ -363,8 +367,11 @@ class OrderPrintProductType(TestCase):
             User.objects.create_superuser("p", "p@t.com", "pw"))
 
     def _resp(self):
+        # ?html=1 — the address itself serves a PDF, and these assertions
+        # read the document's markup.
         resp = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": self.order.pk}))
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+            {"html": "1"})
         self.assertEqual(resp.status_code, 200)
         return resp
 

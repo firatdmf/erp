@@ -1,0 +1,390 @@
+{% load i18n %}
+{% comment %} Edit form rendered into the side panel on the supplier detail page,
+   the way _contact_edit_form.html is for a contact. No base.html chrome — the
+   parent page provides the sidebar shell and runs the <script> below. The
+   linked-record pickers are the same comboboxes as on supplier_form.html;
+   their styles come along because the detail page does not carry them.
+   {% endcomment %}
+<style>
+  #editSupplierForm .sf-field-error { display: none; margin-top: 4px; font: 500 12px var(--font-sans, sans-serif); color: #B91C1C; }
+  #editSupplierForm .sf-field-error.show { display: block; }
+  #editSupplierForm .sf-form-error {
+    display: none; margin-bottom: 14px; padding: 10px 12px; border-radius: 9px;
+    background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C;
+    font: 500 12.5px var(--font-sans, sans-serif);
+  }
+  #editSupplierForm .sf-form-error.show { display: block; }
+  #editSupplierForm .sf-section {
+    margin: 18px 0 10px; font: 700 10.5px var(--font-sans, sans-serif); color: #6B7280;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  #editSupplierForm .sf-section:first-child { margin-top: 0; }
+  /* ── Searchable comboboxes (linked_company / linked_contact) ── */
+  .sf-pickfield { position: relative; }
+  .sf-pick { position: relative; display: flex; flex-direction: column; gap: 6px; }
+  .sf-pick-input-wrap { position: relative; display: flex; align-items: center; }
+  .sf-pick-icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--gray-500); font-size: 12px; pointer-events: none;
+  }
+  .sf-pick-input {
+    width: 100%;
+    padding: 9px 36px 9px 34px !important;
+    background: white;
+    border: 1px solid #E0E6EE;
+    border-radius: 9px;
+    font: 500 13.5px var(--font-sans);
+    color: var(--ink);
+    outline: none;
+    transition: border-color 140ms, box-shadow 140ms;
+    box-sizing: border-box;
+  }
+  .sf-pick-input:hover { border-color: #C5CCD3; }
+  .sf-pick-input:focus {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+    background: #FAFBFD;
+  }
+  .sf-pick-clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    width: 22px; height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #E2E8EE; color: var(--gray-700);
+    border: none; border-radius: 50%; cursor: pointer;
+    font-size: 10px; transition: all 140ms;
+  }
+  .sf-pick-clear:hover { background: #D1D8E0; color: #0F1419; }
+
+  .sf-pick-selected {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .sf-pick-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 6px 5px 10px;
+    background: var(--nejum-teal-50);
+    color: var(--nejum-teal-700);
+    border-radius: 999px;
+    font: 600 12px var(--font-sans);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,0.20);
+  }
+  .sf-pick-chip i { width: 11px; height: 11px; }
+  .sf-pick-chip-x {
+    width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(20,127,116,0.18); color: var(--nejum-teal-700);
+    border: none; border-radius: 50%;
+    cursor: pointer; font-size: 9px;
+    transition: background 140ms, color 140ms;
+  }
+  .sf-pick-chip-x:hover { background: var(--nejum-teal-600); color: white; }
+
+  .sf-pick-results {
+    position: absolute;
+    top: calc(100% + 4px); left: 0; right: 0;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(15,23,31,0.10);
+    max-height: 280px; overflow-y: auto;
+    z-index: 50;
+    padding: 4px;
+  }
+  .sf-pick-result {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 100ms;
+  }
+  .sf-pick-result:hover, .sf-pick-result.active { background: var(--nejum-teal-50); }
+  .sf-pick-result-avatar {
+    width: 28px; height: 28px; flex-shrink: 0;
+    border-radius: 50%;
+    background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600));
+    color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 11px var(--font-sans);
+  }
+  .sf-pick-result-body { flex: 1; min-width: 0; }
+  .sf-pick-result-name {
+    font: 600 13px var(--font-sans);
+    color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sf-pick-result-sub {
+    font: 500 11.5px var(--font-sans);
+    color: var(--gray-500);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sf-pick-empty {
+    padding: 14px 12px;
+    text-align: center;
+    font: 500 12.5px var(--font-sans);
+    color: var(--gray-500);
+  }
+</style>
+
+<form id="editSupplierForm" method="post"
+      action="{% url 'crm:supplier_update' supplier.id %}"
+      onsubmit="submitEditSupplierForm(event); return false;">
+  {% csrf_token %}
+  <div class="sf-form-error" id="editSupplierFormError"></div>
+
+  <div class="sf-section">{% trans "Identity" %}</div>
+  <div class="form-group" style="margin-top:-6px;">
+    <span style="font:500 12px var(--font-sans, sans-serif);color:#6B7280;">{% trans "At least company or contact name is required." %}</span>
+  </div>
+  <div class="form-group">
+    <label for="id_edit_supplier_company_name">{% trans "Company name" %}</label>
+    <input type="text" name="company_name" id="id_edit_supplier_company_name" class="form-input"
+           value="{{ supplier.company_name|default:'' }}">
+    <div class="sf-field-error" data-error-for="company_name"></div>
+  </div>
+  <div class="form-group">
+    <label for="id_edit_supplier_contact_name">{% trans "Contact name" %}</label>
+    <input type="text" name="contact_name" id="id_edit_supplier_contact_name" class="form-input"
+           value="{{ supplier.contact_name|default:'' }}">
+    <div class="sf-field-error" data-error-for="contact_name"></div>
+  </div>
+  <div class="form-group">
+    <label for="id_edit_supplier_email">{% trans "Email" %}</label>
+    <input type="email" name="email" id="id_edit_supplier_email" class="form-input"
+           value="{{ supplier.email|default:'' }}">
+    <div class="sf-field-error" data-error-for="email"></div>
+  </div>
+  <div class="form-group">
+    <label for="id_edit_supplier_phone">{% trans "Phone" %}</label>
+    <input type="text" name="phone" id="id_edit_supplier_phone" class="form-input"
+           value="{{ supplier.phone|default:'' }}">
+    <div class="sf-field-error" data-error-for="phone"></div>
+  </div>
+  <div class="form-group">
+    <label for="id_edit_supplier_website">{% trans "Website" %}</label>
+    <input type="text" name="website" id="id_edit_supplier_website" class="form-input"
+           value="{{ supplier.website|default:'' }}">
+    <div class="sf-field-error" data-error-for="website"></div>
+  </div>
+
+  <div class="sf-section">{% trans "Location" %}</div>
+  <div class="form-group">
+    <label for="id_edit_supplier_address">{% trans "Address" %}</label>
+    <textarea name="address" id="id_edit_supplier_address" class="form-textarea" rows="3">{{ supplier.address|default:'' }}</textarea>
+    <div class="sf-field-error" data-error-for="address"></div>
+  </div>
+  <div class="form-group">
+    <label for="id_edit_supplier_country">{% trans "Country" %}</label>
+    <input type="text" name="country" id="id_edit_supplier_country" class="form-input"
+           value="{{ supplier.country|default:'' }}">
+    <div class="sf-field-error" data-error-for="country"></div>
+  </div>
+
+  <div class="sf-section">{% trans "Link to CRM" %}</div>
+    <div class="form-group sf-pickfield">
+      <label>{% trans "Linked company" %}</label>
+      <div class="sf-pick" data-search-url="{% url 'crm:supplier_search_companies' %}" data-name="linked_company"
+           data-icon="building" data-placeholder="{% trans 'Search companies…' %}">
+        <input type="hidden" name="linked_company" value="{{ supplier.linked_company_id|default:'' }}">
+        <div class="sf-pick-input-wrap">
+          <i class="fa fa-search sf-pick-icon"></i>
+          <input type="text" class="sf-pick-input" placeholder="{% trans 'Search companies…' %}" autocomplete="off">
+          <button type="button" class="sf-pick-clear" style="display:none;" title="{% trans 'Clear' %}">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        {% if supplier.linked_company %}
+        <div class="sf-pick-selected" style="display:flex;">
+          <span class="sf-pick-chip">
+            <i class="fa fa-building"></i>
+            <span class="sf-pick-chip-name">{{ supplier.linked_company.name }}</span>
+            <button type="button" class="sf-pick-chip-x" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button>
+          </span>
+        </div>
+        {% else %}
+        <div class="sf-pick-selected" style="display:none;"></div>
+        {% endif %}
+        <div class="sf-pick-results" style="display:none;"></div>
+      </div>
+      <div class="sf-field-error" data-error-for="linked_company"></div>
+    </div>
+    <div class="form-group sf-pickfield">
+      <label>{% trans "Linked contact" %}</label>
+      <div class="sf-pick" data-search-url="{% url 'crm:supplier_search_contacts' %}" data-name="linked_contact"
+           data-icon="user" data-placeholder="{% trans 'Search contacts…' %}">
+        <input type="hidden" name="linked_contact" value="{{ supplier.linked_contact_id|default:'' }}">
+        <div class="sf-pick-input-wrap">
+          <i class="fa fa-search sf-pick-icon"></i>
+          <input type="text" class="sf-pick-input" placeholder="{% trans 'Search contacts…' %}" autocomplete="off">
+          <button type="button" class="sf-pick-clear" style="display:none;" title="{% trans 'Clear' %}">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        {% if supplier.linked_contact %}
+        <div class="sf-pick-selected" style="display:flex;">
+          <span class="sf-pick-chip">
+            <i class="fa fa-user"></i>
+            <span class="sf-pick-chip-name">{{ supplier.linked_contact.name }}</span>
+            <button type="button" class="sf-pick-chip-x" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button>
+          </span>
+        </div>
+        {% else %}
+        <div class="sf-pick-selected" style="display:none;"></div>
+        {% endif %}
+        <div class="sf-pick-results" style="display:none;"></div>
+      </div>
+      <div class="sf-field-error" data-error-for="linked_contact"></div>
+    </div>
+
+  <div class="sidebar-footer">
+    <button type="submit" id="editSupplierSubmitBtn" class="btn btn-primary">
+      <span class="btn-text">{% trans "Save changes" %}</span>
+      <span class="btn-spinner" style="display:none;">
+        <svg class="spinner-icon" viewBox="0 0 50 50">
+          <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+        </svg>
+        {% trans "Saving…" %}
+      </span>
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="closeEditSupplierSidebar()">{% trans "Cancel" %}</button>
+  </div>
+</form>
+
+<script>
+  /* ─── Linked-entity comboboxes ────────────────────────────────
+     Each .sf-pick has a search input, a hidden FK input, a chip
+     row (shown when something is picked), and a results dropdown.
+     We fetch JSON from the picker's data-search-url, render
+     results, and on click write the chosen id into the hidden
+     input while displaying the chip. The Clear/X button resets. */
+  (function () {
+    document.querySelectorAll('#editSupplierForm .sf-pick').forEach(initPicker);
+
+    function initPicker(root) {
+      var url        = root.dataset.searchUrl;
+      var iconName   = root.dataset.icon || 'tag';
+      var hidden     = root.querySelector('input[type="hidden"]');
+      var input      = root.querySelector('.sf-pick-input');
+      var clearBtn   = root.querySelector('.sf-pick-clear');
+      var selected   = root.querySelector('.sf-pick-selected');
+      var results    = root.querySelector('.sf-pick-results');
+      var existingChipX = root.querySelector('.sf-pick-chip-x');
+      var timer = null;
+      var lastQuery = '';
+
+      // Hide input if a chip is already shown on initial render
+      if (hidden && hidden.value && selected.children.length > 0) {
+        input.style.display = 'none';
+        root.querySelector('.sf-pick-icon').style.display = 'none';
+        clearBtn.style.display = 'none';
+      }
+
+      function clearSelection() {
+        hidden.value = '';
+        selected.style.display = 'none';
+        selected.innerHTML = '';
+        input.style.display = '';
+        root.querySelector('.sf-pick-icon').style.display = '';
+        input.value = '';
+        clearBtn.style.display = 'none';
+        results.style.display = 'none';
+        input.focus();
+      }
+
+      if (existingChipX) existingChipX.addEventListener('click', clearSelection);
+      clearBtn.addEventListener('click', clearSelection);
+
+      function pick(item) {
+        hidden.value = item.id;
+        var iconHtml = '<i class="fa fa-' + iconName + '"></i>';
+        selected.innerHTML =
+          '<span class="sf-pick-chip">' +
+          iconHtml +
+          '<span class="sf-pick-chip-name"></span>' +
+          '<button type="button" class="sf-pick-chip-x" title="Remove"><i class="fa fa-times"></i></button>' +
+          '</span>';
+        selected.querySelector('.sf-pick-chip-name').textContent = item.name;
+        selected.style.display = 'flex';
+        selected.querySelector('.sf-pick-chip-x').addEventListener('click', clearSelection);
+        input.value = '';
+        input.style.display = 'none';
+        root.querySelector('.sf-pick-icon').style.display = 'none';
+        clearBtn.style.display = 'none';
+        results.style.display = 'none';
+      }
+
+      function renderResults(items) {
+        if (!items.length) {
+          results.innerHTML = '<div class="sf-pick-empty">No matches.</div>';
+          results.style.display = 'block';
+          return;
+        }
+        results.innerHTML = '';
+        items.forEach(function (it) {
+          var row = document.createElement('div');
+          row.className = 'sf-pick-result';
+          var initials = (it.name || '?').trim().slice(0, 2).toUpperCase();
+          row.innerHTML =
+            '<div class="sf-pick-result-avatar"></div>' +
+            '<div class="sf-pick-result-body">' +
+            '  <div class="sf-pick-result-name"></div>' +
+            '  <div class="sf-pick-result-sub"></div>' +
+            '</div>';
+          row.querySelector('.sf-pick-result-avatar').textContent = initials;
+          row.querySelector('.sf-pick-result-name').textContent = it.name;
+          var sub = row.querySelector('.sf-pick-result-sub');
+          if (it.subtitle) { sub.textContent = it.subtitle; }
+          else { sub.remove(); }
+          row.addEventListener('mousedown', function (e) {
+            // mousedown so the click fires before blur hides the panel
+            e.preventDefault();
+            pick(it);
+          });
+          results.appendChild(row);
+        });
+        results.style.display = 'block';
+      }
+
+      function fetchResults(q) {
+        if (timer) clearTimeout(timer);
+        // Don't fetch on empty input — only search once the user types.
+        if (!q || !q.trim()) {
+          results.style.display = 'none';
+          results.innerHTML = '';
+          return;
+        }
+        timer = setTimeout(function () {
+          var sep = url.indexOf('?') >= 0 ? '&' : '?';
+          fetch(url + sep + 'q=' + encodeURIComponent(q), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) { renderResults(data.results || []); })
+            .catch(function () {
+              results.innerHTML = '<div class="sf-pick-empty">Search failed.</div>';
+              results.style.display = 'block';
+            });
+        }, 200);
+      }
+
+      input.addEventListener('focus', function () {
+        if (input.style.display === 'none') return;
+        clearBtn.style.display = input.value ? 'inline-flex' : 'none';
+        // Only re-open the dropdown if the user has already typed something.
+        if (input.value.trim()) fetchResults(input.value);
+      });
+
+      input.addEventListener('input', function () {
+        var q = input.value;
+        clearBtn.style.display = q ? 'inline-flex' : 'none';
+        if (q === lastQuery) return;
+        lastQuery = q;
+        fetchResults(q);
+      });
+
+      input.addEventListener('blur', function () {
+        // Delay so a result-click can register first
+        setTimeout(function () { results.style.display = 'none'; }, 150);
+      });
+    }
+  })();
+</script>

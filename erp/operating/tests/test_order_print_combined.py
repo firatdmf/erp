@@ -77,6 +77,16 @@ class OlegOrders:
         ids = ",".join(str(o.pk) for o in orders)
         return self.client.get(self.url, {"ids": ids})
 
+    def _html(self, *orders):
+        """The sheet as the PAGE it is rendered from.
+
+        The address itself now serves a PDF — bytes no assertion can read
+        — so anything checking what the document SAYS asks for ?html=1,
+        which is the same template, rendered the same way, one step
+        before WeasyPrint gets it."""
+        ids = ",".join(str(o.pk) for o in orders)
+        return self.client.get(self.url, {"ids": ids, "html": "1"})
+
 
 class CombinedOrderSheet(OlegOrders, TestCase):
     url_name = "operating:order_print_combined"
@@ -84,7 +94,7 @@ class CombinedOrderSheet(OlegOrders, TestCase):
     # ── what it prints ────────────────────────────────────────────────
     def test_it_totals_every_order_on_the_sheet(self):
         """156.00×2.50 + 40.00×4.41 + 19.50×4.50 = 390.00 + 176.40 + 87.75."""
-        resp = self._get(self.laleli_a, self.laleli_b, self.ergene_a)
+        resp = self._html(self.laleli_a, self.laleli_b, self.ergene_a)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.context["order_total"], Decimal("654.15"))
         self.assertEqual(resp.context["order_total_quantity"], Decimal("215.50"))
@@ -93,7 +103,7 @@ class CombinedOrderSheet(OlegOrders, TestCase):
     def test_each_order_is_named_above_its_own_lines(self):
         """Three orders on one page, and the customer can still tell
         which line came from which."""
-        resp = self._get(self.laleli_a, self.laleli_b, self.ergene_a)
+        resp = self._html(self.laleli_a, self.laleli_b, self.ergene_a)
         for number in ("DK-284", "DK-275", "DK-291"):
             self.assertContains(resp, number)
         self.assertEqual([g["order"].pk for g in resp.context["order_groups"]],
@@ -104,7 +114,7 @@ class CombinedOrderSheet(OlegOrders, TestCase):
         one covers three, so that slot stays empty — one number up there
         would name one order and look like it spoke for all of them."""
         import re
-        html = self._get(self.laleli_a, self.laleli_b, self.ergene_a).content.decode()
+        html = self._html(self.laleli_a, self.laleli_b, self.ergene_a).content.decode()
         header = re.search(r'<table class="hdr".*?</table>', html, re.S)
         self.assertIsNotNone(header, "the print header is gone")
         for number in ("DK-284", "DK-275", "DK-291"):
@@ -301,6 +311,7 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         """Fixed widths were guesses, generous where they should have
         been tight and tight where a heading needed room."""
         from openpyxl.utils import get_column_letter
+        from operating.order_excel import _display_len
         long_name = Product.objects.create(
             title="GREK TAŞLI VE İNCİ EKRU İNCİ BEYAZ ZEMİN",
             sku="HKN00011", price=10)
@@ -311,9 +322,9 @@ class CombinedOrderExcel(OlegOrders, TestCase):
 
         for c in range(1, 10):
             width = ws.column_dimensions[get_column_letter(c)].width
-            widest = max(
-                len(max(str(ws.cell(r, c).value or "").split("\n"), key=len))
-                for r in range(head, ws.max_row + 1))
+            # As it READS: "156.00 m" is what a quantity cell shows.
+            widest = max(_display_len(ws.cell(r, c))
+                         for r in range(head, ws.max_row + 1))
             # Wide enough for what is in it...
             self.assertGreaterEqual(width, widest)
             # ...and not wide enough to be holding room for anything
@@ -391,13 +402,228 @@ class SingleOrderPrintUnchanged(TestCase):
 
     def test_it_still_prints_its_total(self):
         resp = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": self.order.pk}))
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+            {"html": "1"})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.context["order_total"], Decimal("390.00"))
         self.assertContains(resp, "$390.00")
 
     def test_it_carries_no_group_heading(self):
         resp = self.client.get(
-            reverse("operating:order_print", kwargs={"pk": self.order.pk}))
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+            {"html": "1"})
         self.assertEqual(len(resp.context["order_groups"]), 1)
         self.assertNotContains(resp, 'class="grp"')
+
+
+class OrderUnitsAndPacks(TestCase):
+    """A line says what its quantity is counted in and what its packs
+    are: cloth is metres on rolls, curtain sets are pieces in boxes."""
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.order = Order.objects.create(order_number="DK-296",
+                                          contact=Contact.objects.create(name="OLEG"))
+        self.crepe = Product.objects.create(title="Crepe", sku="KZL000315", price=10,
+                                            unit="mt", pack_type="roll")
+        OrderItem.objects.create(order=self.order, product=self.crepe,
+                                 quantity=Decimal("156.00"), price=Decimal("2.50"))
+        self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
+
+    def _print(self, **params):
+        return self.client.get(
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+            {"html": "1", **params})
+
+    def _excel(self):
+        import openpyxl
+        from io import BytesIO
+        resp = self.client.get(
+            reverse("operating:order_excel", kwargs={"pk": self.order.pk}))
+        self.assertEqual(resp.status_code, 200)
+        return openpyxl.load_workbook(BytesIO(resp.content)).active
+
+    def test_fabric_prints_in_metres(self):
+        resp = self._print()
+        # Tied with a non-breaking space: the quantity column is narrow
+        # enough that a plain space put the "m" on a line of its own.
+        self.assertContains(resp, "156.00&nbsp;m")
+        self.assertEqual(resp.context["order_total_unit"], "m")
+
+    def test_mixed_units_total_names_no_unit(self):
+        sets = Product.objects.create(title="Curtain set", sku="CS1", price=10,
+                                      unit="piece", pack_type="box")
+        OrderItem.objects.create(order=self.order, product=sets,
+                                 quantity=Decimal("4"), price=Decimal("20"))
+        resp = self._print()
+        self.assertContains(resp, "4.00&nbsp;pcs")
+        self.assertEqual(resp.context["order_total_unit"], "")
+
+    def test_pack_count_names_the_pack(self):
+        from operating.order_excel import _packs_format
+        self.assertEqual(_packs_format("roll"), '[=1]0" roll";#,##0" rolls"')
+        self.assertEqual(_packs_format(None), '[=1]0" pack";#,##0" packs"')
+
+    def test_excel_quantity_shows_metres_and_stays_a_number(self):
+        ws = self._excel()
+        row = next(r for r in ws.iter_rows() if r[0].value == "Crepe")
+        self.assertEqual(row[3].value, 156)
+        self.assertEqual(row[3].number_format, '#,##0.00" m"')
+        self.assertEqual(row[4].number_format, '[=1]0" roll";#,##0" rolls"')
+        self.assertEqual(row[5].number_format, '"$"#,##0.00')
+        self.assertEqual(row[6].value, 390)
+
+
+class OrderPrintIsAPdf(TestCase):
+    """The order sheet is rendered to a PDF here, not left to whichever
+    browser the reader happened to open it in.
+
+    What the reader used to get was Chrome's idea of the page — its URL
+    and page number stamped across the margins unless they knew to turn
+    that off, and nothing useful at all from a phone. Now the same file
+    arrives for everyone, the way the packing list always has.
+    """
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.order = Order.objects.create(order_number="DK-284",
+                                          contact=Contact.objects.create(name="OLEG"))
+        OrderItem.objects.create(
+            order=self.order,
+            product=Product.objects.create(title="Crepe", sku="KZL000315", price=10),
+            quantity=Decimal("156.00"), price=Decimal("2.50"))
+        self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
+        self.url = reverse("operating:order_print", kwargs={"pk": self.order.pk})
+
+    def test_the_print_address_serves_a_pdf(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertTrue(resp.content.startswith(b"%PDF-"))
+
+    def test_it_opens_in_a_tab_under_the_order_number(self):
+        """Inline, not an attachment: a document to read, and to hand on
+        from there — the Excel export is the one you download."""
+        resp = self.client.get(self.url)
+        self.assertEqual(resp["Content-Disposition"],
+                         'inline; filename="order_DK-284.pdf"')
+
+    def test_the_page_itself_is_still_reachable(self):
+        """?html=1 — how the design is worked on, and the way back if a
+        PDF ever comes out wrong."""
+        resp = self.client.get(self.url, {"html": "1"})
+        self.assertEqual(resp["Content-Type"], "text/html; charset=utf-8")
+        self.assertContains(resp, "DK-284")
+
+    def test_a_host_that_cannot_render_still_serves_the_document(self):
+        """WeasyPrint needs Pango as a system library. Where it is
+        missing the reader gets the page and their browser's print
+        dialog — the old behaviour — rather than a 500 on the document
+        they are trying to hand to a customer."""
+        with patch("erp.pdf_render.render_pdf", side_effect=OSError("no pango")):
+            resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "text/html; charset=utf-8")
+        # The auto-print script is what makes the fallback usable.
+        self.assertContains(resp, "window.print()")
+
+
+class WhoTheCustomerIs(TestCase):
+    """The card says what kind of customer it is with the icon the side
+    menu uses for them, not with the word CONTACT or COMPANY."""
+
+    # lucide 0.460.0, the version base.html loads — drawn inline because
+    # nothing runs lucide.createIcons() on the way to a PDF.
+    USERS = 'd="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"'
+    BUILDING = 'd="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"'
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.product = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
+        self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
+
+    def _order_for(self, **who):
+        order = Order.objects.create(order_number="DK-284", **who)
+        OrderItem.objects.create(order=order, product=self.product,
+                                 quantity=Decimal("156.00"), price=Decimal("2.50"))
+        return self.client.get(
+            reverse("operating:order_print", kwargs={"pk": order.pk}), {"html": "1"})
+
+    def test_a_contact_gets_the_contacts_icon(self):
+        resp = self._order_for(contact=Contact.objects.create(name="OLEG"))
+        self.assertContains(resp, self.USERS)
+        self.assertNotContains(resp, self.BUILDING)
+        # The word it replaces is gone from the card.
+        self.assertNotContains(resp, '<div class="role">Contact</div>', html=False)
+
+    def test_a_company_gets_the_companies_icon(self):
+        from crm.models import Company
+        resp = self._order_for(company=Company.objects.create(name="BURSA TEKSTIL"))
+        self.assertContains(resp, self.BUILDING)
+        self.assertNotContains(resp, self.USERS)
+
+
+class TheCreditAtTheFootOfEveryPage(TestCase):
+    """The Nejum credit is drawn in the page's bottom MARGIN.
+
+    It used to be `position: fixed`, which repeats on every page but
+    reserves no room, so on a document that ran to two pages the last
+    lines of the table and the credit were printed over each other.
+    """
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.order = Order.objects.create(order_number="DK-284",
+                                          contact=Contact.objects.create(name="OLEG"))
+        OrderItem.objects.create(
+            order=self.order,
+            product=Product.objects.create(title="Crepe", sku="KZL000315", price=10),
+            quantity=Decimal("156.00"), price=Decimal("2.50"))
+        self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
+
+    def _rendered(self, is_pdf):
+        from django.template.loader import render_to_string
+        from operating.views import OrderPrint
+
+        request = self.client.get(
+            reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+            {"html": "1"}).wsgi_request
+        view = OrderPrint()
+        view.request, view.object, view.kwargs = request, self.order, {"pk": self.order.pk}
+        return render_to_string("operating/order_print.html",
+                                {**view.get_context_data(object=self.order),
+                                 "is_pdf": is_pdf}, request=request)
+
+    def test_the_page_keeps_a_margin_for_it(self):
+        html = self._rendered(is_pdf=True)
+        self.assertIn("@bottom-center { content: element(nejum); }", html)
+        self.assertIn("position: running(nejum)", html)
+        # One figure on all four sides, and the body adds none of its
+        # own — a padding pads the start and end of the flow once, so
+        # page two began hard against the top edge while page one had
+        # room. Both are what keeps every page's margins identical.
+        self.assertIn("@page { margin: 12mm; }", html)
+        self.assertIn("body { padding: 0; }", html)
+        # The declaration, not the word: the stylesheet's comment still
+        # explains what it used to be.
+        self.assertNotIn("position: fixed;", html)
+
+    def test_it_starts_on_page_one(self):
+        """A running element appears from the page it is REACHED on, so
+        at the foot of the document it printed on the last page alone."""
+        html = self._rendered(is_pdf=True)
+        self.assertLess(html.index('class="nejum"'), html.index('class="hdr"'))
+
+    def test_the_fallback_keeps_it_under_the_footer(self):
+        """No margin boxes in a browser, so there it stays in the flow,
+        where a reader expects it — once, at the end."""
+        html = self._rendered(is_pdf=False)
+        self.assertGreater(html.index('class="nejum"'), html.index('class="foot"'))

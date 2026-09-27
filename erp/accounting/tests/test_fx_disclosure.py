@@ -87,18 +87,25 @@ class ConversionFactsTest(FxDisclosureBase):
         self.assertEqual(fx["base_amount"], Decimal("4.16"))
 
     def test_a_cash_entry_reports_its_own_figures(self):
+        """The kasa row converts at what the money was worth — the
+        published rate — not at the rate typed on the payment, which is
+        what the money settled on the account. Each states its own."""
+        from unittest import mock
         account = CashAccount.objects.create(
             book=self.book, name="Ziraat", currency=self.try_,
             balance=Decimal("0.00"))
         p = self.payment(self.try_, confirm=False)
         p.cash_account = account
         p.save()
-        p.confirm()
+        with mock.patch("accounting.services.get_exchange_rate") as rate:
+            rate.return_value = Decimal("0.020000")
+            p.confirm()
         entry = CashTransactionEntry.objects.filter(cash_account=account).first()
         self.assertIsNotNone(entry)
         fx = conversion_facts(entry)
-        self.assertEqual(fx["rate"], Decimal("0.020800"))
+        self.assertEqual(fx["rate"], Decimal("0.020000"))
         self.assertEqual(fx["base_amount"], entry.amount_in_base_currency)
+        self.assertEqual(entry.amount_in_base_currency, Decimal("4.00"))
 
     def test_none_is_handled(self):
         self.assertIsNone(conversion_facts(None))

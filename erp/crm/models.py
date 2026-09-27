@@ -143,6 +143,16 @@ class Contact(models.Model):
 
 
 class Supplier(models.Model):
+    # Who raised this record — the same column, stamp and reading as on
+    # Contact above (erp.ownership). NULL on rows older than the column.
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="created_%(class)ss",
+        editable=False,
+    )
+
     # the company name or contact name should be unique, I'll set that up later.
     company_name = models.CharField(max_length=300, null=True, blank=True)
     contact_name = models.CharField(max_length=300, null=True, blank=True)

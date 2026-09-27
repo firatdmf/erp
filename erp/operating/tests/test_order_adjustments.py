@@ -154,7 +154,8 @@ class OrderAdjustmentTest(TestCase):
         self._add("Delivery", "45.00")
         user = get_user_model().objects.create_superuser("firat_adj3", "e@f.g", "pw")
         self.client.force_login(user)
-        r = self.client.get(reverse("operating:order_print", args=[self.order.pk]))
+        r = self.client.get(reverse("operating:order_print", args=[self.order.pk]),
+                            {"html": "1"})
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Delivery")
         self.assertContains(r, "245.00")

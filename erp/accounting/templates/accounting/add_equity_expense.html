@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load l10n %}
+{% load static %}
 
 {% comment %}
   Gider ekle — the book's expense entry page.
@@ -481,6 +482,11 @@
         data-ccy-cash="{% trans "Set by the cash account." %}"></span>
 </div>
 
+{# Before the fx script, so its own total box can be grouped the same way. #}
+<script src="{% static 'erp/js/amount_input.js' %}?v=2"></script>
+<script>
+  if (window.NejumAmount) NejumAmount.attach(document.getElementById('id_amount'));
+</script>
 {% include "accounting/partials/fx_rate_field.html" with date_field="date" %}
 
 <script>
@@ -650,10 +656,16 @@
   amountEl.addEventListener('input', syncSummary);
 
   // ── Summary ───────────────────────────────────────────────────────
+  // Grouped in the page's language where amount_input.js loaded, plain
+  // otherwise — a figure the summary cannot show is worse than an ungrouped one.
+  function fmt(n) {
+    return window.NejumAmount ? NejumAmount.format(n) : n.toFixed(2);
+  }
+
   function syncSummary() {
     var amount = parseFloat(amountEl.value);
     document.getElementById('sumAmount').textContent =
-      isFinite(amount) ? amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00';
+      fmt(isFinite(amount) ? amount : 0);
 
     var usingCurrentAccount = document.getElementById('fundCurrentAccount').checked;
     var sel = usingCurrentAccount ? currentAccountSel : cashSel;

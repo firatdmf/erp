@@ -101,6 +101,15 @@
       </div>
     </a>
 
+    <a class="rx-card" href="{% url 'accounts:report_chart_of_accounts' current_book.pk %}">
+      <div class="rx-ico"><i data-lucide="list-tree"></i></div>
+      <h3>{% trans "Chart of Accounts" %}</h3>
+      <p>{% trans "Every ledger code — what it means, what posts to it and its balance" %}</p>
+      <div class="rx-card-foot">
+        <span class="rx-badge info">{% trans "Ledger codes" %}</span>
+      </div>
+    </a>
+
     <a class="rx-card" href="{% url 'accounts:report_credit_limit' current_book.pk %}">
       <div class="rx-ico"><i data-lucide="shield-alert"></i></div>
       <h3>{% trans "Credit Limit Report" %}</h3>

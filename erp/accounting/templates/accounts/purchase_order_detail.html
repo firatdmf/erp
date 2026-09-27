@@ -46,14 +46,24 @@
   .po-card-v a { color: var(--nejum-teal-700); text-decoration: none; }
   .po-card-v a:hover { text-decoration: underline; }
   .po-card-v.total { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .po-card-sub { font: 600 12px var(--font-sans); color: var(--nejum-teal-700); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .po-card-sub .dot { color: #CBD5E1; margin: 0 4px; }
 
   .po-items-h { font: 700 15px var(--font-sans); margin: 0 0 10px; }
   .po-item { background: white; border:1px solid #E2E8EE; border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
-  .po-item-h { display:flex; align-items:baseline; justify-content:space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .po-item-h { display:flex; align-items:flex-start; justify-content:space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .po-item-name { font: 700 14.5px var(--font-sans); color: var(--ink); }
+  /* The line's figures stack top right: the arithmetic as one equation
+     (quantity × price = total), and under it how many rolls the line
+     came in as. Split over two rows the reader had to pair the factors
+     with the result themselves; the roll count sits with the figures
+     because it is the first thing counted against the pallet, and the
+     metres alone do not say how many rolls there are. */
+  .po-item-figures { display:flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .po-item-eq { font: 500 12.5px var(--font-sans); color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .po-item-eq b { color: var(--gray-700); }
   .po-item-total { font: 800 15px var(--font-sans); color: var(--nejum-teal-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .po-item-meta { font: 500 12px var(--font-sans); color: var(--gray-500); margin-bottom: 10px; }
-  .po-item-meta b { color: var(--gray-700); }
+  .po-rolls-n { font: 600 12px var(--font-sans); color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   /* What was bought, one fact per row: the SKU, then each attribute under
      its own name. A run-on line hid which value belonged to which
@@ -149,6 +159,12 @@
     <div class="po-card">
       <div class="po-card-l">{% trans "Total" %}</div>
       <div class="po-card-v total">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|money }}</div>
+      {# The goods behind the money: how much arrived, and on how many packs. #}
+      <div class="po-card-sub">
+        {{ total_quantity|floatformat:2 }}{% if total_unit %} {{ total_unit }}{% endif %}
+        <span class="dot">·</span>
+        {{ total_packs }} {{ total_pack_noun }}
+      </div>
     </div>
     {% if invoice.for_order %}
     <div class="po-card">
@@ -171,10 +187,15 @@
   <div class="po-item">
     <div class="po-item-h">
       <span class="po-item-name">{{ it.description }}</span>
-      <span class="po-item-total">{{ invoice.currency.symbol|default:"$" }}{{ it.total|money }}</span>
-    </div>
-    <div class="po-item-meta">
-      <b>{{ it.quantity|floatformat:2 }} {{ it.unit }}</b> × {{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }}
+      <span class="po-item-figures">
+        <span class="po-item-eq">
+          <b>{{ it.quantity|floatformat:2 }} {{ it.unit }}</b> × {{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }} =
+          <span class="po-item-total">{{ invoice.currency.symbol|default:"$" }}{{ it.total|money }}</span>
+        </span>
+        {% if it.pack_count %}
+        <span class="po-rolls-n">{{ it.pack_count }} {{ it.pack_noun }}</span>
+        {% endif %}
+      </span>
     </div>
     {% if it.variant %}
     <dl class="po-spec">
@@ -188,30 +209,69 @@
     {% endif %}
 
     <div class="po-rolls-h">
-      <i data-lucide="layers"></i> {% trans "Physical rolls received" %}
-      {% if it.warehouse_stock_items.all %}
+      <i data-lucide="layers"></i> {% blocktrans with noun=it.pack_many %}Physical {{ noun }} received{% endblocktrans %}
+      {% if it.pack_count %}
       <a class="po-rolls-print" target="_blank" rel="noopener"
          href="{% url 'accounts:purchase_item_labels' invoice.pk it.pk %}"
-         title="{% trans 'One label per roll on this line, as one PDF' %}">
-        <i class="fa fa-qrcode"></i> {% trans "Print roll barcodes" %}
+         title="{% blocktrans with noun=it.pack_one %}One label per {{ noun }} on this line, as one PDF{% endblocktrans %}">
+        <i class="fa fa-qrcode"></i> {% blocktrans with noun=it.pack_one %}Print {{ noun }} barcodes{% endblocktrans %}
       </a>
       {% endif %}
     </div>
-    {% if it.warehouse_stock_items.all %}
+    {% if it.pack_count %}
     <div class="po-rolls">
       {% for r in it.warehouse_stock_items.all %}
       <div class="po-roll">
         <code>{{ r.barcode|default:"—" }}</code>
-        <span class="m">{{ r.quantity|floatformat:2 }} m</span>
+        <span class="m">{{ r.quantity|floatformat:2 }} {{ r.product.unit_short }}</span>
         {% if r.product.warehouse_id %}<span class="wh">{{ r.product.warehouse.name }}</span>{% endif %}
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <span class="po-no-rolls">{% trans "No rolls linked to this line yet." %}</span>
+    <span class="po-no-rolls">{% blocktrans with noun=it.pack_many %}No {{ noun }} linked to this line yet.{% endblocktrans %}</span>
     {% endif %}
   </div>
   {% endfor %}
+</div>
+
+<!-- PURCHASE CHANGES — the audit trail (accounting.purchase_audit). Rows
+     marked "from the customer order" were made on the order page and
+     mirrored here. -->
+<h2 class="po-items-h" id="po-changes">{% trans "Purchase changes" %}
+  <span style="font:500 12px var(--font-sans); color:#94A3B8; margin-left:8px;">{{ changes|length }} {% trans "records" %}</span>
+</h2>
+<div class="po-item" style="padding:6px 16px;">
+  {% if changes %}
+    {% for c in changes %}
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:9px 2px; {% if not forloop.last %}border-bottom:1px solid #F4F7FA;{% endif %}">
+      <span style="flex-shrink:0; display:inline-flex; align-items:center; padding:2px 9px; border-radius:999px; font:700 10px var(--font-sans); margin-top:1px;
+        {% if c.action == 'created' %}background:#E5F1F0; color:#005354;{% elif c.action == 'status' %}background:#DBEAFE; color:#1D4ED8;{% elif c.action == 'item_added' %}background:#D1FAE5; color:#065F46;{% elif c.action == 'item_removed' %}background:#FEE2E2; color:#B91C1C;{% elif c.action == 'item_updated' %}background:#FEF3C7; color:#8B5A00;{% else %}background:#F1F5F9; color:#475569;{% endif %}">
+        {{ c.action_display }}
+      </span>
+      <span style="flex:1; min-width:0; font:500 12.5px var(--font-sans); color:#374151; line-height:1.45;">
+        {% if c.item_label %}<b style="color:#0F1419;">{{ c.item_label|truncatechars:60 }}</b>{% if c.field_display %} · {{ c.field_display }}{% endif %}{% elif c.field_display %}<b style="color:#0F1419;">{{ c.field_display }}</b>{% endif %}
+        {% if c.old_value and c.new_value %}
+          <span style="color:#B91C1C; text-decoration:line-through;">{{ c.old_value|truncatechars:40 }}</span>
+          <span style="color:#A0A8B0;">→</span>
+          <span style="color:#0E6E4A; font-weight:700;">{{ c.new_value|truncatechars:40 }}</span>
+        {% elif c.new_value %}
+          <span style="color:#0E6E4A; font-weight:700;">{{ c.new_value|truncatechars:60 }}</span>
+        {% elif c.old_value %}
+          <span style="color:#B91C1C; text-decoration:line-through;">{{ c.old_value|truncatechars:60 }}</span>
+        {% endif %}
+        {% if c.origin_display %}<span style="color:#92400E; font-size:11px;"> · {{ c.origin_display }}</span>{% endif %}
+      </span>
+      <span style="flex-shrink:0; font:500 10.5px var(--font-sans); color:#A0A8B0; white-space:nowrap; margin-top:2px;">
+        {{ c.created_at|date:"d M · H:i" }}{% if c.created_by %} · {{ c.created_by.username }}{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div style="padding:10px 2px; color:#94A3B8; font:500 12.5px var(--font-sans);">
+      <i class="fa fa-clock-rotate-left" style="margin-right:6px;"></i>{% trans "No changes recorded for this purchase yet." %}
+    </div>
+  {% endif %}
 </div>
 
 <script>

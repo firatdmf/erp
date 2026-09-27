@@ -63,7 +63,8 @@ from django.db import models
 
 
 from marketing.models import Product, ProductVariant
-from django.utils.translation import gettext as _gettext
+from marketing import units
+from django.utils.translation import gettext as _gettext, ngettext
 
 
 from crm.models import Contact, Company
@@ -455,6 +456,12 @@ class OrderDetail(DetailView):
         ctx["scan_shortfall"] = short_amount
         ctx["scan_shortfall_rows"] = short_rows
         ctx["supplier_purchases"] = self._supplier_purchases()
+        # The customer is charged only once the goods bought for them are
+        # in (post_order_movement) — the account card says so meanwhile,
+        # or the missing sale looks like a bug.
+        ctx["billing_waits_for"] = (
+            [p for p in ctx["supplier_purchases"] if p.status == "draft"]
+            if self.object.billing_waits_for_goods() else [])
         # An order created by a purchase is that purchase's mirror — its
         # lines were written on the purchase form and are kept in step from
         # there (order_purchases.sync_customer_order). A line added on the
@@ -573,6 +580,22 @@ class OrderDetail(DetailView):
             self.object.change_logs.select_related("created_by")[:8]
         ))
         ctx["order_changes_count"] = self.object.change_logs.count()
+
+        # An order split across books is one order on this page: its name
+        # lists every half, and the other halves' lines and totals show
+        # under this one's — to anyone who may open this half, whatever
+        # book the others are in. Their accounts stay behind their books.
+        from .split_orders import (
+            split_halves, combined_number, other_halves_for_page, combined_totals,
+        )
+        halves = split_halves(self.object)
+        if len(halves) > 1:
+            ctx["combined_number"] = combined_number(halves)
+            ctx["this_book_name"] = getattr(
+                getattr(self.object.current_account, "book", None), "name", "")
+            ctx["other_halves"] = other_halves_for_page(
+                self.object, getattr(self.request.user, "member", None))
+            ctx["combined_totals"] = combined_totals(halves)
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -968,6 +991,9 @@ class OrderDetail(DetailView):
             elif code == "cancel_requires_reopen":
                 from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
                 messages.error(request, CANCEL_REQUIRES_REOPEN_MSG)
+            elif code == "goods_not_received":
+                from .views_warehouse import GOODS_NOT_RECEIVED_MSG
+                messages.error(request, GOODS_NOT_RECEIVED_MSG)
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
             return redirect("operating:order_detail", pk=order.pk)
@@ -2615,7 +2641,7 @@ _CHANGE_FIELD_TR = {
     "guest_email": "Misafir e-posta", "guest_phone": "Misafir telefon",
     "customer": "Müşteri", "quantity": "Miktar", "price": "Fiyat",
     "product": "Ürün", "revert_reason": "Geri açma sebebi",
-    "cancel_reason": "İptal sebebi",
+    "cancel_reason": "İptal sebebi", "purchase": "Alım", "quote": "Teklif",
 }
 _CHANGE_ACTION_TR = {
     "created": "Oluşturuldu", "status": "Durum",
@@ -2952,6 +2978,11 @@ def build_order_print_rows(order):
             Decimal("0.01"), rounding=ROUND_HALF_UP)
         it.line_total_calc = line_total
         it.pack_count = len(packs_by_item.get(it.pk, ()))
+        # What the quantity is counted in ("m") and what its packs are
+        # ("rolls"), both facts of the product — see marketing/units.py.
+        it.unit_short = it.product.unit_short
+        it.pack_type = it.product.pack_type
+        it.pack_noun = units.pack_noun(it.pack_type, it.pack_count)
         # What KIND of goods the line is ("Fabric"). Same helper the
         # packing list and the invoice print use, so a customer
         # holding all three documents reads the same word. Its "-"
@@ -2985,6 +3016,23 @@ def build_order_print_rows(order):
     return items, total, total_qty, all_pack_ids
 
 
+def order_print_totals_units(items, pack_count):
+    """The unit and pack noun the foot of an order's lines prints.
+
+    Only when every line shares them: metres and pieces added together
+    are a number with no unit, and printing "m" after it would say
+    otherwise. Mixed packs fall back to the generic "packs".
+    """
+    unit_set = {it.unit_short for it in items}
+    pack_set = {it.pack_type for it in items if it.pack_count}
+    return {
+        "order_total_unit": unit_set.pop() if len(unit_set) == 1 else "",
+        "order_total_pack_noun": (units.pack_noun(pack_set.pop(), pack_count)
+                                  if len(pack_set) == 1 else
+                                  ngettext("pack", "packs", pack_count)),
+    }
+
+
 def order_has_delivery_info(order):
     """Whether this order carries an address worth printing.
 
@@ -3001,14 +3049,17 @@ def order_has_delivery_info(order):
 
 @method_decorator(login_required, name="dispatch")
 class OrderPrint(DetailView):
-    """Printable order view.
+    """The order as a PDF, rendered from the printable template.
 
-    Serves the order as styled HTML and lets the BROWSER render it and
-    "Save as PDF". We deliberately do NOT use xhtml2pdf here: it cannot
-    render this card/badge/two-column layout cleanly (it scatters the
-    blocks down the page and spills onto a second sheet), whereas the
-    browser reproduces the on-screen design pixel-perfect. The template
-    auto-opens the print dialog when is_pdf is False."""
+    Served inline, so it opens in a tab the way the packing list does.
+    It is WeasyPrint that renders it — the CSS engine lays out the cards
+    and the table, which is why the design can go on living in HTML.
+    (xhtml2pdf was tried years ago and could not: it scattered the blocks
+    down the page and spilled onto a second sheet.)
+
+    ?html=1 serves the page itself, which is how you work on the design,
+    and is also what a host with no Pango libraries falls back to — see
+    erp.pdf_render.document_response."""
     model = Order
     template_name = "operating/order_print.html"
     context_object_name = "order"
@@ -3032,23 +3083,19 @@ class OrderPrint(DetailView):
         ctx["order_currency_symbol"] = order.currency_symbol
         ctx["order_total_quantity"] = total_qty
         ctx["order_total_packs"] = len(pack_ids)
+        ctx.update(order_print_totals_units(items, len(pack_ids)))
         ctx["is_pdf"] = True   # template can strip JS auto-print when rendering for PDF
         ctx["has_customer_info"] = bool(order.contact_id or order.company_id or order.web_client_id)
         ctx["has_delivery_info"] = order_has_delivery_info(order)
         return ctx
 
     def render_to_response(self, context, **response_kwargs):
-        from django.template.loader import render_to_string
-        from django.http import HttpResponse
+        from erp.pdf_render import document_response
 
-        # Render the printable HTML and let the browser handle PDF output
-        # (Print → Save as PDF). is_pdf=False triggers the auto-print
-        # dialog and keeps the page looking exactly like the on-screen
-        # design — no xhtml2pdf re-layout that breaks the cards/badges.
-        ctx = dict(context)
-        ctx["is_pdf"] = False
-        html = render_to_string(self.template_name, ctx, request=self.request)
-        return HttpResponse(html)
+        order = self.object
+        return document_response(
+            self.request, self.template_name, dict(context),
+            f"order_{order.order_number or order.pk}.pdf")
 
 
 def select_combined_orders(request):
@@ -3126,6 +3173,7 @@ class OrderPrintCombined(LoginRequiredMixin, View):
     def get(self, request):
         from decimal import Decimal
         from accounting.services_accounts import brand_name_for
+        from erp.pdf_render import document_response
 
         orders, refusal = select_combined_orders(request)
         if refusal is not None:
@@ -3168,7 +3216,7 @@ class OrderPrintCombined(LoginRequiredMixin, View):
         # end and print nothing at all.
         dates = [o.order_date for o in orders if o.order_date]
 
-        return render(request, "operating/order_print.html", {
+        return document_response(request, "operating/order_print.html", {
             "order": primary,
             "combined": True,
             "combined_orders": orders,
@@ -3182,15 +3230,12 @@ class OrderPrintCombined(LoginRequiredMixin, View):
             "combined_mixed_currency": sorted(codes) if len(codes) > 1 else None,
             "order_total_quantity": total_qty,
             "order_total_packs": len(pack_ids),
+            **order_print_totals_units(items, len(pack_ids)),
             "brand_line": brand_name_for(),
             "has_customer_info": bool(primary.contact_id or primary.company_id
                                       or primary.web_client_id),
             "has_delivery_info": order_has_delivery_info(primary),
-            # False, so the template keeps the script that opens the
-            # browser's print dialog — same as OrderPrint, which flips it
-            # in render_to_response for exactly that reason.
-            "is_pdf": False,
-        })
+        }, f"orders_{primary.order_number or primary.pk}.pdf")
 
 
 def save_order_adjustments(order, raw):
@@ -4285,6 +4330,10 @@ class OrderList(ListView):
         # order under "All" has to find it under "Retail" too.
         for order in all_orders:
             order.search_index = _order_search_index(order)
+        # A split order's row carries the combined name and the books of
+        # its other halves, which this list (one book's) never shows.
+        from .split_orders import label_split_rows
+        label_split_rows(all_orders)
         
         # B2B orders: Has contact OR company, but NO web_client
         b2b_orders = [
@@ -6505,6 +6554,9 @@ def update_order_status(request, order_id):
             if code == "cancel_requires_reopen":
                 from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
                 return JsonResponse({'error': str(CANCEL_REQUIRES_REOPEN_MSG)}, status=400)
+            if code == "goods_not_received":
+                from .views_warehouse import GOODS_NOT_RECEIVED_MSG
+                return JsonResponse({'error': str(GOODS_NOT_RECEIVED_MSG)}, status=400)
             return JsonResponse({'error': 'Durum güncelleme hatası', 'details': (code or '').replace('error:', '')}, status=500)
 
         return JsonResponse({
@@ -6915,6 +6967,9 @@ class WebOrderStatusEdit(View):
             elif code == "cancel_requires_reopen":
                 from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
                 messages.error(request, CANCEL_REQUIRES_REOPEN_MSG)
+            elif code == "goods_not_received":
+                from .views_warehouse import GOODS_NOT_RECEIVED_MSG
+                messages.error(request, GOODS_NOT_RECEIVED_MSG)
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
             next_url = request.POST.get('next') or request.GET.get('next')

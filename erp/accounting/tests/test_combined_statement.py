@@ -183,8 +183,10 @@ class WhatMayBePicked(CombinedStatementBase):
 
 class ThePrintedSheet(CombinedStatementBase):
     def _print(self, *accounts):
+        # ?html=1: the address serves a PDF, and what follows reads the
+        # document's markup.
         r = self.client.get(reverse("accounts:statement_print_combined"),
-                            {"ids": self._ids(*accounts)})
+                            {"ids": self._ids(*accounts), "html": "1"})
         self.assertEqual(r.status_code, 200)
         return r
 

@@ -421,7 +421,7 @@ class CurrentAccountCreate(View):
         email = request.POST.get("email", "").strip()
         phone = request.POST.get("phone", "").strip()
         address = request.POST.get("billing_address", "").strip()
-        country = request.POST.get("billing_country", "TR").strip()
+        country = request.POST.get("billing_country", "").strip()
         member = getattr(request.user, "member", None)
 
         # Picked from the search on the form: the customer is already in
@@ -568,7 +568,7 @@ class CurrentAccountEdit(View):
         current_account.identity_number = request.POST.get("identity_number", "")
         current_account.billing_address = request.POST.get("billing_address", "")
         current_account.billing_city = request.POST.get("billing_city", "")
-        current_account.billing_country = request.POST.get("billing_country", "TR")
+        current_account.billing_country = request.POST.get("billing_country", "")
         current_account.email = request.POST.get("email", "")
         current_account.phone = request.POST.get("phone", "")
         current_account.notes = request.POST.get("notes", "")
@@ -1134,6 +1134,10 @@ class CurrentAccountDetail(View):
             r for r in movements_with_balance if not r["mv"].is_void
         ][:20]
         _attach_links(movements_with_balance)
+        # Twenty rows with no word that more exist read as the whole
+        # account. On one whose opening entries are its oldest rows, that
+        # hid the very lines that explain the balance.
+        movement_count = current_account.movements.live().count()
 
         # Orders attached to this current account — newest first. Items prefetched
         # so gross_profit() can run cheaply in the template if needed.
@@ -1169,6 +1173,8 @@ class CurrentAccountDetail(View):
             "today_rate": today_rate,
             "fx": fx,
             "movements": movements_with_balance,
+            "movement_count": movement_count,
+            "movements_shown": len(movements_with_balance),
             "recent_orders": recent_orders,
             "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
@@ -1245,6 +1251,32 @@ def _cancelled_documents(current_account, date_from="", date_to=""):
     return docs
 
 
+def _statement_chart(opening, rows):
+    """The running balance as a series the statement can draw.
+
+    One point per live row, in ledger order, each carrying enough for a
+    hover readout: the balance after it, the date, the type and a short
+    description. Floats, not Decimals — this is a picture of the ledger,
+    the table beside it is the record. `None` when there is nothing to
+    draw: a single step is a number, not a line.
+    """
+    if len(rows) < 2:
+        return None
+    return {
+        "opening": float(opening),
+        "points": [
+            {
+                "d": r["mv"].date.strftime("%d.%m.%Y"),
+                "b": float(r["balance_after"]),
+                "a": float(r["mv"].amount_base),
+                "t": str(r["mv"].get_movement_type_display()),
+                "s": (r["description"] or "")[:90],
+            }
+            for r in rows
+        ],
+    }
+
+
 @method_decorator(login_required, name="dispatch")
 class CurrentAccountStatement(View):
     template_name = "accounts/current_account_statement.html"
@@ -1305,6 +1337,9 @@ class CurrentAccountStatement(View):
             running += mv.amount_base
             rows.append({"mv": mv, "balance_after": running})
         _attach_links(rows)
+        # Built here, before the display sort: the chart walks oldest to
+        # newest whichever way the table is read.
+        chart = _statement_chart(opening, rows)
 
         # Reading order is a DISPLAY choice, made after the walk. The
         # query itself has to stay oldest-first whatever the user picks:
@@ -1338,6 +1373,7 @@ class CurrentAccountStatement(View):
             "sort":         sort,
             "opening":      opening,
             "closing":      running,
+            "chart":        chart,
             "debit_total":  debit_total,
             "credit_total": credit_total,
             "date_from":    date_from,
@@ -1912,7 +1948,8 @@ class CurrentAccountStatementPrintCombined(View):
         _attach_links(rows)
 
         primary = accounts[0]
-        return render(request, self.template_name, {
+        from erp.pdf_render import document_response
+        return document_response(request, self.template_name, {
             "accounts": accounts,
             "customer": primary.crm_link or primary,
             "customer_name": (getattr(primary.crm_link, "name", None)
@@ -1925,4 +1962,4 @@ class CurrentAccountStatementPrintCombined(View):
             "closing": data["closing"],
             "currency_symbol": data["currency_symbol"],
             "printed_at": timezone.now(),
-        })
+        }, f"statement_{primary.code}.pdf")

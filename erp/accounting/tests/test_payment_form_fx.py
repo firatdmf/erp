@@ -119,13 +119,17 @@ class PaymentFormFxTests(TestCase):
 
         payment = Payment.objects.get()
         self.assertEqual(payment.exchange_rate, Decimal("0.030000"))
-
+        # The account settled at the typed rate…
+        self.assertEqual(payment.posted_movement.amount_base, Decimal("-6.00"))
+        # …the kasa holds the lira at what they were worth, and the
+        # published rate is kept beside the typed one to say why.
+        self.assertEqual(payment.published_rate, Decimal("0.025"))
         entry = CashTransactionEntry.objects.get(
             content_type=ContentType.objects.get_for_model(Payment),
             content_pk=payment.pk,
         )
-        self.assertEqual(entry.exchange_rate, Decimal("0.030000"))
-        self.assertEqual(entry.amount_in_base_currency, Decimal("6.00"))
+        self.assertEqual(entry.exchange_rate, Decimal("0.025"))
+        self.assertEqual(entry.amount_in_base_currency, Decimal("5.00"))
 
     def test_an_empty_rate_box_leaves_the_published_rate_to_apply(self):
         with mock.patch("accounting.services.get_exchange_rate") as rate:
@@ -155,21 +159,27 @@ class PaymentFormFxTests(TestCase):
         with mock.patch("accounting.services.get_exchange_rate") as rate:
             rate.return_value = Decimal("0.025")
             self._create(exchange_rate="0.030000")
-        payment = Payment.objects.get()
+            payment = Payment.objects.get()
 
-        self.client.post(
-            reverse("accounts:payment_edit", kwargs={"pk": payment.pk}),
-            {
-                "type": "collection", "method": "cash", "date": "2026-08-17",
-                "amount": "200.00", "currency": self.try_.pk,
-                "cash_account": self.lira.pk, "description": "", "notes": "",
-                "allocations_json": "[]", "exchange_rate": "0.050000",
-            },
-        )
+            self.client.post(
+                reverse("accounts:payment_edit", kwargs={"pk": payment.pk}),
+                {
+                    "type": "collection", "method": "cash", "date": "2026-08-17",
+                    "amount": "200.00", "currency": self.try_.pk,
+                    "cash_account": self.lira.pk, "description": "", "notes": "",
+                    "allocations_json": "[]", "exchange_rate": "0.050000",
+                },
+            )
 
+        # The account moved to what the new rate settles…
+        payment.refresh_from_db()
+        self.assertEqual(payment.exchange_rate, Decimal("0.050000"))
+        self.assertEqual(payment.posted_movement.amount_base, Decimal("-10.00"))
+        # …and the kasa still carries the lira at what they were worth,
+        # which the edit did not change.
         entry = CashTransactionEntry.objects.get(
             content_type=ContentType.objects.get_for_model(Payment),
             content_pk=payment.pk,
         )
-        self.assertEqual(entry.exchange_rate, Decimal("0.050000"))
-        self.assertEqual(entry.amount_in_base_currency, Decimal("10.00"))
+        self.assertEqual(entry.exchange_rate, Decimal("0.025"))
+        self.assertEqual(entry.amount_in_base_currency, Decimal("5.00"))

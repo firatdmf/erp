@@ -95,6 +95,7 @@ urlpatterns = [
     scoped("reports/balance-sheet/",     views_report.BalanceSheet.as_view(),      "report_balance_sheet"),
     scoped("reports/trial-balance/",     views_report.TrialBalance.as_view(),      "report_trial_balance"),
     scoped("reports/credit-limit/",      views_report.CreditLimitReport.as_view(), "report_credit_limit"),
+    scoped("reports/chart-of-accounts/", views_report.ChartOfAccounts.as_view(),   "report_chart_of_accounts"),
 
     scoped("checks/",                    views_check.CheckList.as_view(),   "check_list"),
     scoped("checks/new/",                views_check.CheckCreate.as_view(), "check_create"),
@@ -182,6 +183,7 @@ urlpatterns = [
     legacy("accounts/payments/new/", "payment_create"),
     legacy("accounts/reports/",   "report_index"),
     legacy("accounts/reports/trial-balance/", "report_trial_balance"),
+    legacy("accounts/reports/chart-of-accounts/", "report_chart_of_accounts"),
     legacy("accounts/reports/credit-limit/",  "report_credit_limit"),
     legacy("accounts/checks/",    "check_list"),
     legacy("accounts/checks/new/", "check_create"),

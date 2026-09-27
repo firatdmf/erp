@@ -141,7 +141,8 @@ class QuoteTest(TestCase):
     def test_the_print_is_signed_like_the_order_sheet(self):
         from erp.nejum_credit import brand_color, credit_html
         quote = Quote.objects.get(pk=self._save().json()["quote_id"])
-        page = self.client.get(reverse("marketing:quote_print", args=[quote.pk]))
+        page = self.client.get(reverse("marketing:quote_print", args=[quote.pk]),
+                               {"html": "1"})
         self.assertContains(page, f'<div class="brand" style="color: {brand_color()};">')
         credit = credit_html(self.book)
         if credit:  # empty when the brand has the credit turned off
@@ -150,7 +151,10 @@ class QuoteTest(TestCase):
     def test_the_pages_render(self):
         quote = Quote.objects.get(pk=self._save().json()["quote_id"])
         for name in ("quote_detail", "quote_print", "quote_edit"):
-            page = self.client.get(reverse("marketing:%s" % name, args=[quote.pk]))
+            # quote_print serves a PDF; ?html=1 is the page behind it, and
+            # the other two ignore the parameter.
+            page = self.client.get(reverse("marketing:%s" % name, args=[quote.pk]),
+                                   {"html": "1"})
             self.assertContains(page, quote.number, msg_prefix=name)
         page = self.client.get(reverse("marketing:quote_list"))
         self.assertContains(page, quote.number)

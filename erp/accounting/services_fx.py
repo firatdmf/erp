@@ -165,3 +165,85 @@ def book_fx_positions(book, *, on_date=None):
             total += pos["difference"]
         rows.append({"account": account, "position": pos})
     return {"rows": rows, "total": total, "base_code": _base_code()}
+
+
+# ---------------------------------------------------------------------------
+# Realised: what a rate typed on a payment did
+#
+# The revaluation above is about a balance the rate moved underneath. This
+# is the other way a difference arises: somebody GAVE a rate. A customer
+# who owes $226.40 is refunded €201 at 1.126368 so the account closes to
+# the cent; but €201 was worth $229.36 that day, and the $2.96 between the
+# two is a loss the book actually took. It is not unrealised — the money
+# has moved — so it is recorded the moment the payment posts, not at month
+# end, and shown here so the person who typed the rate can see what it
+# cost or made.
+# ---------------------------------------------------------------------------
+
+def realised_fx(payment, *, base_stated=None):
+    """The gain or loss a payment's typed rate produced, or None.
+
+    None when there is nothing to compare: no rate typed toward the book's
+    base, a payment in base already, or no published rate photographed for
+    the date. Otherwise a dict:
+
+      stated_rate     the rate typed on the payment
+      published_rate  the published rate for its date
+      base_stated     what the payment settled on the account, in base
+      base_published  what the money was worth, in base
+      difference      + a gain, − a loss, for the book
+
+    The sign follows the money. Money in worth more than it settled is a
+    gain (the customer's dollars came to more than the debt they cleared);
+    money out worth more than it settled is a loss (we handed over more
+    than the debt we cleared).
+
+    `base_stated` may be passed in from the ledger row the payment posted,
+    so the entry built on it balances against that row to the cent.
+    """
+    stated, published = payment.exchange_rate, payment.published_rate
+    if stated is None or published is None:
+        return None
+    amount = Decimal(payment.amount or 0)
+    # Rounded the way the rows themselves are — CurrentAccountMovement.save
+    # and CashTransactionEntry.save both quantize with the default
+    # (half-even) rounding — so a rate left at the published one comes to
+    # exactly the figure on the row, and not a cent either side of it.
+    if base_stated is None:
+        base_stated = (amount * Decimal(stated)).quantize(CENTS)
+    base_published = (amount * Decimal(published)).quantize(CENTS)
+    difference = (Decimal(payment.cash_sign) * (base_published - base_stated)).quantize(CENTS)
+    return {
+        "stated_rate": Decimal(stated),
+        "published_rate": Decimal(published),
+        "base_stated": Decimal(base_stated),
+        "base_published": base_published,
+        "difference": difference,
+        "currency": payment.currency.code,
+        "base_code": _base_code(),
+    }
+
+
+def book_realised_fx(book):
+    """Every confirmed payment in `book` taken at a typed rate that differed
+    from the published one, newest first, with the book's total.
+
+    Each row's difference is already on 5900: this lists what is there and
+    why, so a figure on that line can be traced to the payment and the two
+    rates that made it.
+    """
+    from accounting.models_accounts import Payment
+
+    payments = (Payment.objects
+                .filter(book=book, status="confirmed",
+                        exchange_rate__isnull=False, published_rate__isnull=False)
+                .select_related("current_account", "currency")
+                .order_by("-date", "-id"))
+    rows, total = [], Decimal("0.00")
+    for payment in payments:
+        fx = realised_fx(payment)
+        if not fx or fx["difference"] == Decimal("0.00"):
+            continue
+        rows.append({"payment": payment, "fx": fx})
+        total += fx["difference"]
+    return {"rows": rows, "total": total, "base_code": _base_code()}

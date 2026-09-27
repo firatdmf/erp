@@ -33,5 +33,6 @@ class TheAddressKeepsItsLines(TestCase):
         self.assertContains(resp, "Fatih Cad. 12<br>Istanbul, Turkey<br>+90 555 000 00 00")
 
     def test_the_printout(self):
-        resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]))
+        resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]),
+                               {"html": "1"})
         self.assertContains(resp, "Fatih Cad. 12<br>Istanbul, Turkey<br>+90 555 000 00 00")

@@ -18,7 +18,9 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
-from accounting.models_accounts import CurrentAccount, Invoice
+from accounting.models_accounts import (
+    CurrentAccount, CurrentAccountMovement, Invoice, PurchaseChange,
+)
 from crm.models import Contact
 from marketing.models import Product, ProductVariant
 from operating.models import (
@@ -107,6 +109,13 @@ class PurchaseForCustomerTest(TestCase):
         card = inv.intake_plan["products"][0]
         self.assertEqual(card["main_product"]["mode"], "existing")
         self.assertEqual(card["main_product"]["id"], line.product_id)
+
+    def test_the_order_does_not_name_the_supplier(self):
+        """The order prints for the customer, notes and all; who the goods
+        were bought from is ours to know. The link is invoice.for_order."""
+        r = self._save(self._plan())
+        order = Invoice.objects.get(pk=r.json()["invoice_id"]).for_order
+        self.assertFalse(order.notes)
 
     def test_an_auto_sku_is_fixed_at_save(self):
         r = self._save(self._plan(variants=[self._variant(sku="")]))
@@ -344,12 +353,250 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(r.context["intake_plan"]["products"][0]["variants"][0]["sale_price"],
                          "5.00")
 
-    def test_cancelling_the_draft_says_the_order_is_still_open(self):
+    def test_cancelling_the_draft_leaves_an_order_being_packed_alone(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        # Being packed from stock: the packing floor owns it now.
+        Order.objects.update(order_status="packaging")
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.assertTrue(r.json()["success"], r.json())
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "packaging")
+        self.assertEqual(order.items.count(), 1)
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, "is already being packed")
+
+    # ── The customer's bill waits for the goods ──────────────────────
+    # A purchase for a customer says what they will owe, not what they
+    # owe: nothing has been sold until the supplier delivers. The order's
+    # sale posts to their account when the purchase is received.
+
+    def _sale(self, order):
+        return CurrentAccountMovement.objects.filter(movement_type="order_sale",
+                                                     source_id=order.pk)
+
+    def test_the_customer_is_not_billed_until_the_goods_arrive(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self.assertFalse(self._sale(order).exists())
+        self.assertEqual(order.current_account.cached_balance, 0)
+        # Editing the order meanwhile doesn't sneak the bill in either.
+        line = order.items.get()
+        line.quantity = Decimal("40")
+        line.save()
+        self.assertFalse(self._sale(order).exists())
+
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        [sale] = self._sale(order)
+        self.assertEqual(sale.amount, Decimal("200.00"))        # 40 × 5.00
+        self.assertEqual(sale.current_account, order.current_account)
+
+    def test_a_second_purchase_still_on_its_way_keeps_the_bill_waiting(self):
+        first = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=first).for_order
+        second = Invoice.objects.create(
+            type="purchase", status="draft", for_order=order, series="PUR", number="2",
+            current_account=self.supplier, book=self.book, currency=self.usd,
+            date=order.order_date, due_date=order.order_date)
+        self.assertTrue(self._confirm(first).json()["success"])
+        self.assertFalse(self._sale(order).exists())
+        # Cancelling the straggler means nothing more is coming.
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[second.pk]))
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertTrue(self._sale(order).exists())
+
+    def test_cancelling_the_only_draft_bills_what_else_the_order_holds(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
+        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
+        self.assertFalse(self._sale(order).exists())
+        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        # The purchased line went with the purchase; the stock line bills.
+        [sale] = self._sale(order)
+        self.assertEqual(sale.amount, Decimal("20.00"))         # 10 × 2.00
+
+    # ── Nor can the order be completed ───────────────────────────────
+
+    def test_the_order_cannot_be_completed_until_the_goods_arrive(self):
+        from operating.views_warehouse import apply_order_status_change
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self.assertEqual(apply_order_status_change(order, "shipped", user=self.admin),
+                         (False, "goods_not_received"))
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "pending")
+
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        self.assertEqual(apply_order_status_change(order, "shipped", user=self.admin),
+                         (True, None))
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "shipped")
+
+    def test_the_order_page_refuses_to_complete_and_says_why(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        url = reverse("operating:order_detail", args=[order.pk])
+        page = self.client.get(url)
+        self.assertContains(page, 'id="od-complete-btn" class="ord-btn primary" data-status="shipped"\n                        disabled')
+        self.assertContains(page, "can be completed once the goods")
+        r = self.client.post(url, {"action": "update_status", "order_status": "shipped"}, follow=True)
+        self.assertContains(r, "Receive the purchase first, or cancel it.")
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "pending")
+
+    def test_the_order_page_says_the_bill_is_waiting(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        inv = Invoice.objects.get(pk=inv_id)
+        url = reverse("operating:order_detail", args=[inv.for_order.pk])
+        page = self.client.get(url)
+        self.assertContains(page, "Not billed yet")
+        self.assertContains(page, inv.number)
+        self._confirm(inv_id)
+        self.assertNotContains(self.client.get(url), "Not billed yet")
+
+    # ── The order and the purchase move together ─────────────────────
+    # A line changed or removed on the order changes the draft purchase;
+    # a purchase cancelled takes its lines off the order; either document
+    # cancelled cancels the other when nothing is left on it. Both logs
+    # say what the other side did.
+
+    def _purchase_log(self, inv_id):
+        return list(PurchaseChange.objects.filter(invoice_id=inv_id).order_by("pk")
+                    .values_list("action", "field", "origin", "old_value", "new_value"))
+
+    def _order_log(self, order):
+        return list(order.change_logs.order_by("pk").values_list("action", "field", "new_value"))
+
+    @staticmethod
+    def _tops(inv):
+        return [Decimal(str(t["qty"])) for t in inv.intake_plan["products"][0]["variants"][0]["tops"]]
+
+    def test_a_quantity_changed_on_the_order_changes_the_purchase(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        line = order.items.get()
+        line.quantity, line.price = Decimal("40"), Decimal("6")
+        line.save()
+
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertEqual(self._tops(inv), [Decimal("30"), Decimal("10")])      # trimmed from the last roll
+        self.assertEqual(Decimal(inv.intake_plan["products"][0]["variants"][0]["sale_price"]), 6)
+        self.assertEqual(inv.total, Decimal("140.00"))                          # 40 × 3.50
+        self.assertEqual(inv.items.get().quantity, Decimal("40.000"))
+        self.assertIn(("item_updated", "quantity", "order", "55", "40"), self._purchase_log(inv_id))
+        self.assertIn(("item_updated", "sale_price", "order", "5", "6"), self._purchase_log(inv_id))
+        # Nothing bounced back onto the order.
+        self.assertEqual(order.items.get().quantity, Decimal("40.00"))
+
+    def test_more_on_the_order_adds_a_roll_to_the_purchase(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        line = Invoice.objects.get(pk=inv_id).for_order.items.get()
+        line.quantity = Decimal("70")
+        line.save()
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertEqual(self._tops(inv), [Decimal("30"), Decimal("25"), Decimal("15")])
+        self.assertEqual(inv.total, Decimal("245.00"))
+
+    def test_a_line_removed_from_the_order_leaves_the_rest_on_the_purchase(self):
+        inv_id = self._save(self._plan(variants=[
+            self._variant(), self._variant(name="G08", sku="K24644.G08", tops=(20,)),
+        ])).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        order.items.get(product_variant__variant_sku="K24644.G08").delete()
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertEqual(inv.status, "draft")
+        self.assertEqual([v["sku"] for v in inv.intake_plan["products"][0]["variants"]], ["K24644.G07"])
+        self.assertEqual(inv.total, Decimal("192.50"))
+        self.assertEqual([c for c in self._purchase_log(inv_id) if c[0] == "item_removed"][0][2], "order")
+
+    def test_a_line_removed_from_the_order_cancels_a_purchase_left_empty(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        order.items.get().delete()
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertEqual(inv.status, "cancelled")
+        # What it was for still reads on the cancelled purchase.
+        self.assertEqual(len(inv.intake_plan["products"][0]["variants"]), 1)
+        self.assertIn(("status", "status", "order", "draft", "cancelled"), self._purchase_log(inv_id))
+        self.assertIn(("field", "purchase", "%s cancelled — nothing left on it to buy" % inv.number),
+                      self._order_log(order))
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "pending")
+
+    def test_cancelling_the_order_cancels_its_draft_purchase(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        r = self.client.post(reverse("operating:order_detail", args=[order.pk]),
+                             {"action": "update_status", "order_status": "cancelled",
+                              "cancel_reason": "Customer took stock instead"})
+        self.assertEqual(r.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "cancelled")
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertEqual(inv.status, "cancelled")
+        self.assertIn(("status", "status", "order", "draft", "cancelled"), self._purchase_log(inv_id))
+        self.assertIn(("field", "purchase", "%s cancelled with the order" % inv.number),
+                      self._order_log(order))
+
+    def test_cancelling_the_purchase_takes_its_lines_off_the_order(self):
+        inv_id = self._save(self._plan(variants=[
+            self._variant(), self._variant(name="G08", sku="K24644.G08", tops=(20,)),
+        ])).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
+        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual([it.product.sku for it in order.items.select_related("product")], ["STK0001"])
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "pending")
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertIn(("field", "purchase", "%s cancelled — 2 line(s) removed" % inv.number),
+                      self._order_log(order))
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, "were removed from order %s" % order.order_number)
+
+    def test_cancelling_the_purchase_cancels_an_order_left_empty(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
         r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
         self.assertTrue(r.json()["success"], r.json())
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "pending")
+        self.assertEqual(order.order_status, "cancelled")
+        self.assertFalse(order.items.exists())
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertIn(("field", "cancel_reason", "Purchase %s cancelled" % inv.number),
+                      self._order_log(order))
+        self.assertFalse(self._sale(order).exists())
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
-        self.assertContains(page, "is still open")
+        self.assertContains(page, "was cancelled too")
+
+    def test_editing_the_purchase_is_logged_on_both_sides(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self.assertIn(("created", None, "purchase", None, "for order %s" % order.order_number),
+                      self._purchase_log(inv_id))
+        self.assertEqual([c[0] for c in self._purchase_log(inv_id) if c[0] == "item_added"], ["item_added"])
+        r = self._save(self._plan(variants=[self._variant(tops=(40,), sale="5.50")],
+                                  customer=False, product=Product.objects.get()), pk=inv_id)
+        self.assertEqual(r.status_code, 200, r.content)
+        log = self._purchase_log(inv_id)
+        self.assertIn(("item_updated", "quantity", "purchase", "55", "40"), log)
+        self.assertIn(("item_updated", "sale_price", "purchase", "5", "5.5"), log)
+        self.assertIn(("field", "purchase", "1 line(s) changed from purchase %s"
+                       % Invoice.objects.get(pk=inv_id).number), self._order_log(order))
+        # The order's own item log has the quantity row too.
+        self.assertIn(("item_updated", "quantity", "40.00"), self._order_log(order))
+
+    def test_receiving_is_logged(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        self.assertIn(("status", "status", "purchase", "draft", "issued"), self._purchase_log(inv_id))
+
+    def test_the_purchase_page_lists_its_changes(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, "Purchase changes")
+        self.assertContains(page, "Item added")
+        self.assertContains(page, "K24644.G07")

@@ -11,7 +11,7 @@ It does NOT carry the order each line came from. The printed sheet says
 that in a heading above each group, and this deliberately does not
 repeat it — asked for as a list of goods, not a reconciliation.
 """
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from io import BytesIO
 
 from django.conf import settings
@@ -28,6 +28,9 @@ from erp.xlsx_utils import (
     GRID, RULE, FILL_HEAD, RIGHT, LEFT, TOP, INK, TEXT,
     F_TITLE, F_SUB, F_DOCNO, F_HEAD, F_VAL, F_VALB, F_TOTAL,
 )
+from django.utils.translation import ngettext
+
+from marketing import units
 from .models import Order
 
 # The totals row, dressed so the eye lands on it from across the sheet:
@@ -41,7 +44,7 @@ BORDER_TOTAL = Border(top=_rule, bottom=_double)
 FILL_TOTAL = PatternFill("solid", fgColor="FFF3F6F8")
 F_GRAND = Font(size=12, bold=True, color=INK)
 
-NCOLS = 6  # A..F
+NCOLS = 7  # A..G
 
 
 def _dec(v):
@@ -88,6 +91,25 @@ def _money_format(code):
     return f'"{sym}"#,##0.00'
 
 
+def _qty_format(unit):
+    """A quantity that SHOWS its unit — "120.00 m" — and still holds 120,
+    so it sums like the number it is. Bare when there is no one unit to
+    name (a total over metres and pieces)."""
+    unit = (unit or "").replace('"', "")
+    return f'#,##0.00" {unit}"' if unit else "#,##0.00"
+
+
+def _packs_format(pack_type):
+    """A pack count that shows what the packs are: "1 roll", "3 rolls".
+    None for a mix of pack types, which prints as plain "packs"."""
+    if pack_type:
+        one, many = units.pack_nouns(pack_type)
+    else:
+        one, many = ngettext("pack", "packs", 1), ngettext("pack", "packs", 2)
+    one, many = one.replace('"', ""), many.replace('"', "")
+    return f'[=1]0" {one}";#,##0" {many}"'
+
+
 def _break_words(text, every=4):
     """Hard-wrap a name every `every` words.
 
@@ -120,9 +142,11 @@ def _display_len(cl):
     if v is None:
         return 0
     if isinstance(v, (int, float)) and not isinstance(v, bool):
-        fmt = cl.number_format or ""
+        # The last section only: a "1 roll";"3 rolls" format prints one
+        # of its words, never both, and the plural is the longer.
+        fmt = (cl.number_format or "").split(";")[-1]
         # Whatever the format sets in quotes is printed literally beside
-        # the figure — the currency sign, in practice.
+        # the figure — the currency sign, or the unit.
         literal = sum(len(part) for part in fmt.split('"')[1::2])
         return len(f"{v:,.2f}") + literal
     return max((len(line) for line in str(v).split("\n")), default=0)
@@ -220,7 +244,7 @@ def build_order_workbook(order):
     ws = wb.active
     ws.title = "Order"
     ws.sheet_view.showGridLines = False
-    for col, w in zip("ABCDEF", (32, 22, 18, 11, 15, 16)):
+    for col, w in zip("ABCDEFG", (32, 22, 18, 13, 11, 15, 16)):
         ws.column_dimensions[col].width = w
 
     num = order.order_number or f"#{order.pk}"
@@ -230,7 +254,7 @@ def build_order_workbook(order):
     cell(ws, r, 1, brand, font=F_TITLE)
     merge(ws, r, 1, 3)
     cell(ws, r, 4, f"ORDER {num}", font=F_DOCNO, align=RIGHT)
-    merge(ws, r, 4, 6)
+    merge(ws, r, 4, NCOLS)
     # 20pt type in a row sized for 11pt: the wordmark's descenders were
     # cut off by the row beneath it. Row heights are in points.
     ws.row_dimensions[r].height = 28
@@ -238,7 +262,7 @@ def build_order_workbook(order):
     cell(ws, r, 1, "Order Confirmation", font=F_SUB)
     merge(ws, r, 1, 3)
     cell(ws, r, 4, _dt(order.order_date) if order.order_date else _dt(order.created_at), font=F_SUB, align=RIGHT)
-    merge(ws, r, 4, 6)
+    merge(ws, r, 4, NCOLS)
     for c in range(1, NCOLS + 1):
         ws.cell(r, c).border = RULE
     r += 2
@@ -329,9 +353,10 @@ def build_order_workbook(order):
         r += 1
 
     # ── Items ──
-    items = list(order.items.all().select_related("product", "product_variant"))
+    from .views import build_order_print_rows
+    items, _t, _q, _packs = build_order_print_rows(order)
     r = section(ws, r, f"PRODUCTS ({len(items)})", NCOLS)
-    heads = ["Product", "SKU", "Variant", "Qty", "Unit", "Amount"]
+    heads = ["Product", "SKU", "Variant", "Qty", "Packs", "Price", "Amount"]
     for i, h in enumerate(heads, 1):
         cell(ws, r, i, h, font=F_HEAD, fill=FILL_HEAD, border=GRID,
              align=(RIGHT if i >= 4 else LEFT))
@@ -341,7 +366,7 @@ def build_order_workbook(order):
     for it in items:
         qty = it.quantity or Decimal("0")
         price = it.price or Decimal("0")
-        line = (qty * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        line = it.line_total_calc
         total += line
         title = _break_words(getattr(it.product, "title", None)
                              or str(it.product or "—"))
@@ -351,9 +376,10 @@ def build_order_workbook(order):
         cell(ws, r, 1, title, font=F_VAL, border=GRID, align=TOP)
         cell(ws, r, 2, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 3, vsku or "—", font=F_VAL, border=GRID, fmt=TEXT)
-        cell(ws, r, 4, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00")
-        cell(ws, r, 5, _dec(price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
-        cell(ws, r, 6, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
+        cell(ws, r, 4, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt=_qty_format(it.unit_short))
+        cell(ws, r, 5, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt=_packs_format(it.pack_type))
+        cell(ws, r, 6, _dec(price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
+        cell(ws, r, 7, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         r += 1
 
     # ── Totals ──
@@ -373,9 +399,9 @@ def build_order_workbook(order):
         rows += [("Paid", paid, False), ("Balance", grand - paid, True)]
     for lbl, val, strong in rows:
         cell(ws, r, 4, lbl, font=(F_TOTAL if strong else F_VALB), border=GRID, align=RIGHT)
-        merge(ws, r, 4, 5)
-        merge_border(ws, r, 4, 5, GRID)
-        cell(ws, r, 6, val, font=(F_TOTAL if strong else F_VALB), border=GRID, align=RIGHT, fmt=money)
+        merge(ws, r, 4, NCOLS - 1)
+        merge_border(ws, r, 4, NCOLS - 1, GRID)
+        cell(ws, r, NCOLS, val, font=(F_TOTAL if strong else F_VALB), border=GRID, align=RIGHT, fmt=money)
         r += 1
 
     # ── Notes ──
@@ -516,8 +542,8 @@ def build_combined_workbook(orders):
         cell(ws, r, 3, it.variant_label or "—", font=F_VAL, border=GRID)
         cell(ws, r, 4, vsku or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 5, it.product_group_label or "—", font=F_VAL, border=GRID)
-        cell(ws, r, C_QTY, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00")
-        cell(ws, r, C_PACKS, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0")
+        cell(ws, r, C_QTY, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt=_qty_format(it.unit_short))
+        cell(ws, r, C_PACKS, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt=_packs_format(it.pack_type))
         cell(ws, r, C_PRICE, _dec(it.price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         cell(ws, r, C_AMOUNT, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         r += 1
@@ -529,13 +555,19 @@ def build_combined_workbook(orders):
     # people are going to sort and filter is worth avoiding anyway. The
     # word sits in A and the cells beside it are simply dressed to
     # match, which looks the same and behaves better.
+    # The foot names a unit and a pack only when every line shares it:
+    # metres and pieces added together are a number with no unit.
+    line_units = {it.unit_short for _o, it in rows}
+    line_packs = {it.pack_type for _o, it in rows if it.pack_count}
+    total_unit = line_units.pop() if len(line_units) == 1 else ""
+    total_pack = line_packs.pop() if len(line_packs) == 1 else None
     for c in range(1, C_QTY):
         cell(ws, r, c, "TOTAL" if c == 1 else "", font=F_GRAND,
              fill=FILL_TOTAL, border=BORDER_TOTAL)
     cell(ws, r, C_QTY, _dec(total_qty), font=F_GRAND, fill=FILL_TOTAL,
-         border=BORDER_TOTAL, align=RIGHT, fmt="#,##0.00")
+         border=BORDER_TOTAL, align=RIGHT, fmt=_qty_format(total_unit))
     cell(ws, r, C_PACKS, len(packs), font=F_GRAND, fill=FILL_TOTAL,
-         border=BORDER_TOTAL, align=RIGHT, fmt="#,##0")
+         border=BORDER_TOTAL, align=RIGHT, fmt=_packs_format(total_pack))
     cell(ws, r, C_PRICE, "", font=F_GRAND, fill=FILL_TOTAL, border=BORDER_TOTAL)
     cell(ws, r, C_AMOUNT, _dec(total), font=F_GRAND, fill=FILL_TOTAL,
          border=BORDER_TOTAL, align=RIGHT, fmt=money)

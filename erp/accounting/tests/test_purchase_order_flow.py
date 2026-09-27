@@ -184,7 +184,8 @@ class PurchaseOrderFlowTest(TestCase):
     # ── The printed document ────────────────────────────────────────
     def test_the_order_prints_as_an_order_and_then_as_a_receipt(self):
         inv_id = self._save_order().json()["invoice_id"]
-        r = self.client.get(reverse("accounts:purchase_order_print", args=[inv_id]))
+        r = self.client.get(reverse("accounts:purchase_order_print", args=[inv_id]),
+                            {"html": "1"})
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.context["is_order"])
         self.assertContains(r, "Karven")
@@ -192,7 +193,8 @@ class PurchaseOrderFlowTest(TestCase):
         self.assertContains(r, "Fabrika")
 
         self.client.post(reverse("accounts:purchase_order_confirm", args=[inv_id]))
-        r2 = self.client.get(reverse("accounts:purchase_order_print", args=[inv_id]))
+        r2 = self.client.get(reverse("accounts:purchase_order_print", args=[inv_id]),
+                             {"html": "1"})
         self.assertFalse(r2.context["is_order"])
 
 
@@ -221,6 +223,7 @@ class PurchaseListBookScopeTest(TestCase):
             type="supplier", default_currency=self.usd)
         Invoice.objects.create(
             book=book, current_account=current_account, type="purchase", status="draft",
+            number=f"PO-{supplier[:3].upper()}",
             date="2026-08-21", due_date="2026-09-21",
             currency=self.usd, total=Decimal(total))
         return current_account
@@ -241,6 +244,37 @@ class PurchaseListBookScopeTest(TestCase):
         ctx = self._page(self.laleli)
         self.assertEqual(len(ctx["invoices"]), 1)
         self.assertEqual(ctx["total_sum"], Decimal("600.00"))
+
+    def _cancelled(self, supplier, total):
+        current_account = self._purchase(self.laleli, supplier, total)
+        Invoice.objects.filter(current_account=current_account).update(status="cancelled")
+        return current_account
+
+    def _page_with(self, **params):
+        resp = self.client.get(
+            reverse("accounts:purchase_order_list", kwargs={"book_id": self.laleli.pk}),
+            params)
+        self.assertEqual(resp.status_code, 200)
+        return resp.context
+
+    def test_cancelled_orders_are_hidden_by_default(self):
+        self._cancelled("Gone", "999.00")
+        ctx = self._page(self.laleli)
+        self.assertEqual([i.current_account.name for i in ctx["invoices"]], ["Karven"])
+        self.assertEqual(ctx["total_sum"], Decimal("600.00"))
+
+    def test_cancelled_orders_show_when_asked_for_by_status(self):
+        self._cancelled("Gone", "999.00")
+        ctx = self._page_with(status="cancelled")
+        self.assertEqual([i.current_account.name for i in ctx["invoices"]], ["Gone"])
+        self.assertEqual(ctx["total_sum"], Decimal("999.00"))
+
+    def test_all_statuses_includes_cancelled(self):
+        self._cancelled("Gone", "999.00")
+        ctx = self._page_with(status="all")
+        self.assertEqual(
+            sorted(i.current_account.name for i in ctx["invoices"]), ["Gone", "Karven"])
+        self.assertEqual(ctx["total_sum"], Decimal("1599.00"))
 
     def test_the_supplier_filter_offers_only_this_books_suppliers(self):
         """A supplier the page can never show must not sit in its

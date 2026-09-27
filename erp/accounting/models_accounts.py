@@ -181,7 +181,9 @@ class CurrentAccount(models.Model):
     # Billing address (may differ from CRM)
     billing_address = models.TextField(blank=True)
     billing_city    = models.CharField(max_length=100, blank=True)
-    billing_country = models.CharField(max_length=50,  default="TR")
+    # No default: a new account takes its country from the CRM record
+    # (services_accounts._crm_country) and stays blank otherwise.
+    billing_country = models.CharField(max_length=50, blank=True, default="")
     email           = models.EmailField(blank=True)
     phone           = models.CharField(max_length=30, blank=True)
 
@@ -536,6 +538,13 @@ class CurrentAccountMovement(models.Model):
         # it is a loss, and a loss has to reach the P&L as one: filed under
         # "adjustment" it could only ever be parked in Suspense.
         ("write_off",        _("Bad Debt Written Off")),
+        # The small difference left on an account once it is otherwise
+        # settled — a customer who overpaid by a few lira and will not be
+        # refunded, or underpaid by a few and has been let off. Either way
+        # round, so the account can be brought to zero without parking the
+        # difference in Suspense: kept, it is Other Income; let go, it is an
+        # operating cost, too small and too ordinary to count as bad debt.
+        ("balance_close",    _("Balance Closing Difference")),
         ("adjustment",       _("Offset / Adjustment")),
         # The book's valuation of a foreign-currency balance, brought up to
         # date. It moves what the balance is WORTH in base and never what
@@ -632,15 +641,16 @@ class CurrentAccountMovement(models.Model):
     # converting that is what the account's rate is for.
     DEBT_TYPES = frozenset({
         "opening", "order_sale", "invoice_sale", "invoice_purchase",
-        "return_sale", "return_purchase", "interest", "discount", "write_off", "adjustment",
-        "legacy_ar", "legacy_ap",
+        "return_sale", "return_purchase", "interest", "discount", "write_off", "balance_close",
+        "adjustment", "legacy_ar", "legacy_ap",
     })
 
     # Which way each type moves the balance, for the types that only ever go
     # one way. A sale is always owed more and a collection always owed less;
     # on the live books every row of these types agreed but one. Opening
     # balances and adjustments are absent because they genuinely go either
-    # way. Checked on the hand-entry screens only — see
+    # way, and so is a discount: one we give a customer is a credit, one a
+    # supplier gives us a debit (services_posting.DEBIT_CONTRA_BY_TYPE). Checked on the hand-entry screens only — see
     # direction_problem — so documents that post their own rows are
     # untouched.
     DEBIT_ONLY_TYPES = frozenset({
@@ -648,7 +658,7 @@ class CurrentAccountMovement(models.Model):
         "return_purchase", "check_out",
     })
     CREDIT_ONLY_TYPES = frozenset({
-        "collection", "invoice_purchase", "return_sale", "discount",
+        "collection", "invoice_purchase", "return_sale",
         "write_off", "advance_in", "check_in",
     })
 
@@ -666,7 +676,7 @@ class CurrentAccountMovement(models.Model):
         """Why this type cannot go this way, or None when it can.
 
         An existing row keeps the direction it already has as long as its
-        type is unchanged, so opening the one discount entered as a debit to
+        type is unchanged, so opening an old row that went the other way to
         fix its description does not refuse to save.
         """
         fixed = cls.fixed_direction(movement_type)
@@ -1552,6 +1562,20 @@ class Payment(models.Model):
         max_digits=14, decimal_places=6, null=True, blank=True,
         help_text="Rate to the account's own currency, when that is not the "
                   "base. Blank → the published rate for the date.")
+    # The published rate for `date`, toward the book's base, photographed
+    # whenever a rate is typed toward it. The typed rate says what the
+    # money SETTLED on the account; the published one says what the money
+    # was WORTH. They differ exactly when somebody gave or got a rate, and
+    # that gap is a realised exchange gain or loss the ledger records on
+    # its own — see services_fx.realised_fx and the 5900 line in
+    # services_posting.lines_for_movement. Stored rather than re-asked so
+    # the line it produced can still be explained after the rate table has
+    # been corrected. Null when nothing was typed toward base, or the
+    # payment is in base already: nothing was overridden, so there is
+    # nothing to compare.
+    published_rate = models.DecimalField(
+        max_digits=16, decimal_places=8, null=True, blank=True,
+        help_text="The published rate for the date, kept beside a typed one.")
 
     # Cash side — money lands here (or leaves here)
     cash_account = models.ForeignKey(
@@ -1627,6 +1651,58 @@ class Payment(models.Model):
         """
         return self.exchange_rate
 
+    def cash_ledger_rate(self):
+        """The rate this payment's CASH row converts at.
+
+        Not the typed rate: that is what the money settled on the account,
+        and the kasa holds the money itself, worth what it was worth that
+        day. Asked by CashTransactionEntry.resolve_exchange_rate. The two
+        rates agree whenever nothing was typed, so only a payment taken at
+        a rate of its own has a cash side that differs from its account
+        side — and the difference reaches 5900 (services_fx.realised_fx).
+        """
+        return self.published_rate or self.exchange_rate
+
+    def realised_fx(self):
+        """What the typed rate did, against the published one, or None.
+
+        See services_fx.realised_fx for the dict.
+        """
+        from accounting.services_fx import realised_fx
+        return realised_fx(self)
+
+    # The fields a change to which can alter which published rate applies.
+    _RATE_FIELDS = frozenset({"date", "currency", "amount", "exchange_rate",
+                              "account_exchange_rate"})
+
+    def save(self, *args, **kwargs):
+        # Re-photographed on every save of a CONFIRMED payment that could
+        # change which published rate applies: the edit screen saves the
+        # payment and then resyncs its rows, which read the snapshot back.
+        # A draft has posted nothing and is compared with nothing, so it
+        # carries none — confirm() takes the photograph on the way in.
+        update_fields = kwargs.get("update_fields")
+        if self.status == "confirmed" and (
+                update_fields is None or self._RATE_FIELDS & set(update_fields)):
+            self.published_rate = self._published_rate_for_date()
+            if update_fields is not None:
+                kwargs["update_fields"] = list(set(update_fields) | {"published_rate"})
+        super().save(*args, **kwargs)
+
+    def _published_rate_for_date(self):
+        """The published rate this payment would have converted at had
+        nobody typed one — None when nobody did, or when the payment is in
+        base already, since then there is nothing to hold the typed rate
+        against."""
+        if self.exchange_rate is None or not self.currency_id or not self.date:
+            return None
+        base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
+        if self.currency.code.upper() == base_code.upper():
+            return None
+        from accounting.services import get_exchange_rate
+        rate = get_exchange_rate(self.currency.code, base_code, on_date=self.date)
+        return Decimal(str(rate)) if rate else None
+
     def ledger_account_rate(self):
         """The rate this payment's ledger row converts at toward the account's
         own currency — asked by CurrentAccountMovement.entered_account_rate."""
@@ -1670,6 +1746,13 @@ class Payment(models.Model):
             raise ValidationError("Amount must be greater than zero.")
 
         with transaction.atomic():
+            # 0) The published rate for the day, photographed before the
+            #    movement exists: posting the movement reads this payment
+            #    back from the database and holds the typed rate against
+            #    it (services_fx.realised_fx), so it has to be there first.
+            self.published_rate = self._published_rate_for_date()
+            self.save(update_fields=["published_rate", "updated_at"])
+
             # 1) Current account ledger entry
             movement = CurrentAccountMovement.objects.create(
                 current_account=self.current_account,
@@ -2447,3 +2530,51 @@ class CurrentAccountTransfer(models.Model):
         super().save(update_fields=["from_movement", "to_movement"])
         for current_account in {c.pk: c for c in touched if c}.values():
             current_account.recompute_balance(save=True)
+
+
+class PurchaseChange(models.Model):
+    """Audit row for a purchase — one entry per meaningful change, the
+    purchase-side twin of operating.OrderChange, so a purchase's page
+    shows how it came to say what it says.
+
+    A purchase is edited as one JSON plan rewritten whole on every save,
+    so its changes can't be picked up by model signals the way an
+    order's are: the save view, the receipt, the cancel and the
+    order↔purchase mirror log through accounting.purchase_audit by hand.
+    `origin` says which page the change was made on — a quantity changed
+    on the customer's order lands here as "from the order"."""
+
+    ACTION_CHOICES = [
+        ("created", _("Purchase created")),
+        ("status", _("Status changed")),
+        ("item_added", _("Item added")),
+        ("item_removed", _("Item removed")),
+        ("item_updated", _("Item updated")),
+        ("field", _("Field updated")),
+    ]
+    ORIGIN_CHOICES = [
+        ("purchase", _("on the purchase")),
+        ("order", _("from the customer order")),
+    ]
+
+    invoice = models.ForeignKey(
+        Invoice, related_name="change_logs", on_delete=models.CASCADE,
+    )
+    action = models.CharField(max_length=16, choices=ACTION_CHOICES, db_index=True)
+    field = models.CharField(max_length=64, blank=True, null=True)
+    item_label = models.CharField(max_length=255, blank=True, null=True)
+    old_value = models.TextField(blank=True, null=True)
+    new_value = models.TextField(blank=True, null=True)
+    origin = models.CharField(max_length=16, choices=ORIGIN_CHOICES, default="purchase")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="purchase_changes",
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [models.Index(fields=["invoice", "-created_at"])]
+
+    def __str__(self):
+        return f"{self.action} · purchase #{self.invoice_id} · {self.created_at:%Y-%m-%d %H:%M}"

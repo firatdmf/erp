@@ -24,7 +24,16 @@ from .models import Invoice
 
 
 def _render_doc(request, doc):
-    return render(request, "accounts/invoice_document.html", {"doc": doc})
+    """The document as a PDF, opening in a tab.
+
+    Rendered here rather than by the reader's browser, so an invoice
+    handed to a customer is the same file whoever produced it — see
+    erp.pdf_render. ?html=1 still serves the page itself.
+    """
+    from erp.pdf_render import document_response
+
+    return document_response(request, "accounts/invoice_document.html",
+                             {"doc": doc}, f"{doc.filename}.pdf")
 
 
 def _order(pk):

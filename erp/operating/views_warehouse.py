@@ -7065,11 +7065,16 @@ class WarehouseRollEdit(View):
 @method_decorator(login_required, name='dispatch')
 class WarehouseStockOut(View):
     """POST endpoint to record manual stock-out from a product. Body:
-        amount: decimal meters
-        stock_item_id (optional): consume from a specific roll
+        amount: decimal, in the product's unit
+        stock_item_id (optional): consume from a specific stock item
+        purpose (optional): "sample" for a sample given to a client
         reason (optional)
-        reference (optional)
-    Returns JSON with the updated totals."""
+        reference (optional): for a sample, the client it went to
+    Returns JSON with the updated totals.
+
+    A sample needs its stock item and its client. The item is what values
+    it — its cost goes to marketing expenses, not cost of goods sold — and
+    the client is the only thing that says later why it left."""
 
     def post(self, request, warehouse_pk, product_pk):
         warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
@@ -7089,9 +7094,26 @@ class WarehouseStockOut(View):
                 "error": f"Only {product.quantity}m available",
             }, status=400)
 
+        purpose = (request.POST.get("purpose") or "").strip()
+        if purpose not in dict(StockMovement.PURPOSE_CHOICES):
+            return JsonResponse({"success": False, "error": "Unknown purpose"}, status=400)
+        reference = (request.POST.get("reference") or "").strip()
+
         roll = None
         trimmed = []
-        stock_item_id = request.POST.get("stock_item_id")
+        # The form used to send the item as "roll_id" while this read
+        # "stock_item_id", so picking an item did nothing: the product total
+        # dropped and the item kept its quantity. Both names are read now.
+        stock_item_id = request.POST.get("stock_item_id") or request.POST.get("roll_id")
+        if purpose == "sample":
+            if not stock_item_id:
+                return JsonResponse({"success": False,
+                                     "error": str(gettext_lazy("Choose the item the sample was taken from."))},
+                                    status=400)
+            if not reference:
+                return JsonResponse({"success": False,
+                                     "error": str(gettext_lazy("Name the client the sample went to."))},
+                                    status=400)
         if stock_item_id:
             roll = product.stock_items.filter(pk=stock_item_id).first()
             if not roll:
@@ -7117,13 +7139,19 @@ class WarehouseStockOut(View):
         product.quantity = (product.quantity or Decimal("0")) - amount
         product.save(update_fields=["quantity", "updated_at"])
 
+        note = (request.POST.get("reason") or "").strip()
+        if purpose == "sample":
+            reason = f"Sample for {reference}" + (f" — {note}" if note else "")
+        else:
+            reason = note or "Manual stock-out"
         StockMovement.objects.create(
             product=product,
             stock_item=roll,
             movement_type="out",
+            purpose=purpose,
             quantity=amount,
-            reason=(request.POST.get("reason") or "Manual stock-out").strip() or "Manual stock-out",
-            reference=(request.POST.get("reference") or "").strip() or None,
+            reason=reason[:255],
+            reference=reference or None,
             created_by=request.user if request.user.is_authenticated else None,
         )
 

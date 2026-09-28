@@ -11006,3 +11006,92 @@ msgstr "Birleşik toplam"
 #: operating/templates/operating/order_list.html
 msgid "Split with"
 msgstr "Bölündüğü defter:"
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Purpose"
+msgstr "Amaç"
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Other — sold, used, damaged…"
+msgstr "Diğer — satıldı, kullanıldı, hasarlı…"
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Sample for a client"
+msgstr "Müşteriye numune"
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Its cost goes to marketing expenses, not to the cost of goods sold."
+msgstr "Maliyeti satılan malın maliyetine değil, pazarlama giderlerine yazılır."
+
+#: operating/views_warehouse.py
+msgid "Choose the item the sample was taken from."
+msgstr "Numunenin alındığı ürünü seçin."
+
+#: operating/views_warehouse.py
+msgid "Name the client the sample went to."
+msgstr "Numunenin gönderildiği müşteriyi yazın."
+
+#: accounting/services_posting.py
+msgid "What winning customers costs: samples given away, fairs, catalogues."
+msgstr "Müşteri kazanmanın maliyeti: verilen numuneler, fuarlar, kataloglar."
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "Edit %(n)s"
+msgstr "Düzenle: %(n)s"
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "(this %(n)s)"
+msgstr "(bu %(n)s)"
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "(the whole %(n)s, as received)"
+msgstr "(geldiği haliyle bütün %(n)s)"
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "Imperfect %(n)s — sold as-is, kept separate from first-quality stock counts."
+msgstr "Kusurlu %(n)s — olduğu gibi satılır, birinci kalite stok sayımlarından ayrı tutulur."
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "that much has already gone out of this %(n)s"
+msgstr "bu %(n)s içinden zaten bu kadar çıktı"
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "As received, not what is left"
+msgstr "Geldiği hali, kalan değil"
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "Reserved amounts were trimmed to fit this %(n)s:"
+msgstr "Ayrılan miktarlar bu %(n)s içine sığacak şekilde azaltıldı:"
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "Take out of this %(n)s"
+msgstr "Bu %(n)s içinden çıkar"
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Take out"
+msgstr "Çıkar"
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Enter how much is taken out."
+msgstr "Ne kadar çıkarıldığını girin."
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Only this much is left:"
+msgstr "Yalnızca bu kadar kaldı:"
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "Delete %(n)s"
+msgstr "Sil: %(n)s"
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
+msgid "This %(n)s will be permanently removed. A stock-out movement will be recorded so the timeline reflects the deletion."
+msgstr "Bu %(n)s kalıcı olarak silinecek. Zaman çizelgesinin silmeyi göstermesi için bir stok çıkışı kaydedilecek."

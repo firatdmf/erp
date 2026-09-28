@@ -72,6 +72,9 @@ STANDARD_CHART = [
     ("4900", "Other Income",               "revenue",   False),
     ("5000", "Cost of Goods Sold",         "expense",   False),
     ("5100", "Operating Expenses",         "expense",   False),
+    # Part of operating expenses, kept apart so what winning customers costs
+    # can be read on its own: samples given to clients, fairs, catalogues.
+    ("5110", "Marketing Expenses",         "expense",   False),
     # Debts the book has given up on. Apart from operating expenses so that
     # "how much did we forgive this year" is one line, not a search.
     ("5200", "Bad Debts Written Off",      "expense",   False),

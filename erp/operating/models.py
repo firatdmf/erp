@@ -2390,6 +2390,16 @@ class StockMovement(models.Model):
     # Always positive — sign comes from movement_type. Stored in meters.
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
     reason = models.CharField(max_length=255, blank=True, null=True)
+    # Why stock left, when that decides where its cost goes in the ledger.
+    # Blank is the old meaning — a sale or an unspecified stock-out, posted
+    # as cost of goods sold. A sample given to a client is marketing, not
+    # the cost of anything sold (services_posting.lines_for_stock_movement).
+    PURPOSE_CHOICES = [
+        ("", "—"),
+        ("sample", "Sample for a client"),
+    ]
+    purpose = models.CharField(max_length=16, choices=PURPOSE_CHOICES,
+                               blank=True, default="")
     reference = models.CharField(
         max_length=128, blank=True, null=True,
         help_text="Free-form reference, e.g. order number, document id",

@@ -353,6 +353,11 @@
     font: 700 10.5px var(--font-sans); color: var(--gray-700);
     letter-spacing: 0.06em; text-transform: uppercase;
   }
+  .so-hint { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .re-out { margin: 4px 0 14px; padding: 14px 14px 12px; border: 1px solid #E0E6EE; border-radius: 10px; background: #FAFBFD; }
+  .re-out h4 { margin: 0 0 10px; font: 700 12px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-700); }
+  .re-out-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 480px) { .re-out-row { grid-template-columns: 1fr; } }
   .so-input {
     width: 100%; padding: 9px 12px;
     background: white; border: 1px solid #E0E6EE; border-radius: 9px;
@@ -611,9 +616,6 @@
       <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-qrcode"></i>{% trans "Print label" %}
       </a>
-      <button type="button" class="ord-btn ghost" onclick="document.getElementById('soOverlay').classList.add('show')">
-        <i class="fa fa-arrow-up-from-bracket"></i>{% trans "Record stock out" %}
-      </button>
       <button type="button" class="ord-btn ghost" onclick="document.getElementById('peOverlay').classList.add('show')">
         <i class="fa fa-pen"></i>{% trans "Edit" %}
       </button>
@@ -973,47 +975,6 @@
   </div>
 </div>
 
-<!-- Stock-out modal -->
-<div class="so-overlay" id="soOverlay" onclick="if(event.target===this){closeSO();}">
-  <div class="so-card">
-    <h3>{% trans "Record stock out" %}</h3>
-    <form id="soForm" onsubmit="submitStockOut(event); return false;">
-      {% csrf_token %}
-      <div class="so-fld">
-        <label>{% blocktrans with u=product.unit_short %}Amount ({{ u }}){% endblocktrans %} *</label>
-        <input class="so-input" type="number" step="0.01" name="amount" id="soAmount" required>
-      </div>
-      <div class="so-fld">
-        <label>{% trans "From roll (optional)" %}</label>
-        <select class="so-input" name="roll_id" id="soRoll">
-          <option value="">{% trans "Any (decrement from total)" %}</option>
-          {% for r in rolls %}
-            {% if r.status != 'consumed' %}
-              <option value="{{ r.pk }}">
-                #{{ r.pk }} · {% if r.barcode %}{{ r.barcode }} · {% endif %}{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} {{ product.unit_short }}
-              </option>
-            {% endif %}
-          {% endfor %}
-        </select>
-      </div>
-      <div class="so-fld">
-        <label>{% trans "Reason" %}</label>
-        <input class="so-input" type="text" name="reason" id="soReason" placeholder="{% trans 'Sold, used in production, damaged…' %}">
-      </div>
-      <div class="so-fld">
-        <label>{% trans "Reference" %} <small style="color:var(--gray-500);font-weight:500;">{% trans "(order #, doc id...)" %}</small></label>
-        <input class="so-input" type="text" name="reference" id="soReference">
-      </div>
-      <div class="so-actions">
-        <button type="button" class="ord-btn ghost" onclick="closeSO()">{% trans "Cancel" %}</button>
-        <button type="submit" class="ord-btn danger" id="soSubmit">
-          <i class="fa fa-arrow-up-from-bracket"></i> {% trans "Record" %}
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <!-- Roll delete modal -->
 <div class="so-overlay" id="rdOverlay" onclick="if(event.target===this){closeRD();}">
   <div class="so-card">
@@ -1021,10 +982,10 @@
       <span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#FEE2E2;color:#DC2626;">
         <i class="fa fa-trash"></i>
       </span>
-      {% trans "Delete roll" %}
+      {% blocktrans with n=product.item_noun %}Delete {{ n }}{% endblocktrans %}
     </h3>
     <p style="font:500 13px var(--font-sans); color:var(--gray-600); margin:6px 0 16px;">
-      {% trans "This roll will be permanently removed. A stock-out movement will be recorded so the timeline reflects the deletion." %}
+      {% blocktrans with n=product.item_noun %}This {{ n }} will be permanently removed. A stock-out movement will be recorded so the timeline reflects the deletion.{% endblocktrans %}
     </p>
     <div class="so-fld">
       <label>{% trans "Roll" %}</label>
@@ -1038,7 +999,7 @@
     <div class="so-actions">
       <button type="button" class="ord-btn ghost" onclick="closeRD()">{% trans "Cancel" %}</button>
       <button type="button" class="ord-btn danger" id="rdSubmit" onclick="submitRollDelete()">
-        <i class="fa fa-trash"></i> {% trans "Delete roll" %}
+        <i class="fa fa-trash"></i> {% blocktrans with n=product.item_noun %}Delete {{ n }}{% endblocktrans %}
       </button>
     </div>
   </div>
@@ -1051,10 +1012,10 @@
       <span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--nejum-teal-50);color:var(--nejum-teal-700);">
         <i class="fa fa-pen"></i>
       </span>
-      {% trans "Edit roll" %}
+      {% blocktrans with n=product.item_noun %}Edit {{ n }}{% endblocktrans %}
     </h3>
     <div class="so-fld">
-      <label>{% trans "Barcode" %} <small style="color:var(--gray-500);font-weight:500;">{% trans "(this roll)" %}</small></label>
+      <label>{% trans "Barcode" %} <small style="color:var(--gray-500);font-weight:500;">{% blocktrans with n=product.item_noun %}(this {{ n }}){% endblocktrans %}</small></label>
       <input class="so-input" type="text" id="reBarcode" placeholder="—">
     </div>
     {% comment %} The field is the roll's FULL length as received, and it arrives
@@ -1065,8 +1026,8 @@
        which number is being asked for, what has already gone out, and the
        floor the value cannot go under. {% endcomment %}
     <div class="so-fld">
-      <label>{% trans "Total length (m)" %}
-        <small style="color:var(--gray-500);font-weight:500;">{% trans "(the whole roll, as received)" %}</small>
+      <label>{{ product.quantity_label }} ({{ product.unit_short }})
+        <small style="color:var(--gray-500);font-weight:500;">{% blocktrans with n=product.item_noun %}(the whole {{ n }}, as received){% endblocktrans %}</small>
       </label>
       <input class="so-input" type="number" step="0.01" id="reMeters" placeholder="0.00"
              oninput="renderRollMetersHint()">
@@ -1082,8 +1043,39 @@
         {% trans "Factory second (2nd quality)" %}
       </label>
       <small style="color:var(--gray-500); display:block; margin-top:2px;">
-        {% trans "Imperfect roll — sold as-is, kept separate from first-quality stock counts." %}
+        {% blocktrans with n=product.item_noun %}Imperfect {{ n }} — sold as-is, kept separate from first-quality stock counts.{% endblocktrans %}
       </small>
+    </div>
+    {% comment %} Stock leaving this item is recorded here, on the item it
+       leaves from, rather than from the product header: the item is what the
+       cost comes from, and a sample has to name both it and the client. {% endcomment %}
+    <div class="re-out" id="reOut">
+      <h4>{% blocktrans with n=product.item_noun %}Take out of this {{ n }}{% endblocktrans %}</h4>
+      <div class="re-out-row">
+        <div class="so-fld">
+          <label>{% trans "Purpose" %}</label>
+          <select class="so-input" id="reOutPurpose" onchange="syncTakeOut()">
+            <option value="sample">{% trans "Sample for a client" %}</option>
+            <option value="">{% trans "Other — sold, used, damaged…" %}</option>
+          </select>
+        </div>
+        <div class="so-fld">
+          <label>{% trans "Quantity" %} ({{ product.unit_short }})</label>
+          <input class="so-input" type="number" step="0.01" min="0.01" id="reOutAmount" placeholder="0.00">
+        </div>
+      </div>
+      <div class="so-fld">
+        <label id="reOutRefLabel">{% trans "Client" %} *</label>
+        <input class="so-input" type="text" id="reOutRef">
+      </div>
+      <div class="so-fld">
+        <label>{% trans "Note" %}</label>
+        <input class="so-input" type="text" id="reOutNote" placeholder="{% trans 'Optional' %}">
+        <small class="so-hint" id="reOutHint">{% trans "Its cost goes to marketing expenses, not to the cost of goods sold." %}</small>
+      </div>
+      <button type="button" class="ord-btn danger" id="reOutSubmit" onclick="submitTakeOut()">
+        <i class="fa fa-arrow-up-from-bracket"></i> {% trans "Take out" %}
+      </button>
     </div>
     <div class="so-actions">
       <button type="button" class="ord-btn ghost" onclick="closeRE()">{% trans "Cancel" %}</button>
@@ -1291,21 +1283,21 @@
       hint.innerHTML = bar +
         '<div style="color:#C0392B;font-weight:600;">' +
           '{% trans "Cannot be below" %} <b>' + pUnit(floor.toFixed(2)) + '</b>' +
-          (_reOut > 0 ? ' — {% trans "that much has already gone out of this roll" %}' : '') +
+          (_reOut > 0 ? ' — {% blocktrans with n=product.item_noun %}that much has already gone out of this {{ n }}{% endblocktrans %}' : '') +
         '</div>';
     } else if (_reOut > 0) {
       hint.innerHTML = bar +
         '<span style="color:' + colour + ';"><b>' + pUnit(_reOut.toFixed(2)) + '</b> {% trans "used" %}</span>' +
         ' · <b>' + pUnit(left.toFixed(2)) + '</b> {% trans "left" %}' +
         '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "Full length, not the remainder" %} · {% trans "min" %} ' +
+          '{% trans "As received, not what is left" %} · {% trans "min" %} ' +
           '<b>' + pUnit(_reOut.toFixed(2)) + '</b>' +
         '</div>' + trimNote;
     } else {
       hint.innerHTML = bar +
         '<b>' + pUnit(total.toFixed(2)) + '</b> · {% trans "none used" %}' +
         '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "Full length, not the remainder" %}</div>' + trimNote;
+          '{% trans "As received, not what is left" %}</div>' + trimNote;
     }
   }
 
@@ -1330,8 +1322,67 @@
     document.getElementById('reMeters').min = _reOut > 0 ? _reOut.toFixed(2) : '0.01';
 
     renderRollMetersHint();
+    _reLeft = left;
+    document.getElementById('reOutAmount').value = '';
+    document.getElementById('reOutAmount').max = left.toFixed(2);
+    document.getElementById('reOutRef').value = '';
+    document.getElementById('reOutNote').value = '';
+    document.getElementById('reOutPurpose').value = 'sample';
+    // Nothing left means nothing to take out.
+    document.getElementById('reOut').hidden = !(left > 0);
+    syncTakeOut();
     document.getElementById('reOverlay').classList.add('show');
   }
+  // A sample is valued at this item and has to say who it went to; any
+  // other stock-out takes a free note instead.
+  let _reLeft = 0;
+  function syncTakeOut() {
+    const sample = document.getElementById('reOutPurpose').value === 'sample';
+    document.getElementById('reOutRefLabel').textContent = sample
+      ? '{% trans "Client" %} *' : '{% trans "Reference" %}';
+    document.getElementById('reOutHint').hidden = !sample;
+  }
+  function submitTakeOut() {
+    if (!_reRollId) return;
+    const amount = parseFloat((document.getElementById('reOutAmount').value || '').replace(',', '.'));
+    const purpose = document.getElementById('reOutPurpose').value;
+    const ref = document.getElementById('reOutRef').value.trim();
+    if (!(amount > 0)) { alert('{% trans "Enter how much is taken out." %}'); return; }
+    if (amount > _reLeft + 1e-9) {
+      alert('{% trans "Only this much is left:" %} ' + pUnit(_reLeft.toFixed(2))); return;
+    }
+    if (purpose === 'sample' && !ref) { alert('{% trans "Name the client the sample went to." %}'); return; }
+    const btn = document.getElementById('reOutSubmit');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    const fd = new FormData();
+    fd.append('stock_item_id', _reRollId);
+    fd.append('amount', amount.toFixed(2));
+    fd.append('purpose', purpose);
+    fd.append('reference', ref);
+    fd.append('reason', document.getElementById('reOutNote').value.trim());
+    fetch(stockOutUrl, {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(r => r.json()).then(data => {
+      btn.disabled = false; btn.innerHTML = orig;
+      if (!data.success) { alert(data.error || '{% trans "Failed" %}'); return; }
+      const trimmed = data.reservations_trimmed || [];
+      if (trimmed.length) {
+        alert('{% blocktrans with n=product.item_noun %}Reserved amounts were trimmed to fit this {{ n }}:{% endblocktrans %}\n\n' +
+              trimmed.map(function(t){
+                return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) + ' → ' + pUnit(t.now.toFixed(2));
+              }).join('\n'));
+      }
+      closeRE();
+      window.location.reload();
+    }).catch(() => {
+      btn.disabled = false; btn.innerHTML = orig;
+      alert('{% trans "Network error" %}');
+    });
+  }
+
   function closeRE() {
     document.getElementById('reOverlay').classList.remove('show');
     _reRollId = null;
@@ -1360,7 +1411,7 @@
       // page reload underneath would otherwise wash it away unseen.
       const trimmed = data.reservations_trimmed || [];
       if (trimmed.length) {
-        alert('{% trans "Reserved amounts were trimmed to fit this roll:" %}\n\n' +
+        alert('{% blocktrans with n=product.item_noun %}Reserved amounts were trimmed to fit this {{ n }}:{% endblocktrans %}\n\n' +
               trimmed.map(function(t){
                 return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) +
                        ' → ' + pUnit(t.now.toFixed(2));
@@ -1375,47 +1426,7 @@
     });
   }
 
-  function closeSO() {
-    document.getElementById('soOverlay').classList.remove('show');
-  }
-  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSO(); });
 
-  function submitStockOut(e) {
-    e.preventDefault();
-    const btn = document.getElementById('soSubmit');
-    const orig = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Recording…';
-    const fd = new FormData(document.getElementById('soForm'));
-    fetch(stockOutUrl, {
-      method: 'POST',
-      body: fd,
-      credentials: 'same-origin',
-      headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
-    })
-      .then(r => r.json())
-      .then(data => {
-        btn.disabled = false; btn.innerHTML = orig;
-        if (!data.success) {
-          alert(data.error || '{% trans "Failed" %}');
-          return;
-        }
-        const soTrimmed = data.reservations_trimmed || [];
-        if (soTrimmed.length) {
-          alert('{% trans "Reserved amounts were trimmed to fit this roll:" %}\n\n' +
-                soTrimmed.map(function(t){
-                  return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) +
-                         ' → ' + pUnit(t.now.toFixed(2));
-                }).join('\n'));
-        }
-        closeSO();
-        window.location.reload();
-      })
-      .catch(() => {
-        btn.disabled = false; btn.innerHTML = orig;
-        alert('{% trans "Network error" %}');
-      });
-  }
 </script>
 
 <!-- ── Edit product modal ─────────────────────────────────────── -->

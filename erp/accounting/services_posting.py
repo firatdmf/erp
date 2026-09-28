@@ -605,6 +605,7 @@ def _account_meanings():
         "4900": _g("Income that is not a sale."),
         "5000": _g("What the goods sold cost when they were bought."),
         "5100": _g("Running costs: rent, wages, freight and the like."),
+        "5110": _g("What winning customers costs: samples given away, fairs, catalogues."),
         "5200": _g("A loss: a debt the book has given up on."),
         "5900": _g("Gains and losses from exchange rates moving."),
     }
@@ -779,6 +780,7 @@ def chart_of_accounts(book):
 # gap the reconciliation reports, and the next job.
 # ---------------------------------------------------------------------------
 COST_OF_GOODS_SOLD = "5000"
+MARKETING_EXPENSES = "5110"
 INVENTORY = "1300"
 
 
@@ -810,7 +812,8 @@ def stock_unit_cost(item, product=None):
 def lines_for_stock_movement(movement):
     """The two lines this stock movement implies, balanced.
 
-    Out of the warehouse: the cost of what left becomes cost of goods sold.
+    Out of the warehouse: the cost of what left becomes cost of goods sold,
+    or marketing expense when it left as a sample for a client.
     Back in, when it is an order being unshipped or edited, the same cost
     goes back on the shelf. Anything else — an arrival, a correction, a
     transfer between two products — returns no lines; see the note above.
@@ -834,7 +837,12 @@ def lines_for_stock_movement(movement):
     if is_return:
         return [debit(INVENTORY, value, memo=memo),
                 credit(COST_OF_GOODS_SOLD, value, memo=memo)]
-    return [debit(COST_OF_GOODS_SOLD, value, memo=memo),
+    # A sample given to a client was not sold: its cost is what it took to
+    # win the client, so it goes to marketing rather than into the cost of
+    # the sales it sits beside.
+    expense = (MARKETING_EXPENSES if getattr(movement, "purpose", "") == "sample"
+               else COST_OF_GOODS_SOLD)
+    return [debit(expense, value, memo=memo),
             credit(INVENTORY, value, memo=memo)]
 
 

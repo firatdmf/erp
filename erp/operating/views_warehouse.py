@@ -2431,11 +2431,25 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     })
 
 
+def _receivable_products():
+    """Catalog products stock can be received against as an EXISTING main
+    product: the warehouse's own (featured=False, stock or not yet — a
+    purchase for a customer creates one before its goods arrive), plus any
+    storefront product the warehouse holds. MT-5019 is featured and
+    stocked, and used to be unfindable from a purchase because these
+    pickers only offered featured=False."""
+    from django.db.models import Q
+    from marketing.models import Product, ProductVariant
+    held = (ProductVariant.objects.filter(warehouse_products__isnull=False)
+            .values("product_id"))
+    return Product.objects.filter(Q(featured=False) | Q(pk__in=held))
+
+
 @login_required
 def catalog_base_search(request, pk):
     """Autocomplete for the scan screen's "Catalog — main product" field.
-    Returns hidden catalog products (featured=False) matching the query so
-    staff can attach a scanned variant to an EXISTING main product.
+    Returns receivable catalog products (see _receivable_products) matching the
+    query so staff can attach a scanned variant to an EXISTING main product.
 
     The catalog Product/ProductVariant are an auto-generated MIRROR of
     warehouse data (see catalog_sync.py) — staff recognize stock by its
@@ -2446,7 +2460,6 @@ def catalog_base_search(request, pk):
     variant, so using one as the product's name mislabels every product
     with more than one colour."""
     from django.db.models import Q
-    from marketing.models import Product
     q = (request.GET.get("q") or "").strip()
     results = []
     if q:
@@ -2456,7 +2469,7 @@ def catalog_base_search(request, pk):
         # match) makes Django fold the WHERE into the same join, so the
         # count would reflect only the MATCHING variant(s), not the
         # product's true total. One cheap count per row, capped at 12.
-        qs = (Product.objects.filter(featured=False)
+        qs = (_receivable_products()
               .filter(Q(title__icontains=q) | Q(sku__icontains=q) |
                       Q(variants__warehouse_products__name__icontains=q) |
                       Q(variants__warehouse_products__sku__icontains=q))
@@ -2513,11 +2526,10 @@ def catalog_product_variants(request, pk, product_id):
     earlier syncs that never got (or lost) their warehouse row — and
     showing those here is actively misleading: staff see "2 variants"
     for a product that only has 1 in the actual warehouse."""
-    from marketing.models import Product
-    # Scoped to hidden/warehouse products only — same as catalog_base_search —
-    # so this intake endpoint can't be used to read out a real storefront
-    # product's SKU/barcode/quantity by guessing its id.
-    product = Product.objects.filter(pk=product_id, featured=False).first()
+    # Scoped like catalog_base_search (see _receivable_products) so this
+    # intake endpoint can't be used to read out a storefront-only product's
+    # SKU/barcode/quantity by guessing its id.
+    product = _receivable_products().filter(pk=product_id).first()
     if product is None:
         return JsonResponse({"results": []})
     from marketing.models import with_live_quantity
@@ -2645,7 +2657,7 @@ def catalog_variant_match(request, pk, product_id):
     GET: sku, and `attrs` — JSON [{name, value}] — or, from a page older
     than attribute fields, `name`."""
     import json as _json
-    from marketing.models import Product, ProductVariant
+    from marketing.models import ProductVariant
     from .catalog_sync import find_lookalike
 
     sku = (request.GET.get("sku") or "").strip()
@@ -2658,8 +2670,8 @@ def catalog_variant_match(request, pk, product_id):
     if not pairs and not sku:
         return JsonResponse({"exists": False, "attributes": []})
 
-    # Scoped to hidden/warehouse products only — see catalog_product_variants.
-    product = Product.objects.filter(pk=product_id, featured=False).first()
+    # Scoped like catalog_base_search — see _receivable_products.
+    product = _receivable_products().filter(pk=product_id).first()
     match = (ProductVariant.objects.filter(product=product, variant_sku__iexact=sku).first()
              if product is not None and sku else None)
 
@@ -2957,7 +2969,8 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
         main_product = None
         if mode == "existing" and str(mp.get("id") or "").isdigit():
             main_product = (_Prod.objects
-                            .filter(Q(featured=False) | Q(pk__in=list(own_product_ids)))
+                            .filter(Q(pk__in=_receivable_products().values("pk"))
+                                    | Q(pk__in=list(own_product_ids)))
                             .filter(pk=int(mp["id"])).first())
         base_name = (mp.get("name") or "").strip()
         if main_product is not None:

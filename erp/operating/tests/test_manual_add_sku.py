@@ -283,6 +283,21 @@ class CatalogSearchLabelTest(TestCase):
         row = self._search("PETROL")[0]
         self.assertEqual(row["sku"], "N1464T")
 
+    def test_a_featured_product_with_stock_is_found(self):
+        """MT-5019 is on the storefront AND in the warehouse; a purchase
+        must be able to add stock to it rather than start a duplicate."""
+        p = self._product("MT-5019", "MT-5019", ["MT-5019 BEYAZ", "MT-5019 EKRU"])
+        p.featured = True
+        p.save(update_fields=["featured"])
+        row = self._search("MT-5019")[0]
+        self.assertEqual(row["id"], p.id)
+        self.assertEqual(row["variants"], 2)
+
+    def test_a_product_the_warehouse_does_not_hold_is_not_offered(self):
+        p = self.Product.objects.create(title="Web only", sku="WEB-1", featured=True)
+        self.ProductVariant.objects.create(product=p, variant_sku="WEB-1.1")
+        self.assertEqual(self._search("WEB-1"), [])
+
 
 class VariantMatchBySkuTest(TestCase):
     """The exists/new badge answers on the SKU, because that is what the

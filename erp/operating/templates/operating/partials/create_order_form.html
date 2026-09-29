@@ -521,9 +521,15 @@
         </div>
       </div>
 
+      {% comment %}Both filled from the order when editing: the edit view
+      saves whatever these hold, so an empty box would wipe the notes.{% endcomment %}
       <div class="form-group">
-        <label>{% trans "Notes" %}</label>
-        <textarea name="notes" class="form-textarea" placeholder="Order notes..." rows="2"></textarea>
+        <label>{% trans "Notes printed on the order" %}</label>
+        <textarea name="notes" class="form-textarea" placeholder="{% trans 'Shown to the customer on the order PDF, the email and the invoice…' %}" rows="2">{% if order %}{{ order.notes|default:'' }}{% endif %}</textarea>
+      </div>
+      <div class="form-group">
+        <label><i class="fas fa-lock" style="color:#6B7280;"></i> {% trans "Internal notes" %}</label>
+        <textarea name="internal_notes" class="form-textarea" placeholder="{% trans 'Only your team sees these — they are not printed or sent.' %}" rows="2">{% if order %}{{ order.internal_notes|default:'' }}{% endif %}</textarea>
       </div>
 
       <!-- Customer notification opt-in. When checked: a confirmation

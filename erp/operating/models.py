@@ -549,7 +549,11 @@ class Order(models.Model):
     )
     
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
+    # Printed on the customer's copy — the order PDF, the emailed PDF, the
+    # Excel and the sales invoice all carry it.
     notes = models.TextField(blank=True, null=True)
+    # For the team only: shown on the order page, never printed or sent.
+    internal_notes = models.TextField(blank=True, default="")
 
     qr_code_url = models.URLField(blank=True, null=True)
     
@@ -1247,6 +1251,7 @@ class Order(models.Model):
             "order_number": self.order_number,
             "client_name": client_name,
             "notes": self.notes or "",
+            "internal_notes": self.internal_notes or "",
             "delivery_address_title": self.delivery_address_title or "",
             "delivery_address": self.delivery_address or "",
             "delivery_city": self.delivery_city or "",

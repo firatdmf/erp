@@ -23,7 +23,7 @@ class OrderAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Order Information', {
-            'fields': ('order_number', 'status', 'order_status', 'notes', 'created_at', 'updated_at')
+            'fields': ('order_number', 'status', 'order_status', 'notes', 'internal_notes', 'created_at', 'updated_at')
         }),
         ('Customer Information', {
             'fields': ('web_client', 'is_guest_order', 'guest_first_name', 'guest_last_name', 'guest_email', 'guest_phone'),

@@ -720,6 +720,11 @@ class OrderDetail(DetailView):
             order.save(update_fields=["notes", "updated_at"])
             return JsonResponse({"ok": True})
 
+        if action == "update_internal_notes":
+            order.internal_notes = request.POST.get("internal_notes") or ""
+            order.save(update_fields=["internal_notes", "updated_at"])
+            return JsonResponse({"ok": True})
+
         # ── Toggle customer-notification opt-in ─────────────────
         if action == "update_notify":
             raw = (request.POST.get("notify_customer") or "").strip().lower()
@@ -2013,6 +2018,7 @@ def _sibling_order_for_book(order, book, member):
         guest_first_name=order.guest_first_name,
         guest_phone=order.guest_phone,
         notes=order.notes,
+        internal_notes=order.internal_notes,
         notify_customer=order.notify_customer,
         delivery_address_title=order.delivery_address_title,
         delivery_address=order.delivery_address,
@@ -2644,6 +2650,7 @@ def order_pack_complete(request, pk):
 _CHANGE_FIELD_TR = {
     "order_status": "Sipariş durumu", "carrier": "Kargo şirketi",
     "tracking_number": "Takip veya fiş numarası", "notes": "Notlar",
+    "internal_notes": "İç notlar",
     "print_header": "Yazdırma başlığı", "ettn": "ETTN",
     "guest_first_name": "Misafir adı", "guest_last_name": "Misafir soyadı",
     "guest_email": "Misafir e-posta", "guest_phone": "Misafir telefon",
@@ -3468,6 +3475,7 @@ class OrderCreate(View):
                             book=book,
                             items=book_items,
                             notes=form.cleaned_data.get("notes") or "",
+                            internal_notes=form.cleaned_data.get("internal_notes") or "",
                             customer_type=customer_type,
                             customer_pk=customer_pk,
                             split_group=split_group,
@@ -3527,7 +3535,7 @@ class OrderCreate(View):
 
     def _create_one_order(self, request, *, book, items, notes, customer_type,
                           customer_pk, split_group, member, failed_barcodes,
-                          short_lines=None):
+                          short_lines=None, internal_notes=""):
         """Create ONE order, holding only the lines picked off `book`'s
         shelves. Returns (order, stayed_open).
 
@@ -3536,7 +3544,7 @@ class OrderCreate(View):
         is the whole point — so the split calls this once per book rather
         than teaching any of it to straddle two.
         """
-        order = Order(notes=notes)
+        order = Order(notes=notes, internal_notes=internal_notes)
 
         # Customer — order kind is derived from WHICH customer
         # was picked, not a separate radio: a CRM contact/

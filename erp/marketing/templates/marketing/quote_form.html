@@ -117,6 +117,11 @@
     <textarea class="qf-ta" id="qf-notes" placeholder="{% trans 'Lead time, what the price includes, payment terms…' %}">{{ quote.notes|default:'' }}</textarea>
   </div>
 
+  <div class="qf-card">
+    <h3><i class="fa fa-lock" style="color:#6B7280;"></i> {% trans "Internal notes" %}</h3>
+    <textarea class="qf-ta" id="qf-internal-notes" placeholder="{% trans 'Costs, margins, what was agreed — only your team sees these; they are not printed.' %}">{{ quote.internal_notes|default:'' }}</textarea>
+  </div>
+
   <div class="qf-bar">
     <button type="button" class="qf-btn primary" id="qf-save" onclick="qfSave()"><i class="fa fa-save"></i> {% trans "Save quote" %}</button>
   </div>
@@ -447,6 +452,7 @@
       date: document.getElementById('qf-date').value,
       valid_until: document.getElementById('qf-valid').value,
       notes: document.getElementById('qf-notes').value,
+      internal_notes: document.getElementById('qf-internal-notes').value,
       items: items,
     };
     const btn = document.getElementById('qf-save'); btn.disabled = true;

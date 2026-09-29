@@ -10,7 +10,7 @@ from datetime import date
 class OrderForm(forms.ModelForm):
     class Meta:
         model = Order
-        fields = ["notes"]
+        fields = ["notes", "internal_notes"]
         # fields  = '__all__'
 
 

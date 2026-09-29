@@ -318,7 +318,8 @@ def _line_tracks_its_rolls(item):
 
 
 def _note_trim_on_order(order, roll, was, now, *, line=None):
-    """Write the trim onto the order's own notes.
+    """Write the trim onto the order's internal notes — the team's, not
+    the customer's: the printed notes go out on the order PDF and invoice.
 
     The warehouse page is where this happens, and the person who owns the
     order is not standing at it. Without a line here the order's reserved
@@ -329,7 +330,7 @@ def _note_trim_on_order(order, roll, was, now, *, line=None):
     there was one — money moved, so the note says so rather than leaving
     it to be noticed on the invoice.
 
-    Notes is in audit's tracked fields, so saving it also lands a row in
+    Internal notes are in audit's tracked fields, so saving them also lands a row in
     the order's change history — one write, both places."""
     from django.utils.timezone import localtime, now as _now
 
@@ -348,9 +349,9 @@ def _note_trim_on_order(order, roll, was, now, *, line=None):
         text += (" The line quantity was entered by hand rather than picked "
                  "from rolls, so it has been left alone — reduce it, cover "
                  "the shortfall from other stock, or ship it short.")
-    existing = (order.notes or "").rstrip()
-    order.notes = f"{existing}\n{text}" if existing else text
-    order.save(update_fields=["notes"])
+    existing = (order.internal_notes or "").rstrip()
+    order.internal_notes = f"{existing}\n{text}" if existing else text
+    order.save(update_fields=["internal_notes"])
 
 
 class RollLengthError(ValueError):

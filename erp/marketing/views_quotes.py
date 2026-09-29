@@ -306,6 +306,7 @@ class QuoteForm(View):
                 quote.date = _parse_date(data.get("date")) or date.today()
                 quote.valid_until = _parse_date(data.get("valid_until"))
                 quote.notes = (data.get("notes") or "")[:4000]
+                quote.internal_notes = (data.get("internal_notes") or "")[:4000]
                 code = (data.get("currency") or "").strip().upper()
                 quote.currency = (CurrencyCategory.objects.filter(code=code).first() if code
                                   else None) or _customer_currency(quote) or _base_currency()
@@ -526,7 +527,8 @@ def _orders_from_quote(request, quote):
     split_group = uuid4() if len(groups) > 1 else None
     created = []
     for book, parts in groups:
-        order = Order(notes=quote.notes, contact=quote.contact, company=quote.company,
+        order = Order(notes=quote.notes, internal_notes=quote.internal_notes,
+                      contact=quote.contact, company=quote.company,
                       order_date=date.today(), created_by=request.user,
                       split_group=split_group)
         # Priced as quoted, whatever the account's default says — the

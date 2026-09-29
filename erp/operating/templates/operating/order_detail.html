@@ -1861,14 +1861,27 @@
         {% endif %}
       </section>
 
-      <!-- NOTES (inline editable) -->
+      <!-- NOTES (inline editable). The first prints on the customer's
+           copies (PDF, email, Excel, invoice); the second never leaves
+           this page. -->
       <section class="od-card">
         <div class="od-card-h">
-          <h3>{% trans "Notes" %}</h3>
+          <h3>{% trans "Notes printed on the order" %}</h3>
         </div>
         <textarea id="od-notes-edit" class="od-notes-edit"
+                  data-action="update_notes" data-key="notes"
                   data-original="{{ order.notes|default:'' }}"
-                  placeholder="{% trans 'Internal notes about this order…' %}">{{ order.notes|default:'' }}</textarea>
+                  placeholder="{% trans 'Shown to the customer on the order PDF, the email and the invoice…' %}">{{ order.notes|default:'' }}</textarea>
+      </section>
+
+      <section class="od-card">
+        <div class="od-card-h">
+          <h3><i class="fa fa-lock" style="color:#6B7280;"></i> {% trans "Internal notes" %}</h3>
+        </div>
+        <textarea id="od-internal-notes-edit" class="od-notes-edit"
+                  data-action="update_internal_notes" data-key="internal_notes"
+                  data-original="{{ order.internal_notes|default:'' }}"
+                  placeholder="{% trans 'Only your team sees these — they are not printed or sent.' %}">{{ order.internal_notes|default:'' }}</textarea>
       </section>
 
       <!-- ORDER CHANGES — audit trail preview (full page at order_changes) -->
@@ -2714,6 +2727,7 @@
     const saveBtn  = document.getElementById('od-savebar-save');
     const discardBtn = document.getElementById('od-savebar-discard');
     const notes    = document.getElementById('od-notes-edit');
+    const noteBoxes = [notes, document.getElementById('od-internal-notes-edit')].filter(Boolean);
 
     function getInputs() {
       // Only inputs that are item qty/price (have data-item-id + data-field) and not in deleted rows.
@@ -2965,14 +2979,14 @@
           inp.classList.remove('dirty');
         }
       });
-      if (notes) {
-        if ((notes.value || '') !== (notes.getAttribute('data-original') || '')) {
-          notes.classList.add('dirty');
-          dirty.push(notes);
+      noteBoxes.forEach(box => {
+        if ((box.value || '') !== (box.getAttribute('data-original') || '')) {
+          box.classList.add('dirty');
+          dirty.push(box);
         } else {
-          notes.classList.remove('dirty');
+          box.classList.remove('dirty');
         }
-      }
+      });
       const totalChanges = dirty.length + deletedRows.length;
       countEl.textContent = totalChanges;
       pluralEl.style.display = totalChanges === 1 ? 'none' : 'inline';
@@ -2986,7 +3000,7 @@
       return dirty;
     }
 
-    if (notes) notes.addEventListener('input', refreshDirty);
+    noteBoxes.forEach(box => box.addEventListener('input', refreshDirty));
     window.__odRefreshDirty = refreshDirty;
 
     discardBtn.addEventListener('click', () => {
@@ -3003,7 +3017,7 @@
         if (window.__odUpdateActiveItemsCount) window.__odUpdateActiveItemsCount();
       }
       getInputs().forEach(inp => { inp.value = inp.getAttribute('data-original') || ''; });
-      if (notes) notes.value = notes.getAttribute('data-original') || '';
+      noteBoxes.forEach(box => { box.value = box.getAttribute('data-original') || ''; });
       recalculateTotalsLocally();
       refreshDirty();
     });
@@ -3108,10 +3122,10 @@
         // 2. Save remaining modified items & notes
         const remainingDirty = refreshDirty();
         for (const el of remainingDirty) {
-          if (el === notes) {
-            const r = await postUpdate({ action: 'update_notes', notes: el.value });
+          if (noteBoxes.includes(el)) {
+            const r = await postUpdate({ action: el.dataset.action, [el.dataset.key]: el.value });
             if (!(r && r.ok)) throw new Error(r && r.error || 'Notes save failed');
-            notes.setAttribute('data-original', notes.value);
+            el.setAttribute('data-original', el.value);
           } else {
             const r = await postUpdate({
               action: 'update_item',

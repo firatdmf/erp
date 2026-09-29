@@ -11210,3 +11210,37 @@ msgid "%(n)s line"
 msgid_plural "%(n)s lines"
 msgstr[0] "%(n)s satır"
 msgstr[1] "%(n)s satır"
+
+#: marketing/templates/marketing/quote_detail.html
+#: marketing/templates/marketing/quote_form.html
+#: operating/templates/operating/order_detail.html
+#: operating/templates/operating/partials/create_order_form.html
+msgid "Internal notes"
+msgstr "İç notlar"
+
+#: operating/templates/operating/order_detail.html
+#: operating/templates/operating/partials/create_order_form.html
+msgid "Notes printed on the order"
+msgstr "Siparişte basılacak notlar"
+
+#: marketing/templates/marketing/quote_detail.html
+msgid "Only your team sees these — they are not printed."
+msgstr "Bunları yalnızca ekibiniz görür — yazdırılmaz."
+
+#: operating/templates/operating/order_detail.html
+#: operating/templates/operating/partials/create_order_form.html
+msgid "Only your team sees these — they are not printed or sent."
+msgstr "Bunları yalnızca ekibiniz görür — yazdırılmaz ve gönderilmez."
+
+#: operating/templates/operating/order_detail.html
+#: operating/templates/operating/partials/create_order_form.html
+msgid "Shown to the customer on the order PDF, the email and the invoice…"
+msgstr "Müşteriye sipariş PDF'inde, e-postada ve faturada gösterilir…"
+
+#: marketing/templates/marketing/quote_form.html
+msgid ""
+"Costs, margins, what was agreed — only your team sees these; they are not "
+"printed."
+msgstr ""
+"Maliyetler, kârlar, anlaşılanlar — bunları yalnızca ekibiniz görür; "
+"yazdırılmaz."

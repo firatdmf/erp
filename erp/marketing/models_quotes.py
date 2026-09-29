@@ -52,6 +52,9 @@ class Quote(models.Model):
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="draft", db_index=True)
     # Printed on the quote — terms, lead time, what the price includes.
     notes = models.TextField(blank=True)
+    # For the team only: shown on the quote page, never printed. Carried to
+    # the order the quote becomes.
+    internal_notes = models.TextField(blank=True, default="")
     order = models.ForeignKey("operating.Order", on_delete=models.SET_NULL, null=True, blank=True,
                               related_name="quotes")
     created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True,

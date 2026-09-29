@@ -133,37 +133,39 @@ class RollEditTrimsReservations(TestCase):
         """The person who owns the order is not standing at the warehouse
         page where this happened."""
         order, res = self._order("DK0000305", Decimal("19.50"))
-        self.assertFalse(order.notes)
+        self.assertFalse(order.internal_notes)
 
         self._edit("18.50")
 
         order.refresh_from_db()
-        self.assertIn("2000039337908", order.notes)
-        self.assertIn("19.50", order.notes)
-        self.assertIn("18.50", order.notes)
+        self.assertIn("2000039337908", order.internal_notes)
+        self.assertIn("19.50", order.internal_notes)
+        self.assertIn("18.50", order.internal_notes)
         # And what it did to the line's own quantity.
-        self.assertIn("Line quantity followed it down", order.notes)
+        self.assertIn("Line quantity followed it down", order.internal_notes)
+        # The team's note, not the customer's: nothing lands on the printout.
+        self.assertFalse(order.notes)
 
     def test_the_note_is_appended_not_overwritten(self):
         order, res = self._order("DK0000306", Decimal("19.50"))
-        order.notes = "Customer wants this before Friday."
-        order.save(update_fields=["notes"])
+        order.internal_notes = "Customer wants this before Friday."
+        order.save(update_fields=["internal_notes"])
 
         self._edit("18.50")
 
         order.refresh_from_db()
-        self.assertIn("Customer wants this before Friday.", order.notes)
-        self.assertIn("Stock correction", order.notes)
+        self.assertIn("Customer wants this before Friday.", order.internal_notes)
+        self.assertIn("Stock correction", order.internal_notes)
 
     def test_the_note_reaches_the_change_history(self):
-        """notes is audit-tracked, so one write lands in both places."""
+        """internal_notes is audit-tracked, so one write lands in both places."""
         from operating.models import OrderChange
         order, res = self._order("DK0000307", Decimal("19.50"))
 
         self._edit("18.50")
 
         self.assertTrue(OrderChange.objects.filter(
-            order=order, field="notes").exists())
+            order=order, field="internal_notes").exists())
 
     def test_a_hold_that_still_fits_writes_no_note(self):
         order, res = self._order("DK0000308", Decimal("12.00"))
@@ -171,7 +173,7 @@ class RollEditTrimsReservations(TestCase):
         self._edit("18.50")
 
         order.refresh_from_db()
-        self.assertFalse(order.notes)
+        self.assertFalse(order.internal_notes)
 
     def test_a_line_built_from_rolls_follows_them_down(self):
         """There is no quantity box on the order form — the figure IS the
@@ -197,7 +199,7 @@ class RollEditTrimsReservations(TestCase):
         item.refresh_from_db()
         self.assertEqual(item.quantity, Decimal("25.00"))
         order.refresh_from_db()
-        self.assertIn("entered by hand", order.notes)
+        self.assertIn("entered by hand", order.internal_notes)
 
     def test_outsourced_metres_survive_the_sync(self):
         """quantity = picked + outsourced; only the picked half moves."""

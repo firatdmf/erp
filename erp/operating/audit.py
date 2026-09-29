@@ -74,7 +74,7 @@ log_change = _log
 # ────────────────────────────────────────────────────────────────────
 # Simple scalar fields: compared verbatim, logged one row per field.
 _TRACKED_FIELDS = (
-    "order_status", "carrier", "tracking_number", "notes",
+    "order_status", "carrier", "tracking_number", "notes", "internal_notes",
     "ettn",
     "guest_first_name", "guest_last_name", "guest_email", "guest_phone",
 )

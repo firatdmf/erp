@@ -85,8 +85,8 @@ class PrintedQuoteSectionsTest(TestCase):
         # rolls and metres, not the whole line twice.
         lines = [text for cls, text in rows if not cls]
         self.assertEqual(len(lines), 3)
-        self.assertIn("5 mt 1 roll", lines[1]); self.assertIn("$15.00", lines[1])
-        self.assertIn("10 mt 1 roll", lines[2]); self.assertIn("$30.00", lines[2])
+        self.assertIn("5 m 1 roll", lines[1]); self.assertIn("$15.00", lines[1])
+        self.assertIn("10 m 1 roll", lines[2]); self.assertIn("$30.00", lines[2])
 
     def test_the_customers_copy_counts_rolls_but_names_none(self):
         """Barcodes are for picking — the packing list's, not the quote's."""

@@ -1,0 +1,168 @@
+{% comment %}
+The printed documents' shared stylesheet — the order sheet, the quote, and
+whatever joins them. Included inside each document's <style>, which then
+adds only what is its own (its column widths, a row only it has), so a
+change here reaches every document and they stay one family instead of
+drifting apart one copy at a time.
+
+Needs `is_pdf` from erp.pdf_render.document_response: the PDF and the HTML
+fallback lay their margins out differently (see the end).
+{% endcomment %}
+    @page {
+      size: letter portrait;
+      /* No margin at the sides or the top, so a browser printing the HTML
+         fallback adds no header or footer of its own (URL, page number,
+         date); the body padding gives that room. The foot is the credit's. */
+      margin: 0 0 9mm;
+      /* The bottom margin is the credit's, and nothing else is laid in
+         it — see .nejum below. A browser printing the HTML fallback
+         ignores the margin box and prints the credit once, at the end. */
+      @bottom-center { content: element(nejum); }
+    }
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 12.0pt;
+      color: #0F1419;
+      line-height: 1.3;
+      padding: 10mm 12mm 4mm 12mm;
+      margin: 0;
+    }
+    @media print {
+      html, body { margin: 0 !important; }
+      /* Without this the browser strips every background on the way to
+         paper, and the chips, cards and group rows print as bare text. */
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    /* The HTML fallback on screen: a sheet on a page, not text to the edges. */
+    @media screen { body { max-width: 216mm; margin: 16px auto; box-shadow: 0 0 0 1px #E2E8EE; box-sizing: border-box; } }
+
+    /* ── Header (print/_document_header.html) ───────────────────────── */
+    .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 7pt; margin-bottom: 10pt; }
+    .hdr td { vertical-align: top; }
+    /* The house's name, in the house's colour — the markup sets it from
+       erp.nejum_credit.brand_color; this is that function's default. */
+    .hdr .brand { font-size: 16.0pt; font-weight: bold; color: #944F05; line-height: 1.25; max-width: 105mm; }
+    /* The document's number, alone: the chip says what kind it is. */
+    .hdr .doc-type { font-size: 10.67pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
+    .hdr .date { font-size: 10.67pt; color: #4B5563; }
+    /* Date and chip as one right-hand stack, both flush with the right
+       edge. The cell was once right-aligned only by an align="right"
+       attribute, which the PDF renderer ignores, and the chip drifted to
+       the middle of the header. */
+    .hdr td.meta { text-align: right; }
+    .hdr .stack { display: inline-block; text-align: right; }
+    .hdr .kinds { margin-top: 4pt; }
+    /* What the document is — QUOTE, ORDER. One width for every word it
+       may hold, so the chip is the same size on every document (a longer
+       word, SİPARİŞLER, grows it). */
+    .hdr .kind { display: inline-block; min-width: 56pt; text-align: center; box-sizing: border-box;
+                 padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold; letter-spacing: 1pt;
+                 background: #E0F2F1; color: #0B5F60; }
+
+    h3 { font-size: 10.0pt; color: #6B7280; letter-spacing: 1.2pt; text-transform: uppercase; margin: 9pt 0 4pt; font-weight: bold; }
+
+    /* ── Cards: customer, delivery, terms ───────────────────────────── */
+    .twocol { width: 100%; }
+    .twocol td { width: 50%; vertical-align: top; padding-right: 8pt; }
+    .twocol td:last-child { padding-right: 0; padding-left: 8pt; }
+    .twocol td.full { width: 100%; padding-right: 0; padding-left: 0; }
+    .card { background: #FAFBFD; border: 1px solid #E2E8EE; padding: 8.75pt 11.25pt; }
+    .card .name { font-size: 13.33pt; font-weight: bold; color: #0F1419; }
+    .card .role { font-size: 9.33pt; color: #147F74; font-weight: bold; letter-spacing: 0.8pt; text-transform: uppercase; margin-top: 1pt; }
+    /* A kind of customer as the side menu's icon for it, drawn inline:
+       nothing runs a script on a document rendered on the server. */
+    .card .name .who { width: 11pt; height: 11pt; vertical-align: -1pt; margin-right: 4pt; }
+    .card .line { font-size: 11.33pt; color: #374151; margin-top: 3pt; }
+    .card .line b { color: #6B7280; font-weight: bold; }
+
+    /* ── Items table ────────────────────────────────────────────────── */
+    /* Fixed layout: the columns share the width by the document's own
+       <col> rule, not by whichever cell is longest — left to itself one
+       long product title pulled its column halfway across the sheet. */
+    table.items { width: 100%; border-collapse: collapse; margin-top: 4pt; table-layout: fixed; }
+    table.items thead th {
+      background: #FAFBFD;
+      border-top: 1px solid #E2E8EE;
+      border-bottom: 1px solid #E2E8EE;
+      padding: 3.75pt 5.0pt;
+      font-size: 8.67pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8pt;
+      color: #6B7280;
+      text-align: left;
+    }
+    table.items thead th.num { text-align: right; }
+    table.items thead th, table.items tbody td { overflow-wrap: break-word; }
+    /* Centred top to bottom: a line is two or three lines tall (name over
+       code, quantity over roll count), and a figure beside it sits in the
+       middle of the row rather than hanging from its top. */
+    table.items tbody td {
+      padding: 1.25pt 5.0pt;
+      border-bottom: 1px solid #EEF1F5;
+      vertical-align: middle;
+      font-size: 10.0pt;
+      line-height: 1.25;
+    }
+    table.items tbody td.num { text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
+    /* A figure is never broken across lines — "$17,317.3" over "7" is a
+       misprint on a document somebody pays from. The break-word rule
+       above is for long product names; numbers opt out, and each
+       document's <col> widths leave room for its longest total. */
+    table.items td.num, table.items td.val { white-space: nowrap; overflow-wrap: normal; }
+    table.items .pname { font-weight: bold; color: #0F1419; }
+    table.items .pdesc { color: #4B5563; font-size: 8.67pt; margin-top: 1pt; }
+    /* A code under the name it belongs to, sized against it so it follows
+       the table's size; mono, so a digit cannot be misread for a letter. */
+    table.items .sku { font-family: "Courier", monospace; font-size: 0.8em; font-weight: normal; color: #4B5563; }
+    /* How many rolls, under the quantity — never which: barcodes are for
+       picking, and belong on the packing list. */
+    table.items .packs { font-size: 0.85em; font-weight: normal; color: #6B7280; margin-top: 1pt; }
+    /* Group rows — dividers, not line items. The book (or order) a run of
+       lines belongs to, in the column heads' muted uppercase; beneath it
+       the warehouse they are picked from, one step quieter, in light teal. */
+    table.items tbody tr.grp td {
+      background: #FAFBFD;
+      border-bottom: 1px solid #E2E8EE;
+      padding: 3.75pt 5.0pt;
+      font-size: 8.67pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8pt;
+      color: #6B7280;
+    }
+    table.items tbody tr.grp td.num { text-transform: none; letter-spacing: 0; }
+    table.items tbody tr.wh td { background: #F0FAF9; border-bottom: 1px solid #D5EFEC; padding: 3pt 5.0pt;
+                                 font-size: 8.67pt; font-weight: bold; color: #147F74; }
+    table.items tbody tr.wh td span { font-weight: normal; color: #6B7280; }
+    table.items tbody tr.grp, table.items tbody tr.wh { break-after: avoid; page-break-after: avoid; }
+    /* The total is a row of the BODY, not a <tfoot>: a table footer
+       repeats at the foot of every printed page, and a grand total there
+       reads as the total OF that page. It belongs once, under the last
+       line it counts, and is kept with it rather than starting a page. */
+    table.items tbody tr.grand { break-inside: avoid; page-break-inside: avoid; }
+    table.items tbody tr.grand td { border-top: 2px solid #0F1419; border-bottom: none; padding: 5pt 5.0pt;
+                                    font-size: 13.33pt; font-weight: bold; }
+
+    /* ── Notes, footer, credit ──────────────────────────────────────── */
+    /* pre-line: a note keeps the lines it was typed in. */
+    .notes { padding: 7.5pt 11.25pt; border-left: 3pt solid #147F74; background: #F8FAFA; font-size: 10.67pt; color: #374151; white-space: pre-line; }
+    .foot { margin-top: 9pt; padding-top: 6pt; border-top: 1px solid #E2E8EE; font-size: 9.33pt; color: #6B7280; width: 100%; }
+    .foot td { vertical-align: top; }
+    .foot .right { text-align: right; }
+    /* The credit, at the foot of every sheet: a RUNNING element, lifted
+       out of the flow and drawn in the page's bottom margin, so the page
+       ends where the margin begins and no text is laid over it. (It was
+       `position: fixed`, which repeats but reserves no room, and printed
+       on top of a long document's last lines.) Colours come from the
+       markup — see erp/nejum_credit.py. */
+    .nejum { position: running(nejum); text-align: center; font-size: 7.5pt; }
+    {% if is_pdf %}
+    /* Rendered to a PDF, so EVERY margin belongs to the page: one figure,
+       the same on all four sides and on every sheet. The body's padding
+       pads the flow once — page two began hard against the top edge — so
+       the PDF drops it. The HTML fallback keeps the padding: its margins
+       are where the browser puts its own header and footer. */
+    @page { margin: 12mm; }
+    body { padding: 0; }
+    {% endif %}

@@ -1,0 +1,27 @@
+{% comment %}
+The printed documents' shared header (styles in print/_document_styles.html):
+the house's name over the document's number on the left; the date over a
+chip naming the kind of document on the right.
+
+  number     — the document's number, printed alone ("QUO-2026-000004",
+               "ORD-2026-000023 & ORD-2026-000024")
+  kind       — the chip's word, translated ("QUOTE", "ORDER")
+  date       — the document's date; with date_from, a span "from – date"
+               when the two differ
+  brand_line, brand_color — from the view; the colour falls back to the
+               stylesheet's
+{% endcomment %}
+<table class="hdr" cellspacing="0" cellpadding="0">
+  <tr>
+    <td>
+      <div class="brand"{% if brand_color %} style="color: {{ brand_color }};"{% endif %}>{{ brand_line|default:"Nejum ERP" }}</div>
+      <div class="doc-type">{{ number }}</div>
+    </td>
+    <td class="meta">
+      <div class="stack">
+        <div class="date">{% if date_from and date and date_from != date %}{{ date_from|date:"d M Y" }} – {% endif %}{{ date|date:"d M Y" }}</div>
+        <div class="kinds"><span class="kind">{{ kind }}</span></div>
+      </div>
+    </td>
+  </tr>
+</table>

@@ -211,7 +211,7 @@
                     <div class="qd-prod"><span class="qd-prod-img"></span><span class="qd-prod-name">{{ it.label }}</span></div>
                     {% endif %}
                     {% if part.rolls %}
-                    <span class="qd-chip"><i class="fa fa-layer-group"></i> {{ part.pack_label }} · {{ part.quantity|floatformat:"-2g" }} {{ it.unit }}</span>
+                    <span class="qd-chip"><i class="fa fa-layer-group"></i> {{ part.pack_label }} · {{ part.quantity|floatformat:"-2g" }} {{ it.unit_label }}</span>
                     {% if part.stale_count %}<span class="qd-chip bad"><i class="fa fa-triangle-exclamation"></i> {% blocktrans count n=part.stale_count %}{{ n }} no longer free{% plural %}{{ n }} no longer free{% endblocktrans %}</span>{% endif %}
                     {% endif %}
                   </div>
@@ -224,7 +224,7 @@
                   <span class="mono{% if part.variant_lines %} qd-variant-sku{% endif %}">{{ it.product_variant.variant_sku }}</span>
                 {% else %}<span class="qd-empty">—</span>{% endif %}
               </td>
-              <td class="num"><span class="qd-num-val">{{ part.quantity|floatformat:"-2" }}</span> {{ it.unit }}</td>
+              <td class="num"><span class="qd-num-val">{{ part.quantity|floatformat:"-2" }}</span> {{ it.unit_label }}</td>
               <td class="num"><span class="qd-num-val">{{ symbol }}{{ it.price|floatformat:2 }}</span></td>
               <td class="num"><b>{{ symbol }}{{ part.amount|floatformat:2 }}</b></td>
             </tr>
@@ -234,7 +234,7 @@
                 {% for r in part.rolls %}
                 <span class="qd-pill {{ r.state }}"{% if r.held_by %} title="{% trans 'Reserved for' %} {{ r.held_by|join:', ' }}"{% endif %}>
                   <span class="bc">{{ r.barcode|default:"—" }}</span>
-                  <span class="m">{{ r.quantity|floatformat:"-2g" }} {{ it.unit }}</span>
+                  <span class="m">{{ r.quantity|floatformat:"-2g" }} {{ it.unit_label }}</span>
                   {% if r.state == 'short' %}<span class="tag bad">{% blocktrans with free=r.available|floatformat:"-2g" %}only {{ free }} free{% endblocktrans %}</span>{% elif r.state == 'gone' %}<span class="tag bad">{% trans "gone" %}</span>{% endif %}
                 </span>
                 {% endfor %}

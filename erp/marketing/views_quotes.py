@@ -436,7 +436,10 @@ def _quote_page_context(request, pk):
     for it in items:
         it.linked_rolls = by_line.get(it.pk, [])
         it.stale_count = sum(1 for link in it.linked_rolls if link.state != "free")
-        unit = (it.unit or "").strip()
+        # The product's own unit, the one the order sheet prints ("m"); the
+        # unit typed on the line only where it names no product.
+        it.unit_label = it.product.unit_short if it.product_id else (it.unit or "").strip()
+        unit = it.unit_label
         unit_totals[unit] = unit_totals.get(unit, Decimal("0")) + (it.quantity or Decimal("0"))
         if it.linked_rolls:
             pack = getattr(it.product, "pack_type", None) or units.DEFAULT_PACK

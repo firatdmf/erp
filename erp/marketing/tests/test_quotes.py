@@ -205,14 +205,19 @@ class QuoteTest(TestCase):
         self.assertContains(r, "name no catalog product")
 
     def test_detail_and_print_total_the_quantities_per_unit(self):
+        """A product's line counts in the product's own unit, whatever was
+        typed on it — the order sheet's "m", not "mt"; a line naming no
+        product keeps the unit typed on it."""
         quote = Quote.objects.get(pk=self._save(self._body(items=[
             {"sku": "V320.ECRU", "quantity": "60.5", "unit": "mt", "price": "2"},
-            {"sku": "V320.ECRU", "quantity": "41.25", "unit": "mt", "price": "2"},
-            {"sku": "V320.ECRU", "quantity": "3", "unit": "pcs", "price": "2"},
+            {"sku": "V320.ECRU", "quantity": "41.25", "unit": "yd", "price": "2"},
+            {"sku": "", "description": "Cutting service", "quantity": "3", "unit": "pcs", "price": "2"},
         ])).json()["quote_id"])
+        unit = self.product.unit_short
         for page in (self.client.get(reverse("marketing:quote_detail", args=[quote.pk])),
                      self.client.get(reverse("marketing:quote_print", args=[quote.pk]) + "?html=1")):
-            self.assertContains(page, "101.75 mt")
+            self.assertContains(page, f"101.75 {unit}")
+            self.assertNotContains(page, " yd")
             self.assertContains(page, "3 pcs")
             # No line names its rolls, so nothing claims to count them.
             self.assertNotContains(page, "3 rolls")

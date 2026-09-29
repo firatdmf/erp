@@ -262,13 +262,12 @@ class BrandHeader(TestCase):
         return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", header.group(0))).strip()
 
     def test_the_sheet_names_itself_under_the_brand(self):
-        """"Order DK0000270", not a bare number floating under a kicker —
-        the line has to read as a sentence on a document handed over."""
+        """The number under the brand, alone — the chip on the right says
+        it is an order, so the line does not say it twice."""
         header = self._header(self.order)
-        self.assertIn("Order DK0000270", header)
-        self.assertLess(
-            header.index(self.LOCKUP), header.index("Order DK0000270"),
-            "the order line should come after the brand headline")
+        self.assertIn(f"{self.LOCKUP} DK0000270", header)
+        self.assertNotIn("Order DK0000270", header)
+        self.assertTrue(header.endswith("ORDER"), header)
 
     def test_an_order_with_no_number_of_its_own_is_named_by_id(self):
         """The orders that predate ORD- numbering: they were never given
@@ -278,7 +277,7 @@ class BrandHeader(TestCase):
         legacy = Order.objects.create()
         Order.objects.filter(pk=legacy.pk).update(order_number=None)
         legacy.refresh_from_db()
-        self.assertIn(f"Order #{legacy.pk}", self._header(legacy))
+        self.assertIn(f"{self.LOCKUP} #{legacy.pk} ", self._header(legacy))
 
     def test_a_real_order_number_is_not_given_a_hash(self):
         """"Order #DK0000270" reads as a mistake: the hash belongs to a

@@ -4,230 +4,32 @@
   <meta charset="utf-8">
   <title>{% if combined %}{% blocktrans count counter=combined_orders|length %}{{ counter }} Order{% plural %}{{ counter }} Orders{% endblocktrans %}{% else %}{% trans "Order" %} #{{ order.pk }}{% endif %}</title>
   <style>
-    /* xhtml2pdf supports a subset of CSS — keep it simple and inline-friendly.
-       @page handles the actual PDF page size + margins. */
-    @page {
-      /* US Letter. 10pt lines, and 18 line items to a page — measured,
-         not estimated: printed from Chrome, which is what renders this
-         (see OrderPrint).
-
-         That is the size this sheet has always printed at. It was
-         briefly taken down to 7.5pt, which fit forty line items on a
-         page and was too small to read, and then up to 15pt, which was
-         too big. Six columns rather than eight is what leaves room for
-         it: each code folded under the name it belongs to, SKU under
-         product and variant SKU under variant, rather than a column of
-         its own crowding Unit and Amount toward the edge. */
-      size: letter portrait;
-      /* No margin at the sides or the top, so the browser adds no header
-         or footer of its own (URL + page number + date) — the body
-         padding below keeps the breathing room. The foot is the one
-         exception: 9mm belongs to the Nejum credit. */
-      margin: 0 0 9mm;
-      /* The bottom margin is the credit's, and nothing else is laid in
-         it — see .nejum below. A browser printing the HTML fallback
-         ignores the margin box and prints the credit once, at the end. */
-      @bottom-center { content: element(nejum); }
-    }
-    body {
-      font-family: Helvetica, Arial, sans-serif;
-      font-size: 12.0pt;
-      color: #0F1419;
-      line-height: 1.3;
-      padding: 10mm 12mm 4mm 12mm;
-      margin: 0;
-    }
-    /* Belt-and-braces: in browser print mode also hide any address
-       bars/headers the browser tries to inject. */
-    @media print {
-      html, body { margin: 0 !important; }
-      /* Without this the browser strips every background on the way to
-         paper and the chips, cards and header badges print as bare
-         text — the colour IS the classification here. */
-      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    }
-    /* Header */
-    .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 7pt; margin-bottom: 10pt; }
-    .hdr td { vertical-align: top; }
-    /* 14pt, not 18: the default header is now a phrase ("DEMFIRAT® |
-       Karven Home Collection"), not the single word it used to be, and
-       at 18pt it crowded the order number on the right. */
-    .hdr .brand { font-size: 16.0pt; font-weight: bold; color: #944F05; line-height: 1.25; max-width: 105mm; }
-    .hdr .doc-type { font-size: 10.67pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
-    .hdr .date { font-size: 10.67pt; color: #4B5563; }
-    /* Date and badge as one right-hand stack, both flush with the right
-       edge, so the badge's end lines up under the date's. The badge used
-       to be loose in the cell — the cell was right-aligned only by the old
-       align="right" attribute, which the PDF renderer ignores, so it
-       drifted to the middle of the header instead of hanging under the
-       date. */
-    .hdr td.meta { text-align: right; }
-    .hdr .stack { display: inline-block; text-align: right; }
-    .hdr .kinds { margin-top: 4pt; }
-    /* What the document is — ORDER, as the quote's chip says QUOTE, in
-       the same teal. It used to say B2B or WEB: which kind of customer,
-       which the customer holding the sheet already knows. */
-    .hdr .kind { padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold; letter-spacing: 1pt;
-                 background: #E0F2F1; color: #0B5F60; }
-
-    h3 { font-size: 10.0pt; color: #6B7280; letter-spacing: 1.2pt; text-transform: uppercase; margin: 9pt 0 4pt; font-weight: bold; }
-
-    /* Customer / Delivery cards */
-    .twocol { width: 100%; }
-    .twocol td { width: 50%; vertical-align: top; padding-right: 8pt; }
-    .twocol td:last-child { padding-right: 0; padding-left: 8pt; }
-    .twocol td.full { width: 100%; padding-right: 0; padding-left: 0; }
-    .card { background: #FAFBFD; border: 1px solid #E2E8EE; padding: 8.75pt 11.25pt; }
-    .card .name { font-size: 13.33pt; font-weight: bold; color: #0F1419; }
-    .card .role { font-size: 9.33pt; color: #147F74; font-weight: bold; letter-spacing: 0.8pt; text-transform: uppercase; margin-top: 1pt; }
-    /* WHICH KIND of customer, as the icon the side menu uses for them —
-       lucide `users` for a contact, `building-2` for a company — instead
-       of the word CONTACT or COMPANY under the name. Drawn inline rather
-       than as <i data-lucide>, because nothing runs the script that
-       would swap that for an icon: this document is rendered to a PDF on
-       the server. Delivery and Billing keep their words; they are not
-       kinds of customer. */
-    .card .name .who { width: 11pt; height: 11pt; vertical-align: -1pt; margin-right: 4pt; }
-    .card .line { font-size: 11.33pt; color: #374151; margin-top: 3pt; }
-    .card .line b { color: #6B7280; font-weight: bold; }
-
-    /* Items table */
-    /* Fixed layout, and the columns below share the width by a rule
-       rather than by whatever the longest cell happens to be. Left to
-       itself the table sizes each column to its widest line, so one
-       product titled "GREK TAŞLI VE İNCİ EKRU İNCİ BEYAZ ZEMİN" pulled
-       the Product column halfway across the sheet and squeezed the
-       other five — and the columns then moved between documents,
-       depending on which order held the longest name. A title too long
-       for its share now wraps onto a second line, which the row can
-       afford: it is already two lines tall, name over code. */
-    table.items { width: 100%; border-collapse: collapse; margin-top: 4pt;
-                  table-layout: fixed; }
-    table.items col.c-product { width: 26%; }
-    table.items col.c-variant { width: 24%; }
-    table.items col.c-type    { width: 11%; }
-    /* Wide enough for the TOTAL's figure, which is the longest thing the
-       column ever holds and is set two points larger than the lines
-       above it: "1,513.00 m" at 13.33pt did not fit 13% and broke
-       between the figure and its unit. */
+{% include "print/_document_styles.html" %}
+    /* ── The order sheet's own ───────────────────────────────────────
+       US Letter, 10pt lines, 18 line items to a page — measured, printed
+       from Chrome. Six columns rather than eight is what leaves room for
+       that size: each code folded under the name it belongs to (SKU under
+       product, variant SKU under variant) rather than a column of its own. */
+    table.items col.c-product { width: 24%; }
+    table.items col.c-variant { width: 22%; }
+    table.items col.c-type    { width: 10%; }
+    /* Wide enough for the TOTAL's figure, the longest thing the column
+       holds, set larger than the lines: "1,513.00 m" at 13.33pt did not
+       fit 13% and broke between the figure and its unit. */
     table.items col.c-qty     { width: 16%; }
     table.items col.c-unit    { width: 10%; }
-    table.items col.c-amount  { width: 13%; }
-    table.items thead th {
-      background: #FAFBFD;
-      border-top: 1px solid #E2E8EE;
-      border-bottom: 1px solid #E2E8EE;
-      padding: 3.75pt 5.0pt;
-      font-size: 8.67pt;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.8pt;
-      color: #6B7280;
-      text-align: left;
-    }
-    table.items thead th.num { text-align: right; }
-    table.items thead th, table.items tbody td { overflow-wrap: break-word; }
-    table.items tbody td {
-      padding: 1.25pt 5.0pt;
-      border-bottom: 1px solid #EEF1F5;
-      vertical-align: top;
-      font-size: 10.0pt;
-      line-height: 1.25;
-    }
-    table.items tbody td.num { text-align: right; font-weight: bold; }
-    /* Group heading on the combined sheet — the order the lines beneath
-       belong to. Reads as a divider, not as a line item: same muted
-       uppercase as the column heads, on the same tinted ground, so the
-       four columns below it stay the eye's structure. */
-    table.items tbody tr.grp td {
-      background: #FAFBFD;
-      border-bottom: 1px solid #E2E8EE;
-      padding: 3.75pt 5.0pt;
-      font-size: 8.67pt;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.8pt;
-      color: #6B7280;
-    }
-    /* The warehouse a group of lines is picked from — one step quieter
-       than the order heading above it. */
-    table.items tbody tr.wh td { background: #F0FAF9; border-bottom: 1px solid #D5EFEC; padding: 3pt 5.0pt;
-                                 font-size: 8.67pt; font-weight: bold; color: #147F74; }
-    table.items tbody tr.wh td span { font-weight: normal; color: #6B7280; }
-    table.items tbody tr.grp, table.items tbody tr.wh { break-after: avoid; page-break-after: avoid; }
-    table.items .pname { font-weight: bold; color: #0F1419; }
-    table.items .pdesc { color: #4B5563; font-size: 8.67pt; margin-top: 1pt; }
-    /* A code sits under the name it belongs to: the product's SKU
-       beneath the product, the variant's beneath the variant. They were
-       briefly five columns across, which is the clearest arrangement
-       and also the widest — and the width is what held the type down.
-       Stacking each pair trades a line of height, which this table has,
-       for the room to set the whole sheet half again larger.
-
-       What does NOT happen here is the two names sharing a cell: the
-       variant needs its own column, and it was losing the customer's
-       colour to a chip when it did not have one. Codes print in mono so
-       a digit cannot be misread for a letter. */
-    /* The code line under a name: quieter than it, and sized against it
-       rather than in points of its own, so it follows whatever the
-       table's size becomes. */
-    table.items .sku { font-family: "Courier", monospace; font-size: 0.8em;
-                       font-weight: normal; color: #4B5563; }
+    /* The total's figure at 13.33pt: "$999,999.99" needs 17%; at 13% a
+       five-figure total broke onto a second line. */
+    table.items col.c-amount  { width: 18%; }
     table.items .vname { color: #374151; }
     table.items .tname { color: #4B5563; }
-    /* The totals are rows of the BODY, not a <tfoot>. A table footer is
-       repeated at the foot of every printed page, and a grand total
-       repeated there reads as the total OF that page — "$4,577.91" at
-       the bottom of page one of three, on a document somebody pays
-       from. It belongs once, under the last line it counts. What should
-       repeat is <thead>, and does: the column names, so that page two
-       can be read at all. */
-    table.items tbody tr.grand td,
-    table.items tbody tr.sum td {
-      padding: 5.0pt 5.0pt; font-size: 10.67pt; font-weight: bold;
-      border-bottom: none;
-    }
+    /* Totals: the quantity beneath Qty and the money beneath Amount, the
+       label out at the far left; the pack count on a lighter row under
+       the quantity, so the money stays the loudest figure. */
     table.items tbody td.val { text-align: right; color: #0F1419; }
     table.items tbody td.lbl-left { text-align: left; color: #374151; }
-    /* Kept with the lines it totals rather than starting a page alone. */
-    table.items tbody tr.grand { break-inside: avoid; page-break-inside: avoid; }
-    table.items tbody tr.grand td { border-top: 2px solid #0F1419; padding-top: 5pt; font-size: 13.33pt; }
-    /* Pack count hangs on its own line under the Qty total, lighter so
-       the money total stays the loudest thing on the row above. */
-    table.items tbody tr.sum td { font-size: 0.8em; color: #6B7280;
-                                  padding-top: 0; padding-bottom: 3pt; }
-    table.items tbody td .packs { font-size: 0.85em; font-weight: normal; color: #6B7280; }
-
-    /* Notes */
-    .notes { padding: 7.5pt 11.25pt; border-left: 3pt solid #147F74; background: #F8FAFA; font-size: 10.67pt; color: #374151; }
-
-    /* Footer */
-    .foot { margin-top: 9pt; padding-top: 6pt; border-top: 1px solid #E2E8EE; font-size: 9.33pt; color: #6B7280; width: 100%; }
-    .foot td { vertical-align: top; }
-    .foot .right { text-align: right; }
-    /* The credit, at the foot of every sheet. It is a RUNNING element:
-       lifted out of the flow and drawn in the page's bottom margin (the
-       @page rule above puts it there), so the page ends where the margin
-       begins and the text can no longer be laid over it.
-
-       It used to be `position: fixed`, which does repeat on every page
-       but reserves no room for itself — on a document that ran past one
-       page the last lines and the credit were printed on top of each
-       other. Colours come from the markup — see erp/nejum_credit.py. */
-    .nejum { position: running(nejum); text-align: center; font-size: 7.5pt; }
-    {% if is_pdf %}
-    /* Rendered to a PDF, so EVERY margin belongs to the page: one
-       figure, the same on all four sides and on every sheet.
-
-       It used to be the body's padding, which pads the start and the end
-       of the flow once — so page two began hard against the top edge
-       while page one had room, and the sides were padding while the top
-       and foot were something else. The HTML fallback keeps the padding
-       instead: margins there are where Chrome puts its own header and
-       footer. */
-    @page { margin: 12mm; }
-    body { padding: 0; }
-    {% endif %}
+    table.items tbody tr.sum td { padding: 0 5.0pt 3pt; font-size: 0.8em; font-weight: bold;
+                                  color: #6B7280; border-bottom: none; }
   </style>
 </head>
 <body>
@@ -239,34 +41,21 @@
   the footer at the end.{% endcomment %}
   {% if is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
 
-  <!-- HEADER -->
-  <table class="hdr" cellspacing="0" cellpadding="0">
-    <tr>
-      <td>
-        <div class="brand">{{ brand_line|default:"Nejum ERP" }}</div>
-        {% comment %}One teal line, the number alone — the chip on the
-        right already says it is an order: "ORD-2026-000027". A combined
-        print names every order it covers, the way a split order is named
-        on its page ("ORD-2026-000023 & ORD-2026-000024") — never one
-        order's number alone, which would appear to speak for all of them.
-
-        The # belongs to the id. An order_number, once orders carry one,
-        is already a formatted reference and reads wrong behind a hash
-        ("#DK0000297").{% endcomment %}
-        {% if combined %}
-          <div class="doc-type">{{ combined_label }}</div>
-        {% else %}
-          <div class="doc-type">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</div>
-        {% endif %}
-      </td>
-      <td class="meta">
-        <div class="stack">
-          <div class="date">{% if combined %}{% if combined_from and combined_to and combined_from != combined_to %}{{ combined_from|date:"d M Y" }} – {{ combined_to|date:"d M Y" }}{% else %}{{ combined_to|date:"d M Y" }}{% endif %}{% else %}{{ order.order_date|date:"d M Y" }}{% endif %}</div>
-          <div class="kinds"><span class="kind">{% if combined %}{% trans "ORDERS" %}{% else %}{% trans "ORDER" %}{% endif %}</span></div>
-        </div>
-      </td>
-    </tr>
-  </table>
+  <!-- HEADER — the number alone, the chip naming the document. A combined
+       print names every order it covers, the way a split order is named
+       on its page ("ORD-2026-000023 & ORD-2026-000024") — never one
+       order's number, which would appear to speak for all of them. The #
+       belongs to an order with no number yet: a number is already a
+       formatted reference and reads wrong behind a hash. -->
+  {% if combined %}
+    {% trans "ORDERS" as kind %}
+    {% include "print/_document_header.html" with number=combined_label kind=kind date_from=combined_from date=combined_to %}
+  {% else %}
+    {% trans "ORDER" as kind %}
+    {% with pk=order.pk|stringformat:"s" %}{% with unnumbered="#"|add:pk %}
+    {% include "print/_document_header.html" with number=order.order_number|default:unnumbered kind=kind date=order.order_date %}
+    {% endwith %}{% endwith %}
+  {% endif %}
 
   {% if has_customer_info or has_delivery_info %}
   <!-- CUSTOMER + DELIVERY — only the side(s) that have real data print;

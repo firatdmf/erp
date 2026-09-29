@@ -4379,12 +4379,23 @@ class OrderList(ListView):
         context['b2b_count'] = len(b2b_orders)
         context['b2c_count'] = len(b2c_orders)
         context['retail_count'] = len(retail_orders)
+        # Rows print only the symbol, so each tab's Total header names
+        # the currencies its rows are in — more than one when mixed.
+        context['all_currencies'] = _currency_codes(all_orders)
+        context['b2b_currencies'] = _currency_codes(b2b_orders)
+        context['b2c_currencies'] = _currency_codes(b2c_orders)
+        context['retail_currencies'] = _currency_codes(retail_orders)
 
         # Bulk-delete: admins skip the password prompt (server re-checks).
         from .views_warehouse import _is_admin
         context['is_admin'] = _is_admin(self.request.user)
 
         return context
+
+
+def _currency_codes(orders):
+    """The distinct currency codes of these orders, upper-cased, joined."""
+    return ", ".join(sorted({(o.currency_code or "").upper() for o in orders} - {""}))
 
 
 def _order_search_index(order):

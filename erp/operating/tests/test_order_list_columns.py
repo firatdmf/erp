@@ -29,7 +29,7 @@ class OrderListColumnsTest(TestCase):
             product=product, variant_sku="K24649.G34")
         self.order = Order.objects.create(
             order_number="DK-501", current_account=account,
-            is_retail_order=True)
+            is_retail_order=True, currency=usd)
         OrderItem.objects.create(
             order=self.order, product=product, product_variant=variant,
             quantity=Decimal("12"), price=Decimal("4.50"))
@@ -79,6 +79,26 @@ class OrderListColumnsTest(TestCase):
         self.user.save()
         html = self.client.get(self.url).content.decode()
         self.assertEqual(html.count(">Gross profit</span>"), 2)
+
+    def test_rows_print_the_symbol_and_the_header_names_the_code(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertEqual(html.count(">Total (USD)</span>"), 2)
+        self.assertIn("$54.00", html)
+        self.assertNotIn("<span>USD</span>", html)
+
+    def test_a_mixed_tab_names_every_currency_in_its_header(self):
+        eur = CurrencyCategory.objects.create(
+            code="EUR", name="Euro", symbol="€")
+        Order.objects.create(
+            order_number="DK-502", current_account=self.order.current_account,
+            is_retail_order=True, currency=eur)
+        html = self.client.get(self.url).content.decode()
+        self.assertEqual(html.count(">Total (EUR, USD)</span>"), 2)
+
+    def test_the_total_is_grouped_the_way_the_language_groups(self):
+        self.order.items.update(quantity=Decimal("1000"))
+        html = self.client.get(self.url, HTTP_ACCEPT_LANGUAGE="tr").content.decode()
+        self.assertIn("$4.500,00", html)
 
     def _assert_no_profit_column(self, html):
         self.assertNotIn("Gross profit", html)

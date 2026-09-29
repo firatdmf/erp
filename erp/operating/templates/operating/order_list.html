@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load accounts_tags %}
 {% load static %}
 
 {% block css %}
@@ -422,7 +423,7 @@
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
-        <span class="num">{% trans "Total" %}</span>
+        <span class="num">{% trans "Total" %}{% if all_currencies %} ({{ all_currencies }}){% endif %}</span>
         {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
         <span></span>
@@ -491,14 +492,14 @@
           {% endif %}
         </div>
         <div class="num ord-total">
-          {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
+          {{ order.currency_symbol }}{{ order.total_value|money }}
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.gross_profit %}
             <span class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
-              {{ order.currency_symbol }}{{ gp|floatformat:2 }}
+              {{ order.currency_symbol }}{{ gp|money }}
             </span>
           {% endwith %}
         </div>
@@ -532,7 +533,7 @@
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
-        <span class="num">{% trans "Total" %}</span>
+        <span class="num">{% trans "Total" %}{% if b2b_currencies %} ({{ b2b_currencies }}){% endif %}</span>
         {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
         <span></span>
@@ -564,14 +565,14 @@
           {% endif %}
         </div>
         <div class="num ord-total">
-          {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
+          {{ order.currency_symbol }}{{ order.total_value|money }}
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.gross_profit %}
             <span class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
-              {{ order.currency_symbol }}{{ gp|floatformat:2 }}
+              {{ order.currency_symbol }}{{ gp|money }}
             </span>
           {% endwith %}
         </div>
@@ -602,7 +603,7 @@
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
-        <span class="num">{% trans "Total" %}</span>
+        <span class="num">{% trans "Total" %}{% if b2c_currencies %} ({{ b2c_currencies }}){% endif %}</span>
         {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
         <span></span>
@@ -630,14 +631,14 @@
           </div>
         </div>
         <div class="num ord-total">
-          {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
+          {{ order.currency_symbol }}{{ order.total_value|money }}
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.gross_profit %}
             <span class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
-              {{ order.currency_symbol }}{{ gp|floatformat:2 }}
+              {{ order.currency_symbol }}{{ gp|money }}
             </span>
           {% endwith %}
         </div>
@@ -670,7 +671,7 @@
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
-        <span class="num">{% trans "Total" %}</span>
+        <span class="num">{% trans "Total" %}{% if retail_currencies %} ({{ retail_currencies }}){% endif %}</span>
         {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
         <span></span>
@@ -696,14 +697,14 @@
           </div>
         </div>
         <div class="num ord-total">
-          {{ order.total_value|floatformat:2 }} <span>{{ order.currency_code }}</span>
+          {{ order.currency_symbol }}{{ order.total_value|money }}
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.gross_profit %}
             <span class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-up"></i>
-              {{ order.currency_symbol }}{{ gp|floatformat:2 }}
+              {{ order.currency_symbol }}{{ gp|money }}
             </span>
           {% endwith %}
         </div>

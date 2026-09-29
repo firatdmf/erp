@@ -108,3 +108,98 @@ class PurchaseLineRollCountTest(TestCase):
             quantity=Decimal("6.00"), catalog_variant=variant)
         self._line(1, [Decimal("6.00")], stock=stock, unit="piece")
         self.assertIn('<span class="po-rolls-n">1 bag</span>', self._html())
+
+
+class DraftPurchaseExpectedRollsTest(TestCase):
+    """A purchase not yet received has no rolls in the warehouse, but its
+    order says which it expects and roughly how long each is. The page
+    lists those, marked approximate, until the real ones arrive."""
+
+    def setUp(self):
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Demfirat")
+        self.supplier = CurrentAccount.objects.create(
+            book=self.book, code="C-KRV", name="Karven", type="supplier",
+            default_currency=self.usd,
+        )
+        self.wh = Warehouse.objects.create(name="Fabrika", accounting_book=self.book)
+        self.user = get_user_model().objects.create_superuser(
+            username="draft_buyer", password="pw", email="d@a.c")
+        self.client.force_login(self.user)
+        self.invoice = Invoice.objects.create(
+            book=self.book, current_account=self.supplier, currency=self.usd,
+            type="purchase", status="draft", number="PUR-000142",
+            date=date(2026, 9, 29), due_date=date(2026, 10, 29),
+            intake_warehouse=self.wh,
+            intake_plan={"products": [{
+                "unit": "mt", "pack_type": "roll",
+                "main_product": {"mode": "new", "name": "MT-5019"},
+                "variants": [
+                    {"sku": "MRK0013", "name": "ecru", "price": "2.50",
+                     "tops": [{"qty": 30, "barcode": ""}, {"qty": "27,5", "barcode": ""}]},
+                    # No metres entered: no line, so it must not shift the
+                    # next variant's rolls onto the wrong line.
+                    {"sku": "MRK0014", "name": "white", "price": "2.50",
+                     "tops": [{"qty": "", "barcode": ""}]},
+                    {"sku": "MRK0015", "name": "grey", "price": "2.50",
+                     "tops": [{"qty": 40, "barcode": "MRK000123"}]},
+                ],
+            }]},
+        )
+        for n, (desc, qty) in enumerate([("MT-5019 ecru", "57.5"), ("MT-5019 grey", "40")], 1):
+            InvoiceItem.objects.create(
+                invoice=self.invoice, line_no=n, description=desc,
+                quantity=Decimal(qty), unit="mt", unit_price=Decimal("2.50"))
+
+    def _html(self):
+        resp = self.client.get(
+            reverse("accounts:purchase_order_detail", args=[self.invoice.pk]))
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode().split("</style>", 1)[1]
+
+    def test_each_line_lists_the_rolls_it_expects(self):
+        html = self._html()
+        ecru, grey = html.split('class="po-item"')[1:3]
+        self.assertIn('<span class="po-rolls-n">2 rolls</span>', ecru)
+        self.assertIn("≈ 30.00 m", ecru)
+        self.assertIn("≈ 27.50 m", ecru)
+        self.assertIn('<span class="po-rolls-n">1 roll</span>', grey)
+        self.assertIn("≈ 40.00 m", grey)
+        self.assertIn("<code>MRK000123</code>", grey)
+
+    def test_they_are_marked_expected_not_received(self):
+        html = self._html()
+        self.assertIn("Expected rolls — approximate", html)
+        self.assertNotIn("Physical rolls received", html)
+        self.assertNotIn("roll barcodes", html)
+        self.assertNotIn("No rolls linked", html)
+
+    def test_the_total_counts_the_expected_rolls(self):
+        self.assertRegex(self._html(), r'97\.50 mt\s*<span class="dot">·</span>\s*3 rolls')
+
+    def test_the_card_names_the_product_and_its_skus(self):
+        """Picked from the catalog, the form sends the product's title and
+        no name; the card must still say which product the line is of."""
+        mt = Product.objects.create(title="MT-5019", sku="MT-5019")
+        plan = self.invoice.intake_plan
+        plan["products"][0]["main_product"] = {
+            "mode": "existing", "id": mt.pk, "title": "MT-5019", "sku": "MT-5019"}
+        plan["products"][0]["variants"][0]["attributes"] = [{"name": "color", "value": "ecru"}]
+        self.invoice.intake_plan = plan
+        self.invoice.save(update_fields=["intake_plan"])
+        # As it was stored before plan_lines() read the title.
+        self.invoice.items.filter(line_no=1).update(description="ecru")
+        ecru = self._html().split('class="po-item"')[1]
+        self.assertIn('<span class="po-item-name">MT-5019 ecru</span>', ecru)
+        self.assertRegex(ecru, r'Product SKU</dt>\s*<dd class="sku">MT-5019</dd>')
+        self.assertRegex(ecru, r'<dt>SKU</dt>\s*<dd class="sku">MRK0013</dd>')
+        self.assertRegex(ecru, r'<dt>Color</dt>\s*<dd>ecru</dd>')
+
+    def test_a_saved_line_is_described_with_its_product(self):
+        from accounting.views_purchase import plan_lines
+        mt = Product.objects.create(title="MT-5019", sku="MT-5019")
+        plan = {"products": [{"main_product": {"mode": "existing", "id": mt.pk,
+                                               "title": "MT-5019", "sku": "MT-5019"},
+                              "variants": [{"sku": "MRK0013", "name": "ecru",
+                                            "tops": [{"qty": 30}]}]}]}
+        self.assertEqual(plan_lines(plan)[0]["description"], "MT-5019 ecru")

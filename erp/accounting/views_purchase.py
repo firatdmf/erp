@@ -150,7 +150,7 @@ class PurchaseOrderDetail(View):
         )
         items = list(
             invoice.items
-            .select_related("product", "variant")
+            .select_related("product", "variant__product")
             .prefetch_related(
                 Prefetch(
                     "warehouse_stock_items",
@@ -173,23 +173,40 @@ class PurchaseOrderDetail(View):
             )
             .order_by("line_no")
         )
+        # Not received yet, there are no rolls to list — but the order says
+        # which it expects, each with the metres the supplier quoted. Shown
+        # in their place, marked approximate. Line order matches
+        # plan_lines(), which is what built a draft's items.
+        planned = []
+        if invoice.status == "draft" and invoice.intake_plan:
+            planned = plan_lines(invoice.intake_plan)
+            if len(planned) != len(items):
+                planned = []
         # A line is packed the way its product is: rolls of cloth, boxes of
         # fitted sheets. The page names the stock items by that pack, so a
         # receiver counting boxes is not told to count rolls.
-        for it in items:
+        for i, it in enumerate(items):
             rolls = it.warehouse_stock_items.all()
+            plan = planned[i] if planned else None
+            it.planned_rolls = plan["rolls"] if plan else []
+            it.plan = plan
+            # A draft saved before plan_lines() named the product reads just
+            # "ecru"; the plan names it now, so the card does too.
+            it.title = plan["description"] if plan else it.description
             product = it.product or next(
                 (r.product.catalog_product for r in rolls if r.product_id), None)
-            pack_type = product.pack_type if product is not None else units.DEFAULT_PACK
+            pack_type = (product.pack_type if product is not None
+                         else (plan and plan["pack_type"]) or units.DEFAULT_PACK)
             it.pack_type = pack_type
-            it.pack_count = len(rolls)
+            it.unit_short = units.unit_short(it.unit)
+            it.pack_count = len(rolls) or len(it.planned_rolls)
             it.pack_one, it.pack_many = units.pack_nouns(pack_type)
             it.pack_noun = units.pack_noun(pack_type, it.pack_count)
         # What the whole delivery comes to in goods, beside what it costs:
         # so many metres on so many rolls. Only a unit every line shares
         # is printed — metres and pieces added together are a bare number
-        # — and mixed packs are called the generic "packs". The pack is
-        # the product's, so an order still to be received says "0 rolls".
+        # — and mixed packs are called the generic "packs". An order still
+        # to be received counts the rolls it expects.
         total_quantity = sum((it.quantity or 0) for it in items)
         total_packs = sum(it.pack_count for it in items)
         unit_set = {it.unit for it in items}
@@ -435,18 +452,24 @@ def plan_lines(plan):
         pid = str(mp.get("id") or "")
         return int(pid) if mp.get("mode") == "existing" and pid.isdigit() else None
 
-    existing_units = dict(Product.objects
-                          .filter(pk__in=[i for i in map(existing_id, products) if i])
-                          .values_list("pk", "unit"))
+    existing = {pk: (unit, title, sku) for pk, unit, title, sku in
+                Product.objects
+                .filter(pk__in=[i for i in map(existing_id, products) if i])
+                .values_list("pk", "unit", "title", "sku")}
     for p_in in products:
         mp = p_in.get("main_product") or {}
         # Plans saved before products had their own unit carry a single
         # batch-wide one instead.
-        unit = (existing_units.get(existing_id(p_in))
-                or p_in.get("unit") or plan.get("unit") or "mt")[:20]
-        base = (mp.get("name") or "").strip()
+        ex_unit, ex_title, ex_sku = existing.get(existing_id(p_in), (None, None, None))
+        unit = (ex_unit or p_in.get("unit") or plan.get("unit") or "mt")[:20]
+        # A picked existing product arrives with its title, not a name (the
+        # form sends "name" only for a new one), so the line used to read
+        # just "ecru". The catalog's own title wins over either.
+        base = (ex_title or mp.get("name") or mp.get("title") or "").strip()
+        parent_sku = (ex_sku or mp.get("sku") or "").strip()
         for v_in in (p_in.get("variants") or []):
             qty = Decimal("0")
+            rolls = []
             for t in (v_in.get("tops") or []):
                 try:
                     q = Decimal(str(t.get("qty") or "0").replace(",", "."))
@@ -454,6 +477,7 @@ def plan_lines(plan):
                     q = Decimal("0")
                 if q > 0:
                     qty += q
+                    rolls.append({"quantity": q, "barcode": (t.get("barcode") or "").strip()})
             if qty <= 0:
                 continue
             v_name = _row_label(v_in)
@@ -469,6 +493,18 @@ def plan_lines(plan):
                 "currency": v_in.get("currency") or "USD",
                 "product": None,
                 "variant": None,
+                # What the order expects to arrive, roll by roll — shown on
+                # the draft's page until the real rolls replace it.
+                "rolls": rolls,
+                "pack_type": p_in.get("pack_type") or "",
+                # Named on the draft's card the way a received line's
+                # variant names itself: its product, its SKU, its values.
+                "parent_sku": parent_sku,
+                "sku": (v_in.get("sku") or "").strip(),
+                "attributes": [
+                    (str(a.get("name") or "").strip(), str(a.get("value") or "").strip())
+                    for a in (v_in.get("attributes") or [])
+                    if isinstance(a, dict) and str(a.get("value") or "").strip()],
             })
     return lines
 

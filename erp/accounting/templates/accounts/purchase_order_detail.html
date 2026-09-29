@@ -83,6 +83,8 @@
   .po-roll code { font-family: var(--font-mono); background: white; border:1px solid #E2E8EE; border-radius: 5px; padding: 1px 6px; }
   .po-roll .m { font-weight: 700; color: var(--nejum-teal-700); white-space: nowrap; }
   .po-roll .wh { color: var(--gray-500); white-space: nowrap; }
+  .po-roll.planned { border-style: dashed; background: white; }
+  .po-roll.planned .m { color: var(--gray-500); }
   .po-no-rolls { font-size: 12px; color: var(--gray-400); font-style: italic; }
 </style>
 {% endblock %}
@@ -186,7 +188,7 @@
   {% for it in items %}
   <div class="po-item">
     <div class="po-item-h">
-      <span class="po-item-name">{{ it.description }}</span>
+      <span class="po-item-name">{{ it.title }}</span>
       <span class="po-item-figures">
         <span class="po-item-eq">
           <b>{{ it.quantity|floatformat:2 }} {{ it.unit }}</b> × {{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }} =
@@ -199,6 +201,10 @@
     </div>
     {% if it.variant %}
     <dl class="po-spec">
+      {% if it.variant.product.sku %}
+      <dt>{% trans "Product SKU" %}</dt>
+      <dd class="sku">{{ it.variant.product.sku }}</dd>
+      {% endif %}
       <dt>{% trans "SKU" %}</dt>
       <dd class="sku">{{ it.variant.variant_sku }}</dd>
       {% for v in it.variant.product_variant_attribute_values.all %}
@@ -206,8 +212,39 @@
       <dd>{{ v.product_variant_attribute_value }}</dd>
       {% endfor %}
     </dl>
+    {% elif it.plan %}
+    {# Not in the catalog's lines yet: the order's own words for it. #}
+    <dl class="po-spec">
+      {% if it.plan.parent_sku %}
+      <dt>{% trans "Product SKU" %}</dt>
+      <dd class="sku">{{ it.plan.parent_sku }}</dd>
+      {% endif %}
+      {% if it.plan.sku %}
+      <dt>{% trans "SKU" %}</dt>
+      <dd class="sku">{{ it.plan.sku }}</dd>
+      {% endif %}
+      {% for name, value in it.plan.attributes %}
+      <dt>{{ name|capfirst }}</dt>
+      <dd>{{ value }}</dd>
+      {% endfor %}
+    </dl>
     {% endif %}
 
+    {% if it.planned_rolls %}
+    {% comment %}Not received yet: the rolls the order expects, at the metres the
+       supplier quoted — the real ones replace them on confirmation.{% endcomment %}
+    <div class="po-rolls-h">
+      <i data-lucide="layers"></i> {% blocktrans with noun=it.pack_many %}Expected {{ noun }} — approximate{% endblocktrans %}
+    </div>
+    <div class="po-rolls">
+      {% for r in it.planned_rolls %}
+      <div class="po-roll planned">
+        {% if r.barcode %}<code>{{ r.barcode }}</code>{% endif %}
+        <span class="m">≈ {{ r.quantity|floatformat:2 }} {{ it.unit_short }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
     <div class="po-rolls-h">
       <i data-lucide="layers"></i> {% blocktrans with noun=it.pack_many %}Physical {{ noun }} received{% endblocktrans %}
       {% if it.pack_count %}
@@ -230,6 +267,7 @@
     </div>
     {% else %}
     <span class="po-no-rolls">{% blocktrans with noun=it.pack_many %}No {{ noun }} linked to this line yet.{% endblocktrans %}</span>
+    {% endif %}
     {% endif %}
   </div>
   {% endfor %}

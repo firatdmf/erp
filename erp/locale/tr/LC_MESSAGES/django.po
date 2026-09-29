@@ -7740,6 +7740,9 @@ msgstr "Satın alınan ürünler"
 msgid "Physical %(noun)s received"
 msgstr "Gelen fiziksel %(noun)s"
 
+msgid "Expected %(noun)s — approximate"
+msgstr "Beklenen %(noun)s — yaklaşık"
+
 #: current_account/templates/current_account/purchase_order_list.html
 #: current_account/templates/current_account/purchase_order_detail.html
 msgid "No %(noun)s linked to this line yet."

@@ -11104,9 +11104,6 @@ msgstr "Seçilen bir top artık yok — satırın toplarını yeniden seçin."
 msgid "Roll %(roll)s is not a roll of this line's product."
 msgstr "%(roll)s topu bu satırın ürününe ait değil."
 
-#, python-format
-msgid "Roll %(roll)s stands on another book's shelf."
-msgstr "%(roll)s topu başka bir defterin rafında."
 
 #, python-format
 msgid "Roll %(roll)s is on two lines."
@@ -11154,11 +11151,7 @@ msgstr "artık boşta değil: %(n)s"
 msgid "Loading free rolls…"
 msgstr "Boştaki toplar yükleniyor…"
 
-msgid "No free rolls of this product on this book’s shelves."
-msgstr "Bu defterin raflarında bu ürünün boşta topu yok."
 
-msgid "No free roll of this product has that barcode on this book’s shelves."
-msgstr "Bu defterin raflarında bu barkodla boşta bir top yok."
 
 msgid "free"
 msgstr "boş"
@@ -11173,8 +11166,6 @@ msgstr "yalnızca %(n)s boş"
 msgid "Scan or type a barcode, then Enter"
 msgstr "Barkodu okutun ya da yazın, sonra Enter"
 
-msgid "The picked rolls were cleared: they stand on the other book’s shelves."
-msgstr "Seçilen toplar temizlendi: diğer defterin raflarındalar."
 
 #, python-format
 msgid "%(n)s no longer free"
@@ -11187,3 +11178,17 @@ msgid "%(n)s quoted roll is no longer free: an order has reserved it or it was u
 msgid_plural "%(n)s quoted rolls are no longer free: orders have reserved them or they were used since the quote was written."
 msgstr[0] "Teklifteki %(n)s top artık boşta değil: teklif yazıldıktan sonra siparişe rezerve edildi ya da kullanıldı."
 msgstr[1] "Teklifteki %(n)s top artık boşta değil: teklif yazıldıktan sonra siparişe rezerve edildi ya da kullanıldı."
+
+#, python-format
+msgid "Roll %(roll)s stands in a warehouse no book owns."
+msgstr "%(roll)s topu hiçbir deftere ait olmayan bir depoda."
+
+msgid "No free rolls of this product on any shelf."
+msgstr "Hiçbir rafta bu ürünün boşta topu yok."
+
+msgid "No free roll of this product has that barcode."
+msgstr "Bu barkodla bu ürünün boşta bir topu yok."
+
+#, python-format
+msgid "Quote %(quote)s became %(count)s orders, one per book its rolls stand in: %(orders)s."
+msgstr "%(quote)s teklifi, toplarının bulunduğu her defter için bir tane olmak üzere %(count)s siparişe dönüştü: %(orders)s."

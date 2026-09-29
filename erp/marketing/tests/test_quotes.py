@@ -269,14 +269,53 @@ class QuoteTest(TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("R-200", r.json()["error"])
 
-    def test_rolls_must_be_the_lines_product_on_the_quotes_book(self):
+    def test_a_roll_must_be_the_lines_product(self):
         other_variant = ProductVariant.objects.create(product=self.product, variant_sku="V320.GREY")
-        for roll in (self._roll("R-300", "10", variant=other_variant),
-                     self._roll("R-301", "10", book=Book.objects.create(name="Ergene Fabric"))):
-            r = self._save(self._body(items=[
-                {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
-                 "rolls": [{"id": roll.pk, "quantity": ""}]}]))
-            self.assertEqual(r.status_code, 400, roll.barcode)
+        roll = self._roll("R-300", "10", variant=other_variant)
+        r = self._save(self._body(items=[
+            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+             "rolls": [{"id": roll.pk, "quantity": ""}]}]))
+        self.assertEqual(r.status_code, 400)
+
+    def test_the_roll_list_offers_every_books_shelves_labelled(self):
+        ergene = Book.objects.create(name="Ergene Fabric")
+        self._roll("R-310", "10")
+        self._roll("R-311", "12", book=ergene)
+        rolls = self.client.get(reverse("marketing:quote_roll_list"), {"sku": "V320.ECRU"}).json()["rolls"]
+        self.assertEqual(sorted((r["barcode"], r["book"]) for r in rolls),
+                         [("R-310", "Laleli Fabric"), ("R-311", "Ergene Fabric")])
+
+    def test_rolls_from_two_books_become_a_split_order(self):
+        ergene = Book.objects.create(name="Ergene Fabric")
+        own, other = self._roll("R-600", "20"), self._roll("R-601", "30", book=ergene)
+        quote = self._rolled_quote(own, other)                   # one line, rolls on two books' shelves
+        page = self.client.get(reverse("marketing:quote_detail", args=[quote.pk]))
+        self.assertContains(page, "Ergene Fabric")               # the other book's roll is labelled
+        self.client.post(reverse("marketing:quote_convert", args=[quote.pk]))
+        quote.refresh_from_db()
+        lead = quote.order
+        [sibling] = Order.objects.filter(split_group=lead.split_group).exclude(pk=lead.pk)
+        self.assertIsNotNone(lead.split_group)
+        self.assertEqual((lead.current_account.book, sibling.current_account.book), (self.book, ergene))
+        self.assertEqual((lead.currency, sibling.currency), (quote.currency, quote.currency))
+        for order, barcode, metres in ((lead, "R-600", "20.00"), (sibling, "R-601", "30.00")):
+            [line] = order.items.all()
+            self.assertEqual((line.quantity, line.price), (Decimal(metres), Decimal("2.00")))
+            [held] = line.stock_reservations.all()
+            self.assertEqual(held.stock_item.barcode, barcode)
+
+    def test_a_split_is_refused_when_the_other_books_account_is_locked_in_another_currency(self):
+        ergene = Book.objects.create(name="Ergene Fabric")
+        own, other = self._roll("R-700", "20"), self._roll("R-701", "30", book=ergene)
+        quote = self._rolled_quote(own, other)
+        account = CurrentAccount.objects.create(name="Nick Greece", book=ergene, contact=self.customer,
+                                                default_currency=self.eur)
+        with patch.object(CurrentAccount, "currency_is_locked", True):
+            r = self.client.post(reverse("marketing:quote_convert", args=[quote.pk]), follow=True)
+        self.assertFalse(Order.objects.filter(current_account=account).exists())
+        quote.refresh_from_db()
+        self.assertIsNone(quote.order)
+        self.assertContains(r, "one currency")
 
     def test_a_roll_taken_after_quoting_is_flagged_and_blocks_conversion(self):
         roll = self._roll("R-400", "25")

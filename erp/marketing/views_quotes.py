@@ -129,9 +129,9 @@ def _resolve_customer(quote, data):
         raise QuoteSaveError(_("Say who the quote is for — a CRM customer or a name."))
 
 
-def _resolve_rolls(raw_rolls, product, variant, book, already_quoted, taken):
+def _resolve_rolls(raw_rolls, product, variant, already_quoted, taken):
     """The rolls picked for one line, checked: each is a roll of this
-    line's product on this book's shelves, quoted for no more than it
+    line's product, on any book's shelves, quoted for no more than it
     holds. A roll picked just now must also be free of order holds; one
     the quote already had is kept even if an order has taken it since —
     the quote pages flag it, and conversion refuses it, but a save of
@@ -155,8 +155,8 @@ def _resolve_rolls(raw_rolls, product, variant, book, already_quoted, taken):
             matches = bool(product and product.sku and (wp.sku or "").lower() == product.sku.lower())
         if not matches:
             raise QuoteSaveError(_("Roll %(roll)s is not a roll of this line's product.") % {"roll": code})
-        if wp.warehouse.accounting_book_id != book.pk:
-            raise QuoteSaveError(_("Roll %(roll)s stands on another book's shelf.") % {"roll": code})
+        if not wp.warehouse.accounting_book_id:
+            raise QuoteSaveError(_("Roll %(roll)s stands in a warehouse no book owns.") % {"roll": code})
         if roll.pk in taken:
             raise QuoteSaveError(_("Roll %(roll)s is on two lines.") % {"roll": code})
         taken.add(roll.pk)
@@ -177,7 +177,7 @@ def _resolve_rolls(raw_rolls, product, variant, book, already_quoted, taken):
     return out
 
 
-def _resolve_lines(data, book=None, already_quoted=frozenset()):
+def _resolve_lines(data, already_quoted=frozenset()):
     lines = []
     taken = set()
     for raw in data.get("items") or []:
@@ -201,8 +201,8 @@ def _resolve_lines(data, book=None, already_quoted=frozenset()):
         if not unit and product is not None:
             unit = getattr(product, "unit", "") or ""
         rolls = []
-        if raw.get("rolls") and product is not None and book is not None:
-            rolls = _resolve_rolls(raw.get("rolls"), product, variant, book, already_quoted, taken)
+        if raw.get("rolls") and product is not None:
+            rolls = _resolve_rolls(raw.get("rolls"), product, variant, already_quoted, taken)
             # The line is the rolls: its quantity is what they add up to,
             # never a figure typed beside them.
             qty = sum((q for _r, q in rolls), Decimal("0"))
@@ -254,6 +254,8 @@ class QuoteForm(View):
                     "id": link.stock_item_id, "barcode": link.barcode,
                     "quantity": str(link.quantity), "available": float(link.available),
                     "state": link.state, "held_by": list(link.held_by),
+                    "book": link.book.name if link.book else "",
+                    "book_id": link.book.pk if link.book else None,
                 })
             for it in quote.items.select_related("product", "product_variant__product"):
                 items.append({
@@ -310,7 +312,7 @@ class QuoteForm(View):
                 already_quoted = (set(QuoteItemRoll.objects.filter(quote_item__quote=quote)
                                       .values_list("stock_item_id", flat=True))
                                   if quote.pk else set())
-                lines = _resolve_lines(data, quote.book, already_quoted)
+                lines = _resolve_lines(data, already_quoted)
                 quote.save()
                 quote.items.all().delete()
                 for n, line in enumerate(lines, start=1):
@@ -410,49 +412,108 @@ def quote_status(request, pk):
     return redirect("marketing:quote_detail", pk=quote.pk)
 
 
-def _order_from_quote(request, quote):
-    """The order, its lines, and a hold on every quoted roll — inside the
-    caller's transaction, so a roll an order took in the last moment
-    undoes the lot rather than leaving an order short of what was quoted."""
+def _quote_parts_by_book(quote):
+    """The quote's lines cut into the books their rolls stand in.
+
+    Returns [(book, [(quote item, quantity, [links])...])...], the quote's
+    own book first. A line whose rolls stand in two books becomes two
+    lines, each the metres on that book's shelves, at the quoted price —
+    the same cut the order form makes (operating.views._line_parts_by_book).
+    A line with no rolls has no shelf to read and stays in the quote's
+    book."""
+    links = {}
+    for link in (QuoteItemRoll.objects.filter(quote_item__quote=quote)
+                 .select_related("stock_item__product__warehouse__accounting_book")):
+        links.setdefault(link.quote_item_id, []).append(link)
+    groups = {quote.book_id: (quote.book, [])}
+    for it in quote.items.select_related("product", "product_variant"):
+        mine = links.get(it.pk, [])
+        if not mine:
+            groups[quote.book_id][1].append((it, it.quantity, []))
+            continue
+        by_book = {}
+        for link in mine:
+            book = (link.stock_item.product.warehouse.accounting_book
+                    if link.stock_item_id else quote.book)
+            by_book.setdefault(book.pk, (book, []))[1].append(link)
+        for book, book_links in by_book.values():
+            qty = sum((link.quantity for link in book_links), Decimal("0"))
+            groups.setdefault(book.pk, (book, []))[1].append((it, qty, book_links))
+    lead = groups.pop(quote.book_id)
+    rest = sorted(groups.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
+    return [lead] + rest if lead[1] or not rest else rest
+
+
+def _check_split_currency(quote, groups):
+    """Refuse, before anything is written, a split whose other book holds
+    the customer's account in a currency it can no longer leave: every
+    half is priced in the quote's currency."""
+    from accounting.services_accounts import (
+        SplitCurrencyClash, check_split_currency, existing_customer_account,
+    )
+    if len(groups) < 2:
+        return
+    for book, _parts in groups:
+        account = existing_customer_account(book=book, company=quote.company,
+                                            contact=quote.contact)
+        try:
+            check_split_currency(account, quote.currency)
+        except SplitCurrencyClash as exc:
+            raise QuoteSaveError(str(exc))
+
+
+def _orders_from_quote(request, quote):
+    """One order per book the quote's rolls stand in, with its lines and a
+    hold on every quoted roll — inside the caller's transaction, so a roll
+    an order took in the last moment undoes the lot rather than leaving an
+    order short of what was quoted. Returns [(order, book)], the quote's
+    own book's order first; two or more are tied by one split_group, as
+    the order form ties a basket drawn from two books' shelves."""
+    from uuid import uuid4
     from operating.views import _create_roll_reservation
 
-    order = Order(notes=quote.notes, contact=quote.contact, company=quote.company,
-                  order_date=date.today(), created_by=request.user)
-    # Priced as quoted, whatever the account's default says — the
-    # customer agreed to these numbers in this currency.
-    order.currency = quote.currency
-    order.save()
-    links = {}
-    for link in QuoteItemRoll.objects.filter(quote_item__quote=quote).select_related("stock_item"):
-        links.setdefault(link.quote_item_id, []).append(link)
-    for it in quote.items.select_related("product", "product_variant"):
-        line = OrderItem.objects.create(
-            order=order, product=it.product, product_variant=it.product_variant,
-            description=it.description, quantity=it.quantity, price=it.price)
-        for link in links.get(it.pk, []):
-            held, capped, err = (None, False, "gone") if link.stock_item is None else \
-                _create_roll_reservation(order, line, link.stock_item, link.quantity, request.user)
-            if err or capped:
-                raise QuoteSaveError(_("Roll %(roll)s is no longer free — edit the quote to drop "
-                                       "or replace it.") % {"roll": link.barcode or "?"})
+    groups = _quote_parts_by_book(quote)
+    _check_split_currency(quote, groups)
+    split_group = uuid4() if len(groups) > 1 else None
+    created = []
+    for book, parts in groups:
+        order = Order(notes=quote.notes, contact=quote.contact, company=quote.company,
+                      order_date=date.today(), created_by=request.user,
+                      split_group=split_group)
+        # Priced as quoted, whatever the account's default says — the
+        # customer agreed to these numbers in this currency.
+        order.currency = quote.currency
+        order.save()
+        for it, qty, links in parts:
+            line = OrderItem.objects.create(
+                order=order, product=it.product, product_variant=it.product_variant,
+                description=it.description, quantity=qty, price=it.price)
+            for link in links:
+                held, capped, err = (None, False, "gone") if link.stock_item is None else \
+                    _create_roll_reservation(order, line, link.stock_item, link.quantity, request.user)
+                if err or capped:
+                    raise QuoteSaveError(_("Roll %(roll)s is no longer free — edit the quote to drop "
+                                           "or replace it.") % {"roll": link.barcode or "?"})
+        OrderChange.objects.create(
+            order=order, action="field", field="quote",
+            new_value=_("Created from quote %(number)s") % {"number": quote.number},
+            created_by=request.user)
+        created.append((order, book))
     quote.status = "accepted"
-    quote.order = order
+    quote.order = created[0][0]
     quote.save(update_fields=["status", "order", "updated_at"])
-    OrderChange.objects.create(
-        order=order, action="field", field="quote",
-        new_value=_("Created from quote %(number)s") % {"number": quote.number},
-        created_by=request.user)
-    return order
+    return created
 
 
 @login_required
 @require_POST
 def quote_convert(request, pk):
     """The customer said yes: make the order, exactly as the order form
-    would, and point the quote at it."""
+    would, and point the quote at it. Rolls quoted off another book's
+    shelves go to that book's own order, split from this one."""
     from accounting.services_accounts import (
-        get_or_create_current_account_for_order, post_order_movement,
-        stamp_order_currency,
+        align_split_account_currency, get_or_create_current_account_for_order,
+        post_order_movement, stamp_order_currency,
     )
     from operating.views import generate_machine_qr_for_order
 
@@ -467,7 +528,7 @@ def quote_convert(request, pk):
     member = getattr(request.user, "member", None)
     try:
         with transaction.atomic():
-            order = _order_from_quote(request, quote)
+            created = _orders_from_quote(request, quote)
     except QuoteSaveError as exc:
         messages.error(request, str(exc))
         return redirect("marketing:quote_detail", pk=quote.pk)
@@ -475,31 +536,55 @@ def quote_convert(request, pk):
     # The same finishing an order gets from the create form — outside the
     # transaction, as there: a ledger hiccup warns rather than undoing an
     # order the customer has been promised.
-    try:
-        order.original_snapshot = order.build_snapshot()
-        order.save(update_fields=["original_snapshot"])
-    except Exception:
-        pass
-    try:
-        account = get_or_create_current_account_for_order(order, member=member, book=quote.book)
-        if account is not None and order.current_account_id != account.pk:
-            order.current_account = account
-            order.save(update_fields=["current_account"])
-        stamp_order_currency(order, account)
-        post_order_movement(order, member=member)
-    except Exception as exc:
-        messages.warning(request, _("Order saved but its account could not be linked: %(error)s")
-                         % {"error": exc})
-    try:
-        generate_machine_qr_for_order(order)
-    except Exception:
-        pass
-    messages.success(request, _("Quote %(quote)s became order %(order)s.")
-                     % {"quote": quote.number, "order": order.order_number})
-    return redirect("operating:order_detail", pk=order.pk)
+    split = len(created) > 1
+    for order, book in created:
+        try:
+            order.original_snapshot = order.build_snapshot()
+            order.save(update_fields=["original_snapshot"])
+        except Exception:
+            pass
+        try:
+            account = get_or_create_current_account_for_order(order, member=member, book=book)
+            if account is not None and order.current_account_id != account.pk:
+                order.current_account = account
+                order.save(update_fields=["current_account"])
+            if split:
+                # One currency across the halves: each book's account is
+                # put in the quote's (checked possible before any order
+                # was made).
+                align_split_account_currency(account, quote.currency)
+            stamp_order_currency(order, account)
+            post_order_movement(order, member=member)
+        except Exception as exc:
+            messages.warning(request, _("Order saved but its account could not be linked: %(error)s")
+                             % {"error": exc})
+        try:
+            generate_machine_qr_for_order(order)
+        except Exception:
+            pass
+    if split:
+        messages.success(request, _("Quote %(quote)s became %(count)s orders, one per book its "
+                                    "rolls stand in: %(orders)s.")
+                         % {"quote": quote.number, "count": len(created),
+                            "orders": ", ".join(f"{o.order_number} ({b.name})" for o, b in created)})
+    else:
+        messages.success(request, _("Quote %(quote)s became order %(order)s.")
+                         % {"quote": quote.number, "order": created[0][0].order_number})
+    return redirect("operating:order_detail", pk=created[0][0].pk)
 
 
 # ── Product search for the form ──────────────────────────────────────
+
+@login_required
+def quote_roll_list(request):
+    """The free rolls of `?sku=` on every book's shelves, each labelled
+    with its book. Wider than the order form's list on purpose: a quote
+    holds nothing, and the customer is offered whatever the house has —
+    a sales rep included. Which book's order each roll ends up in is
+    settled when the quote is accepted (_order_from_quote)."""
+    from operating.views import free_rolls_response
+    return free_rolls_response(request, Book.objects.all())
+
 
 @login_required
 def quote_product_search(request):

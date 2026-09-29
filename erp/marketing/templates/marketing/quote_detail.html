@@ -35,6 +35,7 @@
   .qd-roll-list { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
   .qd-roll { display:inline-flex; gap:5px; padding:2px 8px; border-radius:6px; background:#F1F5F9; font:500 11.5px var(--font-sans); color:#334155; font-variant-numeric:tabular-nums; }
   .qd-roll b { font-weight:700; }
+  .qd-roll i { font-style:normal; color:#7C3AED; font-weight:600; }
   .qd-roll.short, .qd-roll.gone { background:#FEF2F2; color:#B91C1C; }
   @media (max-width: 640px) { .qd { padding: 12px 12px 80px; } }
 </style>
@@ -96,7 +97,7 @@
             <summary><i class="fa fa-scroll"></i> {{ it.pack_label }}{% if it.stale_count %} <span class="bad">· {% blocktrans count n=it.stale_count %}{{ n }} no longer free{% plural %}{{ n }} no longer free{% endblocktrans %}</span>{% endif %}</summary>
             <div class="qd-roll-list">
             {% for r in it.linked_rolls %}
-              <span class="qd-roll {{ r.state }}" {% if r.state != 'free' %}title="{% if r.held_by %}{% trans 'Reserved for' %} {{ r.held_by|join:', ' }}{% endif %}"{% endif %}><b>{{ r.barcode|default:"—" }}</b> {{ r.quantity|floatformat:"-2g" }} {{ it.unit }}{% if r.state == 'short' %} · {% blocktrans with free=r.available|floatformat:"-2g" %}only {{ free }} free{% endblocktrans %}{% elif r.state == 'gone' %} · {% trans "gone" %}{% endif %}</span>
+              <span class="qd-roll {{ r.state }}" {% if r.state != 'free' %}title="{% if r.held_by %}{% trans 'Reserved for' %} {{ r.held_by|join:', ' }}{% endif %}"{% endif %}><b>{{ r.barcode|default:"—" }}</b> {{ r.quantity|floatformat:"-2g" }} {{ it.unit }}{% if r.book and r.book.pk != quote.book_id %} <i>{{ r.book.name }}</i>{% endif %}{% if r.state == 'short' %} · {% blocktrans with free=r.available|floatformat:"-2g" %}only {{ free }} free{% endblocktrans %}{% elif r.state == 'gone' %} · {% trans "gone" %}{% endif %}</span>
             {% endfor %}
             </div>
           </details>

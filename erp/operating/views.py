@@ -2498,6 +2498,14 @@ def order_create_roll_list(request):
     match rule as _lookup_roll_by_barcode_for_sku (variant SKU or plain
     warehouse SKU), and the same reservation-aware availability as
     order_create_barcode_check. Read-only — reserves nothing."""
+    return free_rolls_response(request, _books_in_scope(request))
+
+
+def free_rolls_response(request, books):
+    """The free stock items of `?sku=` on the shelves `books` own, as the
+    JSON the roll pickers read — oldest first, each with its book. The
+    order form passes the books the request may draw from; the quote form
+    passes every book, because a quote only names rolls and holds none."""
     from django.db.models import DecimalField, F, Q
     from django.db.models.functions import Coalesce, TruncDate
     from .models import WarehouseProductItem
@@ -2548,7 +2556,7 @@ def order_create_roll_list(request):
         # cost turned that from a latent leak into the default: the same SKU
         # stands in Laleli Fabrika at $2.16 and Ergene Fabrika at $2.40, so
         # the cheapest-first list put the other book's stock first.
-        .filter(product__warehouse__accounting_book__in=_books_in_scope(request))
+        .filter(product__warehouse__accounting_book__in=books)
         .filter(Q(product__catalog_variant__variant_sku__iexact=sku) | Q(product__sku__iexact=sku))
         .annotate(unit_cost=unit_cost)
         .order_by(TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),

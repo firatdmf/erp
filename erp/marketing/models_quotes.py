@@ -136,7 +136,7 @@ class Quote(models.Model):
         from operating.models import OrderStockReservation
 
         links = list(QuoteItemRoll.objects.filter(quote_item__quote=self)
-                     .select_related("stock_item"))
+                     .select_related("stock_item__product__warehouse__accounting_book"))
         roll_ids = [link.stock_item_id for link in links if link.stock_item_id]
         reserved, held_by = {}, {}
         for sid, qty, number in (OrderStockReservation.objects
@@ -146,6 +146,7 @@ class Quote(models.Model):
             held_by.setdefault(sid, []).append(number or "?")
         for link in links:
             roll = link.stock_item
+            link.book = roll.product.warehouse.accounting_book if roll is not None else None
             if roll is None or roll.status == "consumed":
                 link.available, link.state, link.held_by = Decimal("0"), "gone", ()
                 continue
@@ -221,3 +222,4 @@ class QuoteItemRoll(models.Model):
     available = None
     state = None          # "free" | "short" | "gone"
     held_by = ()          # order numbers holding the roll now
+    book = None           # the book whose shelf the roll stands on

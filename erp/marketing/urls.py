@@ -33,6 +33,7 @@ urlpatterns = [
     path("quotes/", views_quotes.quote_list, name="quote_list"),
     path("quotes/new/", views_quotes.QuoteForm.as_view(), name="quote_create"),
     path("quotes/product-search/", views_quotes.quote_product_search, name="quote_product_search"),
+    path("quotes/rolls/", views_quotes.quote_roll_list, name="quote_roll_list"),
     path("quotes/<int:pk>/", views_quotes.quote_detail, name="quote_detail"),
     path("quotes/<int:pk>/edit/", views_quotes.QuoteForm.as_view(), name="quote_edit"),
     path("quotes/<int:pk>/print/", views_quotes.quote_print, name="quote_print"),

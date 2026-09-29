@@ -219,7 +219,9 @@
     {% empty %}
       <tr><td colspan="5" style="text-align: center; color: #6B7280; padding: 18pt;">{% trans "No items." %}</td></tr>
     {% endfor %}
-      <tr class="grand"><td colspan="4" class="lbl">{% trans "Total" %}</td><td class="num">{{ symbol }}{{ total|floatformat:"2g" }}</td></tr>
+      <tr class="grand"><td colspan="2" class="lbl">{% trans "Total" %}</td>
+        <td class="num">{% for unit, qty in unit_totals %}<div>{{ qty|floatformat:"-2g" }} {{ unit }}</div>{% endfor %}<div style="font-size: 9pt; color: #6B7280;">{% blocktrans count n=pack_count %}{{ n }} pack{% plural %}{{ n }} packs{% endblocktrans %}</div></td>
+        <td></td><td class="num">{{ symbol }}{{ total|floatformat:"2g" }}</td></tr>
     </tbody>
   </table>
 

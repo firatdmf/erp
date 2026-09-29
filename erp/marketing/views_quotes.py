@@ -263,10 +263,18 @@ def _quote_page_context(request, pk):
         _quotes_for(request).select_related("contact", "company", "currency", "book", "order"),
         pk=pk)
     items = list(quote.items.select_related("product", "product_variant__product"))
+    # Quantities add up per unit (metres with metres); each line is one
+    # pack, so the pack count is the line count.
+    unit_totals = {}
+    for it in items:
+        unit = (it.unit or "").strip()
+        unit_totals[unit] = unit_totals.get(unit, Decimal("0")) + (it.quantity or Decimal("0"))
     return {
         "quote": quote,
         "items": items,
         "total": sum((it.line_total() for it in items), Decimal("0")),
+        "unit_totals": list(unit_totals.items()),
+        "pack_count": len(items),
         "symbol": (quote.currency.symbol if quote.currency and quote.currency.symbol else
                    (quote.currency.code + " " if quote.currency else "$")),
         "brand_line": brand_name_for(quote.book),

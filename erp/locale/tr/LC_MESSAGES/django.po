@@ -11095,3 +11095,10 @@ msgstr "Sil: %(n)s"
 #, python-format
 msgid "This %(n)s will be permanently removed. A stock-out movement will be recorded so the timeline reflects the deletion."
 msgstr "Bu %(n)s kalıcı olarak silinecek. Zaman çizelgesinin silmeyi göstermesi için bir stok çıkışı kaydedilecek."
+
+#: marketing/templates/marketing/quote_detail.html
+#: marketing/templates/marketing/quote_print.html
+msgid "%(n)s pack"
+msgid_plural "%(n)s packs"
+msgstr[0] "%(n)s paket"
+msgstr[1] "%(n)s paket"

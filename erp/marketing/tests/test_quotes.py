@@ -204,6 +204,18 @@ class QuoteTest(TestCase):
         self.assertFalse(Order.objects.exists())
         self.assertContains(r, "name no catalog product")
 
+    def test_detail_and_print_total_the_metres_and_packs(self):
+        quote = Quote.objects.get(pk=self._save(self._body(items=[
+            {"sku": "V320.ECRU", "quantity": "60.5", "unit": "mt", "price": "2"},
+            {"sku": "V320.ECRU", "quantity": "41.25", "unit": "mt", "price": "2"},
+            {"sku": "V320.ECRU", "quantity": "3", "unit": "pcs", "price": "2"},
+        ])).json()["quote_id"])
+        for page in (self.client.get(reverse("marketing:quote_detail", args=[quote.pk])),
+                     self.client.get(reverse("marketing:quote_print", args=[quote.pk]) + "?html=1")):
+            self.assertContains(page, "101.75 mt")
+            self.assertContains(page, "3 pcs")
+            self.assertContains(page, "3 packs")
+
     def test_a_name_only_quote_cannot_convert(self):
         quote = Quote.objects.get(pk=self._save(self._body(
             customer=None, customer_name="Walk-in Ali",

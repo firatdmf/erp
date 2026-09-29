@@ -88,7 +88,9 @@
         <td class="qd-num">{{ symbol }}{{ it.line_total|floatformat:2 }}</td>
       </tr>
     {% endfor %}
-      <tr class="qd-total"><td colspan="4" style="text-align:right;">{% trans "Total" %}</td><td class="qd-num">{{ symbol }}{{ total|floatformat:2 }}</td></tr>
+      <tr class="qd-total"><td colspan="2" style="text-align:right;">{% trans "Total" %}</td>
+        <td class="qd-num">{% for unit, qty in unit_totals %}<div>{{ qty|floatformat:"-2g" }} {{ unit }}</div>{% endfor %}<div style="font-weight:600; font-size:12px; color:#6B7280;">{% blocktrans count n=pack_count %}{{ n }} pack{% plural %}{{ n }} packs{% endblocktrans %}</div></td>
+        <td></td><td class="qd-num">{{ symbol }}{{ total|floatformat:2 }}</td></tr>
     </tbody>
   </table>
 

@@ -1502,4 +1502,4 @@ from .models_email import (  # noqa: E402,F401
 )
 
 # Quotes — see models_quotes.py; re-exported so marketing.models.Quote resolves.
-from .models_quotes import Quote, QuoteItem  # noqa: E402,F401
+from .models_quotes import Quote, QuoteItem, QuoteItemRoll  # noqa: E402,F401

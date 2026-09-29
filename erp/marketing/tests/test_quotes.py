@@ -204,7 +204,7 @@ class QuoteTest(TestCase):
         self.assertFalse(Order.objects.exists())
         self.assertContains(r, "name no catalog product")
 
-    def test_detail_and_print_total_the_metres_and_packs(self):
+    def test_detail_and_print_total_the_quantities_per_unit(self):
         quote = Quote.objects.get(pk=self._save(self._body(items=[
             {"sku": "V320.ECRU", "quantity": "60.5", "unit": "mt", "price": "2"},
             {"sku": "V320.ECRU", "quantity": "41.25", "unit": "mt", "price": "2"},
@@ -214,7 +214,97 @@ class QuoteTest(TestCase):
                      self.client.get(reverse("marketing:quote_print", args=[quote.pk]) + "?html=1")):
             self.assertContains(page, "101.75 mt")
             self.assertContains(page, "3 pcs")
-            self.assertContains(page, "3 packs")
+            # No line names its rolls, so nothing claims to count them.
+            self.assertNotContains(page, "3 rolls")
+
+    # ── Rolls on a line ──────────────────────────────────────────────
+
+    def _roll(self, barcode, metres, book=None, variant=None):
+        from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
+        book = book or self.book
+        wh, _ = Warehouse.objects.get_or_create(name=f"{book.name} depo", accounting_book=book)
+        wp, _ = WarehouseProduct.objects.get_or_create(
+            warehouse=wh, catalog_variant=variant or self.variant,
+            defaults={"name": "Velvet", "sku": (variant or self.variant).variant_sku})
+        return WarehouseProductItem.objects.create(
+            product=wp, quantity=Decimal(metres), quantity_remaining=Decimal(metres),
+            barcode=barcode, status="in_stock")
+
+    def _hold(self, roll, metres):
+        from operating.models import OrderStockReservation
+        other = Order.objects.create(contact=self.customer)
+        return OrderStockReservation.objects.create(
+            order=other, stock_item=roll, warehouse_product=roll.product, quantity=Decimal(metres))
+
+    def _rolled_quote(self, *rolls):
+        r = self._save(self._body(items=[
+            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+             "rolls": [{"id": roll.pk, "quantity": ""} for roll in rolls]}]))
+        self.assertEqual(r.status_code, 200, r.content)
+        return Quote.objects.get(pk=r.json()["quote_id"])
+
+    def test_a_line_is_the_rolls_it_names(self):
+        a, b = self._roll("R-100", "20.9"), self._roll("R-101", "41.2")
+        quote = self._rolled_quote(a, b)
+        [line] = quote.items.all()
+        self.assertEqual(line.quantity, Decimal("62.10"))          # what the rolls hold, not what was typed
+        self.assertEqual(sorted(line.rolls.values_list("barcode", flat=True)), ["R-100", "R-101"])
+        for page in (self.client.get(reverse("marketing:quote_detail", args=[quote.pk])),
+                     self.client.get(reverse("marketing:quote_print", args=[quote.pk]) + "?html=1")):
+            self.assertContains(page, "R-100")
+            self.assertContains(page, "R-101")
+            self.assertContains(page, "2 rolls")
+        form = self.client.get(reverse("marketing:quote_edit", args=[quote.pk]))
+        self.assertContains(form, "R-101")                        # the form reopens with its rolls
+        # Quoting holds nothing: the rolls stay free for any order.
+        from operating.models import OrderStockReservation
+        self.assertFalse(OrderStockReservation.objects.exists())
+
+    def test_a_roll_already_held_by_an_order_cannot_be_quoted(self):
+        roll = self._roll("R-200", "30")
+        self._hold(roll, "30")
+        r = self._save(self._body(items=[
+            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+             "rolls": [{"id": roll.pk, "quantity": ""}]}]))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("R-200", r.json()["error"])
+
+    def test_rolls_must_be_the_lines_product_on_the_quotes_book(self):
+        other_variant = ProductVariant.objects.create(product=self.product, variant_sku="V320.GREY")
+        for roll in (self._roll("R-300", "10", variant=other_variant),
+                     self._roll("R-301", "10", book=Book.objects.create(name="Ergene Fabric"))):
+            r = self._save(self._body(items=[
+                {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+                 "rolls": [{"id": roll.pk, "quantity": ""}]}]))
+            self.assertEqual(r.status_code, 400, roll.barcode)
+
+    def test_a_roll_taken_after_quoting_is_flagged_and_blocks_conversion(self):
+        roll = self._roll("R-400", "25")
+        quote = self._rolled_quote(roll)
+        self._hold(roll, "10")                                   # 15 m left, 25 m quoted
+        page = self.client.get(reverse("marketing:quote_detail", args=[quote.pk]))
+        self.assertContains(page, "only 15 free")
+        self.assertContains(page, "no longer free")
+        orders = Order.objects.count()
+        self.client.post(reverse("marketing:quote_convert", args=[quote.pk]))
+        self.assertEqual(Order.objects.count(), orders)
+        # A save of some other change keeps the roll rather than failing on it.
+        r = self._save(self._body(notes="Updated", items=[
+            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+             "rolls": [{"id": roll.pk, "quantity": "25"}]}]), pk=quote.pk)
+        self.assertEqual(r.status_code, 200, r.content)
+
+    def test_converting_reserves_the_quoted_rolls(self):
+        a, b = self._roll("R-500", "20"), self._roll("R-501", "40")
+        quote = self._rolled_quote(a, b)
+        self.client.post(reverse("marketing:quote_convert", args=[quote.pk]))
+        quote.refresh_from_db()
+        order = quote.order
+        self.assertIsNotNone(order)
+        [line] = order.items.all()
+        self.assertEqual(line.quantity, Decimal("60.00"))
+        self.assertEqual(sorted((r.stock_item.barcode, r.quantity) for r in line.stock_reservations.all()),
+                         [("R-500", Decimal("20.00")), ("R-501", Decimal("40.00"))])
 
     def test_a_name_only_quote_cannot_convert(self):
         quote = Quote.objects.get(pk=self._save(self._body(

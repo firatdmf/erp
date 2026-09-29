@@ -31,7 +31,7 @@ from marketing.models import Product, ProductVariant
 
 from operating.models import Order, OrderChange, OrderItem
 
-from .models import Quote, QuoteItem
+from .models import Quote, QuoteItem, QuoteItemRoll
 
 
 def _dec(value, default="0"):
@@ -129,11 +129,60 @@ def _resolve_customer(quote, data):
         raise QuoteSaveError(_("Say who the quote is for — a CRM customer or a name."))
 
 
-def _resolve_lines(data):
+def _resolve_rolls(raw_rolls, product, variant, book, already_quoted, taken):
+    """The rolls picked for one line, checked: each is a roll of this
+    line's product on this book's shelves, quoted for no more than it
+    holds. A roll picked just now must also be free of order holds; one
+    the quote already had is kept even if an order has taken it since —
+    the quote pages flag it, and conversion refuses it, but a save of
+    some other change must not fail over it. Returns [(roll, quantity)]."""
+    from operating.models import OrderStockReservation, WarehouseProductItem
+    from django.db.models import Sum
+    out = []
+    for raw in raw_rolls or []:
+        rid = str(raw.get("id") or "").strip()
+        if not rid.isdigit():
+            continue
+        roll = (WarehouseProductItem.objects.select_related("product__warehouse")
+                .filter(pk=int(rid)).first())
+        if roll is None:
+            raise QuoteSaveError(_("A picked roll no longer exists — pick the line's rolls again."))
+        code = roll.barcode or f"#{roll.pk}"
+        wp = roll.product
+        if variant is not None:
+            matches = wp.catalog_variant_id == variant.pk
+        else:
+            matches = bool(product and product.sku and (wp.sku or "").lower() == product.sku.lower())
+        if not matches:
+            raise QuoteSaveError(_("Roll %(roll)s is not a roll of this line's product.") % {"roll": code})
+        if wp.warehouse.accounting_book_id != book.pk:
+            raise QuoteSaveError(_("Roll %(roll)s stands on another book's shelf.") % {"roll": code})
+        if roll.pk in taken:
+            raise QuoteSaveError(_("Roll %(roll)s is on two lines.") % {"roll": code})
+        taken.add(roll.pk)
+        qty = _dec(raw.get("quantity"))
+        phys = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
+        if roll.pk not in already_quoted:
+            held = (OrderStockReservation.objects.filter(stock_item=roll, consumed=False)
+                    .aggregate(s=Sum("quantity"))["s"]) or Decimal("0")
+            phys = (phys or Decimal("0")) - held
+        if roll.status == "consumed" and roll.pk not in already_quoted:
+            phys = Decimal("0")
+        if qty <= 0:
+            qty = phys or Decimal("0")
+        if qty <= 0 or (roll.pk not in already_quoted and qty > phys):
+            raise QuoteSaveError(_("Roll %(roll)s has only %(free)s free.")
+                                 % {"roll": code, "free": max(phys or 0, 0)})
+        out.append((roll, qty))
+    return out
+
+
+def _resolve_lines(data, book=None, already_quoted=frozenset()):
     lines = []
+    taken = set()
     for raw in data.get("items") or []:
         qty = _dec(raw.get("quantity"))
-        if qty <= 0:
+        if qty <= 0 and not raw.get("rolls"):
             continue
         sku = (raw.get("sku") or "").strip()
         product = variant = None
@@ -151,8 +200,17 @@ def _resolve_lines(data):
         unit = (raw.get("unit") or "")[:20].strip()
         if not unit and product is not None:
             unit = getattr(product, "unit", "") or ""
+        rolls = []
+        if raw.get("rolls") and product is not None and book is not None:
+            rolls = _resolve_rolls(raw.get("rolls"), product, variant, book, already_quoted, taken)
+            # The line is the rolls: its quantity is what they add up to,
+            # never a figure typed beside them.
+            qty = sum((q for _r, q in rolls), Decimal("0"))
+        if qty <= 0:
+            continue
         lines.append({"product": product, "variant": variant, "description": description,
-                      "quantity": qty, "unit": unit, "price": _dec(raw.get("price"))})
+                      "quantity": qty, "unit": unit, "price": _dec(raw.get("price")),
+                      "rolls": rolls})
     if not lines:
         raise QuoteSaveError(_("Add at least one line with a quantity."))
     return lines
@@ -190,11 +248,19 @@ class QuoteForm(View):
             return redirect("marketing:quote_detail", pk=pk)
         items = []
         if quote:
+            by_line = {}
+            for link in quote.roll_links():
+                by_line.setdefault(link.quote_item_id, []).append({
+                    "id": link.stock_item_id, "barcode": link.barcode,
+                    "quantity": str(link.quantity), "available": float(link.available),
+                    "state": link.state, "held_by": list(link.held_by),
+                })
             for it in quote.items.select_related("product", "product_variant__product"):
                 items.append({
                     "sku": it.sku(), "label": it.label() if it.product_id else "",
                     "description": it.description, "quantity": str(it.quantity),
                     "unit": it.unit, "price": str(it.price),
+                    "rolls": [r for r in by_line.get(it.pk, []) if r["id"]],
                 })
         current_book = getattr(request, "book", None)
         currencies = list(CurrencyCategory.objects.order_by("code"))
@@ -241,14 +307,21 @@ class QuoteForm(View):
                 code = (data.get("currency") or "").strip().upper()
                 quote.currency = (CurrencyCategory.objects.filter(code=code).first() if code
                                   else None) or _customer_currency(quote) or _base_currency()
-                lines = _resolve_lines(data)
+                already_quoted = (set(QuoteItemRoll.objects.filter(quote_item__quote=quote)
+                                      .values_list("stock_item_id", flat=True))
+                                  if quote.pk else set())
+                lines = _resolve_lines(data, quote.book, already_quoted)
                 quote.save()
                 quote.items.all().delete()
                 for n, line in enumerate(lines, start=1):
-                    QuoteItem.objects.create(
+                    item = QuoteItem.objects.create(
                         quote=quote, line_no=n, product=line["product"],
                         product_variant=line["variant"], description=line["description"],
                         quantity=line["quantity"], unit=line["unit"], price=line["price"])
+                    QuoteItemRoll.objects.bulk_create(
+                        QuoteItemRoll(quote_item=item, stock_item=roll, barcode=roll.barcode or "",
+                                      quantity=qty)
+                        for roll, qty in line["rolls"])
         except QuoteSaveError as exc:
             return JsonResponse({"success": False, "error": str(exc)}, status=400)
         return JsonResponse({"success": True, "quote_id": quote.pk,
@@ -262,19 +335,33 @@ def _quote_page_context(request, pk):
     quote = get_object_or_404(
         _quotes_for(request).select_related("contact", "company", "currency", "book", "order"),
         pk=pk)
+    from marketing import units
     items = list(quote.items.select_related("product", "product_variant__product"))
-    # Quantities add up per unit (metres with metres); each line is one
-    # pack, so the pack count is the line count.
-    unit_totals = {}
+    links = quote.roll_links()
+    by_line = {}
+    for link in links:
+        by_line.setdefault(link.quote_item_id, []).append(link)
+    # Quantities add up per unit (metres with metres). Rolls are counted
+    # by what the product comes packed as — "rolls" for cloth, "boxes"
+    # for boxed goods — and only where a line names its rolls: a line
+    # without them says nothing about how many there are.
+    unit_totals, packs = {}, {}
     for it in items:
+        it.linked_rolls = by_line.get(it.pk, [])
+        it.stale_count = sum(1 for link in it.linked_rolls if link.state != "free")
         unit = (it.unit or "").strip()
         unit_totals[unit] = unit_totals.get(unit, Decimal("0")) + (it.quantity or Decimal("0"))
+        if it.linked_rolls:
+            pack = getattr(it.product, "pack_type", None) or units.DEFAULT_PACK
+            packs[pack] = packs.get(pack, 0) + len(it.linked_rolls)
+            it.pack_label = f"{len(it.linked_rolls)} {units.pack_noun(pack, len(it.linked_rolls))}"
     return {
         "quote": quote,
         "items": items,
         "total": sum((it.line_total() for it in items), Decimal("0")),
         "unit_totals": list(unit_totals.items()),
-        "pack_count": len(items),
+        "pack_totals": [f"{n} {units.pack_noun(pack, n)}" for pack, n in packs.items()],
+        "stale_rolls": [link for link in links if link.state != "free"],
         "symbol": (quote.currency.symbol if quote.currency and quote.currency.symbol else
                    (quote.currency.code + " " if quote.currency else "$")),
         "brand_line": brand_name_for(quote.book),
@@ -323,6 +410,41 @@ def quote_status(request, pk):
     return redirect("marketing:quote_detail", pk=quote.pk)
 
 
+def _order_from_quote(request, quote):
+    """The order, its lines, and a hold on every quoted roll — inside the
+    caller's transaction, so a roll an order took in the last moment
+    undoes the lot rather than leaving an order short of what was quoted."""
+    from operating.views import _create_roll_reservation
+
+    order = Order(notes=quote.notes, contact=quote.contact, company=quote.company,
+                  order_date=date.today(), created_by=request.user)
+    # Priced as quoted, whatever the account's default says — the
+    # customer agreed to these numbers in this currency.
+    order.currency = quote.currency
+    order.save()
+    links = {}
+    for link in QuoteItemRoll.objects.filter(quote_item__quote=quote).select_related("stock_item"):
+        links.setdefault(link.quote_item_id, []).append(link)
+    for it in quote.items.select_related("product", "product_variant"):
+        line = OrderItem.objects.create(
+            order=order, product=it.product, product_variant=it.product_variant,
+            description=it.description, quantity=it.quantity, price=it.price)
+        for link in links.get(it.pk, []):
+            held, capped, err = (None, False, "gone") if link.stock_item is None else \
+                _create_roll_reservation(order, line, link.stock_item, link.quantity, request.user)
+            if err or capped:
+                raise QuoteSaveError(_("Roll %(roll)s is no longer free — edit the quote to drop "
+                                       "or replace it.") % {"roll": link.barcode or "?"})
+    quote.status = "accepted"
+    quote.order = order
+    quote.save(update_fields=["status", "order", "updated_at"])
+    OrderChange.objects.create(
+        order=order, action="field", field="quote",
+        new_value=_("Created from quote %(number)s") % {"number": quote.number},
+        created_by=request.user)
+    return order
+
+
 @login_required
 @require_POST
 def quote_convert(request, pk):
@@ -343,24 +465,12 @@ def quote_convert(request, pk):
         return redirect("marketing:quote_detail", pk=quote.pk)
 
     member = getattr(request.user, "member", None)
-    with transaction.atomic():
-        order = Order(notes=quote.notes, contact=quote.contact, company=quote.company,
-                      order_date=date.today(), created_by=request.user)
-        # Priced as quoted, whatever the account's default says — the
-        # customer agreed to these numbers in this currency.
-        order.currency = quote.currency
-        order.save()
-        for it in quote.items.select_related("product", "product_variant"):
-            OrderItem.objects.create(
-                order=order, product=it.product, product_variant=it.product_variant,
-                description=it.description, quantity=it.quantity, price=it.price)
-        quote.status = "accepted"
-        quote.order = order
-        quote.save(update_fields=["status", "order", "updated_at"])
-        OrderChange.objects.create(
-            order=order, action="field", field="quote",
-            new_value=_("Created from quote %(number)s") % {"number": quote.number},
-            created_by=request.user)
+    try:
+        with transaction.atomic():
+            order = _order_from_quote(request, quote)
+    except QuoteSaveError as exc:
+        messages.error(request, str(exc))
+        return redirect("marketing:quote_detail", pk=quote.pk)
 
     # The same finishing an order gets from the create form — outside the
     # transaction, as there: a ledger hiccup warns rather than undoing an

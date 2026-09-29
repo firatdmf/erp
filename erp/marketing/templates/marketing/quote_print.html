@@ -94,6 +94,7 @@
     table.items tbody td.no { color: #6B7280; }
     table.items .pname { font-weight: bold; color: #0F1419; }
     table.items .pdesc { color: #4B5563; font-size: 8.67pt; margin-top: 1pt; }
+    table.items .rolls { color: #4B5563; font-size: 8pt; margin-top: 2pt; line-height: 1.35; }
     table.items .sku { font-family: "Courier", monospace; font-size: 0.8em; font-weight: normal; color: #4B5563; }
     /* The total is a row of the body, not a <tfoot>, which would repeat
        at the foot of every printed page as if it were that page's total. */
@@ -211,6 +212,7 @@
           <div class="pname">{{ it.label }}</div>
           {% if it.product_id and it.sku %}<div class="sku">{{ it.sku }}</div>{% endif %}
           {% if it.product_id and it.description %}<div class="pdesc">{{ it.description }}</div>{% endif %}
+          {% if it.linked_rolls %}<div class="rolls"><b>{{ it.pack_label }}:</b> {% for r in it.linked_rolls %}{{ r.barcode|default:"—" }} ({{ r.quantity|floatformat:"-2g" }}){% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
         </td>
         <td class="num">{{ it.quantity|floatformat:"-2g" }} {{ it.unit }}</td>
         <td class="num">{{ symbol }}{{ it.price|floatformat:"2g" }}</td>
@@ -220,7 +222,7 @@
       <tr><td colspan="5" style="text-align: center; color: #6B7280; padding: 18pt;">{% trans "No items." %}</td></tr>
     {% endfor %}
       <tr class="grand"><td colspan="2" class="lbl">{% trans "Total" %}</td>
-        <td class="num">{% for unit, qty in unit_totals %}<div>{{ qty|floatformat:"-2g" }} {{ unit }}</div>{% endfor %}<div style="font-size: 9pt; color: #6B7280;">{% blocktrans count n=pack_count %}{{ n }} pack{% plural %}{{ n }} packs{% endblocktrans %}</div></td>
+        <td class="num">{% for unit, qty in unit_totals %}<div>{{ qty|floatformat:"-2g" }} {{ unit }}</div>{% endfor %}{% for p in pack_totals %}<div style="font-size: 9pt; color: #6B7280;">{{ p }}</div>{% endfor %}</td>
         <td></td><td class="num">{{ symbol }}{{ total|floatformat:"2g" }}</td></tr>
     </tbody>
   </table>

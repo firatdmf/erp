@@ -117,7 +117,45 @@ class Quote(models.Model):
         if free:
             why.append(_("These lines name no catalog product: %(lines)s")
                        % {"lines": ", ".join(free)})
+        stale = [link for link in self.roll_links() if link.state != "free"]
+        if stale:
+            shown = ", ".join(link.barcode or "?" for link in stale[:10])
+            if len(stale) > 10:
+                shown += " …"
+            why.append(_("%(n)s quoted rolls are no longer free — edit the quote to "
+                         "drop or replace them: %(rolls)s") % {"n": len(stale), "rolls": shown})
         return why
+
+    def roll_links(self):
+        """Every roll quoted on this quote, each with how much of it is
+        free right now (`available`), whether that still covers what was
+        quoted (`state`), and which orders hold it (`held_by`). Free means
+        on the shelf and not reserved for an order — the same measure the
+        order form's roll list uses. Two queries for the whole quote."""
+        from django.db.models import Sum
+        from operating.models import OrderStockReservation
+
+        links = list(QuoteItemRoll.objects.filter(quote_item__quote=self)
+                     .select_related("stock_item"))
+        roll_ids = [link.stock_item_id for link in links if link.stock_item_id]
+        reserved, held_by = {}, {}
+        for sid, qty, number in (OrderStockReservation.objects
+                                 .filter(stock_item_id__in=roll_ids, consumed=False)
+                                 .values_list("stock_item_id", "quantity", "order__order_number")):
+            reserved[sid] = reserved.get(sid, Decimal("0")) + (qty or Decimal("0"))
+            held_by.setdefault(sid, []).append(number or "?")
+        for link in links:
+            roll = link.stock_item
+            if roll is None or roll.status == "consumed":
+                link.available, link.state, link.held_by = Decimal("0"), "gone", ()
+                continue
+            phys = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
+            free = (phys or Decimal("0")) - reserved.get(roll.pk, Decimal("0"))
+            link.available = free if free > 0 else Decimal("0")
+            link.held_by = tuple(held_by.get(roll.pk, ()))
+            link.state = ("free" if link.available >= link.quantity else
+                          "short" if link.available > 0 else "gone")
+        return links
 
     @property
     def can_convert(self):
@@ -155,3 +193,31 @@ class QuoteItem(models.Model):
 
     def line_total(self):
         return (self.quantity or Decimal("0")) * (self.price or Decimal("0"))
+
+
+class QuoteItemRoll(models.Model):
+    """One physical roll offered on a quote line — the barcode the
+    customer is being quoted, not a hold on it. A quote may sit for weeks
+    and most never become orders, so linking a roll here reserves
+    nothing: the roll stays free for any order to take, and the quote
+    says so when one has (see Quote.roll_links). The order a quote
+    becomes is what reserves them."""
+
+    quote_item = models.ForeignKey(QuoteItem, related_name="rolls", on_delete=models.CASCADE)
+    # SET_NULL: a roll deleted from the warehouse leaves its barcode on the
+    # quote, marked gone, rather than silently shrinking the line.
+    stock_item = models.ForeignKey("operating.WarehouseProductItem", on_delete=models.SET_NULL,
+                                   null=True, blank=True, related_name="quote_links")
+    barcode = models.CharField(max_length=64, blank=True)
+    # How much of the roll is quoted, in the product's unit — all of what
+    # was free when it was picked, unless cut down on the form.
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ["pk"]
+
+    # Filled in by Quote.roll_links(), which reads every roll's standing
+    # in one pass.
+    available = None
+    state = None          # "free" | "short" | "gone"
+    held_by = ()          # order numbers holding the roll now

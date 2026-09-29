@@ -28,6 +28,14 @@
   .qd-note { margin-top:12px; padding:10px 14px; border-radius:10px; font-size:12.5px; line-height:1.45; }
   .qd-note.warn { background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; }
   .qd-note.ok { background:#ECFDF5; border:1px solid #A7F3D0; color:#065F46; }
+  .qd-rolls { margin-top:5px; }
+  .qd-rolls summary { cursor:pointer; font:600 12px var(--font-sans); color:#0B5F60; list-style:none; }
+  .qd-rolls summary::-webkit-details-marker { display:none; }
+  .qd-rolls summary .bad { color:#B91C1C; }
+  .qd-roll-list { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .qd-roll { display:inline-flex; gap:5px; padding:2px 8px; border-radius:6px; background:#F1F5F9; font:500 11.5px var(--font-sans); color:#334155; font-variant-numeric:tabular-nums; }
+  .qd-roll b { font-weight:700; }
+  .qd-roll.short, .qd-roll.gone { background:#FEF2F2; color:#B91C1C; }
   @media (max-width: 640px) { .qd { padding: 12px 12px 80px; } }
 </style>
 {% endblock %}
@@ -82,14 +90,24 @@
     {% for it in items %}
       <tr>
         <td style="color:#94A3B8;">{{ it.line_no }}</td>
-        <td><b>{{ it.label }}</b>{% if it.sku and it.product_id %}<div style="font-size:11px; color:#94A3B8;">{{ it.sku }}</div>{% endif %}{% if it.product_id and it.description %}<div style="font-size:12px; color:#6B7280;">{{ it.description }}</div>{% endif %}</td>
+        <td><b>{{ it.label }}</b>{% if it.sku and it.product_id %}<div style="font-size:11px; color:#94A3B8;">{{ it.sku }}</div>{% endif %}{% if it.product_id and it.description %}<div style="font-size:12px; color:#6B7280;">{{ it.description }}</div>{% endif %}
+          {% if it.linked_rolls %}
+          <details class="qd-rolls">
+            <summary><i class="fa fa-scroll"></i> {{ it.pack_label }}{% if it.stale_count %} <span class="bad">· {% blocktrans count n=it.stale_count %}{{ n }} no longer free{% plural %}{{ n }} no longer free{% endblocktrans %}</span>{% endif %}</summary>
+            <div class="qd-roll-list">
+            {% for r in it.linked_rolls %}
+              <span class="qd-roll {{ r.state }}" {% if r.state != 'free' %}title="{% if r.held_by %}{% trans 'Reserved for' %} {{ r.held_by|join:', ' }}{% endif %}"{% endif %}><b>{{ r.barcode|default:"—" }}</b> {{ r.quantity|floatformat:"-2g" }} {{ it.unit }}{% if r.state == 'short' %} · {% blocktrans with free=r.available|floatformat:"-2g" %}only {{ free }} free{% endblocktrans %}{% elif r.state == 'gone' %} · {% trans "gone" %}{% endif %}</span>
+            {% endfor %}
+            </div>
+          </details>
+          {% endif %}</td>
         <td class="qd-num">{{ it.quantity|floatformat:"-2" }} {{ it.unit }}</td>
         <td class="qd-num">{{ symbol }}{{ it.price|floatformat:2 }}</td>
         <td class="qd-num">{{ symbol }}{{ it.line_total|floatformat:2 }}</td>
       </tr>
     {% endfor %}
       <tr class="qd-total"><td colspan="2" style="text-align:right;">{% trans "Total" %}</td>
-        <td class="qd-num">{% for unit, qty in unit_totals %}<div>{{ qty|floatformat:"-2g" }} {{ unit }}</div>{% endfor %}<div style="font-weight:600; font-size:12px; color:#6B7280;">{% blocktrans count n=pack_count %}{{ n }} pack{% plural %}{{ n }} packs{% endblocktrans %}</div></td>
+        <td class="qd-num">{% for unit, qty in unit_totals %}<div>{{ qty|floatformat:"-2g" }} {{ unit }}</div>{% endfor %}{% for p in pack_totals %}<div style="font-weight:600; font-size:12px; color:#6B7280;">{{ p }}</div>{% endfor %}</td>
         <td></td><td class="qd-num">{{ symbol }}{{ total|floatformat:2 }}</td></tr>
     </tbody>
   </table>
@@ -99,6 +117,11 @@
   {% endif %}
 
   {% if quote.can_edit %}
+    {% if stale_rolls %}
+    <div class="qd-note warn"><i class="fa fa-triangle-exclamation"></i>
+      {% blocktrans count n=stale_rolls|length %}{{ n }} quoted roll is no longer free: an order has reserved it or it was used since the quote was written.{% plural %}{{ n }} quoted rolls are no longer free: orders have reserved them or they were used since the quote was written.{% endblocktrans %}
+      {% trans "They are marked red on their lines." %}</div>
+    {% endif %}
     {% if blockers %}
     <div class="qd-note warn" id="qd-blockers"><i class="fa fa-circle-info"></i> {% trans "This quote can't become an order yet:" %}
       <ul style="margin:6px 0 0 18px; padding:0;">{% for why in blockers %}<li>{{ why }}</li>{% endfor %}</ul>

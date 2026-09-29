@@ -11096,9 +11096,94 @@ msgstr "Sil: %(n)s"
 msgid "This %(n)s will be permanently removed. A stock-out movement will be recorded so the timeline reflects the deletion."
 msgstr "Bu %(n)s kalıcı olarak silinecek. Zaman çizelgesinin silmeyi göstermesi için bir stok çıkışı kaydedilecek."
 
-#: marketing/templates/marketing/quote_detail.html
-#: marketing/templates/marketing/quote_print.html
-msgid "%(n)s pack"
-msgid_plural "%(n)s packs"
-msgstr[0] "%(n)s paket"
-msgstr[1] "%(n)s paket"
+#: marketing quotes — rolls on a line
+msgid "A picked roll no longer exists — pick the line's rolls again."
+msgstr "Seçilen bir top artık yok — satırın toplarını yeniden seçin."
+
+#, python-format
+msgid "Roll %(roll)s is not a roll of this line's product."
+msgstr "%(roll)s topu bu satırın ürününe ait değil."
+
+#, python-format
+msgid "Roll %(roll)s stands on another book's shelf."
+msgstr "%(roll)s topu başka bir defterin rafında."
+
+#, python-format
+msgid "Roll %(roll)s is on two lines."
+msgstr "%(roll)s topu iki satırda."
+
+#, python-format
+msgid "Roll %(roll)s has only %(free)s free."
+msgstr "%(roll)s topunda yalnızca %(free)s boş."
+
+#, python-format
+msgid "Roll %(roll)s is no longer free — edit the quote to drop or replace it."
+msgstr "%(roll)s topu artık boşta değil — teklifi düzenleyip çıkarın ya da değiştirin."
+
+#, python-format
+msgid "%(n)s quoted rolls are no longer free — edit the quote to drop or replace them: %(rolls)s"
+msgstr "Teklifteki %(n)s top artık boşta değil — teklifi düzenleyip çıkarın ya da değiştirin: %(rolls)s"
+
+#, python-format
+msgid "only %(free)s free"
+msgstr "yalnızca %(free)s boş"
+
+msgid "gone"
+msgstr "yok"
+
+msgid "Reserved for"
+msgstr "Rezerve:"
+
+msgid "They are marked red on their lines."
+msgstr "Satırlarında kırmızıyla işaretli."
+
+msgid "Pick rolls"
+msgstr "Top seç"
+
+msgid "1 roll picked"
+msgstr "1 top seçildi"
+
+#, python-format
+msgid "%(n)s rolls picked"
+msgstr "%(n)s top seçildi"
+
+#, python-format
+msgid "not free any more: %(n)s"
+msgstr "artık boşta değil: %(n)s"
+
+msgid "Loading free rolls…"
+msgstr "Boştaki toplar yükleniyor…"
+
+msgid "No free rolls of this product on this book’s shelves."
+msgstr "Bu defterin raflarında bu ürünün boşta topu yok."
+
+msgid "No free roll of this product has that barcode on this book’s shelves."
+msgstr "Bu defterin raflarında bu barkodla boşta bir top yok."
+
+msgid "free"
+msgstr "boş"
+
+msgid "reserved for"
+msgstr "rezerve:"
+
+#, python-format
+msgid "only %(n)s free"
+msgstr "yalnızca %(n)s boş"
+
+msgid "Scan or type a barcode, then Enter"
+msgstr "Barkodu okutun ya da yazın, sonra Enter"
+
+msgid "The picked rolls were cleared: they stand on the other book’s shelves."
+msgstr "Seçilen toplar temizlendi: diğer defterin raflarındalar."
+
+#, python-format
+msgid "%(n)s no longer free"
+msgid_plural "%(n)s no longer free"
+msgstr[0] "%(n)s artık boşta değil"
+msgstr[1] "%(n)s artık boşta değil"
+
+#, python-format
+msgid "%(n)s quoted roll is no longer free: an order has reserved it or it was used since the quote was written."
+msgid_plural "%(n)s quoted rolls are no longer free: orders have reserved them or they were used since the quote was written."
+msgstr[0] "Teklifteki %(n)s top artık boşta değil: teklif yazıldıktan sonra siparişe rezerve edildi ya da kullanıldı."
+msgstr[1] "Teklifteki %(n)s top artık boşta değil: teklif yazıldıktan sonra siparişe rezerve edildi ya da kullanıldı."

@@ -41,6 +41,19 @@
   .qf-bar { position:sticky; bottom:0; display:flex; justify-content:flex-end; gap:10px; padding:12px 0; background:rgba(255,255,255,.94); backdrop-filter:blur(8px); border-top:1px solid #EEF2F6; }
   .qf-btn { padding:10px 18px; border-radius:10px; border:1px solid #E0E6EE; background:#fff; font:700 13px var(--font-sans); cursor:pointer; }
   .qf-btn.primary { background:linear-gradient(180deg,#16897D,#0F6B62); border-color:#0F6B62; color:#fff; }
+  /* A line's rolls: a toggle under the product, opening the free rolls of
+     that product on the quote's book's shelves. */
+  .qf-roll-toggle { margin-top:5px; padding:3px 9px; border:1px solid #CFE3E0; border-radius:7px; background:#F6FAFA; color:#005354; font:700 11.5px var(--font-sans); cursor:pointer; }
+  .qf-roll-toggle.bad { border-color:#FCA5A5; background:#FEF2F2; color:#B91C1C; }
+  .qf-roll-panel { margin-top:6px; padding:8px; border:1px solid #E2E8EE; border-radius:9px; background:#FBFCFD; }
+  .qf-roll-panel .qf-in { height:32px; }
+  .qf-roll-msg { font-size:11.5px; color:#6B7280; margin:6px 2px 0; }
+  .qf-roll-msg.err { color:#B91C1C; font-weight:600; }
+  .qf-roll-rows { max-height:240px; overflow-y:auto; margin-top:6px; }
+  .qf-roll-row { display:grid; grid-template-columns: 22px 1fr 90px; gap:6px; align-items:center; padding:3px 2px; font:500 12px var(--font-sans); font-variant-numeric:tabular-nums; }
+  .qf-roll-row small { color:#94A3B8; }
+  .qf-roll-row.bad { color:#B91C1C; }
+  .qf-roll-row .qf-roll-qty { height:28px; padding:0 6px; text-align:right; }
   .qf-err { display:none; margin-bottom:12px; padding:10px 14px; border-radius:10px; background:#FEF2F2; border:1px solid #FCA5A5; color:#B91C1C; font-weight:600; }
   @media (max-width: 640px) { .qf { padding: 12px 12px 120px; } .qf-lines { table-layout:auto; } .qf-lines colgroup, .qf-lines thead { display:none; } .qf-lines tr { display:grid; grid-template-columns: 1fr 1fr; gap:6px; padding:8px 0; border-bottom:1px solid #F1F5F9; } .qf-lines td { padding:0; } .qf-lines td:first-child { grid-column: 1 / -1; } }
 </style>
@@ -112,6 +125,7 @@
 (function () {
   const CUST_URL = "{% url 'crm:customer_autocomplete' %}";
   const PROD_URL = "{% url 'marketing:quote_product_search' %}";
+  const ROLL_URL = "{% url 'operating:order_create_roll_list' %}";
   const SAVE_URL = "{% if quote %}{% url 'marketing:quote_edit' quote.pk %}{% else %}{% url 'marketing:quote_create' %}{% endif %}";
   const CSRF = "{{ csrf_token }}";
   const initial = {{ items_json|safe }};
@@ -213,6 +227,11 @@
         '<input type="hidden" class="qf-sku" value="' + esc(data.sku || '') + '">' +
         '<div class="qf-ac-list qf-prod-results"></div>' +
         '<div class="qf-picked" style="font-size:11px; color:#0B5F60; margin-top:3px; ' + (data.sku ? '' : 'display:none;') + '"><i class="fa fa-tag"></i> <span>' + esc(data.sku || '') + '</span></div>' +
+      '</div>' +
+      '<button type="button" class="qf-roll-toggle" style="display:none;"></button>' +
+      '<div class="qf-roll-panel" style="display:none;">' +
+        '<input class="qf-in qf-roll-scan" placeholder="{% trans "Scan or type a barcode, then Enter" %}" autocomplete="off">' +
+        '<div class="qf-roll-msg"></div><div class="qf-roll-rows"></div>' +
       '</div></td>' +
       '<td><input class="qf-in qf-qty qf-num" type="number" inputmode="decimal" step="0.01" min="0" value="' + esc(data.quantity || '') + '" oninput="qfRecalc()"></td>' +
       '<td><input class="qf-in qf-unit" value="' + esc(data.unit || '') + '"></td>' +
@@ -220,12 +239,19 @@
       '<td class="qf-num qf-amount-cell"><span class="qf-amount"></span></td>' +
       '<td><button type="button" class="qf-x" title="{% trans "Remove" %}" onclick="this.closest(\'tr\').remove(); qfRecalc();">×</button></td>';
     rows.appendChild(tr);
+    // The line's rolls, by stock item id. Saved ones arrive picked, with
+    // how they stand now; the free ones on the shelf join when the panel
+    // opens.
+    tr._rolls = new Map();
+    (data.rolls || []).forEach(r => tr._rolls.set(String(r.id), Object.assign({ picked: true }, r)));
+    setupRolls(tr);
     const desc = tr.querySelector('.qf-desc'), sku = tr.querySelector('.qf-sku');
     const list = tr.querySelector('.qf-prod-results'), picked = tr.querySelector('.qf-picked');
     let t = null;
     desc.addEventListener('input', () => {
       // Typing again means the line is no longer the product picked.
-      sku.value = ''; picked.style.display = 'none';
+      if (sku.value) { sku.value = ''; resetRolls(tr); }
+      picked.style.display = 'none';
       clearTimeout(t);
       const q = desc.value.trim();
       if (q.length < 2) { list.style.display = 'none'; return; }
@@ -241,7 +267,8 @@
     });
     list.addEventListener('click', (e) => {
       const row = e.target.closest('.qf-ac-row'); if (!row) return;
-      desc.value = row.dataset.label; sku.value = row.dataset.sku;
+      desc.value = row.dataset.label;
+      if (sku.value !== row.dataset.sku) { sku.value = row.dataset.sku; resetRolls(tr); }
       picked.querySelector('span').textContent = row.dataset.sku; picked.style.display = '';
       const unit = tr.querySelector('.qf-unit'); if (!unit.value) unit.value = row.dataset.unit || '';
       const price = tr.querySelector('.qf-price'); if (!price.value && row.dataset.price) price.value = row.dataset.price;
@@ -252,6 +279,136 @@
     if (!data.sku && !data.description && !data.label) desc.focus();
     qfRecalc();
   };
+  // ── Rolls ───────────────────────────────────────────────────────
+  const ROLL_TXT = {
+    pick: "{% trans 'Pick rolls' %}",
+    one: "{% trans '1 roll picked' %}",
+    many: "{% trans '%(n)s rolls picked' %}",
+    stale: "{% trans 'not free any more: %(n)s' %}",
+    loading: "{% trans 'Loading free rolls…' %}",
+    none: "{% trans 'No free rolls of this product on this book’s shelves.' %}",
+    notFound: "{% trans 'No free roll of this product has that barcode on this book’s shelves.' %}",
+    free: "{% trans 'free' %}",
+    reserved: "{% trans 'reserved for' %}",
+    onlyFree: "{% trans 'only %(n)s free' %}",
+    gone: "{% trans 'gone' %}",
+  };
+  function picked(tr) { return [...tr._rolls.values()].filter(r => r.picked); }
+  function resetRolls(tr) {
+    tr._rolls = new Map(); tr._rollsLoaded = false;
+    tr.querySelector('.qf-roll-panel').style.display = 'none';
+    tr.querySelector('.qf-qty').readOnly = false;
+    paintRollToggle(tr);
+  }
+  function paintRollToggle(tr) {
+    const btn = tr.querySelector('.qf-roll-toggle');
+    btn.style.display = tr.querySelector('.qf-sku').value ? '' : 'none';
+    const p = picked(tr), bad = p.filter(r => r.state && r.state !== 'free').length;
+    btn.innerHTML = '<i class="fa fa-scroll"></i> ' + esc(!p.length ? ROLL_TXT.pick :
+      p.length === 1 ? ROLL_TXT.one : ROLL_TXT.many.replace('%(n)s', p.length)) +
+      (bad ? ' · ' + esc(ROLL_TXT.stale.replace('%(n)s', bad)) : '');
+    btn.classList.toggle('bad', !!bad);
+  }
+  function rollNote(r) {
+    if (!r.state || r.state === 'free') return FMT.format(r.available || 0) + ' ' + esc(r.unit || '') + ' ' + ROLL_TXT.free;
+    if (r.state === 'short') return esc(ROLL_TXT.onlyFree.replace('%(n)s', FMT.format(r.available || 0)));
+    return esc(r.held_by && r.held_by.length ? ROLL_TXT.reserved + ' ' + r.held_by.join(', ') : ROLL_TXT.gone);
+  }
+  function paintRolls(tr) {
+    const box = tr.querySelector('.qf-roll-rows');
+    const all = [...tr._rolls.values()];
+    box.innerHTML = all.map(r =>
+      '<label class="qf-roll-row' + (r.state && r.state !== 'free' ? ' bad' : '') + '" data-id="' + esc(r.id) + '">' +
+        '<input type="checkbox" class="qf-roll-pick"' + (r.picked ? ' checked' : '') + '>' +
+        '<span><b>' + esc(r.barcode || '—') + '</b> <small>' + esc(r.warehouse || '') + '</small><br><small>' + rollNote(r) + '</small></span>' +
+        '<input class="qf-in qf-roll-qty qf-num" type="number" inputmode="decimal" step="0.01" min="0" value="' + esc(r.quantity || '') + '"' + (r.picked ? '' : ' disabled') + '>' +
+      '</label>').join('');
+    const msg = tr.querySelector('.qf-roll-msg');
+    if (tr._rollsLoaded && !all.length) { msg.textContent = ROLL_TXT.none; msg.className = 'qf-roll-msg'; }
+  }
+  function applyRolls(tr) {
+    const p = picked(tr), qty = tr.querySelector('.qf-qty');
+    qty.readOnly = p.length > 0;
+    if (p.length) {
+      qty.value = p.reduce((a, r) => a + num(r.quantity), 0).toFixed(2);
+      const unit = tr.querySelector('.qf-unit');
+      if (!unit.value && p[0].unit) unit.value = p[0].unit;
+    }
+    paintRollToggle(tr);
+    qfRecalc();
+  }
+  async function loadRolls(tr) {
+    const msg = tr.querySelector('.qf-roll-msg');
+    msg.textContent = ROLL_TXT.loading; msg.className = 'qf-roll-msg';
+    try {
+      const r = await fetch(ROLL_URL + '?sku=' + encodeURIComponent(tr.querySelector('.qf-sku').value) +
+                            '&book=' + encodeURIComponent(document.getElementById('qf-book').value));
+      const d = await r.json();
+      msg.textContent = '';
+      (d.rolls || []).forEach(x => {
+        const id = String(x.id), have = tr._rolls.get(id);
+        const fresh = { id: id, barcode: x.barcode, warehouse: x.warehouse, unit: x.unit,
+                        available: x.available, state: 'free' };
+        if (have) {
+          // Picked on the saved quote and still free: say how much is.
+          Object.assign(have, { warehouse: x.warehouse, unit: x.unit, available: x.available,
+                                state: num(have.quantity) <= x.available ? 'free' : 'short' });
+        } else {
+          tr._rolls.set(id, Object.assign(fresh, { picked: false, quantity: x.available }));
+        }
+      });
+      tr._rollsLoaded = true;
+    } catch (e) { msg.textContent = ''; }
+    paintRolls(tr);
+  }
+  function setupRolls(tr) {
+    const btn = tr.querySelector('.qf-roll-toggle'), panel = tr.querySelector('.qf-roll-panel');
+    btn.addEventListener('click', () => {
+      const open = panel.style.display === 'none';
+      panel.style.display = open ? '' : 'none';
+      if (open) { paintRolls(tr); if (!tr._rollsLoaded) loadRolls(tr); tr.querySelector('.qf-roll-scan').focus(); }
+    });
+    panel.addEventListener('change', (e) => {
+      const row = e.target.closest('.qf-roll-row'); if (!row) return;
+      const r = tr._rolls.get(row.dataset.id);
+      if (e.target.classList.contains('qf-roll-pick')) {
+        r.picked = e.target.checked;
+        row.querySelector('.qf-roll-qty').disabled = !r.picked;
+      }
+      applyRolls(tr);
+    });
+    panel.addEventListener('input', (e) => {
+      if (!e.target.classList.contains('qf-roll-qty')) return;
+      tr._rolls.get(e.target.closest('.qf-roll-row').dataset.id).quantity = e.target.value;
+      applyRolls(tr);
+    });
+    const scan = tr.querySelector('.qf-roll-scan');
+    scan.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const code = scan.value.trim().toLowerCase(); if (!code) return;
+      const r = [...tr._rolls.values()].find(x => (x.barcode || '').toLowerCase() === code);
+      const msg = tr.querySelector('.qf-roll-msg');
+      if (!r) { msg.textContent = ROLL_TXT.notFound; msg.className = 'qf-roll-msg err'; return; }
+      msg.textContent = ''; r.picked = true; scan.value = '';
+      paintRolls(tr); applyRolls(tr);
+    });
+    paintRollToggle(tr);
+    if (picked(tr).length) tr.querySelector('.qf-qty').readOnly = true;
+  }
+  // Rolls stand on one book's shelves; a quote moved to another book
+  // cannot keep them.
+  document.getElementById('qf-book').addEventListener('change', () => {
+    let cleared = false;
+    rows.querySelectorAll('tr').forEach(tr => { if (picked(tr).length) cleared = true; resetRolls(tr); });
+    if (cleared) {
+      const err = document.getElementById('qf-err');
+      err.textContent = "{% trans 'The picked rolls were cleared: they stand on the other book’s shelves.' %}";
+      err.style.display = 'block';
+    }
+    qfRecalc();
+  });
+
   window.qfRecalc = function () {
     let total = 0;
     rows.querySelectorAll('tr').forEach(tr => {
@@ -275,6 +432,7 @@
         quantity: tr.querySelector('.qf-qty').value,
         unit: tr.querySelector('.qf-unit').value.trim(),
         price: tr.querySelector('.qf-price').value,
+        rolls: sku ? picked(tr).map(r => ({ id: r.id, quantity: r.quantity })) : [],
       });
     });
     const type = document.getElementById('qf-cust-type').value, pk = document.getElementById('qf-cust-pk').value;

@@ -290,7 +290,15 @@ class QuoteTest(TestCase):
         own, other = self._roll("R-600", "20"), self._roll("R-601", "30", book=ergene)
         quote = self._rolled_quote(own, other)                   # one line, rolls on two books' shelves
         page = self.client.get(reverse("marketing:quote_detail", args=[quote.pk]))
-        self.assertContains(page, "Ergene Fabric")               # the other book's roll is labelled
+        # The page shows the orders the quote would become: the one line
+        # under each book, with that book's roll and metres.
+        [own, other] = page.context["book_groups"]
+        self.assertEqual((own.book, other.book), (self.book, ergene))
+        self.assertEqual([(p.quantity, [r.barcode for r in p.rolls]) for p in own.parts],
+                         [(Decimal("20.00"), ["R-600"])])
+        self.assertEqual([(p.quantity, [r.barcode for r in p.rolls]) for p in other.parts],
+                         [(Decimal("30.00"), ["R-601"])])
+        self.assertContains(page, "R-601")                       # barcodes show whatever book
         self.client.post(reverse("marketing:quote_convert", args=[quote.pk]))
         quote.refresh_from_db()
         lead = quote.order

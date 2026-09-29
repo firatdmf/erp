@@ -3,133 +3,315 @@
 {% block css %}
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  .qd { --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif; --ink:#0F1419; padding: 22px 28px 80px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 1000px; }
-  .qd-back { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#fff; border:1px solid #E0E6EE; border-radius:8px; font:600 12.5px var(--font-sans); color:#4B5563; text-decoration:none; cursor:pointer; }
-  .qd-back.primary { background:linear-gradient(180deg,#16897D,#0F6B62); border-color:#0F6B62; color:#fff; }
-  .qd-back.danger { color:#B91C1C; border-color:#FCA5A5; }
-  .qd-back[disabled] { opacity:.45; cursor:not-allowed; }
-  .qd-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin:14px 0 18px; }
-  .qd-eyebrow { font:700 11px var(--font-sans); text-transform:uppercase; letter-spacing:.08em; color:#6B7280; }
-  .qd-title { margin:2px 0 0; font:800 24px var(--font-sans); }
-  .qd-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .qd-badge { display:inline-block; padding:3px 10px; border-radius:999px; font:700 11px var(--font-sans); }
+  /* Laid out like the order page (operating/order_detail.html) — the
+     quote is the order before it is one, so the two should read alike:
+     crumbs, a mono title with its status, a products card on the left
+     with the lines under the book each will be ordered in, and the
+     customer and terms on the right. */
+  .qd { --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --ink:#0F1419; --gray-400:#A0A8B0; --gray-500:#6B7280; --gray-600:#4B5563; --gray-700:#374151;
+        padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
+
+  /* CRUMBS */
+  .qd-crumbs { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .qd-btn { display:inline-flex; align-items:center; gap:7px; padding:7px 13px; background:#fff; border:1px solid #E0E6EE;
+    border-radius:9px; font:600 12.5px var(--font-sans); color:var(--gray-700); text-decoration:none; cursor:pointer;
+    box-shadow:0 1px 2px rgba(15,23,31,.04); transition:all 140ms; }
+  .qd-btn:hover { border-color:#147F74; color:#005354; }
+  .qd-btn.primary { background:linear-gradient(180deg,#16897D,#0F6B62); border-color:#0F6B62; color:#fff; }
+  .qd-btn.danger { color:#B91C1C; border-color:#FCA5A5; }
+  .qd-btn[disabled] { opacity:.45; cursor:not-allowed; }
+  .qd-sep { color:var(--gray-400); }
+  .qd-crumb-here { font:600 12.5px var(--font-mono); color:var(--gray-700); }
+
+  /* HEAD */
+  .qd-head { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px;
+    padding-bottom:18px; border-bottom:1px solid #E2E8EE; flex-wrap:wrap; }
+  .qd-head-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .qd-title { font:800 28px var(--font-mono); letter-spacing:.01em; margin:0; }
+  .qd-meta { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font:500 12.5px var(--font-sans); color:var(--gray-600); }
+  .qd-meta i { margin-right:5px; color:var(--gray-500); }
+  .qd-dot { width:3px; height:3px; background:#C5CCD3; border-radius:50%; display:inline-block; }
+  .qd-head-r { display:flex; gap:8px; flex:1 1 0; min-width:0; flex-wrap:wrap; justify-content:flex-end; }
+  .qd-head-r form { display:inline; }
+  .qd-badge { display:inline-block; padding:4px 11px; border-radius:999px; font:700 11.5px var(--font-sans); }
   .qd-badge.draft { background:#F1F5F9; color:#475569; } .qd-badge.sent { background:#DBEAFE; color:#1D4ED8; }
   .qd-badge.accepted { background:#D1FAE5; color:#065F46; } .qd-badge.declined { background:#FEE2E2; color:#B91C1C; }
   .qd-badge.expired { background:#FEF3C7; color:#8B5A00; }
-  .qd-info { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-bottom:18px; }
-  .qd-card { background:#fff; border:1px solid #E2E8EE; border-radius:12px; padding:12px 14px; }
-  .qd-card-l { font:700 10.5px var(--font-sans); text-transform:uppercase; letter-spacing:.06em; color:#6B7280; }
-  .qd-card-v { font:700 14px var(--font-sans); margin-top:3px; }
-  .qd-table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #E2E8EE; border-radius:12px; overflow:hidden; }
-  .qd-table th { text-align:left; font:700 10.5px var(--font-sans); text-transform:uppercase; letter-spacing:.06em; color:#6B7280; padding:10px 12px; background:#F8FAFC; border-bottom:1px solid #E2E8EE; }
-  .qd-table td { padding:11px 12px; border-bottom:1px solid #F1F5F9; }
-  .qd-num { text-align:right; font-variant-numeric: tabular-nums; white-space:nowrap; }
-  .qd-total td { font:800 14px var(--font-sans); background:#F8FAFC; }
-  .qd-note { margin-top:12px; padding:10px 14px; border-radius:10px; font-size:12.5px; line-height:1.45; }
+  .qd-split-note { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding:7px 10px;
+    background:#ECFDF5; border:1px solid #A7F3D0; border-radius:7px; font-size:11.5px; color:#0F766E; }
+
+  /* GRID + CARDS */
+  .qd-grid { display:grid; grid-template-columns:minmax(0, 1fr) 340px; gap:20px; align-items:start; }
+  .qd-left, .qd-right { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .qd-card { background:#fff; border:1px solid #E2E8EE; border-radius:14px; padding:18px 20px; box-shadow:0 1px 2px rgba(15,23,31,.04); }
+  .qd-card-h { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .qd-card-h h3 { font:700 14px var(--font-sans); margin:0; }
+  .qd-card-sub { font:500 11.5px var(--font-sans); color:var(--gray-500); margin-left:auto; }
+  .qd-kv { display:grid; grid-template-columns:auto 1fr; gap:8px 14px; font-size:12.5px; margin:0; }
+  .qd-kv dt { color:var(--gray-500); font-weight:600; }
+  .qd-kv dd { margin:0; font-weight:600; text-align:right; overflow-wrap:anywhere; }
+  .qd-cust-name { font:700 14px var(--font-sans); }
+  .qd-cust-sub { font-size:12px; color:var(--gray-500); margin-top:3px; overflow-wrap:anywhere; }
+
+  /* BOOK SECTIONS — one per order the quote would become */
+  .qd-half-h { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:18px 0 8px; padding:8px 10px;
+    background:#F4F7FB; border:1px solid #E2E8EE; border-radius:9px; font-size:12.5px; }
+  .qd-half-h.first { margin-top:0; }
+  .qd-half-book { display:inline-flex; align-items:center; gap:6px; font-weight:800; }
+  .qd-half-book i { color:var(--gray-500); font-size:11px; }
+  .qd-half-tag { padding:2px 8px; border-radius:999px; background:#E5F1F0; color:#005354; font-weight:700; font-size:11px; }
+  .qd-half-sum { margin-left:auto; font-weight:700; color:var(--gray-700); font-variant-numeric:tabular-nums; }
+
+  /* PRODUCTS TABLE */
+  .qd-prods-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .qd-prods { width:100%; border-collapse:collapse; table-layout:fixed; min-width:600px; }
+  .qd-prods th, .qd-prods td { padding:10px 8px; text-align:left; border-bottom:1px solid #EEF1F5; font-size:12.5px; vertical-align:top; }
+  .qd-prods th { font:600 10.5px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--gray-500); border-bottom:1px solid #E2E8EE; }
+  .qd-prods .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .qd-prods th:nth-child(2) { width:90px; } .qd-prods th:nth-child(3) { width:105px; }
+  .qd-prods th:nth-child(4) { width:96px; } .qd-prods th:nth-child(5) { width:90px; } .qd-prods th:nth-child(6) { width:96px; }
+  .qd-prods .mono { font:500 11.5px var(--font-mono); color:var(--gray-600); overflow-wrap:anywhere; }
+  .qd-prods tbody tr:last-child td { border-bottom:none; }
+  .qd-prod { display:flex; align-items:center; gap:10px; }
+  .qd-prod-img { width:36px; height:36px; border-radius:7px; flex-shrink:0; object-fit:cover;
+    box-shadow:inset 0 0 0 1px rgba(15,23,31,.06); background:linear-gradient(135deg, #E5F1F0, #C2D5D2); }
+  .qd-prod-name { font:600 13px var(--font-sans); color:var(--ink); }
+  .qd-prod-link { color:inherit; text-decoration:none; }
+  .qd-prod-link:hover .qd-prod-name { color:#005354; }
+  .qd-desc { font-size:12px; color:var(--gray-500); margin-top:3px; }
+  .qd-variant-name { font:600 12.5px var(--font-sans); line-height:1.3; overflow-wrap:anywhere; }
+  .qd-variant-name span { display:block; }
+  .qd-prods .qd-variant-sku { display:inline-block; margin-top:2px; font-size:10.5px; color:var(--gray-400); }
+  .qd-num-val { font:700 13px var(--font-sans); font-variant-numeric:tabular-nums; }
+  .qd-empty { color:var(--gray-400); }
+
+  /* A line that names rolls is the accordion trigger — its chevron turns
+     down and the rolls open in a row beneath, as pills. */
+  tr.qd-row-toggle { cursor:pointer; }
+  tr.qd-row-toggle:hover td { background:#FAFCFB; }
+  .qd-chev { font-size:9px; color:#94A3B8; transition:transform 140ms; flex-shrink:0; margin-top:14px; }
+  .qd-chev.open { transform:rotate(90deg); }
+  .qd-chev-pad { width:9px; flex-shrink:0; }
+  .qd-chip { display:inline-flex; align-items:center; gap:4px; margin-top:4px; padding:2px 8px; border-radius:999px;
+    font:700 10.5px var(--font-sans); color:#005354; background:#E5F1F0; white-space:nowrap; }
+  .qd-chip.bad { color:#B91C1C; background:#FEF2F2; }
+  tr.qd-rolls-row > td { padding:2px 12px 10px 23px; background:#FAFCFB; }
+  .qd-roll-list { display:flex; flex-wrap:wrap; gap:6px; }
+  .qd-pill { display:inline-flex; align-items:center; gap:7px; padding:4px 9px; background:#fff; border:1px solid #E2E8F0;
+    border-radius:8px; font-size:11.5px; line-height:1.4; max-width:100%; }
+  .qd-pill .bc { font-family:var(--font-mono); font-size:11px; background:#F1F5F9; border-radius:5px; padding:0 5px; }
+  .qd-pill .m { font-weight:800; color:#005354; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .qd-pill .tag { font:700 9.5px var(--font-sans); letter-spacing:.03em; text-transform:uppercase; border-radius:999px; padding:1px 7px; white-space:nowrap; }
+  .qd-pill .tag.bad { color:#B91C1C; background:#FEE2E2; }
+  .qd-pill.short, .qd-pill.gone { border-color:#FCA5A5; background:#FEF2F2; }
+
+  /* TOTALS */
+  .qd-totals { margin-top:12px; padding-top:12px; border-top:1px dashed #E2E8EE; }
+  .qd-tot-row { display:flex; justify-content:space-between; gap:12px; padding:5px 8px; font:500 12.5px var(--font-sans); color:var(--gray-700); }
+  .qd-tot-row > span:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+  .qd-tot-row.total { border-top:1px solid #E2E8EE; margin-top:6px; padding-top:11px; font:700 15px var(--font-sans); color:var(--ink); }
+
+  .qd-note { padding:10px 14px; border-radius:10px; font-size:12.5px; line-height:1.45; }
   .qd-note.warn { background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; }
   .qd-note.ok { background:#ECFDF5; border:1px solid #A7F3D0; color:#065F46; }
-  .qd-rolls { margin-top:5px; }
-  .qd-rolls summary { cursor:pointer; font:600 12px var(--font-sans); color:#0B5F60; list-style:none; }
-  .qd-rolls summary::-webkit-details-marker { display:none; }
-  .qd-rolls summary .bad { color:#B91C1C; }
-  .qd-roll-list { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-  .qd-roll { display:inline-flex; gap:5px; padding:2px 8px; border-radius:6px; background:#F1F5F9; font:500 11.5px var(--font-sans); color:#334155; font-variant-numeric:tabular-nums; }
-  .qd-roll b { font-weight:700; }
-  .qd-roll i { font-style:normal; color:#7C3AED; font-weight:600; }
-  .qd-roll.short, .qd-roll.gone { background:#FEF2F2; color:#B91C1C; }
-  @media (max-width: 640px) { .qd { padding: 12px 12px 80px; } }
+
+  @media (max-width: 1000px) { .qd-grid { grid-template-columns:1fr; } }
+  @media (max-width: 640px) { .qd { padding:12px 16px 80px; } .qd-title { font-size:22px; } .qd-head-r { justify-content:flex-start; } }
 </style>
 {% endblock %}
 {% block content %}
 <div class="qd">
-  <a class="qd-back" href="{% url 'marketing:quote_list' %}"><i class="fa fa-arrow-left"></i> {% trans "Back to quotes" %}</a>
+  <div class="qd-crumbs">
+    <a class="qd-btn" href="{% url 'marketing:quote_list' %}"><i class="fa fa-arrow-left"></i> {% trans "Quotes" %}</a>
+    <span class="qd-sep">/</span>
+    <span class="qd-crumb-here">{{ quote.number }}</span>
+  </div>
 
   <div class="qd-head">
     <div>
-      <div class="qd-eyebrow">{% trans "Quote" %}{% if quote.book %} · {{ quote.book.name }}{% endif %}</div>
-      <h1 class="qd-title">{{ quote.number }}</h1>
+      <div class="qd-head-row">
+        <h1 class="qd-title">{{ quote.number }}</h1>
+        <span class="qd-badge {{ quote.status_key }}">{{ quote.status_label }}</span>
+      </div>
+      <div class="qd-meta">
+        <span><i class="fa fa-calendar"></i>{{ quote.date|date:"d M Y" }}</span>
+        {% if quote.valid_until %}<span class="qd-dot"></span><span><i class="fa fa-hourglass-half"></i>{% trans "Valid until" %} {{ quote.valid_until|date:"d M Y" }}</span>{% endif %}
+        <span class="qd-dot"></span>
+        <span><i class="fa {% if quote.company_id %}fa-building{% else %}fa-user{% endif %}"></i>{{ quote.get_client }}</span>
+        {% if quote.book %}<span class="qd-dot"></span><span><i class="fa fa-book"></i>{{ quote.book.name }}</span>{% endif %}
+      </div>
+      {% if book_groups|length > 1 %}
+      <div class="qd-split-note"><i class="fa fa-code-branch"></i>
+        <span>{% trans "The rolls stand in more than one book — accepting makes one order per book:" %}
+        {% for g in book_groups %}<strong>{{ g.book.name }}</strong>{% if not forloop.last %} · {% endif %}{% endfor %}</span>
+      </div>
+      {% endif %}
     </div>
-    <div class="qd-actions">
-      <span class="qd-badge {{ quote.status_key }}">{{ quote.status_label }}</span>
-      <a class="qd-back" href="{% url 'marketing:quote_print' quote.pk %}" target="_blank" rel="noopener"><i class="fa fa-print"></i> {% trans "Print" %}</a>
+    <div class="qd-head-r">
+      <a class="qd-btn" href="{% url 'marketing:quote_print' quote.pk %}" target="_blank" rel="noopener"><i class="fa fa-print"></i> {% trans "Print" %}</a>
       {% if quote.can_edit %}
-        <a class="qd-back" href="{% url 'marketing:quote_edit' quote.pk %}"><i class="fa fa-pen"></i> {% trans "Edit" %}</a>
+        <a class="qd-btn" href="{% url 'marketing:quote_edit' quote.pk %}"><i class="fa fa-pen"></i> {% trans "Edit" %}</a>
         {% if quote.status == 'draft' %}
-        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="status" value="sent">
-          <button type="submit" class="qd-back"><i class="fa fa-paper-plane"></i> {% trans "Mark as sent" %}</button></form>
+        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}">{% csrf_token %}<input type="hidden" name="status" value="sent">
+          <button type="submit" class="qd-btn"><i class="fa fa-paper-plane"></i> {% trans "Mark as sent" %}</button></form>
         {% endif %}
-        <form method="post" action="{% url 'marketing:quote_convert' quote.pk %}" style="display:inline;"
-              onsubmit="return confirm('{% trans "Create an order from this quote? The customer's account is charged for it." %}');">{% csrf_token %}
-          <button type="submit" class="qd-back primary" {% if blockers %}disabled title="{% trans 'See why below' %}"{% endif %}><i class="fa fa-check"></i> {% trans "Accepted — create order" %}</button></form>
-        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}" style="display:inline;"
+        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}"
               onsubmit="return confirm('{% trans "Mark this quote as declined?" %}');">{% csrf_token %}<input type="hidden" name="status" value="declined">
-          <button type="submit" class="qd-back danger"><i class="fa fa-ban"></i> {% trans "Declined" %}</button></form>
+          <button type="submit" class="qd-btn danger"><i class="fa fa-ban"></i> {% trans "Declined" %}</button></form>
+        <form method="post" action="{% url 'marketing:quote_convert' quote.pk %}"
+              onsubmit="return confirm('{% trans "Create an order from this quote? The customer's account is charged for it." %}');">{% csrf_token %}
+          <button type="submit" class="qd-btn primary" {% if blockers %}disabled title="{% trans 'See why below' %}"{% endif %}><i class="fa fa-check"></i> {% trans "Accepted — create order" %}</button></form>
       {% elif quote.status == 'declined' %}
-        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="status" value="draft">
-          <button type="submit" class="qd-back"><i class="fa fa-rotate-left"></i> {% trans "Reopen as draft" %}</button></form>
+        <form method="post" action="{% url 'marketing:quote_status' quote.pk %}">{% csrf_token %}<input type="hidden" name="status" value="draft">
+          <button type="submit" class="qd-btn"><i class="fa fa-rotate-left"></i> {% trans "Reopen as draft" %}</button></form>
       {% endif %}
     </div>
   </div>
 
-  <div class="qd-info">
-    <div class="qd-card"><div class="qd-card-l">{% trans "Customer" %}</div>
-      <div class="qd-card-v">{{ quote.get_client }}</div>
-      {% if quote.customer_phone or quote.customer_email %}<div style="font-size:12px; color:#6B7280; margin-top:2px;">{{ quote.customer_phone }}{% if quote.customer_phone and quote.customer_email %} · {% endif %}{{ quote.customer_email }}</div>{% endif %}
+  <div class="qd-grid">
+    <div class="qd-left">
+      <div class="qd-card">
+        <div class="qd-card-h">
+          <h3>{% trans "Products" %}</h3>
+          <span class="qd-card-sub">{% blocktrans count n=items|length %}{{ n }} line{% plural %}{{ n }} lines{% endblocktrans %}{% for p in pack_totals %} · {{ p }}{% endfor %}</span>
+        </div>
+
+        {% for g in book_groups %}
+        {% if book_groups|length > 1 %}
+        <div class="qd-half-h{% if forloop.first %} first{% endif %}">
+          <span class="qd-half-book"><i class="fa fa-book"></i>{{ g.book.name }}</span>
+          {% if g.is_own %}<span class="qd-half-tag">{% trans "Quote's book" %}</span>{% endif %}
+          <span class="qd-half-sum">{% blocktrans count n=g.parts|length %}{{ n }} line{% plural %}{{ n }} lines{% endblocktrans %} · {{ symbol }}{{ g.subtotal|floatformat:"2g" }}</span>
+        </div>
+        {% endif %}
+        <div class="qd-prods-scroll">
+        <table class="qd-prods">
+          <thead><tr>
+            <th>{% trans "Product" %}</th><th>SKU</th><th>{% trans "Variant" %}</th>
+            <th class="num">{% trans "Qty" %}</th><th class="num">{% trans "Price" %}</th><th class="num">{% trans "Amount" %}</th>
+          </tr></thead>
+          <tbody>
+          {% for part in g.parts %}{% with it=part.item %}
+            <tr{% if part.rolls %} class="qd-row-toggle" data-toggle-rolls="{{ part.key }}"{% endif %}>
+              <td>
+                <div style="display:flex; align-items:flex-start; gap:6px;">
+                  {% if part.rolls %}<i class="fa fa-chevron-right qd-chev" data-chev></i>{% else %}<span class="qd-chev-pad"></span>{% endif %}
+                  <div style="min-width:0;">
+                    {% if it.product_id %}
+                    <a href="{% url 'marketing:product_detail' it.product_id %}" class="qd-prod-link">
+                      <div class="qd-prod">
+                        {% if part.image %}<img class="qd-prod-img" src="{{ part.image }}" alt="">{% else %}<span class="qd-prod-img"></span>{% endif %}
+                        <span class="qd-prod-name">{{ it.product.title }}</span>
+                      </div>
+                    </a>
+                    {% if it.description %}<div class="qd-desc">{{ it.description }}</div>{% endif %}
+                    {% else %}
+                    <div class="qd-prod"><span class="qd-prod-img"></span><span class="qd-prod-name">{{ it.label }}</span></div>
+                    {% endif %}
+                    {% if part.rolls %}
+                    <span class="qd-chip"><i class="fa fa-layer-group"></i> {{ part.pack_label }} · {{ part.quantity|floatformat:"-2g" }} {{ it.unit }}</span>
+                    {% if part.stale_count %}<span class="qd-chip bad"><i class="fa fa-triangle-exclamation"></i> {% blocktrans count n=part.stale_count %}{{ n }} no longer free{% plural %}{{ n }} no longer free{% endblocktrans %}</span>{% endif %}
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+              <td><span class="mono">{{ it.product.sku|default:"—" }}</span></td>
+              <td>
+                {% if it.product_variant_id %}
+                  {% if part.variant_lines %}<div class="qd-variant-name">{% for line in part.variant_lines %}<span>{{ line }}</span>{% endfor %}</div>{% endif %}
+                  <span class="mono{% if part.variant_lines %} qd-variant-sku{% endif %}">{{ it.product_variant.variant_sku }}</span>
+                {% else %}<span class="qd-empty">—</span>{% endif %}
+              </td>
+              <td class="num"><span class="qd-num-val">{{ part.quantity|floatformat:"-2" }}</span> {{ it.unit }}</td>
+              <td class="num"><span class="qd-num-val">{{ symbol }}{{ it.price|floatformat:2 }}</span></td>
+              <td class="num"><b>{{ symbol }}{{ part.amount|floatformat:2 }}</b></td>
+            </tr>
+            {% if part.rolls %}
+            <tr class="qd-rolls-row" data-rolls-for="{{ part.key }}" style="display:none;">
+              <td colspan="6"><div class="qd-roll-list">
+                {% for r in part.rolls %}
+                <span class="qd-pill {{ r.state }}"{% if r.held_by %} title="{% trans 'Reserved for' %} {{ r.held_by|join:', ' }}"{% endif %}>
+                  <span class="bc">{{ r.barcode|default:"—" }}</span>
+                  <span class="m">{{ r.quantity|floatformat:"-2g" }} {{ it.unit }}</span>
+                  {% if r.state == 'short' %}<span class="tag bad">{% blocktrans with free=r.available|floatformat:"-2g" %}only {{ free }} free{% endblocktrans %}</span>{% elif r.state == 'gone' %}<span class="tag bad">{% trans "gone" %}</span>{% endif %}
+                </span>
+                {% endfor %}
+              </div></td>
+            </tr>
+            {% endif %}
+          {% endwith %}{% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% endfor %}
+
+        <div class="qd-totals">
+          {% for unit, qty in unit_totals %}
+          <div class="qd-tot-row"><span>{% trans "Quantity" %}</span><span>{{ qty|floatformat:"-2g" }} {{ unit }}</span></div>
+          {% endfor %}
+          {% for p in pack_totals %}
+          <div class="qd-tot-row"><span>{% trans "Rolls quoted" %}</span><span>{{ p }}</span></div>
+          {% endfor %}
+          <div class="qd-tot-row total"><span>{% trans "Total" %}</span><span>{{ symbol }}{{ total|floatformat:2 }}</span></div>
+        </div>
+      </div>
     </div>
-    <div class="qd-card"><div class="qd-card-l">{% trans "Date" %}</div><div class="qd-card-v">{{ quote.date|date:"d.m.Y" }}</div></div>
-    <div class="qd-card"><div class="qd-card-l">{% trans "Valid until" %}</div><div class="qd-card-v">{{ quote.valid_until|date:"d.m.Y"|default:"—" }}</div></div>
-    <div class="qd-card"><div class="qd-card-l">{% trans "Total" %}</div><div class="qd-card-v">{{ symbol }}{{ total|floatformat:2 }}</div></div>
-    {% if quote.order %}
-    <div class="qd-card"><div class="qd-card-l">{% trans "Became order" %}</div>
-      <div class="qd-card-v"><a href="{% url 'operating:order_detail' quote.order.pk %}" style="color:#0B5F60;">{{ quote.order.order_number }}</a></div></div>
-    {% endif %}
+
+    <div class="qd-right">
+      {% if quote.can_edit %}
+        {% if stale_rolls %}
+        <div class="qd-note warn"><i class="fa fa-triangle-exclamation"></i>
+          {% blocktrans count n=stale_rolls|length %}{{ n }} quoted roll is no longer free: an order has reserved it or it was used since the quote was written.{% plural %}{{ n }} quoted rolls are no longer free: orders have reserved them or they were used since the quote was written.{% endblocktrans %}
+          {% trans "They are marked red on their lines." %}</div>
+        {% endif %}
+        {% if blockers %}
+        <div class="qd-note warn" id="qd-blockers"><i class="fa fa-circle-info"></i> {% trans "This quote can't become an order yet:" %}
+          <ul style="margin:6px 0 0 18px; padding:0;">{% for why in blockers %}<li>{{ why }}</li>{% endfor %}</ul>
+        </div>
+        {% else %}
+        <div class="qd-note ok"><i class="fa fa-circle-check"></i> {% trans "When the customer accepts, press “Accepted — create order”: the order is raised with these lines and prices, and the quote is closed." %}</div>
+        {% endif %}
+      {% endif %}
+
+      <div class="qd-card">
+        <div class="qd-card-h"><h3>{% trans "Customer" %}</h3></div>
+        <div class="qd-cust-name">{{ quote.get_client }}</div>
+        {% if quote.customer_phone or quote.customer_email %}<div class="qd-cust-sub">{{ quote.customer_phone }}{% if quote.customer_phone and quote.customer_email %} · {% endif %}{{ quote.customer_email }}</div>{% endif %}
+      </div>
+
+      <div class="qd-card">
+        <div class="qd-card-h"><h3>{% trans "Quote" %}</h3></div>
+        <dl class="qd-kv">
+          <dt>{% trans "Book" %}</dt><dd>{{ quote.book.name|default:"—" }}</dd>
+          <dt>{% trans "Currency" %}</dt><dd>{{ quote.currency.code|default:"—" }}</dd>
+          <dt>{% trans "Date" %}</dt><dd>{{ quote.date|date:"d.m.Y" }}</dd>
+          <dt>{% trans "Valid until" %}</dt><dd>{{ quote.valid_until|date:"d.m.Y"|default:"—" }}</dd>
+          {% if quote.order %}<dt>{% trans "Became order" %}</dt><dd><a href="{% url 'operating:order_detail' quote.order.pk %}" style="color:#0B5F60;">{{ quote.order.order_number }}</a></dd>{% endif %}
+        </dl>
+      </div>
+
+      {% if quote.notes %}
+      <div class="qd-card">
+        <div class="qd-card-h"><h3>{% trans "Notes on the quote" %}</h3></div>
+        <div style="white-space:pre-line; font-size:12.5px; line-height:1.5;">{{ quote.notes }}</div>
+      </div>
+      {% endif %}
+    </div>
   </div>
-
-  <table class="qd-table">
-    <thead><tr><th>#</th><th>{% trans "Item" %}</th><th class="qd-num">{% trans "Quantity" %}</th><th class="qd-num">{% trans "Unit price" %}</th><th class="qd-num">{% trans "Amount" %}</th></tr></thead>
-    <tbody>
-    {% for it in items %}
-      <tr>
-        <td style="color:#94A3B8;">{{ it.line_no }}</td>
-        <td><b>{{ it.label }}</b>{% if it.sku and it.product_id %}<div style="font-size:11px; color:#94A3B8;">{{ it.sku }}</div>{% endif %}{% if it.product_id and it.description %}<div style="font-size:12px; color:#6B7280;">{{ it.description }}</div>{% endif %}
-          {% if it.linked_rolls %}
-          <details class="qd-rolls">
-            <summary><i class="fa fa-scroll"></i> {{ it.pack_label }}{% if it.stale_count %} <span class="bad">· {% blocktrans count n=it.stale_count %}{{ n }} no longer free{% plural %}{{ n }} no longer free{% endblocktrans %}</span>{% endif %}</summary>
-            <div class="qd-roll-list">
-            {% for r in it.linked_rolls %}
-              <span class="qd-roll {{ r.state }}" {% if r.state != 'free' %}title="{% if r.held_by %}{% trans 'Reserved for' %} {{ r.held_by|join:', ' }}{% endif %}"{% endif %}><b>{{ r.barcode|default:"—" }}</b> {{ r.quantity|floatformat:"-2g" }} {{ it.unit }}{% if r.book and r.book.pk != quote.book_id %} <i>{{ r.book.name }}</i>{% endif %}{% if r.state == 'short' %} · {% blocktrans with free=r.available|floatformat:"-2g" %}only {{ free }} free{% endblocktrans %}{% elif r.state == 'gone' %} · {% trans "gone" %}{% endif %}</span>
-            {% endfor %}
-            </div>
-          </details>
-          {% endif %}</td>
-        <td class="qd-num">{{ it.quantity|floatformat:"-2" }} {{ it.unit }}</td>
-        <td class="qd-num">{{ symbol }}{{ it.price|floatformat:2 }}</td>
-        <td class="qd-num">{{ symbol }}{{ it.line_total|floatformat:2 }}</td>
-      </tr>
-    {% endfor %}
-      <tr class="qd-total"><td colspan="2" style="text-align:right;">{% trans "Total" %}</td>
-        <td class="qd-num">{% for unit, qty in unit_totals %}<div>{{ qty|floatformat:"-2g" }} {{ unit }}</div>{% endfor %}{% for p in pack_totals %}<div style="font-weight:600; font-size:12px; color:#6B7280;">{{ p }}</div>{% endfor %}</td>
-        <td></td><td class="qd-num">{{ symbol }}{{ total|floatformat:2 }}</td></tr>
-    </tbody>
-  </table>
-
-  {% if quote.notes %}
-  <div class="qd-card" style="margin-top:12px;"><div class="qd-card-l">{% trans "Notes on the quote" %}</div><div style="margin-top:6px; white-space:pre-line;">{{ quote.notes }}</div></div>
-  {% endif %}
-
-  {% if quote.can_edit %}
-    {% if stale_rolls %}
-    <div class="qd-note warn"><i class="fa fa-triangle-exclamation"></i>
-      {% blocktrans count n=stale_rolls|length %}{{ n }} quoted roll is no longer free: an order has reserved it or it was used since the quote was written.{% plural %}{{ n }} quoted rolls are no longer free: orders have reserved them or they were used since the quote was written.{% endblocktrans %}
-      {% trans "They are marked red on their lines." %}</div>
-    {% endif %}
-    {% if blockers %}
-    <div class="qd-note warn" id="qd-blockers"><i class="fa fa-circle-info"></i> {% trans "This quote can't become an order yet:" %}
-      <ul style="margin:6px 0 0 18px; padding:0;">{% for why in blockers %}<li>{{ why }}</li>{% endfor %}</ul>
-    </div>
-    {% else %}
-    <div class="qd-note ok"><i class="fa fa-circle-check"></i> {% trans "When the customer accepts, press “Accepted — create order”: the order is raised with these lines and prices, and the quote is closed." %}</div>
-    {% endif %}
-  {% endif %}
 </div>
+<script>
+  // A line that names rolls opens them in the row beneath; its chevron
+  // turns down — the same accordion as the order page's lines.
+  document.querySelectorAll('tr.qd-row-toggle').forEach(function (row) {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('a, button, form')) return;
+      const rolls = document.querySelector('tr.qd-rolls-row[data-rolls-for="' + row.dataset.toggleRolls + '"]');
+      const open = rolls.style.display === 'none';
+      rolls.style.display = open ? '' : 'none';
+      row.querySelector('[data-chev]').classList.toggle('open', open);
+    });
+  });
+</script>
 {% endblock %}

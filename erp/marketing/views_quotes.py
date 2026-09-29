@@ -332,13 +332,61 @@ class QuoteForm(View):
 
 # ── Detail / print ───────────────────────────────────────────────────
 
+def _lines_by_book(quote, items):
+    """The quote's lines under the books their rolls stand in — the same
+    cut acceptance makes (_quote_parts_by_book), so the page shows the
+    orders the quote would become. A line with rolls on two books' shelves
+    shows under each, with that book's rolls and metres; a line with no
+    rolls sits under the quote's own book. The quote's book comes first.
+    Every roll is listed whichever book the viewer works in: a quote
+    offers the house's stock, and the barcodes are what it offers."""
+    from types import SimpleNamespace
+    from marketing import units
+    from operating.views import _order_item_variant_lines
+
+    groups = {}
+
+    def group(book):
+        key = book.pk if book else None
+        if key not in groups:
+            groups[key] = SimpleNamespace(book=book, parts=[], subtotal=Decimal("0"),
+                                          rolls=0, is_own=(key == quote.book_id))
+        return groups[key]
+
+    for it in items:
+        files = list(it.product.files.all()) if it.product_id else []
+        image = next((f.file_url for f in files if getattr(f, "file_url", None)), "")
+        variant_lines = _order_item_variant_lines(it) if it.product_variant_id else []
+        pack = getattr(it.product, "pack_type", None) or units.DEFAULT_PACK
+        by_book = {}
+        for link in it.linked_rolls:
+            book = link.book or quote.book
+            by_book.setdefault(book.pk, (book, []))[1].append(link)
+        pieces = list(by_book.values()) or [(quote.book, [])]
+        for book, rolls in pieces:
+            qty = sum((link.quantity for link in rolls), Decimal("0")) if rolls else it.quantity
+            g = group(book)
+            part = SimpleNamespace(
+                item=it, key=f"{it.pk}-{book.pk if book else 0}", rolls=rolls, quantity=qty,
+                amount=qty * (it.price or Decimal("0")), image=image, variant_lines=variant_lines,
+                stale_count=sum(1 for link in rolls if link.state != "free"),
+                pack_label=(f"{len(rolls)} {units.pack_noun(pack, len(rolls))}" if rolls else ""))
+            g.parts.append(part)
+            g.subtotal += part.amount
+            g.rolls += len(rolls)
+    own = groups.pop(quote.book_id, None)
+    rest = sorted(groups.values(), key=lambda g: ((g.book.name if g.book else "") or "", g.book.pk if g.book else 0))
+    return ([own] if own and own.parts else []) + rest
+
+
 def _quote_page_context(request, pk):
     from accounting.services_accounts import brand_name_for
     quote = get_object_or_404(
         _quotes_for(request).select_related("contact", "company", "currency", "book", "order"),
         pk=pk)
     from marketing import units
-    items = list(quote.items.select_related("product", "product_variant__product"))
+    items = list(quote.items.select_related("product", "product_variant__product")
+                 .prefetch_related("product__files", "product_variant__warehouse_products"))
     links = quote.roll_links()
     by_line = {}
     for link in links:
@@ -360,6 +408,7 @@ def _quote_page_context(request, pk):
     return {
         "quote": quote,
         "items": items,
+        "book_groups": _lines_by_book(quote, items),
         "total": sum((it.line_total() for it in items), Decimal("0")),
         "unit_totals": list(unit_totals.items()),
         "pack_totals": [f"{n} {units.pack_noun(pack, n)}" for pack, n in packs.items()],

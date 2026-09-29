@@ -11192,3 +11192,18 @@ msgstr "Bu barkodla bu ürünün boşta bir topu yok."
 #, python-format
 msgid "Quote %(quote)s became %(count)s orders, one per book its rolls stand in: %(orders)s."
 msgstr "%(quote)s teklifi, toplarının bulunduğu her defter için bir tane olmak üzere %(count)s siparişe dönüştü: %(orders)s."
+
+msgid "Quote's book"
+msgstr "Teklifin defteri"
+
+msgid "Rolls quoted"
+msgstr "Teklif edilen toplar"
+
+msgid "The rolls stand in more than one book — accepting makes one order per book:"
+msgstr "Toplar birden fazla defterde — kabul edilince her defter için ayrı sipariş açılır:"
+
+#, python-format
+msgid "%(n)s line"
+msgid_plural "%(n)s lines"
+msgstr[0] "%(n)s satır"
+msgstr[1] "%(n)s satır"

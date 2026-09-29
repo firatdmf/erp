@@ -1161,7 +1161,7 @@
       </div>
     </div>
     <div class="od-head-r">
-      <a href="{% url 'operating:order_print' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
+      <a href="{% if print_ids %}{% url 'operating:order_print_combined' %}?ids={{ print_ids }}{% else %}{% url 'operating:order_print' order.pk %}{% endif %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
       <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost">

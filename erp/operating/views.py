@@ -596,6 +596,11 @@ class OrderDetail(DetailView):
             ctx["other_halves"] = other_halves_for_page(
                 self.object, getattr(self.request.user, "member", None))
             ctx["combined_totals"] = combined_totals(halves)
+            # Print prints the whole order, each half under its book — for
+            # a viewer who may open every half, which the combined sheet
+            # asks. Anyone else prints the half they are on.
+            if all(h.may_open for h in ctx["other_halves"]):
+                ctx["print_ids"] = ",".join(str(h.pk) for h in halves)
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -3031,6 +3036,74 @@ def build_order_print_rows(order):
     return items, total, total_qty, all_pack_ids
 
 
+def order_print_shelves(order, items):
+    """An order's print rows under the warehouse their rolls are picked
+    from — the rows build_order_print_rows made, cut by the warehouse of
+    each line's reserved rolls. Returns (shelves, has_rolls); has_rolls
+    is False when nothing is reserved yet, and the sheet then prints no
+    warehouse headings at all.
+
+    A line whose rolls stand in two warehouses prints under each with
+    that warehouse's metres and rolls, but only when those metres make up
+    the line exactly: a line typed by hand, or picked short, has metres no
+    warehouse accounts for, so it prints whole under the warehouse holding
+    most of it. Split amounts round like the whole line does, the last
+    piece taking what is left, so the pieces add up to it to the cent. A
+    line with nothing reserved closes the sheet, under no warehouse."""
+    from decimal import Decimal, ROUND_HALF_UP
+    from types import SimpleNamespace
+
+    held = {}
+    for r in (order.stock_reservations.filter(order_item__isnull=False)
+              .values("order_item_id", "stock_item_id", "quantity",
+                      "stock_item__product__warehouse_id",
+                      "stock_item__product__warehouse__name")):
+        per = held.setdefault(r["order_item_id"], {})
+        wh = per.setdefault(r["stock_item__product__warehouse_id"],
+                            [r["stock_item__product__warehouse__name"] or "", set(), Decimal("0")])
+        wh[1].add(r["stock_item_id"])
+        wh[2] += r["quantity"] or Decimal("0")
+
+    shelves = {}
+
+    def shelf(key, name):
+        return shelves.setdefault(key, SimpleNamespace(name=name, rows=[], rolls=set()))
+
+    for it in items:
+        per = held.get(it.pk)
+        qty = it.quantity or Decimal("0")
+        whole = SimpleNamespace(item=it, quantity=qty, amount=it.line_total_calc,
+                                pack_count=it.pack_count, pack_noun=it.pack_noun)
+        if not per:
+            shelf(None, "").rows.append(whole)
+            continue
+        if len(per) == 1 or sum(w[2] for w in per.values()) != qty:
+            key = max(per, key=lambda k: per[k][2])
+            s = shelf(key, per[key][0])
+            s.rows.append(whole)
+            for w in per.values():
+                s.rolls |= w[1]
+            continue
+        pieces = sorted(per.items(), key=lambda kv: kv[1][0])
+        spent = Decimal("0.00")
+        for n, (key, (name, rolls, metres)) in enumerate(pieces, start=1):
+            amount = (it.line_total_calc - spent if n == len(pieces) else
+                      (metres * (it.price or Decimal("0"))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+            spent += amount
+            s = shelf(key, name)
+            s.rows.append(SimpleNamespace(item=it, quantity=metres, amount=amount,
+                                          pack_count=len(rolls),
+                                          pack_noun=units.pack_noun(it.pack_type, len(rolls))))
+            s.rolls |= rolls
+
+    ordered = sorted((s for k, s in shelves.items() if k is not None), key=lambda s: s.name)
+    if None in shelves:
+        ordered.append(shelves[None])
+    for s in ordered:
+        s.roll_count = len(s.rolls)
+    return ordered, bool(held)
+
+
 def order_print_totals_units(items, pack_count):
     """The unit and pack noun the foot of an order's lines prints.
 
@@ -3092,7 +3165,9 @@ class OrderPrint(DetailView):
         # A single group, so the template walks the same loop the
         # combined sheet walks — see OrderPrintCombined. `combined` is
         # what puts a heading above each group; one order needs none.
-        ctx["order_groups"] = [{"order": order, "items": items}]
+        shelves, has_rolls = order_print_shelves(order, items)
+        ctx["order_groups"] = [{"order": order, "items": items,
+                                "shelves": shelves, "has_rolls": has_rolls}]
         ctx["order_items"] = items
         ctx["order_total"] = total
         ctx["order_currency_symbol"] = order.currency_symbol
@@ -3205,7 +3280,8 @@ class OrderPrintCombined(LoginRequiredMixin, View):
         codes = {o.currency_code for o in orders}
         for o in orders:
             rows, o_total, o_qty, o_packs = build_order_print_rows(o)
-            groups.append({"order": o, "items": rows})
+            shelves, has_rolls = order_print_shelves(o, rows)
+            groups.append({"order": o, "items": rows, "shelves": shelves, "has_rolls": has_rolls})
             items.extend(rows)
             total += o_total
             base_total += o.to_base(o_total)
@@ -3231,10 +3307,12 @@ class OrderPrintCombined(LoginRequiredMixin, View):
         # end and print nothing at all.
         dates = [o.order_date for o in orders if o.order_date]
 
+        from .split_orders import combined_number
         return document_response(request, "operating/order_print.html", {
             "order": primary,
             "combined": True,
             "combined_orders": orders,
+            "combined_label": combined_number(orders),
             "combined_from": dates[0] if dates else None,
             "combined_to": dates[-1] if dates else None,
             "order_groups": groups,

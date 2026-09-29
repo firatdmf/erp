@@ -54,22 +54,15 @@
        at 18pt it crowded the order number on the right. */
     .hdr .brand { font-size: 16.0pt; font-weight: bold; color: #944F05; line-height: 1.25; max-width: 105mm; }
     .hdr .doc-type { font-size: 10.67pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
-    /* The order number, directly under the brand. Left-aligned and a step
-       SMALLER than the brand (16pt): it identifies the document, it is not
-       the masthead, and at the 21.33pt this rule used to carry — from when
-       the number sat alone in the top-right cell — it out-shouted the mark
-       above it. Scoped to .hdr, so the unrelated `.num` on the items table
-       (right-aligned numeric columns) is untouched. */
-    .hdr .num { font-size: 13.33pt; font-weight: bold; color: #0F1419; margin-top: 2pt; }
     .hdr .date { font-size: 10.67pt; color: #4B5563; }
-    /* Date and badge as one right-hand stack: the stack is pushed to the
-       right edge, and inside it both line up on the LEFT, so the badge
-       sits squarely under the date. The badge used to be loose in the
-       cell — the cell was right-aligned only by the old align="right"
-       attribute, which the PDF renderer ignores, so it drifted to the
-       middle of the header instead of hanging under the date. */
+    /* Date and badge as one right-hand stack, both flush with the right
+       edge, so the badge's end lines up under the date's. The badge used
+       to be loose in the cell — the cell was right-aligned only by the old
+       align="right" attribute, which the PDF renderer ignores, so it
+       drifted to the middle of the header instead of hanging under the
+       date. */
     .hdr td.meta { text-align: right; }
-    .hdr .stack { display: inline-block; text-align: left; }
+    .hdr .stack { display: inline-block; text-align: right; }
     .hdr .kinds { margin-top: 4pt; }
     .hdr .kind { padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold; letter-spacing: 1pt; }
     .hdr .kind.b2b { background: #FEF3C7; color: #8B5A00; }
@@ -155,6 +148,12 @@
       letter-spacing: 0.8pt;
       color: #6B7280;
     }
+    /* The warehouse a group of lines is picked from — one step quieter
+       than the order heading above it. */
+    table.items tbody tr.wh td { background: #F0FAF9; border-bottom: 1px solid #D5EFEC; padding: 3pt 5.0pt;
+                                 font-size: 8.67pt; font-weight: bold; color: #147F74; }
+    table.items tbody tr.wh td span { font-weight: normal; color: #6B7280; }
+    table.items tbody tr.grp, table.items tbody tr.wh { break-after: avoid; page-break-after: avoid; }
     table.items .pname { font-weight: bold; color: #0F1419; }
     table.items .pdesc { color: #4B5563; font-size: 8.67pt; margin-top: 1pt; }
     /* A code sits under the name it belongs to: the product's SKU
@@ -244,19 +243,19 @@
     <tr>
       <td>
         <div class="brand">{{ brand_line|default:"Nejum ERP" }}</div>
-        {% comment %}One line, naming the document: "Order #297". A
-        combined print covers many orders — each already named on the
-        group row above its own lines — so it keeps the bare kicker
-        instead, rather than putting one order's number in a masthead
-        that appears to speak for all of them.
+        {% comment %}One teal line, naming the document: "Order
+        ORD-2026-000027". A combined print names every order it covers,
+        the way a split order is named on its page ("ORD-2026-000023 &
+        ORD-2026-000024") — never one order's number alone, which would
+        appear to speak for all of them.
 
         The # belongs to the id. An order_number, once orders carry one,
         is already a formatted reference and reads wrong behind a hash
         ("Order #DK0000297").{% endcomment %}
         {% if combined %}
-          <div class="doc-type">{% trans "Orders" %}</div>
+          <div class="doc-type">{% trans "Orders" %} {{ combined_label }}</div>
         {% else %}
-          <div class="num">{% trans "Order" %} {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</div>
+          <div class="doc-type">{% trans "Order" %} {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</div>
         {% endif %}
       </td>
       <td class="meta">
@@ -350,10 +349,18 @@
       <!-- Which order the lines under this belong to. One order needs no
            such heading, so it prints only on the combined sheet. -->
       <tr class="grp">
-        <td colspan="6">{% trans "Order" %} {{ g.order.order_number|default:g.order.pk }}{% if g.order.order_date %} · {{ g.order.order_date|date:"d M Y" }}{% endif %}</td>
+        <td colspan="6">{% if g.order.current_account.book %}{{ g.order.current_account.book.name }} · {% endif %}{% trans "Order" %} {{ g.order.order_number|default:g.order.pk }}{% if g.order.order_date %} · {{ g.order.order_date|date:"d M Y" }}{% endif %}</td>
       </tr>
       {% endif %}
-      {% for item in g.items %}
+      {% comment %}Under the warehouse the rolls are picked from — see
+         order_print_shelves. Counts, never barcodes: those are the packing
+         list's. Nothing reserved yet, no headings.{% endcomment %}
+      {% for shelf in g.shelves %}
+      {% if g.has_rolls %}
+      <tr class="wh"><td colspan="6">{% if shelf.name %}{{ shelf.name }} <span>· {% blocktrans count counter=shelf.roll_count %}{{ counter }} roll{% plural %}{{ counter }} rolls{% endblocktrans %}</span>{% else %}{% trans "Rolls not yet chosen" %}{% endif %}</td></tr>
+      {% endif %}
+      {% for row in shelf.rows %}
+      {% with item=row.item %}
       <tr>
         <td>
           <div class="pname">{{ item.product.title|default:item.product }}</div>
@@ -376,12 +383,14 @@
            the separator a comma, whatever locale the person printing has
            active — a Turkish session renders 4.577,91 for the same figure,
            and this document quotes dollars to a foreign customer. {% endcomment %}
-        <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }}
-          {% if item.pack_count %}<div class="packs">{{ item.pack_count }}&nbsp;{{ item.pack_noun }}</div>{% endif %}
+        <td class="num">{{ row.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }}
+          {% if row.pack_count %}<div class="packs">{{ row.pack_count }}&nbsp;{{ row.pack_noun }}</div>{% endif %}
         </td>
         <td class="num">{{ order_currency_symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
-        <td class="num">{{ order_currency_symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
+        <td class="num">{{ order_currency_symbol }}{{ row.amount|floatformat:"2u"|intcomma:False }}</td>
       </tr>
+      {% endwith %}
+      {% endfor %}
       {% endfor %}
       {% comment %}What the deal added or took off this order — delivery,
          packing, a discount. They are in the Total below, so they print

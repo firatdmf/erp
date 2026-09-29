@@ -380,6 +380,42 @@ def _lines_by_book(quote, items):
     return ([own] if own and own.parts else []) + rest
 
 
+def _print_sections(book_groups):
+    """The printed quote's lines, book by book as _lines_by_book cuts them,
+    and within each book by the warehouse whose shelf the rolls stand on —
+    what each order will be and where its goods are picked from. A line
+    with rolls in two warehouses prints under each, with that warehouse's
+    rolls and metres; a line with no rolls closes its book, under no
+    warehouse."""
+    from types import SimpleNamespace
+    from marketing import units
+
+    sections = []
+    for g in book_groups:
+        shelves = {}
+        for part in g.parts:
+            it = part.item
+            pack = getattr(it.product, "pack_type", None) or units.DEFAULT_PACK
+            by_wh = {}
+            for link in part.rolls:
+                wh = link.stock_item.product.warehouse if link.stock_item_id else None
+                by_wh.setdefault(wh.pk if wh else None, (wh, []))[1].append(link)
+            for wh, rolls in (list(by_wh.values()) or [(None, [])]):
+                qty = sum((link.quantity for link in rolls), Decimal("0")) if rolls else part.quantity
+                shelf = shelves.setdefault(wh.pk if wh else None,
+                                           SimpleNamespace(warehouse=wh, rows=[], rolls=0))
+                shelf.rows.append(SimpleNamespace(
+                    item=it, rolls=rolls, quantity=qty, amount=qty * (it.price or Decimal("0")),
+                    pack_label=(f"{len(rolls)} {units.pack_noun(pack, len(rolls))}" if rolls else "")))
+                shelf.rolls += len(rolls)
+        ordered = sorted((s for k, s in shelves.items() if k is not None),
+                         key=lambda s: (s.warehouse.name or "", s.warehouse.pk))
+        if None in shelves:
+            ordered.append(shelves[None])
+        sections.append(SimpleNamespace(book=g.book, shelves=ordered, rolls=g.rolls))
+    return sections
+
+
 def _quote_page_context(request, pk):
     from accounting.services_accounts import brand_name_for
     quote = get_object_or_404(
@@ -430,6 +466,7 @@ def quote_detail(request, pk):
 def quote_print(request, pk):
     from erp.nejum_credit import brand_color, credit_html
     context = _quote_page_context(request, pk)
+    context["sections"] = _print_sections(context["book_groups"])
     # Signed like the order sheet: the house's name in the house's colour,
     # and the Nejum credit for the quote's own book, which may trade
     # under a name of its own.

@@ -249,11 +249,14 @@ class QuoteTest(TestCase):
         [line] = quote.items.all()
         self.assertEqual(line.quantity, Decimal("62.10"))          # what the rolls hold, not what was typed
         self.assertEqual(sorted(line.rolls.values_list("barcode", flat=True)), ["R-100", "R-101"])
-        for page in (self.client.get(reverse("marketing:quote_detail", args=[quote.pk])),
-                     self.client.get(reverse("marketing:quote_print", args=[quote.pk]) + "?html=1")):
-            self.assertContains(page, "R-100")
-            self.assertContains(page, "R-101")
-            self.assertContains(page, "2 rolls")
+        page = self.client.get(reverse("marketing:quote_detail", args=[quote.pk]))
+        self.assertContains(page, "R-100")
+        self.assertContains(page, "R-101")
+        self.assertContains(page, "2 rolls")
+        # The customer's copy counts the rolls and names none of them.
+        printout = self.client.get(reverse("marketing:quote_print", args=[quote.pk]) + "?html=1")
+        self.assertContains(printout, "2 rolls")
+        self.assertNotContains(printout, "R-100")
         form = self.client.get(reverse("marketing:quote_edit", args=[quote.pk]))
         self.assertContains(form, "R-101")                        # the form reopens with its rolls
         # Quoting holds nothing: the rolls stay free for any order.

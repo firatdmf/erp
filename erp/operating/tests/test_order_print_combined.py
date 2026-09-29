@@ -109,16 +109,16 @@ class CombinedOrderSheet(OlegOrders, TestCase):
         self.assertEqual([g["order"].pk for g in resp.context["order_groups"]],
                          [self.laleli_a.pk, self.laleli_b.pk, self.ergene_a.pk])
 
-    def test_the_masthead_names_no_single_order(self):
+    def test_the_masthead_names_every_order(self):
         """A single order's sheet prints its number under the brand. This
-        one covers three, so that slot stays empty — one number up there
-        would name one order and look like it spoke for all of them."""
+        one covers three, so it names all three the way a split order is
+        named on its page — never one number alone, which would look like
+        it spoke for all of them."""
         import re
         html = self._html(self.laleli_a, self.laleli_b, self.ergene_a).content.decode()
         header = re.search(r'<table class="hdr".*?</table>', html, re.S)
         self.assertIsNotNone(header, "the print header is gone")
-        for number in ("DK-284", "DK-275", "DK-291"):
-            self.assertNotIn(number, header.group(0))
+        self.assertIn("Orders DK-284 &amp; DK-275 &amp; DK-291", header.group(0))
 
     def test_it_spans_books(self):
         """The whole point. An Invoice cannot do this — its book is the

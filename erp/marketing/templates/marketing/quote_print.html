@@ -39,13 +39,13 @@
     .hdr .brand { font-size: 16.0pt; font-weight: bold; line-height: 1.25; max-width: 105mm; }
     .hdr .num { font-size: 13.33pt; font-weight: bold; color: #0F1419; margin-top: 2pt; }
     .hdr .date { font-size: 10.67pt; color: #4B5563; }
-    /* Date and badge as one right-hand stack, both lining up on the left
-       inside it — the same header the order sheet prints. The cell used
-       to be right-aligned by the old align="right" attribute, which the
-       PDF renderer ignores, and the badge then drifted away from the
-       date it belongs under. */
+    /* Date and badge as one right-hand stack, both flush with the right
+       edge — the same header the order sheet prints. The cell used to be
+       right-aligned by the old align="right" attribute, which the PDF
+       renderer ignores, and the badge then drifted away from the date it
+       belongs under. */
     .hdr td.meta { text-align: right; }
-    .hdr .stack { display: inline-block; text-align: left; }
+    .hdr .stack { display: inline-block; text-align: right; }
     .hdr .kind { display: inline-block; margin-top: 4pt; padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold;
                  letter-spacing: 1pt; background: #E0F2F1; color: #0B5F60; }
 
@@ -94,8 +94,27 @@
     table.items tbody td.no { color: #6B7280; }
     table.items .pname { font-weight: bold; color: #0F1419; }
     table.items .pdesc { color: #4B5563; font-size: 8.67pt; margin-top: 1pt; }
-    table.items .rolls { color: #4B5563; font-size: 8pt; margin-top: 2pt; line-height: 1.35; }
+    table.items .packs { color: #6B7280; font-size: 8.67pt; font-weight: normal; margin-top: 1pt; }
     table.items .sku { font-family: "Courier", monospace; font-size: 0.8em; font-weight: normal; color: #4B5563; }
+    /* Book and warehouse headings — the order sheet's group row
+       (operating/order_print.html tr.grp): dividers, not line items. The
+       book is the order its lines become; the warehouse, the shelf they
+       are picked from, one step quieter beneath it. */
+    table.items tbody tr.grp td {
+      background: #FAFBFD;
+      border-bottom: 1px solid #E2E8EE;
+      padding: 3.75pt 5.0pt;
+      font-size: 8.67pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8pt;
+      color: #6B7280;
+    }
+    table.items tbody tr.grp td.num { text-transform: none; letter-spacing: 0; }
+    table.items tbody tr.wh td { background: #F0FAF9; border-bottom: 1px solid #D5EFEC; padding: 3pt 5.0pt;
+                                 font-size: 8.67pt; font-weight: bold; color: #147F74; }
+    table.items tbody tr.wh td span { font-weight: normal; color: #6B7280; }
+    table.items tbody tr.grp, table.items tbody tr.wh { break-after: avoid; page-break-after: avoid; }
     /* The total is a row of the body, not a <tfoot>, which would repeat
        at the foot of every printed page as if it were that page's total. */
     table.items tbody tr.grand { break-inside: avoid; page-break-inside: avoid; }
@@ -205,19 +224,40 @@
       <tr><th>#</th><th>{% trans "Item" %}</th><th class="num">{% trans "Quantity" %}</th><th class="num">{% trans "Unit price" %}</th><th class="num">{% trans "Amount" %}</th></tr>
     </thead>
     <tbody>
-    {% for it in items %}
-      <tr>
-        <td class="no">{{ it.line_no }}</td>
-        <td>
-          <div class="pname">{{ it.label }}</div>
-          {% if it.product_id and it.sku %}<div class="sku">{{ it.sku }}</div>{% endif %}
-          {% if it.product_id and it.description %}<div class="pdesc">{{ it.description }}</div>{% endif %}
-          {% if it.linked_rolls %}<div class="rolls"><b>{{ it.pack_label }}:</b> {% for r in it.linked_rolls %}{{ r.barcode|default:"—" }} ({{ r.quantity|floatformat:"-2g" }}){% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
-        </td>
-        <td class="num">{{ it.quantity|floatformat:"-2g" }} {{ it.unit }}</td>
-        <td class="num">{{ symbol }}{{ it.price|floatformat:"2g" }}</td>
-        <td class="num">{{ symbol }}{{ it.line_total|floatformat:"2g" }}</td>
+    {% comment %}Book by book — each book's lines become that book's order
+    on acceptance — and within a book by the warehouse the rolls are picked
+    from. A lone book with no rolls named needs neither heading.{% endcomment %}
+    {% for s in sections %}
+      {% if sections|length > 1 or s.rolls %}
+      <tr class="grp">
+        <td colspan="2">{{ s.book.name|default:"—" }}</td>
+        <td class="num" colspan="3">{% if s.rolls %}{% blocktrans count counter=s.rolls %}{{ counter }} roll{% plural %}{{ counter }} rolls{% endblocktrans %}{% endif %}</td>
       </tr>
+      {% endif %}
+      {% for shelf in s.shelves %}
+        {% if shelf.warehouse %}
+        <tr class="wh"><td></td><td colspan="4">{{ shelf.warehouse.name }} <span>· {% blocktrans count counter=shelf.rolls %}{{ counter }} roll{% plural %}{{ counter }} rolls{% endblocktrans %}</span></td></tr>
+        {% elif s.rolls %}
+        <tr class="wh"><td></td><td colspan="4">{% trans "Rolls not yet chosen" %}</td></tr>
+        {% endif %}
+        {% for row in shelf.rows %}
+        {% with it=row.item %}
+        <tr>
+          <td class="no">{{ it.line_no }}</td>
+          <td>
+            <div class="pname">{{ it.label }}</div>
+            {% if it.product_id and it.sku %}<div class="sku">{{ it.sku }}</div>{% endif %}
+            {% if it.product_id and it.description %}<div class="pdesc">{{ it.description }}</div>{% endif %}
+          </td>
+          {% comment %}How many rolls, never which: barcodes are for picking
+          and belong on the packing list, not on the customer's copy.{% endcomment %}
+          <td class="num">{{ row.quantity|floatformat:"-2g" }} {{ it.unit }}{% if row.pack_label %}<div class="packs">{{ row.pack_label }}</div>{% endif %}</td>
+          <td class="num">{{ symbol }}{{ it.price|floatformat:"2g" }}</td>
+          <td class="num">{{ symbol }}{{ row.amount|floatformat:"2g" }}</td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      {% endfor %}
     {% empty %}
       <tr><td colspan="5" style="text-align: center; color: #6B7280; padding: 18pt;">{% trans "No items." %}</td></tr>
     {% endfor %}

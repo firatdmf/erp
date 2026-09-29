@@ -11244,3 +11244,14 @@ msgid ""
 msgstr ""
 "Maliyetler, kârlar, anlaşılanlar — bunları yalnızca ekibiniz görür; "
 "yazdırılmaz."
+
+#: marketing/templates/marketing/quote_print.html
+#, python-format
+msgid "%(counter)s roll"
+msgid_plural "%(counter)s rolls"
+msgstr[0] "%(counter)s top"
+msgstr[1] "%(counter)s top"
+
+#: marketing/templates/marketing/quote_print.html
+msgid "Rolls not yet chosen"
+msgstr "Toplar henüz seçilmedi"

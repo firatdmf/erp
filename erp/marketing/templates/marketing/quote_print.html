@@ -37,7 +37,7 @@
     .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 7pt; margin-bottom: 10pt; }
     .hdr td { vertical-align: top; }
     .hdr .brand { font-size: 16.0pt; font-weight: bold; line-height: 1.25; max-width: 105mm; }
-    .hdr .num { font-size: 13.33pt; font-weight: bold; color: #0F1419; margin-top: 2pt; }
+    .hdr .doc-type { font-size: 10.67pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
     .hdr .date { font-size: 10.67pt; color: #4B5563; }
     /* Date and badge as one right-hand stack, both flush with the right
        edge — the same header the order sheet prints. The cell used to be
@@ -168,7 +168,8 @@
     <tr>
       <td>
         <div class="brand" style="color: {{ brand_color }};">{{ brand_line|default:"Nejum ERP" }}</div>
-        <div class="num">{% trans "Quote" %} {{ quote.number }}</div>
+        {# The number alone: the chip on the right says it is a quote. #}
+        <div class="doc-type">{{ quote.number }}</div>
       </td>
       <td class="meta">
         <div class="stack">

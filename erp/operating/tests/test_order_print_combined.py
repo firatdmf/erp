@@ -118,7 +118,7 @@ class CombinedOrderSheet(OlegOrders, TestCase):
         html = self._html(self.laleli_a, self.laleli_b, self.ergene_a).content.decode()
         header = re.search(r'<table class="hdr".*?</table>', html, re.S)
         self.assertIsNotNone(header, "the print header is gone")
-        self.assertIn("Orders DK-284 &amp; DK-275 &amp; DK-291", header.group(0))
+        self.assertIn("DK-284 &amp; DK-275 &amp; DK-291", header.group(0))
 
     def test_it_spans_books(self):
         """The whole point. An Invoice cannot do this — its book is the

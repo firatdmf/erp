@@ -150,7 +150,10 @@ class OrderPrintShelvesTest(TestCase):
         b = self._order(self.ergene, "ORD-10")
         self._line(b, "10")
         single = self.client.get(reverse("operating:order_print", args=[a.pk]), {"html": "1"})
-        self.assertContains(single, '<div class="doc-type">Order ORD-9</div>', html=True)
+        self.assertContains(single, '<div class="doc-type">ORD-9</div>', html=True)
+        self.assertContains(single, '<span class="kind">ORDER</span>', html=True)
+        self.assertNotContains(single, "kind b2b")
         combined = self.client.get(reverse("operating:order_print_combined"),
                                    {"ids": f"{a.pk},{b.pk}", "html": "1"})
-        self.assertContains(combined, '<div class="doc-type">Orders ORD-9 &amp; ORD-10</div>', html=True)
+        self.assertContains(combined, '<div class="doc-type">ORD-9 &amp; ORD-10</div>', html=True)
+        self.assertContains(combined, '<span class="kind">ORDERS</span>', html=True)

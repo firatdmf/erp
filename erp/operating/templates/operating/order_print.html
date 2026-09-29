@@ -64,10 +64,11 @@
     .hdr td.meta { text-align: right; }
     .hdr .stack { display: inline-block; text-align: right; }
     .hdr .kinds { margin-top: 4pt; }
-    .hdr .kind { padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold; letter-spacing: 1pt; }
-    .hdr .kind.b2b { background: #FEF3C7; color: #8B5A00; }
-    .hdr .kind.b2c { background: #E0F2F1; color: #0B5F60; }
-    .hdr .kind.web { background: #DBEAFE; color: #1E40AF; }
+    /* What the document is — ORDER, as the quote's chip says QUOTE, in
+       the same teal. It used to say B2B or WEB: which kind of customer,
+       which the customer holding the sheet already knows. */
+    .hdr .kind { padding: 1.25pt 6.25pt; font-size: 9.33pt; font-weight: bold; letter-spacing: 1pt;
+                 background: #E0F2F1; color: #0B5F60; }
 
     h3 { font-size: 10.0pt; color: #6B7280; letter-spacing: 1.2pt; text-transform: uppercase; margin: 9pt 0 4pt; font-weight: bold; }
 
@@ -243,29 +244,25 @@
     <tr>
       <td>
         <div class="brand">{{ brand_line|default:"Nejum ERP" }}</div>
-        {% comment %}One teal line, naming the document: "Order
-        ORD-2026-000027". A combined print names every order it covers,
-        the way a split order is named on its page ("ORD-2026-000023 &
-        ORD-2026-000024") — never one order's number alone, which would
-        appear to speak for all of them.
+        {% comment %}One teal line, the number alone — the chip on the
+        right already says it is an order: "ORD-2026-000027". A combined
+        print names every order it covers, the way a split order is named
+        on its page ("ORD-2026-000023 & ORD-2026-000024") — never one
+        order's number alone, which would appear to speak for all of them.
 
         The # belongs to the id. An order_number, once orders carry one,
         is already a formatted reference and reads wrong behind a hash
-        ("Order #DK0000297").{% endcomment %}
+        ("#DK0000297").{% endcomment %}
         {% if combined %}
-          <div class="doc-type">{% trans "Orders" %} {{ combined_label }}</div>
+          <div class="doc-type">{{ combined_label }}</div>
         {% else %}
-          <div class="doc-type">{% trans "Order" %} {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</div>
+          <div class="doc-type">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</div>
         {% endif %}
       </td>
       <td class="meta">
         <div class="stack">
           <div class="date">{% if combined %}{% if combined_from and combined_to and combined_from != combined_to %}{{ combined_from|date:"d M Y" }} – {{ combined_to|date:"d M Y" }}{% else %}{{ combined_to|date:"d M Y" }}{% endif %}{% else %}{{ order.order_date|date:"d M Y" }}{% endif %}</div>
-          <div class="kinds">
-            {% if order.contact %}<span class="kind b2b">B2B</span>
-            {% elif order.company %}<span class="kind b2b">B2B</span>
-            {% elif order.web_client %}<span class="kind web">WEB</span>{% endif %}
-          </div>
+          <div class="kinds"><span class="kind">{% if combined %}{% trans "ORDERS" %}{% else %}{% trans "ORDER" %}{% endif %}</span></div>
         </div>
       </td>
     </tr>

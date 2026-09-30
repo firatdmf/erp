@@ -577,3 +577,39 @@ class AWarehouseOpenedAfterTheCutover(TestCase):
         theirs = Warehouse.objects.create(name="Laleli", accounting_book=other)
         with self.assertRaises(CommandError):
             self._run("--warehouse", str(theirs.pk), "--date", "2026-09-08")
+
+
+class ReclassifyingPayablesPostsOnlyTheChange(TestCase):
+    """Run once at the cutover and never again, Accounts Payable (2000) kept
+    the cutover credits while customers crossed zero underneath it."""
+
+    def setUp(self):
+        from accounting.models_accounts import CurrentAccount
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Ergene Fabric", base_currency=self.usd)
+        ensure_chart()
+        self.acc = CurrentAccount.objects.create(
+            book=self.book, code="C1", name="Tatyana", type="customer", default_currency=self.usd)
+
+    def _move(self, amount, kind="opening"):
+        CurrentAccountMovement.objects.create(
+            current_account=self.acc, book=self.book, movement_type=kind, date="2026-09-03",
+            amount=Decimal(amount), amount_base=Decimal(amount), currency=self.usd)
+
+    def _payable(self):
+        return {r["code"]: r["balance"] for r in balance_sheet(self.book)["trial_balance"]["rows"]}.get("2000", Decimal("0"))
+
+    def test_a_second_run_posts_nothing(self):
+        self._move("-764.11")
+        reclassify_payables(self.book, date="2026-09-03")
+        entry, _n = reclassify_payables(self.book, date="2026-09-30")
+        self.assertIsNone(entry)
+        self.assertEqual(self._payable(), Decimal("764.11"))
+
+    def test_a_credit_settled_since_comes_back_out_of_payable(self):
+        self._move("-764.11")
+        reclassify_payables(self.book, date="2026-09-03")
+        self._move("231.64", kind="adjustment")          # the customer used part of the credit
+        reclassify_payables(self.book, date="2026-09-30")
+        self.assertEqual(self._payable(), Decimal("532.47"))
+        self.assertTrue(balance_sheet(self.book)["balanced"])

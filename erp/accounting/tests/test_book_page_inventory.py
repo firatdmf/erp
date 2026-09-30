@@ -59,30 +59,47 @@ class BookPageAssets(TestCase):
         self.assertEqual(resp.status_code, 200)
         return resp.context
 
-    def test_stock_shows_up_in_assets(self):
+    def _check(self, ctx, label):
+        return next(c for c in ctx["eq_checks"] if c["label"] == label)
+
+    def test_stock_on_the_shelves_is_checked_against_the_ledger(self):
+        """The card reads the ledger now. Shelf stock with no entry behind it
+        shows as the stock check failing, not as a figure on the card."""
         self._item("100", Decimal("4.00"))
         ctx = self._page()
-        self.assertEqual(ctx["eq_inventory"], Decimal("400.00"))
+        stock = self._check(ctx, "Inventory")
+        self.assertEqual(stock["subsidiary"], Decimal("400.00"))
+        self.assertEqual(stock["ledger"], Decimal("0.00"))
+        self.assertFalse(stock["reconciled"])
+
+    def test_once_stock_is_on_the_books_the_card_shows_it(self):
+        from accounting.services_posting import post_opening_inventory
+        self._item("100", Decimal("4.00"))
+        post_opening_inventory(self.book, date="2026-09-01")
+        ctx = self._page()
+        self.assertIn({"label": "Inventory (1300)", "amount": Decimal("400.00")}, ctx["eq_assets_lines"])
         self.assertEqual(ctx["eq_assets"], Decimal("400.00"))
+        self.assertTrue(ctx["eq_balanced"])
+        self.assertTrue(self._check(ctx, "Inventory")["reconciled"])
 
     def test_it_values_each_item_at_what_that_item_cost(self):
         self._item("100", Decimal("4.00"))
         self._item("100", Decimal("5.00"))
         # Not 200 x the latest price.
-        self.assertEqual(self._page()["eq_inventory"], Decimal("900.00"))
+        self.assertEqual(self._check(self._page(), "Inventory")["subsidiary"], Decimal("900.00"))
 
     def test_it_reports_the_same_inventory_as_the_balance_sheet(self):
         """Two pages, one valuation — they cannot disagree about stock."""
         self._item("100", Decimal("4.00"))
         self._item("250", Decimal("3.25"))
-        self.assertEqual(self._page()["eq_inventory"],
+        self.assertEqual(self._check(self._page(), "Inventory")["subsidiary"],
                          subsidiary_equation(self.book)["inventory"])
 
     def test_an_unpriced_item_is_counted_not_valued(self):
         self._item("100", Decimal("4.00"))
         self._item("20", None, product=self._unpriced_product())
         ctx = self._page()
-        self.assertEqual(ctx["eq_inventory"], Decimal("400.00"))
+        self.assertEqual(self._check(ctx, "Inventory")["subsidiary"], Decimal("400.00"))
         self.assertEqual(ctx["eq_unvalued_items"], 1)
 
     def test_the_page_says_how_many_it_could_not_price(self):
@@ -100,4 +117,41 @@ class BookPageAssets(TestCase):
         WarehouseProductItem.objects.create(
             product=wp, quantity=Decimal("100"), quantity_remaining=Decimal("100"),
             barcode="BC-OTHER", status="in_stock", unit_cost_base=Decimal("9.00"))
-        self.assertEqual(self._page()["eq_inventory"], Decimal("0.00"))
+        self.assertEqual(self._check(self._page(), "Inventory")["subsidiary"], Decimal("0.00"))
+
+
+class BookPageEquationReadsTheLedger(TestCase):
+    """The card used to build equity from hand-typed equity records only, so
+    a book whose ledger balanced to the cent showed 1.4M out of balance."""
+
+    def setUp(self):
+        from accounting.models_accounts import CurrentAccount
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Ergene Fabric", base_currency=self.usd)
+        self.customer = CurrentAccount.objects.create(
+            book=self.book, code="C1", name="Customer", type="customer", default_currency=self.usd)
+        user = get_user_model().objects.create_superuser("owner", "o@x.com", "pw")
+        user.member.books.set([self.book])
+        user.member.default_book = self.book
+        user.member.save(update_fields=["default_book"])
+        self.client.force_login(user)
+
+    def _page(self):
+        resp = self.client.get(reverse("accounting:book_detail", args=[self.book.pk]))
+        self.assertEqual(resp.status_code, 200)
+        return resp
+
+    def test_an_opening_balance_and_a_sale_balance_on_the_card(self):
+        from accounting.models_accounts import CurrentAccountMovement
+        for kind, amt in (("opening", "1000.00"), ("invoice_sale", "250.00")):
+            CurrentAccountMovement.objects.create(
+                current_account=self.customer, book=self.book, movement_type=kind,
+                date="2026-09-10", amount=Decimal(amt), amount_base=Decimal(amt), currency=self.usd)
+        resp = self._page(); ctx = resp.context
+        self.assertTrue(ctx["eq_balanced"])
+        self.assertEqual(ctx["eq_assets"], Decimal("1250.00"))
+        labels = {l["label"]: l["amount"] for l in ctx["eq_equity_lines"]}
+        self.assertEqual(labels["Opening Balance Equity (3100)"], Decimal("1000.00"))
+        self.assertEqual(labels["This period's result"], Decimal("250.00"))
+        self.assertContains(resp, "Assets equal liabilities plus equity.")
+        self.assertNotContains(resp, "unaccounted for")

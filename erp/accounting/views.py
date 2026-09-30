@@ -584,79 +584,54 @@ class BookDetail(generic.DetailView):
     # ------------------------------------------------------------------
     @staticmethod
     def _accounting_equation(book):
-        """Assets = Liabilities + Equity, as far as the data supports it.
+        """Assets = Liabilities + Equity, read from the general ledger.
 
-        Receivables and payables are read off CurrentAccount.cached_balance,
-        which is now the only place they live. They were also mirrored into
-        AssetAccountsReceivable / LiabilityAccountsPayable tables, which
-        this function pointedly did not sum: those mirrors were written per
-        movement and never netted, and a payable was skipped outright
-        unless the account carried a supplier FK, so the payable table held
-        ten rows where the ledger had three hundred. Summing them reported
-        a position off by six figures. The tables are gone; cached_balance
-        is the netted figure the rest of the app already trusts, and it
-        reconciles to the Excel export to the cent.
+        This card used to build its own equation from the working records:
+        cash boxes, customer balances and shelf value on one side, and on
+        the other only the capital, revenue, expense and dividend figures
+        typed in on the equity screens. Nothing a sale, a cost or an
+        opening balance posted ever reached that equity, so the card showed
+        Ergene 1.4M out of balance while its ledger balanced to the cent.
 
-        The equation will NOT balance, and that is a property of the data
-        rather than of this function. Equity here is only the four figures
-        somebody typed in — capital, revenue, expense, dividend. Nothing
-        posts a trading result to it, so accumulated profit has no home and
-        the difference lands in `imbalance` for the template to show. The
-        honest number is the one worth rendering; a plug that forced the
-        two sides to agree would hide exactly the thing worth seeing.
+        It now shows the ledger — the same trial balance the balance-sheet
+        report and audit_ledger read — which balances whenever every entry
+        did. What the old card was really after, whether the books match
+        the cash boxes, customer accounts and shelves, is answered by the
+        control-account checks shown under it (services_ledger.reconcile).
         """
-        zero = Decimal("0.00")
+        from .services_ledger import (_inventory_value, balance_sheet,
+                                      reconcile)
 
-        try:
-            cash = get_total_base_currency_balance(book.pk)
-        except ValidationError:
-            # A currency with no exchange rate — report the cash we can
-            # convert rather than 500-ing the whole page.
-            cash = zero
+        sheet = balance_sheet(book)
+        groups = sheet["groups"]
 
-        current_account = CurrentAccount.objects.filter(book=book).aggregate(
-            receivable=Sum("cached_balance", filter=Q(cached_balance__gt=0)),
-            payable=Sum("cached_balance", filter=Q(cached_balance__lt=0)),
-        )
-        receivable = current_account["receivable"] or zero
-        payable = abs(current_account["payable"] or zero)
+        def lines(kind):
+            return [{"label": f"{row['name']} ({row['code']})",
+                     "amount": row["balance"]}
+                    for row in groups[kind] if row["balance"]]
 
-        # Stock on the shelves is an asset, and this page left it out — it
-        # counted cash, receivables and fixed assets only, so Ergene showed
-        # nothing of the $376,906.10 standing in Ergene Fabrika. Valued by
-        # the same function the balance sheet uses, at what each item cost,
-        # so the two pages cannot report different inventories.
-        from .services_ledger import _inventory_value
-        inventory, unvalued_items, unvalued_qty = _inventory_value(book)
+        equity_lines = lines("equity")
+        if sheet["result"] or sheet["revenue"] or sheet["expenses"]:
+            equity_lines.append({"label": _g("This period's result"),
+                                 "amount": sheet["result"],
+                                 "is_result": True})
 
-        fixed = _sum_in_base(AssetFixedAsset, book, "value")
-        capital = _sum_in_base(EquityCapital, book, "amount")
-        revenue = _sum_in_base(EquityRevenue, book, "amount")
-        expense = _sum_in_base(EquityExpense, book, "amount")
-        dividend = _sum_in_base(EquityDivident, book, "amount")
-
-        assets = cash + receivable + inventory + fixed
-        equity = capital + revenue - expense - dividend
-        liabilities = payable
-
+        _value, unvalued_items, unvalued_qty = _inventory_value(book)
+        checks = reconcile(book)["rows"]
         return {
-            "eq_cash": cash,
-            "eq_receivable": receivable,
-            "eq_inventory": inventory,
+            "eq_assets_lines": lines("asset"),
+            "eq_liabilities_lines": lines("liability"),
+            "eq_equity_lines": equity_lines,
+            "eq_assets": sheet["assets"],
+            "eq_liabilities": sheet["liabilities"],
+            "eq_equity": sheet["equity"],
+            "eq_right_side": sheet["liabilities_plus_equity"],
+            "eq_imbalance": sheet["difference"],
+            "eq_balanced": sheet["balanced"],
+            "eq_checks": checks,
+            "eq_checks_ok": all(c["reconciled"] for c in checks),
             "eq_unvalued_items": unvalued_items,
             "eq_unvalued_qty": unvalued_qty,
-            "eq_fixed": fixed,
-            "eq_assets": assets,
-            "eq_payable": payable,
-            "eq_liabilities": liabilities,
-            "eq_capital": capital,
-            "eq_revenue": revenue,
-            "eq_expense": expense,
-            "eq_dividend": dividend,
-            "eq_equity": equity,
-            "eq_right_side": liabilities + equity,
-            "eq_imbalance": assets - (liabilities + equity),
-            "eq_balanced": abs(assets - (liabilities + equity)) < Decimal("0.01"),
         }
 
     def get_object(self):

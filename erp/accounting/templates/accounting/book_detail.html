@@ -2,6 +2,7 @@
 {% load static %}
 {% load accounting_tags %}
 {% load humanize %}
+{% load i18n %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'accounting/css/book_detail.css' %}">
@@ -267,6 +268,14 @@
     .eq-suspense .code { font-size: .76rem; color: #8A96A6; }
     .eq-suspense a.fix { font-weight: 600; color: #8A5A0B; white-space: nowrap; }
     .eq-suspense .more { margin-top: .5rem; }
+    .eq-checks { margin-top: 12px; border-top: 1px solid #EEF1F5; padding-top: 10px; display: grid; gap: 6px; }
+    .eq-checks-title { font: 700 11px var(--font-sans, sans-serif); letter-spacing: .06em; text-transform: uppercase; color: var(--gray-500, #6B7280); }
+    .eq-check { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+    .eq-check.ok i { color: #0E7C66; } .eq-check.bad i { color: #B23B12; }
+    .eq-check-label { font-weight: 600; min-width: 11rem; }
+    .eq-check-label small { font-weight: 500; color: var(--gray-500, #6B7280); }
+    .eq-check-figs { color: var(--gray-600, #4B5563); font-variant-numeric: tabular-nums; }
+    .eq-check.bad .eq-check-figs strong { color: #B23B12; }
     @media (max-width: 900px) {
       .eq-grid { grid-template-columns: 1fr; }
       .eq-op { padding: .15rem 0; }
@@ -283,60 +292,77 @@
       {% endif %}
     </div>
 
+    {% comment %}
+      Read from the general ledger (BookDetail._accounting_equation), so it
+      balances whenever every entry did. The checks underneath are what the
+      old card was really after: whether the ledger matches the cash boxes,
+      the customer accounts and the stock on the shelves.
+    {% endcomment %}
     <div class="eq-grid">
       <div class="eq-side">
-        <div class="eq-side-title">Assets</div>
-        <div class="eq-line"><span>Cash accounts</span><span class="v">{{ eq_cash|format_money }}</span></div>
-        <div class="eq-line"><span>Receivables</span><span class="v">{{ eq_receivable|format_money }}</span></div>
-        <div class="eq-line">
-          <span>Inventory{% if eq_unvalued_items %}
-            {% comment %}Items with no cost basis are outside the figure, so
-            say how many rather than letting unpriced read as free.{% endcomment %}
-            <small style="color:var(--gray-500);">({{ eq_unvalued_items }} unpriced)</small>{% endif %}</span>
-          <span class="v">{{ eq_inventory|format_money }}</span>
-        </div>
-        <div class="eq-line"><span>Fixed assets</span><span class="v">{{ eq_fixed|format_money }}</span></div>
-        <div class="eq-total"><span>Total</span><span class="v">{{ eq_assets|format_money }}</span></div>
+        <div class="eq-side-title">{% trans "Assets" %}</div>
+        {% for l in eq_assets_lines %}
+        <div class="eq-line"><span>{{ l.label }}</span><span class="v">{{ l.amount|format_money }}</span></div>
+        {% empty %}
+        <div class="eq-line"><span>—</span><span class="v">{{ 0|format_money }}</span></div>
+        {% endfor %}
+        <div class="eq-total"><span>{% trans "Total" %}</span><span class="v">{{ eq_assets|format_money }}</span></div>
       </div>
 
       <div class="eq-op">=</div>
 
       <div class="eq-side">
-        <div class="eq-side-title">Liabilities</div>
-        <div class="eq-line"><span>Payables</span><span class="v">{{ eq_payable|format_money }}</span></div>
-        <div class="eq-total"><span>Total</span><span class="v">{{ eq_liabilities|format_money }}</span></div>
+        <div class="eq-side-title">{% trans "Liabilities" %}</div>
+        {% for l in eq_liabilities_lines %}
+        <div class="eq-line"><span>{{ l.label }}</span><span class="v">{{ l.amount|format_money }}</span></div>
+        {% empty %}
+        <div class="eq-line"><span>—</span><span class="v">{{ 0|format_money }}</span></div>
+        {% endfor %}
+        <div class="eq-total"><span>{% trans "Total" %}</span><span class="v">{{ eq_liabilities|format_money }}</span></div>
       </div>
 
       <div class="eq-op">+</div>
 
       <div class="eq-side">
-        <div class="eq-side-title">Equity</div>
-        <div class="eq-line"><span>Capital</span><span class="v">{{ eq_capital|format_money }}</span></div>
-        <div class="eq-line"><span>Revenue</span><span class="v">{{ eq_revenue|format_money }}</span></div>
-        <div class="eq-line"><span>Expenses</span><span class="v">&minus;{{ eq_expense|format_money }}</span></div>
-        <div class="eq-line"><span>Dividends</span><span class="v">&minus;{{ eq_dividend|format_money }}</span></div>
-        <div class="eq-total"><span>Total</span><span class="v">{{ eq_equity|format_money }}</span></div>
+        <div class="eq-side-title">{% trans "Equity" %}</div>
+        {% for l in eq_equity_lines %}
+        <div class="eq-line"><span>{% if l.is_result %}<em>{{ l.label }}</em>{% else %}{{ l.label }}{% endif %}</span><span class="v">{{ l.amount|format_money }}</span></div>
+        {% empty %}
+        <div class="eq-line"><span>—</span><span class="v">{{ 0|format_money }}</span></div>
+        {% endfor %}
+        <div class="eq-total"><span>{% trans "Total" %}</span><span class="v">{{ eq_equity|format_money }}</span></div>
       </div>
     </div>
 
     {% if eq_balanced %}
     <div class="eq-ok">
       <i class="fas fa-check-circle"></i>
-      <span>Assets equal liabilities plus equity.</span>
+      <span>{% trans "Assets equal liabilities plus equity." %}</span>
     </div>
     {% else %}
     <div class="eq-alert">
       <i class="fas fa-triangle-exclamation"></i>
       <div class="eq-alert-body">
-        <span class="eq-alert-amount">{{ eq_imbalance|format_money }} unaccounted for</span>
-        Assets total <strong>{{ eq_assets|format_money }}</strong> against liabilities plus equity of
-        <strong>{{ eq_right_side|format_money }}</strong>. Equity here holds only the capital, revenue,
-        expense and dividend figures entered by hand &mdash; no trading result is ever posted to it, so
-        accumulated profit has nowhere to sit and shows up as this gap. Until retained earnings is
-        recorded, the two sides cannot meet.
+        <span class="eq-alert-amount">{% blocktrans with amount=eq_imbalance|format_money %}{{ amount }} out of balance{% endblocktrans %}</span>
+        {% blocktrans with a=eq_assets|format_money r=eq_right_side|format_money %}Assets total <strong>{{ a }}</strong> against liabilities plus equity of <strong>{{ r }}</strong>. Every journal entry balances on the way in, so this means an entry was written some other way — run audit_ledger for this book.{% endblocktrans %}
       </div>
     </div>
     {% endif %}
+
+    <div class="eq-checks">
+      <div class="eq-checks-title">{% trans "Does the ledger match the records?" %}</div>
+      {% for c in eq_checks %}
+      <div class="eq-check {% if c.reconciled %}ok{% else %}bad{% endif %}">
+        <i class="fas {% if c.reconciled %}fa-check-circle{% else %}fa-circle-exclamation{% endif %}"></i>
+        <span class="eq-check-label">{% trans c.label %}{% if c.label == "Inventory" and eq_unvalued_items %}
+          <small>({% blocktrans count counter=eq_unvalued_items %}{{ counter }} unpriced{% plural %}{{ counter }} unpriced{% endblocktrans %})</small>{% endif %}</span>
+        <span class="eq-check-figs">
+          {% trans "ledger" %} {{ c.ledger|format_money }} · {% trans "records" %} {{ c.subsidiary|format_money }}
+          {% if not c.reconciled %}· <strong>{% trans "off by" %} {{ c.difference|format_money }}</strong>{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
 
     {% if suspense.balance %}
     {% comment %}

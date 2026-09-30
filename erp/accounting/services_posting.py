@@ -395,29 +395,41 @@ def post_opening_inventory(book, *, date, reference="", warehouse=None,
 
 @transaction.atomic
 def reclassify_payables(book, *, date, reference=""):
-    """Move the accounts that are in credit from receivable to payable.
+    """Bring Accounts Payable (2000) to the accounts that are in credit today.
 
-    Every current account movement posts to 1200 because that is where the account's
-    running balance lives. An account whose balance ends up NEGATIVE is
-    not a receivable at all — the book owes them — and a balance sheet
-    that nets the two together understates both sides. One entry at the
-    end moves the credit balances across, which is how a subsidiary
-    ledger is reconciled to its control accounts anywhere else.
+    Every current account movement posts to 1200 because that is where the
+    account's running balance lives. An account whose balance is NEGATIVE
+    is not a receivable at all — the book owes them — so its credit belongs
+    in 2000. The split was made once, at the cutover, and never again:
+    customers crossing zero afterwards moved only 1200, so 2000 kept the
+    cutover figure (Ergene: 764.11 against 532.47 actually owed).
+
+    This posts the DIFFERENCE between what 2000 holds and what the accounts
+    in credit add up to, so it can be run at any time, as often as liked:
+    a second run posts nothing. Returns (entry or None, accounts in credit).
     """
+    from django.db.models import Sum
     from .models_accounts import CurrentAccount
+    from .models_ledger import JournalLine
 
-    total = -(CurrentAccount.objects.filter(book=book, cached_balance__lt=0)
-              .aggregate(t=__import__("django.db.models", fromlist=["Sum"])
-                         .Sum("cached_balance"))["t"] or ZERO)
-    if total <= ZERO:
-        return None, 0
-    count = CurrentAccount.objects.filter(book=book, cached_balance__lt=0).count()
+    in_credit = CurrentAccount.objects.filter(book=book, cached_balance__lt=0)
+    count = in_credit.count()
+    owed = -(in_credit.aggregate(t=Sum("cached_balance"))["t"] or ZERO)
+    held = JournalLine.objects.filter(entry__book=book, account__code="2000").aggregate(
+        d=Sum("debit"), c=Sum("credit"))
+    held = (held["c"] or ZERO) - (held["d"] or ZERO)
+    delta = (owed - held).quantize(Decimal("0.01"))
+    if delta == ZERO:
+        return None, count
+    memo = f"Accounts in credit: {count}, owed {owed:.2f}; payable held {held:.2f}"
+    if delta > ZERO:
+        lines = [debit("1200", delta, memo=memo), credit("2000", delta, memo=memo)]
+    else:
+        lines = [debit("2000", -delta, memo=memo), credit("1200", -delta, memo=memo)]
     entry = post_entry(
         book=book, date=date,
         description="Reclassify credit balances to accounts payable",
-        lines=[debit("1200", total, memo="Credit balances out of receivable"),
-               credit("2000", total, memo="Credit balances into payable")],
-        reference=reference,
+        lines=lines, reference=reference,
     )
     return entry, count
 

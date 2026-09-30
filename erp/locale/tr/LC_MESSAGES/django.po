@@ -11267,3 +11267,55 @@ msgstr ""
 #: operating/views_warehouse.py
 msgid "You don't have access to this book."
 msgstr "Bu deftere erişiminiz yok."
+#: accounting/templates/accounting/book_detail.html
+msgid "Assets"
+msgstr "Varlıklar"
+
+#: accounting/templates/accounting/book_detail.html
+msgid "Liabilities"
+msgstr "Borçlar"
+
+#: accounting/views.py
+msgid "This period's result"
+msgstr "Bu dönemin sonucu"
+
+#: accounting/templates/accounting/book_detail.html
+msgid "Assets equal liabilities plus equity."
+msgstr "Varlıklar, borçlar ile özkaynağın toplamına eşit."
+
+#: accounting/templates/accounting/book_detail.html
+#, python-format
+msgid "%(amount)s out of balance"
+msgstr "%(amount)s dengesiz"
+
+#: accounting/templates/accounting/book_detail.html
+#, python-format
+msgid "Assets total <strong>%(a)s</strong> against liabilities plus equity of <strong>%(r)s</strong>. Every journal entry balances on the way in, so this means an entry was written some other way — run audit_ledger for this book."
+msgstr "Varlıklar toplamı <strong>%(a)s</strong>, borçlar ile özkaynak toplamı <strong>%(r)s</strong>. Her yevmiye kaydı girerken dengelidir; bu fark, bir kaydın başka bir yolla yazıldığı anlamına gelir — bu defter için audit_ledger çalıştırın."
+
+#: accounting/templates/accounting/book_detail.html
+msgid "Does the ledger match the records?"
+msgstr "Defter kayıtlarla uyuşuyor mu?"
+
+#: accounting/templates/accounting/book_detail.html
+msgid "ledger"
+msgstr "defter"
+
+#: accounting/templates/accounting/book_detail.html
+msgid "off by"
+msgstr "fark"
+
+#: accounting/templates/accounting/book_detail.html
+#, python-format
+msgid "%(counter)s unpriced"
+msgid_plural "%(counter)s unpriced"
+msgstr[0] "%(counter)s fiyatsız"
+msgstr[1] "%(counter)s fiyatsız"
+
+#: accounting/services_ledger.py
+msgid "Receivables less payables"
+msgstr "Alacaklar eksi borçlar"
+
+#: accounting/services_ledger.py
+msgid "Cash and bank"
+msgstr "Kasa ve banka"

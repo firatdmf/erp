@@ -5770,14 +5770,18 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
                   .select_for_update().filter(pk__in=_roll_ids)}
         _wps = {x.pk: x for x in WarehouseProduct.objects
                 .select_for_update().filter(pk__in=_wp_ids)}
+        # Written in bulk once the loop has worked everything out: one
+        # query per roll, product, movement and reservation each timed out
+        # an order of 400 rolls before it could ship.
+        now = _tz.now()
+        cut_rolls, cut_wps, movements = {}, {}, []
         for r in resv:
             roll = _rolls.get(r.stock_item_id)
             wp = _wps.get(r.warehouse_product_id)
             take = Decimal(str(r.quantity or 0))
             if take <= 0 or roll is None or wp is None:
                 r.consumed = True
-                r.consumed_at = _tz.now()
-                r.save(update_fields=["consumed", "consumed_at"])
+                r.consumed_at = now
                 continue
             avail = (roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity) or Decimal("0")
             actual = take if take <= avail else avail  # clamp — never negative
@@ -5786,12 +5790,12 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
                 roll.status = "consumed"
             elif roll.quantity_remaining < (roll.quantity or Decimal("0")):
                 roll.status = "partial"
-            roll.save(update_fields=["quantity_remaining", "status"])
+            cut_rolls[roll.pk] = roll
 
             wp.quantity = (wp.quantity or Decimal("0")) - actual
-            wp.save(update_fields=["quantity", "updated_at"])
+            cut_wps[wp.pk] = wp
 
-            StockMovement.objects.create(
+            movements.append(StockMovement(
                 product=wp, stock_item=roll, movement_type="out",
                 quantity=actual, reason=f"{reason_prefix} {order_ref}",
                 reference=str(order_ref),
@@ -5799,26 +5803,44 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
                 # event — recorded, so nothing downstream has to infer it.
                 order=order, reservation=r,
                 created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
-            )
+            ))
             # If the roll physically had less than was reserved (it got cut
             # elsewhere after reservation), record the shortfall so it's
             # visible on the timeline instead of silently swallowed.
             if actual < take:
-                StockMovement.objects.create(
+                movements.append(StockMovement(
                     product=wp, stock_item=None, movement_type="adjustment",
                     quantity=(take - actual),
                     reason=f"⚠️ Shortage: {reason_prefix} {order_ref} reserved {take}m but only {actual}m was available",
                     reference=str(order_ref),
                     created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
-                )
+                ))
             # Pin the reservation to what was ACTUALLY cut so an un-ship
             # restores exactly that amount (never inflating the roll).
             r.quantity = actual
             r.consumed = True
-            r.consumed_at = _tz.now()
-            r.save(update_fields=["quantity", "consumed", "consumed_at"])
+            r.consumed_at = now
             results.append({"product": wp.id, "roll": roll.id, "taken": float(actual)})
+        _write_stock_changes(cut_rolls, cut_wps, movements, resv,
+                             ["quantity", "consumed", "consumed_at"])
     return results
+
+
+def _write_stock_changes(rolls, wps, movements, reservations, reservation_fields):
+    """Save what consume/restore_reservations_for_order worked out, in a
+    fixed number of queries whatever the roll count. bulk_create sends no
+    post_save, so the movements are posted to the ledger here instead."""
+    from accounting.signals_ledger import post_bulk_stock_movements
+    from .models import OrderStockReservation
+
+    WarehouseProductItem.objects.bulk_update(
+        list(rolls.values()), ["quantity_remaining", "status"], batch_size=500)
+    for wp in wps.values():
+        wp.save(update_fields=["quantity", "updated_at"])
+    movements = StockMovement.objects.bulk_create(movements, batch_size=500)
+    OrderStockReservation.objects.bulk_update(
+        reservations, reservation_fields, batch_size=500)
+    post_bulk_stock_movements(movements)
 
 
 def restore_reservations_for_order(order, user=None, reason_prefix="Order un-ship"):
@@ -5844,6 +5866,8 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
                   .select_for_update().filter(pk__in=_roll_ids)}
         _wps = {x.pk: x for x in WarehouseProduct.objects
                 .select_for_update().filter(pk__in=_wp_ids)}
+        # In bulk, for the same reason as consume_reservations_for_order.
+        back_rolls, back_wps, movements = {}, {}, []
         for r in resv:
             roll = _rolls.get(r.stock_item_id)
             wp = _wps.get(r.warehouse_product_id)
@@ -5860,10 +5884,10 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
                     roll.status = "in_stock"
                 else:
                     roll.status = "partial"
-                roll.save(update_fields=["quantity_remaining", "status"])
+                back_rolls[roll.pk] = roll
                 wp.quantity = (wp.quantity or Decimal("0")) + qty
-                wp.save(update_fields=["quantity", "updated_at"])
-                StockMovement.objects.create(
+                back_wps[wp.pk] = wp
+                movements.append(StockMovement(
                     product=wp, stock_item=roll, movement_type="in",
                     quantity=qty, reason=f"{reason_prefix} {order_ref}",
                     reference=str(order_ref),
@@ -5872,11 +5896,12 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
                     # (services_posting.lines_for_stock_movement).
                     order=order, reservation=r,
                     created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
-                )
+                ))
             r.consumed = False
             r.consumed_at = None
-            r.save(update_fields=["consumed", "consumed_at"])
             restored.append({"product": wp.id if wp else None, "roll": roll.id if roll else None, "qty": float(qty)})
+        _write_stock_changes(back_rolls, back_wps, movements, resv,
+                             ["consumed", "consumed_at"])
     return restored
 
 

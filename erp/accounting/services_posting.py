@@ -879,3 +879,73 @@ def post_stock_movement(movement, *, reference=""):
         source=movement,
         reference=reference or (movement.reference or "")[:60],
     )
+
+
+@transaction.atomic
+def post_stock_movements(movements):
+    """post_stock_movement for many movements, in a handful of queries.
+
+    Shipping an order cuts every roll it holds, and posting each cut on its
+    own took about sixteen queries — an order of 400 rolls ran past the web
+    server's timeout and never shipped at all. The entries are the same
+    ones, one per movement, so the ledger reads exactly as if each had been
+    posted by itself; only the round trips are shared.
+
+    The movements come from bulk_create, which sends no post_save, so this
+    is their only posting. Returns the entries written.
+    """
+    from django.contrib.contenttypes.models import ContentType
+
+    from .models_ledger import JournalEntry, JournalLine
+
+    movements = [m for m in movements if m.pk is not None]
+    if not movements:
+        return []
+    ct = ContentType.objects.get_for_model(movements[0].__class__)
+    JournalEntry.objects.filter(
+        source_type=ct, source_id__in=[m.pk for m in movements]).delete()
+
+    accounts = {}
+    pending = []
+    for movement in movements:
+        lines = lines_for_stock_movement(movement)
+        if not lines:
+            continue
+        book = movement.product.warehouse.accounting_book
+        if book is None:
+            continue
+        # post_entry refuses an entry whose sides disagree; checked here,
+        # before anything is written, since the lines go in by bulk_create.
+        if sum(l["debit"] for l in lines) != sum(l["credit"] for l in lines):
+            raise ValidationError(
+                f"Stock movement {movement.pk} does not balance.")
+        for spec in lines:
+            if spec["code"] not in accounts:
+                accounts[spec["code"]] = account(spec["code"])
+        pending.append((JournalEntry(
+            book=book,
+            date=movement.created_at.date(),
+            description=(movement.reason or movement.get_movement_type_display())[:300],
+            reference=(movement.reference or "")[:60],
+            source_type=ct,
+            source_id=movement.pk,
+        ), lines))
+
+    entries = JournalEntry.objects.bulk_create([entry for entry, _lines in pending])
+    JournalLine.objects.bulk_create([
+        JournalLine(
+            entry=entry,
+            account=accounts[spec["code"]],
+            debit=spec["debit"],
+            credit=spec["credit"],
+            current_account=spec["current_account"],
+            cash_account=spec["cash_account"],
+            currency=spec["currency"],
+            amount_original=spec["amount_original"],
+            exchange_rate=spec["exchange_rate"],
+            memo=spec["memo"],
+        )
+        for entry, (_entry, lines) in zip(entries, pending)
+        for spec in lines
+    ])
+    return entries

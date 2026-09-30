@@ -119,6 +119,13 @@ def post_stock_movement_to_ledger(sender, instance, raw=False, **kwargs):
     _safely(f"stock movement {instance.pk}", post_stock_movement, instance)
 
 
+def post_bulk_stock_movements(movements):
+    """What the receiver above does, for movements made by bulk_create —
+    which sends no post_save. Absorbs a posting problem the same way."""
+    from .services_posting import post_stock_movements
+    _safely(f"{len(movements)} stock movements", post_stock_movements, movements)
+
+
 @receiver(post_delete, sender="operating.StockMovement")
 def unpost_stock_movement_from_ledger(sender, instance, **kwargs):
     from .services_posting import unpost

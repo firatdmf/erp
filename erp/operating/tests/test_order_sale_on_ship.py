@@ -240,6 +240,74 @@ class GoodsComingBackReturnTheirCost(SaleOnShipBase):
         self.assertEqual(rows["1300"], Decimal("0.00"))
 
 
+class AnOrderOfManyRollsShipsInOneGo(SaleOnShipBase):
+    """Each cut roll took about sixteen queries, most of them its cost
+    going into the ledger. An order of 400 rolls (ORD-2026-000033) ran
+    past the web server's timeout and could not be completed."""
+
+    def ship_rolls(self, count):
+        batch = WarehouseProduct.objects.count()
+        warehouse = Warehouse.objects.create(name=f"Laleli Fabrika {batch}",
+                                             accounting_book=self.book)
+        wp = WarehouseProduct.objects.create(
+            warehouse=warehouse, name="2003 EKRU", sku=f"2003.23-100.{batch}",
+            quantity=Decimal(50 * count), cost_usd=Decimal("1.07"))
+        order = self.order()
+        item = order.items.get()
+        for n in range(count):
+            roll = WarehouseProductItem.objects.create(
+                product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
+                barcode=f"TLS-{batch}-{n}", status="in_stock", unit_cost_base=Decimal("1.07"))
+            OrderStockReservation.objects.create(
+                order=order, order_item=item, stock_item=roll,
+                warehouse_product=wp, quantity=Decimal("50"))
+        return order, wp
+
+    def queries_to_ship(self, count):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        order, _wp = self.ship_rolls(count)
+        with CaptureQueriesContext(connection) as ctx:
+            self.move(order, "shipped")
+        return len(ctx.captured_queries)
+
+    def test_shipping_takes_as_many_queries_for_forty_rolls_as_for_four(self):
+        self.queries_to_ship(4)                    # warms the lookups Django caches
+        self.assertEqual(self.queries_to_ship(40), self.queries_to_ship(4))
+
+    def test_every_roll_still_leaves_the_shelf_and_the_ledger(self):
+        from accounting.models_ledger import JournalEntry
+        from operating.models import StockMovement
+        order, wp = self.ship_rolls(30)
+        self.move(order, "shipped")
+
+        wp.refresh_from_db()
+        self.assertEqual(wp.quantity, Decimal("0"))
+        self.assertEqual(set(WarehouseProductItem.objects.values_list(
+            "quantity_remaining", "status")), {(Decimal("0.00"), "consumed")})
+        self.assertFalse(order.stock_reservations.filter(consumed=False).exists())
+        outs = StockMovement.objects.filter(movement_type="out", order=order)
+        self.assertEqual(outs.count(), 30)
+        # One entry per roll, as when each posted on its own.
+        self.assertEqual(JournalEntry.objects.filter(
+            source_type__model="stockmovement",
+            source_id__in=outs.values("pk")).count(), 30)
+        rows = {r["code"]: r["balance"]
+                for r in balance_sheet(self.book)["trial_balance"]["rows"]}
+        self.assertEqual(rows["5000"], Decimal("1605.00"))         # 30 × 50m × 1.07
+
+        self.move(order, "packaging")
+        wp.refresh_from_db()
+        self.assertEqual(wp.quantity, Decimal("1500"))
+        self.assertEqual(set(WarehouseProductItem.objects.values_list(
+            "quantity_remaining", "status")), {(Decimal("50.00"), "in_stock")})
+        self.assertFalse(order.stock_reservations.filter(consumed=True).exists())
+        rows = {r["code"]: r["balance"]
+                for r in balance_sheet(self.book)["trial_balance"]["rows"]}
+        self.assertEqual(rows["5000"], Decimal("0.00"))
+        self.assertEqual(rows["1300"], Decimal("0.00"))
+
+
 class TheAccountPageNamesWhatIsComing(SaleOnShipBase):
 
     def test_open_orders_are_listed_under_the_balance(self):

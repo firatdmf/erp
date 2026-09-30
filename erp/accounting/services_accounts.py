@@ -21,6 +21,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Count, Sum
+from django.utils import timezone
 
 from accounting.models import Book, CurrencyCategory
 
@@ -754,38 +755,129 @@ def mark_as_supplier(current_account):
 # ---------------------------------------------------------------------------
 # Movements — keep the order ↔ movement mapping atomic + idempotent.
 # ---------------------------------------------------------------------------
-def _order_movement(order):
-    """Return the existing 'order_sale' movement for this order, if any.
+# The statuses in which an order's goods are the customer's: a sale. The
+# same set operating.views_warehouse.SHIPPED_CLASS names, repeated rather
+# than imported because operating imports this module.
+SOLD_STATUSES = frozenset({"shipped", "in_transit", "out_for_delivery", "delivered"})
 
-    Uses CurrentAccountMovement's generic source FK so we can look the row up
-    without storing a pointer on Order itself.
+# What an order writes on its customer's account: a sale each time it
+# ships, a reversal each time one of those is taken back.
+ORDER_MOVEMENT_TYPES = ("order_sale", "return_sale")
+
+
+def _order_movements(order):
+    """Every sale and reversal this order has written, oldest first.
+
+    Uses CurrentAccountMovement's generic source FK so we can look the rows
+    up without storing a pointer on Order itself.
     """
     if not order or not order.pk:
-        return None
+        return CurrentAccountMovement.objects.none()
     ct = ContentType.objects.get_for_model(order.__class__)
     return CurrentAccountMovement.objects.filter(
-        source_type=ct, source_id=order.pk, movement_type="order_sale",
-    ).first()
+        source_type=ct, source_id=order.pk, movement_type__in=ORDER_MOVEMENT_TYPES,
+    ).order_by("pk")
+
+
+def _order_movement(order):
+    """The sale that is standing — the last row written, when it is a sale.
+
+    None when the order never shipped, or when its last sale was taken
+    back: sales and reversals alternate, so the last row says which state
+    the order is in.
+    """
+    last = _order_movements(order).last()
+    return last if last is not None and last.movement_type == "order_sale" else None
+
+
+def _delete_movement(movement):
+    if movement is None:
+        return
+    current_account = movement.current_account
+    movement.delete()
+    current_account.recompute_balance(save=True)
+
+
+def _reverse_sale(order, sale, *, member=None):
+    """Take `sale` back: dated today, or gone if it was only written today.
+
+    A sale from an earlier day stays where it is and its exact negative is
+    written beside it — same currency, same rate, same base value — so the
+    pair nets to nothing in either currency, and the month the sale landed
+    in reads the same as it did before. One written today is deleted
+    instead: a click undone the same day is a mistake, and nothing can
+    have been reported or closed on it yet.
+    """
+    if sale.date >= timezone.localdate():
+        _delete_movement(sale)
+        return None
+    returned = getattr(order, "order_status", "") == "returned"
+    ret = CurrentAccountMovement(
+        movement_type="return_sale",
+        source_type=ContentType.objects.get_for_model(order.__class__),
+        source_id=order.pk,
+        date=timezone.localdate(),
+        created_by=member,
+        current_account=sale.current_account,
+        book=sale.book,
+        amount=-sale.amount,
+        currency=sale.currency,
+        exchange_rate=sale.exchange_rate,
+        # Set explicitly: save() derives it only when empty, and would
+        # convert at today's rate instead of the one the sale was booked at.
+        amount_base=-sale.amount_base,
+        description=(f"Return of order #{order.pk}" if returned
+                     else f"Order #{order.pk} reopened"),
+        reference=sale.reference,
+    )
+    ret.save()
+    return ret
+
+
+def _follow_customer(order, current_account):
+    """Move every row of this order onto the account it now belongs to.
+
+    A corrected customer changes who the order was sold to, not when:
+    each row keeps its date, so no month gains or loses the sale.
+    """
+    moved_from = set()
+    for mv in _order_movements(order).exclude(current_account=current_account):
+        moved_from.add(mv.current_account)
+        mv.current_account = current_account
+        mv.book = current_account.book
+        mv.save()
+    for previous in moved_from:
+        previous.recompute_balance(save=True)
 
 
 @transaction.atomic
 def post_order_movement(order, *, member=None):
-    """Create (or update) the current account movement that represents this order.
+    """Make the customer's account say what this order is worth to it.
 
-    Sign convention: order_sale is a debit on the customer (+ amount —
-    the customer owes us more once the order goes out). This mirrors
-    invoice_sale; the customer's current account balance reflects pending orders
-    even before a formal invoice is issued.
+    An order is a sale once it SHIPS, not when it is written: until the
+    goods leave, the customer owes nothing, and a sale booked at order
+    time put revenue in 4000 weeks before its cost reached 5000.
 
-    The amount is order.billable_value() — price × ORDERED quantity per
-    line (see Order.get_billable_line_quantities), i.e. the order total
-    the order screen shows, whatever the warehouse has or hasn't
-    scanned. Called both by the OrderItem save signal (order edits) and
-    by every packing/reservation endpoint, so the current account matches the order
-    from the moment it is saved.
+    Once written, the order's rows are only ever added to, never moved:
 
-    Idempotent: re-running after an edit updates the amount in place
-    instead of creating a duplicate movement.
+      * shipping writes an order_sale — a debit on the customer, + the
+        order total — dated that day;
+      * leaving the shipped statuses (reopened, returned) takes the
+        standing sale back with a return_sale dated that day, or deletes
+        it if it was written today (_reverse_sale);
+      * shipping again writes a new sale, dated that day.
+
+    So a sale stays in the month it shipped, as its cost does in 5000 —
+    stock is cut and restored the same way. An order that went out,
+    came back and went out again reads sale, return, sale.
+
+    The amount is order.billable_value() — see Order.billed_line_quantities
+    for how shipping freezes it. Every caller (item edits, packing scans,
+    customer changes, goods arriving, shipping itself) funnels through
+    here; on an open order all but shipping are a no-op, and after
+    shipping they keep the standing sale's amount right, e.g. a delivery
+    charge added once the goods are out. A later edit keeps the sale's
+    date.
     """
     if not order or not order.pk:
         return None
@@ -793,6 +885,8 @@ def post_order_movement(order, *, member=None):
     current_account = order.current_account
     if not current_account:
         return None
+
+    _follow_customer(order, current_account)
 
     # The order total — see Order.billable_value().
     try:
@@ -802,19 +896,14 @@ def post_order_movement(order, *, member=None):
 
     existing = _order_movement(order)
 
-    # A cancelled order must never carry a receivable — item edits fire
-    # the OrderItem sync signal regardless of status, and without this
-    # guard such an edit would silently resurrect the reversed movement.
     # Goods bought from a supplier for this order and not received yet
-    # mean nothing has been sold: the customer is charged once they are
-    # in (perform_intake reposts). Every caller funnels through here, so
-    # an edit on the order page while the purchase is still a draft can't
-    # sneak the receivable back either.
-    if total <= 0 or getattr(order, "order_status", "") == "cancelled" \
+    # mean nothing has been sold; completion refuses until they are in
+    # (apply_order_status_change), and this holds the same line for any
+    # caller that gets here first.
+    if total <= 0 or getattr(order, "order_status", "") not in SOLD_STATUSES \
             or order.billing_waits_for_goods():
         if existing:
-            existing.delete()
-            current_account.recompute_balance(save=True)
+            _reverse_sale(order, existing, member=member)
         return None
 
     # The movement lives with the account it posts to, not with whoever
@@ -826,29 +915,20 @@ def post_order_movement(order, *, member=None):
     desc = f"Order #{order.pk}"
 
     if existing:
-        # Update in place — keeps the movement's id stable and avoids
-        # phantom rows in the ledger UI. A changed customer moves the row
-        # with it; left behind, it kept billing the old account.
-        previous_account = (existing.current_account
-                            if existing.current_account_id != current_account.pk else None)
-        existing.current_account = current_account
+        # Update in place — keeps the movement's id and date.
         existing.amount = total
         existing.currency = currency
-        existing.book = book
-        existing.date = order.order_date or (order.created_at.date() if order.created_at else date.today())
         existing.description = desc
         existing.reference = ref
         # Force amount_base recompute on save.
         existing.amount_base = Decimal("0")
         existing.save()
-        if previous_account:
-            previous_account.recompute_balance(save=True)
         return existing
 
     return CurrentAccountMovement.objects.create(
         current_account=current_account,
         book=book,
-        date=order.order_date or (order.created_at.date() if order.created_at else date.today()),
+        date=timezone.localdate(),
         amount=total,
         currency=currency,
         movement_type="order_sale",
@@ -861,16 +941,11 @@ def post_order_movement(order, *, member=None):
 
 
 def reverse_order_movement(order):
-    """Delete the current account movement tied to this order (e.g. on order
-    deletion or cancellation). Current account balance is recomputed inside
-    CurrentAccountMovement.delete via the standard model flow."""
-    mv = _order_movement(order)
-    if not mv:
-        return
-    current_account = mv.current_account
-    mv.delete()
-    if current_account:
-        current_account.recompute_balance(save=True)
+    """Delete every row this order wrote on a current account — for an order
+    being deleted, or one whose customer is cleared, where no account is
+    left to carry them."""
+    for mv in list(_order_movements(order)):
+        _delete_movement(mv)
 
 
 # ---------------------------------------------------------------------------
@@ -969,7 +1044,8 @@ def post_retail_order_financials(order, user=None):
 
 def reverse_retail_order_financials(order, user=None):
     """Undo post_retail_order_financials when a retail order leaves the
-    shipped state (un-ship / cancel): remove the sale movement.
+    shipped state (reopened / returned): take the sale back, the same way
+    any order's is (post_order_movement).
 
     Collections are left alone — every one of them is now somebody's
     hand-entered record of money that actually changed hands, and un-
@@ -979,7 +1055,7 @@ def reverse_retail_order_financials(order, user=None):
     """
     from .models import Payment
 
-    reverse_order_movement(order)
+    post_order_movement(order, member=getattr(user, "member", None) if user else None)
 
     # The order already carries the retail current account that
     # post_retail_order_financials attached; ask it rather than guessing

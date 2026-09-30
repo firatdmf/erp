@@ -1151,6 +1151,22 @@ class CurrentAccountDetail(View):
             .order_by("-created_at")
         )[:20]
 
+        # Orders not completed yet are not in the balance — they are billed
+        # when they ship (post_order_movement). Listed under it, per
+        # currency, so what is coming is still in view.
+        open_totals = {}
+        open_count = 0
+        for order in (current_account.orders.exclude(order_status__in=(
+                "shipped", "in_transit", "out_for_delivery", "delivered",
+                "cancelled", "returned"))
+                .select_related("currency")
+                .prefetch_related("items", "adjustments")):
+            open_count += 1
+            symbol = order.currency_symbol
+            open_totals[symbol] = open_totals.get(symbol, Decimal("0")) + order.billable_value()
+        open_orders = {"count": open_count,
+                       "totals": [{"symbol": s, "amount": a} for s, a in open_totals.items()]}
+
         # What the balance is worth at today's rate, beside the figure the
         # book carries. Both lines and the FX panel under them read from the
         # one fx_position call, so they cannot quote different numbers, and
@@ -1176,6 +1192,7 @@ class CurrentAccountDetail(View):
             "movement_count": movement_count,
             "movements_shown": len(movements_with_balance),
             "recent_orders": recent_orders,
+            "open_orders": open_orders,
             "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
             # Buttons on the CRM picker, in the order the CRM itself

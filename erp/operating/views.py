@@ -384,9 +384,10 @@ def _order_current_account_snapshot(order):
         from django.contrib.contenttypes.models import ContentType
         current_account = CurrentAccount.objects.get(pk=order.current_account_id)
         ct = ContentType.objects.get_for_model(order.__class__)
+        # The latest sale — an order shipped twice has two.
         mv = CurrentAccountMovement.objects.filter(
             source_type=ct, source_id=order.pk, movement_type="order_sale",
-        ).first()
+        ).order_by("-pk").first()
         mv_amount = float(mv.amount) if mv else None
         mv_symbol = (mv.currency.symbol if (mv and mv.currency_id) else "") or ""
         bal = float(current_account.cached_balance or 0)
@@ -456,12 +457,17 @@ class OrderDetail(DetailView):
         ctx["scan_shortfall"] = short_amount
         ctx["scan_shortfall_rows"] = short_rows
         ctx["supplier_purchases"] = self._supplier_purchases()
-        # The customer is charged only once the goods bought for them are
-        # in (post_order_movement) — the account card says so meanwhile,
-        # or the missing sale looks like a bug.
+        # Goods bought for the order and not received yet hold completion
+        # back — the Complete button says so and names the purchases.
         ctx["billing_waits_for"] = (
             [p for p in ctx["supplier_purchases"] if p.status == "draft"]
             if self.object.billing_waits_for_goods() else [])
+        # An open order is not a sale yet: its account is charged when it
+        # completes (post_order_movement). Said on the account card, or the
+        # balance beside it looks like it forgot the order.
+        from .order_purchases import order_is_open
+        ctx["billed_on_completion"] = (bool(self.object.current_account_id)
+                                       and order_is_open(self.object))
         # An order created by a purchase is that purchase's mirror — its
         # lines were written on the purchase form and are kept in step from
         # there (order_purchases.sync_customer_order). A line added on the
@@ -898,13 +904,11 @@ class OrderDetail(DetailView):
                 return JsonResponse({"ok": False, "error": "Bad customer"}, status=400)
             order.save(update_fields=["contact", "company", "updated_at"])
 
-            # Customer changed → re-resolve the current account and move the ledger
-            # row to the new account. The old movement (if any) is reversed
-            # before posting fresh to avoid orphaning balance on the old current account.
+            # Customer changed → re-resolve the current account; posting
+            # moves the order's rows onto it with their dates kept
+            # (post_order_movement), so no month gains or loses the sale.
             try:
                 new_current_account = get_or_create_current_account_for_order(order, member=member)
-                if order.current_account_id and (not new_current_account or new_current_account.pk != order.current_account_id):
-                    reverse_order_movement(order)
                 if new_current_account and order.current_account_id != new_current_account.pk:
                     order.current_account = new_current_account
                     order.save(update_fields=["current_account", "updated_at"])
@@ -2740,9 +2744,6 @@ def order_customer_card_view(request, pk):
         and move the order_sale movement to the new account."""
         try:
             new_current_account = get_or_create_current_account_for_order(order, member=member)
-            # If the current account is changing, reverse the old movement first.
-            if prev_current_account_id and (not new_current_account or new_current_account.pk != prev_current_account_id):
-                reverse_order_movement(order)
             if new_current_account and order.current_account_id != new_current_account.pk:
                 order.current_account = new_current_account
                 order.save(update_fields=["current_account", "updated_at"])

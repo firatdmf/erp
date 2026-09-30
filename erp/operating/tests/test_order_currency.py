@@ -40,9 +40,10 @@ class OrderCurrencyTest(TestCase):
         self.member = getattr(
             get_user_model().objects.create_superuser("firat_cur", "a@b.c", "pw"), "member", None)
 
-    def _order(self, account=None, price="2.00", qty="700"):
+    def _order(self, account=None, price="2.00", qty="700", status="pending"):
         order = Order.objects.create(company=self.company,
-                                     current_account=account or self.account)
+                                     current_account=account or self.account,
+                                     order_status=status)
         OrderItem.objects.create(order=order, product=self.product,
                                  quantity=Decimal(qty), price=Decimal(price))
         return order
@@ -119,7 +120,7 @@ class OrderCurrencyTest(TestCase):
 
     # ── What the ledger posts ───────────────────────────────────────
     def test_a_euro_order_posts_euros_converted_at_its_own_rate(self):
-        order = self._order()
+        order = self._order(status="shipped")
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
             order.freeze_billable_quantities()
@@ -133,7 +134,7 @@ class OrderCurrencyTest(TestCase):
         self.assertEqual(mv.amount_base, Decimal("1512.00"))     # 1400 × 1.08
 
     def test_an_order_with_no_currency_posts_dollars_as_it_always_did(self):
-        order = self._order()
+        order = self._order(status="shipped")
         post_order_movement(order, member=self.member)
         mv = CurrentAccountMovement.objects.get(current_account=self.account,
                                                 movement_type="order_sale")

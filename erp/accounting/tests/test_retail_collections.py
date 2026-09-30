@@ -35,10 +35,17 @@ class RetailPostingBase(TestCase):
         self.book = Book.objects.create(name="Laleli Fabric")
         self.product = Product.objects.create(title="STAR BLACKOUT")
 
-        self.order = Order.objects.create(is_retail_order=True)
+        # Shipped: completion is what calls post_retail_order_financials.
+        self.order = Order.objects.create(is_retail_order=True, order_status="shipped")
         OrderItem.objects.create(
             order=self.order, product=self.product,
             quantity=Decimal("5.60"), price=Decimal("10.18"))
+
+    def unship(self):
+        """What leaving the shipped statuses does: the status moves first,
+        then the money follows it."""
+        self.order.order_status = "packaging"
+        reverse_retail_order_financials(self.order, user=self.user)
 
     def retail_current_account(self):
         return CurrentAccount.objects.filter(code=RETAIL_CURRENT_ACCOUNT_CODE).first()
@@ -102,7 +109,7 @@ class RetailUnshipTest(RetailPostingBase):
 
     def test_unshipping_removes_the_sale(self):
         post_retail_order_financials(self.order, user=self.user)
-        reverse_retail_order_financials(self.order, user=self.user)
+        self.unship()
         current_account = self.retail_current_account()
         self.assertEqual(current_account.movements.filter(movement_type="order_sale").count(), 0)
 
@@ -118,7 +125,7 @@ class RetailUnshipTest(RetailPostingBase):
             description="Müşteri ödedi",
         ).confirm()
 
-        reverse_retail_order_financials(self.order, user=self.user)
+        self.unship()
 
         self.assertEqual(self.collections().count(), 1)
 
@@ -135,7 +142,7 @@ class RetailUnshipTest(RetailPostingBase):
             notes="ORD-%d" % self.order.pk,
         ).confirm()
 
-        reverse_retail_order_financials(self.order, user=self.user)
+        self.unship()
 
         self.assertEqual(self.collections().count(), 0)
         current_account.refresh_from_db()
@@ -177,14 +184,14 @@ class RetailReversalFindsTheOrdersOwnAccount(RetailPostingBase):
         pay.confirm(user=self.user)
         self.assertEqual(self.collections().count(), 1)
 
-        reverse_retail_order_financials(self.order, user=self.user)
+        self.unship()
         self.assertEqual(self.collections().count(), 0)
 
     def test_the_sale_movement_is_reversed_too(self):
         post_retail_order_financials(self.order, user=self.user)
         current_account = self.order.current_account
         self.assertEqual(current_account.movements.filter(movement_type="order_sale").count(), 1)
-        reverse_retail_order_financials(self.order, user=self.user)
+        self.unship()
         self.assertEqual(current_account.movements.filter(movement_type="order_sale").count(), 0)
 
 
@@ -219,7 +226,7 @@ class TheAutoCollectionPrefixMatchesWhatIsStored(RetailPostingBase):
             notes="ORD-%d" % self.order.pk,
         ).confirm()
 
-        reverse_retail_order_financials(self.order, user=self.user)
+        self.unship()
 
         self.assertEqual(self.collections().count(), 0)
         current_account.refresh_from_db()

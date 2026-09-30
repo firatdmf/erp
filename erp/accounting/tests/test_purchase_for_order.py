@@ -368,12 +368,17 @@ class PurchaseForCustomerTest(TestCase):
 
     # ── The customer's bill waits for the goods ──────────────────────
     # A purchase for a customer says what they will owe, not what they
-    # owe: nothing has been sold until the supplier delivers. The order's
-    # sale posts to their account when the purchase is received.
+    # owe: nothing has been sold until the supplier delivers. The order
+    # cannot be completed before then, and its sale posts on completion.
 
     def _sale(self, order):
         return CurrentAccountMovement.objects.filter(movement_type="order_sale",
                                                      source_id=order.pk)
+
+    def _complete(self, order):
+        from operating.views_warehouse import apply_order_status_change
+        order.refresh_from_db()
+        return apply_order_status_change(order, "shipped", user=self.admin)
 
     def test_the_customer_is_not_billed_until_the_goods_arrive(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
@@ -387,6 +392,9 @@ class PurchaseForCustomerTest(TestCase):
         self.assertFalse(self._sale(order).exists())
 
         self.assertTrue(self._confirm(inv_id).json()["success"])
+        # In, but not sold: the order is still open.
+        self.assertFalse(self._sale(order).exists())
+        self.assertEqual(self._complete(order), (True, None))
         [sale] = self._sale(order)
         self.assertEqual(sale.amount, Decimal("200.00"))        # 40 × 5.00
         self.assertEqual(sale.current_account, order.current_account)
@@ -399,10 +407,12 @@ class PurchaseForCustomerTest(TestCase):
             current_account=self.supplier, book=self.book, currency=self.usd,
             date=order.order_date, due_date=order.order_date)
         self.assertTrue(self._confirm(first).json()["success"])
+        self.assertEqual(self._complete(order), (False, "goods_not_received"))
         self.assertFalse(self._sale(order).exists())
         # Cancelling the straggler means nothing more is coming.
         r = self.client.post(reverse("accounts:purchase_cancel", args=[second.pk]))
         self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual(self._complete(order), (True, None))
         self.assertTrue(self._sale(order).exists())
 
     def test_cancelling_the_only_draft_bills_what_else_the_order_holds(self):
@@ -412,6 +422,7 @@ class PurchaseForCustomerTest(TestCase):
         OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
         self.assertFalse(self._sale(order).exists())
         self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.assertEqual(self._complete(order), (True, None))
         # The purchased line went with the purchase; the stock line bills.
         [sale] = self._sale(order)
         self.assertEqual(sale.amount, Decimal("20.00"))         # 10 × 2.00
@@ -453,6 +464,9 @@ class PurchaseForCustomerTest(TestCase):
         self.assertContains(page, "Not billed yet")
         self.assertContains(page, inv.number)
         self._confirm(inv_id)
+        # Received, still open: still not billed.
+        self.assertContains(self.client.get(url), "Not billed yet")
+        self.assertEqual(self._complete(inv.for_order), (True, None))
         self.assertNotContains(self.client.get(url), "Not billed yet")
 
     # ── The order and the purchase move together ─────────────────────

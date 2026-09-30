@@ -5536,6 +5536,7 @@ def reverse_consumption_for_order(order, user=None):
                 quantity=qty,
                 reason=f"Order edit · reversed {order_ref}",
                 reference=str(order_ref),
+                order=order,
                 created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
             )
             restored.append({
@@ -5866,6 +5867,10 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
                     product=wp, stock_item=roll, movement_type="in",
                     quantity=qty, reason=f"{reason_prefix} {order_ref}",
                     reference=str(order_ref),
+                    # Linked, or the ledger cannot tell goods coming back
+                    # from goods arriving, and their cost stays in 5000
+                    # (services_posting.lines_for_stock_movement).
+                    order=order, reservation=r,
                     created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
                 )
             r.consumed = False
@@ -6133,18 +6138,27 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # so the ship-time freeze no longer describes anything.
                 # Re-shipping takes a fresh one.
                 order.release_billable_freeze()
+                # Reopened or returned: the sale is taken back, by a
+                # reversal dated today (post_order_movement). Retail does
+                # the same below, with its own clean-up.
+                if order.current_account_id and not getattr(order, "is_retail_order", False):
+                    from accounting.services_accounts import post_order_movement
+                    post_order_movement(order, member=getattr(user, "member", None))
             if entering_cancelled:
                 # Never any physical stock to restore here: a completed
                 # order is refused above, and a non-shipped order's
                 # reservations were never consumed — they're plain soft
                 # holds, safe to drop.
                 order.stock_reservations.filter(consumed=False).delete()
-                # A cancelled order must vanish from the books: the
-                # order_sale movement comes off the current account (retail
-                # posts at create too now). Its invoice is a printout of
-                # the order, so there is nothing else to undo.
-                from accounting.services_accounts import reverse_order_movement
-                reverse_order_movement(order)
+                # A cancelled order owes nothing. A shipped one can't get
+                # here (reopened first), so this only ever takes back a
+                # sale a returned order still somehow stands on — and
+                # leaves a returned order's sale and return as history.
+                # Its invoice is a printout of the order, so there is
+                # nothing else to undo.
+                if order.current_account_id:
+                    from accounting.services_accounts import post_order_movement
+                    post_order_movement(order, member=getattr(user, "member", None))
                 # Stock ordered in for this order is not wanted either:
                 # its draft purchases are cancelled with it (received
                 # ones are stock on the shelf and stay).

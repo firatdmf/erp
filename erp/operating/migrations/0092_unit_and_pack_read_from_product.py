@@ -1,17 +1,19 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 def copy_back_from_product(apps, schema_editor):
     """Reversing: the rows' own columns were not kept up to date while the
-    product owned the facts, so refill them from it."""
-    WarehouseProduct = apps.get_model("operating", "WarehouseProduct")
-    rows = list(WarehouseProduct.objects
-                .filter(catalog_variant__isnull=False)
-                .select_related("catalog_variant__product"))
-    for wp in rows:
-        wp.unit = wp.catalog_variant.product.unit
-        wp.pack_type = wp.catalog_variant.product.pack_type
-    WarehouseProduct.objects.bulk_update(rows, ["unit", "pack_type"], batch_size=500)
+    product owned the facts, so refill them from it.
+
+    SQL rather than the historical models: reversing to before marketing
+    0086 hands this a Product state without unit and pack_type, but with
+    the "type" field whose column 0087 has already dropped."""
+    schema_editor.execute(
+        "UPDATE operating_warehouseproduct wp "
+        "SET unit = p.unit, pack_type = p.pack_type "
+        "FROM marketing_productvariant v "
+        "JOIN marketing_product p ON p.id = v.product_id "
+        "WHERE wp.catalog_variant_id = v.id")
 
 
 class Migration(migrations.Migration):

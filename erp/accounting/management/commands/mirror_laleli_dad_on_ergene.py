@@ -1,6 +1,6 @@
 """Give Ergene its half of the four events Laleli booked against "DAD".
 
-DAD (Laleli CARI-084) was a temporary account standing in for Ergene — the
+DAD (Laleli account 084) was a temporary account standing in for Ergene — the
 account Laleli really keeps for its sister book is DEMFIRAT KARVEN | ERGENE
 (KARFF). Four events went to the stand-in instead, and because they never
 touched the paired account, Ergene never got its mirroring half:

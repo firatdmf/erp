@@ -249,6 +249,8 @@ class ScanningStraightIntoAPackage(TestCase):
         self.assertTrue(data["ok"])
         self.assertTrue(data["placed"])
         self.assertTrue(data["moved"])
+        # Where it was, so the screen needs no preview to say so.
+        self.assertIsNone(data["was_pack_number"])
         self.assertEqual(OrderStockReservation.objects.get(stock_item=self.stock_item).pack_id, self.pack2.pk)
 
     def test_place_only_leaves_a_roll_already_in_that_package_alone(self):
@@ -256,32 +258,8 @@ class ScanningStraightIntoAPackage(TestCase):
         data = self._scan(pack_id=self.pack2.pk, place_only="1").json()
         self.assertTrue(data["placed"])
         self.assertFalse(data["moved"])
+        self.assertEqual(data["was_pack_number"], self.pack2.pack_number)
         self.assertEqual(OrderStockReservation.objects.filter(stock_item=self.stock_item).count(), 1)
-
-    def test_a_preview_reports_the_roll_without_writing_anything(self):
-        """The screen shows what it found and waits for a confirm, so the
-        preview must be incapable of changing anything."""
-        self._scan(pack_id=self.pack1.pk)                 # the order holds it, in #1
-        data = self._scan(pack_id=self.pack2.pk, place_only="1", preview="1").json()
-        self.assertTrue(data["preview"])
-        self.assertTrue(data["held"])
-        self.assertFalse(data["in_target"])               # not in #2 yet
-        self.assertEqual(data["pack_number"], self.pack1.pack_number)
-        self.assertEqual(data["reservation"]["barcode"], "SCAN-1")
-        # Untouched: still in package 1, still exactly one reservation.
-        self.assertEqual(OrderStockReservation.objects.get(stock_item=self.stock_item).pack_id, self.pack1.pk)
-        self.assertEqual(OrderStockReservation.objects.count(), 1)
-
-    def test_a_preview_knows_when_the_roll_is_already_in_that_package(self):
-        self._scan(pack_id=self.pack2.pk)
-        data = self._scan(pack_id=self.pack2.pk, place_only="1", preview="1").json()
-        self.assertTrue(data["in_target"])
-
-    def test_a_preview_refuses_a_roll_the_order_does_not_hold(self):
-        resp = self._scan(pack_id=self.pack1.pk, place_only="1", preview="1")
-        self.assertEqual(resp.status_code, 409)
-        self.assertEqual(resp.json()["kind"], "not_in_order")
-        self.assertFalse(OrderStockReservation.objects.exists())
 
     def test_a_package_from_another_order_is_refused(self):
         other = Pack.objects.create(order=Order.objects.create(order_number="DK0000295"),

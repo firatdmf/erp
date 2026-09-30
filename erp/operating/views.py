@@ -1677,64 +1677,22 @@ def order_pack_reserve_add(request, pk):
             return JsonResponse({"ok": False, "error": "Paket bulunamadı."}, status=404)
     place_only = (request.POST.get("place_only") or "").strip() == "1"
 
-    # preview=1 resolves and validates a barcode exactly like a real
-    # scan and then STOPS, so the screen can show what it found and wait
-    # for a confirm. It returns before every write below, which is the
-    # whole point: a preview must never be able to change anything.
-    if (request.POST.get("preview") or "").strip() == "1":
-        for roll, _mi in matched:
-            existing = OrderStockReservation.objects.filter(
-                order=order, stock_item=roll, consumed=False).first()
-            if existing:
-                return JsonResponse({
-                    "ok": True, "preview": True, "held": True,
-                    "reservation": _reservation_payload(existing),
-                    "pack_number": (existing.pack.pack_number if existing.pack_id else None),
-                    "in_target": bool(target_pack is not None
-                                      and existing.pack_id == target_pack.pk),
-                })
-        if place_only:
-            return JsonResponse({
-                "ok": False, "kind": "not_in_order",
-                "error": "Bu stock item bu siparişe ait değil — pakete eklenemez.",
-            }, status=409)
-        pick = next(((roll, mi) for (roll, mi) in matched
-                     if _roll_available_meters(roll) > 0), None)
-        if pick is None:
-            return _roll_unavailable_response(matched[0][0])
-        roll_pick, _mi = pick
-        wp = roll_pick.product
-        return JsonResponse({
-            "ok": True, "preview": True, "held": False,
-            "roll": {
-                "barcode": roll_pick.barcode,
-                "product_name": (wp.name if wp else ""),
-                "sku": (wp.sku if wp else ""),
-                "warehouse": (wp.warehouse.name if (wp and wp.warehouse_id) else ""),
-                # Which book's shelf — the card tags its line with this so
-                # the save can route the line to that book's order.
-                "book_id": (wp.warehouse.accounting_book_id
-                            if (wp and wp.warehouse_id) else None),
-                "book": (wp.warehouse.accounting_book.name
-                         if (wp and wp.warehouse_id
-                             and wp.warehouse.accounting_book_id) else ""),
-                "available": float(_roll_available_meters(roll_pick)),
-            },
-        })
-
     # Already reserved for this order? Re-scan is a no-op — unless a
     # package is named and the roll is not in it yet, in which case the
-    # scan moves it there.
+    # scan moves it there. was_pack_number is where it sat before, so the
+    # screen can say so without asking for a preview first.
     for roll, _mi in matched:
-        existing = OrderStockReservation.objects.filter(order=order, stock_item=roll, consumed=False).first()
+        existing = (OrderStockReservation.objects.select_related("pack")
+                    .filter(order=order, stock_item=roll, consumed=False).first())
         if existing:
+            was_pack_number = existing.pack.pack_number if existing.pack_id else None
             moved = False
             if target_pack is not None and existing.pack_id != target_pack.pk:
                 existing.pack = target_pack
                 existing.save(update_fields=["pack"])
                 moved = True
             return JsonResponse({"ok": True, "duplicate": True, "moved": moved,
-                                 "placed": place_only,
+                                 "placed": place_only, "was_pack_number": was_pack_number,
                                  "reservation": _reservation_payload(existing)})
 
     # Nothing held for this roll, and the caller may only place what the

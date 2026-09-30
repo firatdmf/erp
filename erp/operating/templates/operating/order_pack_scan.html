@@ -359,8 +359,7 @@
   .pks-log-row.warn{border-color:rgba(251,191,36,.35);background:rgba(245,158,11,.12);}
   .pks-log-row.err{border-color:rgba(251,113,133,.35);background:rgba(244,63,94,.12);color:#FDA4AF;}
 
-  /* What the scan found, held until it is confirmed. Nothing has been
-     written at this point — the roll is only being shown. */
+  /* What a read did with the roll, in place of the scanner. */
   .pks-result{padding:18px 18px 20px;color:#fff;overflow-y:auto;flex:1 1 auto;min-height:0;}
   .pks-result[hidden]{display:none;}
   .pks-rc{text-align:center;}
@@ -1586,11 +1585,9 @@
     if (e.key === 'Escape' && scanModal && scanModal.classList.contains('show')) closeScan();
   });
 
-  // ── read, then confirm ────────────────────────────────────────────
-  // A scan does not place anything. It asks the server what the barcode
-  // is, shows the roll, and waits — so the packer can see they have the
-  // right stock item in their hand before it goes in the sack. Only Confirm
-  // writes, and it reports what the package now holds.
+  // ── the result card ───────────────────────────────────────────────
+  // Every read is into a package and goes straight in; the card that
+  // replaces the scanner says what happened to the roll.
   var stageEl = document.getElementById('pkScanStage');
   var resultEl = document.getElementById('pkScanResult');
   var scanPaused = false;                 // decoding is off while a result is up
@@ -1634,17 +1631,11 @@
     return p ? (p.dataset.packNumber||'') : '';
   }
 
-  function renderFound(d, code){
-    var r = d.reservation || {};
-    var num = targetPackNumber();
-    var here = d.in_target;
-    // Keyed off the number, not the id: "Package #" with nothing after it
-    // is worse than saying it is loose.
-    var where = d.pack_number ? (t('Paket #','Package #') + d.pack_number)
-                              : t('Pakete atanmamış','Not in a package');
-    var html = '<div class="pks-rc">' +
-      '<span class="pks-status ' + (here?'warn':'ok') + '"><i class="fa fa-' + (here?'circle-check':'barcode') + '"></i>' +
-        (here ? t('Bu top zaten bu pakette','Already in this package') : t('Top bulundu','Roll found')) + '</span>' +
+  // The roll was already in this package: nothing moved.
+  function renderAlreadyHere(r, code){
+    showResult('<div class="pks-rc">' +
+      '<span class="pks-status warn"><i class="fa fa-circle-check"></i>' +
+        t('Bu top zaten bu pakette','Already in this package') + '</span>' +
       '<div class="pks-chip"><i class="fa fa-barcode"></i>' + esc(code) + '</div>' +
       '<div class="pks-name">' + esc(r.product_name||'') + '</div>' +
       (r.sku ? '<div><span class="pks-sku">' + esc(r.sku) + '</span></div>' : '') +
@@ -1653,18 +1644,10 @@
         tile(t('Bu siparişe ayrılan','Reserved for this order'), Number(r.quantity||0).toFixed(2), 'm', true) +
         tile(t('Topta kalan','Left on the roll'),
              (r.roll_remaining != null ? Number(r.roll_remaining).toFixed(2) : '—'), 'm') +
-        tile(t('Şu an','Currently'), where, '') +
       '</div>' +
-      '<div class="pks-actions">' +
-        '<button type="button" class="pks-act ghost" data-scan-back><i class="fa fa-xmark"></i>' +
-          t('Vazgeç','Cancel') + '</button>' +
-        (here ? '' :
-        '<button type="button" class="pks-act primary" data-scan-confirm="' + esc(code) + '">' +
-          '<i class="fa fa-check"></i>' +
-          (num ? t('Paket #'+num+'\'e ekle','Add to Package #'+num) : t('Ekle','Add')) +
-        '</button>') +
-      '</div></div>';
-    showResult(html);
+      '<div class="pks-actions"><button type="button" class="pks-act primary" data-scan-back>' +
+        '<i class="fa fa-barcode"></i>' + t('Yeni top okut','Scan another') + '</button></div>' +
+    '</div>');
   }
 
   function renderRefused(msg, code){
@@ -1676,30 +1659,6 @@
       '<div class="pks-actions"><button type="button" class="pks-act primary" data-scan-back>' +
         '<i class="fa fa-barcode"></i>' + t('Tekrar okut','Scan again') + '</button></div>' +
     '</div>');
-  }
-
-  // After the write: what the package now holds, read off the header the
-  // regroup has just recalculated.
-  function renderAdded(code, name){
-    var pack = scanIntoPackId ? document.querySelector('.pk-pack[data-pack-id="'+scanIntoPackId+'"]') : null;
-    var num = pack ? (pack.dataset.packNumber||'') : '';
-    var rolls = pack ? (pack.querySelector('[data-count]')||{}).textContent : '';
-    var meters = pack ? (pack.querySelector('[data-meters]')||{}).textContent : '';
-    showResult('<div class="pks-rc">' +
-      '<span class="pks-status ok"><i class="fa fa-circle-check"></i>' +
-        (num ? t('Paket #'+num+'\'e eklendi','Added to Package #'+num) : t('Eklendi','Added')) + '</span>' +
-      '<div class="pks-chip"><i class="fa fa-barcode"></i>' + esc(code) + '</div>' +
-      '<div class="pks-name">' + esc(name||'') + '</div>' +
-      (pack ? '<div class="pks-tiles">' +
-        tile(t('Paket toplamı','Package total'), meters, 'm', true) +
-        tile(t('Paketteki top','Rolls in package'), rolls, '') +
-      '</div>' : '') +
-      '<div class="pks-actions">' +
-        '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-check"></i>' +
-          t('Bitir','Done') + '</button>' +
-        '<button type="button" class="pks-act primary" data-scan-back><i class="fa fa-barcode"></i>' +
-          t('Yeni top okut','Scan another') + '</button>' +
-      '</div></div>');
   }
 
   // After a list: one card in place of the scanner, the way a single
@@ -1788,41 +1747,25 @@
     openRollCard(row);
   });
 
-  var previewBusy = false;
-  // ``place`` (a camera read, or one typed barcode, into a package): no
-  // confirm step — a roll that isn't in the package yet goes straight in.
-  // Placing only ever moves a roll the order already holds between
-  // packages, so a wrong one is fixed from its package button on the page.
-  function pkScanPreview(code, place){
+  var placeBusy = false;
+  // A camera read, or one typed barcode: straight into the package, no
+  // confirm step. Placing only ever moves a roll the order already holds
+  // between packages, so a wrong one is fixed from its package button on
+  // the page. One round trip — the reply says where the roll sat before
+  // (was_pack_number), which is all the card needs.
+  function pkScanPlace(code){
     code = (code||'').toString().trim();
-    if (!code || previewBusy) return;
-    previewBusy = true;
-    var payload = {barcode: code, place_only: '1', preview: '1'};
-    if (scanIntoPackId) payload.pack_id = scanIntoPackId;
-    post(ADD, payload).then(function(rr){
-      var d = rr.j || {};
-      if (!d.ok){
-        var msg = (d.kind === 'wrong_product' || d.kind === 'not_in_order')
-                    ? t('Bu top bu siparişe ait değil — pakete eklenemez.',
-                        'This roll does not belong to this order — it cannot go in a package.')
-                : d.kind === 'not_found' ? t('Top bulunamadı.','Roll not found.')
-                :                          (d.error || t('Okunamadı.','Could not read it.'));
-        renderRefused(msg, code);
-        return;
-      }
-      if (!place || !scanIntoPackId || d.in_target){ renderFound(d, code); return; }
-      var was = {packNumber: d.pack_number};
-      return addBarcode(code, null, true).then(function(a){
-        if (!a || !a.ok){ renderRefused((a && a.reason) || t('Eklenemedi.','Could not add.'), code); return; }
-        if (scanManual && scanManual.value.trim() === code){ scanManual.value = ''; syncManual(); }
-        renderPlaced(a.reservation || d.reservation || {}, code, was);
-      });
-    }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); })
-      .finally(function(){ previewBusy = false; });
+    if (!code || placeBusy) return;
+    placeBusy = true;
+    addBarcode(code, null, true).then(function(a){
+      if (!a || !a.ok){ renderRefused((a && a.reason) || t('Eklenemedi.','Could not add.'), code); return; }
+      if (a.duplicate && !a.moved){ renderAlreadyHere(a.reservation || {}, code); return; }
+      if (scanManual && scanManual.value.trim() === code){ scanManual.value = ''; syncManual(); }
+      renderPlaced(a.reservation || {}, code, {packNumber: a.was_pack_number});
+    }).finally(function(){ placeBusy = false; });
   }
 
-  // The card after a read has already placed the roll: the same details
-  // the found card shows, with where it came from.
+  // The card after a read has placed the roll, with where it came from.
   function renderPlaced(r, code, was){
     var num = targetPackNumber();
     var from = was.packNumber ? (t('Paket #','Package #') + was.packNumber) : t('Pakete atanmamış','Not in a package');
@@ -1850,21 +1793,12 @@
     if (!e.target || !e.target.closest) return;
     if (e.target.closest('[data-scan-back]')){ showStage(); return; }
     if (e.target.closest('[data-scan-done]')){ closeScan(); return; }
-    var ok = e.target.closest('[data-scan-confirm]');
-    if (!ok) return;
-    var code = ok.dataset.scanConfirm;
-    ok.disabled = true;
-    addBarcode(code).then(function(d){
-      if (!d || !d.ok){ ok.disabled = false; return; }
-      if (scanManual && scanManual.value.trim() === code){ scanManual.value = ''; syncManual(); }
-      renderAdded(code, (d.reservation||{}).product_name);
-    });
   });
 
   // ── the barcode box ───────────────────────────────────────────────
-  // One barcode reads first and waits on the found card, exactly like a
-  // camera scan. Several go straight in, one after another — the packer
-  // has the list in front of them already — and end on a summary card;
+  // One barcode goes in exactly like a camera scan. Several go in one
+  // after another — the packer has the list in front of them already —
+  // and end on a summary card;
   // whatever was refused is left in the box to be corrected and resent.
   var scanCount = document.getElementById('pkScanCount'), scanAddLbl = document.getElementById('pkScanAddLbl');
   var listBusy = false;
@@ -1915,7 +1849,7 @@
     if (!scanManual || listBusy) return;
     var codes = manualCodes();
     if (!codes.length){ scanManual.focus(); return; }
-    if (codes.length === 1){ pkScanPreview(codes[0], true); return; }   // exactly like a camera read
+    if (codes.length === 1){ pkScanPlace(codes[0]); return; }   // exactly like a camera read
     var failed = [], refused = [], added = 0, already = 0;
     listProgress = {added: 0, total: codes.length};
     listBusy = true; syncManual();
@@ -1945,7 +1879,7 @@
     camDebounce = {val:code, t:now};
     beep();
     var hit=document.getElementById('pkHit'); if(hit){ hit.textContent = code; }
-    pkScanPreview(code, true);   // into a package: placed at once, no confirm
+    pkScanPlace(code);
   }
   function camLoop(){
     if (!camRunning) return;

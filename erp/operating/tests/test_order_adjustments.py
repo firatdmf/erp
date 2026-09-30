@@ -38,8 +38,9 @@ class OrderAdjustmentTest(TestCase):
         self.product = Product.objects.create(title="Fitted Sheet", sku="FS", featured=False)
         self.member = getattr(
             get_user_model().objects.create_superuser("firat_adj", "a@b.c", "pw"), "member", None)
+        # Shipped: an order is a sale, and on the account, only from then.
         self.order = Order.objects.create(company=self.company, current_account=self.account,
-                                          currency=self.eur)
+                                          currency=self.eur, order_status="shipped")
         OrderItem.objects.create(order=self.order, product=self.product,
                                  quantity=Decimal("100"), price=Decimal("2.00"))
 
@@ -217,6 +218,12 @@ class AdjustmentsThroughTheFormTest(TestCase):
         data.update(extra or {})
         return self.client.post(url or reverse("operating:create_order"), data)
 
+    def _ship(self, order):
+        """The account is charged when the goods leave, not at create."""
+        Order.objects.filter(pk=order.pk).update(order_status="shipped")
+        order.refresh_from_db()
+        post_order_movement(order)
+
     def test_the_form_saves_them_with_the_order(self):
         self._post([{"label": "Delivery", "amount": "45.00"},
                     {"label": "Partnership discount", "amount": "-20.00"}])
@@ -226,9 +233,11 @@ class AdjustmentsThroughTheFormTest(TestCase):
                           ("Partnership discount", Decimal("-20.00"))])
         self.assertEqual(order.total_value(), Decimal("225.00"))
 
-    def test_the_ledger_is_posted_net_at_create(self):
+    def test_the_ledger_is_posted_net_once_shipped(self):
         self._post([{"label": "Partnership discount", "amount": "-20.00"}])
         order = Order.objects.get()
+        self.assertFalse(CurrentAccountMovement.objects.filter(movement_type="order_sale").exists())
+        self._ship(order)
         mv = CurrentAccountMovement.objects.get(movement_type="order_sale")
         self.assertEqual(mv.amount, Decimal("180.00"))
         # And the frozen first copy agrees with it.
@@ -252,6 +261,7 @@ class AdjustmentsThroughTheFormTest(TestCase):
                    item_id=order.items.get().pk)
         self.assertEqual([(a.label, a.amount) for a in order.adjustments.all()],
                          [("Delivery", Decimal("60.00"))])
+        self._ship(order)
         self.assertEqual(CurrentAccountMovement.objects.get(
             movement_type="order_sale").amount, Decimal("260.00"))
 
@@ -261,6 +271,7 @@ class AdjustmentsThroughTheFormTest(TestCase):
         self._post([], url=reverse("operating:edit_order", args=[order.pk]),
                    item_id=order.items.get().pk)
         self.assertFalse(order.adjustments.exists())
+        self._ship(order)
         self.assertEqual(CurrentAccountMovement.objects.get(
             movement_type="order_sale").amount, Decimal("200.00"))
 

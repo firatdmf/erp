@@ -378,6 +378,9 @@
           </div>
           <div class="sub">{{ current_account.balance_label }}</div>
           {% endif %}
+          {% if open_orders.count %}
+            <div class="alt" title="{% trans "Orders not completed yet. They are added to the balance when they ship." %}">{% blocktrans count n=open_orders.count %}{{ n }} open order not billed yet{% plural %}{{ n }} open orders not billed yet{% endblocktrans %}: {% for t in open_orders.totals %}{{ t.symbol }}{{ t.amount|money }}{% if not forloop.last %} + {% endif %}{% endfor %}</div>
+          {% endif %}
           {% if current_account.is_over_credit_limit %}
             <div class="warn"><i data-lucide="alert-triangle"></i>{% trans "Credit limit exceeded" %}</div>
           {% endif %}

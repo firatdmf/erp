@@ -9643,8 +9643,8 @@ msgstr "Tedarikçi alımları"
 msgid "Awaiting delivery"
 msgstr "Teslimat bekleniyor"
 
-msgid "Not billed yet — the customer is charged once the goods bought for this order are received:"
-msgstr "Henüz faturalanmadı — bu sipariş için alınan mallar teslim alındığında müşteriye yansıtılır:"
+msgid "Not billed yet — the customer's account is charged when the order is completed."
+msgstr "Henüz faturalanmadı — sipariş tamamlandığında müşterinin cari hesabına yansıtılır."
 
 msgid ""
 "This order can't be completed yet — goods bought for it from a supplier "
@@ -11349,3 +11349,12 @@ msgstr ""
 #: accounting/services_posting.py
 msgid "Small differences let go to bring a settled account to zero."
 msgstr "Kapanan bir hesabı sıfırlamak için vazgeçilen küçük farklar."
+
+msgid "Orders not completed yet. They are added to the balance when they ship."
+msgstr "Henüz tamamlanmamış siparişler. Gönderildiklerinde bakiyeye eklenir."
+
+#, python-format
+msgid "%(n)s open order not billed yet"
+msgid_plural "%(n)s open orders not billed yet"
+msgstr[0] "%(n)s açık sipariş henüz faturalanmadı"
+msgstr[1] "%(n)s açık sipariş henüz faturalanmadı"

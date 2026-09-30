@@ -39,7 +39,8 @@ class OrderCustomerChangeTest(TestCase):
             get_user_model().objects.create_superuser("firat_cc", "a@b.c", "pw"), "member", None)
 
     def test_the_sale_follows_the_order_to_its_new_customer(self):
-        order = Order.objects.create(company=self.wrong_co, current_account=self.wrong)
+        order = Order.objects.create(company=self.wrong_co, current_account=self.wrong,
+                                     order_status="shipped")
         OrderItem.objects.create(order=order, product=self.product,
                                  quantity=Decimal("100"), price=Decimal("2.00"))
         post_order_movement(order, member=self.member)

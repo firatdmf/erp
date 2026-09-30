@@ -19,6 +19,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
+from accounting.services_accounts import post_order_movement
 from crm.models import Company, Contact
 from marketing.models import Product, ProductVariant
 from marketing.models import Quote
@@ -186,6 +187,11 @@ class QuoteTest(TestCase):
         [line] = order.items.all()
         self.assertEqual((line.product, line.product_variant, line.quantity, line.price),
                          (self.product, self.variant, Decimal("50.00"), Decimal("2.30")))
+        # An order, not yet a sale: the account is charged when it ships.
+        self.assertFalse(CurrentAccountMovement.objects.filter(movement_type="order_sale").exists())
+        Order.objects.filter(pk=order.pk).update(order_status="shipped")
+        order.refresh_from_db()
+        post_order_movement(order)
         sale = CurrentAccountMovement.objects.get(movement_type="order_sale", source_id=order.pk)
         self.assertEqual((sale.amount, sale.currency), (Decimal("115.00"), self.eur))
         self.assertTrue(OrderChange.objects.filter(order=order, field="quote",

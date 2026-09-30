@@ -167,13 +167,13 @@ class ThePaymentScreensRequireACashBox(_Base):
 
 
 class TheTypeSetsTheDirection(_Base):
-    def _create(self, movement_type, direction, account=None):
+    def _create(self, movement_type, direction, account=None, amount="100.00"):
         account = account or self.account
         return self.client.post(
             reverse("accounts:movement_create", kwargs={"pk": account.pk}), {
                 "date": "2026-09-15", "movement_type": movement_type,
                 "currency": self.usd.pk, "direction": direction,
-                "amount": "100.00", "reference": "", "description": "",
+                "amount": amount, "reference": "", "description": "",
             }, follow=True)
 
     def test_money_types_are_not_offered_here(self):
@@ -209,18 +209,19 @@ class TheTypeSetsTheDirection(_Base):
         self.assertNotIn("discount", r.context["fixed_directions"])
 
     def test_a_balance_closing_difference_goes_either_way(self):
-        """Kept when a customer overpaid, let go when they underpaid."""
-        self._create("balance_close", "credit")
-        self._create("balance_close", "debit")
+        """Kept when a customer overpaid, let go when they underpaid.
+        Within the $3 floor, since this account has traded nothing."""
+        self._create("balance_close", "credit", amount="3.00")
+        self._create("balance_close", "debit", amount="3.00")
         self.assertEqual(
             sorted(CurrentAccountMovement.objects.values_list("amount", flat=True)),
-            [Decimal("-100.00"), Decimal("100.00")])
+            [Decimal("-3.00"), Decimal("3.00")])
 
     def test_the_preview_shows_where_a_balance_closing_difference_goes(self):
         r = self.client.get(reverse("accounts:movement_create",
                                     kwargs={"pk": self.account.pk}))
         rule = r.context["posting_preview"]["rules"]["balance_close"]
-        self.assertEqual(rule["code"], "5100")
+        self.assertEqual(rule["code"], "5150")
         self.assertEqual(rule["debit"]["code"], "4900")
         self.assertFalse(rule["parked"])
         self.assertNotIn("balance_close", r.context["fixed_directions"])

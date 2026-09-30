@@ -44,9 +44,9 @@ CONTRA_BY_TYPE = {
     # year's total of what was let go can be read off directly.
     "write_off":        "5200",
     # A difference let go to close an account (a credit on a customer) is a
-    # cost of doing business; one kept (a debit) is income — see
-    # DEBIT_CONTRA_BY_TYPE.
-    "balance_close":    "5100",
+    # cost of doing business, on its own line under operating expenses; one
+    # kept (a debit) is income — see DEBIT_CONTRA_BY_TYPE.
+    "balance_close":    "5150",
     # Purchases land in stock, not in expense: the cost becomes COGS when
     # the goods leave, not when they arrive.
     "invoice_purchase": "1300",
@@ -618,6 +618,7 @@ def _account_meanings():
         "5000": _g("What the goods sold cost when they were bought."),
         "5100": _g("Running costs: rent, wages, freight and the like."),
         "5110": _g("What winning customers costs: samples given away, fairs, catalogues."),
+        "5150": _g("Small differences let go to bring a settled account to zero."),
         "5200": _g("A loss: a debt the book has given up on."),
         "5900": _g("Gains and losses from exchange rates moving."),
     }

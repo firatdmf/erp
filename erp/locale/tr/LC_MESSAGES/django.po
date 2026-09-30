@@ -11319,3 +11319,33 @@ msgstr "Alacaklar eksi borçlar"
 #: accounting/services_ledger.py
 msgid "Cash and bank"
 msgstr "Kasa ve banka"
+
+#: accounting/models_accounts.py
+msgid "If the account will not pay it, use Bad Debt Written Off."
+msgstr "Hesap bunu ödemeyecekse Tahsil Edilemeyen Alacak (Silindi) türünü kullanın."
+
+#: accounting/models_accounts.py
+msgid ""
+"If the supplier gave you a reduction, use Discount; if goods went back, use "
+"Purchase Return."
+msgstr ""
+"Tedarikçi indirim yaptıysa İskonto, mal iade edildiyse Alış İadesi türünü "
+"kullanın."
+
+#: accounting/models_accounts.py
+msgid "A closing difference brings a balance to zero; this one moves it away."
+msgstr ""
+"Kapatma farkı bakiyeyi sıfıra getirir; bu ise bakiyeyi sıfırdan uzaklaştırıyor."
+
+#: accounting/models_accounts.py
+#, python-format
+msgid ""
+"This is too large for a closing difference (limit: 1%% of the account's "
+"trading, at least $3 — %(limit)s). %(hint)s"
+msgstr ""
+"Bu tutar bir bakiye kapatma farkı için çok büyük (sınır: hesabın ticaret "
+"hacminin %%1'i, en az 3 $ — %(limit)s). %(hint)s"
+
+#: accounting/services_posting.py
+msgid "Small differences let go to bring a settled account to zero."
+msgstr "Kapanan bir hesabı sıfırlamak için vazgeçilen küçük farklar."

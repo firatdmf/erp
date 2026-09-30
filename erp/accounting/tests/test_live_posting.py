@@ -126,7 +126,8 @@ class SavingAMovementPostsIt(_Books):
         self._mv("balance_close", "-3.10")
         b = self._balances()
         self.assertEqual(b["1200"], Decimal("-3.10"))
-        self.assertEqual(b["5100"], Decimal("3.10"))
+        self.assertEqual(b["5150"], Decimal("3.10"))
+        self.assertFalse(b.get("5100"))
         self.assertFalse(b.get("5200"))
         self.assertFalse(b.get("1900"))
 

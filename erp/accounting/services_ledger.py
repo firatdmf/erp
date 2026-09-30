@@ -75,6 +75,10 @@ STANDARD_CHART = [
     # Part of operating expenses, kept apart so what winning customers costs
     # can be read on its own: samples given to clients, fairs, catalogues.
     ("5110", "Marketing Expenses",         "expense",   False),
+    # Also part of operating expenses: the few units let go to bring a
+    # settled account to zero. Apart so the year's total can be read off,
+    # and so a closing difference used for what was really bad debt shows.
+    ("5150", "Balance Closing Differences", "expense",  False),
     # Debts the book has given up on. Apart from operating expenses so that
     # "how much did we forgive this year" is one line, not a search.
     ("5200", "Bad Debts Written Off",      "expense",   False),

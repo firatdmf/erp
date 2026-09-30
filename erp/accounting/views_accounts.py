@@ -1468,6 +1468,13 @@ class CurrentAccountMovementCreate(View):
         if problem:
             messages.error(request, problem)
             return redirect("accounts:movement_create", pk=current_account.pk)
+        problem = CurrentAccountMovement.closing_limit_problem(
+            current_account, movement_type, direction, amount,
+            get_object_or_404(CurrencyCategory, pk=int(currency_id)),
+            request.POST.get("date") or timezone.now().date())
+        if problem:
+            messages.error(request, problem)
+            return redirect("accounts:movement_create", pk=current_account.pk)
 
         try:
             mv = CurrentAccountMovement.objects.create(
@@ -1665,6 +1672,14 @@ class CurrentAccountMovementEdit(View):
             messages.error(request, OPENING_ONLY_WHEN_EMPTY)
             return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
         problem = CurrentAccountMovement.direction_problem(movement_type, direction, existing=mv)
+        if problem:
+            messages.error(request, problem)
+            return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)
+        problem = CurrentAccountMovement.closing_limit_problem(
+            current_account, movement_type, direction, amount,
+            get_object_or_404(CurrencyCategory,
+                              pk=int(request.POST.get("currency") or mv.currency_id)),
+            request.POST.get("date") or mv.date, existing=mv)
         if problem:
             messages.error(request, problem)
             return redirect("accounts:movement_edit", pk=current_account.pk, mv_pk=mv.pk)

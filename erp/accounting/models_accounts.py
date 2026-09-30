@@ -691,6 +691,94 @@ class CurrentAccountMovement(models.Model):
             return _("A %(type)s always increases what the account owes, so it is a debit.") % {"type": label}
         return _("A %(type)s always reduces what the account owes, so it is a credit.") % {"type": label}
 
+    # A closing difference is the few units left once an account is settled,
+    # and it goes to 5100/4900 without anyone looking twice. So it is held to
+    # 1% of what the account has traded, and never less than the floor: a
+    # large amount let go is bad debt, and a large cut from a supplier is a
+    # discount or a return — each with a line of its own in the P&L.
+    CLOSING_LIMIT_SHARE = Decimal("0.01")
+    CLOSING_LIMIT_FLOOR_BASE = Decimal("3.00")
+    # What "traded" counts: what the account was invoiced or charged, plus
+    # the balances it arrived with from the old system.
+    TRADING_TYPES = frozenset({
+        "order_sale", "invoice_sale", "invoice_purchase",
+        "opening", "legacy_ar", "legacy_ap",
+    })
+
+    @classmethod
+    def closing_limit_base(cls, current_account):
+        """The largest closing difference this account allows, in base."""
+        traded = sum(
+            (abs(a) for a in current_account.movements.live()
+             .filter(movement_type__in=cls.TRADING_TYPES)
+             .values_list("amount_base", flat=True)),
+            Decimal("0.00"),
+        )
+        limit = (traded * cls.CLOSING_LIMIT_SHARE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return max(limit, cls.CLOSING_LIMIT_FLOOR_BASE)
+
+    @classmethod
+    def closing_limit_problem(cls, current_account, movement_type, direction,
+                              amount, currency, on_date, existing=None):
+        """Why this closing difference is too large, or None when it is not.
+
+        Compared in base, and reported in the account's own currency with the
+        type that fits instead. An existing row saved with its type and
+        amount unchanged is let through, so one entered before the limit can
+        still have its description fixed.
+        """
+        if movement_type != "balance_close":
+            return None
+        amount = abs(Decimal(amount))
+        if (existing is not None and existing.movement_type == movement_type
+                and abs(existing.amount) == amount
+                and existing.currency_id == currency.pk):
+            return None
+
+        from accounting.services import get_exchange_rate
+        base_code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
+        if currency.code == base_code:
+            amount_base = amount
+        else:
+            rate = get_exchange_rate(currency.code, base_code, on_date=on_date)
+            if not rate:
+                # Without a rate there is nothing to measure it against;
+                # refusing would block every entry while the feed is down.
+                return None
+            amount_base = amount * Decimal(str(rate))
+
+        limit_base = cls.closing_limit_base(current_account)
+        if amount_base <= limit_base:
+            return None
+
+        # The limit as the user reads it: in the account's own currency.
+        own = current_account.default_currency
+        limit_shown, code_shown = limit_base, base_code
+        if own is not None and own.code != base_code:
+            rate = get_exchange_rate(base_code, own.code, on_date=on_date)
+            if rate:
+                limit_shown = (limit_base * Decimal(str(rate))).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP)
+                code_shown = own.code
+        limit_text = f"{limit_shown:,.2f} {code_shown}"
+
+        # Which type fits depends on which way the difference moves the
+        # balance, measured before this row.
+        balance = current_account.cached_balance or Decimal("0.00")
+        if existing is not None and not existing.is_void:
+            balance -= existing.amount_base or Decimal("0.00")
+        if balance > 0 and direction == "credit":
+            hint = _("If the account will not pay it, use Bad Debt Written Off.")
+        elif balance < 0 and direction == "debit":
+            hint = _("If the supplier gave you a reduction, use Discount; "
+                     "if goods went back, use Purchase Return.")
+        else:
+            hint = _("A closing difference brings a balance to zero; "
+                     "this one moves it away.")
+        return _("This is too large for a closing difference (limit: 1%% of the "
+                 "account's trading, at least $3 — %(limit)s). %(hint)s") % {
+            "limit": limit_text, "hint": hint}
+
     def __str__(self):
         sign = "+" if self.amount >= 0 else ""
         return f"{self.current_account.code} | {self.date} | {sign}{self.amount} {self.currency.code}"

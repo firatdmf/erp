@@ -1523,6 +1523,7 @@
                  'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify({
         name: name,
+        book_id: {{ current_book.pk }},
         currency: currencyEl.value,
         phone: (document.getElementById('npSupNewPhone').value || '').trim(),
       }),
@@ -2458,9 +2459,9 @@
           alert((d && d.error) || '{% trans "The purchase could not be loaded." %}');
           return;
         }
-        // The picker lists the default book's active accounts; the one this
-        // purchase is posted to may not be among them, and a select can't
-        // hold a value it has no option for.
+        // The picker lists the page's book's active accounts; the one this
+        // purchase is posted to may not be among them (deactivated since),
+        // and a select can't hold a value it has no option for.
         const sel = document.getElementById('npSupplier');
         if (sel && d.current_account_id &&
             !sel.querySelector('option[value="' + d.current_account_id + '"]')) {

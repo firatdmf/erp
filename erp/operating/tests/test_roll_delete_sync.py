@@ -102,7 +102,7 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Demfirat")
         self.current_account = CurrentAccount.objects.create(
-            book=self.book, code="C-KRV", name="Karven", type="supplier",
+            book=self.warehouse.accounting_book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
 
     def _receive(self, barcode, main=None):

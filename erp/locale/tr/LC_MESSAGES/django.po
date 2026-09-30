@@ -11255,3 +11255,15 @@ msgstr[1] "%(counter)s top"
 #: marketing/templates/marketing/quote_print.html
 msgid "Rolls not yet chosen"
 msgstr "Toplar henüz seçilmedi"
+
+#: operating/views_warehouse.py
+msgid ""
+"This warehouse belongs to another book — pick one of the supplier account's "
+"book."
+msgstr ""
+"Bu depo başka bir deftere ait — cari hesabın defterindeki depolardan birini "
+"seçin."
+
+#: operating/views_warehouse.py
+msgid "You don't have access to this book."
+msgstr "Bu deftere erişiminiz yok."

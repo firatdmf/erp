@@ -81,7 +81,7 @@ class AGoodsReceiptWithANegativePriceIsRefused(TestCase):
         self.client.force_login(user)
         usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.account = CurrentAccount.objects.create(
-            book=Book.objects.create(name="Demfirat"), code="C-KRV", name="Karven",
+            book=Book.objects.get_or_create(name="Laleli Fabric")[0], code="C-KRV", name="Karven",
             type="supplier", default_currency=usd)
         self.warehouse = a_warehouse()
 

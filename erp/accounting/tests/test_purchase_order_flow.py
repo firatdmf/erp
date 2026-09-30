@@ -26,8 +26,7 @@ class PurchaseOrderFlowTest(TestCase):
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd,
         )
-        self.wh = Warehouse.objects.create(name="Fabrika",
-            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
+        self.wh = Warehouse.objects.create(name="Fabrika", accounting_book=self.book)
 
         self.admin = get_user_model().objects.create_superuser(
             username="firat_t", password="pw", email="a@b.c")
@@ -68,6 +67,14 @@ class PurchaseOrderFlowTest(TestCase):
                                 content_type="application/json")
 
     # ── Saving an order ─────────────────────────────────────────────
+    def test_an_order_into_another_books_warehouse_is_refused(self):
+        plan = self._plan()
+        plan["warehouse_id"] = Warehouse.objects.create(
+            name="Laleli", accounting_book=Book.objects.create(name="Laleli Fabric")).pk
+        r = self._save_order(plan)
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Invoice.objects.exists())
+
     def test_saving_an_order_touches_nothing_but_its_own_document(self):
         r = self._save_order()
         self.assertEqual(r.status_code, 200, r.content)

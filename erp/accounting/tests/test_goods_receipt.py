@@ -34,7 +34,10 @@ class GoodsReceiptPageTest(TestCase):
 
         self.depot = Warehouse.objects.create(name="Fabrika",
                                               accounting_book=self.book)
-        self.store = Warehouse.objects.create(name="Laleli",
+        self.store = Warehouse.objects.create(name="Mağaza",
+                                              accounting_book=self.book)
+        # Another book's shelves — a purchase in this book can't land there.
+        self.elsewhere = Warehouse.objects.create(name="Laleli",
             accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         # Combined ("ortak") warehouses hold no stock of their own — nothing
         # can be received into one, so the picker must not offer it.
@@ -74,6 +77,28 @@ class GoodsReceiptPageTest(TestCase):
     def test_new_page_preselects_the_warehouse_it_was_opened_from(self):
         r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}), {"warehouse": self.store.pk})
         self.assertContains(r, f'<option value="{self.store.pk}" selected')
+
+    def test_new_page_lists_only_the_working_books_warehouses(self):
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
+        self.assertEqual({w.pk for w in r.context["warehouses"]},
+                         {self.depot.pk, self.store.pk})
+
+    def test_new_page_lists_only_the_working_books_accounts(self):
+        # Made the member's default so the page's book, not the default,
+        # is what's being tested.
+        laleli = self.elsewhere.accounting_book
+        self.user.member.books.add(laleli)
+        self.user.member.default_book = laleli
+        self.user.member.save()
+        CurrentAccount.objects.create(book=laleli, code="TST-002", name="Ergene Mill",
+                                      type="supplier", default_currency=self.usd)
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
+        self.assertEqual([a["id"] for a in r.context["accounts"]], [self.current_account.pk])
+
+    def test_new_page_ignores_another_books_warehouse_in_the_link(self):
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}),
+                            {"warehouse": self.elsewhere.pk})
+        self.assertIsNone(r.context["selected_warehouse_id"])
 
     def test_new_page_offers_no_default_when_several_warehouses_exist(self):
         r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
@@ -171,11 +196,13 @@ class InlineAccountCarriesItsCurrencyTest(TestCase):
         user.member.default_book = self.book
         user.member.save()
 
-    def _create(self, name, currency=None, status=200):
+    def _create(self, name, currency=None, status=200, book=None):
         import json
         body = {"name": name}
         if currency is not None:
             body["currency"] = currency
+        if book is not None:
+            body["book_id"] = book.pk
         r = self.client.post(reverse("operating:warehouse_account_create"),
                              data=json.dumps(body), content_type="application/json")
         self.assertEqual(r.status_code, status, r.content)
@@ -200,3 +227,16 @@ class InlineAccountCarriesItsCurrencyTest(TestCase):
                 d = self._create("Para Birimsiz", currency=currency, status=400)
                 self.assertFalse(d["success"])
         self.assertFalse(CurrentAccount.objects.filter(name="Para Birimsiz").exists())
+
+    def test_it_is_created_in_the_book_the_page_names(self):
+        laleli = Book.objects.create(name="Laleli Fabric")
+        d = self._create("Yeni Tedarikçi", currency="TRY", book=laleli)
+        self.assertEqual(CurrentAccount.objects.get(pk=d["id"]).book, laleli)
+
+    def test_a_book_the_member_cannot_use_is_refused(self):
+        plain = get_user_model().objects.create_user("acc_plain", "p@m.t", "pw")
+        plain.member.books.add(self.book)
+        self.client.force_login(plain)
+        other = Book.objects.create(name="Laleli Fabric")
+        self._create("Yeni Tedarikçi", currency="TRY", book=other, status=403)
+        self.assertFalse(CurrentAccount.objects.filter(name="Yeni Tedarikçi").exists())

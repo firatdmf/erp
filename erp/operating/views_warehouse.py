@@ -720,7 +720,7 @@ def _slug_token(text):
     return "".join(ch for ch in folded if ch.isalnum())[:10]
 
 
-def _account_choices():
+def _account_choices(book=None):
     """Current account accounts for the goods-receipt account picker, each with its derived
     barcode prefix so the UI can preview it instantly.
 
@@ -734,12 +734,17 @@ def _account_choices():
     is what gets credited.
 
     All types are listed (not just type="supplier") — a current account can trade both
-    ways, and hiding the rest is what made the right account unpickable."""
+    ways, and hiding the rest is what made the right account unpickable.
+
+    `book` — the book the form is entering the purchase in; the member's
+    default book only when the caller names none. The purchase posts in
+    the account's book, so listing another book's accounts would let the
+    debt and the stock land in two different ledgers."""
     try:
         from accounting.models_accounts import CurrentAccount
         from accounting.services_accounts import get_default_book
         rows = (CurrentAccount.objects
-                .filter(book=get_default_book(), is_active=True)
+                .filter(book=book or get_default_book(), is_active=True)
                 .select_related("default_currency")
                 .order_by("name")[:1000])
         base = getattr(_dj_settings, "BASE_CURRENCY_CODE", "USD")
@@ -803,6 +808,9 @@ def warehouse_account_create(request):
     balance. Suppliers remain a CRM/procurement concept; purchases post
     to accounts.
 
+    `book_id` — the book the form is working in, so the new account sits
+    beside the ones it listed; the member's default book when absent.
+
     Returns the account the caller should select, plus its derived
     barcode prefix, and `created` so the UI can say which happened."""
     if request.method != "POST":
@@ -810,7 +818,8 @@ def warehouse_account_create(request):
 
     from accounting.models import CurrencyCategory
     from accounting.models_accounts import CurrentAccount
-    from accounting.services_accounts import get_default_book
+    from accounting.models import Book
+    from accounting.services_accounts import get_default_book, member_can_use_book
     from .catalog_sync import _fold
 
     try:
@@ -825,7 +834,15 @@ def warehouse_account_create(request):
     if not name:
         return JsonResponse({"success": False, "error": "Hesap adı gerekli."}, status=400)
 
-    book = get_default_book()
+    book_id = str(data.get("book_id") or "").strip()
+    if book_id:
+        book = Book.objects.filter(pk=int(book_id)).first() if book_id.isdigit() else None
+        if not member_can_use_book(getattr(request.user, "member", None), book):
+            return JsonResponse({"success": False,
+                                 "error": str(_lz("You don't have access to this book."))},
+                                status=403)
+    else:
+        book = get_default_book()
     folded = _fold(name)
     existing = next(
         (c for c in CurrentAccount.objects.filter(book=book, is_active=True)
@@ -2844,6 +2861,20 @@ def _intake_account(data):
     return current_account_obj
 
 
+def _intake_check_book(warehouse, current_account):
+    """Refuse a purchase whose stock and debt would land in different books.
+
+    The invoice is posted in the account's book (create_purchase_invoice_for_intake),
+    the rolls sit in the warehouse's — both must be the same book, or one
+    book would owe for stock another one holds."""
+    if warehouse.accounting_book_id != current_account.book_id:
+        raise IntakeError(
+            {"success": False,
+             "error": str(_lz("This warehouse belongs to another book — pick one of "
+                              "the supplier account's book."))},
+            status=400)
+
+
 def _intake_prefix(data, account_name):
     """The barcode/SKU prefix a receipt mints with: the one the form sent,
     else the account's consonants, else the house code."""
@@ -3480,6 +3511,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
 
     # ── Current account → barcode prefix + purchase posting below ──
     current_account_obj = _intake_account(data)
+    _intake_check_book(warehouse, current_account_obj)
     account_name = current_account_obj.name
     prefix = _intake_prefix(data, account_name)
     _intake_check_rates(products_in, current_account_obj, data.get("rates"))

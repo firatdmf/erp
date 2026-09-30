@@ -36,7 +36,7 @@ class ManualAddMainProductSkuTest(TestCase):
             default_currency=self.usd,
         )
         self.warehouse = Warehouse.objects.create(name="Fabrika",
-            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
+            accounting_book=self.book)
 
     def _post(self, main_sku, name="K24644", variant_sku="K24644.G07"):
         return self.client.post(
@@ -184,7 +184,7 @@ class ManualAddPermissionTest(TestCase):
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
         self.warehouse = Warehouse.objects.create(name="Fabrika",
-            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
+            accounting_book=self.book)
 
     def _post(self):
         return self.client.post(
@@ -215,6 +215,19 @@ class ManualAddPermissionTest(TestCase):
         self.client.force_login(user)
         self.assertEqual(self._post().status_code, 200)
         self.assertTrue(WarehouseProduct.objects.exists())
+
+    def test_another_books_warehouse_is_refused(self):
+        # The debt would post in the account's book while the rolls sat in
+        # another one's.
+        self.warehouse.accounting_book = Book.objects.create(name="Laleli Fabric")
+        self.warehouse.save(update_fields=["accounting_book"])
+        self.client.force_login(get_user_model().objects.create_superuser(
+            username="cross_book", password="pw", email="c@b.k"))
+        r = self._post()
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(WarehouseProduct.objects.exists())
+        from accounting.models_accounts import Invoice
+        self.assertFalse(Invoice.objects.filter(current_account=self.current_account).exists())
 
 
 class CatalogSearchLabelTest(TestCase):
@@ -480,7 +493,7 @@ class LongVariantSkuTest(TestCase):
             book=self.book, code="C-KRV", name="Karven", type="supplier",
             default_currency=self.usd)
         self.warehouse = Warehouse.objects.create(name="Fabrika",
-            accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
+            accounting_book=self.book)
 
     def _post(self, variants):
         return self.client.post(

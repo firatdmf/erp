@@ -316,7 +316,7 @@ class GoodsReceipt(View):
         # Combined ("ortak") warehouses are browsing views over other
         # warehouses and hold no stock of their own — intake into one is
         # blocked everywhere else too, so they aren't offered here.
-        warehouses = list(Warehouse.objects.exclude(kind="combined").order_by("name"))
+        warehouses = Warehouse.objects.exclude(kind="combined").order_by("name")
         for_order = None        # the customer order this purchase is bought for
         invoice = None          # a RECEIVED purchase: edited against the rolls it has
         order = None            # a DRAFT order: nothing received yet, just a plan
@@ -360,8 +360,18 @@ class GoodsReceipt(View):
                           "view or cancel it from the purchases page instead."),
                     )
                     return redirect("accounts:purchase_order_detail", pk=doc.pk)
+
+        # Only the working book's shelves: a purchase lands in its book's
+        # stock, so another book's warehouse is never the right answer here.
+        # (Editing set request.book to the document's own book above.)
+        if getattr(request, "book", None):
+            warehouses = warehouses.filter(accounting_book=request.book)
+        warehouses = list(warehouses)
+
+        if pk is not None:
             if selected_id and not any(w.pk == selected_id for w in warehouses):
-                # Its warehouse was turned into a combined view after intake.
+                # Its warehouse was turned into a combined view, or moved to
+                # another book, after intake — still show where it went.
                 w = Warehouse.objects.filter(pk=selected_id).first()
                 if w:
                     warehouses.append(w)
@@ -393,7 +403,9 @@ class GoodsReceipt(View):
             "delivery_date": (doc.delivery_date.isoformat()
                               if doc and doc.delivery_date else ""),
             "back_url": back_url,
-            "accounts": _account_choices(),
+            # The page's book, same as the warehouses: an account from any
+            # other book would be refused on save (_intake_check_book).
+            "accounts": _account_choices(getattr(request, "book", None)),
             "product_categories": _product_category_choices(),
             "pack_types": _pack_type_choices(),
             # Every attribute a variant can be described by, for "+ Attribute".
@@ -582,7 +594,11 @@ class PurchaseOrderSave(View):
             CustomerOrderError, parse_customer, plan_variant_skus,
             put_plan_in_catalog, sync_customer_order,
         )
-        from operating.views_warehouse import IntakeError
+        from operating.views_warehouse import IntakeError, _intake_check_book
+        try:
+            _intake_check_book(warehouse, current_account)
+        except IntakeError as exc:
+            return JsonResponse(exc.payload, status=exc.status)
         try:
             customer = parse_customer(data)
         except CustomerOrderError as exc:

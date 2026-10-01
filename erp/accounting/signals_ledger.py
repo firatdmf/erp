@@ -43,6 +43,7 @@ which is the purchase invoice's job (see services_posting).
 """
 import logging
 
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
@@ -70,6 +71,39 @@ def _safely(what, action, *args, **kwargs):
 
 
 # ---------------------------------------------------------------------------
+# Accounts Payable follows the accounts that are in credit
+#
+# Every movement posts its account's side to Accounts Receivable (1200),
+# whichever way the balance ends up. What the book OWES — an account whose
+# balance is negative — belongs in Accounts Payable (2000), and that used to
+# be moved across once, at the cutover: two customers' credits were closed
+# afterwards and 2000 went on showing them.
+#
+# So the split is brought up to date after every movement. On commit, not in
+# the signal: the account's cached_balance is recomputed after post_save
+# fires (CurrentAccountMovement.save), and a delete recomputes it in a
+# receiver of its own, so reading it here would read the balance from before
+# this movement. reclassify_payables posts only the difference from what
+# 2000 holds, so a movement on an account that is not in credit posts
+# nothing.
+# ---------------------------------------------------------------------------
+def _resplit_payables_on_commit(book_id):
+    if not book_id:
+        return
+
+    def run():
+        from django.utils import timezone
+        from .models import Book
+        from .services_posting import reclassify_payables
+        book = Book.objects.filter(pk=book_id).first()
+        if book is not None:
+            _safely(f"payables of book {book_id}", reclassify_payables, book,
+                    date=timezone.localdate(), reference="AP-RESPLIT")
+
+    transaction.on_commit(run)
+
+
+# ---------------------------------------------------------------------------
 # Current account movements
 # ---------------------------------------------------------------------------
 @receiver(post_save, sender=CurrentAccountMovement)
@@ -89,6 +123,7 @@ def post_movement_to_ledger(sender, instance, raw=False, **kwargs):
         return
     from .services_posting import post_movement
     _safely(f"movement {instance.pk}", post_movement, instance)
+    _resplit_payables_on_commit(instance.book_id)
 
 
 @receiver(post_delete, sender=CurrentAccountMovement)
@@ -101,6 +136,7 @@ def unpost_movement_from_ledger(sender, instance, **kwargs):
     """
     from .services_posting import unpost
     _safely(f"movement {instance.pk}", unpost, instance)
+    _resplit_payables_on_commit(instance.book_id)
 
 
 # ---------------------------------------------------------------------------

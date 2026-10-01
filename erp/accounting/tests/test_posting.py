@@ -613,3 +613,51 @@ class ReclassifyingPayablesPostsOnlyTheChange(TestCase):
         reclassify_payables(self.book, date="2026-09-30")
         self.assertEqual(self._payable(), Decimal("532.47"))
         self.assertTrue(balance_sheet(self.book)["balanced"])
+
+
+class AccountsPayableFollowsEveryMovement(TestCase):
+    """Two customers' credits were closed and Accounts Payable (2000) went on
+    showing them, because the split was only ever made by hand."""
+
+    def setUp(self):
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Ergene Fabric", base_currency=self.usd)
+        ensure_chart()
+        self.acc = CurrentAccount.objects.create(
+            book=self.book, code="C1", name="Zamira", type="customer", default_currency=self.usd)
+
+    def _move(self, amount, kind="opening"):
+        with self.captureOnCommitCallbacks(execute=True):
+            return CurrentAccountMovement.objects.create(
+                current_account=self.acc, book=self.book, movement_type=kind, date="2026-09-30",
+                amount=Decimal(amount), amount_base=Decimal(amount), currency=self.usd)
+
+    def _bal(self, code):
+        return {r["code"]: r["balance"] for r in
+                balance_sheet(self.book)["trial_balance"]["rows"]}.get(code, Decimal("0"))
+
+    def test_a_credit_shows_as_payable_the_moment_it_arises(self):
+        self._move("-1.25")
+        self.assertEqual(self._bal("2000"), Decimal("1.25"))
+        self.assertEqual(self._bal("1200"), Decimal("0.00"))
+
+    def test_closing_the_credit_takes_it_back_out(self):
+        self._move("-1.25")
+        self._move("1.25", kind="adjustment")
+        self.assertEqual(self._bal("2000"), Decimal("0.00"))
+        self.assertTrue(balance_sheet(self.book)["balanced"])
+
+    def test_the_resplit_itself_never_touches_the_result(self):
+        self._move("-1.25")
+        self.assertEqual(balance_sheet(self.book)["result"], Decimal("0.00"))
+
+    def test_an_account_that_owes_us_posts_nothing_extra(self):
+        self._move("500.00")
+        self.assertFalse(JournalEntry.objects.filter(reference="AP-RESPLIT").exists())
+        self.assertEqual(self._bal("1200"), Decimal("500.00"))
+
+    def test_deleting_the_movement_is_followed_too(self):
+        mv = self._move("-1.25")
+        with self.captureOnCommitCallbacks(execute=True):
+            mv.delete()
+        self.assertEqual(self._bal("2000"), Decimal("0.00"))

@@ -407,11 +407,24 @@ def reclassify_payables(book, *, date, reference=""):
     This posts the DIFFERENCE between what 2000 holds and what the accounts
     in credit add up to, so it can be run at any time, as often as liked:
     a second run posts nothing. Returns (entry or None, accounts in credit).
+
+    It moves value between two balance-sheet accounts only. Nobody owes
+    more or less afterwards, and the period's result is untouched.
     """
     from django.db.models import Sum
+    from .models import Book
     from .models_accounts import CurrentAccount
     from .models_ledger import JournalLine
 
+    # It now runs after every movement (signals_ledger), so two saves can
+    # arrive together; the book row is the lock that stops both of them
+    # posting the same difference.
+    with transaction.atomic():
+        Book.objects.select_for_update().get(pk=book.pk)
+        return _reclassify_payables_locked(book, date, reference, CurrentAccount, JournalLine, Sum)
+
+
+def _reclassify_payables_locked(book, date, reference, CurrentAccount, JournalLine, Sum):
     in_credit = CurrentAccount.objects.filter(book=book, cached_balance__lt=0)
     count = in_credit.count()
     owed = -(in_credit.aggregate(t=Sum("cached_balance"))["t"] or ZERO)

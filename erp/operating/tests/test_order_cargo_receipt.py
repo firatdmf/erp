@@ -208,3 +208,59 @@ class TheShippedEmailCarriesTheReceipt(_AnOrderToComplete, TestCase):
         self.assertEqual(send.call_count, 1)
         self.assertEqual(send.call_args.kwargs["extra_attachments"], [])
         self.assertNotIn("attached to this email", send.call_args.args[2])
+
+
+@patch("marketing.utils.bunny_storage.upload_to_bunny", return_value=CDN)
+class CargoSavedInTheBackground(_AnOrderToComplete, TestCase):
+    """The cargo card's Save and a receipt's × ask for JSON: the order page
+    redraws the card from the answer instead of reloading."""
+
+    def _save(self, *files, status="shipped", **fields):
+        data = {"action": "update_status", "order_status": status,
+                "carrier": "Sürat Kargo", "tracking_number": "16865",
+                "cargo_receipts": list(files), **fields}
+        return self.client.post(self.url, data, HTTP_ACCEPT="application/json")
+
+    def test_save_answers_with_the_saved_cargo(self, upload):
+        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        data = self._save(_pdf()).json()
+        self.assertTrue(data["ok"])
+        self.assertEqual((data["carrier"], data["carrier_label"], data["tracking_number"]),
+                         ("surat-kargo", "Sürat Kargo", "16865"))
+        self.assertIn('<i class="fa fa-truck"></i>Sürat Kargo</span>', data["summary_html"])
+        receipt = self.order.cargo_receipts.get()
+        self.assertIn(f'data-receipt-id="{receipt.pk}"', data["receipts_html"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.order_status, "shipped")
+
+    def test_a_turned_away_file_comes_back_as_a_warning(self, upload):
+        bad = SimpleUploadedFile("notes.txt", b"hi", content_type="text/plain")
+        data = self._save(bad, status="pending").json()
+        self.assertTrue(data["ok"])
+        self.assertIn("notes.txt", data["warning"])
+
+    def test_a_background_save_never_moves_the_status(self, upload):
+        res = self._save(status="shipped")  # the order is still pending
+        self.assertEqual(res.status_code, 409)
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.order_status, self.order.tracking_number), ("pending", None))
+
+    @patch("marketing.utils.bunny_storage.delete_from_bunny")
+    def test_removing_a_receipt_answers_with_the_card(self, delete, upload):
+        self._complete(_pdf())
+        receipt = self.order.cargo_receipts.get()
+        data = self.client.post(self.url, {"action": "delete_cargo_receipt", "receipt_id": receipt.pk},
+                                HTTP_ACCEPT="application/json").json()
+        self.assertTrue(data["ok"])
+        self.assertFalse(OrderCargoReceipt.objects.filter(pk=receipt.pk).exists())
+        self.assertNotIn("data-receipt-id", data["receipts_html"])
+
+    def test_a_sales_rep_is_refused_in_json(self, upload):
+        self._complete(_pdf())
+        receipt = self.order.cargo_receipts.get()
+        perm, _ = Permission.objects.get_or_create(name="sales_rep")
+        self.user.member.permissions.add(perm)
+        res = self.client.post(self.url, {"action": "delete_cargo_receipt", "receipt_id": receipt.pk},
+                               HTTP_ACCEPT="application/json")
+        self.assertEqual(res.status_code, 403)
+        self.assertTrue(OrderCargoReceipt.objects.filter(pk=receipt.pk).exists())

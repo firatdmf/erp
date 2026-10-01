@@ -1,0 +1,16 @@
+{% load i18n %}{% comment %}A completed order's cargo info on one line. Drawn inside #od-ship-view on the order page, and again after a background save.{% endcomment %}
+{% if order.carrier %}<span title="{% trans "Carrier" %}"><i class="fa fa-truck"></i>{{ order.get_carrier_display }}</span>{% endif %}
+{% if order.tracking_number %}<span title="{% trans "Tracking or receipt number" %}"><i class="fa fa-barcode"></i>{{ order.tracking_number }}</span>{% endif %}
+{% with receipts=order.cargo_receipts.all %}
+{% if receipts %}
+<span class="od-ship-sum-rc">
+  {% for r in receipts %}
+  <a href="{{ r.file_url }}" target="_blank" rel="noopener" title="{{ r.file_name|default:_("Receipt") }}">
+    {% if r.is_pdf %}<span class="od-rcpt-thumb pdf"><i class="fa fa-file-pdf"></i></span>
+    {% else %}<img class="od-rcpt-thumb" src="{{ r.file_url }}" alt="" loading="lazy">{% endif %}
+  </a>
+  {% endfor %}
+</span>
+{% endif %}
+{% if not order.carrier and not order.tracking_number and not receipts %}<span class="od-ship-sum-none">{% trans "No cargo info" %}</span>{% endif %}
+{% endwith %}

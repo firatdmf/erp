@@ -549,6 +549,8 @@ class OrderDetail(DetailView):
         ctx["carrier_choices"] = carrier_choices_for(self.object)
         ctx["is_terminal"] = current in {"cancelled", "returned"}
         ctx["shipped"] = current in _SHIPPED_CLASS
+        # Cargo info reads as sent once the order is done; the page unlocks it on request.
+        ctx["cargo_locked"] = ctx["shipped"] or ctx["is_terminal"]
 
         # ── Packing data (the pack screen folded into this page) ──
         # ONE reservations query; everything else is grouped in Python.
@@ -933,11 +935,17 @@ class OrderDetail(DetailView):
                                        "guest_email", "guest_phone", "updated_at"])
             return JsonResponse({"ok": True})
 
+        # The cargo card saves and removes receipts in the background and
+        # asks for JSON: the redrawn cargo parts instead of a redirect.
+        wants_json = request.headers.get("Accept") == "application/json"
+
         # ── Remove a cargo receipt ──────────────────────────────
         if action == "delete_cargo_receipt":
             from .models import OrderCargoReceipt
             from django.utils.translation import gettext as _g
             if hide_cost:
+                if wants_json:
+                    return JsonResponse({"ok": False, "error": _g("You can't change this order's cargo receipts.")}, status=403)
                 messages.error(request, _g("You can't change this order's cargo receipts."))
                 return redirect("operating:order_detail", pk=order.pk)
             receipt = OrderCargoReceipt.objects.filter(
@@ -949,7 +957,10 @@ class OrderDetail(DetailView):
                 except Exception:
                     pass  # an orphaned CDN file is harmless; the row is what the page shows
                 receipt.delete()
-                messages.success(request, _g("Cargo receipt removed."))
+                if not wants_json:
+                    messages.success(request, _g("Cargo receipt removed."))
+            if wants_json:
+                return _cargo_json(request, order, message=_g("Cargo receipt removed."))
             return redirect("operating:order_detail", pk=order.pk)
 
         if action != "update_status":
@@ -968,6 +979,10 @@ class OrderDetail(DetailView):
         # Cancelling is irreversible, so the page asks why and the reason
         # is required — it lands in the change history below.
         from django.utils.translation import gettext as _g
+        # A background save is the cargo card's Save: cargo only, never a
+        # status change — those reload the page, which they redraw.
+        if wants_json and new_status != order.order_status:
+            return JsonResponse({"ok": False, "error": _g("The order's status changed. Reload the page.")}, status=409)
         cancel_reason = (request.POST.get("cancel_reason") or "").strip()
         cancelling = new_status == "cancelled" and order.order_status != "cancelled"
         if cancelling and not cancel_reason:
@@ -996,20 +1011,23 @@ class OrderDetail(DetailView):
         if not ok:
             discard_cargo_receipts(new_receipts)
             if code == "cargo_required":
-                messages.error(request, _gettext("Enter carrier and tracking or receipt number to complete the order."))
+                error = _gettext("Enter carrier and tracking or receipt number to complete the order.")
             elif code == "insufficient_reservation":
                 from .views_warehouse import reservation_shortfall_message
-                messages.error(request, reservation_shortfall_message(order))
+                error = reservation_shortfall_message(order)
             elif code == "order_cancelled_terminal":
-                messages.error(request, "İptal edilmiş bir sipariş tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun.")
+                error = "İptal edilmiş bir sipariş tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun."
             elif code == "cancel_requires_reopen":
                 from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
-                messages.error(request, CANCEL_REQUIRES_REOPEN_MSG)
+                error = CANCEL_REQUIRES_REOPEN_MSG
             elif code == "goods_not_received":
                 from .views_warehouse import GOODS_NOT_RECEIVED_MSG
-                messages.error(request, GOODS_NOT_RECEIVED_MSG)
+                error = GOODS_NOT_RECEIVED_MSG
             else:
-                messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
+                error = f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}"
+            if wants_json:
+                return JsonResponse({"ok": False, "error": str(error)}, status=400)
+            messages.error(request, error)
             return redirect("operating:order_detail", pk=order.pk)
 
         if cancelling:
@@ -1026,12 +1044,13 @@ class OrderDetail(DetailView):
             )
             return redirect("operating:order_detail", pk=order.pk)
 
+        rejected_msg = rejected and (
+            _g("These files were not attached — only images or PDFs up to 15 MB: %(names)s")
+            % {"names": ", ".join(rejected)})
+        if wants_json:
+            return _cargo_json(request, order, message=_g("Cargo info saved."), warning=rejected_msg)
         if rejected:
-            messages.warning(
-                request,
-                _g("These files were not attached — only images or PDFs up to 15 MB: %(names)s")
-                % {"names": ", ".join(rejected)},
-            )
+            messages.warning(request, rejected_msg)
 
         now_shipped = order.order_status in _SHIPPED_CLASS
         if now_shipped and not was_shipped:
@@ -1080,6 +1099,26 @@ class OrderDetail(DetailView):
 from decimal import Decimal as _PDecimal
 
 _SHIPPED_CLASS = {"shipped", "in_transit", "out_for_delivery", "delivered"}
+
+
+def _cargo_json(request, order, message, warning=None):
+    """The order page's cargo card, redrawn after a background save or a
+    receipt's removal: the saved carrier and tracking number, and the two
+    parts of the card that list receipts."""
+    from django.template.loader import render_to_string
+    from erp.roles import is_sales_rep
+
+    ctx = {"order": order, "is_sales_rep": is_sales_rep(request.user)}
+    return JsonResponse({
+        "ok": True,
+        "message": message,
+        "warning": warning or "",
+        "carrier": order.carrier or "",
+        "carrier_label": order.get_carrier_display() if order.carrier else "",
+        "tracking_number": order.tracking_number or "",
+        "summary_html": render_to_string("operating/partials/_cargo_summary.html", ctx, request=request),
+        "receipts_html": render_to_string("operating/partials/_cargo_receipts.html", ctx, request=request),
+    })
 
 
 def _order_item_match_maps(order):

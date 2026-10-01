@@ -310,6 +310,23 @@
     gap: 12px; flex-wrap: wrap;
     margin-top: 12px;
   }
+  /* Completed order: cargo info on one line, buttons beside it. */
+  .od-ship.locked {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    padding: 10px 12px;
+  }
+  .od-ship.locked > #od-complete-waits { flex-basis: 100%; margin-bottom: 0; }
+  .od-ship.locked .od-ship-actions { margin-top: 0; flex: 1 1 auto; justify-content: flex-end; }
+  .od-ship-sum {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-width: 0;
+    font: 600 13px var(--font-sans); color: #0F1419; overflow-wrap: anywhere;
+  }
+  .od-ship-sum > span > i { color: #147F74; margin-right: 6px; }
+  .od-ship-sum-rc { display: flex; gap: 6px; }
+  .od-ship-sum-rc .od-rcpt-thumb { width: 28px; height: 28px; font-size: 13px; }
+  .od-ship-sum-none { font-weight: 500; color: var(--gray-500); }
+  [data-theme="dark"] .od-ship-sum { color: #E6ECEF; }
+  [data-theme="dark"] .od-ship-sum > span > i { color: #66C2C2; }
   .od-ship-meta {
     font: 500 11.5px var(--font-sans); color: var(--gray-600);
   }
@@ -1241,13 +1258,15 @@
             {% endfor %}
           </div>
 
-          <div class="od-ship">
+          <div class="od-ship{% if cargo_locked %} locked{% endif %}">
+            {% if not cargo_locked %}
             <div class="od-ship-hint" style="font-size:12px;color:#64748B;margin-bottom:8px;">
               <i class="fa fa-circle-info"></i>
               
                 {% trans "No stock is deducted until <b>Complete order</b> is pressed. Cargo info is optional — saved if entered, but the order can complete without it." %}
               
             </div>
+            {% endif %}
             {% if billing_waits_for %}
             <div id="od-complete-waits" style="font-size:12px; color:#92400E; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:8px 10px; margin-bottom:8px;">
               <i class="fa fa-clock"></i>
@@ -1255,6 +1274,13 @@
               {% for p in billing_waits_for %}<a href="{% url 'accounts:purchase_order_detail' p.pk %}" style="color:inherit; font-weight:700;">{{ p.number }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
             </div>
             {% endif %}
+            {% if cargo_locked %}
+            {% comment %}A completed (or cancelled/returned) order shows its cargo info as it went out, on one line beside its buttons. "Edit cargo info" swaps in the fields below — a late tracking number or receipt shouldn't need Re-open & Fix.{% endcomment %}
+            <div class="od-ship-sum" id="od-ship-view">
+              {% include "operating/partials/_cargo_summary.html" %}
+            </div>
+            {% endif %}
+            <div id="od-ship-edit" {% if cargo_locked %}hidden{% endif %}>
             {% if order.is_retail_order %}
             <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#0F766E;margin-bottom:10px;cursor:pointer;">
               <input type="checkbox" id="od-has-cargo" {% if order.carrier or order.tracking_number %}checked{% endif %}>
@@ -1292,25 +1318,7 @@
               </label>
               <div class="od-ship-f od-rcpt">
                 <span class="od-ship-l">{% trans "Cargo receipt" %}</span>
-                {% with receipts=order.cargo_receipts.all %}
-                {% if receipts %}
-                <div class="od-rcpt-list">
-                  {% for r in receipts %}
-                  <div class="od-rcpt-item">
-                    <a href="{{ r.file_url }}" target="_blank" rel="noopener" class="od-rcpt-open" title="{{ r.file_name }}">
-                      {% if r.is_pdf %}<span class="od-rcpt-thumb pdf"><i class="fa fa-file-pdf"></i></span>
-                      {% else %}<img class="od-rcpt-thumb" src="{{ r.file_url }}" alt="" loading="lazy">{% endif %}
-                      <span class="od-rcpt-name">{{ r.file_name|default:_("Receipt")|truncatechars:28 }}</span>
-                    </a>
-                    {% if not is_sales_rep %}
-                    <button type="submit" form="od-rcpt-del-{{ r.pk }}" class="od-rcpt-del"
-                            title="{% trans 'Remove' %}" aria-label="{% trans 'Remove' %}"><i class="fa fa-xmark"></i></button>
-                    {% endif %}
-                  </div>
-                  {% endfor %}
-                </div>
-                {% endif %}
-                {% endwith %}
+                <div id="od-rcpt-saved">{% include "operating/partials/_cargo_receipts.html" %}</div>
                 {% if not is_sales_rep %}
                 <div class="od-rcpt-picks">
                   {% comment %}Phones only: a PDF-or-image picker can't open the camera on Android, so a second input asks for the rear camera outright. Each shot moves into its own hidden input (see the JS) so a second photo doesn't replace the first.{% endcomment %}
@@ -1334,13 +1342,24 @@
                 {% endif %}
               </div>
             </div>
+            </div>
             <div class="od-ship-actions">
               <span class="od-ship-meta">
                 {% if order.shipped_at %}<i class="fa fa-check-circle"></i> {% trans "Completed" %}: {{ order.shipped_at|date:"d M Y · H:i" }}{% endif %}
                 {% if order.delivered_at %} · <i class="fa fa-check-circle"></i> {% trans "Delivered" %}: {{ order.delivered_at|date:"d M Y · H:i" }}{% endif %}
               </span>
               <div style="display:flex; gap:8px;">
-                <button type="submit" class="ord-btn ghost" title="{% trans "Save cargo info only" %}">
+                {% if cargo_locked and not is_sales_rep %}
+                <button type="button" id="od-ship-unlock" class="ord-btn ghost">
+                  <i class="fa fa-pen"></i> {% trans "Edit cargo info" %}
+                </button>
+                {% endif %}
+                {% if cargo_locked and not is_sales_rep %}
+                <button type="button" id="od-ship-cancel" class="ord-btn ghost" hidden>
+                  {% trans "Cancel edit" %}
+                </button>
+                {% endif %}
+                <button type="submit" id="od-ship-save" class="ord-btn ghost" title="{% trans "Save cargo info only" %}" {% if cargo_locked %}hidden{% endif %}>
                   <i class="fa fa-save"></i> {% trans "Save" %}
                 </button>
                 {% if order.order_status == 'cancelled' %}
@@ -1361,13 +1380,6 @@
             </div>
           </div>
         </form>
-        {% for r in order.cargo_receipts.all %}
-        <form method="post" action="{% url 'operating:order_detail' order.pk %}" id="od-rcpt-del-{{ r.pk }}" class="od-rcpt-del-form" hidden>
-          {% csrf_token %}
-          <input type="hidden" name="action" value="delete_cargo_receipt">
-          <input type="hidden" name="receipt_id" value="{{ r.pk }}">
-        </form>
-        {% endfor %}
 
         {% if order.order_status == 'cancelled' %}
         <div class="od-cancelled-note">
@@ -2415,6 +2427,112 @@
       statusInput.value = s;
       statusForm.submit();
     }
+    // The cargo card. A completed order shows it read-only until "Edit
+    // cargo info". Save and a receipt's × go in the background, and the
+    // card redraws from the server's answer instead of reloading the page.
+    const shipView   = document.getElementById('od-ship-view');
+    const shipEdit   = document.getElementById('od-ship-edit');
+    const shipSave   = document.getElementById('od-ship-save');
+    const shipCancel = document.getElementById('od-ship-cancel');
+    const unlockBtn  = document.getElementById('od-ship-unlock');
+    const rcptSaved  = document.getElementById('od-rcpt-saved');
+    const SAVE_FAILED = '{% trans "Could not save. Check your connection and try again." %}';
+    function setEditing(on) {
+      if (!shipView) return;  // an open order has no read-only view
+      shipView.hidden = on;
+      shipView.parentElement.classList.toggle('locked', !on);
+      shipEdit.hidden = !on;
+      shipSave.hidden = !on;
+      if (shipCancel) shipCancel.hidden = !on;
+      if (unlockBtn) unlockBtn.hidden = on;
+    }
+    // Every field back to what the order was last saved with. The fields
+    // stay in the form while hidden and post with any status change, so
+    // an edit left in them would be saved behind the user's back. The
+    // tracking number and the retail tick are reset here; the carrier
+    // and the unsent receipts reset themselves on 'od-ship-reset'.
+    function restoreSaved() {
+      if (trackingInp) trackingInp.value = trackingInp.defaultValue;
+      if (hasCargoChk) {
+        hasCargoChk.checked = hasCargoChk.defaultChecked;
+        if (shipGridEl) shipGridEl.style.display = hasCargoChk.checked ? '' : 'none';
+      }
+      statusForm.dispatchEvent(new Event('od-ship-reset'));
+    }
+    if (unlockBtn) unlockBtn.addEventListener('click', () => setEditing(true));
+    if (shipCancel) shipCancel.addEventListener('click', () => { restoreSaved(); setEditing(false); });
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastNotification');
+      if (!toast) return;
+      toast.querySelector('.toast-message-global').textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+    // Rejects with a TypeError when the request never got an answer (the
+    // network), and with the server's message when it said no.
+    async function postCargo(fd) {
+      // getAttribute, not .action: the form's hidden "action" field shadows it.
+      const res = await fetch(statusForm.getAttribute('action'), {
+        method: 'POST', body: fd, credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+      });
+      let data = null;
+      try { data = await res.json(); } catch (e) { /* an error page, not JSON */ }
+      if (!res.ok || !data || !data.ok) {
+        if (!data) console.error('Cargo save: no JSON in the answer', res.status, res.url);
+        throw new Error((data && data.error) || SAVE_FAILED);
+      }
+      return data;
+    }
+    function applyCargo(data) {
+      if (shipView) shipView.innerHTML = data.summary_html;
+      if (rcptSaved) rcptSaved.innerHTML = data.receipts_html;
+      if (data.message) showToast(data.message);
+      if (data.warning) alert(data.warning);
+    }
+    if (shipSave) {
+      shipSave.addEventListener('click', (e) => {
+        e.preventDefault();
+        const fd = new FormData(statusForm);
+        fd.set('order_status', statusInput.defaultValue);  // Save never moves the status
+        fd.delete('skip_cargo');
+        shipSave.disabled = true;
+        postCargo(fd).then(data => {
+          // What was saved becomes what Cancel edit returns to.
+          if (trackingInp) trackingInp.defaultValue = data.tracking_number;
+          if (hasCargoChk) hasCargoChk.defaultChecked = !!(data.carrier || data.tracking_number);
+          statusForm.dispatchEvent(new CustomEvent('od-ship-saved', { detail: data }));
+          applyCargo(data);
+          restoreSaved();
+          setEditing(false);
+        }).catch(err => {
+          // No answer at all: save the ordinary way rather than lose the edit.
+          if (err instanceof TypeError) {
+            statusInput.value = statusInput.defaultValue;
+            statusForm.submit();
+            return;
+          }
+          alert(err.message || SAVE_FAILED);
+        }).finally(() => { shipSave.disabled = false; });
+      });
+    }
+    // A saved receipt's × removes it at once, edit or no edit.
+    if (rcptSaved) {
+      rcptSaved.addEventListener('click', (e) => {
+        const btn = e.target.closest('.od-rcpt-del[data-receipt-id]');
+        if (!btn || !confirm('{% trans "Remove this cargo receipt?" %}')) return;
+        const fd = new FormData();
+        fd.set('csrfmiddlewaretoken', statusForm.querySelector('[name="csrfmiddlewaretoken"]').value);
+        fd.set('action', 'delete_cargo_receipt');
+        fd.set('receipt_id', btn.dataset.receiptId);
+        btn.disabled = true;
+        postCargo(fd).then(applyCargo).catch(err => {
+          btn.disabled = false;
+          alert(err instanceof TypeError ? SAVE_FAILED : err.message);
+        });
+      });
+    }
     // Carrier combobox. Filtering ignores case and Turkish accents, so
     // "yurtici" finds "Yurtiçi Kargo" and "IS" doesn't miss an "iş".
     (function () {
@@ -2480,7 +2598,9 @@
       }
       function pick(o) {
         if (o.isNew && !Array.from(sel.options).some(opt => opt.value === o.value)) {
-          sel.add(new Option(o.label, o.value));
+          const added = new Option(o.label, o.value);
+          added.dataset.added = '1';
+          sel.add(added);
         }
         sel.value = o.value;
         sel.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2488,6 +2608,26 @@
         chip.hidden = false; box.hidden = true;
         input.value = ''; close();
       }
+      // A background save: the carrier it stored (a typed name may have
+      // matched one already on the list) is now the saved one.
+      statusForm.addEventListener('od-ship-saved', (e) => {
+        const { carrier, carrier_label } = e.detail;
+        sel.querySelectorAll('option[data-added]').forEach(opt => opt.remove());
+        if (carrier && !Array.from(sel.options).some(opt => opt.value === carrier)) {
+          sel.add(new Option(carrier_label, carrier));
+          options.push({ value: carrier, label: carrier_label, key: fold(carrier_label + ' ' + carrier) });
+        }
+        Array.from(sel.options).forEach(opt => { opt.defaultSelected = !!carrier && opt.value === carrier; });
+      });
+      // Cancel edit: back to the carrier the order was saved with.
+      statusForm.addEventListener('od-ship-reset', () => {
+        sel.querySelectorAll('option[data-added]').forEach(opt => opt.remove());
+        const saved = Array.from(sel.options).find(opt => opt.defaultSelected && opt.value);
+        sel.value = saved ? saved.value : '';
+        chip.querySelector('span').textContent = saved ? saved.text : '';
+        chip.hidden = !saved; box.hidden = !!saved;
+        input.value = ''; close();
+      });
       chip.querySelector('.od-cbx-clear').addEventListener('click', () => {
         sel.value = '';
         sel.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2496,7 +2636,21 @@
       });
       input.addEventListener('focus', render);
       input.addEventListener('input', render);
-      input.addEventListener('blur', close);
+      // Leaving the box with a name typed but not picked keeps it — the
+      // carrier it names, or a new one as "Add" would — instead of letting
+      // it look chosen while the form posts no carrier. Picking from the
+      // list never blurs (mousedown is cancelled), so this only catches
+      // a name typed and then walked away from, e.g. to Complete order.
+      input.addEventListener('blur', () => {
+        const typed = input.value.trim().replace(/\s+/g, ' ');
+        if (typed) {
+          const q = fold(typed);
+          pick(options.find(o => fold(o.label) === q || fold(o.value) === q)
+               || { value: typed, label: typed, isNew: true });
+        } else {
+          close();
+        }
+      });
       input.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           e.preventDefault();
@@ -2591,6 +2745,12 @@
         rcptShots.hidden = !parked.length;
       }
 
+      // Cancel edit: the receipts waiting to upload are dropped.
+      statusForm.addEventListener('od-ship-reset', () => {
+        rcptShots.querySelectorAll('input.od-rcpt-parked').forEach(i => i.remove());
+        renderPending();
+      });
+
       [document.getElementById('od-rcpt-input'), document.getElementById('od-rcpt-cam')].forEach(src => {
         if (!src) return;
         src.removeAttribute('name');  // its files post from the parked copy
@@ -2624,11 +2784,6 @@
         }
       });
     }
-    document.querySelectorAll('.od-rcpt-del').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        if (!confirm('{% trans "Remove this cargo receipt?" %}')) e.preventDefault();
-      });
-    });
 
     document.querySelectorAll('.od-stage[data-status], .od-stage-mini[data-status], .od-spk-btn[data-status], #od-complete-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {

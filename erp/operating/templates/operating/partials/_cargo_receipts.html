@@ -1,0 +1,20 @@
+{% load i18n %}{% comment %}The order's saved cargo receipts, each with its × (not for sales reps). Drawn inside #od-rcpt-saved on the order page, and again after a background save or removal.{% endcomment %}
+{% with receipts=order.cargo_receipts.all %}
+{% if receipts %}
+<div class="od-rcpt-list">
+  {% for r in receipts %}
+  <div class="od-rcpt-item">
+    <a href="{{ r.file_url }}" target="_blank" rel="noopener" class="od-rcpt-open" title="{{ r.file_name }}">
+      {% if r.is_pdf %}<span class="od-rcpt-thumb pdf"><i class="fa fa-file-pdf"></i></span>
+      {% else %}<img class="od-rcpt-thumb" src="{{ r.file_url }}" alt="" loading="lazy">{% endif %}
+      <span class="od-rcpt-name">{{ r.file_name|default:_("Receipt")|truncatechars:28 }}</span>
+    </a>
+    {% if not is_sales_rep %}
+    <button type="button" class="od-rcpt-del" data-receipt-id="{{ r.pk }}"
+            title="{% trans 'Remove' %}" aria-label="{% trans 'Remove' %}"><i class="fa fa-xmark"></i></button>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}

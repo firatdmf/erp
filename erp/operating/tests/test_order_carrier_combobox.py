@@ -91,3 +91,37 @@ class TypedCarriersJoinTheList(CarrierCombobox):
         self.assertIn("<span>Diğer</span>", html)
         self.assertIn('<option value="other" selected>', html)
         self.assertEqual(self._save("other"), "other")
+
+
+class CompletedOrderCargoReadsAsSent(CarrierCombobox):
+    """Once the order is completed its cargo info shows read-only, with an
+    "Edit cargo info" button that brings the fields back."""
+
+    def test_an_open_order_shows_the_fields(self):
+        html = self._html()
+        self.assertIn('<div id="od-ship-edit" >', html)
+        self.assertNotIn('id="od-ship-view"', html)
+        self.assertNotIn('id="od-ship-unlock"', html)
+
+    def test_a_completed_order_shows_its_cargo_read_only(self):
+        Order.objects.filter(pk=self.order.pk).update(
+            order_status="shipped", carrier="yurtici", tracking_number="16865")
+        html = self._html()
+        self.assertIn('id="od-ship-view"', html)
+        self.assertIn('<i class="fa fa-truck"></i>Yurtiçi Kargo</span>', html)
+        self.assertIn('<i class="fa fa-barcode"></i>16865</span>', html)
+        self.assertIn('<div id="od-ship-edit" hidden>', html)
+        self.assertIn('id="od-ship-unlock"', html)
+        self.assertIn('id="od-ship-cancel"', html)
+
+    def test_a_completed_order_without_cargo_says_so(self):
+        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        self.assertIn('class="od-ship-sum-none"', self._html())
+
+    def test_a_completed_order_can_still_save_cargo_info(self):
+        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        self.client.post(self.url, {"action": "update_status", "order_status": "shipped",
+                                    "carrier": "aras", "tracking_number": "999"})
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.order_status, self.order.carrier, self.order.tracking_number),
+                         ("shipped", "aras", "999"))

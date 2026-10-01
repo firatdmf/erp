@@ -13114,3 +13114,7 @@ msgstr "Resim silindi!"
 #: hardcoded Turkish moved to the catalogue as written
 msgid "Enter product description..."
 msgstr "Ürün açıklaması giriniz..."
+
+#: accounting/templates/accounting/book_detail.html
+msgid "See the ledger in detail"
+msgstr "Defteri ayrıntılı gör"

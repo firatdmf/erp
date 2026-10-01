@@ -177,3 +177,6 @@ class BookPageEquationReadsTheLedger(TestCase):
         self.assertEqual(resp.context["eq_equity"], Decimal("600"))
         self.assertTrue(resp.context["eq_balanced"])
         self.assertNotContains(resp, "This period")
+
+    def test_the_card_links_to_the_ledger_itself(self):
+        self.assertContains(self._page(), reverse("accounts:report_chart_of_accounts", args=[self.book.pk]))

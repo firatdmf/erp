@@ -200,6 +200,10 @@
   <!-- ============ ACCOUNTING EQUATION ============ -->
   <style>
     .eq-card .card-header-title { justify-content: space-between; }
+    .eq-head-r { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+    a.eq-ledger-link { font-size: 12.5px; font-weight: 600; color: var(--nejum-teal-700, #005354); text-decoration: none; white-space: nowrap; }
+    a.eq-ledger-link:hover { text-decoration: underline; }
+    a.eq-ledger-link i { font-size: 10px; margin-left: 2px; }
     .eq-status {
       font-size: .72rem; font-weight: 700; letter-spacing: .04em;
       text-transform: uppercase; padding: .2rem .6rem; border-radius: 999px;
@@ -293,11 +297,16 @@
   <div class="financial-overview-card eq-card">
     <div class="card-header-title">
       <span><i class="fas fa-balance-scale-right blue-icon"></i> Accounting Equation</span>
-      {% if eq_balanced %}
-      <span class="eq-status ok">Balanced</span>
-      {% else %}
-      <span class="eq-status bad">Out of balance</span>
-      {% endif %}
+      <span class="eq-head-r">
+        {% comment %} The card is a summary of the general ledger; this is the
+           ledger itself — every account, its balance, and from there its entries. {% endcomment %}
+        <a class="eq-ledger-link" href="{% url 'accounts:report_chart_of_accounts' book.pk %}">{% trans "See the ledger in detail" %} <i class="fas fa-arrow-right"></i></a>
+        {% if eq_balanced %}
+        <span class="eq-status ok">Balanced</span>
+        {% else %}
+        <span class="eq-status bad">Out of balance</span>
+        {% endif %}
+      </span>
     </div>
 
     {% comment %}

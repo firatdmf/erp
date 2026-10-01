@@ -223,7 +223,10 @@ class LongDate(TestCase):
 
     def test_turkish_reads_day_month_year(self):
         from datetime import date
-        self.assertEqual(_long_date(date(2026, 8, 20), True), "20 A\u011fustos 2026")
+        from django.utils import translation
+        # The month's name follows the active language, as on the page.
+        with translation.override("tr"):
+            self.assertEqual(_long_date(date(2026, 8, 20), True), "20 A\u011fustos 2026")
 
 
 class BrandHeader(TestCase):

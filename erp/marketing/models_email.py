@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import pgettext_lazy
 from django.contrib.auth.models import User
 from crm.models import Company, Contact
 from django.utils import timezone
@@ -213,15 +214,15 @@ from django.contrib.postgres.fields import ArrayField
 
 class Email(models.Model):
     """
-    Kullanıcının gönderdiği/aldığı tüm e-postalar.
-    Gmail ile senkronize edilir ve CRM entegrasyonu sağlar.
+    Every email the user sent or received.
+    Synchronised with Gmail and tied into CRM.
     """
     FOLDER_CHOICES = [
-        ('inbox', 'Gelen Kutusu'),
-        ('sent', 'Gönderilen'),
-        ('archive', 'Arşiv'),
-        ('trash', 'Silinenler'),
-        ('drafts', 'Taslaklar'),
+        ('inbox', pgettext_lazy("mail folder", "Inbox")),
+        ('sent', pgettext_lazy("mail folder", "Sent")),
+        ('archive', pgettext_lazy("mail folder", "Archive")),
+        ('trash', pgettext_lazy("mail folder", "Trash")),
+        ('drafts', pgettext_lazy("mail folder", "Drafts")),
     ]
     
     email_account = models.ForeignKey(

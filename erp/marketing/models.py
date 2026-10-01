@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils.translation import gettext_lazy as _lz
 import os
 import time
 
@@ -121,7 +122,7 @@ class ProductCollection(models.Model):
 
 
 class ProductCategory(models.Model):
-    """Ürün grubu (bed, fabric, curtain…). Beyond classification, the group
+    """Product group (bed, fabric, curtain…). Beyond classification, the group
     is the DEFAULTS layer for its products: pricing margin, order rules and
     care texts are set once here and every product in the group inherits
     them unless it sets its own override (see Product.effective_*)."""
@@ -144,17 +145,17 @@ class ProductCategory(models.Model):
     # can bulk-apply this to every costed product/variant in the group.
     profit_margin = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
-        help_text="Kar oranı % — maliyet üzerine eklenir (fiyat = maliyet × (1 + oran/100))",
+        help_text=_lz("Margin % — added on top of cost (price = cost × (1 + margin/100))"),
     )
 
     # Order rules — defaults for the B2B storefront.
     minimum_order_quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text="Bu gruptaki ürünler için minimum sipariş miktarı (ürün bazında ezilebilir)",
+        help_text=_lz("Minimum order quantity for products in this group (can be overridden per product)"),
     )
     lead_time_days = models.PositiveIntegerField(
         null=True, blank=True,
-        help_text="Tahmini tedarik/teslim süresi (gün)",
+        help_text=_lz("Estimated supply/delivery time (days)"),
     )
 
     # Care text — entered once per group, pulled by every product that
@@ -326,11 +327,11 @@ class Product(models.Model):
     # the fallback chain (product → category → None).
     profit_margin = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
-        help_text="Kar oranı % — boş bırakılırsa ürün grubununki geçerli",
+        help_text=_lz("Margin % — left blank, the product group's applies"),
     )
     minimum_order_quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text="Minimum sipariş miktarı — boş bırakılırsa ürün grubununki geçerli",
+        help_text=_lz("Minimum order quantity — left blank, the product group's applies"),
     )
 
     # If true, the product will be displayed on marketing channels (website etc)
@@ -343,11 +344,11 @@ class Product(models.Model):
     # being hardcoded in the front-end.
     is_packaged = models.BooleanField(
         default=False,
-        help_text="Bu ürün paket halinde mi satılıyor? (12'li, 5'li vb.)",
+        help_text=_lz("Is this product sold in packs? (of 12, of 5, etc.)"),
     )
     pack_count = models.PositiveSmallIntegerField(
         null=True, blank=True,
-        help_text="Pakette kaç adet var? (is_packaged=True ise zorunlu)",
+        help_text=_lz("How many pieces are in a pack? (required when is_packaged=True)"),
     )
     # If true, the product will be available for sale even if you have no stock.
     selling_while_out_of_stock = models.BooleanField(
@@ -835,27 +836,27 @@ class SupplierItem(models.Model):
 # Example: Size and Color Attributes
 # Make this unique and do get or create when creating the product variant
 # ============================================================
-# PRODUCT ATTRIBUTES (Ürün Özellikleri)
-# Kumaş türü, en, boy, kullanım alanı gibi özellikler
+# PRODUCT ATTRIBUTES
+# Descriptive attributes such as fabric type, width, length, intended use
 # Hem Product'a hem de ProductVariant'a eklenebilir
 # ============================================================
 class ProductAttribute(models.Model):
     """
-    Product veya Variant özellikleri
-    Örnek: En: 150cm, Kumaş Türü: Tül, Kullanım: Gelinlik
+    Attributes of a product or a variant.
+    Example: width: 150cm, fabric type: tulle, use: bridal
     """
     name = models.CharField(
         max_length=255, 
-        verbose_name="Özellik Adı",
-        help_text="Örn: En, Kumaş Türü, Kullanım Alanı"
+        verbose_name=_lz("Attribute name"),
+        help_text=_lz("E.g. width, fabric type, intended use")
     )
     value = models.CharField(
         max_length=500, 
-        verbose_name="Özellik Değeri",
-        help_text="Örn: 150cm, Tül, Gelinlik"
+        verbose_name=_lz("Attribute value"),
+        help_text=_lz("E.g. 150cm, tulle, bridal")
     )
     
-    # Product veya Variant'a bağlanır (ikisinden biri zorunlu)
+    # Attached to a product or a variant (one of the two is required)
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
@@ -873,7 +874,7 @@ class ProductAttribute(models.Model):
         db_index=True
     )
     
-    # Sıralama için
+    # For ordering
     sequence = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -888,11 +889,11 @@ class ProductAttribute(models.Model):
     
     def clean(self):
         from django.core.exceptions import ValidationError
-        # Product veya Variant'tan biri zorunlu (ikisi birden olamaz)
+        # One of product or variant is required (never both)
         if not self.product and not self.product_variant:
-            raise ValidationError("Product veya Product Variant seçilmeli.")
+            raise ValidationError(_lz("Pick a product or a product variant."))
         if self.product and self.product_variant:
-            raise ValidationError("Product ve Variant aynı anda seçilemez.")
+            raise ValidationError(_lz("A product and a variant can't both be picked."))
     
     def __str__(self):
         parent = self.product or self.product_variant
@@ -900,8 +901,8 @@ class ProductAttribute(models.Model):
 
 
 # ============================================================
-# VARIANT ATTRIBUTES (Variant Ayırıcılar)
-# Color, Size, Material gibi variant'ları ayıran özellikler
+# VARIANT ATTRIBUTES
+# The attributes that tell variants apart: colour, size, material
 # ============================================================
 class ProductVariantAttribute(models.Model):
     name = models.CharField(max_length=255, verbose_name="Attribute Name", unique=True)
@@ -1282,7 +1283,7 @@ class NewsletterSubscription(models.Model):
 
 # ============================================================
 # BLOG POSTS
-# Blog yazıları - çok dilli destek ile
+# Blog posts, in several languages
 # ============================================================
 class BlogPost(models.Model):
     """Blog post with multilingual support"""
@@ -1291,31 +1292,31 @@ class BlogPost(models.Model):
     
     # Multilingual Title
     title_en = models.CharField(max_length=300, verbose_name="Title (EN)")
-    title_tr = models.CharField(max_length=300, blank=True, verbose_name="Başlık (TR)")
+    title_tr = models.CharField(max_length=300, blank=True, verbose_name=_lz("Title (TR)"))
     title_ru = models.CharField(max_length=300, blank=True, verbose_name="Заголовок (RU)")
     title_pl = models.CharField(max_length=300, blank=True, verbose_name="Tytuł (PL)")
     
     # Multilingual Excerpt (short description for list view)
     excerpt_en = models.TextField(verbose_name="Excerpt (EN)")
-    excerpt_tr = models.TextField(blank=True, verbose_name="Özet (TR)")
+    excerpt_tr = models.TextField(blank=True, verbose_name=_lz("Excerpt (TR)"))
     excerpt_ru = models.TextField(blank=True, verbose_name="Краткое описание (RU)")
     excerpt_pl = models.TextField(blank=True, verbose_name="Streszczenie (PL)")
     
     # Multilingual Content (Markdown format)
     content_en = models.TextField(verbose_name="Content (EN)")
-    content_tr = models.TextField(blank=True, verbose_name="İçerik (TR)")
+    content_tr = models.TextField(blank=True, verbose_name=_lz("Content (TR)"))
     content_ru = models.TextField(blank=True, verbose_name="Содержание (RU)")
     content_pl = models.TextField(blank=True, verbose_name="Treść (PL)")
     
     # Multilingual Category
     category_en = models.CharField(max_length=100, verbose_name="Category (EN)")
-    category_tr = models.CharField(max_length=100, blank=True, verbose_name="Kategori (TR)")
+    category_tr = models.CharField(max_length=100, blank=True, verbose_name=_lz("Category (TR)"))
     category_ru = models.CharField(max_length=100, blank=True, verbose_name="Категория (RU)")
     category_pl = models.CharField(max_length=100, blank=True, verbose_name="Kategoria (PL)")
     
     # Images (Bunny CDN URLs)
-    cover_image = models.URLField(blank=True, verbose_name="Kapak Resmi (Liste)")
-    hero_image = models.URLField(blank=True, verbose_name="Hero Resmi (Detay)")
+    cover_image = models.URLField(blank=True, verbose_name=_lz("Cover image (list)"))
+    hero_image = models.URLField(blank=True, verbose_name=_lz("Hero image (detail)"))
     
     # Custom Code Injection
     header_content = models.TextField(blank=True, verbose_name="Extra Header Content (CSS/Meta)", help_text="e.g. &lt;style&gt;...&lt;/style&gt; or &lt;link&gt;")
@@ -1323,8 +1324,8 @@ class BlogPost(models.Model):
     
     # Meta
     author = models.CharField(max_length=200, default='Karven Home Collection')
-    published_at = models.DateField(verbose_name="Yayın Tarihi")
-    is_published = models.BooleanField(default=False, verbose_name="Yayında mı?")
+    published_at = models.DateField(verbose_name=_lz("Publication date"))
+    is_published = models.BooleanField(default=False, verbose_name=_lz("Published?"))
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1392,9 +1393,9 @@ class BlogFile(models.Model):
 
     # File type: 'cover', 'hero', 'content'
     FILE_TYPE_CHOICES = [
-        ('cover', 'Kapak Resmi'),
-        ('hero', 'Hero Resmi'),
-        ('content', 'İçerik Resmi'),
+        ('cover', _lz("Cover image")),
+        ('hero', _lz("Hero image")),
+        ('content', _lz("Content image")),
     ]
     file_type = models.CharField(
         max_length=20,
@@ -1410,8 +1411,8 @@ class BlogFile(models.Model):
     
     class Meta:
         ordering = ['sequence', 'pk']
-        verbose_name = "Blog Dosyası"
-        verbose_name_plural = "Blog Dosyaları"
+        verbose_name = _lz("Blog file")
+        verbose_name_plural = _lz("Blog files")
     
     def delete(self, *args, **kwargs):
         """Delete from CDN when deleting the record"""
@@ -1429,9 +1430,9 @@ class BlogFile(models.Model):
 
 # ============================================================
 # PRODUCT CAMPAIGNS / DISCOUNTS
-# Bir ürüne tek tip kampanya bağlanır:
-#   - 'percentage' : sabit yüzde indirim + bitiş tarihi
-#   - 'volume'     : adet bazlı kademe (tier) indirimi
+# A product takes one kind of campaign:
+#   - 'percentage' : a fixed percentage discount + an end date
+#   - 'volume'     : a tiered discount by quantity
 # ============================================================
 class ProductCampaign(models.Model):
     TYPE_CHOICES = [

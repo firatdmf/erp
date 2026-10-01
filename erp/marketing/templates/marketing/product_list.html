@@ -470,7 +470,7 @@ document.addEventListener('keydown', (e) => {
   window.closeImportModal = function() {
     document.getElementById('csvModal').classList.remove('show');
     clearImportFile();
-    importBtn.innerHTML = '<i class="fas fa-upload"></i> Yükle & Karşılaştır';
+    importBtn.innerHTML = '<i class="fas fa-upload"></i> ' + '{% filter escapejs %}{% trans "Upload &amp; compare" %}{% endfilter %}';
     importBtn.onclick = uploadImportFile;
     // No reload: comparing writes nothing, so the list behind is unchanged.
   };
@@ -478,7 +478,7 @@ document.addEventListener('keydown', (e) => {
     const file = fileInput._selectedFile || (fileInput.files && fileInput.files[0]);
     if (!file) return;
     importBtn.disabled = true;
-    importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yükleniyor…';
+    importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + '{% filter escapejs %}{% trans "Loading…" %}{% endfilter %}';
     const fd = new FormData(); fd.append('csv_file', file);
     fetch('{% url "marketing:csv_stock_update" %}', {
       method: 'POST',

@@ -20,7 +20,7 @@ from marketing.models import Product, ProductVariant
 from crm.models import Supplier
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _, pgettext_lazy
 
 # from accounting.models import AssetInventoryRawMaterial
 # uuid is used to generate unique identifiers for models.
@@ -298,9 +298,9 @@ ORDER_STATUS_CHOICES = [
 ]
 # The three stages we surface on the order detail page as a progress
 # bar. Order matters — left to right is the natural flow:
-#   pending  → Açık / Open       (order just created, nothing deducted)
+#   pending  → Open              (order just created, nothing deducted)
 #   packaging→ Paketleniyor      (rolls scanned & reserved during packing)
-#   shipped  → Gönderildi        (cargo info entered → stock actually cut)
+#   shipped  → Shipped           (cargo info entered → stock actually cut)
 # The other status keys (confirmed, preparing, in_transit, …) stay in
 # ORDER_STATUS_CHOICES for backward-compat / web-checkout but are no
 # longer part of the manual 3-step flow.
@@ -327,7 +327,7 @@ CARRIER_CHOICES = [
     ("aras", "Aras Kargo"),
     ("ptt", "PTT Kargo"),
     ("ups", "UPS"),
-    ("other", "Diğer"),
+    ("other", _("Other")),
 ]
 
 
@@ -600,7 +600,7 @@ class Order(models.Model):
     
     # Guest Order Information
     is_guest_order = models.BooleanField(default=False, help_text="True if order was placed by guest (non-registered user)")
-    is_retail_order = models.BooleanField(default=False, help_text="True if order was created via the Perakende (retail/walk-in) toggle on the create-order form")
+    is_retail_order = models.BooleanField(default=False, help_text="True if order was created via the retail (walk-in) toggle on the create-order form")
     guest_email = models.EmailField(blank=True, null=True, help_text="Email address for guest orders")
     guest_phone = models.CharField(max_length=20, blank=True, null=True, help_text="Phone number for guest orders")
     guest_first_name = models.CharField(max_length=100, blank=True, null=True, help_text="First name for guest orders")
@@ -611,17 +611,17 @@ class Order(models.Model):
     shipped_at = models.DateTimeField(blank=True, null=True)
     delivered_at = models.DateTimeField(blank=True, null=True)
     
-    # e-Arşiv Invoice Tracking
+    # e-Archive invoice tracking
     ettn = models.CharField(
         max_length=36,
         null=True,
         blank=True,
-        help_text="e-Arşiv Fatura Tanımlama Numarası (ETTN)"
+        help_text=_("e-Archive invoice identification number (ETTN)")
     )
     invoice_date = models.DateField(
         null=True,
         blank=True,
-        help_text="e-Arşiv Fatura oluşturma tarihi"
+        help_text=_("Date the e-Archive invoice was created")
     )
     
     # Order Tracking for Web Orders
@@ -636,7 +636,7 @@ class Order(models.Model):
         max_length=32,
         choices=ORDER_STATUS_CHOICES,
         default="pending",
-        help_text="Müşteriye gösterilen sipariş durumu"
+        help_text=_("The order status shown to the customer")
     )
     # Set the moment the catalog stock is first deducted for this
     # order's items (the post_save signal handles it on status change
@@ -659,13 +659,13 @@ class Order(models.Model):
         max_length=50,
         null=True,
         blank=True,
-        help_text="Kargo şirketi"
+        help_text=_("Carrier")
     )
 
     # A frozen, point-in-time copy of the order (customer/address/notes +
     # every line item, including any rolls already scanned) captured ONCE
-    # right after creation — see build_snapshot(). Backs the "İlk
-    # Oluşturulan" (originally created) tab on the order detail page so
+    # right after creation — see build_snapshot(). Backs the "First
+    # Created" (originally created) tab on the order detail page so
     # staff can always see what the customer actually ordered, even after
     # later edits change the live OrderItem rows. Never written to again.
     original_snapshot = models.JSONField(null=True, blank=True)
@@ -1207,7 +1207,7 @@ class Order(models.Model):
     def build_snapshot(self):
         """A frozen JSON copy of this order's state, called ONCE right
         after creation (see OrderCreate.post) to populate
-        original_snapshot — the "İlk Oluşturulan" tab. Never call this
+        original_snapshot — the "First Created" tab. Never call this
         again later; the whole point is that it does NOT track edits."""
         def _f(v):
             return float(v) if v is not None else None
@@ -1420,7 +1420,7 @@ class OrderItem(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     # The slice of `quantity` that is NOT coming out of our warehouse —
-    # "depo dışı", sourced elsewhere, so no roll will ever be scanned for
+    # outsourced, sourced elsewhere, so no roll will ever be scanned for
     # it. Entered on the create/edit order sidebar's OUTSOURCED box.
     #
     # It exists because billing bills SCANNED metres (see
@@ -1456,68 +1456,68 @@ class OrderItem(models.Model):
     # Custom Curtain Fields
     is_custom_curtain = models.BooleanField(
         default=False,
-        help_text="Bu bir özel perde siparişi mi?"
+        help_text=_("Is this a custom curtain order?")
     )
     custom_mounting_type = models.CharField(
         max_length=50,
         blank=True,
         null=True,
         choices=[
-            ('cornice', 'Korniş'),
-            ('rustic', 'Rustik'),
+            ('cornice', _("Cornice")),
+            ('rustic', _("Rustic")),
         ],
-        help_text="Montaj tipi"
+        help_text=_("Mounting type")
     )
     custom_pleat_type = models.CharField(
         max_length=50,
         blank=True,
         null=True,
         choices=[
-            ('flat', 'Yatık Pile'),
-            ('kanun', 'Kanun Pile'),
-            ('pipe', 'Boru Pile'),
-            ('water_wave', 'Su Dalgası'),
-            ('american', 'Amerikan Pile'),
-            ('extrafor', 'Ekstrafor'),
+            ('flat', _("Flat pleat")),
+            ('kanun', _("Kanun pleat")),
+            ('pipe', _("Pipe pleat")),
+            ('water_wave', _("Water wave")),
+            ('american', _("American pleat")),
+            ('extrafor', _("Extrafor")),
         ],
-        help_text="Pile tipi"
+        help_text=_("Pleat type")
     )
     custom_pleat_density = models.CharField(
         max_length=20,
         blank=True,
         null=True,
-        help_text="Pile yoğunluğu (örn: 1x2, 1x2.5, 1x3)"
+        help_text=_("Pleat density (e.g. 1x2, 1x2.5, 1x3)")
     )
     custom_width = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         blank=True,
         null=True,
-        help_text="Perde eni (cm)"
+        help_text=_("Curtain width (cm)")
     )
     custom_height = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         blank=True,
         null=True,
-        help_text="Perde boyu (cm)"
+        help_text=_("Curtain height (cm)")
     )
     custom_wing_type = models.CharField(
         max_length=20,
         blank=True,
         null=True,
         choices=[
-            ('single', 'Tek Kanat'),
-            ('double', 'Çift Kanat'),
+            ('single', _("Single panel")),
+            ('double', _("Double panel")),
         ],
-        help_text="Kanat tipi"
+        help_text=_("Panel type")
     )
     custom_fabric_used_meters = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         blank=True,
         null=True,
-        help_text="Kullanılan kumaş miktarı (metre)"
+        help_text=_("Fabric used (metres)")
     )
     
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
@@ -1757,7 +1757,7 @@ class WorkStation(models.Model):
 class Warehouse(models.Model):
     KIND_CHOICES = [
         ("normal", "Normal"),
-        ("combined", "Ortak (birleşik)"),
+        ("combined", pgettext_lazy("warehouse kind", "Combined")),
     ]
 
     name = models.CharField(max_length=150, unique=True)
@@ -1771,7 +1771,7 @@ class Warehouse(models.Model):
                             default="normal", db_index=True)
     combined_sources = models.ManyToManyField(
         "self", symmetrical=False, blank=True, related_name="combined_views",
-        help_text="Member warehouses this combined (ortak) warehouse merges",
+        help_text="Member warehouses this combined warehouse merges",
     )
     # Which book owns this warehouse's stock. Required: the shelves are
     # a business's asset, and who may read them, which orders may draw
@@ -2469,7 +2469,7 @@ class OrderStockReservation(models.Model):
     the WarehouseProduct.quantity stay exactly as they are. The scanned
     metres are only *reserved* (shown as "Rezerv" on the warehouse
     pages). Physical deduction happens ONLY when the order is shipped
-    (cargo info entered + "Siparişi Tamamla" pressed): each active
+    (cargo info entered + "Complete order" pressed): each active
     reservation is then converted into a real StockMovement(out) that
     finally cuts the roll. Removing a reservation before shipping just
     releases the hold — nothing else to undo.

@@ -25,7 +25,7 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext as _, ngettext
+from django.utils.translation import gettext as _, gettext as _gettext, ngettext
 from django.views import View
 
 from .models import CurrencyCategory, Invoice, InvoiceItem
@@ -571,15 +571,15 @@ class PurchaseOrderSave(View):
         try:
             data = json.loads((request.body or b"").decode("utf-8") or "{}")
         except (ValueError, UnicodeDecodeError):
-            return JsonResponse({"success": False, "error": "Geçersiz veri."}, status=400)
+            return JsonResponse({"success": False, "error": _gettext("Invalid data.")}, status=400)
 
         wh_id = str(data.get("warehouse_id") or "").strip()
         warehouse = Warehouse.objects.filter(pk=int(wh_id)).first() if wh_id.isdigit() else None
         if warehouse is None:
-            return JsonResponse({"success": False, "error": "Depo seçin."}, status=400)
+            return JsonResponse({"success": False, "error": _gettext("Pick a warehouse.")}, status=400)
         if warehouse.is_combined:
             return JsonResponse({"success": False,
-                                 "error": "Ortak depo sanaldır — sipariş üye depolardan birine yapılmalı."}, status=400)
+                                 "error": _gettext("A combined warehouse is virtual — the order must go to one of its member warehouses.")}, status=400)
 
         current_account = None
         if str(data.get("current_account_id") or "").isdigit():
@@ -607,7 +607,7 @@ class PurchaseOrderSave(View):
         lines = plan_lines(data)
         if not lines:
             return JsonResponse(
-                {"success": False, "error": "En az bir üründe miktar girin."}, status=400)
+                {"success": False, "error": _gettext("Enter a quantity on at least one product.")}, status=400)
 
         order_date = _parse_date(data.get("date")) or date.today()
         delivery = _parse_date(data.get("delivery_date"))
@@ -620,7 +620,7 @@ class PurchaseOrderSave(View):
                     if invoice.status != "draft":
                         return JsonResponse(
                             {"success": False,
-                             "error": "Bu alım onaylanmış — sipariş olarak düzenlenemez."}, status=400)
+                             "error": _gettext("This purchase is confirmed — it can't be edited as an order.")}, status=400)
                 else:
                     invoice = Invoice(type="purchase", status="draft")
                 # What the purchase said before this save — the log is the
@@ -729,20 +729,20 @@ class PurchaseOrderConfirm(View):
         if not can_confirm_purchase(request.user):
             return JsonResponse(
                 {"success": False,
-                 "error": "Alım onaylama yetkiniz yok — yöneticinize başvurun."}, status=403)
+                 "error": _gettext("You don't have permission to confirm purchases — ask your manager.")}, status=403)
 
         invoice = get_object_or_404(Invoice, pk=pk, type="purchase")
         if invoice.status == "cancelled":
-            return JsonResponse({"success": False, "error": "İptal edilmiş alım onaylanamaz."}, status=400)
+            return JsonResponse({"success": False, "error": _gettext("A cancelled purchase can't be confirmed.")}, status=400)
         if invoice.status != "draft":
             return JsonResponse(
-                {"success": False, "error": "Bu alım zaten onaylanmış."}, status=400)
+                {"success": False, "error": _gettext("This purchase is already confirmed.")}, status=400)
         plan = invoice.intake_plan or {}
         warehouse = invoice.intake_warehouse
         if not plan.get("products") or warehouse is None:
             return JsonResponse(
                 {"success": False,
-                 "error": "Bu siparişte mal kabul bilgisi yok — düzenleyip tekrar kaydedin."}, status=400)
+                 "error": _gettext("This order has no goods-receipt details — edit it and save again.")}, status=400)
 
         try:
             with transaction.atomic():
@@ -846,7 +846,7 @@ def cancel_purchase_invoice(invoice_pk, user, *, origin="purchase", mirror_order
         invoice = (Invoice.objects.select_for_update()
                    .select_related("current_account").get(pk=invoice_pk, type="purchase"))
         if invoice.status == "cancelled":
-            raise ValueError("Bu alım zaten iptal edilmiş.")
+            raise ValueError(_gettext("This purchase is already cancelled."))
 
         rolls = list(
             WarehouseProductItem.objects
@@ -862,8 +862,8 @@ def cancel_purchase_invoice(invoice_pk, user, *, origin="purchase", mirror_order
                 blockers.append({"barcode": roll.barcode, "order_ids": order_ids})
         if blockers:
             raise PurchaseCancelBlocked(
-                "Bu alımdaki bazı toplar başka bir siparişte kullanılmış — "
-                "önce o siparişi düzeltmeden alım iptal edilemez.",
+                _gettext("Some rolls from this purchase are used on another order — the "
+                         "purchase can't be cancelled until that order is corrected."),
                 blockers,
             )
 
@@ -931,12 +931,12 @@ class PurchaseCancel(View):
         from operating.views_warehouse import _is_admin
 
         if not _is_admin(request.user):
-            return JsonResponse({"success": False, "error": "Bu işlem için yönetici yetkisi gerekiyor."}, status=403)
+            return JsonResponse({"success": False, "error": _gettext("This action needs manager permission.")}, status=403)
 
         try:
             invoice = cancel_purchase_invoice(pk, request.user)
         except Invoice.DoesNotExist:
-            return JsonResponse({"success": False, "error": "Alım bulunamadı."}, status=404)
+            return JsonResponse({"success": False, "error": _gettext("Purchase not found.")}, status=404)
         except ValueError as exc:
             return JsonResponse({"success": False, "error": str(exc)}, status=400)
         except PurchaseCancelBlocked as exc:

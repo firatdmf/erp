@@ -11,7 +11,7 @@ from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext_lazy, pgettext_lazy
+from django.utils.translation import gettext as _gettext, gettext_lazy, pgettext_lazy
 from django.views import View
 
 from .models import Warehouse, WarehouseProduct, WarehouseProductItem, StockMovement
@@ -468,7 +468,7 @@ def _set_roll_length(roll, new_full):
     Shared by the roll edit on the warehouse page and the purchase edit, so a
     length corrected from either place obeys the same two rules."""
     if new_full is None or new_full <= 0:
-        raise RollLengthError("Metre pozitif olmalı.")
+        raise RollLengthError(_gettext("Metres must be positive."))
     old_full = roll.quantity or Decimal("0")
     consumed = _roll_metres_out(roll)
 
@@ -484,9 +484,9 @@ def _set_roll_length(roll, new_full):
     # Equal is fine: that is a roll used up exactly.
     if new_full < consumed:
         raise RollLengthError(
-            f"Bu toptan {consumed:.2f} m çıkış yapılmış — "
-            f"uzunluk bundan kısa olamaz. Önce ilgili "
-            f"sevkiyatı veya stok çıkışını düzeltin.")
+            _gettext("%(metres)s m has already gone out of this roll — its length "
+                     "can't be shorter than that. Correct the shipment or the "
+                     "stock-out first.") % {"metres": f"{consumed:.2f}"})
 
     if new_full == old_full:
         return False
@@ -926,7 +926,7 @@ def warehouse_account_create(request):
     currency_code = (data.get("currency") or "").strip().upper()
 
     if not name:
-        return JsonResponse({"success": False, "error": "Hesap adı gerekli."}, status=400)
+        return JsonResponse({"success": False, "error": _gettext("The account name is required.")}, status=400)
 
     book_id = str(data.get("book_id") or "").strip()
     if book_id:
@@ -1410,12 +1410,12 @@ def _resolve_warehouse_book(request, kind='normal'):
         return None, None
     book_id = (request.POST.get('accounting_book') or '').strip()
     if not book_id.isdigit():
-        return None, "Bir defter seçin — deponun stoğu bir defterin varlığıdır."
+        return None, _gettext("Pick a book — a warehouse's stock is an asset of a book.")
     from accounting.services_accounts import member_books
     member = getattr(request.user, "member", None)
     book = member_books(member).filter(pk=int(book_id)).first()
     if book is None:
-        return None, "Bu defterde depo açamazsınız."
+        return None, _gettext("You can't open a warehouse in this book.")
     return book, None
 
 
@@ -1481,7 +1481,7 @@ def _parse_combined_fields(request, *, warehouse=None):
         sources += [m for m in warehouse.combined_sources.all()
                     if m.pk not in picked and m.accounting_book_id not in offered]
     if len(sources) < 2:
-        return kind, sources, "Ortak depo için en az iki normal depo seçin."
+        return kind, sources, _gettext("Pick at least two regular warehouses for a combined warehouse.")
     return kind, sources, None
 
 
@@ -1627,7 +1627,7 @@ class WarehouseEdit(View):
         # A normal warehouse that already HOLDS stock can't become a
         # virtual one — its own products would silently disappear from view.
         if kind == 'combined' and warehouse.kind == 'normal' and warehouse.products.exists():
-            messages.error(request, "İçinde ürün olan bir depo ortak depoya çevrilemez.")
+            messages.error(request, _gettext("A warehouse that holds products can't be turned into a combined warehouse."))
             return render(request, self.template_name, _combined_form_ctx(warehouse, request=request))
 
         warehouse.name = name
@@ -2452,7 +2452,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     if target_warehouse.is_combined:
         # Virtual warehouse — physical goods must land in a member.
         return JsonResponse({"success": False,
-                             "error": "Ortak depo sanaldır — stock item ancak üye depolardan birine taşınabilir."}, status=400)
+                             "error": _gettext("A combined warehouse is virtual — a stock item can only be moved to one of its member warehouses.")}, status=400)
     roll = get_object_or_404(
         WarehouseProductItem.objects.select_related("product", "product__warehouse"),
         pk=roll_pk,
@@ -2460,7 +2460,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     source_wp = roll.product
 
     if source_wp.warehouse_id == target_warehouse.pk:
-        return JsonResponse({"success": False, "error": "Bu stock item zaten bu depoda."}, status=400)
+        return JsonResponse({"success": False, "error": _gettext("This stock item is already in this warehouse.")}, status=400)
 
     # A used-up stock item has no metres left to carry anywhere. Its row is the
     # record of where that stock went OUT from, so moving it would relocate
@@ -2470,7 +2470,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     if roll.status == "consumed":
         return JsonResponse(
             {"success": False,
-             "error": "Bu stock item tükenmiş — taşınacak metre yok."}, status=400)
+             "error": _gettext("This stock item is used up — there are no metres to move.")}, status=400)
 
     # Stock may not cross between BOOKS on a warehouse move. A book is a
     # business: a stocked Warehouse.accounting_book is required and PROTECTed because
@@ -2491,10 +2491,11 @@ def warehouse_roll_move_here(request, pk, roll_pk):
         return JsonResponse({
             "success": False,
             "error": (
-                "Bu stock item başka bir defterin deposunda (%s → %s). Defterler "
-                "arasında mal geçişi satın alma faturası ile yapılmalı — "
-                "taşıma işlemi sadece aynı defterin depoları arasında "
-                "çalışır." % (source_wp.warehouse.name, target_warehouse.name)
+                _gettext("This stock item is in another book's warehouse (%(source)s → "
+                         "%(target)s). Goods pass between books through a purchase "
+                         "invoice — a move only works between warehouses of the "
+                         "same book.")
+                % {"source": source_wp.warehouse.name, "target": target_warehouse.name}
             ),
             "cross_book": True,
         }, status=400)
@@ -2624,7 +2625,7 @@ def _warehouse_variant_label(wp, base_name):
 
 @login_required
 def catalog_product_variants(request, pk, product_id):
-    """List the EXISTING variants of one catalog product, for the "Yeni ürün"
+    """List the EXISTING variants of one catalog product, for the "New product"
     panel's existing-main-product picker — lets staff see what's already on
     the product BEFORE typing a variant name, instead of guessing.
 
@@ -3089,7 +3090,7 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
             pack_type = None
         variants_in = p_in.get("variants") or []
         if not isinstance(variants_in, list) or not variants_in:
-            raise IntakeError({"success": False, "error": f"Ürün {i}: en az bir varyant ekleyin."}, status=400)
+            raise IntakeError({"success": False, "error": _gettext("Product %(n)s: add at least one variant.") % {"n": i}}, status=400)
         mp = p_in.get("main_product") or {}
         mode = (mp.get("mode") or "new").strip()
         main_product = None
@@ -3102,7 +3103,7 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
         if main_product is not None:
             base_name = main_product.title
         elif not base_name:
-            raise IntakeError({"success": False, "error": f"Ürün {i}: ana ürün adı gerekli."}, status=400)
+            raise IntakeError({"success": False, "error": _gettext("Product %(n)s: the main product's name is required.") % {"n": i}}, status=400)
 
         has_variants = p_in.get("has_variants")
         if has_variants is None:
@@ -3128,9 +3129,10 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
             if clash is not None:
                 raise IntakeError(
                     {"success": False,
-                     "error": f"Ürün {i}: “{desired_sku}” SKU'su zaten "
-                              f"“{clash.title}” ürününde kullanılıyor — ana ürünü "
-                              f"“Mevcut”tan seçin ya da başka bir SKU yazın."},
+                     "error": _gettext("Product %(n)s: the SKU “%(sku)s” is already used by "
+                                       "“%(product)s” — pick the main product from "
+                                       "“Existing” or type another SKU.")
+                              % {"n": i, "sku": desired_sku, "product": clash.title}},
                     status=400)
             first = typed_skus.get(desired_sku.upper())
             if first is not None:
@@ -3194,14 +3196,14 @@ def _intake_typed_barcodes(products_in, *, current_barcodes=None):
                 if key in seen_codes:
                     raise IntakeError(
                         {"success": False,
-                         "error": f"“{code}” barkodu bu listede birden fazla kez girildi."},
+                         "error": _gettext("The barcode “%(code)s” was entered more than once in this list.") % {"code": code}},
                         status=400)
                 unchanged = own and (current_barcodes[roll_id] or "").upper() == key
                 if not unchanged and _barcode_taken(
                         code, exclude_roll_ids=((roll_id,) if own else ())):
                     raise IntakeError(
                         {"success": False,
-                         "error": f"“{code}” barkodu zaten kullanılıyor."},
+                         "error": _gettext("The barcode “%(code)s” is already in use.") % {"code": code}},
                         status=400)
                 seen_codes.add(key)
                 manual_codes.append(code)
@@ -3601,7 +3603,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
 
     products_in = data.get("products")
     if not isinstance(products_in, list) or not products_in:
-        raise IntakeError({"success": False, "error": "En az bir ürün ekleyin."}, status=400)
+        raise IntakeError({"success": False, "error": _gettext("Add at least one product.")}, status=400)
 
     # ── Current account → barcode prefix + purchase posting below ──
     current_account_obj = _intake_account(data)
@@ -3693,7 +3695,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     except Exception as exc:
         import traceback
         traceback.print_exc()
-        raise IntakeError({"success": False, "error": f"Kayıt hatası: {exc}"}, status=500)
+        raise IntakeError({"success": False, "error": _gettext("Save error: %(error)s") % {"error": exc}}, status=500)
 
     # ── Alış faturası (purchase invoice) — the intake above IS a
     # purchase: we now owe this account for the goods, across every
@@ -3760,8 +3762,9 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                 # a second confirm would then duplicate).
                 raise IntakeError(
                     {"success": False,
-                     "error": f"Alım faturası kaydedilemedi: {exc}"}, status=500)
-            warnings.append(f"Stok eklendi ama alış faturası oluşturulamadı: {exc}")
+                     "error": _gettext("The purchase invoice could not be saved: %(error)s") % {"error": exc}}, status=500)
+            warnings.append(_gettext("Stock was added but the purchase invoice could not be created: %(error)s")
+                            % {"error": exc})
 
     # Hold what arrived for the customer it was bought for. A hold that
     # can't be made is a warning — the goods are in either way, and can
@@ -3858,18 +3861,18 @@ class WarehouseManualAdd(View):
         if not can_confirm_purchase(request.user):
             return JsonResponse(
                 {"success": False,
-                 "error": "Mal kabul yetkiniz yok — siparişi kaydedip yetkili birinin "
-                          "onaylamasını isteyin."}, status=403)
+                 "error": _gettext("You don't have goods-receipt permission — save the order "
+                                   "and ask someone authorised to confirm it.")}, status=403)
 
         warehouse = get_object_or_404(Warehouse, pk=pk)
         if warehouse.is_combined:
             # Virtual view — receiving goods must target a real member depot.
             return JsonResponse({"success": False,
-                                 "error": "Ortak depo sanaldır — ürün girişi üye depolardan birine yapılmalı."}, status=400)
+                                 "error": _gettext("A combined warehouse is virtual — goods must be received into one of its member warehouses.")}, status=400)
         try:
             data = json.loads((request.body or b"").decode("utf-8") or "{}")
         except (ValueError, UnicodeDecodeError):
-            return JsonResponse({"success": False, "error": "Geçersiz veri."}, status=400)
+            return JsonResponse({"success": False, "error": _gettext("Invalid data.")}, status=400)
 
         try:
             result = perform_intake(
@@ -3954,15 +3957,15 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
     products_in = data.get("products")
     if not isinstance(products_in, list) or not products_in:
-        raise IntakeError({"success": False, "error": "En az bir ürün olmalı."}, status=400)
+        raise IntakeError({"success": False, "error": _gettext("There must be at least one product.")}, status=400)
 
     with transaction.atomic():
         invoice = (Invoice.objects.select_for_update()
                    .filter(pk=invoice_pk, type="purchase").first())
         if invoice is None:
-            raise IntakeError({"success": False, "error": "Alım bulunamadı."}, status=404)
+            raise IntakeError({"success": False, "error": _gettext("Purchase not found.")}, status=404)
         if invoice.status == "cancelled":
-            raise IntakeError({"success": False, "error": "İptal edilmiş alım düzenlenemez."}, status=400)
+            raise IntakeError({"success": False, "error": _gettext("A cancelled purchase can't be edited.")}, status=400)
         if invoice.status == "draft":
             raise IntakeError(
                 {"success": False,
@@ -4072,8 +4075,8 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         if blockers:
             raise IntakeError({
                 "success": False,
-                "error": "Bazı toplar başka bir siparişte kullanılmış, silinemedi. "
-                         "Önce o siparişi düzeltin.",
+                "error": _gettext("Some rolls are used on another order and could not be "
+                                  "deleted. Correct that order first."),
                 "blocked": blockers,
             }, status=422)
 
@@ -4352,7 +4355,7 @@ class WarehousePurchaseEdit(View):
             pk=invoice_id, type="purchase",
         )
         if invoice.status == "cancelled":
-            return JsonResponse({"success": False, "error": "İptal edilmiş alım düzenlenemez."}, status=400)
+            return JsonResponse({"success": False, "error": _gettext("A cancelled purchase can't be edited.")}, status=400)
 
         rolls_qs = (WarehouseProductItem.objects
                     .select_related("product", "product__catalog_variant__product")
@@ -4445,17 +4448,17 @@ class WarehousePurchaseEdit(View):
         if not can_confirm_purchase(request.user):
             return JsonResponse(
                 {"success": False,
-                 "error": "Mal kabul yetkiniz yok — bu alım düzenlenemez."}, status=403)
+                 "error": _gettext("You don't have goods-receipt permission — this purchase can't be edited.")}, status=403)
 
         warehouse = get_object_or_404(Warehouse, pk=pk)
         if warehouse.is_combined:
             # Virtual view — receiving goods must target a real member depot.
             return JsonResponse({"success": False,
-                                 "error": "Ortak depo sanaldır — ürün girişi üye depolardan birine yapılmalı."}, status=400)
+                                 "error": _gettext("A combined warehouse is virtual — goods must be received into one of its member warehouses.")}, status=400)
         try:
             data = json.loads((request.body or b"").decode("utf-8") or "{}")
         except (ValueError, UnicodeDecodeError):
-            return JsonResponse({"success": False, "error": "Geçersiz veri."}, status=400)
+            return JsonResponse({"success": False, "error": _gettext("Invalid data.")}, status=400)
 
         user = request.user if request.user.is_authenticated else None
         try:
@@ -4470,7 +4473,7 @@ class WarehousePurchaseEdit(View):
             # it, because the page can only report what it can parse.
             import traceback
             traceback.print_exc()
-            return JsonResponse({"success": False, "error": f"Kayıt hatası: {exc}"}, status=500)
+            return JsonResponse({"success": False, "error": _gettext("Save error: %(error)s") % {"error": exc}}, status=500)
 
         invoice = result["invoice"]
         return JsonResponse({
@@ -4735,8 +4738,8 @@ class WarehouseDelete(View):
         warehouse = get_object_or_404(Warehouse, pk=pk)
         if not _is_admin(request.user):
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return JsonResponse({"success": False, "error": "Sadece admin depo silebilir."}, status=403)
-            messages.error(request, "Sadece admin depo silebilir.")
+                return JsonResponse({"success": False, "error": _gettext("Only an admin can delete warehouses.")}, status=403)
+            messages.error(request, _gettext("Only an admin can delete warehouses."))
             return redirect("operating:warehouse_detail", warehouse.pk)
         name = warehouse.name
         warehouse.delete()
@@ -6099,7 +6102,7 @@ def order_reservation_shortfalls(order):
         got = reserved.get(it.pk, Decimal("0"))
         if got < required:
             name = ((it.product.title if it.product_id else None)
-                    or it.description or f"Kalem #{it.pk}")
+                    or it.description or _gettext("Line #%(n)s") % {"n": it.pk})
             if it.product_variant_id and vsku:
                 name = f"{name} ({vsku.upper()})"
             shortfalls.append({"item_id": it.pk, "name": name,
@@ -6108,7 +6111,7 @@ def order_reservation_shortfalls(order):
 
 
 def reservation_shortfall_message(order):
-    """Turkish, user-facing summary of what's still missing — shared by
+    """User-facing summary of what's still missing — shared by
     every path that blocks on incomplete coverage."""
     rows = order_reservation_shortfalls(order)
     if not rows:
@@ -6117,9 +6120,11 @@ def reservation_shortfall_message(order):
         f"{r['name']}: {float(r['reserved']):g}/{float(r['required']):g} m"
         for r in rows[:4]
     )
-    more = f" (+{len(rows) - 4} kalem)" if len(rows) > 4 else ""
-    return (f"Okutulan toplar siparişi karşılamıyor — {det}{more}. "
-            "Kalan metreleri paketleme sayfasından okutun.")
+    more = (" " + _gettext("(+%(count)s lines)") % {"count": len(rows) - 4}
+            if len(rows) > 4 else "")
+    return (_gettext("The scanned rolls don't cover the order — %(details)s. "
+                     "Scan the remaining metres from the packing page.")
+            % {"details": det + more})
 
 
 def apply_order_status_change(order, new_status, carrier=None, tracking=None,
@@ -6468,45 +6473,37 @@ def _movement_is_order(m):
             or ref.startswith("Order #"))
 
 
-# English reason prefixes (as stored in the DB) → Turkish display text.
-# Order matters — longest/most-specific prefix first.
-_REASON_TR = [
-    ("Order edit · reversed", "Sipariş düzenleme iadesi"),
-    ("Order un-ship", "Sipariş sevk iptali"),
-    ("Order ship", "Sipariş sevkiyatı"),
-    ("Web order", "Web siparişi"),
-    ("Order", "Sipariş"),
-    ("Roll scanned", "Stock item okutuldu"),
-    ("Manual add", "Manuel ekleme"),
-    ("Manual stock-out", "Manuel stok çıkışı"),
-    ("Bulk roll delete", "Toplu stock item silme"),
-    ("Roll deleted", "Stock item silindi"),
-    ("Roll meters edited", "Stock item metresi düzenlendi"),
-    ("Manual adjustment", "Manuel düzeltme"),
-    ("Product edited", "Ürün düzenlendi"),
-    ("⚠️ Shortage", "⚠️ Eksik"),
+# The reason prefixes a stock movement is stored with (always English in
+# the DB). Each is a catalogue entry under _REASON_CONTEXT, so the page
+# shows it in the reader's language. Order matters — longest/most-specific
+# prefix first.
+_REASON_CONTEXT = "stock movement reason"
+_REASON_PREFIXES = [
+    "Order edit · reversed", "Order un-ship", "Order ship", "Web order", "Order",
+    "Roll scanned", "Manual add", "Manual stock-out", "Bulk roll delete",
+    "Roll deleted", "Roll meters edited", "Manual adjustment", "Product edited",
+    "⚠️ Shortage",
 ]
 
 
 def _reason_display(reason):
-    """Best-effort Turkish rendering of a stored English reason string.
-    Unknown reasons pass through unchanged."""
+    """Best-effort rendering of a stored English reason string in the
+    active language. Unknown reasons pass through unchanged."""
+    from django.utils.translation import pgettext
     if not reason:
         return reason
-    for en, tr in _REASON_TR:
-        if reason.startswith(en):
-            return tr + reason[len(en):]
+    for prefix in _REASON_PREFIXES:
+        if reason.startswith(prefix):
+            return pgettext(_REASON_CONTEXT, prefix) + reason[len(prefix):]
     return reason
 
 
 def _decorate_movements(movements):
     """Attach .kind / .reason_display / .order_pk to each page row so
-    the templates can render category badges, Turkish reasons and a
+    the templates can render category badges, translated reasons and a
     link to the source order."""
-    from django.utils import translation
     import re as _re
     from .models import Order
-    is_tr = (translation.get_language() or "").startswith("tr")
     refs = {m.reference for m in movements
             if m.reference and _re.match(_ORDER_REF_RE, m.reference)}
     order_map = dict(Order.objects.filter(order_number__in=refs)
@@ -6527,7 +6524,7 @@ def _decorate_movements(movements):
 
     for m in movements:
         m.kind = "order" if _movement_is_order(m) else m.movement_type
-        m.reason_display = _reason_display(m.reason) if is_tr else m.reason
+        m.reason_display = _reason_display(m.reason)
         ref = m.reference or ""
         # The FK first: it is the recorded fact, and an order reached
         # through it is known to still exist. The reference is free text
@@ -6926,7 +6923,7 @@ class WarehouseProductEdit(View):
             except Exception as exc:
                 import traceback
                 traceback.print_exc()
-                catalog_warning = f"Katalog senkron hatası: {exc}"
+                catalog_warning = _gettext("Catalogue sync error: %(error)s") % {"error": exc}
 
         # Same SKU = same variant: if editing made this product's SKU match
         # OTHER products in the warehouse, merge them into this one so they stop
@@ -6968,8 +6965,8 @@ class WarehouseProductDelete(View):
         product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
         if not _is_admin(request.user):
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return JsonResponse({"success": False, "error": "Sadece admin ürün silebilir."}, status=403)
-            messages.error(request, "Sadece admin ürün silebilir.")
+                return JsonResponse({"success": False, "error": _gettext("Only an admin can delete products.")}, status=403)
+            messages.error(request, _gettext("Only an admin can delete products."))
             return redirect("operating:warehouse_product_detail", warehouse.pk, product.pk)
         name = product.name
         product.delete()  # cascades to rolls + movements
@@ -6998,7 +6995,7 @@ class WarehouseRollDelete(View):
         from .models import OrderStockReservation
         if OrderStockReservation.objects.filter(stock_item=roll, consumed=False).exists():
             return JsonResponse({"success": False,
-                "error": "Bu stock item aktif bir siparişte rezerve edilmiş — önce ilgili siparişin paketlemesinden kaldırın."}, status=409)
+                "error": _gettext("This stock item is reserved on an active order — remove it from that order's packing first.")}, status=409)
 
         reason = (request.POST.get("reason") or "").strip() or "Roll deleted"
         remaining = (
@@ -7075,12 +7072,12 @@ class WarehouseRollBulkDelete(View):
             except (TypeError, ValueError):
                 pass
         if not ids:
-            return JsonResponse({"success": False, "error": "Silinecek stock item seçilmedi."}, status=400)
+            return JsonResponse({"success": False, "error": _gettext("No stock item was selected to delete.")}, status=400)
 
         reason = (request.POST.get("reason") or "").strip() or "Bulk roll delete"
         rolls = list(WarehouseProductItem.objects.filter(pk__in=ids, product=product))
         if not rolls:
-            return JsonResponse({"success": False, "error": "Seçilen toplar bulunamadı."}, status=404)
+            return JsonResponse({"success": False, "error": _gettext("The selected rolls were not found.")}, status=404)
 
         # Don't delete rolls actively reserved for an order — their hold
         # would be silently lost. Skip them and report the count.
@@ -7092,7 +7089,7 @@ class WarehouseRollBulkDelete(View):
         rolls = [r for r in rolls if r.id not in reserved_ids]
         if not rolls:
             return JsonResponse({"success": False, "skipped": skipped,
-                "error": "Seçilen toplar aktif siparişlerde rezerve — silinemedi. Önce paketlemeden kaldırın."}, status=409)
+                "error": _gettext("The selected rolls are reserved on active orders — not deleted. Remove them from packing first.")}, status=409)
 
         deleted = 0
         with transaction.atomic():
@@ -7151,14 +7148,14 @@ class WarehouseRollEdit(View):
             # scan form now refuses to create.
             if not barcode and roll.barcode:
                 return JsonResponse({"success": False,
-                                     "error": "Barkod zorunlu — bir topun barkodu silinemez."},
+                                     "error": _gettext("A barcode is required — a roll's barcode can't be removed.")},
                                     status=400)
             # Scoped to the whole system, matching the DB's unique constraint.
             # Checking only this warehouse passed codes that the database then
             # rejected, turning a correctable mistake into a 500.
             if barcode and _barcode_taken(barcode, exclude_roll_ids=(roll.pk,)):
                 return JsonResponse({"success": False,
-                                     "error": "Bu barkod zaten başka bir topta kullanılıyor."},
+                                     "error": _gettext("This barcode is already used on another roll.")},
                                     status=400)
             roll.barcode = barcode or None
             roll_fields.append("barcode"); changes.append("barcode")
@@ -7185,7 +7182,7 @@ class WarehouseRollEdit(View):
             try:
                 new_full = Decimal(meters_raw)
             except (InvalidOperation, TypeError):
-                return JsonResponse({"success": False, "error": "Geçersiz metre değeri."}, status=400)
+                return JsonResponse({"success": False, "error": _gettext("Invalid metre value.")}, status=400)
             try:
                 meters_changed = _set_roll_length(roll, new_full)
             except RollLengthError as exc:
@@ -7526,7 +7523,7 @@ class WarehouseRollScan(View):
                 return JsonResponse({
                     "success": False,
                     "duplicate": True,
-                    "error": "Bu barkod zaten okundu — tekrar eklenmedi (%s)." % (
+                    "error": _gettext("This barcode was already scanned — not added again (%s).") % (
                         existing_roll.product.name or existing_roll.product.sku or "?"),
                 })
 
@@ -7566,7 +7563,7 @@ class WarehouseRollScan(View):
         if not barcode:
             return JsonResponse({
                 "success": False,
-                "error": "Barkod zorunlu — bu stock item olmadan kaydedilemez.",
+                "error": _gettext("A barcode is required — this stock item can't be saved without one."),
             }, status=400)
         # Price is optional. Barcode is not.
         purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
@@ -7634,7 +7631,8 @@ class WarehouseRollScan(View):
         if not do_catalog:
             variant_sku = ""   # skip catalog sync entirely
         if variant_sku and len(variant_sku) > 20:
-            catalog_warning = f"SKU '{variant_sku}' 20 karakteri aşıyor — katalog varyantı oluşturulmadı."
+            catalog_warning = (_gettext("SKU '%(sku)s' is longer than 20 characters — no catalogue variant was created.")
+                               % {"sku": variant_sku})
         elif variant_sku:
             try:
                 from .catalog_sync import (
@@ -7680,7 +7678,7 @@ class WarehouseRollScan(View):
             except Exception as exc:
                 import traceback
                 traceback.print_exc()
-                catalog_warning = f"Katalog senkron hatası: {exc}"
+                catalog_warning = _gettext("Catalogue sync error: %(error)s") % {"error": exc}
 
         return JsonResponse({
             "success": True,

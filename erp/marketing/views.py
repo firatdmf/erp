@@ -38,6 +38,8 @@ from .signals import cdn_url_in_use
 
 # AVIF Image Optimizer
 from .utils.image_optimizer import optimize_image_to_avif
+from django.utils.translation import gettext as _gettext
+from erp.storefront import answers_in_storefront_language
 
 
 def smart_upload(file, folder, resource_type="image"):
@@ -3225,10 +3227,11 @@ def get_product(request):
 # ============================================================
 from django.views.decorators.csrf import csrf_exempt
 
+@answers_in_storefront_language
 @csrf_exempt
 @require_http_methods(["POST"])
 def validate_discount_code(request):
-    """İndirim kodunu doğrula - Next.js frontend için"""
+    """Validate a discount code, for the Next.js storefront."""
     from marketing.models import DiscountCode
     
     try:
@@ -3236,20 +3239,20 @@ def validate_discount_code(request):
         code = data.get('code', '').strip().upper()
         
         if not code:
-            return JsonResponse({'success': False, 'error': 'Kod girilmedi'})
+            return JsonResponse({'success': False, 'error': _gettext("No code was entered")})
         
         try:
             discount = DiscountCode.objects.get(code__iexact=code, is_active=True)
             # Check if code is still valid (not exceeded max_uses)
             if not discount.is_valid():
-                return JsonResponse({'success': False, 'error': 'Bu indirim kodu kullanım limitine ulaşmış'})
+                return JsonResponse({'success': False, 'error': _gettext("This discount code has reached its usage limit")})
             return JsonResponse({
                 'success': True,
                 'discount_percentage': float(discount.discount_percentage),
                 'code': discount.code
             })
         except DiscountCode.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'Geçersiz indirim kodu'})
+            return JsonResponse({'success': False, 'error': _gettext("Invalid discount code")})
             
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
@@ -3257,10 +3260,11 @@ def validate_discount_code(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+@answers_in_storefront_language
 @csrf_exempt
 @require_http_methods(["POST"])
 def increment_discount_usage(request):
-    """Başarılı siparişte kullanım sayısını artır"""
+    """Count one more use of the code after a successful order."""
     from marketing.models import DiscountCode
     
     try:
@@ -3276,7 +3280,7 @@ def increment_discount_usage(request):
             except DiscountCode.DoesNotExist:
                 pass
         
-        return JsonResponse({'success': False, 'error': 'Kod bulunamadı'})
+        return JsonResponse({'success': False, 'error': _gettext("Code not found")})
         
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
@@ -3454,7 +3458,7 @@ def _extract_and_rewrite_html(raw_html, path_map, folder):
         key = norm if norm in path_map else norm.split('/')[-1]
         file_obj = path_map.get(key)
         if not file_obj:
-            warnings.append(f'Görsel bulunamadı, bağlantı değiştirilmedi: {src}')
+            warnings.append(_gettext("Image not found, link left unchanged: %(src)s") % {"src": src})
             continue
         try:
             file_obj.seek(0)
@@ -3462,7 +3466,7 @@ def _extract_and_rewrite_html(raw_html, path_map, folder):
             img.set('src', url)
             uploaded += 1
         except Exception as exc:
-            warnings.append(f'{src}: yüklenemedi ({exc})')
+            warnings.append(_gettext("%(src)s: could not be uploaded (%(error)s)") % {"src": src, "error": exc})
 
     parts = [root.text] if root.text else []
     for child in root:
@@ -3483,7 +3487,7 @@ def upload_blog_html(request):
     try:
         html_file = request.FILES.get('html_file')
         if not html_file:
-            return JsonResponse({'success': False, 'error': 'HTML dosyası gerekli.'}, status=400)
+            return JsonResponse({'success': False, 'error': _gettext("An HTML file is required.")}, status=400)
 
         try:
             raw = html_file.read().decode('utf-8')
@@ -3614,6 +3618,7 @@ import re
 from django.core.mail import send_mail
 from django.conf import settings
 
+@answers_in_storefront_language
 @csrf_exempt
 @require_http_methods(["POST"])
 def newsletter_subscribe(request):
@@ -3633,25 +3638,25 @@ def newsletter_subscribe(request):
         
         # Validate inputs
         if not email:
-            return JsonResponse({'success': False, 'error': 'E-posta adresi gereklidir'})
+            return JsonResponse({'success': False, 'error': _gettext("An email address is required")})
         if not phone:
-            return JsonResponse({'success': False, 'error': 'Telefon numarası gereklidir'})
+            return JsonResponse({'success': False, 'error': _gettext("A phone number is required")})
         
         # Basic email validation
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_regex, email):
-            return JsonResponse({'success': False, 'error': 'Geçersiz e-posta adresi'})
+            return JsonResponse({'success': False, 'error': _gettext("Invalid email address")})
         
         # Normalize phone number (remove spaces, dashes, parentheses)
         phone_normalized = re.sub(r'[\s\-\(\)]+', '', phone)
         if len(phone_normalized) < 10:
-            return JsonResponse({'success': False, 'error': 'Geçersiz telefon numarası'})
+            return JsonResponse({'success': False, 'error': _gettext("Invalid phone number")})
         
         # Check if email already exists
         if NewsletterSubscription.objects.filter(email=email).exists():
             return JsonResponse({
                 'success': False, 
-                'error': 'Bu e-posta adresi zaten kayıtlı'
+                'error': _gettext("This email address is already registered")
             })
         
         # Check if phone already exists (skip for footer/no-phone subscriptions)
@@ -3659,7 +3664,7 @@ def newsletter_subscribe(request):
         if not skip_discount and NewsletterSubscription.objects.filter(phone=phone_normalized).exists():
             return JsonResponse({
                 'success': False,
-                'error': 'Bu telefon numarası zaten kayıtlı'
+                'error': _gettext("This phone number is already registered")
             })
 
         # Generate unique discount code (skip for footer subscriptions)
@@ -3707,15 +3712,15 @@ def newsletter_subscribe(request):
         
         return JsonResponse({
             'success': True,
-            'message': 'Aboneliğiniz başarıyla tamamlandı! İndirim kodunuz e-posta adresinize gönderildi.',
+            'message': _gettext("Your subscription is complete! Your discount code has been sent to your email address."),
             'code': discount_code_str  # Return code for frontend to display and send email
         })
         
     except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'error': 'Geçersiz istek formatı'}, status=400)
+        return JsonResponse({'success': False, 'error': _gettext("Invalid request format")}, status=400)
     except Exception as e:
         print(f"[NEWSLETTER] Subscription error: {e}")
-        return JsonResponse({'success': False, 'error': 'Bir hata oluştu, lütfen tekrar deneyin'}, status=500)
+        return JsonResponse({'success': False, 'error': _gettext("Something went wrong, please try again")}, status=500)
 
 
 @login_required
@@ -3786,6 +3791,7 @@ def newsletter_unsubscribe(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+@answers_in_storefront_language
 @csrf_exempt
 def guest_review(request):
     """Create a guest product review (no login required)."""
@@ -3805,14 +3811,14 @@ def guest_review(request):
         image_urls = data.get('image_urls', [])
 
         if not product_sku or not first_name or not last_name:
-            return JsonResponse({'success': False, 'error': 'Ad, soyad ve ürün kodu gerekli'})
+            return JsonResponse({'success': False, 'error': _gettext("First name, last name and product code are required")})
         if rating < 1 or rating > 5:
-            return JsonResponse({'success': False, 'error': 'Puan 1-5 arası olmalıdır'})
+            return JsonResponse({'success': False, 'error': _gettext("The rating must be between 1 and 5")})
 
         try:
             product = Product.objects.get(sku=product_sku)
         except Product.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'Ürün bulunamadı'}, status=404)
+            return JsonResponse({'success': False, 'error': _gettext("Product not found")}, status=404)
 
         review = GuestProductReview.objects.create(
             product=product,

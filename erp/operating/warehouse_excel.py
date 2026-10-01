@@ -8,7 +8,7 @@ Location column naming the member each row stands on — the same column the
 page shows.
 
 A sales rep does not read cost: their export prices each row at the sales
-price derived from the unit cost (Br. Fiyat) and leaves out the Toplam
+price derived from the unit cost and leaves out the total
 column and grand total, which are cost times quantity.
 """
 from io import BytesIO
@@ -18,6 +18,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext as _gettext, pgettext
 
 from erp.roles import is_sales_rep, sales_rep_price
 from erp.xlsx_utils import (
@@ -107,13 +108,13 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
     # A combined (ortak) warehouse pools several members' shelves, so a row
     # is ambiguous without saying which one it came off.
     show_location = warehouse.is_combined
-    # A sales rep's sheet has no Toplam column — see the module docstring.
+    # A sales rep's sheet has no total column — see the module docstring.
     show_total = not for_sales_rep
     ncols = NCOLS + (1 if show_location else 0) - (0 if show_total else 1)
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Depo"
+    ws.title = pgettext("warehouse sheet", "Warehouse")
     ws.sheet_view.showGridLines = False
     widths = [16, 34, 16, 18, 12, 8, 12, 14, 14]
     if not show_total:
@@ -130,11 +131,11 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
     cell(ws, r, 5, warehouse.name, font=F_DOCNO, align=RIGHT)
     merge(ws, r, 5, ncols)
     r += 1
-    cell(ws, r, 1, "Depo Ürün Listesi", font=F_SUB)
+    cell(ws, r, 1, _gettext("Warehouse product list"), font=F_SUB)
     merge(ws, r, 1, 4)
-    subtitle = f"{len(products)} ürün"
+    subtitle = _gettext("%(count)s products") % {"count": len(products)}
     if search:
-        subtitle += f' · "{search}" için filtrelendi'
+        subtitle += " · " + _gettext('filtered for "%(search)s"') % {"search": search}
     cell(ws, r, 5, subtitle, font=F_SUB, align=RIGHT)
     merge(ws, r, 5, ncols)
     for c in range(1, ncols + 1):
@@ -142,12 +143,14 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
     r += 2
 
     # ── Table header ──
-    heads = ["SKU", "Ürün Adı", "Model", "Barkod", "Stok (m)", "Kupon",
-             "Rezerve (m)", "Br. Maliyet", "Toplam (USD)"]
+    X = "warehouse sheet"
+    heads = ["SKU", pgettext(X, "Product name"), pgettext(X, "Model"), pgettext(X, "Barcode"),
+             pgettext(X, "Stock (m)"), pgettext(X, "Rolls"), pgettext(X, "Reserved (m)"),
+             pgettext(X, "Unit cost"), pgettext(X, "Total (USD)")]
     if not show_total:
-        heads[-2:] = ["Br. Fiyat"]
+        heads[-2:] = [pgettext(X, "Unit price")]
     if show_location:
-        heads.insert(4, "Depo")
+        heads.insert(4, pgettext(X, "Warehouse"))
     # Location is text like the four columns before it; the numeric block
     # (stock onward) stays right-aligned, so the boundary moves with it.
     first_num = 6 if show_location else 5
@@ -159,9 +162,9 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
     total_qty = total_usd = 0.0
     for p in products:
         # The WEIGHTED AVERAGE cost of the stock on the floor — the same
-        # number the screen shows, and the one Toplam is built from. This
+        # number the screen shows, and the one the total is built from. This
         # column used to print purchase_price, a last-purchase price, so
-        # Br. Maliyet x Stok never came to Toplam.
+        # unit cost x stock never came to the total.
         unit_cost = ""
         if p.avg_cost is not None and for_sales_rep:
             # The price derived from the cost, which moves in 0.05 steps —
@@ -190,7 +193,7 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
     # ── Totals ──
     for c in range(1, ncols + 1):
         cell(ws, r, c, "", font=F_VALB, border=GRID, fill=FILL_LBL)
-    cell(ws, r, first_num - 1, "TOPLAM", font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT)
+    cell(ws, r, first_num - 1, pgettext(X, "TOTAL"), font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT)
     cell(ws, r, first_num, total_qty, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt="#,##0.00")
     if show_total:
         cell(ws, r, ncols, total_usd, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt='#,##0.00" USD"')

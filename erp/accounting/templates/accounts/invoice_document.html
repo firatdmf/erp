@@ -510,7 +510,7 @@
             {{ it.description }}
             {% if it.rolls %}
             <div class="roll-chips">
-              {% comment %}"Top" (kumaş topu) = fabric roll — the trade term in English is "Rolls".{% endcomment %}
+              {% comment %}The trade word for a bolt of fabric is "roll" — the column is "Rolls".{% endcomment %}
               <span class="rc-lbl">{% trans "Rolls" %}</span>
               {% for r in it.rolls %}
               <span class="roll-chip"><code>{{ r.barcode|default:"—" }}</code>{{ r.quantity|floatformat:"2g" }} m</span>

@@ -68,7 +68,7 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _gettext, gettext_lazy as _
 
 from authentication.models import Member
 from crm.models import Company, Contact, Supplier
@@ -1018,7 +1018,7 @@ class CurrentAccountSettings(models.Model):
 
 
 # ---------------------------------------------------------------------------
-# 4. Invoice — Fatura
+# 4. Invoice
 # ---------------------------------------------------------------------------
 class Invoice(models.Model):
     class Meta:
@@ -1120,7 +1120,7 @@ class Invoice(models.Model):
         related_name="invoice",
     )
 
-    # e-Arşiv / e-Fatura integration placeholders
+    # e-Archive / e-Invoice integration placeholders
     earsiv_uuid    = models.CharField(max_length=50, blank=True)
     earsiv_status  = models.CharField(max_length=20, blank=True)
     earsiv_pdf_url = models.URLField(blank=True)
@@ -1470,11 +1470,11 @@ class Invoice(models.Model):
         Kept only so any stale caller fails loudly instead of half-reviving
         an invoice.
         """
-        raise ValidationError("İptal edilen fatura geri açılamaz.")
+        raise ValidationError(_gettext("A cancelled invoice can't be re-opened."))
 
 
 # ---------------------------------------------------------------------------
-# 5. InvoiceItem — Fatura Kalemi
+# 5. InvoiceItem
 # ---------------------------------------------------------------------------
 class InvoiceItem(models.Model):
     class Meta:
@@ -1582,7 +1582,7 @@ def _invoice_item_deleted(sender, instance, **kwargs):
 
 
 # ---------------------------------------------------------------------------
-# 6. Payment — Tahsilat / Ödeme
+# 6. Payment — collection / payment
 # ---------------------------------------------------------------------------
 class Payment(models.Model):
     class Meta:
@@ -2032,7 +2032,7 @@ class Payment(models.Model):
 
 
 # ---------------------------------------------------------------------------
-# 7. PaymentAllocation — Ödeme ↔ Fatura eşleştirmesi
+# 7. PaymentAllocation — matching a payment to an invoice
 # ---------------------------------------------------------------------------
 class PaymentAllocation(models.Model):
     class Meta:

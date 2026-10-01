@@ -9,6 +9,7 @@ from .models import (
     content_type_for, validate_attachment_size, validate_attachment_type,
 )
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext as _gettext
 from todo.models import Task
 from erp.search_utils import unaccent_icontains
 from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm, SupplierForm
@@ -1298,12 +1299,13 @@ def customer_autocomplete(request):
             "</li>"
         )
     if not contacts and not companies:
-        parts.append("<li class='customer-ac-empty'>No results found.</li>")
+        parts.append(f"<li class='customer-ac-empty'>{escape(_gettext('No results found.'))}</li>")
         parts.append(
             "<li class='customer-ac-create' "
             f"data-name=\"{escape(query)}\" style='cursor:pointer;'>"
-            f"<i class='fa fa-plus-circle'></i> &quot;{escape(query)}&quot; için yeni müşteri oluştur"
-            "</li>"
+            "<i class='fa fa-plus-circle'></i> "
+            + escape(_gettext("Create a new customer for “%(name)s”") % {"name": query})
+            + "</li>"
         )
     parts.append("</ul>")
     return HttpResponse("".join(parts))

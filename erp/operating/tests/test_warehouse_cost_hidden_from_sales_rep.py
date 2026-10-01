@@ -119,8 +119,8 @@ class WarehouseCostIsHiddenFromSalesRep(TestCase):
 
     def test_staff_excel_keeps_cost_and_total(self):
         values = self._excel_values()
-        self.assertIn("Br. Maliyet", values)
-        self.assertIn("Toplam (USD)", values)
+        self.assertIn("Unit cost", values)
+        self.assertIn("Total (USD)", values)
         self.assertTrue(any("7.3319" in v for v in values), values)
 
     # --- sales rep -------------------------------------------------
@@ -182,9 +182,9 @@ class WarehouseCostIsHiddenFromSalesRep(TestCase):
     def test_excel_gives_a_rep_price_and_no_total(self):
         self._make_rep()
         values = self._excel_values()
-        self.assertNotIn("Br. Maliyet", values)
-        self.assertNotIn("Toplam (USD)", values)
-        self.assertIn("Br. Fiyat", values)
+        self.assertNotIn("Unit cost", values)
+        self.assertNotIn("Total (USD)", values)
+        self.assertIn("Unit price", values)
         self.assertFalse(any("7.33" in v or "293" in v for v in values), values)
         self.assertTrue(any("8.10" in v for v in values), values)
 

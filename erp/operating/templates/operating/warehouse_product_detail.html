@@ -635,7 +635,7 @@
       <div class="od-stat-value">{{ product.quantity|default:0|floatformat:"2g" }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     <div class="od-stat">
-      <div class="od-stat-label"><i class="fa fa-lock" style="color:#B45309;"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv stok{% else %}Reserved{% endif %}</div>
+      <div class="od-stat-label"><i class="fa fa-lock" style="color:#B45309;"></i>{% trans "Reserved" context "stock figure" %}</div>
       <div class="od-stat-value" style="color:#B45309;">{{ reserved_total|default:0|floatformat:"2g" }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     <div class="od-stat">
@@ -680,11 +680,11 @@
         <div class="rolls-toolbar">
           <label class="rolls-selall">
             <input type="checkbox" id="rollSelectAll" onchange="toggleAllRolls(this)">
-            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tümünü seç{% else %}Select all{% endif %}
+            {% trans "Select all" %}
           </label>
           <button type="button" id="rollBulkDelBtn" class="rolls-bulk-del" disabled onclick="openBulkRollDelete()">
             <i class="fa fa-trash"></i>
-            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Seçilenleri sil{% else %}Delete selected{% endif %}
+            {% trans "Delete selected" %}
             (<span id="rollSelCount">0</span>)
           </button>
         </div>

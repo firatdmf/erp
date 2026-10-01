@@ -419,15 +419,15 @@
 
   <div class="pk-top">
     <a class="pk-back" href="{% url 'operating:order_detail' order.pk %}">
-      <i class="fa fa-arrow-left"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişe dön{% else %}Back to order{% endif %}
+      <i class="fa fa-arrow-left"></i>{% trans "Back to order" %}
     </a>
     <h1 class="pk-title">
-      {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketleme — Top Okut{% else %}Packing — Scan rolls{% endif %}
+      {% trans "Packing — Scan rolls" %}
       <small>{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</small>
     </h1>
     {% if not shipped %}
     <a href="{% url 'operating:order_packing_list' order.pk %}" class="pk-back" style="margin-left:auto;">
-      <i class="fa fa-box"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Çeki listesi{% else %}Packing List{% endif %}
+      <i class="fa fa-box"></i>{% trans "Packing List" %}
     </a>
     {% endif %}
   </div>
@@ -435,7 +435,7 @@
   {% if shipped %}
   <div class="pk-banner" style="background:#FEF2F2;border-color:#FCA5A5;color:#B91C1C;">
     <i class="fa fa-lock"></i>
-    <div>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu sipariş gönderildi — paketleme kilitli. Rezerve edilen toplar stoktan düşüldü.{% else %}This order is shipped — packing is locked. Reserved rolls were deducted from stock.{% endif %}</div>
+    <div>{% trans "This order is shipped — packing is locked. Reserved rolls were deducted from stock." %}</div>
   </div>
   {% else %}
   <div class="pk-banner">
@@ -451,8 +451,8 @@
     <!-- Available rolls, grouped by product -->
     <div class="pk-card">
       <div class="pk-card-h">
-        <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Mevcut toplar{% else %}Available rolls{% endif %}</h3>
-        <span class="pk-sub"><span id="pkCount">0</span> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top · <span id="pkTotal">0</span> m rezerv{% else %}rolls · <span id="pkTotal">0</span> m reserved{% endif %}</span>
+        <h3>{% trans "Available rolls" %}</h3>
+        <span class="pk-sub"><span id="pkCount">0</span> {% trans "rolls" context "packing count" %} · <span id="pkTotal">0</span> {% trans "m reserved" %}</span>
       </div>
       <div class="pk-card-b">
         <div id="pkGroups">
@@ -468,18 +468,18 @@
               {% for r in reservations %}{% if r.order_item_id == it.pk and not r.pack_id %}
               {% include "operating/partials/_pack_roll_row.html" with r=r oiid=it.pk drag=1 %}
               {% endif %}{% endfor %}
-              <div class="pk-pgroup-empty" data-empty-hint>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu kalem için top yok.{% else %}No rolls on this line.{% endif %}</div>
+              <div class="pk-pgroup-empty" data-empty-hint>{% trans "No rolls on this line." %}</div>
             </div>
           </div>
           {% empty %}
-          <div class="pk-empty" style="padding:14px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu siparişte okutulacak (depo takipli) ürün yok.{% else %}No warehouse-tracked products to scan in this order.{% endif %}</div>
+          <div class="pk-empty" style="padding:14px;">{% trans "No warehouse-tracked products to scan in this order." %}</div>
           {% endfor %}
 
           {% if unassigned_reservations %}
           <div class="pk-pgroup">
             <div class="pk-pgroup-h">
-              <span class="pk-pgroup-name">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Atanmamış toplar{% else %}Unassigned tops{% endif %}</span>
-              <span class="pk-pgroup-sku">{% if LANGUAGE_CODE|slice:":2" == "tr" %}artık siparişteki bir kalemle eşleşmiyor{% else %}no longer matches an order line{% endif %}</span>
+              <span class="pk-pgroup-name">{% trans "Unassigned tops" %}</span>
+              <span class="pk-pgroup-sku">{% trans "no longer matches an order line" %}</span>
             </div>
             <div class="pk-pgroup-rolls" data-order-item-id="">
               {% for r in unassigned_reservations %}
@@ -496,16 +496,16 @@
          "to package" button (see .pk-move) when dragging is awkward. -->
     <div class="pk-card">
       <div class="pk-card-h pk-packs-h">
-        <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketler{% else %}Packages{% endif %}</h3>
+        <h3>{% trans "Packages" %}</h3>
         <span class="pk-badge" id="packsCount">{{ packs|length }}</span>
         <div class="pk-tools">
           <button type="button" class="pk-icon-btn" id="pkCompactBtn"
-                  title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Hepsini kapat{% else %}Fold them all{% endif %}">
+                  title="{% trans "Fold them all" %}">
             <i class="fa fa-compress"></i>
           </button>
           {% if not shipped %}
           <button type="button" class="pk-add-pack" id="pkAddPackBtn">
-            <i class="fa fa-plus"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Yeni Paket{% else %}New package{% endif %}
+            <i class="fa fa-plus"></i> {% trans "New package" %}
           </button>
           {% endif %}
         </div>
@@ -516,14 +516,14 @@
              ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDrop(event)">
           <div class="pk-pack-h">
             <span class="pk-pack-num">{{ p.pack_number }}</span>
-            <span class="pk-pack-title">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paket{% else %}Package{% endif %} #{{ p.pack_number }}</span>
+            <span class="pk-pack-title">{% trans "Package" %} #{{ p.pack_number }}</span>
             <span class="pk-pack-meta">
-              <span data-count>{{ p.roll_count }}</span> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}rolls{% endif %}
+              <span data-count>{{ p.roll_count }}</span> {% trans "rolls" %}
               · <span data-meters>{{ p.total_meters|floatformat:"2g" }}</span> m
-              <span data-extra {% if not p.item_count %}hidden{% endif %}>· +{{ p.item_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}kalem{% else %}items{% endif %}</span>
+              <span data-extra {% if not p.item_count %}hidden{% endif %}>· +{{ p.item_count }} {% trans "items" %}</span>
             </span>
             {% if not shipped %}
-            <button type="button" class="pk-pack-del" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketi sil{% else %}Delete package{% endif %}" onclick="pkDeletePack({{ p.pk }})">
+            <button type="button" class="pk-pack-del" title="{% trans "Delete package" %}" onclick="pkDeletePack({{ p.pk }})">
               <i class="fa fa-trash"></i>
             </button>
             {% endif %}
@@ -543,13 +543,13 @@
               </div>
             </div>
             {% endif %}{% endfor %}
-            <div class="pk-drop-hint" data-empty-hint>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Topları buraya sürükleyin{% else %}Drag rolls here{% endif %}</div>
+            <div class="pk-drop-hint" data-empty-hint>{% trans "Drag rolls here" %}</div>
           </div>
         </div>
         {% endfor %}
         <div class="pk-empty" data-no-packs {% if packs %}style="display:none;"{% endif %}>
           <i class="fa fa-box-open"></i>
-          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Henüz paket yok — “Yeni Paket” ile başlayın.{% else %}No packages yet — start one with “New package”.{% endif %}
+          {% trans "No packages yet — start one with “New package”." %}
         </div>
         {% if not shipped %}
         <button type="button" class="pk-add-tile" data-add-pack-tile>
@@ -570,8 +570,8 @@
        of the roll-reservation machinery tracked lines use. -->
   <div class="pk-card" id="pkUntrackedCard" style="margin-top:16px;">
     <div class="pk-card-h">
-      <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Sipariş listesi{% else %}Order list{% endif %}</h3>
-      <span class="pk-sub">{{ untracked_items|length }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}ürün · okutma gerekmiyor{% else %}products · no scan needed{% endif %}</span>
+      <h3>{% trans "Order list" %}</h3>
+      <span class="pk-sub">{{ untracked_items|length }} {% trans "products · no scan needed" %}</span>
     </div>
     <div class="pk-card-b">
       <div id="pkUntrackedList" ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDropUnassign(event)">
@@ -586,7 +586,7 @@
           </div>
         </div>
         {% endif %}{% endfor %}
-        <div class="pk-pgroup-empty" data-empty-hint>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tüm ürünler paketlere atandı.{% else %}All products assigned to packages.{% endif %}</div>
+        <div class="pk-pgroup-empty" data-empty-hint>{% trans "All products assigned to packages." %}</div>
       </div>
     </div>
   </div>
@@ -628,11 +628,11 @@
       <video id="pkVideo" playsinline muted autoplay></video>
       <div class="pks-guide">
         <div class="pks-frame"><span class="c c1"></span><span class="c c2"></span><span class="c c3"></span><span class="c c4"></span><div class="pks-laser"></div></div>
-        <div class="pks-hint" id="pkHit"><span class="pks-dot"></span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Barkodu çerçeveye getirin{% else %}Point the barcode at the frame{% endif %}</div>
+        <div class="pks-hint" id="pkHit"><span class="pks-dot"></span>{% trans "Point the barcode at the frame" %}</div>
       </div>
     </div>
     <div class="pks-body">
-      <div class="pks-or"><span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}ya da{% else %}or{% endif %}</span></div>
+      <div class="pks-or"><span>{% trans "or" %}</span></div>
       <div class="pks-manual">
         <textarea id="pkScanManual" class="pks-input" rows="1" autocomplete="off" spellcheck="false"
                   placeholder="{% trans 'Enter a barcode — or several, one per line' %}"></textarea>
@@ -660,7 +660,6 @@
       { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
 (function(){
-  var TR = ('{{ LANGUAGE_CODE|slice:":2" }}' === 'tr');
   var wrap = document.querySelector('.pk-wrap');
   var CSRF = '{{ csrf_token }}';
   var ADD = wrap.dataset.addUrl,
@@ -680,7 +679,6 @@
   var toastEl = document.getElementById('pkToast');
   var toastT = null;
 
-  function t(tr, en){ return TR ? tr : en; }
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   // ``action`` ({label, run}) adds a button — Undo — and keeps the toast
   // up long enough to reach it.
@@ -707,7 +705,7 @@
 
   function cutValText(m, rem){
     var partial = m < rem - 0.005;
-    return fmtNum(m) + ' m' + (partial ? ' <small>(' + t('kısmi','partial') + ')</small>' : '');
+    return fmtNum(m) + ' m' + (partial ? ' <small>(' + '{% filter escapejs %}{% trans "partial" %}{% endfilter %}' + ')</small>' : '');
   }
 
   // Must stay attribute-for-attribute with partials/_pack_roll_row.html —
@@ -806,7 +804,7 @@
       var extras = pack.querySelectorAll('.pk-citem').length;
       var extraEl = pack.querySelector('.pk-pack-meta [data-extra]');
       if (extraEl){
-        extraEl.textContent = ' · +' + extras + ' ' + t('kalem','items');
+        extraEl.textContent = ' · +' + extras + ' ' + '{% filter escapejs %}{% trans "items" %}{% endfilter %}';
         extraEl.hidden = !extras;
       }
     });
@@ -877,10 +875,9 @@
         // the reader's language and d.error is only a fallback for the
         // ones this screen has no wording of its own for.
         var msg = (d.kind === 'wrong_product' || d.kind === 'not_in_order')
-                    ? t('Bu top bu siparişe ait değil — pakete eklenemez.',
-                        'This roll does not belong to this order — it cannot go in a package.')
-                : d.kind === 'not_found' ? t('Top bulunamadı.','Roll not found.')
-                :                          (d.error || t('Eklenemedi.','Could not add.'));
+                    ? '{% filter escapejs %}{% trans "This roll does not belong to this order — it cannot go in a package." %}{% endfilter %}'
+                : d.kind === 'not_found' ? '{% filter escapejs %}{% trans "Roll not found." %}{% endfilter %}'
+                :                          (d.error || '{% filter escapejs %}{% trans "Could not add." %}{% endfilter %}');
         d.reason = msg;
         say(msg, 'err');
         scanLogAdd('err', code, msg, null);
@@ -893,11 +890,11 @@
           // it there — the roll is in the packer's hand, going in.
           if (ex) ex.dataset.assignedPack = d.reservation.pack_id || '';
           pkRegroup();
-          say(t('Top pakete kondu.','Roll placed in this package.'));
-          scanLogAdd('', code, t('pakete kondu','placed in this package'), d.reservation.quantity);
+          say('{% filter escapejs %}{% trans "Roll placed in this package." %}{% endfilter %}');
+          scanLogAdd('', code, '{% filter escapejs %}{% trans "placed in this package" %}{% endfilter %}', d.reservation.quantity);
         } else {
-          say(t('Bu top zaten bu pakette.','This roll is already in this package.'), 'warn');
-          scanLogAdd('warn', code, t('zaten bu pakette','already in this package'), d.reservation.quantity);
+          say('{% filter escapejs %}{% trans "This roll is already in this package." %}{% endfilter %}', 'warn');
+          scanLogAdd('warn', code, '{% filter escapejs %}{% trans "already in this package" %}{% endfilter %}', d.reservation.quantity);
         }
         return d;
         if (ex){ ex.classList.add('flash'); setTimeout(function(){ ex.classList.remove('flash'); }, 900); ex.scrollIntoView({block:'center',behavior:'smooth'}); }
@@ -905,13 +902,13 @@
       }
       var el = addRow(d.reservation, true);
       if (el) el.scrollIntoView({block:'center', behavior:'smooth'});
-      if (d.capped) say(t('Girilen metre topta kalanla sınırlandı.','Metres capped to what remains on the roll.'), 'warn');
-      else if (d.reservation.pack_id) say(t('Top pakete eklendi.','Roll added to the package.'));
-      else say(t('Top eklendi.','Roll added.'));
+      if (d.capped) say('{% filter escapejs %}{% trans "Metres capped to what remains on the roll." %}{% endfilter %}', 'warn');
+      else if (d.reservation.pack_id) say('{% filter escapejs %}{% trans "Roll added to the package." %}{% endfilter %}');
+      else say('{% filter escapejs %}{% trans "Roll added." %}{% endfilter %}');
       scanLogAdd('', code, d.reservation.product_name, d.reservation.quantity);
       return d;
-    }).catch(function(){ say(t('Ağ hatası.','Network error.'), 'err');
-                      return {ok:false, reason:t('Ağ hatası.','Network error.')}; })
+    }).catch(function(){ say('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}', 'err');
+                      return {ok:false, reason:'{% filter escapejs %}{% trans "Network error." %}{% endfilter %}'}; })
       .finally(function(){ addBusy = false; });
   }
 
@@ -932,12 +929,12 @@
     function assignToPack(reservationId, packId){
       return post(ASSIGN_PACK, {reservation_id: reservationId, pack_id: packId || ''}).then(function(rr){
         var d = rr.j || {};
-        if (!d.ok){ toast(d.error || t('Taşınamadı.','Could not move.'), 'err'); return false; }
+        if (!d.ok){ toast(d.error || '{% filter escapejs %}{% trans "Could not move." %}{% endfilter %}', 'err'); return false; }
         var row = document.querySelector('.pk-row[data-id="'+reservationId+'"]');
         if (row) row.dataset.assignedPack = d.pack_id || '';
         pkRegroup();
         return d.pack_id || '';
-      }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); return false; });
+      }).catch(function(){ toast('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}','err'); return false; });
     }
 
     // Same as assignToPack, but for a warehouse-untracked order line —
@@ -946,12 +943,12 @@
     function assignItemToPack(itemId, packId){
       return post(ASSIGN_ITEM, {item_id: itemId, pack_id: packId || ''}).then(function(rr){
         var d = rr.j || {};
-        if (!d.ok){ toast(d.error || t('Taşınamadı.','Could not move.'), 'err'); return false; }
+        if (!d.ok){ toast(d.error || '{% filter escapejs %}{% trans "Could not move." %}{% endfilter %}', 'err'); return false; }
         var row = document.querySelector('.pk-citem[data-id="'+itemId+'"]');
         if (row) row.dataset.assignedPack = d.pack_id || '';
         pkRegroup();
         return d.pack_id || '';
-      }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); return false; });
+      }).catch(function(){ toast('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}','err'); return false; });
     }
 
     function packEl(id){ return id ? document.querySelector('.pk-pack[data-pack-id="'+id+'"]') : null; }
@@ -966,7 +963,7 @@
     // Resolves with the new .pk-pack element, or null if it wasn't made.
     function createPack(){
       return pkFetchCrud({action:'add_pack'}).then(function(data){
-        if (!data.ok){ toast(data.error || t('Oluşturulamadı.','Could not create.'), 'err'); return null; }
+        if (!data.ok){ toast(data.error || '{% filter escapejs %}{% trans "Could not create." %}{% endfilter %}', 'err'); return null; }
         var wrapEl = document.createElement('div');
         wrapEl.className = 'pk-pack';
         wrapEl.dataset.packId = data.pack.id;
@@ -977,19 +974,19 @@
         wrapEl.innerHTML =
           '<div class="pk-pack-h">' +
             '<span class="pk-pack-num">' + data.pack.number + '</span>' +
-            '<span class="pk-pack-title">' + t('Paket','Package') + ' #' + data.pack.number + '</span>' +
-            '<span class="pk-pack-meta"><span data-count>0</span> ' + t('top','rolls') +
+            '<span class="pk-pack-title">' + '{% filter escapejs %}{% trans "Package" %}{% endfilter %}' + ' #' + data.pack.number + '</span>' +
+            '<span class="pk-pack-meta"><span data-count>0</span> ' + '{% filter escapejs %}{% trans "rolls" %}{% endfilter %}' +
               ' · <span data-meters>0.00</span> m<span data-extra hidden></span></span>' +
             '<button type="button" class="pk-pack-del" onclick="pkDeletePack(' + data.pack.id + ')"><i class="fa fa-trash"></i></button>' +
           '</div>' +
-          '<div class="pk-pack-body" data-pack-body><div class="pk-drop-hint" data-empty-hint>' + t('Topları buraya sürükleyin','Drag rolls here') + '</div></div>';
+          '<div class="pk-pack-body" data-pack-body><div class="pk-drop-hint" data-empty-hint>' + '{% filter escapejs %}{% trans "Drag rolls here" %}{% endfilter %}' + '</div></div>';
         // Before the "New package" tile, which always stays last.
         var list = document.getElementById('packsList');
         list.insertBefore(wrapEl, list.querySelector('[data-add-pack-tile]'));
         document.getElementById('packsCount').textContent = document.querySelectorAll('.pk-pack').length;
         pkRegroup();
         return wrapEl;
-      }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); return null; });
+      }).catch(function(){ toast('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}','err'); return null; });
     }
 
     var addPackBtn = document.getElementById('pkAddPackBtn');
@@ -1003,8 +1000,8 @@
         if (!el) return;
         var id = el.dataset.packId, n = el.dataset.packNumber || '';
         flashPack(id);
-        toast(t('Paket #' + n + ' oluşturuldu.', 'Package #' + n + ' created.'), '', {
-          label: t('Buna okut', 'Scan into it'),
+        toast('{% filter escapejs %}{% trans "Package #%(n)s created." %}{% endfilter %}'.replace('%(n)s', n), '', {
+          label: '{% filter escapejs %}{% trans "Scan into it" %}{% endfilter %}',
           run: function(){ if (pkArmPack) pkArmPack(id); }
         });
       });
@@ -1019,14 +1016,14 @@
         var n = String(numbers[id]);
         p.dataset.packNumber = n;
         var num = p.querySelector('.pk-pack-num'); if (num) num.textContent = n;
-        var ttl = p.querySelector('.pk-pack-title'); if (ttl) ttl.textContent = t('Paket','Package') + ' #' + n;
+        var ttl = p.querySelector('.pk-pack-title'); if (ttl) ttl.textContent = '{% filter escapejs %}{% trans "Package" %}{% endfilter %}' + ' #' + n;
       });
     }
 
     window.pkDeletePack = function(packId){
-      if (!confirm(t('Bu paketi silmek istiyor musunuz? İçindeki toplar atanmamış duruma döner.','Delete this package? Its rolls will become unassigned.'))) return;
+      if (!confirm('{% filter escapejs %}{% trans "Delete this package? Its rolls will become unassigned." %}{% endfilter %}')) return;
       pkFetchCrud({action:'delete_pack', pack_id: packId}).then(function(data){
-        if (!data.ok){ toast(data.error || t('Silinemedi.','Could not delete.'), 'err'); return; }
+        if (!data.ok){ toast(data.error || '{% filter escapejs %}{% trans "Could not delete." %}{% endfilter %}', 'err'); return; }
         document.querySelectorAll('.pk-row[data-assigned-pack="'+packId+'"]').forEach(function(row){ row.dataset.assignedPack = ''; });
         var el = document.querySelector('.pk-pack[data-pack-id="'+packId+'"]');
         if (el) el.remove();
@@ -1082,7 +1079,7 @@
     document.addEventListener('dragover', function(e){
       if (!dragResId || !dragRow || !dragSrcPack) return;
       var outside = !(e.target && e.target.closest && e.target.closest('.pk-pack'));
-      dragRow.dataset.leavingLabel = t('Çıkarılıyor','Taking out');
+      dragRow.dataset.leavingLabel = '{% filter escapejs %}{% trans "Taking out" %}{% endfilter %}';
       dragRow.classList.toggle('is-leaving', outside);
       if (outside){ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
     });
@@ -1149,14 +1146,14 @@
       if (cur){
         html += '<button type="button" class="pk-menu-i danger" data-pick="">' +
                   '<span class="pk-pack-num" style="background:#FEE2E2;color:#DC2626;"><i class="fa fa-arrow-turn-up"></i></span>' +
-                  '<span>' + t('Paketten çıkar','Take out of package') + '</span>' +
+                  '<span>' + '{% filter escapejs %}{% trans "Take out of package" %}{% endfilter %}' + '</span>' +
                 '</button><div class="pk-menu-sep"></div>';
       }
-      html += '<div class="pk-menu-h">' + t('Pakete taşı','Move to package') + '</div>';
+      html += '<div class="pk-menu-h">' + '{% filter escapejs %}{% trans "Move to package" %}{% endfilter %}' + '</div>';
       var packs = document.querySelectorAll('.pk-pack');
       if (!packs.length){
         html += '<div class="pk-menu-h" style="text-transform:none;letter-spacing:0;">' +
-                t('Henüz paket yok.','No packages yet.') + '</div>';
+                '{% filter escapejs %}{% trans "No packages yet." %}{% endfilter %}' + '</div>';
       }
       packs.forEach(function(p){
         var n = p.dataset.packNumber || '';
@@ -1164,14 +1161,14 @@
         html += '<button type="button" class="pk-menu-i' + (cur === p.dataset.packId ? ' is-current' : '') +
                 '" data-pick="' + esc(p.dataset.packId) + '">' +
                   '<span class="pk-pack-num">' + esc(n) + '</span>' +
-                  '<span>' + t('Paket','Package') + ' #' + esc(n) + '</span>' +
-                  '<small>' + cnt + ' ' + t('kalem','items') + '</small>' +
+                  '<span>' + '{% filter escapejs %}{% trans "Package" %}{% endfilter %}' + ' #' + esc(n) + '</span>' +
+                  '<small>' + cnt + ' ' + '{% filter escapejs %}{% trans "items" %}{% endfilter %}' + '</small>' +
                 '</button>';
       });
       html += '<div class="pk-menu-sep"></div>' +
               '<button type="button" class="pk-menu-i" data-pick="new">' +
                 '<span class="pk-pack-num"><i class="fa fa-plus"></i></span>' +
-                '<span>' + t('Yeni pakete koy','Put in a new package') + '</span>' +
+                '<span>' + '{% filter escapejs %}{% trans "Put in a new package" %}{% endfilter %}' + '</span>' +
               '</button>';
       menuEl.innerHTML = html;
     }
@@ -1197,19 +1194,19 @@
       return p.then(function(pid){
         if (pid === false) return pid;
         var undo = (prev !== null && String(prev) !== String(pid)) ? {
-          label: t('Geri al','Undo'),
+          label: '{% filter escapejs %}{% trans "Undo" %}{% endfilter %}',
           run: function(){
             var back = (kind === 'item') ? assignItemToPack(id, prev) : assignToPack(id, prev);
             back.then(function(b){
               if (b === false) return;
               if (b) flashPack(b);
-              toast(b ? t('Önceki pakete geri kondu.','Put back in its previous package.')
-                      : t('Pakete atanmamış duruma geri döndü.','Back to not in a package.'));
+              toast(b ? '{% filter escapejs %}{% trans "Put back in its previous package." %}{% endfilter %}'
+                      : '{% filter escapejs %}{% trans "Back to not in a package." %}{% endfilter %}');
             });
           }
         } : null;
-        if (pid){ flashPack(pid); toast(t('Pakete taşındı.','Moved into the package.'), '', undo); }
-        else toast(t('Paketten çıkarıldı.','Taken out of the package.'), '', undo);
+        if (pid){ flashPack(pid); toast('{% filter escapejs %}{% trans "Moved into the package." %}{% endfilter %}', '', undo); }
+        else toast('{% filter escapejs %}{% trans "Taken out of the package." %}{% endfilter %}', '', undo);
         return pid;
       });
     }
@@ -1263,7 +1260,7 @@
       var open = anyOpen();
       foldAllBtn.classList.toggle('on', !open && allPacks().length > 0);
       foldAllBtn.innerHTML = '<i class="fa fa-' + (open ? 'compress' : 'expand') + '"></i>';
-      foldAllBtn.title = open ? t('Hepsini kapat','Fold them all') : t('Hepsini aç','Unfold them all');
+      foldAllBtn.title = open ? '{% filter escapejs %}{% trans "Fold them all" %}{% endfilter %}' : '{% filter escapejs %}{% trans "Unfold them all" %}{% endfilter %}';
     }
 
     function setCollapsed(pack, on){
@@ -1346,13 +1343,13 @@
         return pkFetchCrud({action:'reorder_packs', pack_ids: after.join(',')}).then(function(data){
           if (!data.ok){
             putBack();
-            toast(data.error || t('Sıralanamadı.','Could not reorder.'), 'err');
+            toast(data.error || '{% filter escapejs %}{% trans "Could not reorder." %}{% endfilter %}', 'err');
             return;
           }
           relabelPacks(data.numbers);
           pkRegroup();
-          toast(t('Paketler yeniden numaralandı.','Packages renumbered.'));
-        }).catch(function(){ putBack(); toast(t('Ağ hatası.','Network error.'),'err'); });
+          toast('{% filter escapejs %}{% trans "Packages renumbered." %}{% endfilter %}');
+        }).catch(function(){ putBack(); toast('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}','err'); });
       });
     }
 
@@ -1371,10 +1368,10 @@
         var rolls = (p.querySelector('[data-count]') || {}).textContent || '0';
         var meters = (p.querySelector('[data-meters]') || {}).textContent || '0.00';
         rows += '<div class="pk-reo-row">' +
-          '<span class="from">' + t('Paket','Package') + ' #' + esc(from) + '</span>' +
+          '<span class="from">' + '{% filter escapejs %}{% trans "Package" %}{% endfilter %}' + ' #' + esc(from) + '</span>' +
           '<i class="fa fa-arrow-right" style="color:var(--pk-gray);font-size:11px;"></i>' +
           '<span class="to">#' + esc(to) + '</span>' +
-          '<span class="what">' + esc(rolls) + ' ' + t('top','rolls') + ' · ' + esc(meters) + ' m</span></div>';
+          '<span class="what">' + esc(rolls) + ' ' + '{% filter escapejs %}{% trans "rolls" %}{% endfilter %}' + ' · ' + esc(meters) + ' m</span></div>';
       });
       if (!rows) return Promise.resolve(false);
       reoList.innerHTML = rows;
@@ -1427,7 +1424,7 @@
         if (!SHIPPED && !h.querySelector('.pk-pack-grip')){
           var grip = document.createElement('span');
           grip.className = 'pk-pack-grip';
-          grip.title = t('Sırayı değiştirmek için sürükleyin','Drag to change the order');
+          grip.title = '{% filter escapejs %}{% trans "Drag to change the order" %}{% endfilter %}';
           grip.innerHTML = '<i class="fa fa-grip-vertical"></i>';
           h.insertBefore(grip, h.firstChild);
         }
@@ -1435,8 +1432,8 @@
           var scanBtn = document.createElement('button');
           scanBtn.type = 'button';
           scanBtn.className = 'pk-pack-scan';
-          scanBtn.title = t('Bu pakete okut','Scan into this package');
-          scanBtn.innerHTML = '<i class="fa fa-barcode"></i>' + t('Buraya okut','Scan here');
+          scanBtn.title = '{% filter escapejs %}{% trans "Scan into this package" %}{% endfilter %}';
+          scanBtn.innerHTML = '<i class="fa fa-barcode"></i>' + '{% filter escapejs %}{% trans "Scan here" %}{% endfilter %}';
           h.insertBefore(scanBtn, h.querySelector('.pk-pack-del') || null);
         }
         // Restore the remembered state once, on the package's first pass
@@ -1477,10 +1474,10 @@
         // this is — into a package, or on to another one.
         if (pack){
           if (ico) ico.className = 'fa fa-arrow-right-arrow-left';
-          mv.title = t('Başka pakete taşı','Move to another package');
+          mv.title = '{% filter escapejs %}{% trans "Move to another package" %}{% endfilter %}';
         } else {
           if (ico) ico.className = 'fa fa-box';
-          mv.title = t('Pakete at','To package');
+          mv.title = '{% filter escapejs %}{% trans "To package" %}{% endfilter %}';
         }
       });
     };
@@ -1547,9 +1544,9 @@
   var scanModal = document.getElementById('pkScanModal');
   function startCam(){
     if (camRunning) return;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast(t('Kamera desteklenmiyor.','Camera not supported.'),'err'); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('{% filter escapejs %}{% trans "Camera not supported." %}{% endfilter %}','err'); return; }
     getRearStream().then(function(stream){ camStream=stream; video.srcObject=stream; camRunning=true; lastDecode=0;
-      loadZxw().then(function(){ camLoop(); }).catch(function(){ toast(t('Tarayıcı yüklenemedi.','Scanner failed to load.'),'err'); });
+      loadZxw().then(function(){ camLoop(); }).catch(function(){ toast('{% filter escapejs %}{% trans "Scanner failed to load." %}{% endfilter %}','err'); });
     }).catch(function(err){ toast('Camera: '+(err&&err.message||err),'err'); });
   }
   function stopCam(){
@@ -1567,9 +1564,8 @@
     var pack = scanIntoPackId ? document.querySelector('.pk-pack[data-pack-id="'+scanIntoPackId+'"]') : null;
     var title = document.getElementById('pkScanTitle');
     if (title) title.textContent = pack
-      ? t('Paket #' + (pack.dataset.packNumber||'') + ' içine okut',
-          'Scan into Package #' + (pack.dataset.packNumber||''))
-      : t('Top okut','Scan a roll');
+      ? '{% filter escapejs %}{% trans "Scan into Package #%(n)s" %}{% endfilter %}'.replace('%(n)s', pack.dataset.packNumber||'')
+      : '{% filter escapejs %}{% trans "Scan a roll" %}{% endfilter %}';
     if (scanLog) scanLog.innerHTML = '';
     showStage();
     scanModal.classList.add('show');
@@ -1643,29 +1639,29 @@
   function renderAlreadyHere(r, code){
     showResult('<div class="pks-rc">' +
       '<span class="pks-status warn"><i class="fa fa-circle-check"></i>' +
-        t('Bu top zaten bu pakette','Already in this package') + '</span>' +
+        '{% filter escapejs %}{% trans "Already in this package" %}{% endfilter %}' + '</span>' +
       '<div class="pks-chip"><i class="fa fa-barcode"></i>' + esc(code) + '</div>' +
       '<div class="pks-name">' + esc(r.product_name||'') + '</div>' +
       (r.sku ? '<div><span class="pks-sku">' + esc(r.sku) + '</span></div>' : '') +
       (r.warehouse ? '<div class="pks-where">' + esc(r.warehouse) + '</div>' : '') +
       '<div class="pks-tiles">' +
-        tile(t('Bu siparişe ayrılan','Reserved for this order'), fmtNum(Number(r.quantity||0)), 'm', true) +
-        tile(t('Topta kalan','Left on the roll'),
+        tile('{% filter escapejs %}{% trans "Reserved for this order" %}{% endfilter %}', fmtNum(Number(r.quantity||0)), 'm', true) +
+        tile('{% filter escapejs %}{% trans "Left on the roll" %}{% endfilter %}',
              (r.roll_remaining != null ? fmtNum(Number(r.roll_remaining)) : '—'), 'm') +
       '</div>' +
       '<div class="pks-actions"><button type="button" class="pks-act primary" data-scan-back>' +
-        '<i class="fa fa-barcode"></i>' + t('Yeni top okut','Scan another') + '</button></div>' +
+        '<i class="fa fa-barcode"></i>' + '{% filter escapejs %}{% trans "Scan another" %}{% endfilter %}' + '</button></div>' +
     '</div>');
   }
 
   function renderRefused(msg, code){
     showResult('<div class="pks-rc">' +
       '<span class="pks-status err"><i class="fa fa-triangle-exclamation"></i>' +
-        t('Eklenemez','Cannot be added') + '</span>' +
+        '{% filter escapejs %}{% trans "Cannot be added" %}{% endfilter %}' + '</span>' +
       '<div class="pks-chip"><i class="fa fa-barcode"></i>' + esc(code) + '</div>' +
       '<div class="pks-where">' + esc(msg) + '</div>' +
       '<div class="pks-actions"><button type="button" class="pks-act primary" data-scan-back>' +
-        '<i class="fa fa-barcode"></i>' + t('Tekrar okut','Scan again') + '</button></div>' +
+        '<i class="fa fa-barcode"></i>' + '{% filter escapejs %}{% trans "Scan again" %}{% endfilter %}' + '</button></div>' +
     '</div>');
   }
 
@@ -1677,29 +1673,29 @@
     var pack = scanIntoPackId ? document.querySelector('.pk-pack[data-pack-id="'+scanIntoPackId+'"]') : null;
     var num = pack ? (pack.dataset.packNumber||'') : '';
     var bad = refused.length, total = added + already + bad;
-    var head = bad ? t(total+' barkoddan '+bad+' tanesi eklenemedi', bad+' of '+total+' barcodes refused')
-             : num ? t('Liste Paket #'+num+'\'e eklendi','List added to Package #'+num)
-             :       t('Liste eklendi','List added');
+    var head = bad ? '{% filter escapejs %}{% trans "%(bad)s of %(total)s barcodes refused" %}{% endfilter %}'.replace('%(bad)s', bad).replace('%(total)s', total)
+             : num ? '{% filter escapejs %}{% trans "List added to Package #%(n)s" %}{% endfilter %}'.replace('%(n)s', num)
+             :       '{% filter escapejs %}{% trans "List added" %}{% endfilter %}';
     var html = '<div class="pks-rc">' +
       '<span class="pks-status ' + (bad?'warn':'ok') + '"><i class="fa fa-' + (bad?'triangle-exclamation':'circle-check') + '"></i>' +
         esc(head) + '</span>' +
       '<div class="pks-tiles">' +
-        tile(t('Eklendi','Added'), added, '', true) +
-        tile(t('Zaten pakette','Already in the package'), already, '') +
-        tile(t('Eklenemedi','Refused'), bad, '') +
+        tile('{% filter escapejs %}{% trans "Added" %}{% endfilter %}', added, '', true) +
+        tile('{% filter escapejs %}{% trans "Already in the package" %}{% endfilter %}', already, '') +
+        tile('{% filter escapejs %}{% trans "Refused" %}{% endfilter %}', bad, '') +
       '</div>' +
       (pack ? '<div class="pks-tiles">' +
-        tile(t('Paket toplamı','Package total'), (pack.querySelector('[data-meters]')||{}).textContent || '0.00', 'm') +
-        tile(t('Paketteki top','Rolls in package'), (pack.querySelector('[data-count]')||{}).textContent || '0', '') +
+        tile('{% filter escapejs %}{% trans "Package total" %}{% endfilter %}', (pack.querySelector('[data-meters]')||{}).textContent || '0.00', 'm') +
+        tile('{% filter escapejs %}{% trans "Rolls in package" %}{% endfilter %}', (pack.querySelector('[data-count]')||{}).textContent || '0', '') +
       '</div>' : '') +
       (bad ? '<div class="pks-log" style="margin-top:14px;text-align:left;">' + refused.map(function(r){
           return '<div class="pks-log-row err"><code>' + esc(r.code) + '</code><span class="nm" style="white-space:normal;color:inherit;">' +
                  esc(r.reason) + '</span></div>';
         }).join('') + '</div>' : '') +
       '<div class="pks-actions">' +
-        '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-check"></i>' + t('Bitir','Done') + '</button>' +
+        '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-check"></i>' + '{% filter escapejs %}{% trans "Done" context "finish scanning" %}{% endfilter %}' + '</button>' +
         '<button type="button" class="pks-act primary" data-scan-back><i class="fa fa-' + (bad?'pen':'barcode') + '"></i>' +
-          (bad ? t('Eklenemeyenleri düzelt','Fix refused') : t('Devam et','Add more')) + '</button>' +
+          (bad ? '{% filter escapejs %}{% trans "Fix refused" %}{% endfilter %}' : '{% filter escapejs %}{% trans "Add more" %}{% endfilter %}') + '</button>' +
       '</div></div>';
     showResult(html);
   }
@@ -1718,28 +1714,28 @@
     var qty = Number((cut && cut.dataset.quantity) || 0);
     var rem = Number(row.dataset.remaining || 0);
     var pack = row.closest('.pk-pack');
-    var where = pack ? (t('Paket #','Package #') + (pack.dataset.packNumber || ''))
-                     : t('Pakete atanmamış','Not in a package');
+    var where = pack ? ('{% filter escapejs %}{% trans "Package #" %}{% endfilter %}' + (pack.dataset.packNumber || ''))
+                     : '{% filter escapejs %}{% trans "Not in a package" %}{% endfilter %}';
     var url = row.dataset.rollUrl || '';
     var title = document.getElementById('pkScanTitle');
-    if (title) title.textContent = t('Top','Roll');
+    if (title) title.textContent = '{% filter escapejs %}{% trans "Roll" %}{% endfilter %}';
     showResult('<div class="pks-rc">' +
       '<span class="pks-status ok"><i class="fa fa-barcode"></i>' +
-        t('Siparişteki top','Roll on this order') + '</span>' +
+        '{% filter escapejs %}{% trans "Roll on this order" %}{% endfilter %}' + '</span>' +
       '<div class="pks-chip"><i class="fa fa-barcode"></i>' + esc(row.dataset.barcode || '—') + '</div>' +
       '<div class="pks-name">' + esc(row.dataset.name || '') + '</div>' +
       (row.dataset.sku ? '<div><span class="pks-sku">' + esc(row.dataset.sku) + '</span></div>' : '') +
       (row.dataset.warehouse ? '<div class="pks-where">' + esc(row.dataset.warehouse) + '</div>' : '') +
       '<div class="pks-tiles">' +
-        tile(t('Bu siparişe ayrılan','Reserved for this order'), fmtNum(qty), 'm', true) +
-        tile(t('Topta kalan','Left on the roll'), fmtNum(rem), 'm') +
-        tile(t('Şu an','Currently'), where, '') +
+        tile('{% filter escapejs %}{% trans "Reserved for this order" %}{% endfilter %}', fmtNum(qty), 'm', true) +
+        tile('{% filter escapejs %}{% trans "Left on the roll" %}{% endfilter %}', fmtNum(rem), 'm') +
+        tile('{% filter escapejs %}{% trans "Currently" %}{% endfilter %}', where, '') +
       '</div>' +
       '<div class="pks-actions">' +
         '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-xmark"></i>' +
-          t('Kapat','Close') + '</button>' +
+          '{% filter escapejs %}{% trans "Close" %}{% endfilter %}' + '</button>' +
         (url ? '<a class="pks-act primary" href="' + esc(url) + '"><i class="fa fa-pen"></i>' +
-          t('Topu düzenle','Edit roll') + '</a>' : '') +
+          '{% filter escapejs %}{% trans "Edit roll" %}{% endfilter %}' + '</a>' : '') +
       '</div></div>');
     scanModal.classList.add('show');
   }
@@ -1766,7 +1762,7 @@
     if (!code || placeBusy) return;
     placeBusy = true;
     addBarcode(code, null, true).then(function(a){
-      if (!a || !a.ok){ renderRefused((a && a.reason) || t('Eklenemedi.','Could not add.'), code); return; }
+      if (!a || !a.ok){ renderRefused((a && a.reason) || '{% filter escapejs %}{% trans "Could not add." %}{% endfilter %}', code); return; }
       if (a.duplicate && !a.moved){ renderAlreadyHere(a.reservation || {}, code); return; }
       if (scanManual && scanManual.value.trim() === code){ scanManual.value = ''; syncManual(); }
       renderPlaced(a.reservation || {}, code, {packNumber: a.was_pack_number});
@@ -1776,24 +1772,24 @@
   // The card after a read has placed the roll, with where it came from.
   function renderPlaced(r, code, was){
     var num = targetPackNumber();
-    var from = was.packNumber ? (t('Paket #','Package #') + was.packNumber) : t('Pakete atanmamış','Not in a package');
+    var from = was.packNumber ? ('{% filter escapejs %}{% trans "Package #" %}{% endfilter %}' + was.packNumber) : '{% filter escapejs %}{% trans "Not in a package" %}{% endfilter %}';
     showResult('<div class="pks-rc">' +
       '<span class="pks-status ok"><i class="fa fa-circle-check"></i>' +
-        (num ? t('Paket #'+num+'\'e eklendi','Added to Package #'+num) : t('Eklendi','Added')) + '</span>' +
+        (num ? '{% filter escapejs %}{% trans "Added to Package #%(n)s" %}{% endfilter %}'.replace('%(n)s', num) : '{% filter escapejs %}{% trans "Added" %}{% endfilter %}') + '</span>' +
       '<div class="pks-chip"><i class="fa fa-barcode"></i>' + esc(code) + '</div>' +
       '<div class="pks-name">' + esc(r.product_name||'') + '</div>' +
       (r.sku ? '<div><span class="pks-sku">' + esc(r.sku) + '</span></div>' : '') +
       (r.warehouse ? '<div class="pks-where">' + esc(r.warehouse) + '</div>' : '') +
       '<div class="pks-tiles">' +
-        tile(t('Bu siparişe ayrılan','Reserved for this order'), fmtNum(Number(r.quantity||0)), 'm', true) +
-        tile(t('Topta kalan','Left on the roll'),
+        tile('{% filter escapejs %}{% trans "Reserved for this order" %}{% endfilter %}', fmtNum(Number(r.quantity||0)), 'm', true) +
+        tile('{% filter escapejs %}{% trans "Left on the roll" %}{% endfilter %}',
              (r.roll_remaining != null ? fmtNum(Number(r.roll_remaining)) : '—'), 'm') +
-        tile(t('Önceden','Was'), from, '') +
+        tile('{% filter escapejs %}{% trans "Was" %}{% endfilter %}', from, '') +
       '</div>' +
       '<div class="pks-actions">' +
-        '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-check"></i>' + t('Bitir','Done') + '</button>' +
+        '<button type="button" class="pks-act ghost" data-scan-done><i class="fa fa-check"></i>' + '{% filter escapejs %}{% trans "Done" context "finish scanning" %}{% endfilter %}' + '</button>' +
         '<button type="button" class="pks-act primary" data-scan-back><i class="fa fa-barcode"></i>' +
-          t('Yeni top okut','Scan another') + '</button>' +
+          '{% filter escapejs %}{% trans "Scan another" %}{% endfilter %}' + '</button>' +
       '</div></div>');
   }
 
@@ -1830,12 +1826,11 @@
     // During a run, and after it until the box is edited, the hint says
     // how far the list got rather than how long it is.
     if (scanCount) scanCount.textContent = listProgress
-      ? t(listProgress.added + '/' + listProgress.total + ' eklendi',
-          listProgress.added + '/' + listProgress.total + ' added')
-      : n > 1 ? n + ' ' + t('barkod','barcodes') : '';
+      ? '{% filter escapejs %}{% trans "%(added)s/%(total)s added" %}{% endfilter %}'.replace('%(added)s', listProgress.added).replace('%(total)s', listProgress.total)
+      : n > 1 ? n + ' ' + '{% filter escapejs %}{% trans "barcodes" %}{% endfilter %}' : '';
     if (scanAddLbl) scanAddLbl.textContent = n > 1
-      ? (num ? t('Tümünü Paket #'+num+'\'e ekle','Add all to Package #'+num) : t('Tümünü ekle','Add all'))
-      : t('Ekle','Add');
+      ? (num ? '{% filter escapejs %}{% trans "Add all to Package #%(n)s" %}{% endfilter %}'.replace('%(n)s', num) : '{% filter escapejs %}{% trans "Add all" %}{% endfilter %}')
+      : '{% filter escapejs %}{% trans "Add" %}{% endfilter %}';
     if (scanAdd) scanAdd.disabled = listBusy;
   }
   function resetList(){
@@ -1864,7 +1859,7 @@
     codes.reduce(function(chain, code){
       return chain.then(function(){
         return addBarcode(code, null, true).then(function(d){
-          if (!d || !d.ok){ failed.push(code); refused.push({code:code, reason:(d && d.reason) || t('Eklenemedi.','Could not add.')}); }
+          if (!d || !d.ok){ failed.push(code); refused.push({code:code, reason:(d && d.reason) || '{% filter escapejs %}{% trans "Could not add." %}{% endfilter %}'}); }
           else if (d.duplicate && !d.moved) already++;   // was in this package before the list
           else added++;
           listProgress.added = added; syncManual();

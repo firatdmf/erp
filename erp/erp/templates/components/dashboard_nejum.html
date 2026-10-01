@@ -2,8 +2,8 @@
 {% load i18n %}
 {% comment %}
   Nejum-exact dashboard partial. Mirrors Nejum design kit's
-  ScreenHome.jsx structure 1:1: top tab bar (Takvim / Görevlerim /
-  Atanan Görevler) + 2-col grid (calendar card + today's tasks card)
+  ScreenHome.jsx structure 1:1: top tab bar (Calendar / My Tasks /
+  Assigned Tasks) + 2-col grid (calendar card + today's tasks card)
   + premium task cards with stripe / aging / assignee / actions.
 
   The only dashboard. The dashboard_new.html it used to sit beside
@@ -74,7 +74,7 @@
       <i data-lucide="user-plus"></i>
       <span>
         {% get_current_language as LANGUAGE_CODE %}
-        {% if LANGUAGE_CODE|slice:":2" == "tr" %}Görev Ata{% else %}Assign Task{% endif %}
+        {% trans "Assign Task" %}
       </span>
     </button>
   </div>
@@ -195,12 +195,12 @@
             </div>
             <div class="njdash-empty-title">
               {% get_current_language as LANGUAGE_CODE %}
-              {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bugün için görev yok{% else %}No tasks for today{% endif %}
+              {% trans "No tasks for today" %}
             </div>
             <div class="njdash-empty-sub">
               <button class="nj-empty-action-btn" onclick="openTaskSidebar(); return false;">
                 <i data-lucide="user-plus"></i>
-                {% if LANGUAGE_CODE|slice:":2" == "tr" %}Yeni Bir Görev Ata{% else %}Assign a New Task{% endif %}
+                {% trans "Assign a New Task" %}
               </button>
             </div>
           </div>
@@ -471,28 +471,27 @@
     }
     function emptyMarkup() {
       var title, sub, btnText;
-      var isTr = "{{ LANGUAGE_CODE|slice:':2' }}" === "tr";
       
       if (currentTab === 'mine') {
-        title = isTr ? 'Görev bulunamadı' : 'No tasks yet';
-        sub = isTr ? 'İlk görevinizi atayarak başlayın.' : 'Get started by assigning your first task.';
-        btnText = isTr ? 'Yeni Görev Ata' : 'Assign New Task';
+        title = '{% filter escapejs %}{% trans "No tasks yet" %}{% endfilter %}';
+        sub = '{% filter escapejs %}{% trans "Get started by assigning your first task." %}{% endfilter %}';
+        btnText = '{% filter escapejs %}{% trans "Assign New Task" %}{% endfilter %}';
       } else if (currentTab === 'completed') {
-        title = isTr ? 'Tamamlanan görev yok' : 'No completed tasks yet';
-        sub = isTr ? 'Tamamladığınız görevler burada listelenir.' : 'Tasks you mark as complete show up here.';
+        title = '{% filter escapejs %}{% trans "No completed tasks yet" %}{% endfilter %}';
+        sub = '{% filter escapejs %}{% trans "Tasks you mark as complete show up here." %}{% endfilter %}';
         btnText = null;
       } else if (currentTab === 'delegated') {
-        title = isTr ? 'Atanan görev yok' : 'No assigned tasks';
-        sub = isTr ? 'Ekip arkadaşlarınıza atadığınız veya size atanan görevler burada listelenir.' : 'Tasks assigned to you or by you will appear here.';
-        btnText = isTr ? 'Yeni Görev Ata' : 'Assign New Task';
+        title = '{% filter escapejs %}{% trans "No assigned tasks" %}{% endfilter %}';
+        sub = '{% filter escapejs %}{% trans "Tasks assigned to you or by you will appear here." %}{% endfilter %}';
+        btnText = '{% filter escapejs %}{% trans "Assign New Task" %}{% endfilter %}';
       } else if (currentTab === 'future') {
-        title = isTr ? 'Gelecek tarihli görev yok' : 'No future tasks';
-        sub = isTr ? 'Gelecek tarihli planlanan görevler burada listelenir.' : 'Tasks with future due dates will appear here.';
-        btnText = isTr ? 'Yeni Görev Ata' : 'Assign New Task';
+        title = '{% filter escapejs %}{% trans "No future tasks" %}{% endfilter %}';
+        sub = '{% filter escapejs %}{% trans "Tasks with future due dates will appear here." %}{% endfilter %}';
+        btnText = '{% filter escapejs %}{% trans "Assign New Task" %}{% endfilter %}';
       } else {
-        title = isTr ? 'Bugün için görev yok' : 'No tasks for this day';
-        sub = isTr ? 'Bugün için planlanmış bir görev bulunmuyor.' : 'There are no tasks scheduled for this day.';
-        btnText = isTr ? 'Yeni Görev Ata' : 'Assign New Task';
+        title = '{% filter escapejs %}{% trans "No tasks for this day" %}{% endfilter %}';
+        sub = '{% filter escapejs %}{% trans "There are no tasks scheduled for this day." %}{% endfilter %}';
+        btnText = '{% filter escapejs %}{% trans "Assign New Task" %}{% endfilter %}';
       }
       
       var html = '<div class="njdash-empty">' +

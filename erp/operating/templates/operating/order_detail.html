@@ -98,7 +98,7 @@
     font: 600 12.5px var(--font-sans);
   }
 
-  /* Products card: Current vs. İlk Oluşturulan (original snapshot) tabs */
+  /* Products card: Current vs. First Created (original snapshot) tabs */
   .od-item-tabs {
     display: inline-flex; align-items: center; gap: 4px;
     background: #F4F7FB; border: 1px solid #E2E8EE; border-radius: 10px;
@@ -642,7 +642,7 @@
   /* ══════════ Stock items (scanned rolls) — READ-ONLY display ══════════
      Each product line shows its scanned tops as compact pills right
      under it: barcode · metres · partial/cut/pack tags. All EDITING
-     (scan, cut, remove, pack) lives on the separate "Düzenleme ve
+     (scan, cut, remove, pack) lives on the separate "Edit &
      Paketleme" screen (order_pack_scan). */
   tr.od-tops-row > td { padding: 2px 12px 10px !important; background: #FAFCFB; border-top: 0 !important; }
   .od-tops-wrap { position: sticky; left: 0; max-width: calc(100vw - 72px); }
@@ -1216,7 +1216,7 @@
           <input type="hidden" name="action" value="update_status">
           <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}">
 
-          {% comment %}3-stage flow — Açık → Paketleniyor (opens the "Düzenleme ve Paketleme" screen) → Tamamlandı (cuts reserved rolls; cargo optional).{% endcomment %}
+          {% comment %}3-stage flow — Open → Packing (opens the "Edit & Pack" screen) → Completed (cuts reserved rolls; cargo optional).{% endcomment %}
           <div class="od-stages od-stages-3">
             {% for s in status_stages %}
               {% if s.key == 'packaging' %}
@@ -1407,7 +1407,7 @@
 
       <!-- PRODUCTS — rich READ-ONLY view. All editing (qty/price/lines,
            top scanning/cutting, packing) happens on the dedicated
-           "Düzenleme ve Paketleme" screen (order_pack_scan). -->
+           "Edit & Pack" screen (order_pack_scan). -->
       <section class="od-card" id="od-products-card">
         <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
           <div style="display:flex; align-items:baseline; gap:10px;">
@@ -2842,7 +2842,7 @@
       });
     }
 
-    // "Geri Aç & Düzelt" — take a completed order back to Paketleniyor:
+    // "Re-open & Fix" — take a completed order back to Packing:
     // stock returns to the exact rolls, the retail auto-collection is
     // cancelled and the defter entry is removed (server side), and the
     // order becomes editable again. Reason is optional and lands in the
@@ -3348,7 +3348,7 @@
   })();
 
   // ──────────────────────────────────────────────────────────
-  //  Products card: Current / İlk Oluşturulan (original) tabs.
+  //  Products card: Current / First Created (original) tabs.
   // ──────────────────────────────────────────────────────────
   (function () {
     const tabs = document.getElementById('od-item-tabs');

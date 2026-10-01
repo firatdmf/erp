@@ -4,7 +4,9 @@ from decimal import Decimal, InvalidOperation
 from django import forms
 from django.contrib.postgres.forms import SimpleArrayField
 from django.forms import inlineformset_factory
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext_lazy
+
+_lazy_title_tr = gettext_lazy("Turkish title")
 from .models import *
 
 
@@ -215,7 +217,7 @@ class BlogPostForm(forms.ModelForm):
             'content_en': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15, 'placeholder': 'Full content in English (Markdown supported)'}),
             'category_en': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Category'}),
             # Turkish
-            'title_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Türkçe Başlık'}),
+            'title_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': _lazy_title_tr}),
             'excerpt_tr': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
             'content_tr': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
             'category_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Kategori'}),

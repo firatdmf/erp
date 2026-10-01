@@ -1,4 +1,4 @@
-<div class="files-list-container">
+{% load i18n %}<div class="files-list-container">
     {% if attachments %}
     <div class="files-grid">
         {% for file in attachments %}
@@ -17,7 +17,7 @@
     {% else %}
     <div class="empty-state">
         <i class="far fa-folder-open"></i>
-        <p>Henüz paylaşılan dosya bulunmuyor.</p>
+        <p>{% trans "No files have been shared yet." %}</p>
     </div>
     {% endif %}
 </div>

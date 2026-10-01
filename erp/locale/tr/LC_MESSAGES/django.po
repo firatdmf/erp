@@ -1163,7 +1163,7 @@ msgid "Content Type #"
 msgstr "Content Type #"
 
 msgid "Cornice"
-msgstr "Cornice"
+msgstr "Korniş"
 
 msgid "Cost"
 msgstr "Maliyet"
@@ -1373,7 +1373,7 @@ msgid "Extra Header Content (CSS/Styles/Meta)"
 msgstr "Extra Header Content (CSS/Styles/Meta)"
 
 msgid "Extrafor"
-msgstr "Extrafor"
+msgstr "Ekstrafor"
 
 msgid "Fabric"
 msgstr "Fabric"
@@ -1586,7 +1586,7 @@ msgid "No B2B orders"
 msgstr "B2B sipariş yok"
 
 msgid "No assigned tasks"
-msgstr "No assigned tasks"
+msgstr "Atanan görev yok"
 
 msgid "No campaigns yet"
 msgstr "No campaigns yet"
@@ -1628,7 +1628,7 @@ msgid "No tasks found"
 msgstr "No tasks found"
 
 msgid "No tasks yet"
-msgstr "No tasks yet"
+msgstr "Görev bulunamadı"
 
 msgid "No teams yet"
 msgstr "Henüz takım yok"
@@ -1841,7 +1841,7 @@ msgid "Role"
 msgstr "Rol"
 
 msgid "Rustic"
-msgstr "Rustic"
+msgstr "Rustik"
 
 msgid "SKU"
 msgstr "SKU"
@@ -11515,6 +11515,425 @@ msgstr "Yeni firma — siparişle birlikte oluşturulur"
 #: operating/templates/operating/partials/create_order_form.html
 msgid "Existing company — the contact will be linked to it"
 msgstr "Kayıtlı firma — kişi bu firmaya bağlanacak"
+
+#: crm/models.py
+msgid "A record with this name already exists."
+msgstr "Bu adla bir kayıt zaten var."
+
+#: crm/models.py
+msgid "A contact with this name already exists."
+msgstr "Bu adla bir kişi zaten var."
+
+#: crm/models.py
+msgid "A supplier with this name already exists."
+msgstr "Bu adla bir tedarikçi zaten var."
+
+#: operating/views.py
+msgid "A contact named %(name)s already exists — search for it above and link to it instead."
+msgstr "%(name)s adlı bir kişi zaten var — yukarıdan arayıp onu bağlayın."
+
+#: operating/views.py
+msgid "A contact named %(name)s already exists — search for it and link it instead."
+msgstr "%(name)s adlı bir kişi zaten var — arayıp onu bağlayın."
+
+#: crm/forms.py
+msgid "A contact named %(name)s already exists — pick them from the search instead."
+msgstr "%(name)s adlı bir kişi zaten var — aramadan seçin."
+
+#: operating/views.py
+msgid "Order completed — stock was deducted and the entries were posted. If something is wrong, undo it with 'Re-open & Fix'."
+msgstr "Sipariş tamamlandı — stok düşüldü ve kayıtlar işlendi. Bir yanlışlık olduysa 'Geri Aç & Düzelt' ile geri alabilirsiniz."
+
+#: operating/views.py
+msgid "Order re-opened — stock was returned and the financial entries were reversed. Once corrected, close it again with 'Complete order'."
+msgstr "Sipariş geri açıldı — stok iade edildi, mali kayıtlar geri alındı. Düzeltmeleri yaptıktan sonra 'Siparişi Tamamla' ile tekrar kapatın."
+
+#: operating/views.py
+msgid "Order updated."
+msgstr "Sipariş güncellendi."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "The order could not be updated: %(error)s"
+msgstr "Sipariş güncellenemedi: %(error)s"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "This stock item is reserved — %(metres)s m is held for another order (%(ref)s)."
+msgstr "Bu stock item rezerve durumunda — %(metres)s m başka sipariş için ayrılmış (%(ref)s)."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "(existing)"
+msgstr "(mevcut)"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Lines belonging to other books were moved to their own orders (%(orders)s)."
+msgstr "Diğer defterlere ait satırlar kendi siparişlerine taşındı (%(orders)s)."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The order was created, but these barcodes could not be reserved — try again from the packing page: "
+msgstr "Sipariş oluşturuldu ama şu barkodlar için rezervasyon yapılamadı, paketleme sayfasından tekrar deneyin: "
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The order was created but stayed Open: "
+msgstr "Sipariş oluşturuldu ama Açık durumda kaldı: "
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The order was updated, but these barcodes could not be reserved — try again from the packing page: "
+msgstr "Sipariş güncellendi ama şu barkodlar için rezervasyon yapılamadı, paketleme sayfasından tekrar deneyin: "
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Only an admin may delete orders — enter the delete password to continue."
+msgstr "Sipariş silme yetkisi yalnızca adminde — devam etmek için silme şifresini girin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The delete password is wrong."
+msgstr "Silme şifresi hatalı."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "%(count)s completed orders were not deleted — re-open them first with 'Re-open & Fix' on the order page."
+msgstr "%(count)s tamamlanmış sipariş silinmedi — önce sipariş detayından 'Geri Aç & Düzelt' ile geri açın."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "%(metres)s m has already gone out of this roll — its length can't be shorter than that. Correct the shipment or the stock-out first."
+msgstr "Bu toptan %(metres)s m çıkış yapılmış — uzunluk bundan kısa olamaz. Önce ilgili sevkiyatı veya stok çıkışını düzeltin."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "This stock item is in another book's warehouse (%(source)s → %(target)s). Goods pass between books through a purchase invoice — a move only works between warehouses of the same book."
+msgstr "Bu stock item başka bir defterin deposunda (%(source)s → %(target)s). Defterler arasında mal geçişi satın alma faturası ile yapılmalı — taşıma işlemi sadece aynı defterin depoları arasında çalışır."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Product %(n)s: add at least one variant."
+msgstr "Ürün %(n)s: en az bir varyant ekleyin."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Product %(n)s: the main product's name is required."
+msgstr "Ürün %(n)s: ana ürün adı gerekli."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Product %(n)s: the SKU “%(sku)s” is already used by “%(product)s” — pick the main product from “Existing” or type another SKU."
+msgstr "Ürün %(n)s: “%(sku)s” SKU'su zaten “%(product)s” ürününde kullanılıyor — ana ürünü “Mevcut”tan seçin ya da başka bir SKU yazın."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "The barcode “%(code)s” is already in use."
+msgstr "“%(code)s” barkodu zaten kullanılıyor."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Save error: %(error)s"
+msgstr "Kayıt hatası: %(error)s"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "The purchase invoice could not be saved: %(error)s"
+msgstr "Alım faturası kaydedilemedi: %(error)s"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Stock was added but the purchase invoice could not be created: %(error)s"
+msgstr "Stok eklendi ama alış faturası oluşturulamadı: %(error)s"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "You don't have goods-receipt permission — save the order and ask someone authorised to confirm it."
+msgstr "Mal kabul yetkiniz yok — siparişi kaydedip yetkili birinin onaylamasını isteyin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Some rolls are used on another order and could not be deleted. Correct that order first."
+msgstr "Bazı toplar başka bir siparişte kullanılmış, silinemedi. Önce o siparişi düzeltin."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "(+%(count)s lines)"
+msgstr "(+%(count)s kalem)"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "The scanned rolls don't cover the order — %(details)s. Scan the remaining metres from the packing page."
+msgstr "Okutulan toplar siparişi karşılamıyor — %(details)s. Kalan metreleri paketleme sayfasından okutun."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Catalogue sync error: %(error)s"
+msgstr "Katalog senkron hatası: %(error)s"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "SKU '%(sku)s' is longer than 20 characters — no catalogue variant was created."
+msgstr "SKU '%(sku)s' 20 karakteri aşıyor — katalog varyantı oluşturulmadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Some rolls from this purchase are used on another order — the purchase can't be cancelled until that order is corrected."
+msgstr "Bu alımdaki bazı toplar başka bir siparişte kullanılmış — önce o siparişi düzeltmeden alım iptal edilemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Create a new customer for “%(name)s”"
+msgstr "“%(name)s” için yeni müşteri oluştur"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Enter a title..."
+msgstr "Başlık girin..."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Enter the content..."
+msgstr "İçerik girin..."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Items on a shipped order can't be edited."
+msgstr "Gönderilen siparişlerde ürünler düzenlenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A cancelled order can't be edited."
+msgstr "İptal edilmiş sipariş düzenlenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A cancelled order can't be re-opened. Create a new order if needed."
+msgstr "İptal edilmiş bir sipariş tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No available metres are left on this roll."
+msgstr "Bu topta uygun metre kalmadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A cancelled order can't be packed."
+msgstr "İptal edilmiş sipariş paketlenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The order has shipped — packing is locked."
+msgstr "Sipariş gönderildi — paketleme kilitli."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The barcode is empty."
+msgstr "Barkod boş."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The order has no items."
+msgstr "Siparişte ürün yok."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No stock item (roll) was found with this barcode."
+msgstr "Bu barkodla bir stock item (roll) bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This stock item doesn't belong to any product on this order — not added."
+msgstr "Bu stock item bu siparişteki ürünlere ait değil — eklenmedi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Package not found."
+msgstr "Paket bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This stock item doesn't belong to this order — it can't be added to the package."
+msgstr "Bu stock item bu siparişe ait değil — pakete eklenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Invalid metres."
+msgstr "Geçersiz metre."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Metres must be greater than zero."
+msgstr "Metre sıfırdan büyük olmalı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Invalid reservation."
+msgstr "Geçersiz rezervasyon."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Reservation not found."
+msgstr "Rezervasyon bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Invalid line."
+msgstr "Geçersiz kalem."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Line not found."
+msgstr "Kalem bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The barcode or the product is missing."
+msgstr "Barkod veya ürün bilgisi eksik."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No stock item was found with this barcode."
+msgstr "Bu barkodla bir stock item bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This stock item doesn't belong to this product."
+msgstr "Bu stock item bu ürüne ait değil."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This roll's product has no SKU — add the product by searching for it."
+msgstr "Bu topun ürününde SKU yok — ürünü arayarak ekleyin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The product is missing."
+msgstr "Ürün bilgisi eksik."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The order has already shipped."
+msgstr "Sipariş zaten gönderildi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A cancelled order can't be re-opened."
+msgstr "İptal edilmiş bir sipariş tekrar açılamaz."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Scan at least one stock item to finish packing."
+msgstr "Paketlemeyi tamamlamak için en az bir stock item okutmalısınız."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Shipped orders can't be edited."
+msgstr "Gönderilen siparişler düzenlenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The package list is out of date — refresh the page."
+msgstr "Paket listesi güncel değil — sayfayı yenileyin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Metres must be positive."
+msgstr "Metre pozitif olmalı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The account name is required."
+msgstr "Hesap adı gerekli."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Pick a book — a warehouse's stock is an asset of a book."
+msgstr "Bir defter seçin — deponun stoğu bir defterin varlığıdır."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "You can't open a warehouse in this book."
+msgstr "Bu defterde depo açamazsınız."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Pick at least two regular warehouses for a combined warehouse."
+msgstr "Ortak depo için en az iki normal depo seçin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A warehouse that holds products can't be turned into a combined warehouse."
+msgstr "İçinde ürün olan bir depo ortak depoya çevrilemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A combined warehouse is virtual — a stock item can only be moved to one of its member warehouses."
+msgstr "Ortak depo sanaldır — stock item ancak üye depolardan birine taşınabilir."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This stock item is used up — there are no metres to move."
+msgstr "Bu stock item tükenmiş — taşınacak metre yok."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A combined warehouse is virtual — goods must be received into one of its member warehouses."
+msgstr "Ortak depo sanaldır — ürün girişi üye depolardan birine yapılmalı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "There must be at least one product."
+msgstr "En az bir ürün olmalı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Purchase not found."
+msgstr "Alım bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A cancelled purchase can't be edited."
+msgstr "İptal edilmiş alım düzenlenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "You don't have goods-receipt permission — this purchase can't be edited."
+msgstr "Mal kabul yetkiniz yok — bu alım düzenlenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Only an admin can delete products."
+msgstr "Sadece admin ürün silebilir."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This stock item is reserved on an active order — remove it from that order's packing first."
+msgstr "Bu stock item aktif bir siparişte rezerve edilmiş — önce ilgili siparişin paketlemesinden kaldırın."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No stock item was selected to delete."
+msgstr "Silinecek stock item seçilmedi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The selected rolls were not found."
+msgstr "Seçilen toplar bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The selected rolls are reserved on active orders — not deleted. Remove them from packing first."
+msgstr "Seçilen toplar aktif siparişlerde rezerve — silinemedi. Önce paketlemeden kaldırın."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This barcode is already used on another roll."
+msgstr "Bu barkod zaten başka bir topta kullanılıyor."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Invalid metre value."
+msgstr "Geçersiz metre değeri."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Pick a warehouse."
+msgstr "Depo seçin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A combined warehouse is virtual — the order must go to one of its member warehouses."
+msgstr "Ortak depo sanaldır — sipariş üye depolardan birine yapılmalı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Enter a quantity on at least one product."
+msgstr "En az bir üründe miktar girin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This purchase is confirmed — it can't be edited as an order."
+msgstr "Bu alım onaylanmış — sipariş olarak düzenlenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "You don't have permission to confirm purchases — ask your manager."
+msgstr "Alım onaylama yetkiniz yok — yöneticinize başvurun."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A cancelled purchase can't be confirmed."
+msgstr "İptal edilmiş alım onaylanamaz."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This purchase is already confirmed."
+msgstr "Bu alım zaten onaylanmış."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This order has no goods-receipt details — edit it and save again."
+msgstr "Bu siparişte mal kabul bilgisi yok — düzenleyip tekrar kaydedin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This purchase is already cancelled."
+msgstr "Bu alım zaten iptal edilmiş."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This action needs manager permission."
+msgstr "Bu işlem için yönetici yetkisi gerekiyor."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The group name is required."
+msgstr "Grup adı gerekli."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Another group with this name already exists."
+msgstr "Bu isimde başka bir grup zaten var."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Save the group's margin first."
+msgstr "Önce grubun kar oranını kaydedin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A cancelled invoice can't be re-opened."
+msgstr "İptal edilen fatura geri açılamaz."
+
 #: accounting/templates/accounts/report_ledger_account.html
 msgid "Chart of accounts"
 msgstr "Hesap planı"
@@ -11549,3 +11968,1149 @@ msgstr "Bu hesaba henüz kayıt atılmadı."
 #: accounting/templates/accounts/report_chart_of_accounts.html
 msgid "See the entries behind this balance"
 msgstr "Bu bakiyeyi oluşturan kayıtları gör"
+
+msgid "No rolls picked yet"
+msgstr "Henüz top seçilmedi"
+
+#, python-format
+msgid "Accepted as it is, these go on the %(book)s order."
+msgstr "Bu haliyle kabul edilirse bunlar %(book)s siparişine girer."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Assign Task"
+msgstr "Görev Ata"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No tasks for today"
+msgstr "Bugün için görev yok"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Assign a New Task"
+msgstr "Yeni Bir Görev Ata"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Get started by assigning your first task."
+msgstr "İlk görevinizi atayarak başlayın."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Assign New Task"
+msgstr "Yeni Görev Ata"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No completed tasks yet"
+msgstr "Tamamlanan görev yok"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Tasks you mark as complete show up here."
+msgstr "Tamamladığınız görevler burada listelenir."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Tasks assigned to you or by you will appear here."
+msgstr "Ekip arkadaşlarınıza atadığınız veya size atanan görevler burada listelenir."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No future tasks"
+msgstr "Gelecek tarihli görev yok"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Tasks with future due dates will appear here."
+msgstr "Gelecek tarihli planlanan görevler burada listelenir."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No tasks for this day"
+msgstr "Bugün için görev yok"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "There are no tasks scheduled for this day."
+msgstr "Bugün için planlanmış bir görev bulunmuyor."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Virtual view — shows the member warehouses' stock as one"
+msgstr "Sanal görünüm — üye depoların stoğunu tek listede gösterir"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Merged warehouses"
+msgstr "Birleştirilen depolar"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Merge duplicate-SKU variants into one"
+msgstr "Aynı SKU'lu tekrar varyantları tek kayıtta birleştir"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Merge duplicates"
+msgstr "Tekrarları birleştir"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "or"
+msgstr "ya da"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Enter barcode manually…"
+msgstr "Barkodu elle gir…"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Look up"
+msgstr "Ara"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The same-SKU records below will be merged into one. Tops and movements are preserved. Confirm?"
+msgstr "Aşağıdaki aynı SKU'lu kayıtlar tek üründe birleştirilecek. Toplar ve hareketler korunur. Onaylıyor musun?"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Merge"
+msgstr "Birleştir"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No duplicates to merge."
+msgstr "Birleştirilecek tekrar bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid " records → 1"
+msgstr " kayıt → 1"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "keeps"
+msgstr "kalır"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "moves"
+msgstr "taşınır"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "rolls will be combined into one"
+msgstr "top tek üründe toplanacak"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Merging…"
+msgstr "Birleştiriliyor…"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "COMBINED"
+msgstr "ORTAK"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Warehouse type"
+msgstr "Depo Tipi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Normal"
+msgstr "Normal"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A combined warehouse is a virtual view that shows the selected warehouses as ONE — it holds no stock of its own; goods are received into the members."
+msgstr "Ortak depo, seçtiğiniz depoları TEK depo gibi gösteren sanal bir görünümdür — kendi stoğu olmaz, ürün girişi üye depolara yapılır."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Warehouses to merge"
+msgstr "Birleştirilecek depolar"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No normal warehouses to merge."
+msgstr "Birleştirilecek normal depo yok."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Pick at least two (e.g. Laleli Store + Factory Solids). A combined warehouse has no book of its own — each member keeps its own."
+msgstr "En az iki depo seçin (ör. Laleli Store + Factory Solids). Ortak deponun defteri olmaz — her üye depo kendi defterine aittir."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Delete selected"
+msgstr "Seçilenleri sil"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Packing — Scan rolls"
+msgstr "Paketleme — Top Okut"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Packing List"
+msgstr "Çeki listesi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This order is shipped — packing is locked. Reserved rolls were deducted from stock."
+msgstr "Bu sipariş gönderildi — paketleme kilitli. Rezerve edilen toplar stoktan düşüldü."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Available rolls"
+msgstr "Mevcut toplar"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No rolls on this line."
+msgstr "Bu kalem için top yok."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No warehouse-tracked products to scan in this order."
+msgstr "Bu siparişte okutulacak (depo takipli) ürün yok."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Unassigned tops"
+msgstr "Atanmamış toplar"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "no longer matches an order line"
+msgstr "artık siparişteki bir kalemle eşleşmiyor"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Packages"
+msgstr "Paketler"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Fold them all"
+msgstr "Hepsini kapat"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Delete package"
+msgstr "Paketi sil"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Drag rolls here"
+msgstr "Topları buraya sürükleyin"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No packages yet — start one with “New package”."
+msgstr "Henüz paket yok — “Yeni Paket” ile başlayın."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "products · no scan needed"
+msgstr "ürün · okutma gerekmiyor"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "All products assigned to packages."
+msgstr "Tüm ürünler paketlere atandı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "partial"
+msgstr "kısmi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This roll does not belong to this order — it cannot go in a package."
+msgstr "Bu top bu siparişe ait değil — pakete eklenemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Roll not found."
+msgstr "Top bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Could not add."
+msgstr "Eklenemedi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Roll placed in this package."
+msgstr "Top pakete kondu."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "placed in this package"
+msgstr "pakete kondu"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This roll is already in this package."
+msgstr "Bu top zaten bu pakette."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "already in this package"
+msgstr "zaten bu pakette"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Metres capped to what remains on the roll."
+msgstr "Girilen metre topta kalanla sınırlandı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Roll added to the package."
+msgstr "Top pakete eklendi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Roll added."
+msgstr "Top eklendi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Could not create."
+msgstr "Oluşturulamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Scan into it"
+msgstr "Buna okut"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Delete this package? Its rolls will become unassigned."
+msgstr "Bu paketi silmek istiyor musunuz? İçindeki toplar atanmamış duruma döner."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Could not delete."
+msgstr "Silinemedi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Taking out"
+msgstr "Çıkarılıyor"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Take out of package"
+msgstr "Paketten çıkar"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Move to package"
+msgstr "Pakete taşı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No packages yet."
+msgstr "Henüz paket yok."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Put in a new package"
+msgstr "Yeni pakete koy"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Put back in its previous package."
+msgstr "Önceki pakete geri kondu."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Back to not in a package."
+msgstr "Pakete atanmamış duruma geri döndü."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Moved into the package."
+msgstr "Pakete taşındı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Taken out of the package."
+msgstr "Paketten çıkarıldı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Unfold them all"
+msgstr "Hepsini aç"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Could not reorder."
+msgstr "Sıralanamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Packages renumbered."
+msgstr "Paketler yeniden numaralandı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Drag to change the order"
+msgstr "Sırayı değiştirmek için sürükleyin"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Scan into this package"
+msgstr "Bu pakete okut"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Scan here"
+msgstr "Buraya okut"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Move to another package"
+msgstr "Başka pakete taşı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "To package"
+msgstr "Pakete at"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Camera not supported."
+msgstr "Kamera desteklenmiyor."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Scanner failed to load."
+msgstr "Tarayıcı yüklenemedi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Scan a roll"
+msgstr "Top okut"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Already in this package"
+msgstr "Bu top zaten bu pakette"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Reserved for this order"
+msgstr "Bu siparişe ayrılan"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Left on the roll"
+msgstr "Topta kalan"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Scan another"
+msgstr "Yeni top okut"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "List added"
+msgstr "Liste eklendi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Already in the package"
+msgstr "Zaten pakette"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Refused"
+msgstr "Eklenemedi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Package total"
+msgstr "Paket toplamı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Rolls in package"
+msgstr "Paketteki top"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Fix refused"
+msgstr "Eklenemeyenleri düzelt"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Add more"
+msgstr "Devam et"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Package #"
+msgstr "Paket #"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Not in a package"
+msgstr "Pakete atanmamış"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Roll on this order"
+msgstr "Siparişteki top"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Was"
+msgstr "Önceden"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "barcodes"
+msgstr "barkod"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Add all"
+msgstr "Tümünü ekle"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Reserved for packed orders"
+msgstr "Paketlenen siparişler için ayrılan"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Reserved"
+msgstr "Rezerv"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "cut"
+msgstr "kesildi"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Package #%(n)s created."
+msgstr "Paket #%(n)s oluşturuldu."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Scan into Package #%(n)s"
+msgstr "Paket #%(n)s içine okut"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "%(bad)s of %(total)s barcodes refused"
+msgstr "%(total)s barkoddan %(bad)s tanesi eklenemedi"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "List added to Package #%(n)s"
+msgstr "Liste Paket #%(n)s'e eklendi"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Added to Package #%(n)s"
+msgstr "Paket #%(n)s'e eklendi"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Add all to Package #%(n)s"
+msgstr "Tümünü Paket #%(n)s'e ekle"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "m reserved"
+msgstr "m rezerv"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "View only — to change which roll goes in which package, use the \"Edit &amp; Pack\" screen."
+msgstr "Salt görünüm — hangi topun hangi pakete gireceğini \"Düzenleme ve Paketleme\" ekranında değiştirin."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Enter care instructions..."
+msgstr "Bakım talimatlarını giriniz..."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Upload &amp; compare"
+msgstr "Yükle &amp; Karşılaştır"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No files have been shared yet."
+msgstr "Henüz paylaşılan dosya bulunmuyor."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Could not load"
+msgstr "Yüklenemedi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Delete the image?"
+msgstr "Resmi Sil?"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This image will be deleted permanently. This cannot be undone."
+msgstr "Bu resim kalıcı olarak silinecek. Bu işlem geri alınamaz."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The delete failed"
+msgstr "Silme işlemi başarısız"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Delete error"
+msgstr "Silme hatası"
+
+msgctxt "packing count"
+msgid "rolls"
+msgstr "top"
+
+msgctxt "warehouse badge"
+msgid "Combined"
+msgstr "Ortak Depo"
+
+msgctxt "warehouse kind"
+msgid "Combined"
+msgstr "Ortak (birleşik)"
+
+msgctxt "stock figure"
+msgid "Reserved"
+msgstr "Rezerv stok"
+
+msgctxt "finish scanning"
+msgid "Done"
+msgstr "Bitir"
+
+msgctxt "back out"
+msgid "Cancel"
+msgstr "Vazgeç"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Order No"
+msgstr "Sipariş No"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Metres"
+msgstr "Metre"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Total Packages"
+msgstr "Toplam Paket"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Total Metres"
+msgstr "Toplam Metre"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "(empty)"
+msgstr "(boş)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Nothing has been packed for this order yet."
+msgstr "Bu siparişte paketlenmiş ürün yok."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "PACKAGE"
+msgstr "PAKET"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "CONTENTS"
+msgstr "İÇERİK"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Order Confirmation"
+msgstr "Sipariş Onayı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Warehouse product list"
+msgstr "Depo Ürün Listesi"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "%(count)s products"
+msgstr "%(count)s ürün"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "filtered for \"%(search)s\""
+msgstr "\"%(search)s\" için filtrelendi"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "variant_sku '%(sku)s' already belongs to another variant (product #%(product)s)."
+msgstr "variant_sku '%(sku)s' zaten başka bir varyanta ait (ürün #%(product)s)."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "more than one variant matches once folded — check by hand"
+msgstr "birden fazla varyant fold-eşleşmesi — elle inceleyin"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "the variant sits under featured product '%(current)s', which conflicts with the SKU match '%(target)s' — not moved"
+msgstr "varyant featured ürün '%(current)s' altında; sku-eşleşen '%(target)s' ile çelişiyor — taşınmadı"
+
+msgctxt "order change"
+msgid "order status"
+msgstr "Sipariş durumu"
+
+msgctxt "order change"
+msgid "carrier"
+msgstr "Kargo şirketi"
+
+msgctxt "order change"
+msgid "tracking number"
+msgstr "Takip veya fiş numarası"
+
+msgctxt "order change"
+msgid "notes"
+msgstr "Notlar"
+
+msgctxt "order change"
+msgid "internal notes"
+msgstr "İç notlar"
+
+msgctxt "order change"
+msgid "print header"
+msgstr "Yazdırma başlığı"
+
+msgctxt "order change"
+msgid "ettn"
+msgstr "ETTN"
+
+msgctxt "order change"
+msgid "guest first name"
+msgstr "Misafir adı"
+
+msgctxt "order change"
+msgid "guest last name"
+msgstr "Misafir soyadı"
+
+msgctxt "order change"
+msgid "guest email"
+msgstr "Misafir e-posta"
+
+msgctxt "order change"
+msgid "guest phone"
+msgstr "Misafir telefon"
+
+msgctxt "order change"
+msgid "customer"
+msgstr "Müşteri"
+
+msgctxt "order change"
+msgid "quantity"
+msgstr "Miktar"
+
+msgctxt "order change"
+msgid "price"
+msgstr "Fiyat"
+
+msgctxt "order change"
+msgid "product"
+msgstr "Ürün"
+
+msgctxt "order change"
+msgid "revert reason"
+msgstr "Geri açma sebebi"
+
+msgctxt "order change"
+msgid "cancel reason"
+msgstr "İptal sebebi"
+
+msgctxt "order change"
+msgid "purchase"
+msgstr "Alım"
+
+msgctxt "order change"
+msgid "quote"
+msgstr "Teklif"
+
+msgctxt "order change"
+msgid "Order created"
+msgstr "Oluşturuldu"
+
+msgctxt "order change"
+msgid "Status changed"
+msgstr "Durum"
+
+msgctxt "order change"
+msgid "Item added"
+msgstr "Ürün eklendi"
+
+msgctxt "order change"
+msgid "Item removed"
+msgstr "Ürün çıkarıldı"
+
+msgctxt "order change"
+msgid "Item updated"
+msgstr "Ürün güncellendi"
+
+msgctxt "order change"
+msgid "Field updated"
+msgstr "Bilgi güncellendi"
+
+msgctxt "stock movement reason"
+msgid "Order edit · reversed"
+msgstr "Sipariş düzenleme iadesi"
+
+msgctxt "stock movement reason"
+msgid "Order un-ship"
+msgstr "Sipariş sevk iptali"
+
+msgctxt "stock movement reason"
+msgid "Order ship"
+msgstr "Sipariş sevkiyatı"
+
+msgctxt "stock movement reason"
+msgid "Web order"
+msgstr "Web siparişi"
+
+msgctxt "stock movement reason"
+msgid "Order"
+msgstr "Sipariş"
+
+msgctxt "stock movement reason"
+msgid "Roll scanned"
+msgstr "Stock item okutuldu"
+
+msgctxt "stock movement reason"
+msgid "Manual add"
+msgstr "Manuel ekleme"
+
+msgctxt "stock movement reason"
+msgid "Manual stock-out"
+msgstr "Manuel stok çıkışı"
+
+msgctxt "stock movement reason"
+msgid "Bulk roll delete"
+msgstr "Toplu stock item silme"
+
+msgctxt "stock movement reason"
+msgid "Roll deleted"
+msgstr "Stock item silindi"
+
+msgctxt "stock movement reason"
+msgid "Roll meters edited"
+msgstr "Stock item metresi düzenlendi"
+
+msgctxt "stock movement reason"
+msgid "Manual adjustment"
+msgstr "Manuel düzeltme"
+
+msgctxt "stock movement reason"
+msgid "Product edited"
+msgstr "Ürün düzenlendi"
+
+msgctxt "stock movement reason"
+msgid "⚠️ Shortage"
+msgstr "⚠️ Eksik"
+
+msgctxt "warehouse sheet"
+msgid "Product name"
+msgstr "Ürün Adı"
+
+msgctxt "warehouse sheet"
+msgid "Model"
+msgstr "Model"
+
+msgctxt "warehouse sheet"
+msgid "Barcode"
+msgstr "Barkod"
+
+msgctxt "warehouse sheet"
+msgid "Stock (m)"
+msgstr "Stok (m)"
+
+msgctxt "warehouse sheet"
+msgid "Rolls"
+msgstr "Kupon"
+
+msgctxt "warehouse sheet"
+msgid "Reserved (m)"
+msgstr "Rezerve (m)"
+
+msgctxt "warehouse sheet"
+msgid "Unit cost"
+msgstr "Br. Maliyet"
+
+msgctxt "warehouse sheet"
+msgid "Total (USD)"
+msgstr "Toplam (USD)"
+
+msgctxt "warehouse sheet"
+msgid "Unit price"
+msgstr "Br. Fiyat"
+
+msgctxt "warehouse sheet"
+msgid "Warehouse"
+msgstr "Depo"
+
+msgctxt "warehouse sheet"
+msgid "TOTAL"
+msgstr "TOPLAM"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Margin % — added on top of cost (price = cost × (1 + margin/100))"
+msgstr "Kar oranı % — maliyet üzerine eklenir (fiyat = maliyet × (1 + oran/100))"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Minimum order quantity for products in this group (can be overridden per product)"
+msgstr "Bu gruptaki ürünler için minimum sipariş miktarı (ürün bazında ezilebilir)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Estimated supply/delivery time (days)"
+msgstr "Tahmini tedarik/teslim süresi (gün)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Margin % — left blank, the product group's applies"
+msgstr "Kar oranı % — boş bırakılırsa ürün grubununki geçerli"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Minimum order quantity — left blank, the product group's applies"
+msgstr "Minimum sipariş miktarı — boş bırakılırsa ürün grubununki geçerli"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Is this product sold in packs? (of 12, of 5, etc.)"
+msgstr "Bu ürün paket halinde mi satılıyor? (12'li, 5'li vb.)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "How many pieces are in a pack? (required when is_packaged=True)"
+msgstr "Pakette kaç adet var? (is_packaged=True ise zorunlu)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Attribute name"
+msgstr "Özellik Adı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "E.g. width, fabric type, intended use"
+msgstr "Örn: En, Kumaş Türü, Kullanım Alanı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Attribute value"
+msgstr "Özellik Değeri"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "E.g. 150cm, tulle, bridal"
+msgstr "Örn: 150cm, Tül, Gelinlik"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Pick a product or a product variant."
+msgstr "Product veya Product Variant seçilmeli."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A product and a variant can't both be picked."
+msgstr "Product ve Variant aynı anda seçilemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Title (TR)"
+msgstr "Başlık (TR)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Excerpt (TR)"
+msgstr "Özet (TR)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Content (TR)"
+msgstr "İçerik (TR)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Category (TR)"
+msgstr "Kategori (TR)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Cover image (list)"
+msgstr "Kapak Resmi (Liste)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Hero image (detail)"
+msgstr "Hero Resmi (Detay)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Publication date"
+msgstr "Yayın Tarihi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Published?"
+msgstr "Yayında mı?"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Cover image"
+msgstr "Kapak Resmi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Hero image"
+msgstr "Hero Resmi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Content image"
+msgstr "İçerik Resmi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Blog file"
+msgstr "Blog Dosyası"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Blog files"
+msgstr "Blog Dosyaları"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Trash"
+msgstr "Silinenler"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Drafts"
+msgstr "Taslaklar"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "e-Archive invoice identification number (ETTN)"
+msgstr "e-Arşiv Fatura Tanımlama Numarası (ETTN)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Date the e-Archive invoice was created"
+msgstr "e-Arşiv Fatura oluşturma tarihi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The order status shown to the customer"
+msgstr "Müşteriye gösterilen sipariş durumu"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Is this a custom curtain order?"
+msgstr "Bu bir özel perde siparişi mi?"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Mounting type"
+msgstr "Montaj tipi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Flat pleat"
+msgstr "Yatık Pile"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Kanun pleat"
+msgstr "Kanun Pile"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Pipe pleat"
+msgstr "Boru Pile"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Water wave"
+msgstr "Su Dalgası"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "American pleat"
+msgstr "Amerikan Pile"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Pleat type"
+msgstr "Pile tipi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Pleat density (e.g. 1x2, 1x2.5, 1x3)"
+msgstr "Pile yoğunluğu (örn: 1x2, 1x2.5, 1x3)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Curtain width (cm)"
+msgstr "Perde eni (cm)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Curtain height (cm)"
+msgstr "Perde boyu (cm)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Single panel"
+msgstr "Tek Kanat"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Double panel"
+msgstr "Çift Kanat"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Panel type"
+msgstr "Kanat tipi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Fabric used (metres)"
+msgstr "Kullanılan kumaş miktarı (metre)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Turkish title"
+msgstr "Türkçe Başlık"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This discount code has reached its usage limit"
+msgstr "Bu indirim kodu kullanım limitine ulaşmış"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Invalid discount code"
+msgstr "Geçersiz indirim kodu"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Code not found"
+msgstr "Kod bulunamadı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No code was entered"
+msgstr "Kod girilmedi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "An HTML file is required."
+msgstr "HTML dosyası gerekli."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "An email address is required"
+msgstr "E-posta adresi gereklidir"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A phone number is required"
+msgstr "Telefon numarası gereklidir"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Invalid email address"
+msgstr "Geçersiz e-posta adresi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Invalid phone number"
+msgstr "Geçersiz telefon numarası"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This email address is already registered"
+msgstr "Bu e-posta adresi zaten kayıtlı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This phone number is already registered"
+msgstr "Bu telefon numarası zaten kayıtlı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Your subscription is complete! Your discount code has been sent to your email address."
+msgstr "Aboneliğiniz başarıyla tamamlandı! İndirim kodunuz e-posta adresinize gönderildi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Invalid request format"
+msgstr "Geçersiz istek formatı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Something went wrong, please try again"
+msgstr "Bir hata oluştu, lütfen tekrar deneyin"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "First name, last name and product code are required"
+msgstr "Ad, soyad ve ürün kodu gerekli"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The rating must be between 1 and 5"
+msgstr "Puan 1-5 arası olmalıdır"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Product not found"
+msgstr "Ürün bulunamadı"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Image not found, link left unchanged: %(src)s"
+msgstr "Görsel bulunamadı, bağlantı değiştirilmedi: %(src)s"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "%(src)s: could not be uploaded (%(error)s)"
+msgstr "%(src)s: yüklenemedi (%(error)s)"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "No order matches this order number."
+msgstr "Bu sipariş numarası ile eşleşen sipariş bulunamadı."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Order not found"
+msgstr "Sipariş bulunamadı"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Order lookup error"
+msgstr "Sipariş sorgulama hatası"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Status update error"
+msgstr "Durum güncelleme hatası"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Order status updated"
+msgstr "Sipariş durumu güncellendi"
+
+msgctxt "document title"
+msgid "Packing List"
+msgstr "Çeki Listesi"
+
+msgctxt "mail folder"
+msgid "Inbox"
+msgstr "Gelen Kutusu"
+
+msgctxt "mail folder"
+msgid "Sent"
+msgstr "Gönderilen"
+
+msgctxt "mail folder"
+msgid "Archive"
+msgstr "Arşiv"
+
+msgctxt "mail folder"
+msgid "Trash"
+msgstr "Silinenler"
+
+msgctxt "mail folder"
+msgid "Drafts"
+msgstr "Taslaklar"
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "The barcode “%(code)s” was entered more than once in this list."
+msgstr "“%(code)s” barkodu bu listede birden fazla kez girildi."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Only an admin can delete warehouses."
+msgstr "Sadece admin depo silebilir."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This barcode was already scanned — not added again (%s)."
+msgstr "Bu barkod zaten okundu — tekrar eklenmedi (%s)."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "Line #%(n)s"
+msgstr "Kalem #%(n)s"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "This stock item is already in this warehouse."
+msgstr "Bu stock item zaten bu depoda."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A barcode is required — a roll's barcode can't be removed."
+msgstr "Barkod zorunlu — bir topun barkodu silinemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A barcode is required — this stock item can't be saved without one."
+msgstr "Barkod zorunlu — bu stock item olmadan kaydedilemez."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "The barcode is missing."
+msgstr "Barkod eksik."
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "A group with this name already exists."
+msgstr "Bu isimde bir grup zaten var."
+
+#: hardcoded Turkish moved to the catalogue as written
+#, python-format
+msgid "%(added)s/%(total)s added"
+msgstr "%(added)s/%(total)s eklendi"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Image deleted!"
+msgstr "Resim silindi!"
+
+#: hardcoded Turkish moved to the catalogue as written
+msgid "Enter product description..."
+msgstr "Ürün açıklaması giriniz..."

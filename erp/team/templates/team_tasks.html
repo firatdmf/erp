@@ -70,7 +70,7 @@
         <i class="fas fa-lock"></i> 
         <span>
           {% get_current_language as LANGUAGE_CODE %}
-          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Görev Oluştur{% else %}Create Task{% endif %}
+          {% trans "Create Task" %}
         </span>
       </button>
       {% else %}
@@ -78,7 +78,7 @@
         <i class="fas fa-plus"></i> 
         <span>
           {% get_current_language as LANGUAGE_CODE %}
-          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Görev Oluştur{% else %}Create Task{% endif %}
+          {% trans "Create Task" %}
         </span>
       </button>
       {% endif %}
@@ -691,10 +691,10 @@
         html += '</div>';
 
         // Add names text if only 1 (optional, but requested layout seemed to be just avatars or list)
-        // User asked for: "4 tane göster geri kalanı yanına + 11 yaz" -> This implies just the stack.
+        // User asked for: "show 4 and write +11 beside them for the rest" -> This implies just the stack.
         // But the previous layout had name next to it. Let's keep it clean with just the stack for multiple, 
         // or a list if single? 
-        // "task detailde assignees kısmında" -> The screenshot showed a stack.
+        // "in the assignees part of the task detail" -> The screenshot showed a stack.
         // Let's wrap it in a flex container if needed.
         assigneeContainer.innerHTML = html;
       }

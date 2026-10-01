@@ -1314,12 +1314,12 @@
                 onclick="whToggleCombined(event, this)"
                 onkeydown="if (event.key === 'Enter' || event.key === ' ') whToggleCombined(event, this)">
             <span class="od-chip" style="background:#EDE9FE;color:#5B21B6;border:1px solid #DDD6FE;">
-              <i class="fa fa-layer-group"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Ortak Depo{% else %}Combined{% endif %}
+              <i class="fa fa-layer-group"></i>{% trans "Combined" context "warehouse badge" %}
             </span>
             <span class="od-combined-pop" role="tooltip">
-              <span class="od-combined-note">{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Sanal görünüm — üye depoların stoğunu tek listede gösterir{% else %}Virtual view — shows the member warehouses' stock as one{% endif %}</span>
+              <span class="od-combined-note">{% trans "Virtual view — shows the member warehouses' stock as one" %}</span>
               {% if combined_members %}
-              <span class="od-combined-label">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilen depolar{% else %}Merged warehouses{% endif %}</span>
+              <span class="od-combined-label">{% trans "Merged warehouses" %}</span>
               {% for m in combined_members %}
               <a href="{% url 'operating:warehouse_detail' m.pk %}">{{ m.name }}</a>
               {% endfor %}
@@ -1367,8 +1367,8 @@
       preview modal, JS and endpoint stay in place; re-enable by uncommenting. {% endcomment %}
       {% if False and dup_count %}
       {% get_current_language as LANGUAGE_CODE %}
-      <button type="button" class="ord-btn" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;" onclick="mergeDuplicates(this)" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Aynı SKU'lu tekrar varyantları tek kayıtta birleştir{% else %}Merge duplicate-SKU variants into one{% endif %}">
-        <i class="fa fa-object-group"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tekrarları birleştir{% else %}Merge duplicates{% endif %} ({{ dup_count }})
+      <button type="button" class="ord-btn" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;" onclick="mergeDuplicates(this)" title="{% trans "Merge duplicate-SKU variants into one" %}">
+        <i class="fa fa-object-group"></i>{% trans "Merge duplicates" %} ({{ dup_count }})
       </button>
       {% endif %}
       {% if not warehouse.is_combined %}
@@ -1883,13 +1883,13 @@
       </div>
       {% get_current_language as LANGUAGE_CODE %}
       <div class="bl-manual">
-        <div class="bl-or"><span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}ya da{% else %}or{% endif %}</span></div>
+        <div class="bl-or"><span>{% trans "or" %}</span></div>
         <div class="bl-manual-row">
           <input type="text" id="blManualInput" class="bl-manual-input" autocomplete="off"
                  inputmode="text" enterkeyhint="search"
-                 placeholder="{% if LANGUAGE_CODE|slice:":2" == "tr" %}Barkodu elle gir…{% else %}Enter barcode manually…{% endif %}">
+                 placeholder="{% trans "Enter barcode manually…" %}">
           <button type="button" id="blManualBtn" class="bl-manual-btn" onclick="lookupManualBarcode()">
-            <i class="fa fa-magnifying-glass"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Ara{% else %}Look up{% endif %}
+            <i class="fa fa-magnifying-glass"></i> {% trans "Look up" %}
           </button>
         </div>
       </div>
@@ -1962,19 +1962,19 @@
 {% get_current_language as LANGUAGE_CODE %}
 <div id="mergeOverlay" class="mg-overlay" aria-hidden="true">
   <div class="mg-backdrop" onclick="closeMerge()"></div>
-  <div class="mg-card" role="dialog" aria-label="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Tekrarları birleştir{% else %}Merge duplicates{% endif %}">
+  <div class="mg-card" role="dialog" aria-label="{% trans "Merge duplicates" %}">
     <div class="mg-head">
-      <h3><i class="fa fa-object-group"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tekrarları birleştir{% else %}Merge duplicates{% endif %}</h3>
+      <h3><i class="fa fa-object-group"></i> {% trans "Merge duplicates" %}</h3>
       <button type="button" class="mg-x" onclick="closeMerge()" aria-label="{% trans 'Close' %}">&times;</button>
     </div>
     <div class="mg-body">
-      <p class="mg-intro">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Aşağıdaki aynı SKU'lu kayıtlar tek üründe birleştirilecek. Toplar ve hareketler korunur. Onaylıyor musun?{% else %}The same-SKU records below will be merged into one. Tops and movements are preserved. Confirm?{% endif %}</p>
+      <p class="mg-intro">{% trans "The same-SKU records below will be merged into one. Tops and movements are preserved. Confirm?" %}</p>
       <div id="mergeBody"></div>
     </div>
     <div class="mg-foot">
-      <button type="button" class="ord-btn ghost" onclick="closeMerge()">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Vazgeç{% else %}Cancel{% endif %}</button>
+      <button type="button" class="ord-btn ghost" onclick="closeMerge()">{% trans "Cancel" context "back out" %}</button>
       <button type="button" class="ord-btn" id="mergeConfirmBtn" style="background:linear-gradient(180deg,#F5B544,#D97706);color:#fff;border:1px solid #B45309;" onclick="confirmMerge(this)">
-        <i class="fa fa-object-group"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştir{% else %}Merge{% endif %}
+        <i class="fa fa-object-group"></i> {% trans "Merge" %}
       </button>
     </div>
   </div>
@@ -1993,14 +1993,13 @@
   const MG_CSRF = "{{ csrf_token }}";
   // Merge duplicate same-SKU variants — PREVIEW which stock items/products merge, then confirm.
   const MERGE_URL = "{% url 'operating:warehouse_merge_duplicates' warehouse.pk %}";
-  const _mgTR = "{% get_current_language as LC2 %}{{ LC2|slice:':2' }}" === "tr";
   function mgEsc(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
   window.mergeDuplicates = function () {
     fetch(MERGE_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || !d.success || !d.groups || !d.groups.length) {
-          alert(_mgTR ? 'Birleştirilecek tekrar bulunamadı.' : 'No duplicates to merge.');
+          alert('{% filter escapejs %}{% trans "No duplicates to merge." %}{% endfilter %}');
           return;
         }
         let html = '';
@@ -2008,28 +2007,28 @@
           html += '<div class="mg-group">';
           html += '<div class="mg-group-h"><span class="mg-sku">' + mgEsc(g.sku) + '</span>' +
                   (g.main_product ? ' · ' + mgEsc(g.main_product) : '') +
-                  ' — ' + g.count + (_mgTR ? ' kayıt → 1' : ' records → 1') + '</div>';
+                  ' — ' + g.count + ('{% filter escapejs %}{% trans " records → 1" %}{% endfilter %}') + '</div>';
           g.products.forEach(function (p) {
             html += '<div class="mg-row' + (p.survivor ? ' keep' : '') + '">' +
-              '<span class="mg-tag">' + (p.survivor ? (_mgTR ? 'kalır' : 'keeps') : (_mgTR ? 'taşınır' : 'moves')) + '</span>' +
+              '<span class="mg-tag">' + (p.survivor ? ('{% filter escapejs %}{% trans "keeps" %}{% endfilter %}') : ('{% filter escapejs %}{% trans "moves" %}{% endfilter %}')) + '</span>' +
               '<span class="mg-name">' + mgEsc(p.name) + '</span>' +
-              '<span class="mg-tops">' + p.tops + ' ' + (_mgTR ? 'top' : (p.tops == 1 ? 'roll' : 'rolls')) + '</span>' +
+              '<span class="mg-tops">' + p.tops + ' ' + (p.tops == 1 ? '{% filter escapejs %}{% blocktrans count c=1 %}roll{% plural %}rolls{% endblocktrans %}{% endfilter %}' : '{% filter escapejs %}{% blocktrans count c=2 %}roll{% plural %}rolls{% endblocktrans %}{% endfilter %}') + '</span>' +
               '<span class="mg-qty">' + fmtNum(p.quantity || 0) + ' m</span>' +
             '</div>';
           });
           html += '<div class="mg-group-f"><i class="fa fa-arrow-down-long"></i> ' + g.total_tops + ' ' +
-                  (_mgTR ? 'top tek üründe toplanacak' : 'rolls will be combined into one') + '</div>';
+                  ('{% filter escapejs %}{% trans "rolls will be combined into one" %}{% endfilter %}') + '</div>';
           html += '</div>';
         });
         document.getElementById('mergeBody').innerHTML = html;
         document.getElementById('mergeOverlay').classList.add('show');
-      }).catch(function () { alert(_mgTR ? 'Ağ hatası' : 'Network error'); });
+      }).catch(function () { alert('{% filter escapejs %}{% trans "Network error" %}{% endfilter %}'); });
   };
   window.closeMerge = function () { document.getElementById('mergeOverlay').classList.remove('show'); };
   window.confirmMerge = function (btn) {
     const orig = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + (_mgTR ? 'Birleştiriliyor…' : 'Merging…');
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + ('{% filter escapejs %}{% trans "Merging…" %}{% endfilter %}');
     fetch(MERGE_URL, {
       method: 'POST',
       headers: { 'X-CSRFToken': MG_CSRF, 'X-Requested-With': 'XMLHttpRequest' }
@@ -2037,7 +2036,7 @@
       .then(function (d) {
         if (d && d.success) { window.location.reload(); }
         else { alert((d && d.error) || '{% trans "Merge failed" %}'); btn.disabled = false; btn.innerHTML = orig; }
-      }).catch(function () { alert(_mgTR ? 'Ağ hatası' : 'Network error'); btn.disabled = false; btn.innerHTML = orig; });
+      }).catch(function () { alert('{% filter escapejs %}{% trans "Network error" %}{% endfilter %}'); btn.disabled = false; btn.innerHTML = orig; });
   };
 })();
 </script>
@@ -2254,7 +2253,7 @@
       })
       .catch(function () {
         document.querySelectorAll('.whg-rows-' + gid + '.whg-loading').forEach(function (r) {
-          r.querySelector('td').innerHTML = '<span style="color:#B23B12;">Yüklenemedi</span>';
+          r.querySelector('td').innerHTML = '<span style="color:#B23B12;">' + '{% filter escapejs %}{% trans "Could not load" %}{% endfilter %}' + '</span>';
         });
       });
   }

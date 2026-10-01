@@ -42,8 +42,8 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
   {% endif %}
   <td class="num" data-label="{% trans 'Stock' %}">
     <div class="qty">{{ p.quantity|floatformat:"2g" }} m</div>
-    {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each roll has its own barcode' %}">{{ p.roll_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}{% blocktrans count c=p.roll_count %}roll{% plural %}rolls{% endblocktrans %}{% endif %}</div>{% endif %}
-    {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:"2g" }} m</div>{% endif %}
+    {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each roll has its own barcode' %}">{{ p.roll_count }} {% blocktrans count c=p.roll_count %}roll{% plural %}rolls{% endblocktrans %}</div>{% endif %}
+    {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} m</div>{% endif %}
   </td>
   {% comment %}Weighted average of the stock on the floor, matching the flat
   list — not the SKU's last-purchase price.{% endcomment %}

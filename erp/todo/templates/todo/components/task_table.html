@@ -1,4 +1,4 @@
-{% load static %}
+{% load static i18n %}
 <style>
   .task-table-container {
     background: #ffffff;
@@ -535,7 +535,7 @@
       <i class="fa fa-user-plus"></i>
       <span>
         {% get_current_language as LANGUAGE_CODE %}
-        {% if LANGUAGE_CODE|slice:":2" == "tr" %}Görev Ata{% else %}Assign Task{% endif %}
+        {% trans "Assign Task" %}
       </span>
     </a>
     {% endif %}

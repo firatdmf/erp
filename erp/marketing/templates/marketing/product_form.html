@@ -213,7 +213,7 @@
             </div>
             <div class="trans-panel" data-lang="tr">
               <label class="trans-label">{% trans "Product Name" %}</label>
-              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="{% trans 'Urun adi giriniz...' %}">
+              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="{% trans 'Enter product name...' %}">
               <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-tr" class="trans-desc" data-lang="tr"></div>
@@ -1429,7 +1429,7 @@
     const orderInput = document.getElementById('image_order');
     if (orderInput) {
       orderInput.value = JSON.stringify(order);
-      console.log('Sıra güncellendi:', order);
+      console.log('Order updated:', order);
     }
   }
 
@@ -2413,8 +2413,7 @@
     const editor = new Quill(container, {
       theme: 'snow',
       modules: { toolbar: toolbarOptions },
-      placeholder: lang === 'en' ? 'Enter product description...'
-        : 'Urun aciklamasi giriniz...'
+      placeholder: '{% filter escapejs %}{% trans "Enter product description..." %}{% endfilter %}'
     });
     quillEditors[lang] = editor;
     editor.on('text-change', syncToDescription);
@@ -2425,8 +2424,7 @@
       const careEditor = new Quill(careContainer, {
         theme: 'snow',
         modules: { toolbar: toolbarOptions },
-        placeholder: lang === 'en' ? 'Enter care instructions...'
-          : 'Bakım talimatlarını giriniz...'
+        placeholder: '{% filter escapejs %}{% trans "Enter care instructions..." %}{% endfilter %}'
       });
       quillCareEditors[lang] = careEditor;
       careEditor.on('text-change', syncToDescription);

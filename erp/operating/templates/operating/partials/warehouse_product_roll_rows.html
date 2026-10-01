@@ -56,7 +56,7 @@ them into the same grid squeezed both.{% endcomment %}
           {% if r.reserved_m %}
             <span class="wh-roll-resv">
               <i class="fa fa-lock"></i>
-              {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ r.reserved_m|floatformat:"2g" }} {{ product.unit_short }}
+              {% trans "Reserved" %}: {{ r.reserved_m|floatformat:"2g" }} {{ product.unit_short }}
             </span>
             {% for resv in r.reservation_list %}
               <a href="{% url 'operating:order_detail' resv.order_id %}" target="_blank" rel="noopener" class="wh-roll-order">

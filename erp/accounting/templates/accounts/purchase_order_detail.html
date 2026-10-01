@@ -342,7 +342,7 @@
       .then(function (d) {
         if (d && d.success) { window.location.reload(); }
         else { alert((d && d.error) || 'Kaydedilemedi.'); btn.disabled = false; btn.innerHTML = orig; }
-      }).catch(function () { alert('Ağ hatası.'); btn.disabled = false; btn.innerHTML = orig; });
+      }).catch(function () { alert('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}'); btn.disabled = false; btn.innerHTML = orig; });
   };
 </script>
 {% endblock %}

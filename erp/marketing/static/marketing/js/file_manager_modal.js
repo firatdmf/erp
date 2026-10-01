@@ -1,9 +1,9 @@
 /**
  * File Manager Modal - Shopify Style
- * Modern dosya yönetim sistemi
+ * Modern file management
  */
 
-// Modal HTML yapısı
+// Modal HTML structure
 const modalHTML = `
 <div id="fileManagerModal" class="fm-modal">
   <div class="fm-modal-content">
@@ -1664,7 +1664,7 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
-// Variant için özel fonksiyon
+// A function for variants only
 function openVariantFileManager(productId, variantId) {
   openFileManager(productId, variantId);
 }

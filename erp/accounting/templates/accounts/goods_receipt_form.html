@@ -7,7 +7,7 @@
   atomic submit that creates both the stock and the supplier purchase
   invoice.
 
-  Grew out of the warehouse page's right-side "Yeni ürün" sidebar and keeps
+  Grew out of the warehouse page's right-side "New product" sidebar and keeps
   its np-* class/JS vocabulary verbatim, so the two never drift; what
   changed is the frame around it — a document-shaped page reached from the
   purchases list, with the warehouse itself picked here rather than implied
@@ -572,7 +572,7 @@
         </div>
 
         <!-- Current account → barcode prefix (whole batch — one delivery).
-             REQUIRED: the alım invoice posts to whichever account is picked
+             REQUIRED: the purchase invoice posts to whichever account is picked
              here, so intake without one is never valid. Type-to-search over
              the loaded accounts; no match offers an inline "create" so a
              first-time vendor doesn't send you off to accounting
@@ -698,7 +698,7 @@
         Products stay shut until the warehouse and the account are settled.
         Both decide what a product row MEANS — the warehouse is the stock it
         lands in and keys the catalog lookups and SKU previews, the account
-        is who the alım is billed to and supplies the code prefix the SKUs
+        is who the purchase is billed to and supplies the code prefix the SKUs
         are minted from. Entered first, they were answered before anything
         depended on them; entered last, they invalidated a delivery already
         typed in. npWarehouseChanged wiping the list on a switch was the
@@ -718,7 +718,7 @@
   </div>
 
   {% comment %}
-    One alım, one currency — the account's own, because that is what we owe
+    One purchase, one currency — the account's own, because that is what we owe
     them. A line priced in anything else needs a rate to reach the invoice,
     and this is where that rate is shown and can be corrected. It appears
     only when a batch actually carries a second currency; a delivery priced
@@ -806,7 +806,7 @@
       '<span class="np-th-state"></span>' +
       '<span class="np-th-x"></span>' +
     '</div>';
-  // Product group (marketing ProductCategory) options — fabric (Kumaş) comes
+  // Product group (marketing ProductCategory) options — fabric comes
   // first from the server and is the preselected default for new products.
   const NP_CATS = JSON.parse((document.getElementById('np-cats-data') || {}).textContent || '[]');
   const NP_CAT_SEL = '<select class="np-select np-main-cat" onchange="npCategoryChanged(this)">' +
@@ -1991,7 +1991,7 @@
   // What the batch costs, per currency it was entered in.
   //
   // Per currency, and not one converted figure, because that is what the
-  // page actually knows. create_purchase_invoice denominates the alım in
+  // page actually knows. create_purchase_invoice denominates the purchase in
   // the FIRST line's currency and sums every line into it, so a batch
   // carrying two currencies has no single true total — printing one here
   // would be inventing a rate the invoice never applies. Two subtotals
@@ -2064,7 +2064,7 @@
         Object.keys(totals).map(function (u) {
           return ' · <b>' + (Math.round(totals[u] * 100) / 100) + '</b> ' + (NP_UNIT_SHORT[u] || u);
         }).join('');
-      // One figure, in the currency the alım is actually cut in, because
+      // One figure, in the currency the purchase is actually cut in, because
       // that is the number the operator is about to commit to. A line whose
       // rate is still missing is NAMED rather than folded in at par — the
       // whole bug this replaces was lira counted as dollars.
@@ -2714,7 +2714,7 @@
 
     const sel = document.getElementById('npSupplier');
     const opt = sel && sel.options[sel.selectedIndex];
-    // The account is what the alım gets posted to — no account, no intake.
+    // The account is what the purchase gets posted to — no account, no intake.
     // The server enforces this too; this check just spares a round trip
     // and, more importantly, doesn't lose the batch that was typed in.
     if (!sel || !sel.value) {
@@ -2732,7 +2732,7 @@
       // Batch-wide unit, from before each product had its own — the server
       // only falls back on it for a product that names none.
       unit: products.length ? products[0].unit : 'mt',
-      // What the rate boxes above say, so the alım is cut at the rate the
+      // What the rate boxes above say, so the purchase is cut at the rate the
       // page showed. Without these the server falls back to the published
       // rate and the total that posts is not the total that was agreed to.
       rates: npFxRates,

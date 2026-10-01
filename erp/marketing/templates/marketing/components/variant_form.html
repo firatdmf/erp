@@ -120,6 +120,18 @@
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=4" defer></script>
+  <script>
+    // A static script cannot reach the catalogue, so its words come from here.
+    window.VF_TEXT = {
+      deleteImageTitle: '{% filter escapejs %}{% trans "Delete the image?" %}{% endfilter %}',
+      deleteImageBody: '{% filter escapejs %}{% trans "This image will be deleted permanently. This cannot be undone." %}{% endfilter %}',
+      delete: '{% filter escapejs %}{% trans "Delete" %}{% endfilter %}',
+      cancel: '{% filter escapejs %}{% trans "Cancel" %}{% endfilter %}',
+      deleteFailed: '{% filter escapejs %}{% trans "The delete failed" %}{% endfilter %}',
+      imageDeleted: '{% filter escapejs %}{% trans "Image deleted!" %}{% endfilter %}',
+      deleteError: '{% filter escapejs %}{% trans "Delete error" %}{% endfilter %}'
+    };
+  </script>
+  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=5" defer></script>
   <script src="{% static 'marketing/js/variant_attributes_modal.js' %}" defer></script>
 </div>

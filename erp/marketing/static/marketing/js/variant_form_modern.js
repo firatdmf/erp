@@ -1,3 +1,5 @@
+// Words the page translates for this script (see components/variant_form.html).
+const VF_TEXT = window.VF_TEXT || {};
 // Figures written by script follow the app's language (<html lang>), like
 // the ones the server renders: 1,234.50 in English, 1.234,50 in Turkish.
 window.fmtNum = window.fmtNum || function (n, decimals) {
@@ -1792,10 +1794,10 @@ async function removeVariantImage(variantIndex, imageIndex) {
 
     // Use modern confirmation dialog
     const confirmed = await window.showConfirmDialog(
-        'Resmi Sil?',
-        'Bu resim kalıcı olarak silinecek. Bu işlem geri alınamaz.',
-        'Sil',
-        'İptal'
+        VF_TEXT.deleteImageTitle || 'Delete the image?',
+        VF_TEXT.deleteImageBody || 'This image will be deleted permanently. This cannot be undone.',
+        VF_TEXT.delete || 'Delete',
+        VF_TEXT.cancel || 'Cancel'
     );
 
     if (!confirmed) return;
@@ -1814,7 +1816,7 @@ async function removeVariantImage(variantIndex, imageIndex) {
 
             const data = await response.json();
             if (!data.success) {
-                throw new Error(data.error || 'Silme işlemi başarısız');
+                throw new Error(data.error || VF_TEXT.deleteFailed || 'The delete failed');
             }
 
             // Remove this image from ALL variants that share the same URL
@@ -1824,11 +1826,11 @@ async function removeVariantImage(variantIndex, imageIndex) {
             // Also remove from main product gallery if exists
             removeImageFromMainGallery(deletedUrl);
 
-            showToast('🗑️ Resim silindi!', 'success');
+            showToast('🗑️ ' + (VF_TEXT.imageDeleted || 'Image deleted!'), 'success');
             return; // Already handled UI update in removeImageFromAllVariants
         } catch (error) {
             console.error('Delete error:', error);
-            showToast(`❌ Silme hatası: ${error.message}`, 'error');
+            showToast(`❌ ${VF_TEXT.deleteError || 'Delete error'}: ${error.message}`, 'error');
             return; // Don't remove from UI if delete failed
         }
     }

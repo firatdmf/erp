@@ -217,10 +217,7 @@ def _render_order_pdf(order):
         from django.utils import timezone
         from django.template.defaultfilters import date as datef, floatformat
 
-        _is_tr = (get_language() or "").lower().startswith("tr")
-        # "Order Confirmation" has no Turkish entry in the .po (and msgfmt
-        # isn't available to add one), so pick the Turkish phrase directly.
-        subtitle = "Sipariş Onayı" if _is_tr else "Order Confirmation"
+        subtitle = _("Order Confirmation")
 
         REG, BOLD = "DejaVuSans", "DejaVuSans-Bold"
         INK = colors.HexColor("#111111")

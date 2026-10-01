@@ -16,7 +16,7 @@ from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext as _gettext
 from django.views import View
 
 from .attributes import normalize_attribute_name
@@ -125,12 +125,12 @@ class ProductGroupCreate(View):
     def post(self, request):
         name = (request.POST.get("name") or "").strip()
         if not name:
-            return JsonResponse({"success": False, "error": "Grup adı gerekli."}, status=400)
+            return JsonResponse({"success": False, "error": _gettext("The group name is required.")}, status=400)
         normalized = name.lower().strip().replace(" ", "_")
         existing = ProductCategory.objects.filter(name__iexact=normalized).first()
         if existing:
             return JsonResponse(
-                {"success": False, "error": "Bu isimde bir grup zaten var.", "id": existing.pk},
+                {"success": False, "error": _gettext("A group with this name already exists."), "id": existing.pk},
                 status=400,
             )
         group = ProductCategory(name=name)
@@ -195,7 +195,7 @@ class ProductGroupDetail(View):
             return self._apply_margin(request, group)
         if action == "delete_group":
             return self._delete_group(request, group)
-        return JsonResponse({"success": False, "error": "Bilinmeyen işlem."}, status=400)
+        return JsonResponse({"success": False, "error": _gettext("Unknown action.")}, status=400)
 
     def _save_settings(self, request, group):
         name = (request.POST.get("name") or "").strip()
@@ -204,7 +204,7 @@ class ProductGroupDetail(View):
             clash = ProductCategory.objects.filter(name__iexact=normalized).exclude(pk=group.pk).first()
             if clash:
                 return JsonResponse(
-                    {"success": False, "error": "Bu isimde başka bir grup zaten var."},
+                    {"success": False, "error": _gettext("Another group with this name already exists.")},
                     status=400,
                 )
             group.name = name
@@ -220,7 +220,7 @@ class ProductGroupDetail(View):
         without a cost are left untouched and reported back."""
         if group.profit_margin is None:
             return JsonResponse(
-                {"success": False, "error": "Önce grubun kar oranını kaydedin."},
+                {"success": False, "error": _gettext("Save the group's margin first.")},
                 status=400,
             )
 

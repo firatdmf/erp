@@ -318,7 +318,7 @@
         const detailItems = document.querySelectorAll('.detail-item');
         detailItems.forEach(item => {
           const label = item.querySelector('.detail-label');
-          if (label && (label.textContent.includes('Due Date') || label.textContent.includes('Bitiş'))) {
+          if (label && (label.textContent.includes('Due Date') || label.textContent.includes('{% filter escapejs %}{% trans "Due date" %}{% endfilter %}'))) {
             const value = item.querySelector('.detail-value');
             if (value) {
               value.innerHTML = '<i class="fa fa-calendar-alt"></i> ' + taskData.due_date;

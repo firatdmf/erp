@@ -27,6 +27,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from marketing.models import SKU_MAX_LENGTH
+from django.utils.translation import gettext as _gettext
 
 
 class CatalogSyncConflict(Exception):
@@ -475,8 +476,9 @@ def resync_warehouse_product(wp, base_override=None):
     clash = (ProductVariant.objects.filter(variant_sku=sku)
              .exclude(pk=old.pk if old else 0).first())
     if clash:
-        return None, (f"variant_sku '{sku}' zaten başka bir varyanta ait "
-                      f"(ürün #{clash.product_id}).")
+        return None, (_gettext("variant_sku '%(sku)s' already belongs to another variant "
+                               "(product #%(product)s).")
+                      % {"sku": sku, "product": clash.product_id})
 
     with _tx.atomic():
         kept = variant_attributes(old)

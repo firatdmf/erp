@@ -64,7 +64,8 @@ from django.db import models
 
 from marketing.models import Product, ProductVariant
 from marketing import units
-from django.utils.translation import gettext as _gettext, ngettext
+from django.utils.translation import gettext as _gettext, ngettext, pgettext
+from erp.storefront import answers_in_storefront_language
 
 
 from crm.models import Contact, Company
@@ -642,7 +643,7 @@ class OrderDetail(DetailView):
         # earlier stage) takes the order out of _SHIPPED_CLASS, which
         # re-opens editing automatically — no separate unlock needed.
         if action in {"update_item", "add_item", "remove_item"} and order.order_status in _SHIPPED_CLASS:
-            return JsonResponse({"ok": False, "error": "Gönderilen siparişlerde ürünler düzenlenemez."}, status=400)
+            return JsonResponse({"ok": False, "error": _gettext("Items on a shipped order can't be edited.")}, status=400)
         # Terminal orders: item/customer mutations are dead too — same
         # direct-POST reasoning as above. update_status stays allowed (the
         # funnel itself refuses leaving 'cancelled'; 'returned' may be
@@ -650,7 +651,7 @@ class OrderDetail(DetailView):
         if (action in {"update_item", "add_item", "remove_item",
                        "update_customer", "update_guest"}
                 and order.order_status in {"cancelled", "returned"}):
-            return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş düzenlenemez."}, status=400)
+            return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be edited.")}, status=400)
 
         def _sync_current_account_total():
             """Re-post the current account movement for this order after its total
@@ -970,7 +971,7 @@ class OrderDetail(DetailView):
         carrier = request.POST.get("carrier")
         tracking = request.POST.get("tracking_number")
         # Retail (Perakende) orders can complete without cargo info — a
-        # walk-in/in-person sale — via the "Bu siparişte kargo var"
+        # walk-in/in-person sale — via the "This order has cargo"
         # checkbox on the detail page. Gated on is_retail_order so this
         # flag can never bypass the cargo gate for a normal order.
         skip_cargo = order.is_retail_order and request.POST.get("skip_cargo") == "1"
@@ -1016,7 +1017,7 @@ class OrderDetail(DetailView):
                 from .views_warehouse import reservation_shortfall_message
                 error = reservation_shortfall_message(order)
             elif code == "order_cancelled_terminal":
-                error = "İptal edilmiş bir sipariş tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun."
+                error = _gettext("A cancelled order can't be re-opened. Create a new order if needed.")
             elif code == "cancel_requires_reopen":
                 from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
                 error = CANCEL_REQUIRES_REOPEN_MSG
@@ -1024,7 +1025,7 @@ class OrderDetail(DetailView):
                 from .views_warehouse import GOODS_NOT_RECEIVED_MSG
                 error = GOODS_NOT_RECEIVED_MSG
             else:
-                error = f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}"
+                error = _gettext("The order could not be updated: %(error)s") % {"error": (code or '').replace('error:', '')}
             if wants_json:
                 return JsonResponse({"ok": False, "error": str(error)}, status=400)
             messages.error(request, error)
@@ -1056,8 +1057,8 @@ class OrderDetail(DetailView):
         if now_shipped and not was_shipped:
             messages.success(
                 request,
-                "Sipariş tamamlandı — stok düşüldü ve kayıtlar işlendi. "
-                "Bir yanlışlık olduysa 'Geri Aç & Düzelt' ile geri alabilirsiniz.",
+                _g("Order completed — stock was deducted and the entries were posted. "
+                   "If something is wrong, undo it with 'Re-open & Fix'."),
             )
         elif was_shipped and not now_shipped:
             # The optional reason from the "Geri Aç & Düzelt" prompt goes
@@ -1076,11 +1077,11 @@ class OrderDetail(DetailView):
                     pass
             messages.success(
                 request,
-                "Sipariş geri açıldı — stok iade edildi, mali kayıtlar geri alındı. "
-                "Düzeltmeleri yaptıktan sonra 'Siparişi Tamamla' ile tekrar kapatın.",
+                _g("Order re-opened — stock was returned and the financial entries were "
+                   "reversed. Once corrected, close it again with 'Complete order'."),
             )
         else:
-            messages.success(request, "Order updated.")
+            messages.success(request, _g("Order updated."))
         return redirect("operating:order_detail", pk=order.pk)
 
 
@@ -1233,10 +1234,11 @@ def _roll_unavailable_response(roll, exclude_order_id=None):
         ref_txt = ", ".join(refs[:3]) + ("…" if len(refs) > 3 else "")
         return JsonResponse({
             "ok": False, "kind": "reserved",
-            "error": f"Bu stock item rezerve durumunda — {float(phys):g} m başka sipariş için ayrılmış ({ref_txt}).",
+            "error": _gettext("This stock item is reserved — %(metres)s m is held for another order (%(ref)s).")
+                     % {"metres": f"{float(phys):g}", "ref": ref_txt},
         }, status=409)
     return JsonResponse({"ok": False, "kind": "no_stock",
-                         "error": "Bu topta uygun metre kalmadı."}, status=409)
+                         "error": _gettext("No available metres are left on this roll.")}, status=409)
 
 
 def _outsourced_qty(item_data):
@@ -1599,7 +1601,7 @@ def order_pack_scan(request, pk):
     # Cancelled/returned is terminal — never render the packing UI (which
     # would also auto-create Pack #1 as a GET side effect) for a dead order.
     if order.order_status in {"cancelled", "returned"}:
-        messages.error(request, "İptal edilmiş sipariş paketlenemez.")
+        messages.error(request, _gettext("A cancelled order can't be packed."))
         return redirect("operating:order_detail", pk=order.pk)
     reservations = list(
         order.stock_reservations
@@ -1674,27 +1676,27 @@ def order_pack_reserve_add(request, pk):
     from .models import WarehouseProductItem, OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
-        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
         # Cancelling an order deletes its reservations and is terminal —
         # a stock item scanned onto it afterwards would hold warehouse stock
         # forever with nothing to ever release it.
-        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
 
     code = (request.POST.get("barcode") or "").strip()
     if not code:
-        return JsonResponse({"ok": False, "error": "Barkod boş."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The barcode is empty.")}, status=400)
 
     items, variant_ids, product_ids, skus = _order_item_match_maps(order)
     if not items:
-        return JsonResponse({"ok": False, "error": "Siparişte ürün yok."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The order has no items.")}, status=400)
 
     rolls = list(WarehouseProductItem.objects
                  .select_related("product", "product__catalog_variant", "product__warehouse")
                  .filter(barcode__iexact=code))
     if not rolls:
         return JsonResponse({"ok": False, "kind": "not_found",
-                             "error": "Bu barkodla bir stock item (roll) bulunamadı."}, status=404)
+                             "error": _gettext("No stock item (roll) was found with this barcode.")}, status=404)
 
     # All rolls sharing this barcode whose product belongs to the order
     # (a barcode is code-unique but not DB-unique, so there can be more
@@ -1707,7 +1709,7 @@ def order_pack_reserve_add(request, pk):
     if not matched:
         return JsonResponse({
             "ok": False, "kind": "wrong_product",
-            "error": "Bu stock item bu siparişteki ürünlere ait değil — eklenmedi.",
+            "error": _gettext("This stock item doesn't belong to any product on this order — not added."),
             "product_name": (rolls[0].product.name if rolls[0].product else ""),
         }, status=409)
 
@@ -1717,7 +1719,7 @@ def order_pack_reserve_add(request, pk):
     if pack_id:
         target_pack = Pack.objects.filter(pk=pack_id, order=order).first()
         if target_pack is None:
-            return JsonResponse({"ok": False, "error": "Paket bulunamadı."}, status=404)
+            return JsonResponse({"ok": False, "error": _gettext("Package not found.")}, status=404)
     place_only = (request.POST.get("place_only") or "").strip() == "1"
 
     # Already reserved for this order? Re-scan is a no-op — unless a
@@ -1744,7 +1746,7 @@ def order_pack_reserve_add(request, pk):
     if place_only:
         return JsonResponse({
             "ok": False, "kind": "not_in_order",
-            "error": "Bu stock item bu siparişe ait değil — pakete eklenemez.",
+            "error": _gettext("This stock item doesn't belong to this order — it can't be added to the package."),
         }, status=409)
 
     # Prefer the first matching roll that still has reservable metres.
@@ -1760,9 +1762,9 @@ def order_pack_reserve_add(request, pk):
         try:
             req_meters = _PDecimal(raw)
         except Exception:
-            return JsonResponse({"ok": False, "error": "Geçersiz metre."}, status=400)
+            return JsonResponse({"ok": False, "error": _gettext("Invalid metres.")}, status=400)
         if req_meters <= 0:
-            return JsonResponse({"ok": False, "error": "Metre sıfırdan büyük olmalı."}, status=400)
+            return JsonResponse({"ok": False, "error": _gettext("Metres must be greater than zero.")}, status=400)
 
     r, capped, err = _create_roll_reservation(order, matched_item, roll_pick, req_meters, request.user)
     if err == "no_stock":
@@ -1789,22 +1791,22 @@ def order_pack_reserve_update(request, pk):
     from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
-        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
-        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
-        return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("Invalid reservation.")}, status=400)
     r = OrderStockReservation.objects.filter(pk=rid, order=order, consumed=False).first()
     if r is None:
-        return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
+        return JsonResponse({"ok": False, "error": _gettext("Reservation not found.")}, status=404)
     raw = (request.POST.get("quantity") or "").strip()
     try:
         meters = _PDecimal(raw)
     except Exception:
-        return JsonResponse({"ok": False, "error": "Geçersiz metre."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("Invalid metres.")}, status=400)
     if meters <= 0:
-        return JsonResponse({"ok": False, "error": "Metre sıfırdan büyük olmalı."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("Metres must be greater than zero.")}, status=400)
     avail = _roll_available_meters(r.stock_item, exclude_reservation_id=r.pk)
     capped = meters > avail
     if capped:
@@ -1825,15 +1827,15 @@ def order_pack_reserve_remove(request, pk):
     from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
-        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
-        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
-        return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("Invalid reservation.")}, status=400)
     r = OrderStockReservation.objects.filter(pk=rid, order=order, consumed=False).first()
     if r is None:
-        return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
+        return JsonResponse({"ok": False, "error": _gettext("Reservation not found.")}, status=404)
     removed = r.id
     r.delete()
     if order.current_account_id:
@@ -1852,20 +1854,20 @@ def order_pack_reserve_assign_pack(request, pk):
     from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
-        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
-        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
-        return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("Invalid reservation.")}, status=400)
     r = OrderStockReservation.objects.filter(pk=rid, order=order, consumed=False).first()
     if r is None:
-        return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
+        return JsonResponse({"ok": False, "error": _gettext("Reservation not found.")}, status=404)
     pack_id = (request.POST.get("pack_id") or "").strip()
     if pack_id:
         pack = Pack.objects.filter(pk=pack_id, order=order).first()
         if pack is None:
-            return JsonResponse({"ok": False, "error": "Paket bulunamadı."}, status=404)
+            return JsonResponse({"ok": False, "error": _gettext("Package not found.")}, status=404)
         r.pack = pack
     else:
         r.pack = None
@@ -1884,20 +1886,20 @@ def order_pack_assign_item(request, pk):
     tracked lines use (order_pack_reserve_assign_pack)."""
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
-        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
-        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     item_id = (request.POST.get("item_id") or "").strip()
     if not item_id.isdigit():
-        return JsonResponse({"ok": False, "error": "Geçersiz kalem."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("Invalid line.")}, status=400)
     item = OrderItem.objects.filter(pk=item_id, order=order).first()
     if item is None:
-        return JsonResponse({"ok": False, "error": "Kalem bulunamadı."}, status=404)
+        return JsonResponse({"ok": False, "error": _gettext("Line not found.")}, status=404)
     pack_id = (request.POST.get("pack_id") or "").strip()
     if pack_id:
         pack = Pack.objects.filter(pk=pack_id, order=order).first()
         if pack is None:
-            return JsonResponse({"ok": False, "error": "Paket bulunamadı."}, status=404)
+            return JsonResponse({"ok": False, "error": _gettext("Package not found.")}, status=404)
         item.pack = pack
     else:
         item.pack = None
@@ -1915,7 +1917,7 @@ def order_create_barcode_check(request):
     code = (request.GET.get("barcode") or "").strip()
     sku = (request.GET.get("sku") or "").strip()
     if not code or not sku:
-        return JsonResponse({"ok": False, "error": "Barkod veya ürün bilgisi eksik."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The barcode or the product is missing.")}, status=400)
     roll, err = _lookup_roll_by_barcode_for_sku(
         code, sku, books=_books_in_scope(request))
     if err == "not_found":
@@ -1923,9 +1925,9 @@ def order_create_barcode_check(request):
         if other is not None:
             return JsonResponse({"ok": False, "kind": "wrong_book",
                                  "error": _wrong_book_error(other, request)}, status=404)
-        return JsonResponse({"ok": False, "kind": "not_found", "error": "Bu barkodla bir stock item bulunamadı."}, status=404)
+        return JsonResponse({"ok": False, "kind": "not_found", "error": _gettext("No stock item was found with this barcode.")}, status=404)
     if err == "wrong_product":
-        return JsonResponse({"ok": False, "kind": "wrong_product", "error": "Bu stock item bu ürüne ait değil."}, status=409)
+        return JsonResponse({"ok": False, "kind": "wrong_product", "error": _gettext("This stock item doesn't belong to this product.")}, status=409)
     editing = _editing_order_id(request)
     avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
@@ -2312,12 +2314,12 @@ def _spun_off_message(spun_off):
     order that was being edited, so without this the rest are invisible —
     the user would be left believing the lines had simply vanished."""
     parts = ", ".join(
-        f"{book.name}: #{order.pk}" + ("" if is_new else " (mevcut)")
+        f"{book.name}: #{order.pk}" + ("" if is_new else " " + _gettext("(existing)"))
         for order, book, is_new in spun_off
     )
     return (
-        "Diğer defterlere ait satırlar kendi siparişlerine taşındı "
-        f"({parts})."
+        _gettext("Lines belonging to other books were moved to their own orders (%(orders)s).")
+        % {"orders": parts}
     )
 
 
@@ -2423,7 +2425,7 @@ def order_create_barcode_resolve(request):
     reserves nothing; the form then runs the normal pick flow."""
     code = (request.GET.get("barcode") or "").strip()
     if not code:
-        return JsonResponse({"ok": False, "error": "Barkod eksik."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The barcode is missing.")}, status=400)
     from .models import WarehouseProductItem
     roll = (WarehouseProductItem.objects
             .select_related("product__warehouse",
@@ -2436,7 +2438,7 @@ def order_create_barcode_resolve(request):
         if other is not None:
             return JsonResponse({"ok": False, "kind": "wrong_book",
                                  "error": _wrong_book_error(other, request)}, status=404)
-        return JsonResponse({"ok": False, "error": "Bu barkodla bir stock item bulunamadı."}, status=404)
+        return JsonResponse({"ok": False, "error": _gettext("No stock item was found with this barcode.")}, status=404)
     editing = _editing_order_id(request)
     avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
@@ -2447,7 +2449,7 @@ def order_create_barcode_resolve(request):
     parent = cv.product if cv else None
     sku = ((cv.variant_sku if cv and cv.variant_sku else None) or wp.sku or "").strip()
     if not sku:
-        return JsonResponse({"ok": False, "error": "Bu topun ürününde SKU yok — ürünü arayarak ekleyin."}, status=409)
+        return JsonResponse({"ok": False, "error": _gettext("This roll's product has no SKU — add the product by searching for it.")}, status=409)
 
     base_title = ((parent.title if parent else "") or "").strip()
     disp = (wp.name or "").strip()
@@ -2523,7 +2525,7 @@ def free_rolls_response(request, books):
     from .models import WarehouseProductItem
     sku = (request.GET.get("sku") or "").strip()
     if not sku:
-        return JsonResponse({"ok": False, "error": "Ürün bilgisi eksik."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The product is missing.")}, status=400)
     # OLDEST first — FIFO. Fabric that has sat longest goes out first
     # instead of ageing on the shelf behind items scanned last week.
     #
@@ -2633,15 +2635,15 @@ def order_pack_complete(request, pk):
     Order.billable_value), only "nothing scanned at all" is rejected."""
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
-        return JsonResponse({"ok": False, "error": "Sipariş zaten gönderildi."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("The order has already shipped.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
         # Also blocks the raw order_status='packaging' save below from
         # reviving a terminal order outside the status funnel.
-        return JsonResponse({"ok": False, "error": "İptal edilmiş bir sipariş tekrar açılamaz."}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be re-opened.")}, status=400)
     n = order.stock_reservations.filter(consumed=False).count()
     if n < 1:
         return JsonResponse({"ok": False,
-                             "error": "Paketlemeyi tamamlamak için en az bir stock item okutmalısınız."}, status=400)
+                             "error": _gettext("Scan at least one stock item to finish packing.")}, status=400)
     if order.order_status != "packaging":
         order.order_status = "packaging"
         order.save(update_fields=["order_status", "updated_at"])
@@ -2653,30 +2655,17 @@ def order_pack_complete(request, pk):
 # Order change history — the audit trail written by operating/audit.py.
 # Preview card on the detail page + a dedicated filterable page.
 # ---------------------------------------------------------------------------
-_CHANGE_FIELD_TR = {
-    "order_status": "Sipariş durumu", "carrier": "Kargo şirketi",
-    "tracking_number": "Takip veya fiş numarası", "notes": "Notlar",
-    "internal_notes": "İç notlar",
-    "print_header": "Yazdırma başlığı", "ettn": "ETTN",
-    "guest_first_name": "Misafir adı", "guest_last_name": "Misafir soyadı",
-    "guest_email": "Misafir e-posta", "guest_phone": "Misafir telefon",
-    "customer": "Müşteri", "quantity": "Miktar", "price": "Fiyat",
-    "product": "Ürün", "revert_reason": "Geri açma sebebi",
-    "cancel_reason": "İptal sebebi", "purchase": "Alım", "quote": "Teklif",
-}
-_CHANGE_ACTION_TR = {
-    "created": "Oluşturuldu", "status": "Durum",
-    "item_added": "Ürün eklendi", "item_removed": "Ürün çıkarıldı",
-    "item_updated": "Ürün güncellendi", "field": "Bilgi güncellendi",
-}
+# A change is labelled by its field and action as English reads them
+# ("order status", "Item added"); the catalogue holds the other languages,
+# under the context below so "price" here cannot borrow a button's wording.
+_CHANGE_CONTEXT = "order change"
 
 
 def _decorate_order_changes(changes):
-    """Attach display attrs (Turkish labels, resolved status/carrier
+    """Attach display attrs (translated labels, resolved status/carrier
     names) to OrderChange rows for the templates."""
-    from django.utils import translation
+    from django.utils.translation import pgettext
     from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
-    is_tr = (translation.get_language() or "").startswith("tr")
     status_map = {k: str(v) for k, v in ORDER_STATUS_CHOICES}
     from .models import Carrier
     carrier_map = dict(Carrier.objects.values_list("code", "name"))
@@ -2691,11 +2680,9 @@ def _decorate_order_changes(changes):
         return v
 
     for c in changes:
-        c.action_display = (_CHANGE_ACTION_TR.get(c.action, c.action) if is_tr
-                            else c.get_action_display())
+        c.action_display = pgettext(_CHANGE_CONTEXT, str(c.get_action_display()))
         if c.field:
-            c.field_display = (_CHANGE_FIELD_TR.get(c.field, c.field) if is_tr
-                               else c.field.replace("_", " "))
+            c.field_display = pgettext(_CHANGE_CONTEXT, c.field.replace("_", " "))
         else:
             c.field_display = None
         c.old_display = val_display(c, c.old_value)
@@ -3640,8 +3627,8 @@ class OrderCreate(View):
                 if failed_barcodes:
                     messages.warning(
                         request,
-                        "Sipariş oluşturuldu ama şu barkodlar için rezervasyon yapılamadı, "
-                        "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
+                        _gettext("The order was created, but these barcodes could not be reserved — "
+                                 "try again from the packing page: ") + ", ".join(failed_barcodes),
                     )
                 # Saying it is the whole point: the metres were quietly
                 # unavailable, and a line that silently bills less than
@@ -3659,7 +3646,7 @@ class OrderCreate(View):
                         from .views_warehouse import reservation_shortfall_message
                         messages.warning(
                             request,
-                            "Sipariş oluşturuldu ama Açık durumda kaldı: "
+                            _gettext("The order was created but stayed Open: ")
                             + reservation_shortfall_message(order),
                         )
 
@@ -3989,14 +3976,14 @@ class OrderEdit(UpdateView):
         # Editing either would silently mutate items and re-trigger
         # current account/catalog signals on a dead order.
         if self.object.order_status in {"cancelled", "returned"}:
-            messages.error(request, "İptal edilmiş sipariş düzenlenemez.")
+            messages.error(request, _gettext("A cancelled order can't be edited."))
             return redirect("operating:order_detail", pk=self.object.pk)
         # Once an order is shipped its rolls are already cut and its
         # reservations consumed. Editing items then would desync catalog
         # vs warehouse stock (the item signals adjust catalog while the
         # consumed reservations are never revisited), so block it.
         if self.object.order_status in {"shipped", "in_transit", "out_for_delivery", "delivered"}:
-            messages.error(request, "Gönderilen siparişler düzenlenemez.")
+            messages.error(request, _gettext("Shipped orders can't be edited."))
             return redirect("operating:order_detail", pk=self.object.pk)
         return super().dispatch(request, *args, **kwargs)
 
@@ -4363,8 +4350,8 @@ class OrderEdit(UpdateView):
                 if failed_barcodes:
                     messages.warning(
                         self.request,
-                        "Sipariş güncellendi ama şu barkodlar için rezervasyon yapılamadı, "
-                        "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
+                        _gettext("The order was updated, but these barcodes could not be reserved — "
+                                 "try again from the packing page: ") + ", ".join(failed_barcodes),
                     )
                 if short_lines:
                     from django.utils.translation import gettext as _
@@ -4823,9 +4810,9 @@ class OrderPackingList(View):
         # was previously only enforced by hiding the buttons in the UI,
         # leaving the endpoint itself open on a shipped order.
         if order.order_status in _SHIPPED_CLASS:
-            return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+            return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
         if order.order_status in {"cancelled", "returned"}:
-            return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
+            return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
         action = (request.POST.get("action") or "").strip()
 
         if action == "add_pack":
@@ -4865,7 +4852,7 @@ class OrderPackingList(View):
                 # Every package, each once — a stale screen that missed an
                 # add or delete must not leave a package unnumbered.
                 if len(ids) != len(current) or set(ids) != current:
-                    return JsonResponse({"ok": False, "error": "Paket listesi güncel değil — sayfayı yenileyin."}, status=409)
+                    return JsonResponse({"ok": False, "error": _gettext("The package list is out of date — refresh the page.")}, status=409)
                 numbers = _renumber_packs(order, ids)
             return JsonResponse({"ok": True, "numbers": numbers})
 
@@ -5097,8 +5084,9 @@ def _order_delete_allowed(request):
             supplied = ""
     if supplied and supplied == _s.ORDER_DELETE_PASSWORD:
         return True, None
-    return False, ("Sipariş silme yetkisi yalnızca adminde — devam etmek için "
-                   "silme şifresini girin." if not supplied else "Silme şifresi hatalı.")
+    return False, (_gettext("Only an admin may delete orders — enter the delete "
+                            "password to continue.")
+                   if not supplied else _gettext("The delete password is wrong."))
 
 
 @require_POST
@@ -5174,8 +5162,8 @@ def bulk_delete_orders(request):
             "skipped_ids": skipped_ids}
     if skipped_ids:
         resp["warning"] = (
-            f"{len(skipped_ids)} tamamlanmış sipariş silinmedi — önce sipariş "
-            "detayından 'Geri Aç & Düzelt' ile geri açın."
+            _gettext("%(count)s completed orders were not deleted — re-open them first "
+                     "with 'Re-open & Fix' on the order page.") % {"count": len(skipped_ids)}
         )
     return JsonResponse(resp)
 
@@ -5846,16 +5834,15 @@ def get_pack_qr_image(pack):
 
 
 def _long_date(d, is_tr):
-    """August 20, 2026 / 20 Agustos 2026. strftime("%B") spells the month
-    in the server process's C locale, which on the deploy box is neither
-    of ours — so the names live here instead."""
-    months_en = ["January", "February", "March", "April", "May", "June",
-                 "July", "August", "September", "October", "November", "December"]
-    months_tr = ["Ocak", "\u015eubat", "Mart", "Nisan", "May\u0131s", "Haziran",
-                 "Temmuz", "A\u011fustos", "Eyl\u00fcl", "Ekim", "Kas\u0131m", "Aral\u0131k"]
+    """August 20, 2026, or day-month-year in Turkish. strftime("%B") spells
+    the month in the server process's C locale, which on the deploy box is
+    neither of ours — so the name comes from Django's own month catalogue,
+    which follows the active language."""
+    from django.utils.dates import MONTHS
+    month = MONTHS[d.month]
     if is_tr:
-        return f"{d.day} {months_tr[d.month - 1]} {d.year}"
-    return f"{months_en[d.month - 1]} {d.day}, {d.year}"
+        return f"{d.day} {month} {d.year}"
+    return f"{month} {d.day}, {d.year}"
 
 
 def _packing_list_doc_qr(order):
@@ -5898,22 +5885,22 @@ def order_packing_list_pdf(request, pk):
     is_tr = lang.startswith('tr')
 
     labels = {
-        'title': "\u00c7eki Listesi" if is_tr else "Packing List",
-        'order_no': "Sipari\u015f No" if is_tr else "Order No",
-        'date': "Tarih" if is_tr else "Date",
-        'customer': "M\u00fc\u015fteri" if is_tr else "Customer",
+        'title': pgettext("document title", "Packing List"),
+        'order_no': _gettext("Order No"),
+        'date': _gettext("Date"),
+        'customer': _gettext("Customer"),
         'item_no': "No",
-        'pack': "Paket" if is_tr else "Pack",
-        'product': "\u00dcr\u00fcn" if is_tr else "Product",
-        'variant': "Varyant" if is_tr else "Variant",
-        'product_group': "\u00dcr\u00fcn Grubu" if is_tr else "Product Group",
-        'barcode': "Barkod" if is_tr else "Barcode",
-        'quantity': "Metre" if is_tr else "Metres",
-        'total_packages': "Toplam Paket" if is_tr else "Total Packages",
-        'total_items': "Toplam Kalem" if is_tr else "Total Items",
-        'total_meters': "Toplam Metre" if is_tr else "Total Metres",
-        'empty_pack': "(bo\u015f)" if is_tr else "(empty)",
-        'no_items': "Bu sipari\u015fte paketlenmi\u015f \u00fcr\u00fcn yok." if is_tr else "Nothing has been packed for this order yet.",
+        'pack': _gettext("Pack"),
+        'product': _gettext("Product"),
+        'variant': _gettext("Variant"),
+        'product_group': _gettext("Product Group"),
+        'barcode': _gettext("Barcode"),
+        'quantity': _gettext("Metres"),
+        'total_packages': _gettext("Total Packages"),
+        'total_items': _gettext("Total Items"),
+        'total_meters': _gettext("Total Metres"),
+        'empty_pack': _gettext("(empty)"),
+        'no_items': _gettext("Nothing has been packed for this order yet."),
     }
 
     font = _ensure_pdf_fonts() or "Helvetica"
@@ -6163,11 +6150,11 @@ def pack_pdf(request, pack_pk):
     
     # Text labels mapping dynamically based on active language
     labels = {
-        'package': "PAKET" if is_tr else "PACKAGE",
-        'order': "Sipariş" if is_tr else "Order",
-        'contents': "İÇERİK" if is_tr else "CONTENTS",
-        'product': "Ürün" if is_tr else "Product",
-        'quantity': "Metre" if is_tr else "Metres",
+        'package': _gettext("PACKAGE"),
+        'order': _gettext("Order"),
+        'contents': _gettext("CONTENTS"),
+        'product': _gettext("Product"),
+        'quantity': _gettext("Metres"),
     }
     
     font = _ensure_pdf_fonts() or "Helvetica"
@@ -6573,6 +6560,7 @@ def create_web_order(request):
 
 # -------------------------------- Order Tracking API -------------------------------- #
 
+@answers_in_storefront_language
 @csrf_exempt
 def track_order(request):
     """
@@ -6603,8 +6591,8 @@ def track_order(request):
         if not order:
             return JsonResponse({
                 'success': False,
-                'error': 'Sipariş bulunamadı',
-                'message': 'Bu sipariş numarası ile eşleşen sipariş bulunamadı.'
+                'error': _gettext("Order not found"),
+                'message': _gettext("No order matches this order number.")
             }, status=404)
         
         # Get order items
@@ -6677,11 +6665,12 @@ def track_order(request):
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': 'Sipariş sorgulama hatası',
+            'error': _gettext("Order lookup error"),
             'details': str(e)
         }, status=500)
 
 
+@answers_in_storefront_language
 @csrf_exempt
 def update_order_status(request, order_id):
     """
@@ -6721,18 +6710,18 @@ def update_order_status(request, order_id):
                 from .views_warehouse import reservation_shortfall_message
                 return JsonResponse({'error': reservation_shortfall_message(order)}, status=400)
             if code == "order_cancelled_terminal":
-                return JsonResponse({'error': 'İptal edilmiş bir sipariş tekrar açılamaz.'}, status=400)
+                return JsonResponse({'error': _gettext("A cancelled order can't be re-opened.")}, status=400)
             if code == "cancel_requires_reopen":
                 from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
                 return JsonResponse({'error': str(CANCEL_REQUIRES_REOPEN_MSG)}, status=400)
             if code == "goods_not_received":
                 from .views_warehouse import GOODS_NOT_RECEIVED_MSG
                 return JsonResponse({'error': str(GOODS_NOT_RECEIVED_MSG)}, status=400)
-            return JsonResponse({'error': 'Durum güncelleme hatası', 'details': (code or '').replace('error:', '')}, status=500)
+            return JsonResponse({'error': _gettext("Status update error"), 'details': (code or '').replace('error:', '')}, status=500)
 
         return JsonResponse({
             'success': True,
-            'message': 'Sipariş durumu güncellendi',
+            'message': _gettext("Order status updated"),
             'order_number': order.order_number,
             'order_status': order.order_status,
             'carrier': order.carrier,
@@ -6741,13 +6730,13 @@ def update_order_status(request, order_id):
 
     except Order.DoesNotExist:
         return JsonResponse({
-            'error': 'Sipariş bulunamadı'
+            'error': _gettext("Order not found")
         }, status=404)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         return JsonResponse({
-            'error': 'Durum güncelleme hatası',
+            'error': _gettext("Status update error"),
             'details': str(e)
         }, status=500)
 
@@ -7134,7 +7123,7 @@ class WebOrderStatusEdit(View):
                 from .views_warehouse import reservation_shortfall_message
                 messages.error(request, reservation_shortfall_message(order))
             elif code == "order_cancelled_terminal":
-                messages.error(request, "İptal edilmiş bir sipariş tekrar açılamaz.")
+                messages.error(request, _gettext("A cancelled order can't be re-opened."))
             elif code == "cancel_requires_reopen":
                 from .views_warehouse import CANCEL_REQUIRES_REOPEN_MSG
                 messages.error(request, CANCEL_REQUIRES_REOPEN_MSG)
@@ -7142,7 +7131,7 @@ class WebOrderStatusEdit(View):
                 from .views_warehouse import GOODS_NOT_RECEIVED_MSG
                 messages.error(request, GOODS_NOT_RECEIVED_MSG)
             else:
-                messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
+                messages.error(request, _gettext("The order could not be updated: %(error)s") % {"error": (code or '').replace('error:', '')})
             next_url = request.POST.get('next') or request.GET.get('next')
             return redirect(next_url or reverse('operating:order_detail', kwargs={'pk': order.pk}))
 

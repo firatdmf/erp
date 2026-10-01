@@ -33,6 +33,7 @@ from contextlib import nullcontext as _nullcontext
 
 from .catalog_sync import _fold, _norm_attr, _norm_value, derive_catalog
 from marketing.models import SKU_MAX_LENGTH, ProductCategory
+from django.utils.translation import gettext as _gettext
 
 
 def _norm(s):
@@ -127,7 +128,7 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
         variant, v_how = find_variant(k, _norm(sku))
         if v_how == "ambiguous":
             summary["conflicts"].append(
-                {"sku": sku, "error": "birden fazla varyant fold-eşleşmesi — elle inceleyin"})
+                {"sku": sku, "error": _gettext("more than one variant matches once folded — check by hand")})
             continue
         parent = find_parent(base)
 
@@ -146,8 +147,9 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                             # Never yank a variant off a real web product.
                             summary["conflicts"].append(
                                 {"sku": sku,
-                                 "error": (f"varyant featured ürün '{variant.product.title}' altında; "
-                                           f"sku-eşleşen '{target.title}' ile çelişiyor — taşınmadı")})
+                                 "error": (_gettext("the variant sits under featured product '%(current)s', which "
+                                                    "conflicts with the SKU match '%(target)s' — not moved")
+                                           % {"current": variant.product.title, "target": target.title})})
                             target = variant.product
                         else:
                             maybe_empty_product_ids.add(variant.product_id)

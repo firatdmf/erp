@@ -203,28 +203,26 @@
       </div>
 
       <div class="wh-form-field">
-        <label>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Depo Tipi{% else %}Warehouse type{% endif %}</label>
+        <label>{% trans "Warehouse type" %}</label>
         <div style="display:flex; gap:8px;">
           <label style="flex:1; display:flex; align-items:center; gap:8px; padding:11px 14px; border:1.5px solid {% if warehouse.kind == 'combined' %}#e2e8f0{% else %}#6366f1{% endif %}; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600; color:#0f172a; text-transform:none; letter-spacing:0;">
             <input type="radio" name="kind" value="normal" {% if warehouse.kind != 'combined' %}checked{% endif %} onchange="whKindToggle()" style="width:auto; accent-color:#6366f1;">
-            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Normal{% else %}Normal{% endif %}
+            {% trans "Normal" %}
           </label>
           <label style="flex:1; display:flex; align-items:center; gap:8px; padding:11px 14px; border:1.5px solid {% if warehouse.kind == 'combined' %}#6366f1{% else %}#e2e8f0{% endif %}; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600; color:#0f172a; text-transform:none; letter-spacing:0;">
             <input type="radio" name="kind" value="combined" {% if warehouse.kind == 'combined' %}checked{% endif %} onchange="whKindToggle()" style="width:auto; accent-color:#6366f1;">
-            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Ortak (birleşik){% else %}Combined{% endif %}
+            {% trans "Combined" context "warehouse kind" %}
           </label>
         </div>
         <div class="hint">
-          {% if LANGUAGE_CODE|slice:":2" == "tr" %}
-            Ortak depo, seçtiğiniz depoları TEK depo gibi gösteren sanal bir görünümdür — kendi stoğu olmaz, ürün girişi üye depolara yapılır.
-          {% else %}
-            A combined warehouse is a virtual view that shows the selected warehouses as ONE — it holds no stock of its own; goods are received into the members.
-          {% endif %}
+          
+            {% trans "A combined warehouse is a virtual view that shows the selected warehouses as ONE — it holds no stock of its own; goods are received into the members." %}
+          
         </div>
       </div>
 
       <div class="wh-form-field" id="wh-members-field" style="display:none;">
-        <label>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilecek depolar{% else %}Warehouses to merge{% endif %} <span style="color:#ef4444;">*</span></label>
+        <label>{% trans "Warehouses to merge" %} <span style="color:#ef4444;">*</span></label>
         <div style="display:flex; flex-direction:column; gap:6px; border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px; max-height:220px; overflow:auto;">
           {% for w in member_choices %}
           <label style="display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:#0f172a; text-transform:none; letter-spacing:0; cursor:pointer;">
@@ -235,7 +233,7 @@
             {% if w.location %}<span style="color:#94a3b8; font-weight:500; font-size:12px;">— {{ w.location }}</span>{% endif %}
           </label>
           {% empty %}
-          <span style="color:#94a3b8; font-size:13px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilecek normal depo yok.{% else %}No normal warehouses to merge.{% endif %}</span>
+          <span style="color:#94a3b8; font-size:13px;">{% trans "No normal warehouses to merge." %}</span>
           {% endfor %}
           {% for w in locked_members %}
           <label style="display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:#94a3b8; text-transform:none; letter-spacing:0; cursor:not-allowed;" title="{% trans "Belongs to a book you do not work in — it stays as it is." %}">
@@ -245,7 +243,7 @@
           </label>
           {% endfor %}
         </div>
-        <div class="hint">{% if LANGUAGE_CODE|slice:":2" == "tr" %}En az iki depo seçin (ör. Laleli Store + Factory Solids). Ortak deponun defteri olmaz — her üye depo kendi defterine aittir.{% else %}Pick at least two (e.g. Laleli Store + Factory Solids). A combined warehouse has no book of its own — each member keeps its own.{% endif %}</div>
+        <div class="hint">{% trans "Pick at least two (e.g. Laleli Store + Factory Solids). A combined warehouse has no book of its own — each member keeps its own." %}</div>
       </div>
       <div class="wh-form-field" id="wh-book-field">
         <label>{% trans "Accounting book" %} <span style="color:#ef4444;">*</span></label>

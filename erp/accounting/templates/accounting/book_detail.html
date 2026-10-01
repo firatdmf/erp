@@ -298,9 +298,10 @@
     <div class="card-header-title">
       <span><i class="fas fa-balance-scale-right blue-icon"></i> Accounting Equation</span>
       <span class="eq-head-r">
-        {% comment %} The card is a summary of the general ledger; this is the
-           ledger itself — every account, its balance, and from there its entries. {% endcomment %}
-        <a class="eq-ledger-link" href="{% url 'accounts:report_chart_of_accounts' book.pk %}">{% trans "See the ledger in detail" %} <i class="fas fa-arrow-right"></i></a>
+        {% comment %} The card is a summary; the balance sheet is the same
+           equation in full — every ledger account, the checks against the
+           records, and from each account its entries. {% endcomment %}
+        <a class="eq-ledger-link" href="{% url 'accounts:report_balance_sheet' book.pk %}">{% trans "See the ledger in detail" %} <i class="fas fa-arrow-right"></i></a>
         {% if eq_balanced %}
         <span class="eq-status ok">Balanced</span>
         {% else %}

@@ -3,7 +3,67 @@ from django.db import models
 
 # To store array field use this
 from django.contrib.postgres.fields import ArrayField
+from django.db.models import Q
+from django.db.models.functions import Lower
 from django.forms import ValidationError
+from django.utils.translation import gettext_lazy as _
+
+
+class DuplicateName(ValueError):
+    """A second company, contact or supplier under a name CRM already has."""
+
+
+class UniqueNameMixin:
+    """One record per name, whatever its case.
+
+    Two records under one name cannot be told apart by anyone picking
+    from a search box, so every later order, payment and statement lands
+    on whichever was clicked. The rule is kept in three places, each for
+    the callers the others miss: `clean()` tells a form which field is
+    wrong, `save()` stops the views that build a record by hand, and the
+    model's constraint stops whatever reaches the table without either.
+
+    `unique_name_field` is the column checked; `unique_name_scope` narrows
+    the records it is checked against (a supplier known by its contact's
+    name is only compared with other such suppliers).
+    """
+
+    unique_name_field = "name"
+    duplicate_name_message = _("A record with this name already exists.")
+
+    def unique_name_scope(self):
+        return type(self).objects.all()
+
+    def _name_is_taken(self):
+        field = self.unique_name_field
+        value = (getattr(self, field) or "").strip()
+        if not value:
+            return False
+        # Lower() on both sides, as the constraint does, so the check and
+        # the table agree on what "the same name" is.
+        taken = (self.unique_name_scope()
+                 .annotate(_n=Lower(field))
+                 .filter(_n=Lower(models.Value(value))))
+        if self.pk:
+            taken = taken.exclude(pk=self.pk)
+        return taken.exists()
+
+    def clean(self):
+        super().clean()
+        if self._name_is_taken():
+            raise ValidationError({self.unique_name_field: self.duplicate_name_message})
+
+    def save(self, *args, **kwargs):
+        field = self.unique_name_field
+        update_fields = kwargs.get("update_fields")
+        if update_fields is None or field in update_fields:
+            value = getattr(self, field)
+            if isinstance(value, str):
+                # "Woodline " beside "Woodline" is the same double.
+                setattr(self, field, value.strip())
+            if self._name_is_taken():
+                raise DuplicateName(str(self.duplicate_name_message))
+        super().save(*args, **kwargs)
 
 # Create your models here.
 
@@ -25,7 +85,9 @@ class ClientGroup(models.Model):
         return self.name
 
 
-class Company(models.Model):
+class Company(UniqueNameMixin, models.Model):
+    duplicate_name_message = _("A company with this name already exists.")
+
     # Who raised this record. Stamped automatically on first save by
     # erp.ownership.stamp_creator, from the request-scoped user. NULL on
     # rows that predate this column (and on anything created outside a
@@ -79,9 +141,17 @@ class Company(models.Model):
 
     class Meta:
         verbose_name_plural = "Companies"
+        constraints = [
+            # The column's own unique=True only stops an exact repeat.
+            models.UniqueConstraint(
+                Lower("name"), name="uniq_company_name_ci",
+                violation_error_message=_("A company with this name already exists.")),
+        ]
 
 
-class Contact(models.Model):
+class Contact(UniqueNameMixin, models.Model):
+    duplicate_name_message = _("A contact with this name already exists.")
+
     # Who raised this record. Stamped automatically on first save by
     # erp.ownership.stamp_creator, from the request-scoped user. NULL on
     # rows that predate this column (and on anything created outside a
@@ -140,9 +210,16 @@ class Contact(models.Model):
 
     class Meta:
         verbose_name_plural = "Contacts"
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"), name="uniq_contact_name_ci",
+                violation_error_message=_("A contact with this name already exists.")),
+        ]
 
 
-class Supplier(models.Model):
+class Supplier(UniqueNameMixin, models.Model):
+    duplicate_name_message = _("A supplier with this name already exists.")
+
     # Who raised this record — the same column, stamp and reading as on
     # Contact above (erp.ownership). NULL on rows older than the column.
     created_by = models.ForeignKey(
@@ -153,7 +230,8 @@ class Supplier(models.Model):
         editable=False,
     )
 
-    # the company name or contact name should be unique, I'll set that up later.
+    # A supplier goes by its company name, or by its contact's when it has
+    # none (see __str__) — and that name is unique among suppliers.
     company_name = models.CharField(max_length=300, null=True, blank=True)
     contact_name = models.CharField(max_length=300, null=True, blank=True)
     email = models.EmailField(blank=True)
@@ -180,6 +258,17 @@ class Supplier(models.Model):
         related_name="linked_suppliers",
     )
 
+    @property
+    def unique_name_field(self):
+        return "company_name" if (self.company_name or "").strip() else "contact_name"
+
+    def unique_name_scope(self):
+        # A contact's name is only the supplier's name where there is no
+        # company name: two companies may both be reached through "Ahmet".
+        if self.unique_name_field == "contact_name":
+            return Supplier.objects.filter(Q(company_name__isnull=True) | Q(company_name=""))
+        return Supplier.objects.all()
+
     def clean(self):
         # Ensure that you call super().clean() to maintain the default validation behavior.
         super().clean()
@@ -187,6 +276,19 @@ class Supplier(models.Model):
             raise ValidationError(
                 "You have to enter either, company name or contact name."
             )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                Lower("company_name"), name="uniq_supplier_company_name_ci",
+                condition=Q(company_name__gt=""),
+                violation_error_message=_("A supplier with this name already exists.")),
+            models.UniqueConstraint(
+                Lower("contact_name"), name="uniq_supplier_contact_name_ci",
+                condition=(Q(company_name__isnull=True) | Q(company_name=""))
+                          & Q(contact_name__gt=""),
+                violation_error_message=_("A supplier with this name already exists.")),
+        ]
 
     def __str__(self):
         if self.company_name:

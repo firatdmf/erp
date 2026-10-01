@@ -345,13 +345,22 @@ class CompanyForm(ModelForm):
             rows = json.loads(raw) if raw else []
         except ValueError:
             return []
-        people = []
+        from django.utils.translation import gettext as _
+        people, seen = [], set()
         for row in rows if isinstance(rows, list) else []:
             name = (row.get("name") or "").strip() if isinstance(row, dict) else ""
-            if name:
-                people.append({"name": name,
-                               "email": (row.get("email") or "").strip(),
-                               "phone": (row.get("phone") or "").strip()})
+            if not name:
+                continue
+            # One contact per name — said here, on the form, rather than
+            # as a failed save after the company has been half made.
+            if name.lower() in seen or Contact.objects.filter(name__iexact=name).exists():
+                raise forms.ValidationError(
+                    _("A contact named %(name)s already exists — pick them from "
+                      "the search instead.") % {"name": name})
+            seen.add(name.lower())
+            people.append({"name": name,
+                           "email": (row.get("email") or "").strip(),
+                           "phone": (row.get("phone") or "").strip()})
         return people
     
     # Hidden fields to store JSON arrays

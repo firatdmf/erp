@@ -2796,6 +2796,7 @@ def order_customer_card_view(request, pk):
             pass
 
     mode = "view"
+    create_error = None
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -2898,21 +2899,31 @@ def order_customer_card_view(request, pk):
             if not name:
                 mode = "create"
             else:
+                from crm.models import DuplicateName
                 prev_current_account_id = order.current_account_id
                 email_val = (request.POST.get("email") or "").strip()
                 phone_val = (request.POST.get("phone") or "").strip()
-                new_contact = Contact.objects.create(
-                    name=name,
-                    email=[email_val] if email_val else [],
-                    phone=[phone_val] if phone_val else [],
-                    address=(request.POST.get("address") or "").strip(),
-                    country=(request.POST.get("country") or "").strip(),
-                )
-                order.contact = new_contact
-                order.company = None
-                order.save(update_fields=["contact", "company", "updated_at"])
-                _save_current_account_link(prev_current_account_id)
-                mode = "view"
+                try:
+                    new_contact = Contact.objects.create(
+                        name=name,
+                        email=[email_val] if email_val else [],
+                        phone=[phone_val] if phone_val else [],
+                        address=(request.POST.get("address") or "").strip(),
+                        country=(request.POST.get("country") or "").strip(),
+                    )
+                except DuplicateName:
+                    # Back to the create form, saying why, with what was
+                    # typed still in it.
+                    from django.utils.translation import gettext as _g
+                    create_error = _g("A contact named %(name)s already exists — "
+                                     "search for it and link it instead.") % {"name": name}
+                    mode = "create"
+                else:
+                    order.contact = new_contact
+                    order.company = None
+                    order.save(update_fields=["contact", "company", "updated_at"])
+                    _save_current_account_link(prev_current_account_id)
+                    mode = "view"
 
     elif request.method == "GET":
         mode = request.GET.get("mode") or "view"
@@ -2924,6 +2935,8 @@ def order_customer_card_view(request, pk):
     return render(request, "operating/partials/_customer_card.html", {
         "order": order,
         "cust_card_mode": mode,
+        "cust_card_error": create_error,
+        "cust_card_posted": request.POST if create_error else {},
     })
 
 
@@ -3510,12 +3523,15 @@ class OrderCreate(View):
             from accounting.models import CurrencyCategory
             code = new_customer.pop("currency")
             new_currency = code and CurrencyCategory.objects.filter(code=code).first() or None
-        # A company is one company: a name already in CRM, in any case,
-        # is not made again — the search above finds it to link to.
-        if new_customer and customer_type == "company" and not customer_pk \
-                and Company.objects.filter(name__iexact=new_customer["name"]).exists():
+        # One record per name: a company or contact already in CRM, in any
+        # case, is not made again — the search above finds it to link to.
+        new_kind = Company if customer_type == "company" else Contact
+        if new_customer and customer_type in {"company", "contact"} and not customer_pk \
+                and new_kind.objects.filter(name__iexact=new_customer["name"]).exists():
             from django.utils.translation import gettext as _
-            msg = _("A company named %(name)s already exists — search for it above and link to it instead.") \
+            msg = (_("A company named %(name)s already exists — search for it above and link to it instead.")
+                   if new_kind is Company else
+                   _("A contact named %(name)s already exists — search for it above and link to it instead.")) \
                 % {"name": new_customer["name"]}
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 return JsonResponse({"ok": False, "error": str(msg)})

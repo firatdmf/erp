@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views import View, generic
 from .models import (
-    Attachment, Contact, Company, Note, CompanyFollowUp, Supplier,
+    Attachment, Contact, Company, DuplicateName, Note, CompanyFollowUp, Supplier,
     content_type_for, validate_attachment_size, validate_attachment_type,
 )
 from django.core.exceptions import ValidationError
@@ -149,7 +149,10 @@ class ContactCreate(generic.edit.CreateView):
                 company_name = form.cleaned_data.get("company_name")
                 if company_name:
                     # get the company object from database or create a new one if it does not exist.
-                    company, created = Company.objects.get_or_create(name=company_name)
+                    # Found whatever its case: "woodline" typed here is
+                    # the Woodline CRM already has, not a second company.
+                    company = (Company.objects.filter(name__iexact=company_name.strip()).first()
+                               or Company.objects.create(name=company_name))
                     # set contact's company to the created or existing company.
                     form.instance.company = company
 
@@ -1332,8 +1335,11 @@ def quick_create_customer(request):
     address = (request.POST.get("address") or "").strip()
 
     kind = (request.POST.get("kind") or "contact").strip().lower()
-    obj = create_quick_customer(kind=kind, name=name, phone=phone, email=email,
-                                address=address)
+    try:
+        obj = create_quick_customer(kind=kind, name=name, phone=phone, email=email,
+                                    address=address)
+    except DuplicateName as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
     return JsonResponse({
         "ok": True,
         "id": obj.pk,

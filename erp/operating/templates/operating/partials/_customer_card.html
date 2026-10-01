@@ -294,9 +294,12 @@
             hx-target="#od-customer-section" hx-swap="outerHTML"
             style="display:flex; flex-direction:column; gap:8px;">
         <input type="hidden" name="action" value="create_contact">
+        {% if cust_card_error %}
+          <div style="padding:8px 10px; border-radius:8px; background:#FEF2F2; border:1px solid #FECACA; color:#991B1B; font-size:12.5px;">{{ cust_card_error }}</div>
+        {% endif %}
         <div>
           <label class="od-cust-flbl">{% trans "Name (required)" %}</label>
-          <input type="text" class="od-input" name="name" required placeholder="{% trans 'Full name' %}">
+          <input type="text" class="od-input" name="name" required placeholder="{% trans 'Full name' %}" value="{{ cust_card_posted.name|default:'' }}">
         </div>
         <div>
           <label class="od-cust-flbl">{% trans "Email" %}</label>

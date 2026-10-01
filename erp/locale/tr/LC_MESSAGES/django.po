@@ -9328,6 +9328,24 @@ msgstr "<b>Siparişi Tamamla</b> denene kadar stok düşmez. Kargo bilgileri ops
 msgid "Save cargo info only"
 msgstr "Sadece kargo bilgisini kaydet"
 
+msgid "Edit cargo info"
+msgstr "Kargo bilgisini düzenle"
+
+msgid "No cargo info"
+msgstr "Kargo bilgisi yok"
+
+msgid "Cancel edit"
+msgstr "Düzenlemeyi iptal et"
+
+msgid "Could not save. Check your connection and try again."
+msgstr "Kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin."
+
+msgid "Cargo info saved."
+msgstr "Kargo bilgisi kaydedildi."
+
+msgid "The order's status changed. Reload the page."
+msgstr "Siparişin durumu değişti. Sayfayı yenileyin."
+
 msgid "Complete order"
 msgstr "Siparişi Tamamla"
 
@@ -11074,6 +11092,11 @@ msgstr "Ayrılan miktarlar bu %(n)s içine sığacak şekilde azaltıldı:"
 
 #: operating/templates/operating/warehouse_product_detail.html
 #, python-format
+msgid "The order holding this whole %(n)s now holds its new amount:"
+msgstr "Bu %(n)s bütün olarak bir siparişe ayrılmıştı; siparişte ayrılan miktar güncellendi:"
+
+#: operating/templates/operating/warehouse_product_detail.html
+#, python-format
 msgid "Take out of this %(n)s"
 msgstr "Bu %(n)s içinden çıkar"
 
@@ -11098,6 +11121,60 @@ msgstr "Sil: %(n)s"
 #, python-format
 msgid "This %(n)s will be permanently removed. A stock-out movement will be recorded so the timeline reflects the deletion."
 msgstr "Bu %(n)s kalıcı olarak silinecek. Zaman çizelgesinin silmeyi göstermesi için bir stok çıkışı kaydedilecek."
+
+msgid "Put into this account"
+msgstr "Bu hesaba girdi"
+
+msgid "Delete this revenue? The cash it added is taken back out of the account."
+msgstr "Bu gelir silinsin mi? Eklediği nakit hesaptan geri çıkarılır."
+
+msgid "Capital deposit"
+msgstr "Sermaye girişi"
+
+msgid "Delete this capital deposit? The cash it added is taken back out of the account."
+msgstr "Bu sermaye girişi silinsin mi? Eklediği nakit hesaptan geri çıkarılır."
+
+msgid "Delete this exchange? Both accounts go back to where they were before it."
+msgstr "Bu döviz işlemi silinsin mi? İki hesap da işlemden önceki haline döner."
+
+msgid "Rate"
+msgstr "Kur"
+
+msgid "Cash it moved"
+msgstr "Hareket ettirdiği nakit"
+
+msgid "No cash entry is posted for this."
+msgstr "Bunun için kasa hareketi işlenmemiş."
+
+#, python-format
+msgid "%(label)s updated."
+msgstr "%(label)s güncellendi."
+
+#, python-format
+msgid "%(label)s deleted."
+msgstr "%(label)s silindi."
+
+#, python-format
+msgid "%(account)s does not hold enough for this — the money has already left it."
+msgstr "%(account)s hesabında bunun için yeterli bakiye yok — para hesaptan zaten çıkmış."
+
+msgid "Dividend"
+msgstr "Kâr payı"
+
+msgid "Delete this dividend? The cash it paid out goes back into the account."
+msgstr "Bu kâr payı silinsin mi? Ödediği nakit hesaba geri döner."
+
+msgid "Delete this transfer? Both accounts go back to where they were before it."
+msgstr "Bu transfer silinsin mi? İki hesap da transferden önceki haline döner."
+
+msgid "Orders not completed yet. They are added to the balance when they ship."
+msgstr "Henüz tamamlanmamış siparişler. Gönderildiklerinde bakiyeye eklenir."
+
+#, python-format
+msgid "%(n)s open order not billed yet"
+msgid_plural "%(n)s open orders not billed yet"
+msgstr[0] "%(n)s açık sipariş henüz faturalanmadı"
+msgstr[1] "%(n)s açık sipariş henüz faturalanmadı"
 
 #: marketing quotes — rolls on a line
 msgid "A picked roll no longer exists — pick the line's rolls again."
@@ -11267,6 +11344,7 @@ msgstr ""
 #: operating/views_warehouse.py
 msgid "You don't have access to this book."
 msgstr "Bu deftere erişiminiz yok."
+
 #: accounting/templates/accounting/book_detail.html
 msgid "Assets"
 msgstr "Varlıklar"
@@ -11350,11 +11428,82 @@ msgstr ""
 msgid "Small differences let go to bring a settled account to zero."
 msgstr "Kapanan bir hesabı sıfırlamak için vazgeçilen küçük farklar."
 
-msgid "Orders not completed yet. They are added to the balance when they ship."
-msgstr "Henüz tamamlanmamış siparişler. Gönderildiklerinde bakiyeye eklenir."
+#: operating/templates/operating/order_picking_list.html
+msgid "Picking list"
+msgstr "Toplama listesi"
 
+#: operating/templates/operating/order_picking_list.html
+msgid "PICKING LIST"
+msgstr "TOPLAMA LİSTESİ"
+
+#: operating/picking_list.py
 #, python-format
-msgid "%(n)s open order not billed yet"
-msgid_plural "%(n)s open orders not billed yet"
-msgstr[0] "%(n)s açık sipariş henüz faturalanmadı"
-msgstr[1] "%(n)s açık sipariş henüz faturalanmadı"
+msgid "Contact #%(id)s"
+msgstr "Kişi #%(id)s"
+
+#: operating/picking_list.py
+#, python-format
+msgid "Company #%(id)s"
+msgstr "Firma #%(id)s"
+
+#: operating/picking_list.py
+#, python-format
+msgid "Web client #%(id)s"
+msgstr "Web müşterisi #%(id)s"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "To pick"
+msgstr "Toplanacak"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "Scan to open the order"
+msgstr "Siparişi açmak için okutun"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "Lot"
+msgstr "Lot"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "On roll"
+msgstr "Topta"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "Cut"
+msgstr "Kesilecek"
+
+#: operating/templates/operating/order_picking_list.html
+#, python-format
+msgid "%(metres)s of %(needed)s %(unit)s"
+msgstr "%(metres)s / %(needed)s %(unit)s"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "Not tied to a line"
+msgstr "Bir satıra bağlı değil"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "No rolls chosen yet."
+msgstr "Henüz top seçilmedi."
+
+#: operating/templates/operating/order_picking_list.html
+msgid "Not picked yet"
+msgstr "Henüz toplanmayanlar"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "Ordered"
+msgstr "Sipariş edilen"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "Picked"
+msgstr "Toplanan"
+
+#: operating/templates/operating/order_picking_list.html
+msgid "Missing"
+msgstr "Eksik"
+
+#: operating/templates/operating/partials/create_order_form.html
+msgid "Company they work for"
+msgstr "Çalıştığı firma"
+
+#: operating/templates/operating/partials/create_order_form.html
+msgid "Company name — leave blank for an individual"
+msgstr "Firma adı — bireysel müşteri için boş bırakın"

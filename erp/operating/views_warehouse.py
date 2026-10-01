@@ -206,9 +206,10 @@ def _clamp_reservations_to_roll(roll, *, user=None):
     left to it is deleted rather than kept at zero: an empty reservation
     is a roll sitting on a packing list contributing nothing.
 
-    Only shrinks. A roll corrected UPWARDS does not grow the holds on it:
-    the order asked for a quantity, not for whatever the roll happens to
-    carry.
+    Only shrinks. A roll corrected UPWARDS does not grow a hold for part
+    of it: the order asked for a quantity, not for whatever the roll
+    happens to carry. The one hold that does grow is the one that was the
+    whole roll — see _grow_whole_roll_hold.
 
     The order LINE follows the hold down when — and only when — its
     quantity is still exactly the metres picked for it (see
@@ -285,6 +286,77 @@ def _clamp_reservations_to_roll(roll, *, user=None):
     return adjusted
 
 
+def _grow_whole_roll_hold(roll, old_remaining, *, user=None):
+    """Lengthen the hold on a roll that was sold whole, when the roll
+    itself turns out longer, and say which order was touched.
+
+    The other half of _clamp_reservations_to_roll. A hold for PART of a
+    roll is a quantity somebody asked for, and a longer roll changes
+    nothing about it. But a single hold for everything the roll carried
+    is "this roll", not "31 metres": the roll goes out the door whole, so
+    re-measuring it at 32 means 32 is shipped — and the order, left at
+    31, would bill a metre short of what the customer receives (order
+    #330, roll ADM10525600001618).
+
+    So it grows only when exactly one live hold is on the roll and it
+    held all of what was left before the correction. Two orders sharing a
+    roll, or one holding less than all of it, are left alone.
+
+    The order LINE follows the hold up under the same rule it follows it
+    down: only while its quantity is still exactly the metres picked for
+    it (_line_tracks_its_rolls).
+
+    Returns a list of {order, label, was, now}, like the clamp; empty
+    when nothing grew."""
+    from .models import OrderStockReservation
+
+    remaining = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
+    remaining = remaining or Decimal("0")
+    old_remaining = old_remaining or Decimal("0")
+    if remaining <= old_remaining:
+        return []
+
+    holds = list(OrderStockReservation.objects
+                 .filter(stock_item=roll, consumed=False)
+                 .select_related("order", "warehouse_product")[:2])
+    if len(holds) != 1:
+        return []
+    res = holds[0]
+    was = res.quantity or Decimal("0")
+    if was != old_remaining:
+        return []
+
+    entry = {
+        "order": res.order_id,
+        "label": str(res.order) if res.order_id else f"#{res.order_id}",
+        "was": float(was),
+        "now": float(remaining),
+    }
+    StockMovement.objects.create(
+        product=res.warehouse_product, stock_item=roll,
+        movement_type="adjustment", quantity=(remaining - was),
+        reason=(f"Reservation grown with the roll "
+                f"({was:.2f}m → {remaining:.2f}m) · {entry['label']}"),
+        reference=roll.barcode or f"Roll #{roll.pk}",
+        created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+    )
+    # Decided BEFORE the write, while the reservations still hold the
+    # figures the line was built from.
+    line = res.order_item if _line_tracks_its_rolls(res.order_item) else None
+
+    res.quantity = remaining
+    res.save(update_fields=["quantity"])
+
+    if line is not None:
+        entry["line_was"] = float(line.quantity or 0)
+        line.quantity = (line.quantity or Decimal("0")) + (remaining - was)
+        line.save(update_fields=["quantity"])
+        entry["line_now"] = float(line.quantity)
+
+    _note_growth_on_order(res.order, roll, was, remaining, line=line)
+    return [entry]
+
+
 def _line_tracks_its_rolls(item):
     """Whether this order line's quantity is still simply what its rolls
     plus its outsourced metres come to.
@@ -349,6 +421,28 @@ def _note_trim_on_order(order, roll, was, now, *, line=None):
         text += (" The line quantity was entered by hand rather than picked "
                  "from rolls, so it has been left alone — reduce it, cover "
                  "the shortfall from other stock, or ship it short.")
+    existing = (order.internal_notes or "").rstrip()
+    order.internal_notes = f"{existing}\n{text}" if existing else text
+    order.save(update_fields=["internal_notes"])
+
+
+def _note_growth_on_order(order, roll, was, now, *, line=None):
+    """_note_trim_on_order for a hold that grew — same place, same reason:
+    the order's figure moved because of an edit made on another page."""
+    from django.utils.timezone import localtime, now as _now
+
+    if order is None:
+        return
+    stamp = localtime(_now()).strftime("%d.%m.%Y %H:%M")
+    label = roll.barcode or f"#{roll.pk}"
+    text = (f"[{stamp}] Stock correction: roll {label} re-measured, and this "
+            f"order holds the whole roll, so the amount held rose "
+            f"{was:.2f} → {now:.2f} ({now - was:.2f} more).")
+    if line is not None:
+        text += f" Line quantity followed it up to {line.quantity:.2f}."
+    else:
+        text += (" The line quantity was entered by hand rather than picked "
+                 "from rolls, so it has been left alone.")
     existing = (order.internal_notes or "").rstrip()
     order.internal_notes = f"{existing}\n{text}" if existing else text
     order.save(update_fields=["internal_notes"])
@@ -4114,6 +4208,8 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
                     fields = []
                     old_full = roll.quantity or Decimal("0")
+                    old_remaining = (roll.quantity_remaining
+                                     if roll.quantity_remaining is not None else old_full)
                     try:
                         length_changed = _set_roll_length(roll, _safe_decimal(t.get("qty")))
                     except RollLengthError as exc:
@@ -4138,6 +4234,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                             reference=roll.barcode or f"Roll #{roll.pk}", created_by=user,
                         )
                         trimmed.extend(_clamp_reservations_to_roll(roll, user=user))
+                        _grow_whole_roll_hold(roll, old_remaining, user=user)
 
                 new_tops = [t for t in tops if t.get("stock_item_id") in (None, "")]
                 if new_tops:
@@ -7083,6 +7180,7 @@ class WarehouseRollEdit(View):
         meters_raw = (request.POST.get("quantity") or "").strip().replace(",", ".")
         meters_changed = False
         old_full = new_full = roll.quantity or Decimal("0")
+        old_remaining = roll.quantity_remaining if roll.quantity_remaining is not None else old_full
         if meters_raw:
             try:
                 new_full = Decimal(meters_raw)
@@ -7103,6 +7201,10 @@ class WarehouseRollEdit(View):
         # has. Without this the order goes on displaying the old reserved
         # figure and the metres stay blocked for everyone else.
         trimmed = _clamp_reservations_to_roll(roll, user=request.user) if meters_changed else []
+        # ...and a roll sold whole takes its order with it when it turns
+        # out longer.
+        grown = (_grow_whole_roll_hold(roll, old_remaining, user=request.user)
+                 if meters_changed else [])
 
         # Recompute the parent quantity authoritatively from its rolls
         # (current stock = remaining meters, falling back to full meters).
@@ -7144,6 +7246,7 @@ class WarehouseRollEdit(View):
             # because of an edit made on the warehouse page is exactly the
             # kind of change that needs to be told, not discovered.
             "reservations_trimmed": trimmed,
+            "reservations_grown": grown,
         })
 
 

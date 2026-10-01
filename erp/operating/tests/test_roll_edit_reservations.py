@@ -83,14 +83,62 @@ class RollEditTrimsReservations(TestCase):
         self.assertEqual(res.quantity, Decimal("12.00"))
         self.assertEqual(body["reservations_trimmed"], [])
 
-    def test_a_longer_roll_does_not_grow_the_hold(self):
+    def test_a_longer_roll_does_not_grow_a_part_hold(self):
         """The order asked for a quantity, not for whatever the roll carries."""
-        order, res = self._order("DK0000299", Decimal("19.50"))
+        order, res = self._order("DK0000299", Decimal("12.00"))
+        item = order.items.first()
+
+        body = self._edit("25.00").json()
+
+        res.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(res.quantity, Decimal("12.00"))
+        self.assertEqual(item.quantity, Decimal("12.00"))
+        self.assertEqual(body["reservations_grown"], [])
+
+    def test_a_longer_roll_takes_the_order_holding_all_of_it_along(self):
+        """Order #330: the roll was sold whole at 31 m, then re-measured at
+        32. It ships whole, so the order is for 32."""
+        order, res = self._order("DK0000330", Decimal("19.50"))
+        item = order.items.first()
+
+        body = self._edit("20.50").json()
+
+        res.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(res.quantity, Decimal("20.50"))
+        self.assertEqual(item.quantity, Decimal("20.50"))
+        self.assertEqual(body["reservations_grown"][0]["was"], 19.50)
+        self.assertEqual(body["reservations_grown"][0]["now"], 20.50)
+        order.refresh_from_db()
+        self.assertIn("Line quantity followed it up", order.internal_notes)
+        self.assertTrue(StockMovement.objects.filter(
+            stock_item=self.roll, reason__startswith="Reservation grown").exists())
+
+    def test_a_longer_shared_roll_grows_nobody(self):
+        """Two orders on one roll: neither of them is "the whole roll"."""
+        first, res_first = self._order("DK0000331", Decimal("12.00"))
+        second, res_second = self._order("DK0000332", Decimal("7.50"))
 
         self._edit("25.00")
 
+        res_first.refresh_from_db()
+        res_second.refresh_from_db()
+        self.assertEqual(res_first.quantity, Decimal("12.00"))
+        self.assertEqual(res_second.quantity, Decimal("7.50"))
+
+    def test_a_longer_roll_leaves_a_hand_typed_line_alone(self):
+        order, res = self._order("DK0000333", Decimal("19.50"))
+        item = order.items.first()
+        item.quantity = Decimal("25.00")          # typed, no longer its rolls
+        item.save(update_fields=["quantity"])
+
+        self._edit("20.50")
+
         res.refresh_from_db()
-        self.assertEqual(res.quantity, Decimal("19.50"))
+        item.refresh_from_db()
+        self.assertEqual(res.quantity, Decimal("20.50"))
+        self.assertEqual(item.quantity, Decimal("25.00"))
 
     def test_oldest_hold_keeps_its_claim(self):
         """Two orders on one roll: the shortfall lands on the later picker."""

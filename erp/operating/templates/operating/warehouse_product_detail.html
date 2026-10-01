@@ -1417,6 +1417,14 @@
                        ' → ' + pUnit(t.now.toFixed(2));
               }).join('\n'));
       }
+      const grown = data.reservations_grown || [];
+      if (grown.length) {
+        alert('{% blocktrans with n=product.item_noun %}The order holding this whole {{ n }} now holds its new amount:{% endblocktrans %}\n\n' +
+              grown.map(function(t){
+                return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) +
+                       ' → ' + pUnit(t.now.toFixed(2));
+              }).join('\n'));
+      }
       closeRE();
       window.location.reload();
     }).catch(() => {

@@ -613,11 +613,32 @@ class BookDetail(generic.DetailView):
                      "amount": row["balance"]}
                     for row in groups[kind] if row["balance"]]
 
-        equity_lines = lines("equity")
-        if sheet["result"] or sheet["revenue"] or sheet["expenses"]:
-            equity_lines.append({"label": _g("This period's result"),
-                                 "amount": sheet["result"],
-                                 "is_result": True})
+        # Equity the way it is said aloud: what the owners put in, plus
+        # what was earned, less what it cost, less what they took out. It
+        # used to end in one line, "This period's result", which is revenue
+        # less expenses already netted — a figure nobody could check
+        # against anything on the page. Dividends (3300) goes last, after
+        # the trading figures, because that is where it comes in the sum.
+        DIVIDENDS = "3300"
+        capital = [l for l in lines("equity") if l["code"] != DIVIDENDS]
+        dividends = [l for l in lines("equity") if l["code"] == DIVIDENDS]
+        equity_lines = list(capital)
+        if sheet["revenue"] or groups["revenue"]:
+            equity_lines.append({"label": _g("Revenue"), "amount": sheet["revenue"],
+                                 "sign": "+", "parts": lines("revenue")})
+        if sheet["expenses"] or groups["expense"]:
+            equity_lines.append({"label": _g("Expenses"), "amount": -sheet["expenses"],
+                                 "sign": "−",
+                                 "parts": [dict(l, amount=-l["amount"]) for l in lines("expense")]})
+        for l in dividends:
+            equity_lines.append(dict(l, sign="−"))
+        # `amount` stays signed so the lines add up to the total; `shown`
+        # is what is printed beside a "−", where a second minus sign would
+        # read as a double negative.
+        for l in equity_lines:
+            l["shown"] = abs(l["amount"]) if l.get("sign") == "−" else l["amount"]
+            for part in l.get("parts") or []:
+                part["shown"] = abs(part["amount"]) if l.get("sign") == "−" else part["amount"]
 
         _value, unvalued_items, unvalued_qty = _inventory_value(book)
         checks = reconcile(book)["rows"]

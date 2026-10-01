@@ -269,6 +269,12 @@
     .eq-suspense a.fix { font-weight: 600; color: #8A5A0B; white-space: nowrap; }
     .eq-suspense .more { margin-top: .5rem; }
     a.eq-acct { color: inherit; text-decoration: none; }
+    .eq-sign { display: inline-block; width: 1em; color: var(--gray-500, #6B7280); font-weight: 600; }
+    details.eq-fold > summary { cursor: pointer; list-style: none; }
+    details.eq-fold > summary::-webkit-details-marker { display: none; }
+    details.eq-fold > summary > span:first-child::after { content: " ▸"; color: var(--gray-400, #A0A8B0); font-size: .8em; }
+    details.eq-fold[open] > summary > span:first-child::after { content: " ▾"; }
+    .eq-line.eq-sub { padding-left: 1.6em; font-size: .92em; color: var(--gray-600, #4B5563); }
     a.eq-acct:hover { text-decoration: underline; }
     .eq-checks { margin-top: 12px; border-top: 1px solid #EEF1F5; padding-top: 10px; display: grid; gap: 6px; }
     .eq-checks-title { font: 700 11px var(--font-sans, sans-serif); letter-spacing: .06em; text-transform: uppercase; color: var(--gray-500, #6B7280); }
@@ -327,8 +333,19 @@
 
       <div class="eq-side">
         <div class="eq-side-title">{% trans "Equity" %}</div>
+        {% comment %} Capital, plus revenue, less expenses, less dividends. Revenue
+           and expenses are totals that open into their accounts. {% endcomment %}
         {% for l in eq_equity_lines %}
-        <div class="eq-line"><span>{% if l.is_result %}<em>{{ l.label }}</em>{% else %}<a class="eq-acct" href="{% url 'accounts:report_ledger_account' book.pk l.code %}">{{ l.label }}</a>{% endif %}</span><span class="v">{{ l.amount|format_money }}</span></div>
+        {% if l.parts is not None %}
+        <details class="eq-fold">
+          <summary class="eq-line"><span><span class="eq-sign">{{ l.sign }}</span>{{ l.label }}</span><span class="v">{{ l.shown|format_money }}</span></summary>
+          {% for part in l.parts %}
+          <div class="eq-line eq-sub"><span><a class="eq-acct" href="{% url 'accounts:report_ledger_account' book.pk part.code %}">{{ part.label }}</a></span><span class="v">{{ part.shown|format_money }}</span></div>
+          {% endfor %}
+        </details>
+        {% else %}
+        <div class="eq-line"><span>{% if l.sign %}<span class="eq-sign">{{ l.sign }}</span>{% endif %}<a class="eq-acct" href="{% url 'accounts:report_ledger_account' book.pk l.code %}">{{ l.label }}</a></span><span class="v">{{ l.shown|format_money }}</span></div>
+        {% endif %}
         {% empty %}
         <div class="eq-line"><span>—</span><span class="v">{{ 0|format_money }}</span></div>
         {% endfor %}

@@ -152,6 +152,28 @@ class BookPageEquationReadsTheLedger(TestCase):
         self.assertEqual(ctx["eq_assets"], Decimal("1250.00"))
         labels = {l["label"]: l["amount"] for l in ctx["eq_equity_lines"]}
         self.assertEqual(labels["Opening Balance Equity (3100)"], Decimal("1000.00"))
-        self.assertEqual(labels["This period's result"], Decimal("250.00"))
+        self.assertEqual(labels["Revenue"], Decimal("250.00"))
+        revenue = next(l for l in ctx["eq_equity_lines"] if l["label"] == "Revenue")
+        self.assertEqual([(p["label"], p["amount"]) for p in revenue["parts"]],
+                         [("Sales (4000)", Decimal("250.00"))])
+        self.assertEqual(sum(l["amount"] for l in ctx["eq_equity_lines"]), ctx["eq_equity"])
         self.assertContains(resp, "Assets equal liabilities plus equity.")
         self.assertNotContains(resp, "unaccounted for")
+
+
+    def test_equity_reads_capital_plus_revenue_less_expenses_less_dividends(self):
+        from accounting.services_ledger import post_entry, debit, credit
+        post_entry(book=self.book, date="2026-09-10", description="t", lines=[
+            debit("1000", Decimal("1000")), credit("3100", Decimal("1000"))])
+        post_entry(book=self.book, date="2026-09-11", description="t", lines=[
+            debit("5100", Decimal("300")), credit("1000", Decimal("300"))])
+        post_entry(book=self.book, date="2026-09-12", description="t", lines=[
+            debit("3300", Decimal("100")), credit("1000", Decimal("100"))])
+        resp = self._page(); lines = resp.context["eq_equity_lines"]
+        self.assertEqual([(l.get("sign", ""), l["label"], l["shown"]) for l in lines],
+                         [("", "Opening Balance Equity (3100)", Decimal("1000")),
+                          ("−", "Expenses", Decimal("300")),
+                          ("−", "Dividends (3300)", Decimal("100"))])
+        self.assertEqual(resp.context["eq_equity"], Decimal("600"))
+        self.assertTrue(resp.context["eq_balanced"])
+        self.assertNotContains(resp, "This period")

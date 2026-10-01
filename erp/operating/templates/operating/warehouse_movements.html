@@ -387,11 +387,11 @@
     </div>
     <div class="mv-stat">
       <div class="mv-stat-label"><i class="fa fa-arrow-down" style="color:#0E6E4A;"></i>{% trans "Stock in" %}</div>
-      <div class="mv-stat-value in">{{ in_total|default:0|floatformat:2 }}<span class="unit">m</span></div>
+      <div class="mv-stat-value in">{{ in_total|default:0|floatformat:"2g" }}<span class="unit">m</span></div>
     </div>
     <div class="mv-stat">
       <div class="mv-stat-label"><i class="fa fa-arrow-up" style="color:#DC2626;"></i>{% trans "Stock out" %}</div>
-      <div class="mv-stat-value out">{{ out_total|default:0|floatformat:2 }}<span class="unit">m</span></div>
+      <div class="mv-stat-value out">{{ out_total|default:0|floatformat:"2g" }}<span class="unit">m</span></div>
     </div>
     <div class="mv-stat">
       <div class="mv-stat-label"><i class="fa fa-cart-shopping" style="color:#1D4ED8;"></i>{% trans "Orders" %}</div>
@@ -508,7 +508,7 @@
             {% endif %}
           </td>
           <td class="qty {{ m.movement_type }}">
-            {% if m.quantity == 0 %}—{% else %}{% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m{% endif %}
+            {% if m.quantity == 0 %}—{% else %}{% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:"2g" }} m{% endif %}
           </td>
           <td class="user-cell">
             {% if m.created_by %}{{ m.created_by.username }}{% else %}<span style="color:#C5CCD3;">{% trans "system" %}</span>{% endif %}

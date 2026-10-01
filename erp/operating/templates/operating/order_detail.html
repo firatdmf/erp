@@ -1495,7 +1495,7 @@
                     {% endif %}
                     {% if item.is_tracked %}
                       {% if item.scanned_count %}
-                      <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2" }} m</span>
+                      <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2g" }} m</span>
                       {% else %}
                       <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% trans "no tops" %}</span>
                       {% endif %}
@@ -1526,22 +1526,22 @@
                   <span class="od-empty-mute">—</span>
                 {% endif %}
               </td>
-              <td class="num"><span class="od-num-val">{{ item.quantity|default:0|floatformat:"-2" }}</span></td>
-              <td class="num"><span class="od-num-val">{{ order.currency_symbol }}{{ item.price|default:0|floatformat:2 }}</span></td>
+              <td class="num"><span class="od-num-val">{{ item.quantity|default:0|floatformat:"-2g" }}</span></td>
+              <td class="num"><span class="od-num-val">{{ order.currency_symbol }}{{ item.price|default:0|floatformat:"2g" }}</span></td>
               {% if is_sales_rep %}
               <td class="num od-cost-col" data-item-cost="{{ item.pk }}"></td>
               {% else %}
               <td class="num od-cost-col" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}">
                 {% with uc=item.unit_cost %}
                   {% if uc and uc > 0 %}
-                    <span style="color:var(--gray-700);">{{ order.currency_symbol }}{{ uc|floatformat:2 }}</span>
+                    <span style="color:var(--gray-700);">{{ order.currency_symbol }}{{ uc|floatformat:"2g" }}</span>
                   {% else %}
                     <span class="od-empty-mute" title="{% trans 'No cost set on this product' %}">—</span>
                   {% endif %}
                 {% endwith %}
               </td>
               {% endif %}
-              <td class="num" data-item-subtotal="{{ item.pk }}"><b>{{ order.currency_symbol }}{{ item.subtotal|floatformat:2 }}</b></td>
+              <td class="num" data-item-subtotal="{{ item.pk }}"><b>{{ order.currency_symbol }}{{ item.subtotal|floatformat:"2g" }}</b></td>
             </tr>
             {% if item.is_tracked and item.scanned_count %}
             <tr class="od-tops-row" data-tops-for="{{ item.pk }}" style="display:none;">
@@ -1642,7 +1642,7 @@
         <div class="od-totals{% if order.order_status == 'cancelled' %} od-totals-cancelled{% endif %}">
           <div class="od-tot-row">
             <span>{% trans "Subtotal" %}</span>
-            <span data-order-subtotal>{{ order.currency_symbol }}{{ order.lines_total|floatformat:2 }}</span>
+            <span data-order-subtotal>{{ order.currency_symbol }}{{ order.lines_total|floatformat:"2g" }}</span>
           </div>
           {% comment %}Delivery, packing, a discount: what the deal adds
              to or takes off the goods, each on its own row and each in
@@ -1651,13 +1651,13 @@
           <div class="od-tot-row">
             <span>{{ adj.label }}</span>
             <span{% if adj.amount < 0 %} style="color:#0E6E4A;"{% endif %}>
-              {% if adj.amount < 0 %}−{{ order.currency_symbol }}{{ adj.amount|floatformat:2|cut:"-" }}{% else %}{{ order.currency_symbol }}{{ adj.amount|floatformat:2 }}{% endif %}
+              {% if adj.amount < 0 %}−{{ order.currency_symbol }}{{ adj.amount|floatformat:"2g"|cut:"-" }}{% else %}{{ order.currency_symbol }}{{ adj.amount|floatformat:"2g" }}{% endif %}
             </span>
           </div>
           {% endfor %}
           <div class="od-tot-row total">
             <span>{% trans "Grand total" %}</span>
-            <span data-order-total>{{ order.currency_symbol }}{{ order.total_value|floatformat:2 }}</span>
+            <span data-order-total>{{ order.currency_symbol }}{{ order.total_value|floatformat:"2g" }}</span>
           </div>
           {% if scan_shortfall %}
           {% comment %}
@@ -1673,13 +1673,13 @@
               {% trans "Not yet scanned" %}
             </span>
             <span style="text-align:right;">
-              <span style="font-weight:700;">{{ order.currency_symbol }}{{ scan_shortfall|floatformat:2 }}</span>
+              <span style="font-weight:700;">{{ order.currency_symbol }}{{ scan_shortfall|floatformat:"2g" }}</span>
               <span style="display:block; font-weight:500; font-size:10.5px; opacity:.85;">
                 {% trans "Billed in full regardless" %}
               </span>
               {% for it, ordered, got in scan_shortfall_rows %}
               <span style="display:block; font-weight:500; font-size:10.5px; opacity:.75;">
-                {{ it.product.title|default:"—"|truncatechars:26 }}: {{ got|floatformat:"-2" }} / {{ ordered|floatformat:"-2" }} m
+                {{ it.product.title|default:"—"|truncatechars:26 }}: {{ got|floatformat:"-2g" }} / {{ ordered|floatformat:"-2g" }} m
               </span>
               {% endfor %}
             </span>
@@ -1688,7 +1688,7 @@
           {% if total_scanned_count %}
           <div class="od-tot-row" style="color:#005354;">
             <span><i class="fa fa-layer-group" style="font-size:10px; opacity:.7;"></i> {% trans "Total scanned" %}</span>
-            <span style="font-weight:700;">{{ total_scanned_count }} {% trans "tops" %} · {{ total_scanned_meters|floatformat:"-2" }} m</span>
+            <span style="font-weight:700;">{{ total_scanned_count }} {% trans "tops" %} · {{ total_scanned_meters|floatformat:"-2g" }} m</span>
           </div>
           {% endif %}
           {% if may_see_profit %}
@@ -1698,7 +1698,7 @@
               <i class="fa fa-lock" style="font-size:10px; opacity:0.6;" title="{% trans 'Internal only — not on invoice' %}"></i>
               {% trans "Total cost (COGS)" %}
             </span>
-            <span data-order-cost style="font-weight:700;">{{ order.currency_symbol }}{{ tc|floatformat:2 }}</span>
+            <span data-order-cost style="font-weight:700;">{{ order.currency_symbol }}{{ tc|floatformat:"2g" }}</span>
           </div>
           <div id="od-profit-row" class="od-tot-row od-gross"
                style="margin-top:4px; padding:8px 10px; border-radius:8px;
@@ -1709,7 +1709,7 @@
               {% trans "Gross profit" %}
               <small data-order-margin style="opacity:0.75; font-weight:600;">{% if gm is not None and tc and tc > 0 %}· {{ gm }}%{% endif %}</small>
             </span>
-            <span data-order-profit style="font-weight:700;">{{ order.currency_symbol }}{{ gp|floatformat:2 }}</span>
+            <span data-order-profit style="font-weight:700;">{{ order.currency_symbol }}{{ gp|floatformat:"2g" }}</span>
           </div>
           {% if not tc or tc == 0 %}
           <div class="od-tot-row" style="margin-top:4px; padding:6px 10px; font-size:11px; color:#92400E; background:#FEF3C7; border:1px dashed #FCD34D; border-radius:8px;">
@@ -1722,7 +1722,7 @@
           {% if order.paid_amount and order.paid_currency and order.paid_currency != 'USD' %}
           <div class="od-tot-row" style="opacity:0.7;">
             <span style="font-size: 11.5px;">{% trans "Customer paid" %} ({{ order.paid_currency }})</span>
-            <span>{{ order.paid_amount|floatformat:2 }} {{ order.paid_currency }}</span>
+            <span>{{ order.paid_amount|floatformat:"2g" }} {{ order.paid_currency }}</span>
           </div>
           {% endif %}
         </div>
@@ -1758,7 +1758,7 @@
                 <td>
                   <div class="od-prod"><span>{% if item.product %}{{ item.product.title }}{% else %}<span class="od-empty-mute">{% trans "(deleted product)" %}</span>{% endif %}</span></div>
                   {% if item.scanned_count %}
-                  <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2" }} m</span>
+                  <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2g" }} m</span>
                   {% endif %}
                 </td>
                 <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
@@ -1768,9 +1768,9 @@
                   {% endif %}
                   {% if item.product_variant %}<span class="mono od-variant-sku">{{ item.product_variant.variant_sku }}</span>{% elif not item.variant_lines %}<span class="od-empty-mute">—</span>{% endif %}
                 </td>
-                <td class="num">{{ item.quantity|default:0|floatformat:"-2" }}</td>
-                <td class="num">{{ half.currency_symbol }}{{ item.price|default:0|floatformat:2 }}</td>
-                <td class="num"><b>{{ half.currency_symbol }}{{ item.subtotal|floatformat:2 }}</b></td>
+                <td class="num">{{ item.quantity|default:0|floatformat:"-2g" }}</td>
+                <td class="num">{{ half.currency_symbol }}{{ item.price|default:0|floatformat:"2g" }}</td>
+                <td class="num"><b>{{ half.currency_symbol }}{{ item.subtotal|floatformat:"2g" }}</b></td>
               </tr>
               {% empty %}
               <tr><td colspan="6" class="od-empty-mute" style="text-align:center; padding:14px;">{% trans "This order has no items yet" %}</td></tr>
@@ -1781,17 +1781,17 @@
           <div class="od-totals">
             <div class="od-tot-row">
               <span>{% trans "Subtotal" %}</span>
-              <span>{{ half.currency_symbol }}{{ half.lines_total|floatformat:2 }}</span>
+              <span>{{ half.currency_symbol }}{{ half.lines_total|floatformat:"2g" }}</span>
             </div>
             {% for adj in half.adjustments.all %}
             <div class="od-tot-row">
               <span>{{ adj.label }}</span>
-              <span>{% if adj.amount < 0 %}−{{ half.currency_symbol }}{{ adj.amount|floatformat:2|cut:"-" }}{% else %}{{ half.currency_symbol }}{{ adj.amount|floatformat:2 }}{% endif %}</span>
+              <span>{% if adj.amount < 0 %}−{{ half.currency_symbol }}{{ adj.amount|floatformat:"2g"|cut:"-" }}{% else %}{{ half.currency_symbol }}{{ adj.amount|floatformat:"2g" }}{% endif %}</span>
             </div>
             {% endfor %}
             <div class="od-tot-row total">
               <span>{% trans "Grand total" %}</span>
-              <span>{{ half.currency_symbol }}{{ half.total_value|floatformat:2 }}</span>
+              <span>{{ half.currency_symbol }}{{ half.total_value|floatformat:"2g" }}</span>
             </div>
           </div>
           {% endfor %}
@@ -1799,7 +1799,7 @@
           <div class="od-totals od-combined-total">
             <div class="od-tot-row total">
               <span>{% trans "Combined total" %}</span>
-              <span>{% for symbol, total in combined_totals %}{{ symbol }}{{ total|floatformat:2 }}{% if not forloop.last %} + {% endif %}{% endfor %}</span>
+              <span>{% for symbol, total in combined_totals %}{{ symbol }}{{ total|floatformat:"2g" }}{% if not forloop.last %} + {% endif %}{% endfor %}</span>
             </div>
           </div>
         </div>
@@ -1835,15 +1835,15 @@
                     <div style="margin-top:3px;">
                       {% for rl in oi.stock_items %}
                         {% if rl.barcode %}
-                        <span class="mono" style="display:inline-block; font-size:10.5px; color:var(--gray-600); background:#F4F7FB; border-radius:5px; padding:1px 6px; margin:1px 3px 1px 0;">{{ rl.barcode }} · {{ rl.quantity|floatformat:"-2" }}</span>
+                        <span class="mono" style="display:inline-block; font-size:10.5px; color:var(--gray-600); background:#F4F7FB; border-radius:5px; padding:1px 6px; margin:1px 3px 1px 0;">{{ rl.barcode }} · {{ rl.quantity|floatformat:"-2g" }}</span>
                         {% endif %}
                       {% endfor %}
                     </div>
                   {% endif %}
                 </td>
-                <td class="num">{{ oi.quantity|floatformat:"-2" }}</td>
-                <td class="num">{{ order.currency_symbol }}{{ oi.price|floatformat:2 }}</td>
-                <td class="num"><b>{{ order.currency_symbol }}{{ oi.subtotal|floatformat:2 }}</b></td>
+                <td class="num">{{ oi.quantity|floatformat:"-2g" }}</td>
+                <td class="num">{{ order.currency_symbol }}{{ oi.price|floatformat:"2g" }}</td>
+                <td class="num"><b>{{ order.currency_symbol }}{{ oi.subtotal|floatformat:"2g" }}</b></td>
               </tr>
               {% empty %}
               <tr><td colspan="6" class="od-empty-mute" style="text-align:center; padding:16px;">{% trans "No items recorded in the original snapshot." %}</td></tr>
@@ -1854,7 +1854,7 @@
           <div class="od-totals">
             <div class="od-tot-row total">
               <span>{% trans "Original grand total" %}</span>
-              <span>{{ order.snapshot_currency_symbol }}{{ order.original_snapshot.total_value|floatformat:2 }}</span>
+              <span>{{ order.snapshot_currency_symbol }}{{ order.original_snapshot.total_value|floatformat:"2g" }}</span>
             </div>
           </div>
         </div>
@@ -1981,7 +1981,7 @@
                 {% if p.status == 'draft' %}
                   {% trans "Awaiting delivery" %}{% if p.delivery_date %} · {{ p.delivery_date|date:"d.m.Y" }}{% endif %}
                 {% else %}
-                  {% trans "Received" %} · {{ p.held_quantity|floatformat:"-2" }} {% trans "reserved" %}
+                  {% trans "Received" %} · {{ p.held_quantity|floatformat:"-2g" }} {% trans "reserved" %}
                 {% endif %}
               </span>
             </li>
@@ -2050,7 +2050,7 @@
               {{ order.current_account.balance_label }}
             </div>
             <div id="od-current-account-balance" style="font:800 16px var(--font-sans); color:{% if order.current_account.cached_balance > 0 %}#B45309{% elif order.current_account.cached_balance < 0 %}#147F74{% else %}#374151{% endif %}; font-variant-numeric:tabular-nums; margin-top:2px;">
-              {{ order.current_account.display_currency_symbol }}{{ order.current_account.absolute_balance|floatformat:2 }}
+              {{ order.current_account.display_currency_symbol }}{{ order.current_account.absolute_balance|floatformat:"2g" }}
             </div>
           </div>
         </div>
@@ -2078,7 +2078,7 @@
                 </div>
               </div>
               <div data-current-account-mv-amount style="font-weight:700; font-variant-numeric:tabular-nums; color:{% if mv.amount >= 0 %}#B45309{% else %}#147F74{% endif %}; flex-shrink:0; margin-left:8px;">
-                {% if mv.amount >= 0 %}+{% endif %}{{ mv.currency.symbol }}{{ mv.amount|floatformat:2 }}
+                {% if mv.amount >= 0 %}+{% endif %}{{ mv.currency.symbol }}{{ mv.amount|floatformat:"2g" }}
               </div>
             </a>
             {% endfor %}
@@ -2122,7 +2122,7 @@
         <div class="od-detail-list">
           {% if order.payment_status %}<div class="od-dt"><span>{% trans "Status" %}</span><b>{{ order.get_payment_status_display }}</b></div>{% endif %}
           {% if order.payment_method %}<div class="od-dt"><span>{% trans "Method" %}</span><b>{{ order.payment_method }}</b></div>{% endif %}
-          {% if order.original_price %}<div class="od-dt"><span>{% trans "Amount" %}</span><b>{{ order.original_currency|default:order.currency_code }} {{ order.original_price|floatformat:2 }}</b></div>{% endif %}
+          {% if order.original_price %}<div class="od-dt"><span>{% trans "Amount" %}</span><b>{{ order.original_currency|default:order.currency_code }} {{ order.original_price|floatformat:"2g" }}</b></div>{% endif %}
           {% if order.card_last_four %}<div class="od-dt"><span>{% trans "Card" %}</span><b>{{ order.card_association|default:"Card" }} •••• {{ order.card_last_four }}</b></div>{% endif %}
         </div>
       </section>
@@ -2242,6 +2242,11 @@
     const trackingInp = statusForm.querySelector('[name="tracking_number"]');
     const SHIPPED = ['shipped', 'in_transit', 'out_for_delivery', 'delivered'];
     const NEED_CARGO_MSG = '{% trans "Enter carrier and tracking or receipt number to complete the order." %}';
+  // Figures the scripts write are grouped the way the server groups the
+  // ones it renders: by the app's language (<html lang>), not the browser's.
+  const NUM_LOCALE = /^tr\b/i.test(document.documentElement.lang || '') ? 'tr-TR' : 'en-US';
+  const fmtNum = (n, decimals = 2) => (Number(n) || 0).toLocaleString(
+    NUM_LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     const CONFIRM_SHIP = '{% trans "The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?" %}';
 
     // Retail-only: the "shipped by carrier" tick toggles the carrier/tracking
@@ -2261,16 +2266,21 @@
     // off the table at confirm time, because inline edits save via AJAX
     // without a reload and a baked constant would show pre-edit numbers.
     const ORDER_SUMMARY_FALLBACK = [
-      {% for item in order_items_sorted %}{ name: '{{ item.product.title|default:item.description|escapejs }}', sku: '{% if item.product_variant %}{{ item.product_variant.variant_sku|escapejs }}{% endif %}', qty: '{{ item.quantity|default:0 }}', price: '{{ item.price|default:0 }}' },
+      {% for item in order_items_sorted %}{ name: '{{ item.product.title|default:item.description|escapejs }}', sku: '{% if item.product_variant %}{{ item.product_variant.variant_sku|escapejs }}{% endif %}', qty: '{{ item.quantity|default:0|unlocalize }}', price: '{{ item.price|default:0|unlocalize }}' },
       {% endfor %}];
 
     // Numbers reach us either from an input (plain "12.5") or from a
-    // rendered cell, which in Turkish carries a decimal comma. Thousand
-    // separators are off, so the last . or , is always the decimal point.
-    const parseNum = (raw) => {
-      let v = String(raw == null ? '' : raw).replace(/[^0-9.,\-]/g, '');
-      const cut = Math.max(v.lastIndexOf('.'), v.lastIndexOf(','));
-      if (cut !== -1) v = v.slice(0, cut).replace(/[.,]/g, '') + '.' + v.slice(cut + 1);
+    // rendered cell, which is written in the app's language: grouped, and
+    // in Turkish with a decimal comma. The two cannot be told apart by
+    // looking — "1.234" is a thousand in one and a fraction in the other —
+    // so each has its own reader.
+    const parseNum = (raw) => (typeof raw === 'number' ? raw : parseFloat(raw) || 0);
+    const parseShown = (raw) => {
+      const tr = NUM_LOCALE === 'tr-TR';
+      const v = String(raw == null ? '' : raw).replace(/\u2212/g, '-')
+        .replace(/[^0-9.,\-]/g, '')
+        .split(tr ? '.' : ',').join('')
+        .replace(',', '.');
       return parseFloat(v) || 0;
     };
     const flattenText = (el) => (el ? el.textContent : '').replace(/\s+/g, ' ').trim();
@@ -2283,7 +2293,7 @@
         // this session (not yet saved) carry the editable inputs.
         const cellNum = (row, idx, field) => {
           const inp = row.querySelector('input[data-field="' + field + '"]');
-          return parseNum(inp ? inp.value : flattenText(row.children[idx]));
+          return inp ? parseNum(inp.value) : parseShown(flattenText(row.children[idx]));
         };
         return Array.from(rows).map(r => {
           const sku = flattenText(r.children[2]);
@@ -2306,7 +2316,7 @@
       if (!odcModal || !rowsEl) {   // markup missing → fall back, never block the order
         return Promise.resolve(confirm(noCargo ? CONFIRM_SHIP_NO_CARGO : CONFIRM_SHIP));
       }
-      const money = (n) => ORDER_CUR + n.toFixed(2);
+      const money = (n) => ORDER_CUR + fmtNum(n);
       const lines = orderSummaryRows();
       let total = 0;
       rowsEl.textContent = '';
@@ -2327,7 +2337,7 @@
         }
         const qtyTd = document.createElement('td');
         qtyTd.className = 'odc-qty';
-        qtyTd.textContent = qty.toFixed(2) + ' × ' + money(price);
+        qtyTd.textContent = fmtNum(qty) + ' × ' + money(price);
         const subTd = document.createElement('td');
         subTd.className = 'odc-sub-cell';
         subTd.textContent = money(qty * price);
@@ -2755,27 +2765,27 @@
           // Update the row subtotal display
           const subEl = row.querySelector('[data-item-subtotal]');
           if (subEl) {
-            subEl.innerHTML = '<b>' + ORDER_CUR + sub.toFixed(2) + '</b>';
+            subEl.innerHTML = '<b>' + ORDER_CUR + fmtNum(sub) + '</b>';
           }
         }
       });
       // Update order totals display — the rows add up to the subtotal,
       // and the grand total is that plus whatever the deal adjusted.
       document.querySelectorAll('[data-order-subtotal]').forEach(el => {
-        el.textContent = ORDER_CUR + orderTotal.toFixed(2);
+        el.textContent = ORDER_CUR + fmtNum(orderTotal);
       });
       const grandTotal = Math.max(0, orderTotal + ORDER_ADJUSTMENTS);
       document.querySelectorAll('[data-order-total]').forEach(el => {
-        el.textContent = ORDER_CUR + grandTotal.toFixed(2);
+        el.textContent = ORDER_CUR + fmtNum(grandTotal);
       });
       
       // Update cost, profit, margin
       document.querySelectorAll('[data-order-cost]').forEach(el => {
-        el.textContent = ORDER_CUR + totalCost.toFixed(2);
+        el.textContent = ORDER_CUR + fmtNum(totalCost);
       });
       const grossProfit = orderTotal - totalCost;
       document.querySelectorAll('[data-order-profit]').forEach(el => {
-        el.textContent = ORDER_CUR + grossProfit.toFixed(2);
+        el.textContent = ORDER_CUR + fmtNum(grossProfit);
       });
       document.querySelectorAll('[data-order-margin]').forEach(el => {
         if (totalCost > 0) {
@@ -2872,7 +2882,7 @@
       const labelEl = document.getElementById('od-current-account-label');
       if (balEl) {
         const sym = snap.currency_symbol || '';
-        balEl.textContent = sym + Number(snap.absolute_balance).toFixed(2);
+        balEl.textContent = sym + fmtNum(snap.absolute_balance);
         if (snap.color) balEl.style.color = snap.color;
       }
       if (labelEl && snap.balance_label) labelEl.textContent = snap.balance_label;
@@ -2882,7 +2892,7 @@
         const amtEl = mvRow.querySelector('[data-current-account-mv-amount]');
         if (amtEl) {
           const sign = snap.mv_amount >= 0 ? '+' : '';
-          amtEl.textContent = sign + (snap.mv_symbol || '') + Number(snap.mv_amount).toFixed(2);
+          amtEl.textContent = sign + (snap.mv_symbol || '') + fmtNum(snap.mv_amount);
           amtEl.style.color = snap.mv_amount >= 0 ? '#B45309' : '#147F74';
         }
       }
@@ -2894,10 +2904,10 @@
     function applyProfitSnapshot(p) {
       if (!p) return;
       document.querySelectorAll('[data-order-cost]').forEach(el => {
-        el.textContent = ORDER_CUR + Number(p.total_cost || 0).toFixed(2);
+        el.textContent = ORDER_CUR + fmtNum(p.total_cost || 0);
       });
       document.querySelectorAll('[data-order-profit]').forEach(el => {
-        el.textContent = ORDER_CUR + Number(p.gross_profit || 0).toFixed(2);
+        el.textContent = ORDER_CUR + fmtNum(p.gross_profit || 0);
       });
       document.querySelectorAll('[data-order-margin]').forEach(el => {
         el.textContent = (p.margin === null || p.margin === undefined) ? '' : ('· ' + p.margin + '%');
@@ -3092,7 +3102,7 @@
           if (costCell) {
             costCell.setAttribute('data-item-cost', realId);
             if (r.item.unit_cost && Number(r.item.unit_cost) > 0) {
-              costCell.innerHTML = '<span style="color:var(--gray-700);">' + ORDER_CUR + Number(r.item.unit_cost).toFixed(2) + '</span>';
+              costCell.innerHTML = '<span style="color:var(--gray-700);">' + ORDER_CUR + fmtNum(r.item.unit_cost) + '</span>';
             } else {
               costCell.innerHTML = '<span class="od-empty-mute" title="No cost set">—</span>';
             }
@@ -3101,7 +3111,7 @@
           const subCell = newRow.querySelector('[data-item-subtotal]');
           if (subCell) {
             subCell.setAttribute('data-item-subtotal', realId);
-            subCell.innerHTML = '<b>' + ORDER_CUR + Number(r.item.subtotal).toFixed(2) + '</b>';
+            subCell.innerHTML = '<b>' + ORDER_CUR + fmtNum(r.item.subtotal) + '</b>';
           }
 
           const stockWrap = newRow.querySelector('[data-row-stock]');
@@ -3136,7 +3146,7 @@
             el.setAttribute('data-original', el.value);
             if (r.subtotal !== undefined) {
               const sub = document.querySelector('[data-item-subtotal="' + el.getAttribute('data-item-id') + '"]');
-              if (sub) sub.innerHTML = '<b>' + ORDER_CUR + Number(r.subtotal).toFixed(2) + '</b>';
+              if (sub) sub.innerHTML = '<b>' + ORDER_CUR + fmtNum(r.subtotal) + '</b>';
             }
             if (r.order_total !== undefined) latestTotal = r.order_total;
             if (r.current_account) applyCurrentAccountSnapshot(r.current_account);
@@ -3148,10 +3158,10 @@
           // The server's figure is already net of the adjustments; the
           // subtotal above it is that minus them.
           document.querySelectorAll('[data-order-total]').forEach(el => {
-            el.textContent = ORDER_CUR + Number(latestTotal).toFixed(2);
+            el.textContent = ORDER_CUR + fmtNum(latestTotal);
           });
           document.querySelectorAll('[data-order-subtotal]').forEach(el => {
-            el.textContent = ORDER_CUR + (Number(latestTotal) - ORDER_ADJUSTMENTS).toFixed(2);
+            el.textContent = ORDER_CUR + fmtNum(Number(latestTotal) - ORDER_ADJUSTMENTS);
           });
         }
         // Structural change → reload so the new line's stock items section, scan
@@ -3434,10 +3444,10 @@
             ' data-original="" onwheel="this.blur()"></td>' +
           '<td class="num od-cost-col" data-item-cost="' + tempId + '" data-unit-cost="' + (it.unit_cost || 0) + '">' +
             ((it.unit_cost && Number(it.unit_cost) > 0)
-              ? '<span style="color:var(--gray-700);">' + ORDER_CUR + Number(it.unit_cost).toFixed(2) + '</span>'
+              ? '<span style="color:var(--gray-700);">' + ORDER_CUR + fmtNum(it.unit_cost) + '</span>'
               : '<span class="od-empty-mute" title="No cost set">—</span>') +
           '</td>' +
-          '<td class="num" data-item-subtotal="' + tempId + '"><b>' + ORDER_CUR + Number(it.subtotal).toFixed(2) + '</b></td>' +
+          '<td class="num" data-item-subtotal="' + tempId + '"><b>' + ORDER_CUR + fmtNum(it.subtotal) + '</b></td>' +
           '<td class="od-edit-only"><button type="button" class="od-row-del" data-remove-item="' + tempId + '" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button></td>';
         tbody.appendChild(tr);
 

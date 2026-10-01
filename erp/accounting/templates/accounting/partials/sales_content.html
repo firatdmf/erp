@@ -4,17 +4,17 @@
     <div class="summary-card">
         <div class="card-icon revenue"><i class="fas fa-dollar-sign"></i></div>
         <div class="card-label">Total Revenue</div>
-        <div class="card-value">${{ total_revenue|floatformat:2|default:"0" }}</div>
+        <div class="card-value">${{ total_revenue|floatformat:"2g"|default:"0" }}</div>
     </div>
     <div class="summary-card">
         <div class="card-icon profit"><i class="fas fa-chart-line"></i></div>
         <div class="card-label">Total Profit</div>
-        <div class="card-value profit">${{ total_profit|floatformat:2|default:"0" }}</div>
+        <div class="card-value profit">${{ total_profit|floatformat:"2g"|default:"0" }}</div>
     </div>
     <div class="summary-card">
         <div class="card-icon cost"><i class="fas fa-coins"></i></div>
         <div class="card-label">Total Cost</div>
-        <div class="card-value cost">${{ total_cost|floatformat:2|default:"0" }}</div>
+        <div class="card-value cost">${{ total_cost|floatformat:"2g"|default:"0" }}</div>
     </div>
     <div class="summary-card">
         <div class="card-icon orders"><i class="fas fa-shopping-cart"></i></div>
@@ -24,12 +24,12 @@
     <div class="summary-card">
         <div class="card-icon week"><i class="fas fa-calendar-week"></i></div>
         <div class="card-label">Last 7 Days</div>
-        <div class="card-value">${{ week_revenue|floatformat:2|default:"0" }}</div>
+        <div class="card-value">${{ week_revenue|floatformat:"2g"|default:"0" }}</div>
     </div>
     <div class="summary-card">
         <div class="card-icon month"><i class="fas fa-calendar-alt"></i></div>
         <div class="card-label">Last 30 Days</div>
-        <div class="card-value">${{ month_revenue|floatformat:2|default:"0" }}</div>
+        <div class="card-value">${{ month_revenue|floatformat:"2g"|default:"0" }}</div>
     </div>
 </div>
 
@@ -59,10 +59,10 @@
                 <td class="order-number">{{ order.order_number }}</td>
                 <td class="customer-name">{{ order.customer_name }}</td>
                 <td>{{ order.date|date:"d M Y, H:i" }}</td>
-                <td class="revenue-cell">${{ order.revenue|floatformat:2 }}</td>
-                <td class="cost-cell">${{ order.cost|floatformat:2 }}</td>
+                <td class="revenue-cell">${{ order.revenue|floatformat:"2g" }}</td>
+                <td class="cost-cell">${{ order.cost|floatformat:"2g" }}</td>
                 <td class="profit-cell {% if order.profit >= 0 %}profit-positive{% else %}profit-negative{% endif %}">
-                    ${{ order.profit|floatformat:2 }}
+                    ${{ order.profit|floatformat:"2g" }}
                 </td>
                 <td>
                     <span class="status-badge status-{{ order.status }}">

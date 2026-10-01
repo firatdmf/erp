@@ -36,8 +36,8 @@ the roll sits under), packid (the package it is in) and drag.{% endcomment %}
        data-quantity="{{ r.quantity|default_if_none:0|stringformat:'.2f' }}"
        data-remaining="{{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|default_if_none:0|stringformat:'.2f' }}">
     <span class="pk-cut-view">
-      <span class="pk-cut-val">{{ r.quantity|floatformat:2 }} m{% if r.quantity < r.stock_item.quantity_remaining|default:r.stock_item.quantity %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
-      <span class="pk-avail">/ {{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:2 }} m</span>
+      <span class="pk-cut-val">{{ r.quantity|floatformat:"2g" }} m{% if r.quantity < r.stock_item.quantity_remaining|default:r.stock_item.quantity %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
+      <span class="pk-avail">/ {{ r.stock_item.quantity_remaining|default:r.stock_item.quantity|floatformat:"2g" }} m</span>
     </span>
   </div>
 </div>

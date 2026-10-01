@@ -632,11 +632,11 @@
   <div class="od-stats">
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-warehouse"></i>{% trans "Current stock" %}</div>
-      <div class="od-stat-value">{{ product.quantity|default:0|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
+      <div class="od-stat-value">{{ product.quantity|default:0|floatformat:"2g" }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-lock" style="color:#B45309;"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv stok{% else %}Reserved{% endif %}</div>
-      <div class="od-stat-value" style="color:#B45309;">{{ reserved_total|default:0|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
+      <div class="od-stat-value" style="color:#B45309;">{{ reserved_total|default:0|floatformat:"2g" }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-layer-group"></i>{% blocktrans with n=product.item_noun_plural %}Active {{ n }}{% endblocktrans %}</div>
@@ -644,11 +644,11 @@
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-arrow-down" style="color:#0E6E4A;"></i>{% trans "Stock in (total)" %}</div>
-      <div class="od-stat-value" style="color:#0E6E4A;">{{ in_total|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
+      <div class="od-stat-value" style="color:#0E6E4A;">{{ in_total|floatformat:"2g" }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-arrow-up" style="color:#DC2626;"></i>{% trans "Stock out (total)" %}</div>
-      <div class="od-stat-value" style="color:#DC2626;">{{ out_total|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
+      <div class="od-stat-value" style="color:#DC2626;">{{ out_total|floatformat:"2g" }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     {% comment %}Deleting a roll is a CORRECTION, not a sale, so it is never
     counted as stock out — which left in/out unable to explain the current
@@ -658,7 +658,7 @@
       <div class="od-stat-label" title="{% blocktrans with n=product.item_noun_plural %}Deleted {{ n }}, transfers and other corrections — not sales{% endblocktrans %}">
         <i class="fa fa-sliders" style="color:#B45309;"></i>{% trans "Corrections" %}
       </div>
-      <div class="od-stat-value" style="color:#B45309;">{{ adjust_total|floatformat:2 }}<span class="unit">{{ product.unit_short }}</span></div>
+      <div class="od-stat-value" style="color:#B45309;">{{ adjust_total|floatformat:"2g" }}<span class="unit">{{ product.unit_short }}</span></div>
     </div>
     {% endif %}
   </div>
@@ -722,7 +722,7 @@
               </td>
               <td>
                 <div class="roll-meters">
-                  {% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:2 }}{% else %}{{ r.quantity|floatformat:2 }}{% endif %} {{ product.unit_short }}
+                  {% if r.quantity_remaining is not None %}{{ r.quantity_remaining|floatformat:"2g" }}{% else %}{{ r.quantity|floatformat:"2g" }}{% endif %} {{ product.unit_short }}
                   <span class="roll-inline-status roll-status {{ r.status }}" style="display:none;">
                     {% if r.status == 'in_stock' %}<i class="fa fa-circle-check"></i>{% trans "In stock" %}
                     {% elif r.status == 'partial' %}<i class="fa fa-circle-half-stroke"></i>{% trans "Partial" %}
@@ -731,17 +731,17 @@
                 </div>
                 {% if r.quantity and r.quantity_remaining is not None %}
                   <div class="roll-bar"><span style="width:{% widthratio r.quantity_remaining r.quantity 100 %}%;"></span></div>
-                  <div style="font-size:10.5px; color:var(--gray-500); margin-top:2px;">{% trans "of" %} {{ r.quantity|floatformat:2 }} {{ product.unit_short }}</div>
+                  <div style="font-size:10.5px; color:var(--gray-500); margin-top:2px;">{% trans "of" %} {{ r.quantity|floatformat:"2g" }} {{ product.unit_short }}</div>
                 {% endif %}
                 {% if r.reserved_m %}
-                  <div style="font-size:10.5px;color:#B45309;font-weight:700;margin-top:3px;"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ r.reserved_m|floatformat:2 }} {{ product.unit_short }}</div>
+                  <div style="font-size:10.5px;color:#B45309;font-weight:700;margin-top:3px;"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ r.reserved_m|floatformat:"2g" }} {{ product.unit_short }}</div>
                   {% for resv in r.reservation_list %}
                     <div style="font-size:10px;margin-top:1px;">
                       <a href="{% url 'operating:order_detail' resv.order_id %}" target="_blank" rel="noopener" style="color:#92400E;text-decoration:underline;">
                         <i class="fa fa-arrow-up-right-from-square" style="font-size:8px;"></i>
                         {{ resv.order.order_number|default:resv.order_id }}
                       </a>
-                      <span style="color:var(--gray-500);">({{ resv.quantity|floatformat:2 }} {{ product.unit_short }})</span>
+                      <span style="color:var(--gray-500);">({{ resv.quantity|floatformat:"2g" }} {{ product.unit_short }})</span>
                     </div>
                   {% endfor %}
                 {% endif %}
@@ -868,7 +868,7 @@
               </div>
             </div>
             <div class="mv-qty {{ m.movement_type }}">
-              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} {{ product.unit_short }}
+              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:"2g" }} {{ product.unit_short }}
             </div>
           </div>
           {% endfor %}
@@ -949,7 +949,7 @@
             <span class="info-k">{% trans "Purchase price" %}</span>
             <span class="info-v">
               {% if product.purchase_price %}
-                {{ product.purchase_price|floatformat:2 }} {{ product.purchase_currency }}
+                {{ product.purchase_price|floatformat:"2g" }} {{ product.purchase_currency }}
               {% else %}<span class="muted">{% trans "Not set" %}</span>{% endif %}
             </span>
           </div>
@@ -1087,6 +1087,14 @@
 </div>
 
 <script>
+  // Figures written by script follow the app's language (<html lang>), like
+  // the ones the server renders: 1,234.50 in English, 1.234,50 in Turkish.
+  window.fmtNum = window.fmtNum || function (n, decimals) {
+    if (decimals == null) decimals = 2;
+    var tr = /^tr\b/i.test(document.documentElement.lang || '');
+    return (Number(n) || 0).toLocaleString(tr ? 'tr-TR' : 'en-US',
+      { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  };
   const stockOutUrl = "{% url 'operating:warehouse_stock_out' warehouse.pk product.pk %}";
   const rollDeleteUrlPattern = "{% url 'operating:warehouse_roll_delete' warehouse.pk product.pk 0 %}";
   const rollEditUrlPattern = "{% url 'operating:warehouse_roll_edit' warehouse.pk product.pk 0 %}";
@@ -1140,7 +1148,7 @@
     document.getElementById('rdRollInfo').innerHTML =
       '<span class="mono">' + label + '</span> · ' +
       '<span style="color:var(--gray-500);font-weight:500;">' +
-      pUnit(remaining.toFixed(2)) + ' {% trans "remaining" %}</span>';
+      pUnit(fmtNum(remaining)) + ' {% trans "remaining" %}</span>';
     document.getElementById('rdReason').value = '';
     document.getElementById('rdOverlay').classList.add('show');
   }
@@ -1254,11 +1262,11 @@
       ? '<div style="margin-top:5px;padding:6px 8px;border-radius:6px;background:#FEF3C7;' +
         'border:1px solid #FCD34D;color:#92400E;font-weight:600;">' +
           '<i class="fa fa-lock" style="font-size:9px;"></i> ' +
-          '<b>' + pUnit(_reReserved.toFixed(2)) + '</b> {% trans "is reserved" %}' +
+          '<b>' + pUnit(fmtNum(_reReserved)) + '</b> {% trans "is reserved" %}' +
           (_reReservedFor ? ' — ' + _reReservedFor : '') +
           '<div style="font-weight:500;margin-top:2px;">' +
             '{% trans "Saving this length trims that hold down to" %} ' +
-            '<b>' + pUnit(Math.max(0, Math.round((total - _reOut) * 100) / 100).toFixed(2)) + '</b>.' +
+            '<b>' + pUnit(fmtNum(Math.max(0, Math.round((total - _reOut) * 100) / 100))) + '</b>.' +
           '</div>' +
         '</div>'
       : '';
@@ -1282,20 +1290,20 @@
       // eye two things to reconcile while Save is shut anyway.
       hint.innerHTML = bar +
         '<div style="color:#C0392B;font-weight:600;">' +
-          '{% trans "Cannot be below" %} <b>' + pUnit(floor.toFixed(2)) + '</b>' +
+          '{% trans "Cannot be below" %} <b>' + pUnit(fmtNum(floor)) + '</b>' +
           (_reOut > 0 ? ' — {% blocktrans with n=product.item_noun %}that much has already gone out of this {{ n }}{% endblocktrans %}' : '') +
         '</div>';
     } else if (_reOut > 0) {
       hint.innerHTML = bar +
-        '<span style="color:' + colour + ';"><b>' + pUnit(_reOut.toFixed(2)) + '</b> {% trans "used" %}</span>' +
-        ' · <b>' + pUnit(left.toFixed(2)) + '</b> {% trans "left" %}' +
+        '<span style="color:' + colour + ';"><b>' + pUnit(fmtNum(_reOut)) + '</b> {% trans "used" %}</span>' +
+        ' · <b>' + pUnit(fmtNum(left)) + '</b> {% trans "left" %}' +
         '<div style="margin-top:3px;color:var(--gray-500);">' +
           '{% trans "As received, not what is left" %} · {% trans "min" %} ' +
-          '<b>' + pUnit(_reOut.toFixed(2)) + '</b>' +
+          '<b>' + pUnit(fmtNum(_reOut)) + '</b>' +
         '</div>' + trimNote;
     } else {
       hint.innerHTML = bar +
-        '<b>' + pUnit(total.toFixed(2)) + '</b> · {% trans "none used" %}' +
+        '<b>' + pUnit(fmtNum(total)) + '</b> · {% trans "none used" %}' +
         '<div style="margin-top:3px;color:var(--gray-500);">' +
           '{% trans "As received, not what is left" %}</div>' + trimNote;
     }
@@ -1349,7 +1357,7 @@
     const ref = document.getElementById('reOutRef').value.trim();
     if (!(amount > 0)) { alert('{% trans "Enter how much is taken out." %}'); return; }
     if (amount > _reLeft + 1e-9) {
-      alert('{% trans "Only this much is left:" %} ' + pUnit(_reLeft.toFixed(2))); return;
+      alert('{% trans "Only this much is left:" %} ' + pUnit(fmtNum(_reLeft))); return;
     }
     if (purpose === 'sample' && !ref) { alert('{% trans "Name the client the sample went to." %}'); return; }
     const btn = document.getElementById('reOutSubmit');
@@ -1372,7 +1380,7 @@
       if (trimmed.length) {
         alert('{% blocktrans with n=product.item_noun %}Reserved amounts were trimmed to fit this {{ n }}:{% endblocktrans %}\n\n' +
               trimmed.map(function(t){
-                return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) + ' → ' + pUnit(t.now.toFixed(2));
+                return '• ' + t.label + ': ' + pUnit(fmtNum(t.was)) + ' → ' + pUnit(fmtNum(t.now));
               }).join('\n'));
       }
       closeRE();
@@ -1413,16 +1421,16 @@
       if (trimmed.length) {
         alert('{% blocktrans with n=product.item_noun %}Reserved amounts were trimmed to fit this {{ n }}:{% endblocktrans %}\n\n' +
               trimmed.map(function(t){
-                return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) +
-                       ' → ' + pUnit(t.now.toFixed(2));
+                return '• ' + t.label + ': ' + pUnit(fmtNum(t.was)) +
+                       ' → ' + pUnit(fmtNum(t.now));
               }).join('\n'));
       }
       const grown = data.reservations_grown || [];
       if (grown.length) {
         alert('{% blocktrans with n=product.item_noun %}The order holding this whole {{ n }} now holds its new amount:{% endblocktrans %}\n\n' +
               grown.map(function(t){
-                return '• ' + t.label + ': ' + pUnit(t.was.toFixed(2)) +
-                       ' → ' + pUnit(t.now.toFixed(2));
+                return '• ' + t.label + ': ' + pUnit(fmtNum(t.was)) +
+                       ' → ' + pUnit(fmtNum(t.now));
               }).join('\n'));
       }
       closeRE();

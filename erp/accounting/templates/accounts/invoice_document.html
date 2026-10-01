@@ -513,7 +513,7 @@
               {% comment %}"Top" (kumaş topu) = fabric roll — the trade term in English is "Rolls".{% endcomment %}
               <span class="rc-lbl">{% trans "Rolls" %}</span>
               {% for r in it.rolls %}
-              <span class="roll-chip"><code>{{ r.barcode|default:"—" }}</code>{{ r.quantity|floatformat:2 }} m</span>
+              <span class="roll-chip"><code>{{ r.barcode|default:"—" }}</code>{{ r.quantity|floatformat:"2g" }} m</span>
               {% endfor %}
             </div>
             {% endif %}

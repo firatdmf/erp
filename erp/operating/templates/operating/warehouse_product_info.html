@@ -68,7 +68,7 @@
         </div>
         <div class="metre">
           <div class="lbl">{% trans "Meters" %}</div>
-          <div class="val">{{ product.quantity|default:0|floatformat:2 }}</div>
+          <div class="val">{{ product.quantity|default:0|floatformat:"2g" }}</div>
         </div>
       </div>
     </div>

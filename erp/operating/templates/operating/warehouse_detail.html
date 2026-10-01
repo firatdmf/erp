@@ -1352,7 +1352,7 @@
         </span>
         <span class="od-dot"></span>
         <span>
-          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:0|intcomma }} {{ total_unit_short }} {% trans "in stock" %}
+          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:"0g" }} {{ total_unit_short }} {% trans "in stock" %}
         </span>
         {% if warehouse.created_at %}
           <span class="od-dot"></span>
@@ -1680,7 +1680,7 @@
             {% if m.quantity != 0 %}
             <span style="flex-shrink:0; font:800 12px var(--font-sans, sans-serif); font-variant-numeric:tabular-nums; white-space:nowrap;
               {% if m.movement_type == 'in' %}color:#0E6E4A;{% elif m.movement_type == 'out' %}color:#DC2626;{% else %}color:#6B7280;{% endif %}">
-              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} {{ m.product.unit_short }}
+              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:"2g" }} {{ m.product.unit_short }}
             </span>
             {% endif %}
           </div>
@@ -1714,12 +1714,12 @@
             <div class="lbl">{{ item_noun_plural|capfirst }}</div>
           </div>
           <div class="od-stat">
-            <div class="val">{{ total_quantity|floatformat:0|intcomma }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> {{ total_unit_short }}</span></div>
+            <div class="val">{{ total_quantity|floatformat:"0g" }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> {{ total_unit_short }}</span></div>
             <div class="lbl">{% trans "Total stock" %}</div>
           </div>
           {% if not is_sales_rep %}
           <div class="od-stat full">
-            <div class="val">${{ total_value_usd|floatformat:2|intcomma }}</div>
+            <div class="val">${{ total_value_usd|floatformat:"2g" }}</div>
             <div class="lbl">{% trans "Net worth (USD)" %}</div>
           </div>
           {% endif %}
@@ -1981,6 +1981,14 @@
 </div>
 
 <script>
+  // Figures written by script follow the app's language (<html lang>), like
+  // the ones the server renders: 1,234.50 in English, 1.234,50 in Turkish.
+  window.fmtNum = window.fmtNum || function (n, decimals) {
+    if (decimals == null) decimals = 2;
+    var tr = /^tr\b/i.test(document.documentElement.lang || '');
+    return (Number(n) || 0).toLocaleString(tr ? 'tr-TR' : 'en-US',
+      { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  };
 (function () {
   const MG_CSRF = "{{ csrf_token }}";
   // Merge duplicate same-SKU variants — PREVIEW which stock items/products merge, then confirm.
@@ -2006,7 +2014,7 @@
               '<span class="mg-tag">' + (p.survivor ? (_mgTR ? 'kalır' : 'keeps') : (_mgTR ? 'taşınır' : 'moves')) + '</span>' +
               '<span class="mg-name">' + mgEsc(p.name) + '</span>' +
               '<span class="mg-tops">' + p.tops + ' ' + (_mgTR ? 'top' : (p.tops == 1 ? 'roll' : 'rolls')) + '</span>' +
-              '<span class="mg-qty">' + (p.quantity || 0).toFixed(2) + ' m</span>' +
+              '<span class="mg-qty">' + fmtNum(p.quantity || 0) + ' m</span>' +
             '</div>';
           });
           html += '<div class="mg-group-f"><i class="fa fa-arrow-down-long"></i> ' + g.total_tops + ' ' +
@@ -3039,7 +3047,7 @@
       badge.classList.remove('new');
       badge.innerHTML = '<i class="fa fa-check-circle"></i> Matched: <b>' +
         (data.matched_product.name || '') + '</b> (' +
-        (data.matched_product.quantity || 0).toFixed(2) + 'm currently)';
+        fmtNum(data.matched_product.quantity || 0) + 'm currently)';
     } else {
       badge.hidden = false;
       badge.classList.add('new');
@@ -3227,7 +3235,7 @@
         '</span>' +
         (bc ? '<span class="rs-recent-bc"><i class="fa fa-barcode"></i>' + rsEscapeHtml(bc) + '</span>' : '') +
       '</span>' +
-      '<span class="rs-recent-meters">' + whUnit(parseFloat(it.quantity || 0).toFixed(2)) + '</span>' +
+      '<span class="rs-recent-meters">' + whUnit(fmtNum(parseFloat(it.quantity || 0))) + '</span>' +
       '<button type="button" class="rs-recent-edit" title="{% trans "Edit" %}" ' +
         'onclick="openRsEdit(this.closest(\'.rs-recent-row\'))"><i class="fa fa-pen"></i></button>';
   }
@@ -3250,7 +3258,7 @@
     list.prepend(row);
     document.getElementById('rsTotalCount').textContent =
       rsSession.count + ' ' + (rsSession.count === 1 ? WH_ITEM_NOUN : WH_ITEM_NOUN_PLURAL) +
-      ' · ' + whUnit(rsSession.quantity.toFixed(2));
+      ' · ' + whUnit(fmtNum(rsSession.quantity));
   }
 
   // ── Edit a just-added item from the recent list ──
@@ -3596,7 +3604,7 @@
         ? '<a href="' + e.url + '" style="color:#1E40AF; text-decoration:underline;">' + blEsc(e.label) + '</a>'
         : blEsc(e.label);
       var bits = [];
-      if (e.quantity) bits.push(whUnit(Number(e.quantity).toFixed(2)));
+      if (e.quantity) bits.push(whUnit(fmtNum(Number(e.quantity))));
       if (e.date) bits.push(blEsc(e.date));
       if (e.line) bits.push(blEsc(e.line));
       return '<div style="font-weight:500; margin-top:3px;">→ ' + who +
@@ -3606,7 +3614,7 @@
     return '<div style="color:#1E40AF; background:#EFF6FF; border:1px solid #BFDBFE;' +
            ' border-radius:8px; padding:8px 10px; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
              '<i class="fa fa-hand"></i> {% trans "Reserved for an order" %} · ' +
-             '<b>' + whUnit(Number(h.quantity).toFixed(2)) + '</b> {% trans "held" %} ' +
+             '<b>' + whUnit(fmtNum(Number(h.quantity))) + '</b> {% trans "held" %} ' +
              '<span style="font-weight:500;">({% trans "not yet shipped" %})</span>' +
              rows +
            '</div>';
@@ -3622,10 +3630,10 @@
     var head = u.consumed
       ? '{% trans "This roll has been used up" %}'
       : '{% trans "This roll is partly used" %}';
-    var sum = '<b>' + whUnit(Number(u.used).toFixed(2)) + '</b> {% trans "of" %} ' +
-              whUnit(Number(u.total).toFixed(2));
+    var sum = '<b>' + whUnit(fmtNum(Number(u.used))) + '</b> {% trans "of" %} ' +
+              whUnit(fmtNum(Number(u.total)));
     if (!u.consumed) {
-      sum += ' · <b>' + whUnit(Number(u.remaining).toFixed(2)) + '</b> {% trans "left" %}';
+      sum += ' · <b>' + whUnit(fmtNum(Number(u.remaining))) + '</b> {% trans "left" %}';
     }
 
     var rows = (u.entries || []).map(function (e) {
@@ -3639,7 +3647,7 @@
         if (e.by) what += ' · ' + blEsc(e.by);
       }
       var bits = [];
-      if (e.quantity) bits.push(whUnit(Number(e.quantity).toFixed(2)));
+      if (e.quantity) bits.push(whUnit(fmtNum(Number(e.quantity))));
       if (e.date) bits.push(blEsc(e.date));
       // The order line this roll was cut for — one order can eat several
       // rolls, so the order number alone doesn't say what this one became.
@@ -3669,9 +3677,9 @@
       var tiles = '';
       // HERO — the scanned stock item's meters, front and centre.
       if (d.roll) {
-        var rm = (d.roll.quantity || 0).toFixed(2);
+        var rm = fmtNum(d.roll.quantity || 0);
         var rem = (d.roll.quantity_remaining !== null && d.roll.quantity_remaining !== undefined)
-                  ? Number(d.roll.quantity_remaining).toFixed(2) : null;
+                  ? fmtNum(Number(d.roll.quantity_remaining)) : null;
         var sub = '';
         if (rem !== null && rem !== rm) sub += '{% trans "remaining" %}: <b>' + whUnit(rem) + '</b>';
         if (d.roll.lot_number) sub += (sub ? ' · ' : '') + 'Lot: ' + blEsc(d.roll.lot_number);
@@ -3685,7 +3693,7 @@
       tiles +=
         '<div class="bl-tile">' +
           '<div class="t-label"><i class="fa fa-warehouse"></i> {% trans "Current stock" %}</div>' +
-          '<div class="t-value">' + (p.quantity || 0).toFixed(2) + '<span class="t-unit">' + (p.unit_short || 'm') + '</span></div>' +
+          '<div class="t-value">' + fmtNum(p.quantity || 0) + '<span class="t-unit">' + (p.unit_short || 'm') + '</span></div>' +
         '</div>' +
         '<div class="bl-tile">' +
           '<div class="t-label"><i class="fa fa-layer-group"></i> ' + blCap(p.item_noun_plural || 'rolls') + '</div>' +
@@ -3712,7 +3720,7 @@
     } else if (d && d.found_elsewhere) {
       var ep = d.product, er = d.roll, ew = d.other_warehouse;
       var erem = (er.quantity_remaining !== null && er.quantity_remaining !== undefined)
-                 ? Number(er.quantity_remaining).toFixed(2) : Number(er.quantity || 0).toFixed(2);
+                 ? fmtNum(Number(er.quantity_remaining)) : fmtNum(Number(er.quantity || 0));
       r.innerHTML =
         '<div class="bl-rc elsewhere">' +
           '<span class="bl-status elsewhere"><i class="fa fa-warehouse"></i> {% trans "In a different warehouse" %}</span>' +

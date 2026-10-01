@@ -398,7 +398,7 @@
               <h3>{% trans "Summary" %}</h3>
             </div>
             <div class="pf-sum">
-              <div class="row"><span class="lbl">{% trans "Amount" %}</span><span class="val" id="sumAmount">{{ 0|floatformat:2 }}</span></div>
+              <div class="row"><span class="lbl">{% trans "Amount" %}</span><span class="val" id="sumAmount">{{ 0|floatformat:"2g" }}</span></div>
               <div class="row grand"><span class="lbl">{% trans "Currency" %}</span><span class="val" id="sumCurrency">—</span></div>
             </div>
 
@@ -419,9 +419,9 @@
               </a>
               <div class="n">
                 {{ ledger_movement.date }} ·
-                {{ ledger_movement.amount|floatformat:2 }} {{ ledger_movement.currency.code }}
+                {{ ledger_movement.amount|floatformat:"2g" }} {{ ledger_movement.currency.code }}
                 {% if ledger_movement.currency_id != ledger_movement.current_account.default_currency_id or ledger_movement.exchange_rate != 1 %}
-                  · {{ ledger_movement.amount_base|floatformat:2 }} {{ book.effective_base_currency.code }}
+                  · {{ ledger_movement.amount_base|floatformat:"2g" }} {{ book.effective_base_currency.code }}
                 {% endif %}
               </div>
             </div>

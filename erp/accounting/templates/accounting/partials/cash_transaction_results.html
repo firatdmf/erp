@@ -78,7 +78,7 @@
         {% if t.exchange_rate %}
         <span class="tx-fx" title="Rate on {{ t.date|date:'d M Y' }}">
           {{ base_currency_symbol }}{{ t.amount_in_base_currency|format_money }}
-          <span class="r">@ {{ t.exchange_rate|floatformat:4 }}</span>
+          <span class="r">@ {{ t.exchange_rate|floatformat:"4g" }}</span>
         </span>
         {% endif %}
       </td>

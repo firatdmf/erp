@@ -165,7 +165,7 @@
                 <div class="cl-bar-fill {% if r.is_over %}over{% elif r.usage_pct >= 80 %}warn{% else %}safe{% endif %}" style="width: {% if r.usage_pct > 100 %}100{% elif r.usage_pct < 0 %}0{% else %}{{ r.usage_pct|floatformat:0 }}{% endif %}%;"></div>
               </div>
               <div class="cl-pct {% if r.is_over %}over{% elif r.usage_pct >= 80 %}warn{% else %}safe{% endif %}">
-                %{{ r.usage_pct|floatformat:1 }}
+                %{{ r.usage_pct|floatformat:"1g" }}
               </div>
             </div>
           </td>

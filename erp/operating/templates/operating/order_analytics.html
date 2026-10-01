@@ -420,7 +420,7 @@
       <div class="an-kpi-value">${{ summary.total_profit|money }}</div>
       <div class="an-kpi-meta">
         {% trans "Margin" %}
-        <b class="{% if summary.margin_pct < 0 %}neg{% else %}pos{% endif %}">{{ summary.margin_pct|floatformat:"-1" }}%</b>
+        <b class="{% if summary.margin_pct < 0 %}neg{% else %}pos{% endif %}">{{ summary.margin_pct|floatformat:"-1g" }}%</b>
       </div>
     </div>
 

@@ -42,7 +42,7 @@
     <div class="pr-stock {% if stock <= 0 %}out{% elif stock < 10 %}low{% endif %}">
       <i data-lucide="{% if stock <= 0 %}package-x{% else %}boxes{% endif %}"></i>
       <div>
-        <div class="pr-stock-num">{{ stock|floatformat:0|default:"0" }}</div>
+        <div class="pr-stock-num">{{ stock|floatformat:"0g"|default:"0" }}</div>
         <div class="pr-stock-l">stock</div>
       </div>
     </div>

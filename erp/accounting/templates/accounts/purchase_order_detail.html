@@ -163,7 +163,7 @@
       <div class="po-card-v total">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|money }}</div>
       {# The goods behind the money: how much arrived, and on how many packs. #}
       <div class="po-card-sub">
-        {{ total_quantity|floatformat:2 }}{% if total_unit %} {{ total_unit }}{% endif %}
+        {{ total_quantity|floatformat:"2g" }}{% if total_unit %} {{ total_unit }}{% endif %}
         <span class="dot">·</span>
         {{ total_packs }} {{ total_pack_noun }}
       </div>
@@ -191,7 +191,7 @@
       <span class="po-item-name">{{ it.title }}</span>
       <span class="po-item-figures">
         <span class="po-item-eq">
-          <b>{{ it.quantity|floatformat:2 }} {{ it.unit }}</b> × {{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }} =
+          <b>{{ it.quantity|floatformat:"2g" }} {{ it.unit }}</b> × {{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:"2g" }} =
           <span class="po-item-total">{{ invoice.currency.symbol|default:"$" }}{{ it.total|money }}</span>
         </span>
         {% if it.pack_count %}
@@ -240,7 +240,7 @@
       {% for r in it.planned_rolls %}
       <div class="po-roll planned">
         {% if r.barcode %}<code>{{ r.barcode }}</code>{% endif %}
-        <span class="m">≈ {{ r.quantity|floatformat:2 }} {{ it.unit_short }}</span>
+        <span class="m">≈ {{ r.quantity|floatformat:"2g" }} {{ it.unit_short }}</span>
       </div>
       {% endfor %}
     </div>
@@ -260,7 +260,7 @@
       {% for r in it.warehouse_stock_items.all %}
       <div class="po-roll">
         <code>{{ r.barcode|default:"—" }}</code>
-        <span class="m">{{ r.quantity|floatformat:2 }} {{ r.product.unit_short }}</span>
+        <span class="m">{{ r.quantity|floatformat:"2g" }} {{ r.product.unit_short }}</span>
         {% if r.product.warehouse_id %}<span class="wh">{{ r.product.warehouse.name }}</span>{% endif %}
       </div>
       {% endfor %}

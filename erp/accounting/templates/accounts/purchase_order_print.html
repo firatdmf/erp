@@ -144,8 +144,8 @@
       <td>{{ it.line_no }}</td>
       <td class="desc">{{ it.description }}</td>
       <td class="num">{{ it.roll_count }}</td>
-      <td class="num">{{ it.quantity|floatformat:2 }} {{ it.unit }}</td>
-      <td class="num">{{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }}</td>
+      <td class="num">{{ it.quantity|floatformat:"2g" }} {{ it.unit }}</td>
+      <td class="num">{{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:"2g" }}</td>
       <td class="num">{{ invoice.currency.symbol|default:"$" }}{{ it.total|money }}</td>
     </tr>
     {% endfor %}

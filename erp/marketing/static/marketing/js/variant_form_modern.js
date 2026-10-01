@@ -1,3 +1,12 @@
+// Figures written by script follow the app's language (<html lang>), like
+// the ones the server renders: 1,234.50 in English, 1.234,50 in Turkish.
+window.fmtNum = window.fmtNum || function (n, decimals) {
+  if (decimals == null) decimals = 2;
+  var tr = /^tr\b/i.test(document.documentElement.lang || '');
+  return (Number(n) || 0).toLocaleString(tr ? 'tr-TR' : 'en-US',
+    { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+};
+
 // Modern Variant Form System - Auto-updating with real-time table generation
 let optionCounter = 0;
 let variantData = {};
@@ -1371,9 +1380,9 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                 const minPrice = Math.min(...prices);
                 const maxPrice = Math.max(...prices);
                 if (minPrice === maxPrice) {
-                    priceRange = `$ ${minPrice.toFixed(2)}`;
+                    priceRange = `$ ${fmtNum(minPrice)}`;
                 } else {
-                    priceRange = `$ ${minPrice.toFixed(2)}-${maxPrice.toFixed(2)}`;
+                    priceRange = `$ ${fmtNum(minPrice)}-${fmtNum(maxPrice)}`;
                 }
             }
 
@@ -1456,9 +1465,9 @@ function updateGroupPriceRange(groupId) {
         const minPrice = Math.min(...prices);
         const maxPrice = Math.max(...prices);
         if (minPrice === maxPrice) {
-            priceRange = `$ ${minPrice.toFixed(2)}`;
+            priceRange = `$ ${fmtNum(minPrice)}`;
         } else {
-            priceRange = `$ ${minPrice.toFixed(2)}-${maxPrice.toFixed(2)}`;
+            priceRange = `$ ${fmtNum(minPrice)}-${fmtNum(maxPrice)}`;
         }
     }
 

@@ -18,7 +18,7 @@ class TheFormPrintsOneCurrency(SimpleTestCase):
 
     def test_no_line_total_is_hard_coded_in_dollars(self):
         self.assertNotIn('>$${', self.src)
-        self.assertIn('${CO_CUR.symbol}${(item.quantity*item.price)', self.src)
+        self.assertIn('${CO_CUR.symbol}${fmtNum(item.quantity*item.price)', self.src)
 
     def test_the_reprice_redraws_the_totals_and_the_cards(self):
         body = self.src.split("function coRepriceLabels() {", 1)[1].split("\n  }\n", 1)[0]

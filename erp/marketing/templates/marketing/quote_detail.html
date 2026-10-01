@@ -224,9 +224,9 @@
                   <span class="mono{% if part.variant_lines %} qd-variant-sku{% endif %}">{{ it.product_variant.variant_sku }}</span>
                 {% else %}<span class="qd-empty">—</span>{% endif %}
               </td>
-              <td class="num"><span class="qd-num-val">{{ part.quantity|floatformat:"-2" }}</span> {{ it.unit_label }}</td>
-              <td class="num"><span class="qd-num-val">{{ symbol }}{{ it.price|floatformat:2 }}</span></td>
-              <td class="num"><b>{{ symbol }}{{ part.amount|floatformat:2 }}</b></td>
+              <td class="num"><span class="qd-num-val">{{ part.quantity|floatformat:"-2g" }}</span> {{ it.unit_label }}</td>
+              <td class="num"><span class="qd-num-val">{{ symbol }}{{ it.price|floatformat:"2g" }}</span></td>
+              <td class="num"><b>{{ symbol }}{{ part.amount|floatformat:"2g" }}</b></td>
             </tr>
             {% if part.rolls %}
             <tr class="qd-rolls-row" data-rolls-for="{{ part.key }}" style="display:none;">
@@ -254,7 +254,7 @@
           {% for p in pack_totals %}
           <div class="qd-tot-row"><span>{% trans "Rolls quoted" %}</span><span>{{ p }}</span></div>
           {% endfor %}
-          <div class="qd-tot-row total"><span>{% trans "Total" %}</span><span>{{ symbol }}{{ total|floatformat:2 }}</span></div>
+          <div class="qd-tot-row total"><span>{% trans "Total" %}</span><span>{{ symbol }}{{ total|floatformat:"2g" }}</span></div>
         </div>
       </div>
     </div>

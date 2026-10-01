@@ -126,7 +126,7 @@ tables themselves — see services_posting.chart_of_accounts.
             {% endif %}
           </td>
           <td class="num {% if r.balance < 0 %}neg{% elif not r.balance %}zero{% endif %}">
-            {{ r.balance|floatformat:2|intcomma }} {{ current_book.base_currency.code }}
+            {{ r.balance|floatformat:"2g" }} {{ current_book.base_currency.code }}
           </td>
         </tr>
         {% endfor %}

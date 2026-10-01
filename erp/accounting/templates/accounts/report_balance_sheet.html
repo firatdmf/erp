@@ -130,7 +130,7 @@ where it has not.
         {% if gl.balanced %}
           <span class="note ok">{% trans "Balanced" %}</span>
         {% else %}
-          <span class="note warn">{% trans "Out by" %} {{ gl.difference|floatformat:2|intcomma }}</span>
+          <span class="note warn">{% trans "Out by" %} {{ gl.difference|floatformat:"2g" }}</span>
         {% endif %}
       </div>
 
@@ -139,33 +139,33 @@ where it has not.
         <tr class="section"><td colspan="2">{% trans "Assets" %}</td></tr>
         {% for r in gl.groups.asset %}
         <tr><td><span class="code">{{ r.code }}</span>{{ r.name }}</td>
-            <td class="num">{{ r.balance|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ r.balance|floatformat:"2g" }}</td></tr>
         {% endfor %}
         <tr class="total"><td>{% trans "Total assets" %}</td>
-            <td class="num">{{ gl.assets|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ gl.assets|floatformat:"2g" }}</td></tr>
 
         <tr class="section"><td colspan="2">{% trans "Liabilities" %}</td></tr>
         {% for r in gl.groups.liability %}
         <tr><td><span class="code">{{ r.code }}</span>{{ r.name }}</td>
-            <td class="num">{{ r.balance|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ r.balance|floatformat:"2g" }}</td></tr>
         {% empty %}
         <tr><td class="muted">{% trans "None" %}</td><td class="num muted">0.00</td></tr>
         {% endfor %}
         <tr class="total"><td>{% trans "Total liabilities" %}</td>
-            <td class="num">{{ gl.liabilities|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ gl.liabilities|floatformat:"2g" }}</td></tr>
 
         <tr class="section"><td colspan="2">{% trans "Equity" %}</td></tr>
         {% for r in gl.groups.equity %}
         <tr><td><span class="code">{{ r.code }}</span>{{ r.name }}</td>
-            <td class="num">{{ r.balance|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ r.balance|floatformat:"2g" }}</td></tr>
         {% endfor %}
         <tr><td class="muted">{% trans "Result for the period (revenue less expenses)" %}</td>
-            <td class="num">{{ gl.result|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ gl.result|floatformat:"2g" }}</td></tr>
         <tr class="total"><td>{% trans "Total equity" %}</td>
-            <td class="num">{{ gl.equity|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ gl.equity|floatformat:"2g" }}</td></tr>
 
         <tr class="grand"><td>{% trans "Liabilities + Equity" %}</td>
-            <td class="num">{{ gl.liabilities_plus_equity|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ gl.liabilities_plus_equity|floatformat:"2g" }}</td></tr>
       </table>
       {% else %}
       <div class="bs-empty">
@@ -186,48 +186,48 @@ where it has not.
         {% if subs.balanced %}
           <span class="note ok">{% trans "Balanced" %}</span>
         {% else %}
-          <span class="note warn">{% trans "Out by" %} {{ subs.residual|floatformat:2|intcomma }}</span>
+          <span class="note warn">{% trans "Out by" %} {{ subs.residual|floatformat:"2g" }}</span>
         {% endif %}
       </div>
       <table class="bs-tbl">
         <tr class="section"><td colspan="2">{% trans "Assets" %}</td></tr>
         <tr><td>{% trans "Cash and bank" %} <span class="muted">({% trans "cash journal" %})</span></td>
-            <td class="num">{{ subs.cash|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ subs.cash|floatformat:"2g" }}</td></tr>
         <tr><td>{% trans "Accounts receivable" %} <span class="muted">({% trans "current accounts" %})</span></td>
-            <td class="num">{{ subs.receivable|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ subs.receivable|floatformat:"2g" }}</td></tr>
         <tr>
           <td>{% trans "Inventory" %}
             {% if subs.unvalued_rolls %}
             <span class="muted">
-              — {% blocktrans trimmed with n=subs.unvalued_rolls|intcomma m=subs.unvalued_metres|floatformat:0|intcomma %}
+              — {% blocktrans trimmed with n=subs.unvalued_rolls|intcomma m=subs.unvalued_metres|floatformat:"0g" %}
                 {{ n }} rolls ({{ m }} m) have no cost basis and are not counted
               {% endblocktrans %}
             </span>
             {% endif %}
           </td>
-          <td class="num">{{ subs.inventory|floatformat:2|intcomma }}</td>
+          <td class="num">{{ subs.inventory|floatformat:"2g" }}</td>
         </tr>
         <tr><td>{% trans "Fixed assets" %}</td>
-            <td class="num">{{ subs.fixed|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ subs.fixed|floatformat:"2g" }}</td></tr>
         <tr class="total"><td>{% trans "Total assets" %}</td>
-            <td class="num">{{ subs.assets|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ subs.assets|floatformat:"2g" }}</td></tr>
 
         <tr class="section"><td colspan="2">{% trans "Liabilities" %}</td></tr>
         <tr><td>{% trans "Accounts payable" %} <span class="muted">({% trans "current accounts" %})</span></td>
-            <td class="num">{{ subs.payable|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ subs.payable|floatformat:"2g" }}</td></tr>
         <tr class="total"><td>{% trans "Total liabilities" %}</td>
-            <td class="num">{{ subs.liabilities|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ subs.liabilities|floatformat:"2g" }}</td></tr>
 
         <tr class="section"><td colspan="2">{% trans "Equity" %}</td></tr>
         {% for source, amount in subs.equity_by_source.items %}
         <tr><td class="muted">{{ source }}</td>
-            <td class="num">{{ amount|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ amount|floatformat:"2g" }}</td></tr>
         {% endfor %}
         <tr class="total"><td>{% trans "Total equity" %}</td>
-            <td class="num">{{ subs.equity|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ subs.equity|floatformat:"2g" }}</td></tr>
 
         <tr class="grand"><td>{% trans "Liabilities + Equity" %}</td>
-            <td class="num">{{ subs.liabilities_plus_equity|floatformat:2|intcomma }}</td></tr>
+            <td class="num">{{ subs.liabilities_plus_equity|floatformat:"2g" }}</td></tr>
       </table>
     </div>
   </div>
@@ -254,10 +254,10 @@ where it has not.
           <div class="muted rec-note">{{ r.note }}</div>
           {% endif %}
         </td>
-        <td class="num">{{ r.ledger|floatformat:2|intcomma }}</td>
-        <td class="num">{{ r.subsidiary|floatformat:2|intcomma }}</td>
+        <td class="num">{{ r.ledger|floatformat:"2g" }}</td>
+        <td class="num">{{ r.subsidiary|floatformat:"2g" }}</td>
         <td class="num {% if not r.reconciled %}neg{% endif %}">
-          {% if r.reconciled %}—{% else %}{{ r.difference|floatformat:2|intcomma }}{% endif %}
+          {% if r.reconciled %}—{% else %}{{ r.difference|floatformat:"2g" }}{% endif %}
         </td>
       </tr>
       {% endfor %}
@@ -273,7 +273,7 @@ where it has not.
         <td><span class="code">{{ r.code }}</span>{{ r.label }}
           <div class="muted rec-note">{{ r.note }}</div>
         </td>
-        <td class="num">{{ r.balance|floatformat:2|intcomma }}</td>
+        <td class="num">{{ r.balance|floatformat:"2g" }}</td>
       </tr>
       {% endfor %}
     </table>
@@ -285,14 +285,14 @@ where it has not.
   <div class="bs-resid">
     <div class="bs-resid-h">
       <i data-lucide="alert-triangle"></i>
-      {% blocktrans trimmed with amount=subs.residual|floatformat:2|intcomma %}
+      {% blocktrans trimmed with amount=subs.residual|floatformat:"2g" %}
         The subsidiary ledgers are out by {{ amount }} — here is all of it
       {% endblocktrans %}
     </div>
     <table class="bs-tbl">
       {% for c in subs.causes %}
       <tr><td>{{ c.label }}</td>
-          <td class="num">{{ c.amount|floatformat:2|intcomma }}</td></tr>
+          <td class="num">{{ c.amount|floatformat:"2g" }}</td></tr>
       {% endfor %}
       <tr class="total">
         <td>
@@ -301,7 +301,7 @@ where it has not.
             <span class="muted">— {% trans "exactly equal to the difference above, nothing unexplained" %}</span>
           {% endif %}
         </td>
-        <td class="num">{{ subs.causes_total|floatformat:2|intcomma }}</td>
+        <td class="num">{{ subs.causes_total|floatformat:"2g" }}</td>
       </tr>
     </table>
   </div>
@@ -313,7 +313,7 @@ where it has not.
         {% for r in subs.movement_types %}
         <tr>
           <td>{{ r.type }} <span class="muted">× {{ r.n|intcomma }}</span></td>
-          <td class="num {% if r.amount < 0 %}neg{% endif %}">{{ r.amount|floatformat:2|intcomma }}</td>
+          <td class="num {% if r.amount < 0 %}neg{% endif %}">{{ r.amount|floatformat:"2g" }}</td>
         </tr>
         {% endfor %}
       </table>

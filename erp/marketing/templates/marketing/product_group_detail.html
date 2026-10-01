@@ -30,7 +30,7 @@
   <div class="pgd-stats">
     <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.product_count }}</div><div class="pgd-stat-l">{% trans "Products" %}</div></div>
     <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.variant_count }}</div><div class="pgd-stat-l">{% trans "Variants" %}</div></div>
-    <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.total_stock|floatformat:"-2" }}</div><div class="pgd-stat-l">{% trans "Total stock" %}</div></div>
+    <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.total_stock|floatformat:"-2g" }}</div><div class="pgd-stat-l">{% trans "Total stock" %}</div></div>
     <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.costed_count }}</div><div class="pgd-stat-l">{% trans "Products with cost" %}</div></div>
   </div>
 
@@ -68,11 +68,11 @@
                     {% if r.product.sku %}<span class="pgd-sku">{{ r.product.sku }}</span>{% endif %}
                   </td>
                   <td class="num">{{ r.variant_count }}</td>
-                  <td class="num">{{ r.stock|floatformat:"-2" }}</td>
-                  <td class="num">{% if r.product.price %}${{ r.product.price|floatformat:2 }}{% else %}—{% endif %}</td>
+                  <td class="num">{{ r.stock|floatformat:"-2g" }}</td>
+                  <td class="num">{% if r.product.price %}${{ r.product.price|floatformat:"2g" }}{% else %}—{% endif %}</td>
                   <td>
                     {% if r.margin_override is not None %}
-                      <span class="pgd-mini-chip teal">%{{ r.margin_override|floatformat:"-2" }} {% trans "own" %}</span>
+                      <span class="pgd-mini-chip teal">%{{ r.margin_override|floatformat:"-2g" }} {% trans "own" %}</span>
                     {% elif not r.has_cost %}
                       <span class="pgd-mini-chip warn">{% trans "no cost" %}</span>
                     {% else %}
@@ -92,6 +92,14 @@
 </div>
 
 <script>
+  // Figures written by script follow the app's language (<html lang>), like
+  // the ones the server renders: 1,234.50 in English, 1.234,50 in Turkish.
+  window.fmtNum = window.fmtNum || function (n, decimals) {
+    if (decimals == null) decimals = 2;
+    var tr = /^tr\b/i.test(document.documentElement.lang || '');
+    return (Number(n) || 0).toLocaleString(tr ? 'tr-TR' : 'en-US',
+      { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  };
 const PGD_URL = "{% url 'marketing:product_group_detail' group.pk %}";
 const PGD_CSRF = '{{ csrf_token }}';
 
@@ -108,7 +116,7 @@ function pgdMarginExample() {
   const box = document.getElementById('pgdMarginExample');
   const m = parseFloat((document.getElementById('pgdMargin').value || '').replace(',', '.'));
   if (isNaN(m)) { box.style.display = 'none'; return; }
-  const price = (100 * (1 + m / 100)).toFixed(2);
+  const price = fmtNum(100 * (1 + m / 100));
   box.style.display = '';
   box.textContent = '{% trans "Example" %}: {% trans "cost" %} $100 → {% trans "price" %} $' + price;
 }

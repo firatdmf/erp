@@ -7,7 +7,7 @@
 <body style="margin:0;padding:0;background:#F4F7FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0F1419;">
   <!-- Preheader (hidden inbox preview text) -->
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#F4F7FA;">
-    {{ event_label }} · {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} · {{ currency_symbol|default:"$" }}{{ order_total|default:0|floatformat:2 }}
+    {{ event_label }} · {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} · {{ currency_symbol|default:"$" }}{{ order_total|default:0|floatformat:"2g" }}
   </div>
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F4F7FA;padding:32px 16px;">
     <tr>
@@ -74,8 +74,8 @@
                       {% if it.product_variant and it.product_variant.variant_sku %}<div style="font-size:11.5px;color:#64748B;">{{ it.product_variant.variant_sku }}</div>{% endif %}
                     </td>
                     <td align="right" style="padding:6px 0;white-space:nowrap;">
-                      {{ it.quantity|default:0|floatformat:2 }} × {{ currency_symbol|default:"$" }}{{ it.price|default:0|floatformat:2 }}
-                      <div style="font-weight:700;color:#0F1419;">{{ currency_symbol|default:"$" }}{{ it.line_total_calc|default:0|floatformat:2 }}</div>
+                      {{ it.quantity|default:0|floatformat:"2g" }} × {{ currency_symbol|default:"$" }}{{ it.price|default:0|floatformat:"2g" }}
+                      <div style="font-weight:700;color:#0F1419;">{{ currency_symbol|default:"$" }}{{ it.line_total_calc|default:0|floatformat:"2g" }}</div>
                     </td>
                   </tr>
                   {% endfor %}
@@ -83,12 +83,12 @@
                   {% for adj in order_adjustments %}
                   <tr>
                     <td style="padding:4px 0;color:#475569;">{{ adj.label }}</td>
-                    <td align="right" style="padding:4px 0;color:#475569;">{% if adj.amount < 0 %}−{{ currency_symbol|default:"$" }}{{ adj.amount|floatformat:2|cut:"-" }}{% else %}{{ currency_symbol|default:"$" }}{{ adj.amount|floatformat:2 }}{% endif %}</td>
+                    <td align="right" style="padding:4px 0;color:#475569;">{% if adj.amount < 0 %}−{{ currency_symbol|default:"$" }}{{ adj.amount|floatformat:"2g"|cut:"-" }}{% else %}{{ currency_symbol|default:"$" }}{{ adj.amount|floatformat:"2g" }}{% endif %}</td>
                   </tr>
                   {% endfor %}
                   <tr>
                     <td style="padding:8px 0;font-weight:600;">Total</td>
-                    <td align="right" style="padding:8px 0;font-weight:800;font-size:16px;color:#0F1419;">{{ currency_symbol|default:"$" }}{{ order_total|default:0|floatformat:2 }}</td>
+                    <td align="right" style="padding:8px 0;font-weight:800;font-size:16px;color:#0F1419;">{{ currency_symbol|default:"$" }}{{ order_total|default:0|floatformat:"2g" }}</td>
                   </tr>
                 </table>
               </div>

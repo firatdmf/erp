@@ -154,7 +154,7 @@
           {% if item.is_custom_curtain %}
             <div class="pdesc">
               {% trans "Custom curtain" %}
-              {% if item.custom_width %} · {{ item.custom_width|floatformat:0 }}{% if item.custom_height %}×{{ item.custom_height|floatformat:0 }}{% endif %} cm{% endif %}
+              {% if item.custom_width %} · {{ item.custom_width|floatformat:"0g" }}{% if item.custom_height %}×{{ item.custom_height|floatformat:"0g" }}{% endif %} cm{% endif %}
               {% if item.custom_pleat_type %} · {{ item.custom_pleat_type }}{% endif %}
             </div>
           {% endif %}

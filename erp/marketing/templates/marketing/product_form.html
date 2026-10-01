@@ -444,7 +444,7 @@
                   </td>
                   <td>
                     <div class="cost-display" data-unit-cost="{{ item.raw_material.unit_cost|default:0 }}">
-                      ${{ item.raw_material.unit_cost|default:0|floatformat:2 }}
+                      ${{ item.raw_material.unit_cost|default:0|floatformat:"2g" }}
                     </div>
                   </td>
                   <td>
@@ -536,7 +536,7 @@
             <label for="id_profit_margin">
               {% trans "Profit margin" %} (%)
               {% if product.category and product.category.profit_margin is not None %}
-                <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "group default" %}: %{{ product.category.profit_margin|floatformat:"-2" }}</span>
+                <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "group default" %}: %{{ product.category.profit_margin|floatformat:"-2g" }}</span>
               {% endif %}
             </label>
             {{ form.profit_margin }}
@@ -555,7 +555,7 @@
             <label for="id_minimum_order_quantity">
               {% trans "Minimum order quantity" %}
               {% if product.category and product.category.minimum_order_quantity is not None %}
-                <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "group default" %}: {{ product.category.minimum_order_quantity|floatformat:"-2" }}</span>
+                <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "group default" %}: {{ product.category.minimum_order_quantity|floatformat:"-2g" }}</span>
               {% endif %}
             </label>
             {{ form.minimum_order_quantity }}
@@ -710,7 +710,7 @@
             {# Read-only: stock is what the warehouse holds, not a field. #}
             <div class="form-input" style="background:#F8FAFC;color:#475569;">
               {% if product.live_quantity is not None %}
-                {{ product.live_quantity|floatformat:"-2" }}
+                {{ product.live_quantity|floatformat:"-2g" }}
               {% else %}
                 <span style="color:#94A3B8;">{% trans "Not stocked \u2014 made to order" %}</span>
               {% endif %}
@@ -971,6 +971,14 @@
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
+  // Figures written by script follow the app's language (<html lang>), like
+  // the ones the server renders: 1,234.50 in English, 1.234,50 in Turkish.
+  window.fmtNum = window.fmtNum || function (n, decimals) {
+    if (decimals == null) decimals = 2;
+    var tr = /^tr\b/i.test(document.documentElement.lang || '');
+    return (Number(n) || 0).toLocaleString(tr ? 'tr-TR' : 'en-US',
+      { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  };
   let sortableInstance = null;
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -1294,7 +1302,7 @@
         </td>
         <td>
           <div class="cost-display" data-unit-cost="${material.cost || 0}">
-            $${parseFloat(material.cost || 0).toFixed(2)}
+            $${fmtNum(parseFloat(material.cost || 0))}
           </div>
         </td>
         <td>
@@ -1341,10 +1349,10 @@
         const unitCost = parseFloat(costDiv.dataset.unitCost) || 0;
         const total = qty * unitCost;
 
-        row.querySelector('.total-cost-display').textContent = '$' + total.toFixed(2);
+        row.querySelector('.total-cost-display').textContent = '$' + fmtNum(total);
         grandTotal += total;
       });
-      bomGrandTotal.textContent = '$' + grandTotal.toFixed(2);
+      bomGrandTotal.textContent = '$' + fmtNum(grandTotal);
     }
 
     // Init existing rows logic

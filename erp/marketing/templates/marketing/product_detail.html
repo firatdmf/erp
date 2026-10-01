@@ -167,7 +167,7 @@
           {% if camp %}
             {% if camp.campaign_type == 'percentage' %}
               <span class="b2b-badge b2b-badge--pct">
-                <i data-lucide="percent"></i> %{{ camp.discount_percent|floatformat:'-2' }}
+                <i data-lucide="percent"></i> %{{ camp.discount_percent|floatformat:"-2g" }}
                 {% if camp.end_date %} · {{ camp.end_date|date:"d M" }}{% endif %}
               </span>
             {% elif camp.campaign_type == 'volume' %}
@@ -190,7 +190,7 @@
               {{ t.min_qty }}{% if t.max_qty %} – {{ t.max_qty }}{% else %}+{% endif %}
               <small>{% trans "units" %}</small>
             </div>
-            <div class="b2b-tier-pct">%{{ t.discount_percent|floatformat:'-2' }} {% trans "off" %}</div>
+            <div class="b2b-tier-pct">%{{ t.discount_percent|floatformat:"-2g" }} {% trans "off" %}</div>
           </div>
           {% endfor %}
         </div>
@@ -318,7 +318,7 @@
                 who sell and cut the cloth, who need to know whether 40 metres
                 are left — the storefront's "50+" hedge is for buyers, and it
                 called every variant under fifty "unavailable".{% endcomment %}
-                <span class="variant-availability"><b>{{ variant.live_quantity|floatformat:"-2" }}</b> {{ product.unit_short }}</span>
+                <span class="variant-availability"><b>{{ variant.live_quantity|floatformat:"-2g" }}</b> {{ product.unit_short }}</span>
                 {% comment %}The total counts every warehouse in every book, so
                 where it is split it says so by name. Nobody should read one
                 company's cloth and another's as a single pile to cut
@@ -327,7 +327,7 @@
                 <span class="stock-where">
                   {% for row in variant.stock_locations %}
                   <span class="stock-at">
-                    <span class="q">{{ row.quantity|floatformat:"-2" }}</span>
+                    <span class="q">{{ row.quantity|floatformat:"-2g" }}</span>
                     <span class="wh">{{ row.warehouse.name }}</span>
                   </span>
                   {% endfor %}

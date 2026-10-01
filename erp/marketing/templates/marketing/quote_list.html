@@ -49,7 +49,7 @@
         <td><a href="{% url 'marketing:quote_detail' qo.pk %}">{{ qo.number }}</a>{% if qo.book %}<div style="font-size:11px; color:#94A3B8;">{{ qo.book.name }}</div>{% endif %}</td>
         <td>{{ qo.date|date:"d.m.Y" }}</td>
         <td>{{ qo.get_client }}</td>
-        <td class="qt-num">{{ qo.currency.symbol|default:qo.currency.code }}{{ qo.total|floatformat:2 }}</td>
+        <td class="qt-num">{{ qo.currency.symbol|default:qo.currency.code }}{{ qo.total|floatformat:"2g" }}</td>
         <td>{{ qo.valid_until|date:"d.m.Y"|default:"—" }}</td>
         <td><span class="qt-badge {{ qo.status_key }}">{{ qo.status_label }}</span></td>
         <td>{% if qo.order %}<a href="{% url 'operating:order_detail' qo.order.pk %}">{{ qo.order.order_number }}</a>{% else %}—{% endif %}</td>

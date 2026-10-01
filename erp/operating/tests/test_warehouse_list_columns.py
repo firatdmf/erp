@@ -89,7 +89,7 @@ class UnitCostIsTheWeightedAverage(TestCase):
         self._top("300", "4.00", "a")
         html = self._list()
         self.assertEqual(_cell(html, "Unit cost"), "$4.00")
-        self.assertEqual(_cell(html, "Total"), "$1200.00")
+        self.assertEqual(_cell(html, "Total"), "$1,200.00")
 
     def test_stock_with_no_recorded_cost_shows_a_dash_not_a_guess(self):
         self._top("300", None, "a")

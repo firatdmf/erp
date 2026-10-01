@@ -125,9 +125,9 @@
           <td>{{ r.mv.get_movement_type_display }}</td>
           <td>{{ r.description|default:r.mv.description|default:"" }}</td>
           <td>{{ r.mv.reference|default:"" }}</td>
-          <td class="num">{% if r.mv.amount_base > 0 %}{{ r.mv.amount_base|floatformat:2 }}{% endif %}</td>
-          <td class="num">{% if r.mv.amount_base < 0 %}{{ r.mv.amount_base|floatformat:2|cut:"-" }}{% endif %}</td>
-          <td class="num bal">{{ r.balance_after|floatformat:2 }}</td>
+          <td class="num">{% if r.mv.amount_base > 0 %}{{ r.mv.amount_base|floatformat:"2g" }}{% endif %}</td>
+          <td class="num">{% if r.mv.amount_base < 0 %}{{ r.mv.amount_base|floatformat:"2g"|cut:"-" }}{% endif %}</td>
+          <td class="num bal">{{ r.balance_after|floatformat:"2g" }}</td>
         </tr>
       {% empty %}
         <tr><td colspan="8" class="empty">{% trans "No movements on this account." %}</td></tr>
@@ -137,9 +137,9 @@
       <tfoot>
         <tr>
           <td colspan="5">{% trans "Total" %}</td>
-          <td class="num">{{ debit_total|floatformat:2 }}</td>
-          <td class="num">{{ credit_total|floatformat:2 }}</td>
-          <td class="num">{{ closing|floatformat:2 }}</td>
+          <td class="num">{{ debit_total|floatformat:"2g" }}</td>
+          <td class="num">{{ credit_total|floatformat:"2g" }}</td>
+          <td class="num">{{ closing|floatformat:"2g" }}</td>
         </tr>
       </tfoot>
     {% endif %}
@@ -153,7 +153,7 @@
         {% else %}{% trans "Account closed" %}{% endif %}
       </td>
       <td class="val">
-        {{ closing|floatformat:2|cut:"-" }} {{ currency_symbol }}
+        {{ closing|floatformat:"2g"|cut:"-" }} {{ currency_symbol }}
       </td>
     </tr>
   </table>

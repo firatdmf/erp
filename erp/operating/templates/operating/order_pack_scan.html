@@ -462,7 +462,7 @@
             <div class="pk-pgroup-h">
               <span class="pk-pgroup-name">{{ it.display_name }}</span>
               <span class="pk-pgroup-sku">{{ it.display_sku|default:'—' }}</span>
-              <span class="pk-pgroup-qty">{{ it.quantity|floatformat:2 }} m</span>
+              <span class="pk-pgroup-qty">{{ it.quantity|floatformat:"2g" }} m</span>
             </div>
             <div class="pk-pgroup-rolls" data-order-item-id="{{ it.pk }}" ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDropUnassign(event)">
               {% for r in reservations %}{% if r.order_item_id == it.pk and not r.pack_id %}
@@ -519,7 +519,7 @@
             <span class="pk-pack-title">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paket{% else %}Package{% endif %} #{{ p.pack_number }}</span>
             <span class="pk-pack-meta">
               <span data-count>{{ p.roll_count }}</span> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}rolls{% endif %}
-              · <span data-meters>{{ p.total_meters|floatformat:2 }}</span> m
+              · <span data-meters>{{ p.total_meters|floatformat:"2g" }}</span> m
               <span data-extra {% if not p.item_count %}hidden{% endif %}>· +{{ p.item_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}kalem{% else %}items{% endif %}</span>
             </span>
             {% if not shipped %}
@@ -539,7 +539,7 @@
                   <div class="pk-row-name">{{ it.display_name }}</div>
                   <div class="pk-row-meta">{{ it.display_sku|default:'—' }}</div>
                 </div>
-                <span class="pk-item-qty" style="flex-shrink:0;">{{ it.quantity|floatformat:2 }}</span>
+                <span class="pk-item-qty" style="flex-shrink:0;">{{ it.quantity|floatformat:"2g" }}</span>
               </div>
             </div>
             {% endif %}{% endfor %}
@@ -582,7 +582,7 @@
               <div class="pk-row-name">{{ it.display_name }}</div>
               <div class="pk-row-meta">{{ it.display_sku|default:'—' }}</div>
             </div>
-            <span class="pk-item-qty" style="flex-shrink:0;">{{ it.quantity|floatformat:2 }}</span>
+            <span class="pk-item-qty" style="flex-shrink:0;">{{ it.quantity|floatformat:"2g" }}</span>
           </div>
         </div>
         {% endif %}{% endfor %}
@@ -650,8 +650,16 @@
 </div>
 
 <script>
-(function(){
   "use strict";
+  // Figures written by script follow the app's language (<html lang>), like
+  // the ones the server renders: 1,234.50 in English, 1.234,50 in Turkish.
+  window.fmtNum = window.fmtNum || function (n, decimals) {
+    if (decimals == null) decimals = 2;
+    var tr = /^tr\b/i.test(document.documentElement.lang || '');
+    return (Number(n) || 0).toLocaleString(tr ? 'tr-TR' : 'en-US',
+      { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  };
+(function(){
   var TR = ('{{ LANGUAGE_CODE|slice:":2" }}' === 'tr');
   var wrap = document.querySelector('.pk-wrap');
   var CSRF = '{{ csrf_token }}';
@@ -699,7 +707,7 @@
 
   function cutValText(m, rem){
     var partial = m < rem - 0.005;
-    return m.toFixed(2) + ' m' + (partial ? ' <small>(' + t('kısmi','partial') + ')</small>' : '');
+    return fmtNum(m) + ' m' + (partial ? ' <small>(' + t('kısmi','partial') + ')</small>' : '');
   }
 
   // Must stay attribute-for-attribute with partials/_pack_roll_row.html —
@@ -724,7 +732,7 @@
         '<div class="pk-row-cut" data-cut="'+res.id+'" data-quantity="'+m.toFixed(2)+'" data-remaining="'+Number(rem).toFixed(2)+'">'+
           '<span class="pk-cut-view">'+
             '<span class="pk-cut-val">'+cutValText(m, rem)+'</span>'+
-            '<span class="pk-avail">/ '+Number(rem).toFixed(2)+' m</span>'+
+            '<span class="pk-avail">/ '+fmtNum(Number(rem))+' m</span>'+
           '</span>'+
         '</div>'+
       '</div>';
@@ -794,7 +802,7 @@
       var countEl = pack.querySelector('.pk-pack-meta [data-count]');
       if (countEl) countEl.textContent = rows.length;
       var metersEl = pack.querySelector('.pk-pack-meta [data-meters]');
-      if (metersEl) metersEl.textContent = meters.toFixed(2);
+      if (metersEl) metersEl.textContent = fmtNum(meters);
       var extras = pack.querySelectorAll('.pk-citem').length;
       var extraEl = pack.querySelector('.pk-pack-meta [data-extra]');
       if (extraEl){
@@ -815,7 +823,7 @@
     });
     var c1=document.getElementById('pkCount'), tt=document.getElementById('pkTotal');
     if (c1) c1.textContent = n;
-    if (tt) tt.textContent = tot.toFixed(2);
+    if (tt) tt.textContent = fmtNum(tot);
     pkRegroup();
   }
 
@@ -845,7 +853,7 @@
     row.className = 'pks-log-row' + (kind ? ' ' + kind : '');
     row.innerHTML = '<code>' + esc(code || '—') + '</code>' +
                     '<span class="nm">' + esc(name || '') + '</span>' +
-                    (meters != null ? '<span class="m">' + Number(meters).toFixed(2) + ' m</span>' : '');
+                    (meters != null ? '<span class="m">' + fmtNum(Number(meters)) + ' m</span>' : '');
     log.insertBefore(row, log.firstChild);
     while (log.children.length > 200) log.removeChild(log.lastChild);
   }
@@ -1641,9 +1649,9 @@
       (r.sku ? '<div><span class="pks-sku">' + esc(r.sku) + '</span></div>' : '') +
       (r.warehouse ? '<div class="pks-where">' + esc(r.warehouse) + '</div>' : '') +
       '<div class="pks-tiles">' +
-        tile(t('Bu siparişe ayrılan','Reserved for this order'), Number(r.quantity||0).toFixed(2), 'm', true) +
+        tile(t('Bu siparişe ayrılan','Reserved for this order'), fmtNum(Number(r.quantity||0)), 'm', true) +
         tile(t('Topta kalan','Left on the roll'),
-             (r.roll_remaining != null ? Number(r.roll_remaining).toFixed(2) : '—'), 'm') +
+             (r.roll_remaining != null ? fmtNum(Number(r.roll_remaining)) : '—'), 'm') +
       '</div>' +
       '<div class="pks-actions"><button type="button" class="pks-act primary" data-scan-back>' +
         '<i class="fa fa-barcode"></i>' + t('Yeni top okut','Scan another') + '</button></div>' +
@@ -1723,8 +1731,8 @@
       (row.dataset.sku ? '<div><span class="pks-sku">' + esc(row.dataset.sku) + '</span></div>' : '') +
       (row.dataset.warehouse ? '<div class="pks-where">' + esc(row.dataset.warehouse) + '</div>' : '') +
       '<div class="pks-tiles">' +
-        tile(t('Bu siparişe ayrılan','Reserved for this order'), qty.toFixed(2), 'm', true) +
-        tile(t('Topta kalan','Left on the roll'), rem.toFixed(2), 'm') +
+        tile(t('Bu siparişe ayrılan','Reserved for this order'), fmtNum(qty), 'm', true) +
+        tile(t('Topta kalan','Left on the roll'), fmtNum(rem), 'm') +
         tile(t('Şu an','Currently'), where, '') +
       '</div>' +
       '<div class="pks-actions">' +
@@ -1777,9 +1785,9 @@
       (r.sku ? '<div><span class="pks-sku">' + esc(r.sku) + '</span></div>' : '') +
       (r.warehouse ? '<div class="pks-where">' + esc(r.warehouse) + '</div>' : '') +
       '<div class="pks-tiles">' +
-        tile(t('Bu siparişe ayrılan','Reserved for this order'), Number(r.quantity||0).toFixed(2), 'm', true) +
+        tile(t('Bu siparişe ayrılan','Reserved for this order'), fmtNum(Number(r.quantity||0)), 'm', true) +
         tile(t('Topta kalan','Left on the roll'),
-             (r.roll_remaining != null ? Number(r.roll_remaining).toFixed(2) : '—'), 'm') +
+             (r.roll_remaining != null ? fmtNum(Number(r.roll_remaining)) : '—'), 'm') +
         tile(t('Önceden','Was'), from, '') +
       '</div>' +
       '<div class="pks-actions">' +

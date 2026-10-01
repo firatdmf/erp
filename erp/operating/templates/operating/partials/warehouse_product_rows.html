@@ -58,9 +58,9 @@ links so that keeps working.{% endcomment %}
   {% endif %}
   <td class="num" data-label="{% trans 'Stock' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
-      <div class="qty">{{ p.quantity|floatformat:2 }} {{ p.unit_short }}</div>
+      <div class="qty">{{ p.quantity|floatformat:"2g" }} {{ p.unit_short }}</div>
       {% if p.roll_count %}<div class="tops-sub" title="{% blocktrans with n=p.item_noun_plural %}The {{ n }} this product is stored in{% endblocktrans %}">{{ p.roll_count }} {% if p.roll_count == 1 %}{{ p.item_noun }}{% else %}{{ p.item_noun_plural }}{% endif %}</div>{% endif %}
-      {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} {{ p.unit_short }}</div>{% endif %}
+      {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:"2g" }} {{ p.unit_short }}</div>{% endif %}
     </a>
   </td>
   {% comment %}Unit cost is the quantity-weighted average of the rolls
@@ -75,19 +75,19 @@ links so that keeps working.{% endcomment %}
   warehouse_detail.html drops the same column.{% endcomment %}
   <td class="num" data-label="{% trans 'Price' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
-      {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|sales_rep_price|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+      {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|sales_rep_price|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
   {% else %}
   <td class="num" data-label="{% trans 'Unit cost' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;"
-       {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:4 }}"{% endif %}>
-      {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+       {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"4g" }}"{% endif %}>
+      {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
   <td class="num" data-label="{% trans 'Total' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
-      {% if p.line_usd %}<span class="cost-usd">{{ p.warehouse|book_sign }}{{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+      {% if p.line_usd %}<span class="cost-usd">{{ p.warehouse|book_sign }}{{ p.line_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
   {% endif %}
@@ -130,20 +130,20 @@ links so that keeps working.{% endcomment %}
   </td>
   {% endif %}
   <td class="num" data-label="{% trans 'Total' %}">
-    <div class="qty">{{ g.total_qty|floatformat:2 }} {{ g.unit_short }}</div>
+    <div class="qty">{{ g.total_qty|floatformat:"2g" }} {{ g.unit_short }}</div>
     {% if g.roll_total %}<div class="tops-sub">{{ g.roll_total }} {% if g.roll_total == 1 %}{{ g.item_noun }}{% else %}{{ g.item_noun_plural }}{% endif %}</div>{% endif %}
-    {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ g.reserved_total|floatformat:2 }} {{ g.unit_short }}</div>{% endif %}
+    {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ g.reserved_total|floatformat:"2g" }} {{ g.unit_short }}</div>{% endif %}
   </td>
   {% if is_sales_rep %}
   {# Price derived from the average cost, and no Total — as the flat rows. #}
   <td class="num" data-label="{% trans 'Price' %}">
-    {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|sales_rep_price|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|sales_rep_price|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   {% else %}
   <td class="num" data-label="{% trans 'Unit cost' %}" title="{% trans 'Weighted-average unit cost across the variants of this product' %}">
-    {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
-  <td class="num" data-label="{% trans 'Total' %}">{% if g.total_usd %}<span class="cost-usd">{{ cost_sign }}{{ g.total_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num" data-label="{% trans 'Total' %}">{% if g.total_usd %}<span class="cost-usd">{{ cost_sign }}{{ g.total_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
   {% endif %}
 </tr>
 {% endwith %}

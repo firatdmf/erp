@@ -69,6 +69,10 @@
     .tx-filter a.on { background: #46546A; border-color: #46546A; color: #fff; }
     .tx-filter .n { font-size: .74rem; color: #8A96A6; }
     .tx-filter a.on .n { color: #C9D3E0; }
+
+    /* A row whose source has a page opens it; the rest are not links. */
+    tr.tx-link { cursor: pointer; }
+    tr.tx-link:hover td { background: #F5F8FB; }
   </style>
 
   <div class="financial-overview-card">
@@ -82,4 +86,17 @@
     </div>
   </div>
 </div>
+
+<script>
+  // One listener on the document rather than one per row: htmx replaces
+  // the rows whenever an account tab or pager link is clicked, and
+  // listeners bound to the old rows would go with them.
+  document.addEventListener('click', function (e) {
+    const row = e.target.closest('tr.tx-link[data-href]');
+    if (!row || e.target.closest('a, button')) return;
+    if (window.getSelection().toString()) return;  // selecting text, not opening
+    if (e.metaKey || e.ctrlKey) window.open(row.dataset.href, '_blank');
+    else window.location.href = row.dataset.href;
+  });
+</script>
 {% endblock %}

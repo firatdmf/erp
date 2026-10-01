@@ -235,7 +235,8 @@ class EquityCapitalForm(ExchangeRateFormMixin, forms.ModelForm):
         model = EquityCapital
         exclude = ["new_shares_issued"]
         widgets = {
-            "date_invested": forms.DateInput(attrs={"type": "date"}),
+            # ISO whatever the locale — see EquityRevenueForm.
+            "date_invested": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             # Hide the book field, and pass the value from the view (url)
             "book": forms.HiddenInput(),
             "currency": forms.HiddenInput(),
@@ -245,9 +246,11 @@ class EquityCapitalForm(ExchangeRateFormMixin, forms.ModelForm):
         book = kwargs.pop("book", None)
         super(EquityCapitalForm, self).__init__(*args, **kwargs)
 
-        self.fields["date_invested"].widget.attrs["value"] = date.today().strftime(
-            "%Y-%m-%d"
-        )
+        # Today for a new deposit; an edit opens on the date it was made.
+        if not self.instance.pk:
+            self.fields["date_invested"].widget.attrs["value"] = date.today().strftime(
+                "%Y-%m-%d"
+            )
 
         if book:
             # The values_list method in Django's QuerySet API is used to create a list (or tuple) of values from the specified fields of the model.
@@ -272,7 +275,9 @@ class EquityRevenueForm(forms.ModelForm):
         model = EquityRevenue
         fields = "__all__"
         widgets = {
-            "date": forms.DateInput(attrs={"type": "date"}),
+            # ISO whatever the locale: <input type="date"> drops anything
+            # else, and an edit would open with the date blank.
+            "date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "book": forms.HiddenInput(),
             "currency": forms.HiddenInput(),
             # "invoice_number": forms.HiddenInput(),
@@ -281,8 +286,10 @@ class EquityRevenueForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         book = kwargs.pop("book", None)
         super(EquityRevenueForm, self).__init__(*args, **kwargs)
-        # pre-populate the datefield with today's date
-        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # pre-populate the datefield with today's date — a new revenue only;
+        # an edit opens on the date it was recorded for.
+        if not self.instance.pk:
+            self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
 
         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
@@ -398,7 +405,8 @@ class EquityDividentForm(ExchangeRateFormMixin, forms.ModelForm):
         model = EquityDivident
         fields = "__all__"
         widgets = {
-            "date": forms.DateInput(attrs={"type": "date"}),
+            # ISO whatever the locale — see EquityRevenueForm.
+            "date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "book": forms.HiddenInput(),
             "currency": forms.HiddenInput(),
         }
@@ -406,7 +414,9 @@ class EquityDividentForm(ExchangeRateFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         book = kwargs.pop("book", None)
         super(EquityDividentForm, self).__init__(*args, **kwargs)
-        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # Today for a new entry; an edit opens on the date it was made.
+        if not self.instance.pk:
+            self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         if book:
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
@@ -427,7 +437,8 @@ class InTransferForm(forms.ModelForm):
         fields = "__all__"
         # exclude = ["currency"]
         widgets = {
-            "date": forms.DateInput(attrs={"type": "date"}),
+            # ISO whatever the locale — see EquityRevenueForm.
+            "date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "book": forms.HiddenInput(),
             "currency": forms.HiddenInput(),
         }
@@ -435,7 +446,9 @@ class InTransferForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         book = kwargs.pop("book", None)
         super(InTransferForm, self).__init__(*args, **kwargs)
-        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # Today for a new entry; an edit opens on the date it was made.
+        if not self.instance.pk:
+            self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         # self.fields["currency"].value =
         # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
@@ -583,7 +596,8 @@ class CurrencyExchangeForm(forms.ModelForm):
         model = CurrencyExchange
         fields = "__all__"
         widgets = {
-            "date": forms.DateInput(attrs={"type": "date"}),
+            # ISO whatever the locale — see EquityRevenueForm.
+            "date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "book": forms.HiddenInput(),
         }
 
@@ -595,7 +609,9 @@ class CurrencyExchangeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         book = kwargs.pop("book", None)
         super(CurrencyExchangeForm, self).__init__(*args, **kwargs)
-        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # Today for a new exchange; an edit opens on the date it was made.
+        if not self.instance.pk:
+            self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
             self.fields["from_cash_account"].queryset = CashAccount.objects.filter(

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% comment %}
+  Correcting a revenue, a capital deposit or a currency exchange. Saving
+  unposts what is stored and posts the edited entry — see CashSourceEdit —
+  and lands back on the entry's own page.
+{% endcomment %}
+
+{% block css %}
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .xd { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 880px; margin: 0 auto; }
+  .xd, .xd * { box-sizing: border-box; }
+
+  .xd-back { display:inline-flex; align-items:center; gap:6px; color: var(--gray-600); font: 500 12.5px var(--font-sans); text-decoration: none; margin-bottom: 14px; }
+  .xd-back:hover { color: var(--nejum-teal-700); }
+
+  .xd-head { display:flex; align-items:flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .xd-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .xd-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0; font-variant-numeric: tabular-nums; }
+  .xd-id { color: var(--gray-400); font-weight: 700; margin-left: 8px; }
+  .xd-actions { margin-left: auto; display:flex; gap: 8px; flex-wrap: wrap; }
+
+  .xd-btn { display:inline-flex; align-items:center; gap:7px; padding: 9px 16px; border-radius: 10px; font: 600 13px var(--font-sans); cursor: pointer; text-decoration: none; border: none; transition: all 140ms; }
+  .xd-btn i { width: 14px; height: 14px; }
+  .xd-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; }
+  .xd-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .xd-btn.danger { background: white; border:1px solid #F0C9C2; color: #B23B12; }
+  .xd-btn.danger:hover { background: #FDF3F2; }
+
+  .xd-card { background: white; border:1px solid #E2E8EE; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); overflow: hidden; margin-bottom: 14px; }
+  .xd-sect { padding: 18px 22px; }
+  .xd-sect-h { display:flex; align-items:center; gap: 10px; margin-bottom: 14px; }
+  .xd-sect-h .ico { display:inline-flex; align-items:center; justify-content:center; width: 28px; height: 28px; border-radius: 8px; background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+  .xd-sect-h h3 { font: 700 14px var(--font-sans); margin: 0; }
+
+  .xd-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  @media (max-width: 720px) { .xd-facts { grid-template-columns: 1fr; } }
+  .xd-fact { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px dashed #E7ECF2; }
+  .xd-fact .k { color: var(--gray-600); font: 500 12.5px var(--font-sans); }
+  .xd-fact .v { font: 600 13px var(--font-sans); text-align: right; font-variant-numeric: tabular-nums; }
+  .xd-fact .v.mono { font-family: var(--font-mono); font-size: 12.5px; }
+  .xd-fact .v .eq { color: var(--gray-500); font-weight: 500; margin-left: 6px; }
+
+  /* The posted row: what the ledger holds, not what the form said. */
+  .xd-posted { border: 1px solid #E7ECF2; border-radius: 10px; padding: 13px 15px; background: #FCFDFE; }
+  .xd-posted .who { display:flex; align-items:center; gap: 8px; flex-wrap: wrap; }
+  .xd-posted .code { font: 600 11.5px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 7px; background: var(--nejum-teal-50); border-radius: 6px; }
+  .xd-posted .name { font: 700 14px var(--font-sans); color: var(--ink); text-decoration: none; }
+  .xd-posted .name:hover { color: var(--nejum-teal-700); text-decoration: underline; }
+  .xd-posted .n { font: 500 12.5px var(--font-sans); color: var(--gray-500); margin-top: 7px; font-variant-numeric: tabular-nums; }
+  .xd-posted .amt { font: 700 16px var(--font-sans); color: #B23B12; font-variant-numeric: tabular-nums; margin-top: 8px; display:block; }
+  .xd-posted .gone { font: 500 12.5px var(--font-sans); color: #B23B12; }
+
+  .xd-note { display:flex; gap: 10px; align-items:flex-start; border-radius: 10px; padding: 12px 14px; font: 500 12.5px var(--font-sans); line-height: 1.55; margin-bottom: 14px; }
+  .xd-note.info { background: #F1F6FB; border: 1px solid #CFE0F0; color: #24486B; }
+  .xd-note i { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+
+  .xd-desc { font: 500 13px var(--font-sans); color: var(--ink); line-height: 1.6; }
+
+  .xd-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+  @media (max-width: 720px) { .xd-form { grid-template-columns: 1fr; } }
+  .xd-field.wide { grid-column: 1 / -1; }
+  .xd-field label { display: block; font: 600 12.5px var(--font-sans); color: var(--gray-600); margin-bottom: 6px; }
+  .xd-field input, .xd-field select, .xd-field textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #D1D9E2; border-radius: 9px;
+    font: 500 13.5px var(--font-sans); color: var(--ink); background: white;
+  }
+  .xd-field input:focus, .xd-field select:focus, .xd-field textarea:focus {
+    outline: none; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px var(--nejum-teal-50);
+  }
+  .xd-field .err, .xd-errors { color: #B23B12; font: 500 12.5px var(--font-sans); margin-top: 5px; }
+  .xd-errors { background: #FDF3F2; border: 1px solid #F0C9C2; border-radius: 10px; padding: 11px 14px; margin-bottom: 14px; }
+  .xd-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .xd-btn.ghost { background: white; border: 1px solid #D1D9E2; color: var(--gray-600); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="xd">
+  <a href="{{ detail_url }}" class="xd-back">
+    &larr; {{ label }} #{{ source.pk }}
+  </a>
+
+  <div class="xd-head">
+    <div>
+      <div class="xd-eyebrow">{% trans "Edit" %}</div>
+      <h1 class="xd-title">{{ label }} <span class="xd-id">#{{ source.pk }}</span></h1>
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="xd-errors">{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>
+  {% endif %}
+
+  <form method="post" class="xd-card">
+    {% csrf_token %}
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="xd-sect">
+      <div class="xd-form">
+        {% for field in form.visible_fields %}
+        <div class="xd-field{% if field.name == 'description' or field.name == 'note' or field.name == 'order' %} wide{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for e in field.errors %}<div class="err">{{ e }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="xd-foot">
+        <a href="{{ detail_url }}" class="xd-btn ghost">{% trans "Cancel" %}</a>
+        <button type="submit" class="xd-btn primary">{% trans "Save" %}</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% if has_rate %}
+{% include "accounting/partials/fx_rate_field.html" with date_field=date_field %}
+{% endif %}
+{% endblock %}

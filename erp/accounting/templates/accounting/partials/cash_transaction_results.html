@@ -45,7 +45,7 @@
   </thead>
   <tbody>
     {% for t in object_list %}
-    <tr>
+    <tr{% if t.source_url %} class="tx-link" data-href="{{ t.source_url }}"{% endif %}>
       <td class="tx-when">
         {{ t.date|date:"d M Y" }}
         {% comment %}

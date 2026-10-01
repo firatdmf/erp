@@ -319,6 +319,38 @@ class CashEntryListPageTests(CashEntryTestBase):
         response = self.client.get(self.url())
         self.assertContains(response, "hamal cuval")
 
+    def test_an_expense_row_opens_the_expense(self):
+        expense = EquityExpense.objects.create(
+            book=self.book,
+            category=ExpenseCategory.objects.create(name="Rent"),
+            cash_account=self.kasa,
+            currency=self.usd,
+            amount=Decimal("100.00"),
+            date="2026-08-20",
+        )
+        CashTransactionEntry.objects.create(
+            book=self.book,
+            content_type=ContentType.objects.get_for_model(EquityExpense),
+            content_pk=expense.pk,
+            amount=Decimal("100.00"),
+            is_amount_positive=False,
+            currency=self.usd,
+            cash_account=self.kasa,
+        )
+        href = reverse(
+            "accounting:equity_expense_detail", args=[self.book.pk, expense.pk]
+        )
+        response = self.client.get(self.url())
+        self.assertContains(response, f'data-href="{href}"')
+
+    def test_a_row_whose_source_is_gone_is_not_a_link(self):
+        """Every source has a page now; a deleted one has nowhere to go."""
+        entry = self._entry("600.00", True)
+        EquityCapital.objects.filter(pk=entry.content_pk).delete()
+        response = self.client.get(self.url())
+        self.assertEqual(response.context["object_list"][0].source_url, "")
+        self.assertNotContains(response, 'class="tx-link"')
+
     def test_a_source_with_no_description_still_says_something(self):
         """A capital deposit with a blank note is identified by its member."""
         self._entry("600.00", True)  # note left empty

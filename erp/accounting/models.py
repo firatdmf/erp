@@ -972,9 +972,11 @@ class CurrencyExchange(models.Model):
     def clean(self):
         # Validation check
         if self.from_cash_account == self.to_cash_account:
+            # Keyed to a field the form has: an unknown key made Django's
+            # ModelForm raise ValueError instead of showing the message.
             raise ValidationError(
                 {
-                    "cash_account": "You cannot pick the same cash account for both accounts"
+                    "to_cash_account": "You cannot pick the same cash account for both accounts"
                 }
             )
 

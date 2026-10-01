@@ -19,6 +19,8 @@ from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils.translation import gettext as _g
+from django.utils.translation import gettext_lazy as _l
+from .templatetags.accounting_tags import format_money, format_rate
 
 
 from django.http import JsonResponse
@@ -1138,6 +1140,525 @@ class AddEquityRevenue(generic.edit.CreateView):
         return super().form_invalid(form)
 
 
+class CashOverdrawn(Exception):
+    """Undoing an entry would take a cash account below zero.
+
+    Raised inside the atomic block so everything already done in it rolls
+    back, and caught outside it so the answer reaches the person rather
+    than a 500.
+    """
+
+    def __init__(self, account):
+        super().__init__(account.name)
+        self.account = account
+
+
+def _overdrawn_message(exc):
+    return _g(
+        "%(account)s does not hold enough for this — the money has already "
+        "left it."
+    ) % {"account": exc.account.name}
+
+
+def assert_not_overdrawn(*cash_account_ids):
+    for account in CashAccount.objects.filter(pk__in=set(cash_account_ids)):
+        if account.balance < 0:
+            raise CashOverdrawn(account)
+
+
+def _delete_cash_rows(obj):
+    # Deleting a revenue's or a capital deposit's row takes its journal
+    # entry with it — see signals_ledger.unpost_cash_entry_from_ledger.
+    CashTransactionEntry.objects.filter(
+        content_type=ContentType.objects.get_for_model(obj), content_pk=obj.pk,
+    ).delete()
+
+
+def unpost_cash_inflow(obj):
+    """Undo what handle_equity_transaction did for a revenue or a deposit.
+
+    Call it with the row AS STORED: it is the old cash account that gives
+    the money back and the old cash row that goes. It does not check the
+    balance, because on an edit the money usually comes straight back in
+    and only the end state matters — the caller runs assert_not_overdrawn
+    once everything is done.
+    """
+    CashAccount.objects.filter(pk=obj.cash_account_id).update(
+        balance=F("balance") - obj.amount
+    )
+    _delete_cash_rows(obj)
+
+
+def post_cash_inflow(book, obj):
+    obj.currency = obj.cash_account.currency
+    obj.save()
+    handle_equity_transaction(
+        book, obj.amount, obj.currency, obj, obj.pk, obj.cash_account,
+    )
+
+
+def unpost_cash_outflow(obj):
+    """Undo what handle_equity_transaction did for a dividend: give it back."""
+    CashAccount.objects.filter(pk=obj.cash_account_id).update(
+        balance=F("balance") + obj.amount
+    )
+    _delete_cash_rows(obj)
+
+
+def post_cash_outflow(book, obj):
+    obj.currency = obj.cash_account.currency
+    obj.save()
+    try:
+        handle_equity_transaction(
+            book, obj.amount, obj.currency, obj, obj.pk, obj.cash_account,
+        )
+    except ValidationError:
+        # CashAccount.save refuses a negative balance; say which account
+        # in the same words every other refusal here uses.
+        raise CashOverdrawn(obj.cash_account)
+
+
+def _legs(obj):
+    """(account, amount, into it?) for each side of a two-account move.
+
+    A currency exchange has an amount per side; a transfer within one
+    currency moves the same amount out of one and into the other.
+    """
+    if isinstance(obj, CurrencyExchange):
+        return ((obj.from_cash_account, obj.from_amount, False),
+                (obj.to_cash_account, obj.to_amount, True))
+    return ((obj.from_cash_account, obj.amount, False),
+            (obj.to_cash_account, obj.amount, True))
+
+
+def unpost_two_legs(obj):
+    """Undo an exchange or a transfer: both balances and both rows.
+
+    Neither posts a journal entry — see CASH_CONTRA_BY_SOURCE — so the
+    balances and the two cash rows are all there is to reverse.
+    """
+    for account, amount, into in _legs(obj):
+        CashAccount.objects.filter(pk=account.pk).update(
+            balance=F("balance") + (-amount if into else amount)
+        )
+    _delete_cash_rows(obj)
+
+
+def post_two_legs(book, obj):
+    """The same two moves and two rows MakeCurrencyExchange and
+    MakeInTransfer write."""
+    obj.save()
+    content_type = ContentType.objects.get_for_model(obj)
+    for account, amount, into in _legs(obj):
+        CashAccount.objects.filter(pk=account.pk).update(
+            balance=F("balance") + (amount if into else -amount)
+        )
+        CashTransactionEntry.objects.create(
+            book=book, content_type=content_type, content_pk=obj.pk,
+            amount=amount, is_amount_positive=into,
+            currency=account.currency, cash_account=account,
+        )
+
+
+class CashSourcePage:
+    """What every cash source's view and edit pages share.
+
+    Revenue, capital deposits and currency exchanges each had an add form
+    and nothing after it: an entry made by mistake could be neither
+    corrected nor removed. One page each for viewing, editing and deleting,
+    with only what differs — the fields shown, how it posts — left to the
+    subclasses below.
+
+    `kind` names the URLs: equity_<kind>_detail, edit_equity_<kind>,
+    delete_equity_<kind>.
+    """
+
+    pk_url_kwarg = "source_pk"
+    context_object_name = "source"
+    kind = ""
+    label = ""
+    delete_confirm = ""
+
+    def get_book(self):
+        return get_object_or_404(Book, pk=self.kwargs.get("pk"))
+
+    def get_queryset(self):
+        # Reached through the wrong book's URL, an entry is a 404, not
+        # somebody else's row.
+        return self.model.objects.filter(book_id=self.kwargs.get("pk"))
+
+    def source_url(self, name):
+        return reverse(name, kwargs={
+            "pk": self.kwargs.get("pk"), "source_pk": self.object.pk,
+        })
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["book"] = self.get_book()
+        context["label"] = self.label
+        context["detail_url"] = self.source_url(f"accounting:equity_{self.kind}_detail")
+        context["edit_url"] = self.source_url(f"accounting:edit_equity_{self.kind}")
+        context["delete_url"] = self.source_url(f"accounting:delete_equity_{self.kind}")
+        context["delete_confirm"] = self.delete_confirm
+        return context
+
+
+class CashSourceDetail(CashSourcePage, generic.DetailView):
+    template_name = "accounting/cash_source_detail.html"
+
+    def title(self, obj):
+        return f"{obj.currency.symbol}{format_money(obj.amount)} {obj.currency.code}"
+
+    def facts(self, obj):
+        """[(label, value, link or None)] for the entry's card."""
+        raise NotImplementedError
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        obj = self.object
+        context["title"] = self.title(obj)
+        context["facts"] = self.facts(obj)
+        context["description"] = (
+            getattr(obj, "description", "") or getattr(obj, "note", "") or ""
+        )
+        context["cash_entries"] = list(
+            CashTransactionEntry.objects
+            .filter(content_type=ContentType.objects.get_for_model(obj),
+                    content_pk=obj.pk)
+            .select_related("currency", "cash_account", "cash_account__currency")
+            .order_by("is_amount_positive", "pk")
+        )
+        return context
+
+    def conversion_fact(self, obj):
+        """The rate the posted row converted at, read off that row.
+
+        Never recomputed here, for the reason EquityExpenseDetail.conversion
+        gives. None when the entry is in the book's own currency.
+        """
+        base = obj.book.effective_base_currency
+        entry = (
+            CashTransactionEntry.objects
+            .filter(content_type=ContentType.objects.get_for_model(obj),
+                    content_pk=obj.pk)
+            .first()
+        )
+        if obj.currency_id == base.pk or not entry or not entry.exchange_rate:
+            return None
+        return (
+            _g("Exchange rate"),
+            f"{format_rate(entry.exchange_rate)} = "
+            f"{base.symbol}{format_money(entry.amount_in_base_currency)}",
+            None,
+        )
+
+
+class CashSourceEdit(CashSourcePage, generic.edit.UpdateView):
+    """Correct an entry: unpost the stored row, post the edited one.
+
+    A reversal and a fresh posting, the way EditEquityExpense does it, so a
+    change of account, amount or date cannot leave a stale cash row or
+    journal entry behind.
+    """
+
+    template_name = "accounting/edit_cash_source.html"
+    date_field = "date"
+
+    def unpost_entry(self, stored):
+        raise NotImplementedError
+
+    def post_entry(self, book, obj):
+        raise NotImplementedError
+
+    def accounts(self, obj):
+        """Every cash account the entry moves — each is checked afterwards."""
+        raise NotImplementedError
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["book"] = self.get_book()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["base_currency"] = fx_context_json(context["book"])
+        context["date_field"] = self.date_field
+        context["has_rate"] = "exchange_rate" in context["form"].fields
+        return context
+
+    def form_valid(self, form):
+        book = self.get_book()
+        try:
+            with transaction.atomic():
+                # Read from the database, not self.object: form validation
+                # has already written the edited values onto the instance.
+                stored = self.model.objects.get(pk=self.object.pk)
+                self.unpost_entry(stored)
+                self.object = form.save(commit=False)
+                # The book comes from the URL, whatever the hidden field said.
+                self.object.book = book
+                self.post_entry(book, self.object)
+                assert_not_overdrawn(*self.accounts(stored), *self.accounts(self.object))
+        except CashOverdrawn as exc:
+            form.add_error(None, _overdrawn_message(exc))
+            return self.form_invalid(form)
+        messages.success(self.request, _g("%(label)s updated.") % {"label": self.label})
+        return HttpResponseRedirect(self.source_url(f"accounting:equity_{self.kind}_detail"))
+
+
+class CashSourceDelete(View):
+    """Remove an entry that should never have been recorded.
+
+    POST only, like DeleteEquityExpense: a link a crawler or a prefetch can
+    follow must not be able to unwind a ledger entry.
+    """
+
+    model = None
+    kind = ""
+    label = ""
+
+    def unpost_entry(self, obj):
+        raise NotImplementedError
+
+    def accounts(self, obj):
+        raise NotImplementedError
+
+    def post(self, request, pk, source_pk):
+        obj = get_object_or_404(self.model, pk=source_pk, book_id=pk)
+        try:
+            with transaction.atomic():
+                self.unpost_entry(obj)
+                assert_not_overdrawn(*self.accounts(obj))
+                obj.delete()
+        except CashOverdrawn as exc:
+            messages.error(request, _overdrawn_message(exc))
+            return HttpResponseRedirect(reverse(
+                f"accounting:equity_{self.kind}_detail",
+                kwargs={"pk": pk, "source_pk": source_pk},
+            ))
+        messages.success(request, _g("%(label)s deleted.") % {"label": self.label})
+        return HttpResponseRedirect(
+            reverse("accounting:cash_transaction_entry_list", kwargs={"pk": pk})
+        )
+
+
+# --- Revenue ---------------------------------------------------------------
+
+class CashInflowSource:
+    """Revenue and capital: money into one cash account, posted the same way."""
+
+    def unpost_entry(self, obj):
+        unpost_cash_inflow(obj)
+
+    def post_entry(self, book, obj):
+        post_cash_inflow(book, obj)
+
+    def accounts(self, obj):
+        return [obj.cash_account_id]
+
+
+class RevenueSource(CashInflowSource):
+    model = EquityRevenue
+    kind = "revenue"
+    label = _l("Revenue")
+    delete_confirm = _l("Delete this revenue? The cash it added is taken back out of the account.")
+
+
+@method_decorator(login_required, name="dispatch")
+class EquityRevenueDetail(RevenueSource, CashSourceDetail):
+    def facts(self, obj):
+        order = None
+        if obj.order_id:
+            order = (obj.order.order_number or str(obj.order_id),
+                     reverse("operating:order_detail", args=[obj.order_id]))
+        return [f for f in [
+            (_g("Date"), obj.date.strftime("%d.%m.%Y"), None),
+            (_g("Type"), obj.get_revenue_type_display(), None),
+            (_g("Amount"), f"{format_money(obj.amount)} {obj.currency.code}", None),
+            self.conversion_fact(obj),
+            (_g("Order"), order[0] if order else "—", order[1] if order else None),
+            (_g("Book"), obj.book.name, None),
+            (_g("Recorded"), timezone.localtime(obj.created_at).strftime("%d.%m.%Y %H:%M"), None),
+        ] if f]
+
+
+@method_decorator(login_required, name="dispatch")
+class EditEquityRevenue(RevenueSource, CashSourceEdit):
+    form_class = EquityRevenueForm
+
+
+
+@method_decorator(login_required, name="dispatch")
+class DeleteEquityRevenue(RevenueSource, CashSourceDelete):
+    pass
+
+
+# --- Capital deposit -------------------------------------------------------
+
+class CapitalSource(CashInflowSource):
+    model = EquityCapital
+    kind = "capital"
+    label = _l("Capital deposit")
+    delete_confirm = _l("Delete this capital deposit? The cash it added is taken back out of the account.")
+
+
+@method_decorator(login_required, name="dispatch")
+class EquityCapitalDetail(CapitalSource, CashSourceDetail):
+    def facts(self, obj):
+        return [f for f in [
+            (_g("Date"), obj.date_invested.strftime("%d.%m.%Y"), None),
+            (_g("Member"), str(obj.member), None),
+            (_g("Amount"), f"{format_money(obj.amount)} {obj.currency.code}", None),
+            self.conversion_fact(obj),
+            (_g("Book"), obj.book.name, None),
+            (_g("Recorded"), timezone.localtime(obj.created_at).strftime("%d.%m.%Y %H:%M"), None),
+        ] if f]
+
+
+@method_decorator(login_required, name="dispatch")
+class EditEquityCapital(CapitalSource, CashSourceEdit):
+    form_class = EquityCapitalForm
+    date_field = "date_invested"
+
+
+@method_decorator(login_required, name="dispatch")
+class DeleteEquityCapital(CapitalSource, CashSourceDelete):
+    pass
+
+
+# --- Currency exchange -----------------------------------------------------
+
+class TwoLegSource:
+    """Exchanges and transfers: out of one cash account, into another."""
+
+    def unpost_entry(self, obj):
+        unpost_two_legs(obj)
+
+    def post_entry(self, book, obj):
+        post_two_legs(book, obj)
+
+    def accounts(self, obj):
+        return [obj.from_cash_account_id, obj.to_cash_account_id]
+
+
+class ExchangeSource(TwoLegSource):
+    model = CurrencyExchange
+    kind = "exchange"
+    label = _l("Currency exchange")
+    delete_confirm = _l("Delete this exchange? Both accounts go back to where they were before it.")
+
+
+@method_decorator(login_required, name="dispatch")
+class EquityExchangeDetail(ExchangeSource, CashSourceDetail):
+    def title(self, obj):
+        src, dst = obj.from_cash_account.currency, obj.to_cash_account.currency
+        return (f"{src.symbol}{format_money(obj.from_amount)} {src.code} → "
+                f"{dst.symbol}{format_money(obj.to_amount)} {dst.code}")
+
+    def facts(self, obj):
+        src, dst = obj.from_cash_account, obj.to_cash_account
+        facts = [
+            (_g("Date"), obj.date.strftime("%d.%m.%Y") if obj.date else "—", None),
+            (_g("From"), f"{src.name} · {format_money(obj.from_amount)} {src.currency.code}", None),
+            (_g("To"), f"{dst.name} · {format_money(obj.to_amount)} {dst.currency.code}", None),
+        ]
+        if src.currency_id != dst.currency_id and obj.from_amount:
+            # The rate the two typed amounts imply — what the exchange was
+            # done at, stated both ways so neither has to be inverted.
+            rate = obj.to_amount / obj.from_amount
+            facts.append((_g("Rate"),
+                          f"1 {src.currency.code} = {format_rate(rate)} {dst.currency.code}",
+                          None))
+        facts += [
+            (_g("Book"), obj.book.name, None),
+            (_g("Recorded"), timezone.localtime(obj.created_at).strftime("%d.%m.%Y %H:%M"), None),
+        ]
+        return facts
+
+
+@method_decorator(login_required, name="dispatch")
+class EditEquityExchange(ExchangeSource, CashSourceEdit):
+    form_class = CurrencyExchangeForm
+
+
+@method_decorator(login_required, name="dispatch")
+class DeleteEquityExchange(ExchangeSource, CashSourceDelete):
+    pass
+
+
+# --- Dividend --------------------------------------------------------------
+
+class DividendSource:
+    model = EquityDivident
+    kind = "dividend"
+    label = _l("Dividend")
+    delete_confirm = _l("Delete this dividend? The cash it paid out goes back into the account.")
+
+    def unpost_entry(self, obj):
+        unpost_cash_outflow(obj)
+
+    def post_entry(self, book, obj):
+        post_cash_outflow(book, obj)
+
+    def accounts(self, obj):
+        return [obj.cash_account_id]
+
+
+@method_decorator(login_required, name="dispatch")
+class EquityDividendDetail(DividendSource, CashSourceDetail):
+    def facts(self, obj):
+        return [f for f in [
+            (_g("Date"), obj.date.strftime("%d.%m.%Y"), None),
+            (_g("Member"), str(obj.member) if obj.member_id else "—", None),
+            (_g("Amount"), f"{format_money(obj.amount)} {obj.currency.code}", None),
+            self.conversion_fact(obj),
+            (_g("Book"), obj.book.name, None),
+            (_g("Recorded"), timezone.localtime(obj.created_at).strftime("%d.%m.%Y %H:%M"), None),
+        ] if f]
+
+
+@method_decorator(login_required, name="dispatch")
+class EditEquityDividend(DividendSource, CashSourceEdit):
+    form_class = EquityDividentForm
+
+
+@method_decorator(login_required, name="dispatch")
+class DeleteEquityDividend(DividendSource, CashSourceDelete):
+    pass
+
+
+# --- Transfer between the book's own cash accounts -------------------------
+
+class TransferSource(TwoLegSource):
+    model = InTransfer
+    kind = "transfer"
+    label = _l("Transfer")
+    delete_confirm = _l("Delete this transfer? Both accounts go back to where they were before it.")
+
+
+@method_decorator(login_required, name="dispatch")
+class EquityTransferDetail(TransferSource, CashSourceDetail):
+    def facts(self, obj):
+        return [
+            (_g("Date"), obj.date.strftime("%d.%m.%Y") if obj.date else "—", None),
+            (_g("From"), obj.from_cash_account.name, None),
+            (_g("To"), obj.to_cash_account.name, None),
+            (_g("Amount"), f"{format_money(obj.amount)} {obj.currency.code}", None),
+            (_g("Book"), obj.book.name, None),
+            (_g("Recorded"), timezone.localtime(obj.created_at).strftime("%d.%m.%Y %H:%M"), None),
+        ]
+
+
+@method_decorator(login_required, name="dispatch")
+class EditEquityTransfer(TransferSource, CashSourceEdit):
+    form_class = InTransferForm
+
+
+@method_decorator(login_required, name="dispatch")
+class DeleteEquityTransfer(TransferSource, CashSourceDelete):
+    pass
+
+
 class EquityExpensePage:
     """The shared half of the two expense pages.
 
@@ -1799,6 +2320,32 @@ def describe_cash_entry_source(obj, accounts=None):
     return ""
 
 
+def cash_entry_url(obj, book):
+    """The page a cash row opens, or "" when its source has none.
+
+    Every source a cash row can have has a page of its own, and each
+    carries Edit. Anything else — a model added later, or a source row that
+    has since been deleted — stays unclickable rather than leading nowhere.
+    """
+    if obj is None:
+        return ""
+    name = obj._meta.model_name
+    if name == "payment":
+        return reverse("accounts:payment_detail", args=[obj.pk])
+    if name == "equityexpense":
+        return reverse("accounting:equity_expense_detail", args=[book.pk, obj.pk])
+    kinds = {
+        "equityrevenue": "revenue",
+        "equitycapital": "capital",
+        "currencyexchange": "exchange",
+        "equitydivident": "dividend",
+        "intransfer": "transfer",
+    }
+    if name in kinds:
+        return reverse(f"accounting:equity_{kinds[name]}_detail", args=[book.pk, obj.pk])
+    return ""
+
+
 @method_decorator(login_required, name="dispatch")
 class CashTransactionEntryList(generic.ListView):
     model = CashTransactionEntry
@@ -1859,6 +2406,7 @@ class CashTransactionEntryList(generic.ListView):
             source = sources.get(entry.content_type_id, {}).get(entry.content_pk)
             entry.source_heading = cash_entry_heading(source)
             entry.source_description = describe_cash_entry_source(source, accounts)
+            entry.source_url = cash_entry_url(source, book)
             entry.account_running, entry.book_running = balances.get(
                 entry.pk, (None, None)
             )

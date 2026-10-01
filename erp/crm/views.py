@@ -1258,14 +1258,22 @@ def customer_autocomplete(request):
     typed query. Each row carries data-attrs (type/pk/name) so a
     single delegated listener on the parent can apply the selection
     safely — no inline onclick string interpolation that breaks on
-    apostrophes or HTML entities in names."""
+    apostrophes or HTML entities in names.
+
+    ?only=company answers with companies alone and no "create" row — the
+    order form's new-contact panel asks it which company the person works
+    for, and a name with no match is simply the new company to be made."""
     from django.utils.html import escape
 
     query = request.GET.get("customer", "")
     if query == "":
         return HttpResponse("")
-    contacts = Contact.objects.filter(unaccent_icontains(query, "name"))[:5]
-    companies = Company.objects.filter(unaccent_icontains(query, "name"))[:5]
+    only_companies = request.GET.get("only") == "company"
+    contacts = [] if only_companies else \
+        Contact.objects.filter(unaccent_icontains(query, "name"))[:5]
+    companies = Company.objects.filter(unaccent_icontains(query, "name"))[:8 if only_companies else 5]
+    if only_companies and not companies:
+        return HttpResponse("")
 
     parts = ["<ul class='customer-autocomplete-list'>"]
     for contact in contacts:
@@ -1334,7 +1342,8 @@ def quick_create_customer(request):
     })
 
 
-def create_quick_customer(*, kind, name, phone="", email="", address=""):
+def create_quick_customer(*, kind, name, phone="", email="", address="",
+                          company=""):
     """The record quick_create_customer makes, for callers that make it
     themselves — the order form saves its new customer with the order,
     so the two are created together or not at all.
@@ -1342,14 +1351,23 @@ def create_quick_customer(*, kind, name, phone="", email="", address=""):
     Both models keep phone/email as ArrayFields, so a blank one has to
     be an empty list rather than [""] — an array holding one empty
     string reads as "has a phone number" everywhere downstream.
+
+    `company` names the company a new contact works for. A company is
+    one company: a name CRM already has, in any case, is linked rather
+    than made again. Ignored when the customer is itself a company.
     """
-    model = Company if kind == "company" else Contact
-    return model.objects.create(
-        name=name,
-        phone=[phone] if phone else [],
-        email=[email] if email else [],
-        address=address,
-    )
+    fields = {
+        "name": name,
+        "phone": [phone] if phone else [],
+        "email": [email] if email else [],
+        "address": address,
+    }
+    if kind == "company":
+        return Company.objects.create(**fields)
+    if company:
+        fields["company"] = (Company.objects.filter(name__iexact=company).order_by("pk").first()
+                             or Company.objects.create(name=company))
+    return Contact.objects.create(**fields)
 
 
 @login_required

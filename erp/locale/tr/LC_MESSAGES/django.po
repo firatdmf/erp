@@ -11507,3 +11507,11 @@ msgstr "Çalıştığı firma"
 #: operating/templates/operating/partials/create_order_form.html
 msgid "Company name — leave blank for an individual"
 msgstr "Firma adı — bireysel müşteri için boş bırakın"
+
+#: operating/templates/operating/partials/create_order_form.html
+msgid "New company — created with the order"
+msgstr "Yeni firma — siparişle birlikte oluşturulur"
+
+#: operating/templates/operating/partials/create_order_form.html
+msgid "Existing company — the contact will be linked to it"
+msgstr "Kayıtlı firma — kişi bu firmaya bağlanacak"

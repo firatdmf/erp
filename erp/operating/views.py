@@ -2897,7 +2897,9 @@ def base_currency_facts():
     code = getattr(_s, "BASE_CURRENCY_CODE", "USD")
     cur = CurrencyCategory.objects.filter(code=code).first()
     return {"base_currency_code": code,
-            "base_currency_symbol": (cur.symbol if (cur and cur.symbol) else "$")}
+            "base_currency_symbol": (cur.symbol if (cur and cur.symbol) else "$"),
+            # What a customer made on the form can be billed in.
+            "currencies": CurrencyCategory.objects.order_by("code")}
 
 
 def _base_currency_symbol():
@@ -3359,7 +3361,44 @@ def _pending_new_customer(request):
         "phone": (data.get("phone") or "").strip(),
         "email": (data.get("email") or "").strip(),
         "address": (data.get("address") or "").strip(),
+        # The company a new contact works for, by name. Made with the
+        # contact (or found, if CRM already has it) and linked to it.
+        "company": (data.get("company") or "").strip(),
+        # The currency their new account is opened in (a code). Not a
+        # CRM field — OrderCreate.post takes it off before the record is
+        # made and hands it to the account instead.
+        "currency": (data.get("currency") or "").strip().upper(),
     }
+
+
+def _new_customer_currency_clash(new_customer, currency, groups):
+    """Why a new contact can't be billed in `currency`, or None.
+
+    The contact is new, but the company they are linked to may not be:
+    one CRM already has can hold an account in these books, and the order
+    goes on that account. If it has transactions in another currency it
+    can't be moved, and the prices typed in `currency` would be read as
+    that one — so the save is refused rather than quietly billed wrong.
+    An account with no transactions is simply moved over, as a split does.
+    """
+    from accounting.services_accounts import existing_customer_account
+    name = new_customer.get("company")
+    company = name and Company.objects.filter(name__iexact=name).order_by("pk").first()
+    if not company:
+        return None
+    for book, _lines in groups:
+        account = existing_customer_account(book=book, company=company)
+        if (account and account.default_currency_id != currency.pk
+                and account.currency_is_locked):
+            from django.utils.translation import gettext as _
+            return _("%(company)s is billed in %(account_currency)s in %(book)s and "
+                     "already has transactions, so this order can't be in "
+                     "%(currency)s. Pick %(account_currency)s instead.") % {
+                "company": company.name, "book": book.name,
+                "account_currency": account.default_currency.code,
+                "currency": currency.code,
+            }
+    return None
 
 
 # Behind the sign-in like every other order page: served open, the form
@@ -3427,6 +3466,11 @@ class OrderCreate(View):
         # record yet: it is made below, with the order, so abandoning the
         # form leaves nothing behind.
         new_customer = _pending_new_customer(request)
+        new_currency = None
+        if new_customer:
+            from accounting.models import CurrencyCategory
+            code = new_customer.pop("currency")
+            new_currency = code and CurrencyCategory.objects.filter(code=code).first() or None
         # A company is one company: a name already in CRM, in any case,
         # is not made again — the search above finds it to link to.
         if new_customer and customer_type == "company" and not customer_pk \
@@ -3486,6 +3530,14 @@ class OrderCreate(View):
             # One currency for every half, or no split at all.
             split_currency = _split_currency_at_create(
                 request, member, groups, customer_type, customer_pk)
+            if new_currency is not None and not customer_pk:
+                clash = _new_customer_currency_clash(new_customer, new_currency, groups)
+                if clash:
+                    raise ValueError(clash)
+                # A customer made with the order has no account anywhere
+                # yet: each book's is opened in the currency picked for
+                # them — the same one across a split, as a split needs.
+                split_currency = new_currency
         except ValueError as _e:
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 return JsonResponse({"ok": False, "error": str(_e)})

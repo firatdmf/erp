@@ -271,6 +271,19 @@
               <label>{% trans "Name" %}</label>
               <input type="text" id="co-nc-name" class="form-input" placeholder="{% trans 'Full name' %}">
             </div>
+            {# A person only: the company they work for is made with them #}
+            {# (or found, if CRM already has it) and linked to them. #}
+            <div class="form-group" id="co-nc-company-group">
+              <label>{% trans "Company they work for" %}</label>
+              {# Searches CRM as it is typed: a match is picked and linked, #}
+              {# a name with no match is the new company to be made. #}
+              <div class="co-sup">
+                <input type="text" id="co-nc-company" class="form-input" autocomplete="off"
+                       placeholder="{% trans 'Company name — leave blank for an individual' %}">
+                <div id="co-nc-company-results" class="co-autocomplete-results co-sup-results"></div>
+              </div>
+              <small id="co-nc-company-hint" style="display:none; margin-top:4px; font-size:12px; color:#147F74;"></small>
+            </div>
             <div class="co-row">
               <div class="form-group">
                 <label>{% trans "Phone" %}</label>
@@ -280,6 +293,17 @@
                 <label>{% trans "Email" %}</label>
                 <input type="email" id="co-nc-email" class="form-input" placeholder="{% trans 'Email' %}">
               </div>
+            </div>
+            {# The currency the new customer's account is opened in — and #}
+            {# so what the prices typed below are in. #}
+            <div class="form-group">
+              <label>{% trans "Currency" %}</label>
+              <select id="co-nc-currency" class="form-input">
+                {% for c in currencies %}
+                  <option value="{{ c.code }}" data-symbol="{{ c.symbol|default:c.code }}"
+                          {% if c.code == base_currency_code %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
+                {% endfor %}
+              </select>
             </div>
             <div class="form-group">
               <label>{% trans "Address" %}</label>
@@ -1104,7 +1128,89 @@
     var isCompany = document.getElementById('co-nc-kind').value === 'company';
     document.getElementById('co-nc-name').placeholder =
       isCompany ? '{% trans "Company name" %}' : '{% trans "Full name" %}';
+    document.getElementById('co-nc-company-group').style.display = isCompany ? 'none' : '';
   };
+
+  // The currency picked for a customer being made with the order: the
+  // prices are typed in it, so the labels follow it at once — there is
+  // no account yet for coCurrencyFor to ask.
+  function coNewCustomerCurrency() {
+    var sel = document.getElementById('co-nc-currency');
+    var opt = sel && sel.options[sel.selectedIndex];
+    if (!opt) return null;
+    return { code: opt.value, symbol: opt.dataset.symbol || opt.value,
+             is_base: opt.value === CO_BASE.code };
+  }
+  function coApplyNewCustomerCurrency(cur, name) {
+    if (!cur) return;
+    CO_CUR = { symbol: cur.symbol, code: cur.code, currency: cur.code, is_base: cur.is_base };
+    coRepriceLabels();
+    if (cur.is_base) {
+      coCurrencyNote('<i class="fas fa-circle-info"></i> ' +
+        '{% trans "Prices are in" %} <b>' + esc(cur.code) + '</b>.');
+    } else {
+      coCurrencyNote('<i class="fas fa-triangle-exclamation"></i> ' +
+        '<b>' + esc(name) + '</b> {% trans "is billed in" %} <b>' + esc(cur.code) + '</b> — ' +
+        '{% trans "type the prices below in" %} ' + esc(cur.code) + ' (' + esc(cur.symbol) + '). ' +
+        '{% trans "The order is recorded to the book in" %} ' + CO_BASE.code + ' ' +
+        '{% trans "at the rate of the day, fixed when the order completes." %}', true);
+    }
+  }
+
+  // "Company they work for": search CRM while it is typed. Picking a
+  // match links the contact to that company — and, since the order then
+  // goes on the company's account, takes that account's currency. A name
+  // nobody matches stays what it was: a new company, made with the order.
+  (function () {
+    var input = document.getElementById('co-nc-company');
+    var results = document.getElementById('co-nc-company-results');
+    if (!input || !results) return;
+    var timer = null, seq = 0;
+
+    input.addEventListener('input', function () {
+      coCompanyHint('');
+      clearTimeout(timer);
+      var q = input.value.trim();
+      if (!q) { results.innerHTML = ''; return; }
+      timer = setTimeout(function () {
+        var mine = ++seq;
+        fetch("{% url 'crm:customer_autocomplete' %}?only=company&customer=" + encodeURIComponent(q),
+              { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            if (mine !== seq) return;
+            results.innerHTML = html;
+            if (!html) coCompanyHint('{% trans "New company — created with the order" %}');
+          }).catch(function () {});
+      }, 300);
+    });
+
+    results.addEventListener('click', function (e) {
+      var item = e.target.closest('.customer-ac-item');
+      if (!item) return;
+      seq++;
+      input.value = item.dataset.name || '';
+      results.innerHTML = '';
+      coCompanyHint('{% trans "Existing company — the contact will be linked to it" %}');
+      // The order goes on this company's account in this book, so its
+      // currency is the one the prices will be in.
+      var book = (document.querySelector('[name="book"]') || {}).value || '';
+      fetch(CO_CURRENCY_URL + '?book=' + encodeURIComponent(book) +
+            '&type=company&pk=' + encodeURIComponent(item.dataset.pk || ''),
+            { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var sel = document.getElementById('co-nc-currency');
+          if (d && d.account && d.currency && sel) sel.value = d.currency;
+        }).catch(function () {});
+    });
+  })();
+  function coCompanyHint(text) {
+    var hint = document.getElementById('co-nc-company-hint');
+    if (!hint) return;
+    hint.textContent = text;
+    hint.style.display = text ? 'block' : 'none';
+  }
 
   window.coCreateCustomer = function () {
     var nameEl = document.getElementById('co-nc-name');
@@ -1114,15 +1220,19 @@
     var phone = document.getElementById('co-nc-phone').value || '';
     var email = document.getElementById('co-nc-email').value || '';
     var address = document.getElementById('co-nc-address').value || '';
+    var company = kind === 'company' ? '' : (document.getElementById('co-nc-company').value || '').trim();
     // Held in the form, not sent to CRM: the record is made with the
     // order (OrderCreate.post), so nothing is left behind by a form
     // that is closed instead of saved.
     document.getElementById('new-customer-json').value = JSON.stringify(
-      { name: name, phone: phone, email: email, address: address });
+      { name: name, phone: phone, email: email, address: address, company: company,
+        currency: (coNewCustomerCurrency() || {}).code || '' });
+    var cur = coNewCustomerCurrency();
     coApplyCustomerSelection(kind === 'company' ? 'company' : 'contact', '', name);
+    coApplyNewCustomerCurrency(cur, name);
     var chipName = document.querySelector('#co-customer-selected > span');
     if (chipName) {
-      chipName.innerHTML = esc(name) +
+      chipName.innerHTML = esc(name) + (company ? ' · ' + esc(company) : '') +
         ' <small style="font-weight:600;font-size:10.5px;color:#147F74;background:#fff;border:1px solid #BFE0DB;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle;">' +
         '{% trans "new — saved with the order" %}</small>';
     }
@@ -1134,6 +1244,11 @@
     document.getElementById('co-nc-kind').value = 'contact';
     coNewCustomerKindChanged();
     document.getElementById('co-nc-name').value = '';
+    document.getElementById('co-nc-company').value = '';
+    document.getElementById('co-nc-company-results').innerHTML = '';
+    coCompanyHint('');
+    var curSel = document.getElementById('co-nc-currency');
+    if (curSel) curSel.value = CO_BASE.code;
     document.getElementById('co-nc-phone').value = '';
     document.getElementById('co-nc-email').value = '';
     document.getElementById('co-nc-address').value = '';

@@ -89,6 +89,8 @@ where it has not.
   .bs-detail summary { cursor:pointer; font:600 12.5px var(--font-sans); color:var(--nejum-teal-700); padding:10px 0; }
   .bs-cov { margin-top:10px; font:500 12.5px var(--font-sans); color:var(--gray-600); }
   .bs-cov b { color: var(--ink); }
+  a.bs-acct { color: inherit; text-decoration: none; }
+  a.bs-acct:hover { color: var(--nejum-teal-700); text-decoration: underline; }
 </style>
 {% endblock %}
 
@@ -138,7 +140,7 @@ where it has not.
       <table class="bs-tbl">
         <tr class="section"><td colspan="2">{% trans "Assets" %}</td></tr>
         {% for r in gl.groups.asset %}
-        <tr><td><span class="code">{{ r.code }}</span>{{ r.name }}</td>
+        <tr><td><a class="bs-acct" href="{% url 'accounts:report_ledger_account' current_book.pk r.code %}"><span class="code">{{ r.code }}</span>{{ r.name }}</a></td>
             <td class="num">{{ r.balance|floatformat:"2g" }}</td></tr>
         {% endfor %}
         <tr class="total"><td>{% trans "Total assets" %}</td>
@@ -146,7 +148,7 @@ where it has not.
 
         <tr class="section"><td colspan="2">{% trans "Liabilities" %}</td></tr>
         {% for r in gl.groups.liability %}
-        <tr><td><span class="code">{{ r.code }}</span>{{ r.name }}</td>
+        <tr><td><a class="bs-acct" href="{% url 'accounts:report_ledger_account' current_book.pk r.code %}"><span class="code">{{ r.code }}</span>{{ r.name }}</a></td>
             <td class="num">{{ r.balance|floatformat:"2g" }}</td></tr>
         {% empty %}
         <tr><td class="muted">{% trans "None" %}</td><td class="num muted">0.00</td></tr>
@@ -156,7 +158,7 @@ where it has not.
 
         <tr class="section"><td colspan="2">{% trans "Equity" %}</td></tr>
         {% for r in gl.groups.equity %}
-        <tr><td><span class="code">{{ r.code }}</span>{{ r.name }}</td>
+        <tr><td><a class="bs-acct" href="{% url 'accounts:report_ledger_account' current_book.pk r.code %}"><span class="code">{{ r.code }}</span>{{ r.name }}</a></td>
             <td class="num">{{ r.balance|floatformat:"2g" }}</td></tr>
         {% endfor %}
         <tr><td class="muted">{% trans "Result for the period (revenue less expenses)" %}</td>
@@ -270,7 +272,7 @@ where it has not.
       </td></tr>
       {% for r in rec.pending %}
       <tr>
-        <td><span class="code">{{ r.code }}</span>{{ r.label }}
+        <td><a class="bs-acct" href="{% url 'accounts:report_ledger_account' current_book.pk r.code %}"><span class="code">{{ r.code }}</span>{{ r.label }}</a>
           <div class="muted rec-note">{{ r.note }}</div>
         </td>
         <td class="num">{{ r.balance|floatformat:"2g" }}</td>

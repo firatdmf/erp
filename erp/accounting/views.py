@@ -607,6 +607,7 @@ class BookDetail(generic.DetailView):
 
         def lines(kind):
             return [{"label": f"{row['name']} ({row['code']})",
+                     "code": row["code"],
                      "amount": row["balance"]}
                     for row in groups[kind] if row["balance"]]
 

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load static i18n accounting_tags %}
+{% comment %}
+One ledger account and every entry behind its balance — see
+views_report.LedgerAccount. Reached from the account names on the balance
+sheet, the chart of accounts and the book page's equation card.
+{% endcomment %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  .la { --teal-50:#E5F1F0; --teal-700:#005354; --g400:#A0A8B0; --g500:#6B7280; --g600:#4B5563; --g700:#374151; --ink:#0F1419;
+        --sans:'Plus Jakarta Sans',-apple-system,'Segoe UI',sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        max-width: 1180px; margin: 0 auto; padding: 24px 20px 64px; font-family: var(--sans); color: var(--ink); }
+  .la-back { display:inline-flex; align-items:center; gap:6px; font:600 12.5px var(--sans); color:var(--g600); text-decoration:none; }
+  .la-back:hover { color: var(--teal-700); }
+  .la-back i, .la-back svg { width:14px; height:14px; }
+  .la-eyebrow { margin-top:14px; font:700 11px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--g500); }
+  .la-title { margin:4px 0 4px; font:800 26px/1.15 var(--sans); }
+  .la-sub { margin:0 0 16px; font:500 13.5px/1.5 var(--sans); color:var(--g600); max-width:70ch; }
+  .la-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:14px; }
+  .la-bar label { display:flex; flex-direction:column; gap:4px; font:700 10.5px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--g500); }
+  .la-bar input { padding:7px 9px; border:1px solid #E0E6EE; border-radius:8px; font:500 13px var(--sans); }
+  .la-btn { padding:8px 14px; border-radius:8px; border:1px solid #E0E6EE; background:#fff; font:600 12.5px var(--sans); color:var(--g700); cursor:pointer; text-decoration:none; }
+  .la-btn.primary { background:var(--teal-700); border-color:var(--teal-700); color:#fff; }
+  .la-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:14px; }
+  .la-stat { background:#fff; border:1px solid #E2E8EE; border-radius:12px; padding:13px 15px; }
+  .la-stat .l { font:700 10.5px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--g500); }
+  .la-stat .v { margin-top:4px; font:700 20px var(--sans); font-variant-numeric:tabular-nums; }
+  .la-card { background:#fff; border:1px solid #E2E8EE; border-radius:12px; overflow-x:auto; }
+  .la-tbl { width:100%; border-collapse:collapse; font:400 13px var(--sans); }
+  .la-tbl th { background:#FAFBFD; border-bottom:1px solid #E2E8EE; padding:10px 12px; text-align:left; font:700 10.5px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--g500); white-space:nowrap; }
+  .la-tbl td { padding:9px 12px; border-bottom:1px solid #EEF1F5; vertical-align:top; }
+  .la-tbl tr:last-child td { border-bottom:none; }
+  .la-tbl .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .la-tbl th.num { text-align:right; }
+  .la-date { white-space:nowrap; color:var(--g700); font-variant-numeric:tabular-nums; }
+  .la-ref { font:500 12px var(--mono); color:var(--g600); white-space:nowrap; }
+  .la-text { max-width:44ch; }
+  .la-against, .la-party { display:block; margin-top:2px; font:500 11.5px var(--sans); color:var(--g500); }
+  .la-party a { color:var(--teal-700); text-decoration:none; }
+  .la-tbl tr.carry td { background:#FAFBFD; font-style:italic; color:var(--g600); }
+  .la-tbl tfoot td { background:#FAFBFD; border-top:1px solid #E2E8EE; font-weight:700; }
+  .la-muted { color:var(--g400); }
+  .la-empty { padding:56px 20px; text-align:center; color:var(--g500); font:500 13.5px var(--sans); }
+  @media print { .no-print { display:none !important; } .la { padding:0; } .la-card { border:none; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="la">
+  <a class="la-back no-print" href="{% url 'accounts:report_chart_of_accounts' current_book.pk %}">
+    <i data-lucide="arrow-left"></i>{% trans "Chart of accounts" %}
+  </a>
+  <div class="la-eyebrow">{{ current_book.name }} · {% trans "Ledger account" %}</div>
+  <h1 class="la-title">{{ account_label }}</h1>
+  <p class="la-sub">{% trans "Every journal entry behind this account's balance, oldest first. Entries with no movement on anyone's statement — opening corrections, reclassifications, the payables re-split — appear only here." %}</p>
+
+  <form class="la-bar no-print" method="get">
+    <label>{% trans "From" %}<input type="date" name="date_from" value="{{ date_from }}"></label>
+    <label>{% trans "To" %}<input type="date" name="date_to" value="{{ date_to }}"></label>
+    <button class="la-btn primary" type="submit">{% trans "Show" %}</button>
+    {% if date_from or date_to %}<a class="la-btn" href="{% url 'accounts:report_ledger_account' current_book.pk account.code %}">{% trans "Clear" %}</a>{% endif %}
+  </form>
+
+  <div class="la-stats">
+    <div class="la-stat"><div class="l">{% trans "Entries" %}</div><div class="v">{{ count }}</div></div>
+    <div class="la-stat"><div class="l">{% trans "Debit" %}</div><div class="v">{{ debit_total|format_money }}</div></div>
+    <div class="la-stat"><div class="l">{% trans "Credit" %}</div><div class="v">{{ credit_total|format_money }}</div></div>
+    <div class="la-stat"><div class="l">{% trans "Balance" %}</div><div class="v">{{ closing|format_money }}</div></div>
+  </div>
+
+  <div class="la-card">
+    {% if rows or show_opening %}
+    <table class="la-tbl">
+      <thead>
+        <tr>
+          <th>{% trans "Date" %}</th>
+          <th>{% trans "Reference" %}</th>
+          <th>{% trans "Description" %}</th>
+          <th class="num">{% trans "Debit" %}</th>
+          <th class="num">{% trans "Credit" %}</th>
+          <th class="num">{% trans "Balance" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if show_opening %}
+        <tr class="carry">
+          <td colspan="5">
+            {% if hidden %}{% blocktrans count counter=hidden %}Carried from {{ counter }} earlier entry{% plural %}Carried from {{ counter }} earlier entries{% endblocktrans %}{% else %}{% trans "Opening balance" %}{% endif %}
+          </td>
+          <td class="num">{{ opening|format_money }}</td>
+        </tr>
+        {% endif %}
+        {% for r in rows %}
+        <tr>
+          <td class="la-date">{{ r.entry.date|date:"d.m.Y" }}</td>
+          <td><span class="la-ref">{{ r.entry.reference|default:"—" }}</span></td>
+          <td class="la-text">
+            {{ r.text|default:"—" }}
+            {% if r.against %}<span class="la-against">{% trans "against" %} {{ r.against|join:", " }}</span>{% endif %}
+            {% if r.party %}<span class="la-party"><a href="{{ r.party_url }}">{{ r.party.code }} · {{ r.party.name }}</a></span>{% endif %}
+          </td>
+          <td class="num">{% if r.line.debit %}{{ r.line.debit|format_money }}{% else %}<span class="la-muted">—</span>{% endif %}</td>
+          <td class="num">{% if r.line.credit %}{{ r.line.credit|format_money }}{% else %}<span class="la-muted">—</span>{% endif %}</td>
+          <td class="num">{{ r.balance|format_money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">{% trans "Total" %}</td>
+          <td class="num">{{ debit_total|format_money }}</td>
+          <td class="num">{{ credit_total|format_money }}</td>
+          <td class="num">{{ closing|format_money }}</td>
+        </tr>
+      </tfoot>
+    </table>
+    {% else %}
+    <div class="la-empty">{% trans "Nothing has been posted to this account." %}</div>
+    {% endif %}
+  </div>
+</div>
+<script>if (window.lucide) lucide.createIcons();</script>
+{% endblock %}

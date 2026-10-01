@@ -11515,3 +11515,37 @@ msgstr "Yeni firma — siparişle birlikte oluşturulur"
 #: operating/templates/operating/partials/create_order_form.html
 msgid "Existing company — the contact will be linked to it"
 msgstr "Kayıtlı firma — kişi bu firmaya bağlanacak"
+#: accounting/templates/accounts/report_ledger_account.html
+msgid "Chart of accounts"
+msgstr "Hesap planı"
+
+#: accounting/templates/accounts/report_ledger_account.html
+msgid "Every journal entry behind this account's balance, oldest first. Entries with no movement on anyone's statement — opening corrections, reclassifications, the payables re-split — appear only here."
+msgstr "Bu hesabın bakiyesini oluşturan tüm yevmiye kayıtları, eskiden yeniye. Hiçbir cari ekstresinde hareketi olmayan kayıtlar — açılış düzeltmeleri, yeniden sınıflandırmalar, borçların yeniden ayrılması — yalnızca burada görünür."
+
+#: accounting/templates/accounts/report_ledger_account.html
+msgid "Entries"
+msgstr "Kayıtlar"
+
+#: accounting/templates/accounts/report_ledger_account.html
+msgid "Opening balance"
+msgstr "Açılış bakiyesi"
+
+#: accounting/templates/accounts/report_ledger_account.html
+#, python-format
+msgid "Carried from %(counter)s earlier entry"
+msgid_plural "Carried from %(counter)s earlier entries"
+msgstr[0] "Önceki %(counter)s kayıttan devreden"
+msgstr[1] "Önceki %(counter)s kayıttan devreden"
+
+#: accounting/templates/accounts/report_ledger_account.html
+msgid "against"
+msgstr "karşılığı"
+
+#: accounting/templates/accounts/report_ledger_account.html
+msgid "Nothing has been posted to this account."
+msgstr "Bu hesaba henüz kayıt atılmadı."
+
+#: accounting/templates/accounts/report_chart_of_accounts.html
+msgid "See the entries behind this balance"
+msgstr "Bu bakiyeyi oluşturan kayıtları gör"

@@ -264,3 +264,106 @@ class BalanceSheet(View):
             "date_to": date_to or "",
             "identity_holds": subs["causes_total"] == subs["residual"],
         })
+
+
+@method_decorator(login_required, name="dispatch")
+class LedgerAccount(View):
+    """One ledger account: every entry behind its balance.
+
+    The balance sheet, the chart of accounts and the book page each print a
+    figure per account and nothing said what it was made of. Some of what
+    makes it up exists nowhere else — an opening correction, a
+    reclassification out of Suspense, the entries that keep Accounts
+    Payable in step with the accounts in credit (reference AP-RESPLIT) —
+    because those are entries with no movement on anybody's statement.
+
+    Newest last, with a running balance, so the last row is the figure the
+    other pages print. An account with a long history shows its latest
+    LIMIT rows and carries everything before them as one opening line,
+    which keeps the running balance true without loading ten thousand rows.
+    """
+    template_name = "accounts/report_ledger_account.html"
+    LIMIT = 500
+
+    def get(self, request, code):
+        from django.db.models import Sum
+        from django.http import Http404
+        from django.urls import reverse
+        from .models_ledger import JournalLine
+
+        account = ChartAccount.objects.filter(code=code).first()
+        if account is None:
+            raise Http404("No such ledger account.")
+        debit_normal = account.type in (ChartAccount.ASSET, ChartAccount.EXPENSE)
+
+        def signed(debit, credit):
+            debit, credit = debit or Decimal("0"), credit or Decimal("0")
+            return (debit - credit) if debit_normal else (credit - debit)
+
+        def total(qs):
+            agg = qs.aggregate(d=Sum("debit"), c=Sum("credit"))
+            return signed(agg["d"], agg["c"])
+
+        date_from = request.GET.get("date_from") or ""
+        date_to = request.GET.get("date_to") or ""
+        base = JournalLine.objects.filter(entry__book=request.book, account=account)
+        opening = Decimal("0")
+        in_range = base
+        if date_from:
+            opening = total(base.filter(entry__date__lt=date_from))
+            in_range = in_range.filter(entry__date__gte=date_from)
+        if date_to:
+            in_range = in_range.filter(entry__date__lte=date_to)
+
+        count = in_range.count()
+        ordered = (in_range.select_related("entry", "current_account", "cash_account")
+                   .order_by("entry__date", "entry_id", "pk"))
+        hidden = max(0, count - self.LIMIT)
+        lines = list(ordered[hidden:])
+        if hidden:
+            # Everything in range before the rows shown, folded into the
+            # opening line: the range total less what is on the page.
+            shown = sum((signed(l.debit, l.credit) for l in lines), Decimal("0"))
+            opening += total(in_range) - shown
+
+        # The other side of each entry, so a row says what it was against
+        # without opening the entry: "Accounts Receivable (1200)".
+        others = {}
+        for other in (JournalLine.objects
+                      .filter(entry_id__in={l.entry_id for l in lines})
+                      .exclude(account=account).select_related("account")):
+            label = f"{other.account.name} ({other.account.code})"
+            bucket = others.setdefault(other.entry_id, [])
+            if label not in bucket:
+                bucket.append(label)
+
+        running = opening
+        rows = []
+        for line in lines:
+            running += signed(line.debit, line.credit)
+            party = line.current_account
+            rows.append({
+                "line": line,
+                "entry": line.entry,
+                "text": line.memo or line.entry.description,
+                "against": others.get(line.entry_id, []),
+                "party": party,
+                "party_url": (reverse("accounts:statement", args=[party.pk])
+                              if party is not None else ""),
+                "balance": running,
+            })
+
+        return render(request, self.template_name, {
+            "account": account,
+            "account_label": f"{account.name} ({account.code})",
+            "rows": rows,
+            "opening": opening,
+            "closing": running,
+            "show_opening": bool(date_from or hidden),
+            "hidden": hidden,
+            "count": count,
+            "date_from": date_from,
+            "date_to": date_to,
+            "debit_total": sum((l.debit for l in lines), Decimal("0")),
+            "credit_total": sum((l.credit for l in lines), Decimal("0")),
+        })

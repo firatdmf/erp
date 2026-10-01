@@ -77,7 +77,7 @@ class BookPageAssets(TestCase):
         self._item("100", Decimal("4.00"))
         post_opening_inventory(self.book, date="2026-09-01")
         ctx = self._page()
-        self.assertIn({"label": "Inventory (1300)", "amount": Decimal("400.00")}, ctx["eq_assets_lines"])
+        self.assertIn({"label": "Inventory (1300)", "code": "1300", "amount": Decimal("400.00")}, ctx["eq_assets_lines"])
         self.assertEqual(ctx["eq_assets"], Decimal("400.00"))
         self.assertTrue(ctx["eq_balanced"])
         self.assertTrue(self._check(ctx, "Inventory")["reconciled"])

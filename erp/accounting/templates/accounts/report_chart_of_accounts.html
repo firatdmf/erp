@@ -110,7 +110,7 @@ tables themselves — see services_posting.chart_of_accounts.
       <tbody>
         {% for r in group.rows %}
         <tr id="code-{{ r.code }}" data-search="{{ r.code }} {{ r.name|lower }} {{ r.meaning|lower }}">
-          <td><span class="coa-code">{{ r.code }}</span></td>
+          <td><a class="coa-code" href="{% url 'accounts:report_ledger_account' current_book.pk r.code %}" title="{% trans 'See the entries behind this balance' %}">{{ r.code }}</a></td>
           <td>
             <span class="coa-name">{{ r.name }}</span>
             {% if r.is_control %}<span class="coa-tag control" title="{% trans 'Summarises a subsidiary ledger (current accounts, cash accounts).' %}">{% trans "Control" %}</span>{% endif %}

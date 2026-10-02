@@ -466,9 +466,12 @@ class OrderDetail(DetailView):
         # An open order is not a sale yet: its account is charged when it
         # completes (post_order_movement). Said on the account card, or the
         # balance beside it looks like it forgot the order.
-        from .order_purchases import order_is_open
+        from .order_purchases import order_is_open, packing_state
         ctx["billed_on_completion"] = (bool(self.object.current_account_id)
                                        and order_is_open(self.object))
+        # Cancelling an order that has purchases behind it reaches past the
+        # order — the cancel dialog says how far packing has got first.
+        ctx["packing"] = packing_state(self.object) if ctx["supplier_purchases"] else None
         # An order created by a purchase is that purchase's mirror — its
         # lines were written on the purchase form and are kept in step from
         # there (order_purchases.sync_customer_order). A line added on the
@@ -4437,6 +4440,17 @@ class OrderListRedirect(RedirectView):
         return f"{url}?{query}" if query else url
 
 
+def _draft_purchases_prefetch():
+    """Each row's purchases still awaiting delivery, as
+    Order.draft_purchase_numbers reads them: deleting a selection of
+    orders cancels those, and the confirmation names them."""
+    from django.db.models import Prefetch
+    from accounting.models_accounts import Invoice
+    return Prefetch("supplier_purchases",
+                    queryset=Invoice.objects.filter(status="draft").order_by("pk"),
+                    to_attr="draft_purchases")
+
+
 class OrderList(ListView):
     model = Order
     template_name = "operating/order_list.html"
@@ -4457,7 +4471,8 @@ class OrderList(ListView):
             .prefetch_related('items__product', 'items__product_variant',
                               # Every row's total is net of them, so without
                               # this the list fires one more query per order.
-                              'adjustments')
+                              'adjustments',
+                              _draft_purchases_prefetch())
             .order_by("-created_at")
         )
         # One book's orders. An Order carries no book of its own; the
@@ -5114,8 +5129,16 @@ def delete_order(request, pk):
               "'Re-open & Fix' on the order page, then delete it."),
         )
         return redirect("operating:order_detail", pk=order.pk)
+    # Goods still on their way in for it are not wanted either — same as
+    # cancelling. A received purchase is stock on the shelf and stays.
+    from .order_purchases import cancel_purchases_for_cancelled_order
+    cancelled = cancel_purchases_for_cancelled_order(order, user=request.user, deleted=True)
     order.delete()
-    messages.success(request, "Order deleted successfully.")
+    messages.success(request, _gettext("Order deleted."))
+    if cancelled:
+        messages.warning(request, _gettext(
+            "Its supplier purchases awaiting delivery were cancelled with it: %(numbers)s")
+            % {"numbers": ", ".join(cancelled)})
     return redirect("operating:order_list")
 
 
@@ -5155,11 +5178,16 @@ def bulk_delete_orders(request):
     # reversed). bulk delete via qs.delete() would still cascade but
     # we keep it per-row for predictable signal ordering on Postgres.
     deleted_ids = [o.pk for o in deletable]  # capture BEFORE delete() nulls pk
+    from .order_purchases import cancel_purchases_for_cancelled_order
+    purchases_cancelled = []
     for o in deletable:
+        # Goods still on their way in for it go with it — as on cancel.
+        purchases_cancelled += cancel_purchases_for_cancelled_order(o, user=request.user, deleted=True)
         o.delete()
     resp = {"ok": True, "deleted": len(deleted_ids),
             "deleted_ids": deleted_ids,
-            "skipped_ids": skipped_ids}
+            "skipped_ids": skipped_ids,
+            "purchases_cancelled": purchases_cancelled}
     if skipped_ids:
         resp["warning"] = (
             _gettext("%(count)s completed orders were not deleted — re-open them first "

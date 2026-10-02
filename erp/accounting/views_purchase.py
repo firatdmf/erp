@@ -220,6 +220,7 @@ class PurchaseOrderDetail(View):
         # field existed editable. None = no stock left to trace back to this
         # invoice, so Edit can't be offered — only Cancel (money-only).
         warehouse_id = invoice.intake_warehouse_id or purchase_warehouse_id(invoice.pk)
+        from operating.order_purchases import purchase_cancel_warning
         return render(request, self.template_name, {
             "invoice": invoice,
             "items": items,
@@ -232,6 +233,9 @@ class PurchaseOrderDetail(View):
             "can_confirm": can_confirm_purchase(request.user),
             "changes": decorate_changes(
                 list(invoice.change_logs.select_related("created_by"))),
+            # Said in the cancel confirmation: what becomes of the
+            # customer's order, which turns on whether packing has started.
+            "cancel_order_warning": purchase_cancel_warning(invoice),
         })
 
 

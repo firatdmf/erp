@@ -2191,9 +2191,29 @@
       <button type="button" class="odc-x" id="odxClose" aria-label="{% trans 'Close' %}"><i class="fa fa-xmark"></i></button>
     </div>
     <div class="odc-warn danger"><i class="fa fa-triangle-exclamation"></i><span>{% trans "This can't be undone. A cancelled order can never be re-opened." %}</span></div>
+    {% if packing %}
+    {% comment %}The order has supplier purchases behind it, so cancelling reaches past the order: say first how far packing has got.{% endcomment %}
+    <div class="odc-warn {% if packing.started %}danger{% endif %}" id="odx-packing">
+      <i class="fa {% if packing.started %}fa-box-open{% else %}fa-circle-info{% endif %}"></i>
+      <span>
+        {% if packing.started %}
+          {% blocktrans with status=packing.status_label count counter=packing.rolls %}Packing has started on this order ({{ status }}, {{ counter }} roll held).{% plural %}Packing has started on this order ({{ status }}, {{ counter }} rolls held).{% endblocktrans %}
+        {% else %}
+          {% trans "Packing has not started on this order — no rolls are held for it." %}
+        {% endif %}
+      </span>
+    </div>
+    {% endif %}
     <div class="odc-body">
       <div class="odc-lbl">{% trans "What happens" %}</div>
       <ul class="odx-list">
+        {% for p in supplier_purchases %}
+          {% if p.status == 'draft' %}
+          <li>{% blocktrans with number=p.number supplier=p.current_account.name %}Purchase {{ number }} ({{ supplier }}) is cancelled with the order — its goods were never received{% endblocktrans %}</li>
+          {% else %}
+          <li>{% blocktrans with number=p.number %}Purchase {{ number }} was already received — its rolls stay in stock{% endblocktrans %}</li>
+          {% endif %}
+        {% endfor %}
         {% if reservation_count %}<li>{% blocktrans count counter=reservation_count %}{{ counter }} reserved roll is released{% plural %}{{ counter }} reserved rolls are released{% endblocktrans %}</li>{% endif %}
         {% if order.current_account_id %}<li>{% trans "The sale is removed from the customer's account" %}</li>{% endif %}
         {% if order.notify_customer %}<li>{% trans "The customer is emailed that the order was cancelled" %}</li>{% endif %}

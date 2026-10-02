@@ -68,6 +68,53 @@ class CustomerOrderError(Exception):
     user-facing."""
 
 
+def packing_state(order):
+    """Whether the packing floor has started on `order`, and how far.
+
+    Started means it has left "Open" or rolls are already held for it —
+    the one rule every order↔purchase path uses to decide the order is no
+    longer theirs to rewrite, and what both cancel confirmations say out
+    loud before anyone confirms."""
+    status = order.order_status or "pending"
+    rolls = order.stock_reservations.filter(consumed=False).count()
+    return {
+        "started": status != "pending" or rolls > 0,
+        "rolls": rolls,
+        "status": status,
+        "status_label": order.get_order_status_display(),
+    }
+
+
+def packing_started(order):
+    return packing_state(order)["started"]
+
+
+def purchase_cancel_warning(invoice):
+    """What cancelling `invoice` will do to the customer order it was
+    bought for, said before the cancel is confirmed: whether packing has
+    started, and so whether the order is rewritten or left alone. Empty
+    when there is no open order to speak of."""
+    order = invoice.for_order
+    if order is None or invoice.status == "cancelled" or not order_is_open(order):
+        return ""
+    number = order.order_number or order.pk
+    state = packing_state(order)
+    if state["started"]:
+        return (_("Order %(number)s: packing HAS started (%(status)s, %(rolls)s roll(s) "
+                  "held). The order is left as it is — check it after cancelling.")
+                % {"number": number, "status": state["status_label"], "rolls": state["rolls"]})
+    skus = plan_variant_skus(invoice.intake_plan)
+    items = list(order.items.select_related("product_variant"))
+    ours = [it for it in items
+            if it.product_variant_id and (it.product_variant.variant_sku or "").lower() in skus]
+    if items and len(ours) == len(items):
+        return (_("Order %(number)s: packing has not started. All its lines come from "
+                  "this purchase, so the order is cancelled too.") % {"number": number})
+    return (_("Order %(number)s: packing has not started. Its %(count)s line(s) from this "
+              "purchase are removed; the order stays open with the rest.")
+            % {"number": number, "count": len(ours)})
+
+
 def order_is_open(order):
     return (order.order_status or "pending") not in _CLOSED_STATUSES
 
@@ -249,8 +296,7 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
         created = True
     else:
         created = False
-        if (order.order_status or "pending") != "pending" or \
-                order.stock_reservations.filter(consumed=False).exists():
+        if packing_started(order):
             return (_("Order %(number)s is already being packed, so its lines were not "
                       "changed — edit them on the order.")
                     % {"number": order.order_number or order.pk})
@@ -477,19 +523,33 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
                            % {"number": invoice.number})
 
 
-def cancel_purchases_for_cancelled_order(order, *, user=None):
-    """The order is being cancelled: stock ordered in for it is no longer
-    wanted, so its draft purchases are cancelled with it. A received
-    purchase is stock on the shelf and stays."""
+def cancel_purchases_for_cancelled_order(order, *, user=None, deleted=False):
+    """The order is being cancelled (or deleted — `deleted`): stock
+    ordered in for it is no longer wanted, so its draft purchases are
+    cancelled with it. A received purchase is stock on the shelf and
+    stays. Returns the numbers of the purchases cancelled.
+
+    A deleted order takes its own log with it, so the purchase's log is
+    told the order is gone — otherwise the cancel row would point at an
+    order nobody can open."""
+    from accounting.purchase_audit import log_purchase
     from accounting.views_purchase import cancel_purchase_invoice
     from .audit import log_change
 
     user = _auth_user(user)
+    cancelled = []
     for invoice in list(order.unreceived_purchases()):
         with syncing():
             cancel_purchase_invoice(invoice.pk, user, origin="order", mirror_order=False)
-        log_change(order, "field", field="purchase",
-                   new=_("%(number)s cancelled with the order") % {"number": invoice.number})
+        if deleted:
+            log_purchase(invoice, "field", field="order", origin="order", user=user,
+                         new=_("Order %(number)s deleted — this purchase was cancelled with it")
+                         % {"number": order.order_number or order.pk})
+        else:
+            log_change(order, "field", field="purchase",
+                       new=_("%(number)s cancelled with the order") % {"number": invoice.number})
+        cancelled.append(invoice.number)
+    return cancelled
 
 
 def drop_purchase_lines_from_order(invoice, *, user=None):
@@ -505,10 +565,8 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
     if order is None or not order_is_open(order):
         return None
     number = order.order_number or order.pk
-    if (order.order_status or "pending") != "pending" or \
-            order.stock_reservations.filter(consumed=False).exists():
-        # It has left "Open", or rolls are already held for it — the
-        # packing floor owns it now. Same rule as sync_customer_order.
+    if packing_started(order):
+        # The packing floor owns it now. Same rule as sync_customer_order.
         return (_("Order %(number)s is already being packed, so its lines were left "
                   "as they are — check it.") % {"number": number})
     skus = plan_variant_skus(invoice.intake_plan)

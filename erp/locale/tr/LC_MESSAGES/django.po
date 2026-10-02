@@ -13115,6 +13115,29 @@ msgstr "Resim silindi!"
 msgid "Enter product description..."
 msgstr "Ürün açıklaması giriniz..."
 
+msgid "Packing has started on this order (%(status)s, %(counter)s roll held)."
+msgid_plural "Packing has started on this order (%(status)s, %(counter)s rolls held)."
+msgstr[0] "Bu siparişte paketleme başladı (%(status)s, %(counter)s top ayrıldı)."
+msgstr[1] "Bu siparişte paketleme başladı (%(status)s, %(counter)s top ayrıldı)."
+
+msgid "Packing has not started on this order — no rolls are held for it."
+msgstr "Bu siparişte paketleme başlamadı — sipariş için ayrılmış top yok."
+
+msgid "Purchase %(number)s (%(supplier)s) is cancelled with the order — its goods were never received"
+msgstr "%(number)s alımı (%(supplier)s) siparişle birlikte iptal edilir — malları hiç teslim alınmadı"
+
+msgid "Purchase %(number)s was already received — its rolls stay in stock"
+msgstr "%(number)s alımı zaten teslim alındı — topları stokta kalır"
+
+msgid "Order %(number)s: packing HAS started (%(status)s, %(rolls)s roll(s) held). The order is left as it is — check it after cancelling."
+msgstr "%(number)s siparişi: paketleme BAŞLADI (%(status)s, %(rolls)s top ayrıldı). Sipariş olduğu gibi bırakılır — iptalden sonra kontrol edin."
+
+msgid "Order %(number)s: packing has not started. All its lines come from this purchase, so the order is cancelled too."
+msgstr "%(number)s siparişi: paketleme başlamadı. Tüm satırları bu alımdan geldiği için sipariş de iptal edilir."
+
+msgid "Order %(number)s: packing has not started. Its %(count)s line(s) from this purchase are removed; the order stays open with the rest."
+msgstr "%(number)s siparişi: paketleme başlamadı. Bu alımdan gelen %(count)s satırı çıkarılır; sipariş kalanlarla açık kalır."
+
 #: accounting/templates/accounting/book_detail.html
 msgid "See the ledger in detail"
 msgstr "Defteri ayrıntılı gör"
@@ -13229,3 +13252,18 @@ msgid "%(n)s stock item has no cost and is counted at zero."
 msgid_plural "%(n)s stock items have no cost and are counted at zero."
 msgstr[0] "%(n)s stok kaleminin maliyeti yok ve sıfır olarak sayılıyor."
 msgstr[1] "%(n)s stok kaleminin maliyeti yok ve sıfır olarak sayılıyor."
+
+msgid "Order deleted."
+msgstr "Sipariş silindi."
+
+msgid "Its supplier purchases awaiting delivery were cancelled with it: %(numbers)s"
+msgstr "Teslimat bekleyen tedarikçi alımları onunla birlikte iptal edildi: %(numbers)s"
+
+msgid "Order %(number)s deleted — this purchase was cancelled with it"
+msgstr "%(number)s siparişi silindi — bu alım onunla birlikte iptal edildi"
+
+msgid "Supplier purchases still awaiting delivery are cancelled with them:"
+msgstr "Hâlâ teslimat bekleyen tedarikçi alımları onlarla birlikte iptal edilir:"
+
+msgid "Supplier purchases cancelled with the deleted orders:"
+msgstr "Silinen siparişlerle birlikte iptal edilen tedarikçi alımları:"

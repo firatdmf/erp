@@ -319,7 +319,12 @@
   // irreversible, unlike a normal invoice cancel. A plain confirm() is too
   // easy to click through by habit, so require typing the purchase number.
   function poConfirmCancel(form) {
+    // A purchase bought for a customer order changes that order too —
+    // how depends on whether packing has started, so it is said here,
+    // before the number is typed (order_purchases.purchase_cancel_warning).
+    const orderWarning = "{{ cancel_order_warning|escapejs }}";
     const typed = window.prompt(
+      (orderWarning ? orderWarning + "\n\n" : "") +
       "{% trans 'This permanently deletes the physical stock this purchase brought in and cannot be undone. Type the purchase number to confirm:' %}\n" +
       "{{ invoice.display_number }}"
     );

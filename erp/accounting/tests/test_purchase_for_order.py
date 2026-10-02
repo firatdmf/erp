@@ -366,6 +366,66 @@ class PurchaseForCustomerTest(TestCase):
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
         self.assertContains(page, "is already being packed")
 
+    # ── Both cancel confirmations say how far packing has got ────────
+    # Cancelling either document reaches the other, and what happens
+    # there turns on whether packing has started — so it is said before
+    # anyone confirms, not after.
+
+    def _cancel_warning(self, inv_id):
+        """What the purchase page's cancel confirmation will say about the
+        order — read off the context, since the page carries it inside a
+        script string, escaped."""
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, "const orderWarning")
+        return page.context["cancel_order_warning"]
+
+    def test_the_purchase_cancel_says_packing_has_not_started(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self.assertEqual(
+            self._cancel_warning(inv_id),
+            "Order %s: packing has not started. All its lines come from this purchase, "
+            "so the order is cancelled too." % order.order_number)
+        # With a line of its own the order outlives the purchase.
+        stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
+        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
+        self.assertIn("Its 1 line(s) from this purchase are removed", self._cancel_warning(inv_id))
+
+    def test_the_purchase_cancel_says_packing_has_started(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        Order.objects.update(order_status="packaging")
+        self.assertEqual(
+            self._cancel_warning(inv_id),
+            "Order %s: packing HAS started (Packaging, 0 roll(s) held). The order is left "
+            "as it is — check it after cancelling." % order.order_number)
+
+    def test_a_cancelled_purchase_warns_about_no_order(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.assertEqual(self._cancel_warning(inv_id), "")
+
+    def test_the_order_cancel_says_how_far_packing_has_got(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        inv = Invoice.objects.get(pk=inv_id)
+        url = reverse("operating:order_detail", args=[inv.for_order.pk])
+        page = self.client.get(url)
+        self.assertContains(page, "Packing has not started on this order")
+        self.assertContains(page, "Purchase %s (Karven) is cancelled with the order" % inv.number)
+        Order.objects.update(order_status="packaging")
+        page = self.client.get(url)
+        self.assertContains(page, "Packing has started on this order (Packaging, 0 rolls held).")
+        self.assertNotContains(page, "Packing has not started on this order")
+
+    def test_an_order_with_no_purchase_gets_no_packing_warning(self):
+        account = CurrentAccount.objects.create(
+            book=self.book, code="C-OLEG", name="Oleg", type="customer",
+            contact=self.customer, default_currency=self.usd)
+        order = Order.objects.create(contact=self.customer, current_account=account)
+        page = self.client.get(reverse("operating:order_detail", args=[order.pk]))
+        self.assertContains(page, 'id="odCancelModal"')
+        self.assertNotContains(page, 'id="odx-packing"')
+
     # ── The customer's bill waits for the goods ──────────────────────
     # A purchase for a customer says what they will owe, not what they
     # owe: nothing has been sold until the supplier delivers. The order
@@ -552,6 +612,125 @@ class PurchaseForCustomerTest(TestCase):
         self.assertIn(("status", "status", "order", "draft", "cancelled"), self._purchase_log(inv_id))
         self.assertIn(("field", "purchase", "%s cancelled with the order" % inv.number),
                       self._order_log(order))
+
+    # ── A received purchase is out of the order's reach ──────────────
+    # Once the goods are in, the purchase is a fact: the stock is on the
+    # shelf and the supplier is owed for it, whatever becomes of the
+    # customer's order. Cancelling the order, deleting it or rewriting
+    # its lines releases the rolls it held and leaves everything else
+    # about the purchase exactly as the receipt left it.
+
+    def _received(self):
+        """A purchase saved for the customer and received, with what it
+        looks like at that moment."""
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        return inv_id, self._purchase_facts(inv_id)
+
+    def _purchase_facts(self, inv_id):
+        inv = Invoice.objects.get(pk=inv_id)
+        return {
+            "status": inv.status,
+            "total": inv.total,
+            "plan": inv.intake_plan,
+            "lines": list(inv.items.order_by("line_no")
+                          .values_list("description", "quantity", "unit_price")),
+            "debt": inv.posted_movement_id,
+            "supplier_balance": CurrentAccount.objects.get(pk=self.supplier.pk).cached_balance,
+            "rolls": sorted(WarehouseProductItem.objects
+                            .filter(purchase_invoice_item__invoice_id=inv_id)
+                            .values_list("barcode", "quantity", "quantity_remaining")),
+            "log": self._purchase_log(inv_id),
+        }
+
+    def test_cancelling_the_order_leaves_a_received_purchase_alone(self):
+        inv_id, before = self._received()
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self.assertEqual(len(self._held(order)), 2)
+        r = self.client.post(reverse("operating:order_detail", args=[order.pk]),
+                             {"action": "update_status", "order_status": "cancelled",
+                              "cancel_reason": "Customer changed their mind"})
+        self.assertEqual(r.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "cancelled")
+        self.assertEqual(before["status"], "issued")
+        self.assertEqual(self._purchase_facts(inv_id), before)
+        self.assertEqual(Invoice.objects.get(pk=inv_id).for_order, order)
+        # The rolls it held are free stock again — still on the shelf.
+        self.assertEqual(self._held(order), [])
+        self.assertEqual(len(before["rolls"]), 2)
+
+    def test_deleting_the_order_leaves_a_received_purchase_alone(self):
+        inv_id, before = self._received()
+        order = Invoice.objects.get(pk=inv_id).for_order
+        r = self.client.post(reverse("operating:delete_order", args=[order.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(Order.objects.filter(pk=order.pk).exists())
+        self.assertEqual(self._purchase_facts(inv_id), before)
+        # Only the link goes, with the order it pointed at.
+        self.assertIsNone(Invoice.objects.get(pk=inv_id).for_order)
+        self.assertFalse(OrderStockReservation.objects.exists())
+
+    # ── Deleting the order takes its draft purchases with it ─────────
+    # Like cancelling: goods still on their way in for an order that no
+    # longer exists are not wanted. The purchase's own log says the order
+    # was deleted, since the order's log goes with the order.
+
+    def test_deleting_the_order_cancels_its_draft_purchase(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        inv = Invoice.objects.get(pk=inv_id)
+        order = inv.for_order
+        r = self.client.post(reverse("operating:delete_order", args=[order.pk]), follow=True)
+        self.assertFalse(Order.objects.filter(pk=order.pk).exists())
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, "cancelled")
+        self.assertIsNone(inv.for_order)
+        self.assertIn(("status", "status", "order", "draft", "cancelled"), self._purchase_log(inv_id))
+        self.assertIn(("field", "order", "order", None,
+                       "Order %s deleted — this purchase was cancelled with it" % order.order_number),
+                      self._purchase_log(inv_id))
+        self.assertContains(r, "cancelled with it: %s" % inv.number)
+
+    def test_bulk_deleting_orders_cancels_their_draft_purchases(self):
+        first = self._save(self._plan()).json()["invoice_id"]
+        second = self._save(self._plan(variants=[self._variant(name="G08", sku="K24644.G08")],
+                                       product=Product.objects.get())).json()["invoice_id"]
+        orders = [Invoice.objects.get(pk=pk).for_order.pk for pk in (first, second)]
+        r = self.client.post(reverse("operating:bulk_delete_orders"), {"order_ids[]": orders})
+        self.assertEqual(r.json()["deleted"], 2, r.json())
+        self.assertEqual(r.json()["purchases_cancelled"],
+                         [Invoice.objects.get(pk=pk).number for pk in (first, second)])
+        self.assertEqual(set(Invoice.objects.filter(pk__in=[first, second])
+                             .values_list("status", flat=True)), {"cancelled"})
+        self.assertFalse(Order.objects.exists())
+
+    def test_the_order_list_names_the_purchases_a_delete_would_cancel(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        inv = Invoice.objects.get(pk=inv_id)
+        url = reverse("operating:order_list_scoped", args=[self.book.pk])
+        self.assertContains(self.client.get(url), 'data-draft-purchases="%s"' % inv.number)
+        self._confirm(inv_id)
+        page = self.client.get(url)
+        self.assertContains(page, 'data-draft-purchases=""')
+        self.assertNotContains(page, 'data-draft-purchases="%s"' % inv.number)
+
+    def test_editing_the_order_leaves_a_received_purchase_alone(self):
+        inv_id, before = self._received()
+        order = Invoice.objects.get(pk=inv_id).for_order
+        OrderStockReservation.objects.filter(order=order).delete()
+        line = order.items.get()
+        line.quantity, line.price = Decimal("10"), Decimal("9")
+        line.save()
+        self.assertEqual(self._purchase_facts(inv_id), before)
+        line.delete()
+        self.assertEqual(self._purchase_facts(inv_id), before)
+
+    def test_the_cancel_dialog_says_a_received_purchase_stays(self):
+        inv_id, _before = self._received()
+        inv = Invoice.objects.get(pk=inv_id)
+        page = self.client.get(reverse("operating:order_detail", args=[inv.for_order.pk]))
+        self.assertContains(page, "Purchase %s was already received" % inv.number)
+        self.assertNotContains(page, "is cancelled with the order")
 
     def test_cancelling_the_purchase_takes_its_lines_off_the_order(self):
         inv_id = self._save(self._plan(variants=[

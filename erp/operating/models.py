@@ -1173,6 +1173,18 @@ class Order(models.Model):
         more. Cancelled ones are not waiting for anything."""
         return self.supplier_purchases.filter(status="draft")
 
+    @property
+    def draft_purchase_numbers(self):
+        """The numbers of the purchases still on their way in for this
+        order, joined — what the list's delete confirmation names, since
+        deleting the order cancels them. Reads the OrderList prefetch
+        (`draft_purchases`) when it is there, so a long list stays one
+        query."""
+        drafts = getattr(self, "draft_purchases", None)
+        if drafts is None:
+            drafts = self.unreceived_purchases()
+        return ", ".join(p.number for p in drafts)
+
     def billing_waits_for_goods(self):
         """True while the customer must not be charged yet: the order is
         still open and stock is on its way in from a supplier for it. The

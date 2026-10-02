@@ -431,7 +431,7 @@
       {% for order in orders %}
       <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
         <label class="ord-select">
-          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
+          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
         <span class="ord-pk">{{ order.pk }}</span>
         <div class="ord-id">
@@ -541,7 +541,7 @@
       {% for order in b2b_orders %}
       <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
         <label class="ord-select">
-          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
+          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
         <span class="ord-pk">{{ order.pk }}</span>
         <div class="ord-id">
@@ -611,7 +611,7 @@
       {% for order in b2c_orders %}
       <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
         <label class="ord-select">
-          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
+          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
         <span class="ord-pk">{{ order.pk }}</span>
         <div class="ord-id">
@@ -679,7 +679,7 @@
       {% for order in retail_orders %}
       <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
         <label class="ord-select">
-          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
+          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
         <span class="ord-pk">{{ order.pk }}</span>
         <div class="ord-id">
@@ -869,9 +869,21 @@
     deleteBtn?.addEventListener('click', async () => {
       if (selected.size === 0) return;
       const ids = Array.from(selected);
-      const msg = ids.length === 1
+      let msg = ids.length === 1
         ? '{% trans "Delete this order? This cannot be undone." %}'
         : ('{% trans "Delete" %} ' + ids.length + ' {% trans "orders? This cannot be undone." %}');
+      // Goods still on their way in for these orders go with them:
+      // their draft purchases are cancelled, so the confirmation names
+      // them (data-draft-purchases, from Order.draft_purchase_numbers).
+      const drafts = [];
+      ids.forEach(id => {
+        const cb = document.querySelector(`.ord-select-row[data-order-id="${id}"]`);
+        const v = cb && (cb.dataset.draftPurchases || '').trim();
+        if (v) drafts.push(v);
+      });
+      if (drafts.length) {
+        msg += '\n\n{% trans "Supplier purchases still awaiting delivery are cancelled with them:" %} ' + drafts.join(', ');
+      }
       if (!confirm(msg)) return;
 
       // Non-admins must supply the deletion password (verified
@@ -907,6 +919,9 @@
         selected.clear();
         refresh();
         if (data.warning) alert(data.warning);
+        if (data.purchases_cancelled && data.purchases_cancelled.length) {
+          alert('{% trans "Supplier purchases cancelled with the deleted orders:" %} ' + data.purchases_cancelled.join(', '));
+        }
         // Update tab counts.
         document.querySelectorAll('.ord-tab').forEach(t => {
           const pane = document.querySelector(`.ord-list-wrap[data-pane="${t.dataset.tab}"]`);

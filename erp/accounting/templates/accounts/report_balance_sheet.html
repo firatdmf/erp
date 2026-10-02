@@ -2,20 +2,12 @@
 {% load i18n %}
 {% load humanize %}
 {% comment %}
-The accounting equation, side by side.
+The balance sheet, from the general ledger, where A = L + E is true by
+construction — an unbalanced entry cannot be stored.
 
-Left: the general ledger, where A = L + E is true by construction — an
-unbalanced entry cannot be stored. Right: the same equation computed from
-the subsidiary ledgers, where it has never balanced.
-
-Both, because the ledger starts empty and fills as history is backfilled —
-everything from now on posts as it is saved. Showing only the ledger would
-report a tidy zero while the money sat somewhere else; showing only the
-subsidiary side is what we had before.
-
-Underneath, each control account against the subsidiary ledger it
-summarises. The two columns say whether the ledger has caught up; this says
-where it has not.
+Underneath, the subsidiary ledgers one by one, each beside the control
+account it is the detail of, with any difference stated and explained.
+They are never totalled into an equation of their own: they hold no equity.
 {% endcomment %}
 
 {% block css %}
@@ -85,6 +77,18 @@ where it has not.
   .bs-rec .bs-tbl td { border-bottom-color:#F4F7FB; }
   .bs-rec .rec-note { font:400 12px var(--font-sans); color:var(--gray-500); margin-top:3px; line-height:1.5; max-width:62ch; }
 
+  .bs-sl-head { margin:30px 0 14px; }
+  .bs-sl-head h2 { font:800 18px var(--font-sans); letter-spacing:-0.01em; margin:0 0 6px; }
+  .bs-sl-head p { font:500 13px var(--font-sans); color:var(--gray-600); margin:0; max-width:78ch; line-height:1.55; }
+  .bs-sl { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; align-items:flex-start; }
+  @media (max-width: 1100px) { .bs-sl { grid-template-columns:1fr; } }
+  .bs-sl-what { padding:10px 20px; font:500 12.5px var(--font-sans); color:var(--gray-500); border-bottom:1px solid #F4F7FB; }
+  .bs-sl-gap { margin:12px 20px 0; padding:10px 12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; font:400 12.5px var(--font-sans); color:#92400E; line-height:1.5; }
+  .bs-sl-gap b { display:block; font-weight:700; }
+  .bs-sl-open { display:flex; align-items:center; gap:6px; padding:12px 20px 14px; font:600 12.5px var(--font-sans); color:var(--nejum-teal-700); text-decoration:none; }
+  .bs-sl-open:hover { text-decoration:underline; }
+  .bs-sl-open i, .bs-sl-open svg { width:13px; height:13px; }
+
   .bs-detail { margin-top:20px; }
   .bs-detail summary { cursor:pointer; font:600 12.5px var(--font-sans); color:var(--nejum-teal-700); padding:10px 0; }
   .bs-cov { margin-top:10px; font:500 12.5px var(--font-sans); color:var(--gray-600); }
@@ -109,8 +113,8 @@ where it has not.
       {% blocktrans trimmed %}
         Assets = Liabilities + Equity, from the general ledger. It cannot be
         out of balance — an entry whose debits and credits disagree is
-        refused. Below it, each control account is checked against the
-        records it summarises.
+        refused. Below it, each subsidiary ledger is checked against the
+        ledger account it is the detail of.
       {% endblocktrans %}
     </p>
     {% if coverage is not None %}
@@ -181,39 +185,93 @@ where it has not.
     </div>
   </div>
 
-  <!-- ── Control accounts against the ledgers they summarise ───── -->
-  <div class="bs-resid bs-rec">
-    <div class="bs-resid-h">
-      <i data-lucide="scale"></i>
-      {% trans "Control accounts, against the ledger each one summarises" %}
-    </div>
-    <table class="bs-tbl">
-      <tr class="section">
-        <td>{% trans "Ledger account" %}</td>
-        <td class="num">{% trans "General ledger" %}</td>
-        <td class="num">{% trans "Records" %}</td>
-        <td class="num">{% trans "Difference" %}</td>
-      </tr>
-      {% for r in rec.rows %}
-      <tr>
-        <td>
-          <span class="code">{{ r.control }}</span>{{ r.label }}
-          <span class="muted">— {{ r.subsidiary_label }}</span>
-          {% if not r.reconciled and r.note %}
-          <div class="muted rec-note">{{ r.note }}</div>
-          {% endif %}
-        </td>
-        <td class="num">{{ r.ledger|floatformat:"2g" }}</td>
-        <td class="num">{{ r.subsidiary|floatformat:"2g" }}</td>
-        <td class="num {% if not r.reconciled %}neg{% endif %}">
-          {% if r.reconciled %}—{% else %}{{ r.difference|floatformat:"2g" }}{% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+  <!-- ── Subsidiary ledgers, each against its control account ───── -->
+  <div class="bs-sl-head">
+    <h2>{% trans "Subsidiary ledgers" %}</h2>
+    <p>
+      {% blocktrans trimmed %}
+        The general ledger above keeps one total per account. A subsidiary
+        ledger is the detail behind one of those totals: which cash
+        account, which customer, which warehouse. Each one is checked
+        against its own ledger account. They are not added up into a
+        balance sheet of their own, because they hold no equity.
+      {% endblocktrans %}
+    </p>
+  </div>
 
-    {% if rec.pending %}
-    <table class="bs-tbl" style="margin-top:10px;">
+  <div class="bs-sl">
+    {% for l in ledgers %}
+    <div class="bs-card">
+      <div class="bs-card-h">
+        <span class="ico"><i data-lucide="{{ l.icon }}"></i></span>
+        <h2>{{ l.title }}</h2>
+        {% if l.agrees %}
+          <span class="note ok">{% trans "Agrees with the ledger" %}</span>
+        {% else %}
+          <span class="note warn">{% trans "Differs" %}</span>
+        {% endif %}
+      </div>
+      <div class="bs-sl-what">{{ l.what }}</div>
+
+      <table class="bs-tbl">
+        {% for line in l.lines %}
+        <tr>
+          <td>
+            {% if line.url %}<a class="bs-acct" href="{{ line.url }}">{{ line.label }}</a>{% else %}{{ line.label }}{% endif %}
+            {% if line.count is not None %}<span class="muted">× {{ line.count|intcomma }}</span>{% endif %}
+          </td>
+          <td class="num {% if line.amount < 0 %}neg{% endif %}">{{ line.amount|floatformat:"2g" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td class="muted">{% trans "Nothing recorded" %}</td><td class="num muted">0.00</td></tr>
+        {% endfor %}
+        <tr class="total">
+          <td>{% trans "This ledger adds up to" %}</td>
+          <td class="num">{{ l.records|floatformat:"2g" }}</td>
+        </tr>
+        <tr>
+          <td class="muted">
+            {% trans "General ledger" %}:
+            {% for code, name in l.controls %}{% if not forloop.first %} {{ l.controls_joiner }} {% endif %}<a class="bs-acct" href="{% url 'accounts:report_ledger_account' current_book.pk code %}">{{ name }} ({{ code }})</a>{% endfor %}
+          </td>
+          <td class="num">{{ l.ledger|floatformat:"2g" }}</td>
+        </tr>
+      </table>
+
+      {% if not l.agrees %}
+      <div class="bs-sl-gap">
+        <b>
+        {% if l.records_show_more %}
+          {% blocktrans trimmed with amount=l.gap|floatformat:"2g" %}
+            This ledger shows {{ amount }} more than the general ledger.
+          {% endblocktrans %}
+        {% else %}
+          {% blocktrans trimmed with amount=l.gap|floatformat:"2g" %}
+            This ledger shows {{ amount }} less than the general ledger.
+          {% endblocktrans %}
+        {% endif %}
+        </b>
+        {{ l.why }}
+      </div>
+      {% endif %}
+      {% if l.unvalued %}
+      <div class="bs-sl-gap">
+        {% blocktrans trimmed count n=l.unvalued %}
+          {{ n }} stock item has no cost and is counted at zero.
+        {% plural %}
+          {{ n }} stock items have no cost and are counted at zero.
+        {% endblocktrans %}
+      </div>
+      {% endif %}
+
+      <a class="bs-sl-open" href="{{ l.url }}">{{ l.url_label }}<i data-lucide="arrow-right"></i></a>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if rec.pending %}
+  <div class="bs-resid bs-rec">
+    <table class="bs-tbl">
       <tr class="section"><td colspan="2">
         {% trans "Held until somebody says what it was" %}
       </td></tr>
@@ -226,8 +284,8 @@ where it has not.
       </tr>
       {% endfor %}
     </table>
-    {% endif %}
   </div>
+  {% endif %}
 </div>
 
 <script>if (window.lucide) lucide.createIcons();</script>

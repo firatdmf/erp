@@ -100,16 +100,41 @@ class BalanceSheetPage(TestCase):
             status="in_stock", unit_cost_base=Decimal("4.00"))
         self.assertEqual(self._page().context["coverage"], Decimal("71.4"))
 
-    def test_the_page_shows_each_control_account_against_its_ledger(self):
-        """Where the ledger has not caught up with the records, account by
-        account."""
+    def test_each_subsidiary_ledger_stands_beside_its_control_account(self):
         r = self._page()
-        self.assertContains(r, "Control accounts")
-        rec = r.context["rec"]
-        receivables = rec["rows"][0]
-        self.assertEqual(receivables["ledger"], Decimal("1000.00"))
-        self.assertEqual(receivables["subsidiary"], Decimal("1000.00"))
-        self.assertTrue(receivables["reconciled"])
+        self.assertContains(r, "Subsidiary ledgers")
+        cash, accounts, stock = r.context["ledgers"]
+        self.assertEqual(accounts["records"], Decimal("1000.00"))
+        self.assertEqual(accounts["ledger"], Decimal("1000.00"))
+        self.assertTrue(accounts["agrees"])
+        self.assertEqual([(l["count"], l["amount"]) for l in accounts["lines"]],
+                         [(1, Decimal("1000.00")), (0, Decimal("0.00"))])
+        self.assertContains(r, "Accounts Receivable (1200)")
+        self.assertContains(r, "Agrees with the ledger")
+        self.assertNotContains(r, "more than the general ledger")
+
+    def test_a_difference_says_which_side_shows_more_and_why(self):
+        """Stock put on the shelves with no purchase behind it is in the
+        warehouse and not in the ledger, and the page says exactly that."""
+        from operating.models import (Warehouse, WarehouseProduct,
+                                      WarehouseProductItem)
+        wh = Warehouse.objects.create(name="Laleli Depo",
+                                      accounting_book=self.book)
+        wp = WarehouseProduct.objects.create(
+            warehouse=wh, name="seta", sku="S1", quantity=Decimal("0"))
+        WarehouseProductItem.objects.create(
+            product=wp, quantity=Decimal("100"),
+            quantity_remaining=Decimal("100"), barcode="BC-1",
+            status="in_stock", unit_cost_base=Decimal("4.00"))
+        r = self._page()
+        stock = r.context["ledgers"][2]
+        self.assertFalse(stock["agrees"])
+        self.assertTrue(stock["records_show_more"])
+        self.assertEqual(stock["gap"], Decimal("400.00"))
+        self.assertEqual([(l["label"], l["amount"]) for l in stock["lines"]],
+                         [("Laleli Depo", Decimal("400.00"))])
+        self.assertContains(r, "This ledger shows 400.00 more than the general ledger.")
+        self.assertContains(r, "Stock that arrives without a purchase invoice")
 
     def test_an_adjustment_shows_up_as_held_rather_than_vanishing(self):
         CurrentAccountMovement.objects.create(

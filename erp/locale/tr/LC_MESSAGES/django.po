@@ -13120,11 +13120,112 @@ msgid "See the ledger in detail"
 msgstr "Defteri ayrıntılı gör"
 
 #: accounting/templates/accounts/report_balance_sheet.html
-msgid ""
-"Assets = Liabilities + Equity, from the general ledger. It cannot be out of "
-"balance — an entry whose debits and credits disagree is refused. Below it, "
-"each control account is checked against the records it summarises."
-msgstr ""
-"Varlıklar = Borçlar + Özkaynak, büyük defterden. Dengesiz olamaz — borcu ile "
-"alacağı tutmayan bir kayıt reddedilir. Altında her kontrol hesabı, "
-"özetlediği kayıtlarla karşılaştırılır."
+msgid "Assets = Liabilities + Equity, from the general ledger. It cannot be out of balance — an entry whose debits and credits disagree is refused. Below it, each subsidiary ledger is checked against the ledger account it is the detail of."
+msgstr "Varlıklar = Borçlar + Özkaynak, büyük defterden. Dengesiz olamaz — borcu ile alacağı tutmayan bir kayıt reddedilir. Altında her yardımcı defter, ayrıntısını tuttuğu defter hesabıyla karşılaştırılır."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Subsidiary ledgers"
+msgstr "Yardımcı defterler"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "The general ledger above keeps one total per account. A subsidiary ledger is the detail behind one of those totals: which cash account, which customer, which warehouse. Each one is checked against its own ledger account. They are not added up into a balance sheet of their own, because they hold no equity."
+msgstr "Yukarıdaki büyük defter her hesap için tek bir toplam tutar. Yardımcı defter, bu toplamlardan birinin ayrıntısıdır: hangi kasa hesabı, hangi müşteri, hangi depo. Her biri kendi defter hesabıyla karşılaştırılır. Özkaynak içermedikleri için kendi başlarına bir bilanço olarak toplanmazlar."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Agrees with the ledger"
+msgstr "Defterle uyumlu"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Differs"
+msgstr "Farklı"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Nothing recorded"
+msgstr "Kayıt yok"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "This ledger adds up to"
+msgstr "Bu defterin toplamı"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "General ledger"
+msgstr "Büyük defter"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "This ledger shows %(amount)s more than the general ledger."
+msgstr "Bu defter büyük defterden %(amount)s fazla gösteriyor."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "This ledger shows %(amount)s less than the general ledger."
+msgstr "Bu defter büyük defterden %(amount)s eksik gösteriyor."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "No cash account"
+msgstr "Kasa hesabı yok"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Accounts that owe us"
+msgstr "Bize borçlu hesaplar"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Accounts we owe"
+msgstr "Borçlu olduğumuz hesaplar"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Cash journal"
+msgstr "Kasa defteri"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Every cash and bank transaction, by cash account."
+msgstr "Kasa hesabına göre her kasa ve banka hareketi."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Open the cash journal"
+msgstr "Kasa defterini aç"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Current accounts"
+msgstr "Cari hesaplar"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Every customer and supplier account, with its movements."
+msgstr "Her müşteri ve tedarikçi hesabı, hareketleriyle birlikte."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "less"
+msgstr "eksi"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Open the current accounts"
+msgstr "Cari hesapları aç"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Warehouse stock"
+msgstr "Depo stoğu"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Every stock item on the shelves, at its cost."
+msgstr "Raflardaki her stok kalemi, maliyetiyle."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Open the warehouses"
+msgstr "Depoları aç"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Movements recorded before automatic posting began have not been replayed into the general ledger yet."
+msgstr "Otomatik kayıt başlamadan önce girilen hareketler henüz büyük deftere işlenmedi."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Transfers and currency exchanges move cash on both legs and are not posted yet, so they sit in this gap."
+msgstr "Transferler ve döviz işlemleri kasayı iki tarafta da hareket ettirir ve henüz deftere işlenmez; bu fark onlardan oluşur."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid "Stock that arrives without a purchase invoice raises the shelves and not the ledger. Goods leaving on a sale do relieve stock, but only since that posting began: anything older is still in this difference."
+msgstr "Satın alma faturası olmadan gelen stok rafları artırır, defteri artırmaz. Satışla çıkan mallar stoğu düşer, ancak yalnızca bu kayıt başladığından beri: daha eskisi hâlâ bu farkın içindedir."
+
+#: accounting/templates/accounts/report_balance_sheet.html
+#, python-format
+msgid "%(n)s stock item has no cost and is counted at zero."
+msgid_plural "%(n)s stock items have no cost and are counted at zero."
+msgstr[0] "%(n)s stok kaleminin maliyeti yok ve sıfır olarak sayılıyor."
+msgstr[1] "%(n)s stok kaleminin maliyeti yok ve sıfır olarak sayılıyor."

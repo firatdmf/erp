@@ -217,15 +217,121 @@ class ChartOfAccounts(View):
         return render(request, self.template_name, {"groups": groups})
 
 
+def _subsidiary_ledgers(book, rec):
+    """Each subsidiary ledger beside the ledger account it is the detail of.
+
+    The general ledger holds one total per account; a subsidiary ledger
+    says what that total is made of — which cash account, which customer,
+    which warehouse. They are shown one by one, each against its own
+    control account, and never added into an equation of their own: they
+    hold no equity, so that sum cannot balance.
+
+    `rec` is reconcile()'s answer, which already has both totals for each.
+    """
+    from django.urls import reverse
+    from django.utils.translation import gettext as _
+
+    from .models import CashTransactionEntry
+    from .services_ledger import _inventory_value, _signed_cash
+
+    ZERO = Decimal("0.00")
+    names = dict(ChartAccount.objects
+                 .filter(code__in=("1000", "1200", "1300", "2000"))
+                 .values_list("code", "name"))
+    by_control = {r["control"]: r for r in rec["rows"]}
+
+    def card(control, **kwargs):
+        row = by_control[control]
+        # Positive when the records hold more than the ledger has been told.
+        gap = row["subsidiary"] - row["ledger"]
+        return {
+            "records": row["subsidiary"],
+            "ledger": row["ledger"],
+            "agrees": gap == ZERO,
+            "records_show_more": gap > ZERO,
+            "gap": abs(gap),
+            "why": _(row["note"]) if row["note"] else _(
+                "Movements recorded before automatic posting began have "
+                "not been replayed into the general ledger yet."),
+            **kwargs,
+        }
+
+    # ── Cash journal: one line per cash account ──────────────────────
+    cash_lines = [
+        {"label": (f'{r["cash_account__name"]} ({r["cash_account__currency__code"]})'
+                   if r["cash_account__name"] else _("No cash account")),
+         "amount": r["t"] or ZERO}
+        for r in (CashTransactionEntry.objects.filter(book=book)
+                  .values("cash_account__name", "cash_account__currency__code")
+                  .annotate(t=Sum(_signed_cash()))
+                  .order_by("cash_account__name"))
+        if r["t"]
+    ]
+
+    # ── Current accounts: who owes us, and whom we owe ───────────────
+    accounts = CurrentAccount.objects.filter(book=book)
+    owed_to_us = accounts.filter(cached_balance__gt=0)
+    owed_by_us = accounts.filter(cached_balance__lt=0)
+    account_lines = [
+        {"label": _("Accounts that owe us"), "count": owed_to_us.count(),
+         "amount": owed_to_us.aggregate(t=Sum("cached_balance"))["t"] or ZERO},
+        {"label": _("Accounts we owe"), "count": owed_by_us.count(),
+         "amount": owed_by_us.aggregate(t=Sum("cached_balance"))["t"] or ZERO},
+    ]
+
+    # ── Warehouse stock: one line per warehouse this book owns ───────
+    stock_lines, unvalued = [], 0
+    try:
+        from operating.models import Warehouse
+        warehouses = Warehouse.objects.filter(accounting_book=book).order_by("name")
+    except ImportError:
+        warehouses = []
+    for warehouse in warehouses:
+        value, missing, _qty = _inventory_value(book, warehouse=warehouse)
+        unvalued += missing
+        if value or missing:
+            stock_lines.append({
+                "label": warehouse.name, "amount": value,
+                "url": reverse("operating:warehouse_detail", args=[warehouse.pk]),
+            })
+
+    return [
+        card("1000",
+             title=_("Cash journal"), icon="wallet",
+             what=_("Every cash and bank transaction, by cash account."),
+             controls=[("1000", names.get("1000", ""))],
+             lines=cash_lines,
+             url=reverse("accounting:cash_transaction_entry_list", args=[book.pk]),
+             url_label=_("Open the cash journal")),
+        card("1200 − 2000",
+             title=_("Current accounts"), icon="users",
+             what=_("Every customer and supplier account, with its movements."),
+             controls=[("1200", names.get("1200", "")),
+                       ("2000", names.get("2000", ""))],
+             controls_joiner=_("less"),
+             lines=account_lines,
+             url=reverse("accounts:list", args=[book.pk]),
+             url_label=_("Open the current accounts")),
+        card("1300",
+             title=_("Warehouse stock"), icon="package",
+             what=_("Every stock item on the shelves, at its cost."),
+             controls=[("1300", names.get("1300", ""))],
+             lines=stock_lines,
+             unvalued=unvalued,
+             url=reverse("operating:warehouse_list"),
+             url_label=_("Open the warehouses")),
+    ]
+
+
 @method_decorator(login_required, name="dispatch")
 class BalanceSheet(View):
     """Assets = Liabilities + Equity, from the general ledger.
 
     The equation is true there by construction, because an unbalanced
-    entry cannot be written. Under it, each control account is set against
-    the records it summarises — cash against the cash journal, receivables
-    and payables against the current accounts, inventory against the
-    shelves — which is where a ledger that has fallen behind shows.
+    entry cannot be written. Under it, each subsidiary ledger is set
+    against the control account it is the detail of — the cash journal,
+    the current accounts, the warehouse stock — which is where a ledger
+    that has fallen behind shows. See _subsidiary_ledgers.
 
     The records were once totalled into an equation of their own beside
     this one. They hold no equity, so that column could never balance and
@@ -253,6 +359,7 @@ class BalanceSheet(View):
         return render(request, self.template_name, {
             "gl": gl,
             "rec": rec,
+            "ledgers": _subsidiary_ledgers(request.book, rec),
             "coverage": coverage,
             "date_to": date_to or "",
         })

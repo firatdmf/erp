@@ -13118,3 +13118,13 @@ msgstr "Ürün açıklaması giriniz..."
 #: accounting/templates/accounting/book_detail.html
 msgid "See the ledger in detail"
 msgstr "Defteri ayrıntılı gör"
+
+#: accounting/templates/accounts/report_balance_sheet.html
+msgid ""
+"Assets = Liabilities + Equity, from the general ledger. It cannot be out of "
+"balance — an entry whose debits and credits disagree is refused. Below it, "
+"each control account is checked against the records it summarises."
+msgstr ""
+"Varlıklar = Borçlar + Özkaynak, büyük defterden. Dengesiz olamaz — borcu ile "
+"alacağı tutmayan bir kayıt reddedilir. Altında her kontrol hesabı, "
+"özetlediği kayıtlarla karşılaştırılır."

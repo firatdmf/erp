@@ -67,34 +67,25 @@ class BalanceSheetPage(TestCase):
         self.assertEqual(ctx["gl"]["assets"], Decimal("1000.00"))
         self.assertEqual(ctx["gl"]["equity"], Decimal("1000.00"))
 
-    def test_the_subsidiary_side_reports_the_receivable_and_does_not_balance(self):
-        ctx = self._page().context
-        self.assertEqual(ctx["subs"]["receivable"], Decimal("1000.00"))
-        self.assertFalse(ctx["subs"]["balanced"])
-        self.assertEqual(ctx["subs"]["residual"], Decimal("1000.00"))
+    def test_the_page_shows_one_equation_and_it_is_the_ledgers(self):
+        """The records hold no equity, so totalling them into an equation
+        of their own reported the whole of a book's equity as an error."""
+        r = self._page()
+        self.assertNotContains(r, "Subsidiary Ledgers")
+        self.assertNotContains(r, "Out by")
+        self.assertNotIn("subs", r.context)
+        self.assertContains(r, "Balanced")
 
-    def test_the_residual_is_accounted_for_exactly(self):
-        """The causes are an identity, not an estimate — if they ever stop
-        summing to the residual, something is unexplained and the page has
-        to say so rather than round it away."""
+    def test_the_ledger_and_the_records_report_the_same_assets(self):
+        from accounting.services_ledger import subsidiary_equation
         ctx = self._page().context
-        self.assertTrue(ctx["identity_holds"])
-        self.assertEqual(ctx["subs"]["causes_total"], ctx["subs"]["residual"])
-
-    def test_the_two_columns_agree_once_the_contra_is_posted(self):
-        """The migration finishes when the ledger column and the
-        subsidiary one report the same assets. For an opening balance that
-        now happens as the movement is saved, so the page reaches 100%
-        coverage with nobody having posted anything by hand."""
-        ctx = self._page().context
-        self.assertEqual(ctx["gl"]["assets"], ctx["subs"]["assets"])
+        self.assertEqual(ctx["gl"]["assets"],
+                         subsidiary_equation(self.book)["assets"])
         self.assertEqual(ctx["coverage"], Decimal("100.0"))
 
     def test_coverage_reports_how_much_is_posted(self):
         """A book whose movements are all posted reads 100; one with stock
-        the ledger has not been told about reads lower, because the
-        subsidiary column counts the stock and the ledger column does
-        not."""
+        the ledger has not been told about reads lower."""
         self.assertEqual(self._page().context["coverage"], Decimal("100.0"))
 
         from operating.models import (Warehouse, WarehouseProduct,
@@ -110,9 +101,8 @@ class BalanceSheetPage(TestCase):
         self.assertEqual(self._page().context["coverage"], Decimal("71.4"))
 
     def test_the_page_shows_each_control_account_against_its_ledger(self):
-        """The two columns say whether the ledger has caught up. This says
-        where it has not, which is the difference between a number to worry
-        about and a job to do."""
+        """Where the ledger has not caught up with the records, account by
+        account."""
         r = self._page()
         self.assertContains(r, "Control accounts")
         rec = r.context["rec"]

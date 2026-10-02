@@ -47,7 +47,7 @@ where it has not.
   .bs-title { font:800 28px var(--font-sans); letter-spacing:-0.02em; margin:0 0 6px; }
   .bs-sub { font:500 13px var(--font-sans); color:var(--gray-600); margin:0; max-width: 70ch; line-height:1.55; }
 
-  .bs-cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:flex-start; }
+  .bs-cols { display:grid; grid-template-columns:1fr; gap:20px; align-items:flex-start; }
   @media (max-width: 980px) { .bs-cols { grid-template-columns:1fr; } }
 
   .bs-card { background:#fff; border:1px solid #E2E8EE; border-radius:12px; box-shadow:0 1px 2px rgba(15,23,31,.03); overflow:hidden; }
@@ -107,10 +107,10 @@ where it has not.
     <h1 class="bs-title">{% trans "Balance Sheet" %}</h1>
     <p class="bs-sub">
       {% blocktrans trimmed %}
-        Assets = Liabilities + Equity, computed two ways. The general ledger
-        cannot be out of balance — an entry whose debits and credits disagree
-        is refused. The subsidiary ledgers can be, and are. The two columns
-        converge as posting is wired up.
+        Assets = Liabilities + Equity, from the general ledger. It cannot be
+        out of balance — an entry whose debits and credits disagree is
+        refused. Below it, each control account is checked against the
+        records it summarises.
       {% endblocktrans %}
     </p>
     {% if coverage is not None %}
@@ -179,59 +179,6 @@ where it has not.
       </div>
       {% endif %}
     </div>
-
-    <!-- ── Subsidiary ledgers ───────────────────────────────────── -->
-    <div class="bs-card">
-      <div class="bs-card-h">
-        <span class="ico"><i data-lucide="layers"></i></span>
-        <h2>{% trans "Subsidiary Ledgers" %}</h2>
-        {% if subs.balanced %}
-          <span class="note ok">{% trans "Balanced" %}</span>
-        {% else %}
-          <span class="note warn">{% trans "Out by" %} {{ subs.residual|floatformat:"2g" }}</span>
-        {% endif %}
-      </div>
-      <table class="bs-tbl">
-        <tr class="section"><td colspan="2">{% trans "Assets" %}</td></tr>
-        <tr><td>{% trans "Cash and bank" %} <span class="muted">({% trans "cash journal" %})</span></td>
-            <td class="num">{{ subs.cash|floatformat:"2g" }}</td></tr>
-        <tr><td>{% trans "Accounts receivable" %} <span class="muted">({% trans "current accounts" %})</span></td>
-            <td class="num">{{ subs.receivable|floatformat:"2g" }}</td></tr>
-        <tr>
-          <td>{% trans "Inventory" %}
-            {% if subs.unvalued_rolls %}
-            <span class="muted">
-              — {% blocktrans trimmed with n=subs.unvalued_rolls|intcomma m=subs.unvalued_metres|floatformat:"0g" %}
-                {{ n }} rolls ({{ m }} m) have no cost basis and are not counted
-              {% endblocktrans %}
-            </span>
-            {% endif %}
-          </td>
-          <td class="num">{{ subs.inventory|floatformat:"2g" }}</td>
-        </tr>
-        <tr><td>{% trans "Fixed assets" %}</td>
-            <td class="num">{{ subs.fixed|floatformat:"2g" }}</td></tr>
-        <tr class="total"><td>{% trans "Total assets" %}</td>
-            <td class="num">{{ subs.assets|floatformat:"2g" }}</td></tr>
-
-        <tr class="section"><td colspan="2">{% trans "Liabilities" %}</td></tr>
-        <tr><td>{% trans "Accounts payable" %} <span class="muted">({% trans "current accounts" %})</span></td>
-            <td class="num">{{ subs.payable|floatformat:"2g" }}</td></tr>
-        <tr class="total"><td>{% trans "Total liabilities" %}</td>
-            <td class="num">{{ subs.liabilities|floatformat:"2g" }}</td></tr>
-
-        <tr class="section"><td colspan="2">{% trans "Equity" %}</td></tr>
-        {% for source, amount in subs.equity_by_source.items %}
-        <tr><td class="muted">{{ source }}</td>
-            <td class="num">{{ amount|floatformat:"2g" }}</td></tr>
-        {% endfor %}
-        <tr class="total"><td>{% trans "Total equity" %}</td>
-            <td class="num">{{ subs.equity|floatformat:"2g" }}</td></tr>
-
-        <tr class="grand"><td>{% trans "Liabilities + Equity" %}</td>
-            <td class="num">{{ subs.liabilities_plus_equity|floatformat:"2g" }}</td></tr>
-      </table>
-    </div>
   </div>
 
   <!-- ── Control accounts against the ledgers they summarise ───── -->
@@ -244,7 +191,7 @@ where it has not.
       <tr class="section">
         <td>{% trans "Ledger account" %}</td>
         <td class="num">{% trans "General ledger" %}</td>
-        <td class="num">{% trans "Subsidiary" %}</td>
+        <td class="num">{% trans "Records" %}</td>
         <td class="num">{% trans "Difference" %}</td>
       </tr>
       {% for r in rec.rows %}
@@ -281,47 +228,6 @@ where it has not.
     </table>
     {% endif %}
   </div>
-
-  <!-- ── Why the subsidiary side does not balance ───────────────── -->
-  {% if not subs.balanced %}
-  <div class="bs-resid">
-    <div class="bs-resid-h">
-      <i data-lucide="alert-triangle"></i>
-      {% blocktrans trimmed with amount=subs.residual|floatformat:"2g" %}
-        The subsidiary ledgers are out by {{ amount }} — here is all of it
-      {% endblocktrans %}
-    </div>
-    <table class="bs-tbl">
-      {% for c in subs.causes %}
-      <tr><td>{{ c.label }}</td>
-          <td class="num">{{ c.amount|floatformat:"2g" }}</td></tr>
-      {% endfor %}
-      <tr class="total">
-        <td>
-          {% trans "Accounted for" %}
-          {% if identity_holds %}
-            <span class="muted">— {% trans "exactly equal to the difference above, nothing unexplained" %}</span>
-          {% endif %}
-        </td>
-        <td class="num">{{ subs.causes_total|floatformat:"2g" }}</td>
-      </tr>
-    </table>
-  </div>
-
-  <details class="bs-detail">
-    <summary>{% trans "Current account movements by type — these are what the backfill still has to replay" %}</summary>
-    <div class="bs-card" style="margin-top:8px;">
-      <table class="bs-tbl">
-        {% for r in subs.movement_types %}
-        <tr>
-          <td>{{ r.type }} <span class="muted">× {{ r.n|intcomma }}</span></td>
-          <td class="num {% if r.amount < 0 %}neg{% endif %}">{{ r.amount|floatformat:"2g" }}</td>
-        </tr>
-        {% endfor %}
-      </table>
-    </div>
-  </details>
-  {% endif %}
 </div>
 
 <script>if (window.lucide) lucide.createIcons();</script>

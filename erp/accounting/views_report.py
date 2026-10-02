@@ -219,20 +219,17 @@ class ChartOfAccounts(View):
 
 @method_decorator(login_required, name="dispatch")
 class BalanceSheet(View):
-    """Assets = Liabilities + Equity, twice over.
+    """Assets = Liabilities + Equity, from the general ledger.
 
-    The left column is the general ledger, where the equation is true by
-    construction because an unbalanced entry cannot be written. The right
-    column is the same equation computed from the subsidiary ledgers, the
-    way it has always had to be computed — and there it does not balance,
-    by $353,865.03 on Laleli and $1,319,947.21 on Ergene.
+    The equation is true there by construction, because an unbalanced
+    entry cannot be written. Under it, each control account is set against
+    the records it summarises — cash against the cash journal, receivables
+    and payables against the current accounts, inventory against the
+    shelves — which is where a ledger that has fallen behind shows.
 
-    Both are shown because the ledger starts empty and fills up as history
-    is backfilled. Everything that happens from now on posts as it happens
-    — see signals_ledger — so the gap between the columns is the past, not
-    the present, and it stops growing. Watching them converge IS the
-    migration; when they agree, it is finished. Showing only the ledger
-    would report a tidy zero while the money sat somewhere else entirely.
+    The records were once totalled into an equation of their own beside
+    this one. They hold no equity, so that column could never balance and
+    only ever reported a book's whole equity as an error.
     """
     template_name = "accounts/report_balance_sheet.html"
 
@@ -244,9 +241,6 @@ class BalanceSheet(View):
         gl = balance_sheet(request.book, date_to=date_to)
         subs = subsidiary_equation(request.book)
         # What each control account says against the ledger it summarises.
-        # The two columns above say whether the ledger has caught up; this
-        # says WHERE it has not, which is the difference between a number to
-        # worry about and a job to do.
         rec = reconcile(request.book, date_to=date_to)
 
         # How far the ledger has come. Zero when nothing is posted yet; 100
@@ -258,11 +252,9 @@ class BalanceSheet(View):
 
         return render(request, self.template_name, {
             "gl": gl,
-            "subs": subs,
             "rec": rec,
             "coverage": coverage,
             "date_to": date_to or "",
-            "identity_holds": subs["causes_total"] == subs["residual"],
         })
 
 

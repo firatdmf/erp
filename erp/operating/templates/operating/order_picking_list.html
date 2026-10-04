@@ -1,0 +1,202 @@
+{% load i18n %}{% load humanize %}<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{% trans "Picking list" %} · {{ number }}</title>
+  <style>
+{% include "print/_document_styles.html" %}
+    /* ── The picking list's own ──────────────────────────────────────
+       A roll to a row: a box to tick, which roll, and — only when the
+       whole roll is not going — how much to cut from it. */
+    table.items col.c-tick    { width: 6%; }
+    table.items col.c-no      { width: 6%; }
+    table.items col.c-barcode { width: 38%; }
+    table.items col.c-lot     { width: 18%; }
+    table.items col.c-roll    { width: 16%; }
+    table.items col.c-cut     { width: 16%; }
+    table.items tbody td { padding: 1.5pt 5.0pt; font-size: 10.0pt; }
+    table.items .barcode { font-family: "Courier", monospace; font-weight: bold; font-size: 10.67pt; letter-spacing: 0.3pt; }
+    table.items .tick { display: inline-block; width: 8pt; height: 8pt; vertical-align: -1pt; border: 1.25pt solid #0F1419; }
+    table.items td.idx { color: #6B7280; }
+    /* The parent product, then each variant of it the rolls fill — the
+       variant set in from the parent, led by its SKU in a chip. */
+    table.items tbody tr.pr td { padding-top: 5pt; border-bottom: 1px solid #E2E8EE; }
+    table.items tbody tr.ln td { padding-top: 3pt; padding-left: 14pt; border-bottom: 1px solid #EEF1F5; }
+    table.items tbody tr.ln td.num { padding-left: 5.0pt; }
+    table.items tbody tr.pr td.num, table.items tbody tr.ln td.num { font-weight: normal; color: #4B5563; font-size: 9.33pt; }
+    table.items tbody tr.pr, table.items tbody tr.ln { break-after: avoid; page-break-after: avoid; }
+    table.items .vname { color: #374151; }
+    table.items .indent { padding-left: 9pt; }
+    /* In the house's colour, on a tint of it (both from the view). */
+    table.items .vsku { font-family: "Courier", monospace; font-weight: bold; font-size: 10.0pt;
+                        background: {{ brand_tint }}; color: {{ brand_color }}; padding: 0.5pt 4pt; margin-right: 3pt; }
+    /* Whole roll or cut: the cut is what the floor must not miss. */
+    table.items td.cut { color: #B45309; }
+    table.items td.cut svg { width: 9pt; height: 9pt; vertical-align: -1pt; margin-right: 2pt; }
+    table.items tbody tr.short td.num { color: #B91C1C; }
+    /* Customer id, carrier and counts beside the QR to the order. */
+    .facts td { vertical-align: top; }
+    .facts .card .line { margin-top: 2pt; }
+    .facts td.qr { width: 30mm; text-align: right; padding-left: 8pt; }
+    .facts td.qr img { width: 26mm; height: 26mm; }
+    .facts td.qr div { font-size: 8pt; color: #6B7280; margin-top: 2pt; }
+  </style>
+</head>
+<body>
+  {% if is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
+
+  {% trans "PICKING LIST" as kind %}
+  {% include "print/_document_header.html" with number=number kind=kind date=order.order_date %}
+
+  {% comment %}No name, no address, no prices: the customer's id and the
+     QR to the order are how an admin finds out whose it is.{% endcomment %}
+  <table class="facts" cellspacing="0" cellpadding="0" style="width: 100%;">
+    <tr>
+      <td>
+        <div class="card">
+          {% if customer_id %}<div class="line"><b>{% trans "Customer" %}:</b> {{ customer_id }}</div>{% endif %}
+          {% if carrier %}<div class="line"><b>{% trans "Carrier" %}:</b> {{ carrier }}</div>{% endif %}
+          <div class="line"><b>{% trans "To pick" %}:</b>
+            {% blocktrans count counter=roll_count %}{{ counter }} roll{% plural %}{{ counter }} rolls{% endblocktrans %}{% if total_unit %} · {{ total_metres|floatformat:"2u"|intcomma:False }}&nbsp;{{ total_unit }}{% endif %}
+          </div>
+        </div>
+      </td>
+      <td class="qr">
+        <img src="{{ qr }}" alt="">
+        <div>{% trans "Scan to open the order" %}</div>
+      </td>
+    </tr>
+  </table>
+
+  <h3>{% trans "Rolls" %}</h3>
+  <table class="items" cellspacing="0" cellpadding="0">
+    <colgroup>
+      <col class="c-tick"><col class="c-no"><col class="c-barcode"><col class="c-lot">
+      <col class="c-roll"><col class="c-cut">
+    </colgroup>
+    <thead>
+      <tr>
+        <th></th>
+        <th>#</th>
+        <th>{% trans "Barcode" %}</th>
+        <th>{% trans "Lot" %}</th>
+        <th class="num">{% trans "On roll" %}</th>
+        <th class="num">{% trans "Cut" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in groups %}
+      {% if split %}
+      <tr class="grp"><td colspan="6">{% if g.book %}{{ g.book }} · {% endif %}{% trans "Order" %} {{ g.order.order_number|default:g.order.pk }}</td></tr>
+      {% endif %}
+      {% for shelf in g.warehouses %}
+      <tr class="wh"><td colspan="6">{{ shelf.name|default:"—" }} <span>· {% blocktrans count counter=shelf.roll_count %}{{ counter }} roll{% plural %}{{ counter }} rolls{% endblocktrans %}</span></td></tr>
+      {% comment %}The parent product once, its variants under it — each
+         led by its SKU, which is what the roll's label is read against.
+         A product with one line and no variant is all heading.{% endcomment %}
+      {% for p in shelf.products %}
+      <tr class="pr">
+        <td colspan="4">
+          {% if p.item %}
+            <span class="pname">{{ p.item.product.title|default:p.item.product }}</span>
+            {% if p.item.product.sku and p.item.product.sku != p.item.product.title %}<span class="sku">{{ p.item.product.sku }}</span>{% endif %}
+          {% else %}
+            <span class="pname">{{ p.product.name|default:p.product.sku }}</span> <span class="sku">{{ p.product.sku }}</span>
+          {% endif %}
+        </td>
+        <td class="num" colspan="2">{% if p.single %}{{ p.lines.0.summary }}{% endif %}</td>
+      </tr>
+      {% for line in p.lines %}
+      {% if not p.single %}
+      <tr class="ln">
+        <td colspan="4">
+          {% if line.item.product_variant.variant_sku %}<span class="vsku">{{ line.item.product_variant.variant_sku }}</span>{% endif %}
+          {% if line.item.variant_label %}<span class="vname">{{ line.item.variant_label }}</span>{% elif not line.item.product_variant_id %}—{% endif %}
+        </td>
+        <td class="num" colspan="2">{{ line.summary }}</td>
+      </tr>
+      {% endif %}
+      {% for roll in line.rolls %}
+      {% with unit=line.item.unit_short|default:line.product.unit_short %}
+      <tr>
+        <td><span class="tick"></span></td>
+        <td class="idx">{{ forloop.counter }}</td>
+        <td><span class="barcode">{{ roll.barcode }}</span></td>
+        <td>{{ roll.lot|default:"—" }}</td>
+        <td class="num">{{ roll.on_roll|floatformat:"2u"|intcomma:False }}&nbsp;{{ unit }}</td>
+        {% comment %}Empty when the whole roll goes, which is most of the
+           time; the scissors and the length only for the roll to cut.
+           Drawn inline: nothing runs a script on a server-rendered PDF.{% endcomment %}
+        <td class="num cut">{% if not roll.whole %}<svg viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>{{ roll.take|floatformat:"2u"|intcomma:False }}&nbsp;{{ unit }}{% endif %}</td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+      {% endfor %}
+      {% endfor %}
+      {% empty %}
+      <tr><td colspan="6" style="text-align: center; color: #6B7280; padding: 12pt;">{% trans "No rolls chosen yet." %}</td></tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% comment %}What the rolls above do not cover — so a sheet with a line
+     still open cannot pass for a finished pick.{% endcomment %}
+  {% for g in groups %}{% if g.short %}
+  <h3>{% trans "Not picked yet" %}{% if split %} · {{ g.order.order_number|default:g.order.pk }}{% endif %}</h3>
+  <table class="items" cellspacing="0" cellpadding="0">
+    <colgroup><col style="width: 46%;"><col style="width: 18%;"><col style="width: 18%;"><col style="width: 18%;"></colgroup>
+    <thead>
+      <tr>
+        <th>{% trans "Product" %}</th>
+        <th class="num">{% trans "Ordered" %}</th>
+        <th class="num">{% trans "Picked" %}</th>
+        <th class="num">{% trans "Missing" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in g.short %}
+      {% if not p.single %}
+      <tr class="pr">
+        <td colspan="4"><span class="pname">{{ p.item.product.title|default:p.item.product }}</span>
+          {% if p.item.product.sku and p.item.product.sku != p.item.product.title %}<span class="sku">{{ p.item.product.sku }}</span>{% endif %}</td>
+      </tr>
+      {% endif %}
+      {% for s in p.lines %}
+      <tr class="short">
+        <td>{% if p.single %}<span class="pname">{{ s.item.product.title|default:s.item.product }}</span>
+          {% if s.item.product.sku and s.item.product.sku != s.item.product.title %}<span class="sku">{{ s.item.product.sku }}</span>{% endif %}
+          {% else %}<span class="indent">{% if s.item.product_variant.variant_sku %}<span class="vsku">{{ s.item.product_variant.variant_sku }}</span>{% endif %}
+          {% if s.item.variant_label %}<span class="vname">{{ s.item.variant_label }}</span>{% elif not s.item.product_variant_id %}—{% endif %}</span>{% endif %}</td>
+        <td class="num">{{ s.needed|floatformat:"2u"|intcomma:False }}&nbsp;{{ s.item.unit_short }}</td>
+        <td class="num">{{ s.picked|floatformat:"2u"|intcomma:False }}&nbsp;{{ s.item.unit_short }}</td>
+        <td class="num">{{ s.missing|floatformat:"2u"|intcomma:False }}&nbsp;{{ s.item.unit_short }}</td>
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}{% endfor %}
+
+  {% for g in groups %}{% if g.order.notes %}
+  <h3>{% trans "Notes" %}{% if split %} · {{ g.order.order_number|default:g.order.pk }}{% endif %}</h3>
+  <div class="notes">{{ g.order.notes }}</div>
+  {% endif %}{% endfor %}
+
+  <table class="foot" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>{{ brand_line|default:"Nejum ERP" }} · {% trans "Picking list" %}</td>
+      <td class="right">{% now "d M Y · H:i" %}</td>
+    </tr>
+  </table>
+  {% if not is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
+
+  {% if not is_pdf %}
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () { window.print(); }, 250);
+      });
+    </script>
+  {% endif %}
+</body>
+</html>

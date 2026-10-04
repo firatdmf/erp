@@ -1181,6 +1181,11 @@
       <a href="{% if print_ids %}{% url 'operating:order_print_combined' %}?ids={{ print_ids }}{% else %}{% url 'operating:order_print' order.pk %}{% endif %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
+      {% comment %}The warehouse's sheet: which rolls to pull, by barcode.
+         A split order's prints every half, so it needs no ids.{% endcomment %}
+      <a href="{% url 'operating:order_picking_list' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
+        <i class="fa fa-clipboard-list"></i>{% trans "Picking list" %}
+      </a>
       <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost">
         <i class="fa fa-file-excel"></i>{% trans "Excel" %}
       </a>
@@ -2257,6 +2262,11 @@
   // Every figure the scripts below rewrite is in it, so the symbol
   // has to travel with them: they overwrite what the server rendered.
   const ORDER_CUR = "{{ order.currency_symbol|escapejs }}";
+  // Figures the scripts write are grouped the way the server groups the
+  // ones it renders: by the app's language (<html lang>), not the browser's.
+  const NUM_LOCALE = /^tr\b/i.test(document.documentElement.lang || '') ? 'tr-TR' : 'en-US';
+  const fmtNum = (n, decimals = 2) => (Number(n) || 0).toLocaleString(
+    NUM_LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   // Delivery, a discount — they are in the grand total but not in any
   // line, so the scripts that rebuild the total from the rows have to
   // add them back. Localisation is turned off around the number below:
@@ -2274,11 +2284,6 @@
     const trackingInp = statusForm.querySelector('[name="tracking_number"]');
     const SHIPPED = ['shipped', 'in_transit', 'out_for_delivery', 'delivered'];
     const NEED_CARGO_MSG = '{% trans "Enter carrier and tracking or receipt number to complete the order." %}';
-  // Figures the scripts write are grouped the way the server groups the
-  // ones it renders: by the app's language (<html lang>), not the browser's.
-  const NUM_LOCALE = /^tr\b/i.test(document.documentElement.lang || '') ? 'tr-TR' : 'en-US';
-  const fmtNum = (n, decimals = 2) => (Number(n) || 0).toLocaleString(
-    NUM_LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     const CONFIRM_SHIP = '{% trans "The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?" %}';
 
     // Retail-only: the "shipped by carrier" tick toggles the carrier/tracking

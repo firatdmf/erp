@@ -2,6 +2,7 @@ from django.urls import path, include
 from . import views
 from . import views_warehouse
 from . import order_excel
+from . import picking_list
 from . import warehouse_label
 from . import warehouse_excel
 from accounting import views_invoice
@@ -89,6 +90,10 @@ urlpatterns = [
     path("orders/print/combined/", views.OrderPrintCombined.as_view(), name="order_print_combined"),
     path("orders/print/combined/excel/", order_excel.combined_order_excel, name="order_excel_combined"),
     path("orders/<int:pk>/changes/", views.order_changes, name="order_changes"),
+    # The rolls to pull for an order, for the warehouse floor: no prices,
+    # no customer name. Guarded the way the pack screen is — it is the
+    # same people's sheet.
+    path("orders/<int:pk>/picking_list/", book_guarded_for_sales_rep(picking_list.order_picking_list, Order, "current_account.book"), name="order_picking_list"),
     # Packing-scan flow (reserve warehouse rolls before shipping).
     #
     # The sales-rep role reaches these (erp.roles), and these routes name

@@ -14,7 +14,8 @@
       "Bash(python manage.py migrate*)",
       "Bash(python3 manage.py migrate*)",
       "Read(//Users/muhammed/**)",
-      "Bash(python3 -)"
+      "Bash(python3 -)",
+      "Bash(python manage.py migrate:*)"
     ]
   },
   "autoMode": {

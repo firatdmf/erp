@@ -203,6 +203,16 @@ class TheCreditIsOn(NejumCreditBase):
         self.assertIn(f'<span style="color:#944F05;">{HOUSE}</span>', html)
         self.assertIn(f'color:{CREDIT_COLOR};text-decoration:none;">Nejum</a>', html)
 
+    def test_the_link_opens_in_a_new_tab(self):
+        """The credit sits at the foot of a document somebody is reading,
+        so following it must not take that page away from them — and
+        target="_blank" without rel hands the opened page a handle on
+        the one it came from."""
+        from erp.nejum_credit import credit_html
+        html = credit_html(self.book)
+        self.assertIn('target="_blank"', html)
+        self.assertIn('rel="noopener noreferrer"', html)
+
     def test_the_house_colour_is_a_setting(self):
         from erp.models import BrandProfile
         from erp.nejum_credit import credit_runs

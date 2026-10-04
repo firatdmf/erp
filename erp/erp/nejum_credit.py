@@ -81,7 +81,13 @@ def credit_html(book=None):
     out = []
     for text, colour in runs:
         if text == NEJUM_NAME:
-            out.append(f'<a href="{NEJUM_URL}" style="color:{colour};'
+            # A new tab: this line sits at the foot of a document
+            # somebody is reading — an order, a statement, the app
+            # itself — and following it must not take that page away
+            # from them. rel, because target="_blank" hands the opened
+            # page a handle on this one otherwise.
+            out.append(f'<a href="{NEJUM_URL}" target="_blank" '
+                       f'rel="noopener noreferrer" style="color:{colour};'
                        f'text-decoration:none;">{escape(text)}</a>')
         else:
             out.append(f'<span style="color:{colour};">{escape(text)}</span>')

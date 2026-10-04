@@ -41,6 +41,16 @@ def _dec(value, default="0"):
         return Decimal(default)
 
 
+def one_month_after(day):
+    """The same day next month — how long a quote stands unless it says
+    otherwise. A day the next month doesn't have lands on its last day:
+    31 January is good until 28 February, not 3 March."""
+    import calendar
+    year, month = (day.year + 1, 1) if day.month == 12 else (day.year, day.month + 1)
+    return day.replace(year=year, month=month,
+                       day=min(day.day, calendar.monthrange(year, month)[1]))
+
+
 def _parse_date(value):
     try:
         return date.fromisoformat(str(value)[:10]) if value else None
@@ -280,6 +290,7 @@ class QuoteForm(View):
             "default_book_id": (quote.book_id if quote else
                                 (current_book.pk if current_book else None)),
             "today": date.today().isoformat(),
+            "default_valid_until": one_month_after(date.today()).isoformat(),
         })
 
     def post(self, request, pk=None):
@@ -380,6 +391,32 @@ def _lines_by_book(quote, items):
     return ([own] if own and own.parts else []) + rest
 
 
+def _page_groups(quote, book_groups):
+    """The quote page's sections: `book_groups`, with the lines that name
+    no rolls moved out of the quote's book into a last section of their
+    own. Such a line has no shelf to read, so it is filed under the
+    quote's book — which on the page read as "this is that book's stock"
+    when its rolls, once picked, may stand anywhere. Only when the quote
+    has both kinds of line: one that names no rolls at all needs no
+    section telling them apart."""
+    from types import SimpleNamespace
+    parts = [part for g in book_groups for part in g.parts]
+    if not (any(part.rolls for part in parts) and any(not part.rolls for part in parts)):
+        return book_groups
+    picked, loose = [], []
+    for g in book_groups:
+        mine = [part for part in g.parts if part.rolls]
+        loose += [part for part in g.parts if not part.rolls]
+        if mine:
+            picked.append(SimpleNamespace(
+                book=g.book, parts=mine, rolls=g.rolls, is_own=g.is_own, unpicked=False,
+                subtotal=sum((part.amount for part in mine), Decimal("0"))))
+    picked.append(SimpleNamespace(
+        book=quote.book, parts=loose, rolls=0, is_own=False, unpicked=True,
+        subtotal=sum((part.amount for part in loose), Decimal("0"))))
+    return picked
+
+
 def _print_sections(book_groups):
     """The printed quote's lines, book by book as _lines_by_book cuts them,
     and within each book by the warehouse whose shelf the rolls stand on —
@@ -445,10 +482,12 @@ def _quote_page_context(request, pk):
             pack = getattr(it.product, "pack_type", None) or units.DEFAULT_PACK
             packs[pack] = packs.get(pack, 0) + len(it.linked_rolls)
             it.pack_label = f"{len(it.linked_rolls)} {units.pack_noun(pack, len(it.linked_rolls))}"
+    book_groups = _lines_by_book(quote, items)
     return {
         "quote": quote,
         "items": items,
-        "book_groups": _lines_by_book(quote, items),
+        "book_groups": book_groups,
+        "page_groups": _page_groups(quote, book_groups),
         "total": sum((it.line_total() for it in items), Decimal("0")),
         "unit_totals": list(unit_totals.items()),
         "pack_totals": [f"{n} {units.pack_noun(pack, n)}" for pack, n in packs.items()],

@@ -97,7 +97,7 @@
       <div class="qf-f"><span class="qf-l">{% trans "Currency" %}</span>
         <select class="qf-sel" id="qf-currency" onchange="qfRecalc()"><option value="">{% trans "Customer's account currency" %}</option>{% for c in currencies %}<option value="{{ c.code }}" {% if quote and quote.currency_id == c.pk %}selected{% endif %}>{{ c.code }}{% if c.symbol %} ({{ c.symbol }}){% endif %}</option>{% endfor %}</select></div>
       <div class="qf-f"><span class="qf-l">{% trans "Date" %}</span><input class="qf-in" type="date" id="qf-date" value="{% if quote %}{{ quote.date|date:'Y-m-d' }}{% else %}{{ today }}{% endif %}"></div>
-      <div class="qf-f"><span class="qf-l">{% trans "Valid until" %}</span><input class="qf-in" type="date" id="qf-valid" value="{% if quote.valid_until %}{{ quote.valid_until|date:'Y-m-d' }}{% endif %}"></div>
+      <div class="qf-f"><span class="qf-l">{% trans "Valid until" %}</span><input class="qf-in" type="date" id="qf-valid" value="{% if quote %}{{ quote.valid_until|date:'Y-m-d' }}{% else %}{{ default_valid_until }}{% endif %}"{% if quote %} data-set-by-hand="1"{% endif %}></div>
     </div>
   </div>
 
@@ -178,6 +178,20 @@
     qfRecalc();
   }
   document.getElementById('qf-book').addEventListener('change', refreshAccountCurrency);
+
+  // A new quote stands for a month from its date: "Valid until" follows
+  // the Date until someone sets it by hand. A saved quote's is its own.
+  const dateIn = document.getElementById('qf-date'), validIn = document.getElementById('qf-valid');
+  function oneMonthAfter(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();       // days in the next month
+    const next = new Date(Date.UTC(y, m, Math.min(d, last)));
+    return next.toISOString().slice(0, 10);
+  }
+  validIn.addEventListener('input', () => { validIn.dataset.setByHand = '1'; });
+  dateIn.addEventListener('change', () => {
+    if (!validIn.dataset.setByHand && dateIn.value) validIn.value = oneMonthAfter(dateIn.value);
+  });
   function num(v) { const n = parseFloat(String(v || '').replace(',', '.')); return isNaN(n) ? 0 : n; }
 
   // ── Customer ────────────────────────────────────────────────────

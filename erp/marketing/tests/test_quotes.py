@@ -367,6 +367,40 @@ class QuoteTest(TestCase):
         self.assertEqual(sorted((r.stock_item.barcode, r.quantity) for r in line.stock_reservations.all()),
                          [("R-500", Decimal("20.00")), ("R-501", Decimal("40.00"))])
 
+    def test_a_new_quote_stands_for_a_month_by_default(self):
+        from marketing.views_quotes import one_month_after
+        self.assertEqual(one_month_after(date(2026, 9, 29)), date(2026, 10, 29))
+        self.assertEqual(one_month_after(date(2026, 1, 31)), date(2026, 2, 28))   # no 31 Feb
+        self.assertEqual(one_month_after(date(2026, 12, 31)), date(2027, 1, 31))
+        form = self.client.get(reverse("marketing:quote_create"))
+        self.assertContains(form, 'id="qf-valid" value="%s"' % one_month_after(date.today()).isoformat())
+        # A saved quote shows its own date, empty included — no default imposed.
+        quote = Quote.objects.get(pk=self._save(self._body(valid_until="")).json()["quote_id"])
+        self.assertIsNone(quote.valid_until)
+        form = self.client.get(reverse("marketing:quote_edit", args=[quote.pk]))
+        self.assertContains(form, 'id="qf-valid" value=""')
+
+    def test_lines_without_rolls_get_their_own_section_beside_lines_with_them(self):
+        roll = self._roll("R-800", "20")
+        quote = Quote.objects.get(pk=self._save(self._body(items=[
+            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+             "rolls": [{"id": roll.pk, "quantity": ""}]},
+            {"sku": "V320.ECRU", "quantity": "15", "unit": "mt", "price": "2"},
+        ])).json()["quote_id"])
+        page = self.client.get(reverse("marketing:quote_detail", args=[quote.pk]))
+        [picked, loose] = page.context["page_groups"]
+        self.assertEqual((picked.unpicked, [p.quantity for p in picked.parts]), (False, [Decimal("20.00")]))
+        self.assertEqual((loose.unpicked, [p.quantity for p in loose.parts]), (True, [Decimal("15.00")]))
+        self.assertEqual((picked.subtotal, loose.subtotal), (Decimal("40.00"), Decimal("30.00")))
+        self.assertContains(page, "No rolls picked yet")
+        self.assertContains(page, "these go on the Laleli Fabric order")
+        # Still one order when accepted: the section is the page's, not the books'.
+        self.assertEqual(len(page.context["book_groups"]), 1)
+        # A quote where no line names rolls needs no such section.
+        plain = Quote.objects.get(pk=self._save().json()["quote_id"])
+        page = self.client.get(reverse("marketing:quote_detail", args=[plain.pk]))
+        self.assertNotContains(page, "No rolls picked yet")
+
     def test_a_name_only_quote_cannot_convert(self):
         quote = Quote.objects.get(pk=self._save(self._body(
             customer=None, customer_name="Walk-in Ali",

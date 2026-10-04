@@ -54,6 +54,9 @@
   }
   .m-icon-btn {
     width: 44px; height: 44px;
+    /* base.css pads every <button> 20px a side; left in, it squeezes a
+       44px button's icon to a sliver (the settings <a> escaped it) */
+    padding: 0;
     display: inline-flex; align-items: center; justify-content: center;
     background: transparent;
     border: 0;
@@ -74,9 +77,6 @@
     stroke: currentColor !important;
   }
   .m-icon-btn svg * { fill: none !important; stroke: currentColor !important; }
-  /* The magnifier fills less of its box than the bell beside it, so at
-     the same 22px it read as the smaller icon */
-  .m-search-btn svg { width: 26px; height: 26px; stroke-width: 1.8 !important; }
 
   /* CSS-drawn hamburger — three horizontal bars (no SVG dependency) */
   .m-hamburger-bars,
@@ -558,6 +558,7 @@
   }
   .m-fav-close {
     width: 32px; height: 32px;
+    padding: 0;
     display: inline-flex; align-items: center; justify-content: center;
     background: #F4F6F8;
     border: 1px solid #EAEFF1;

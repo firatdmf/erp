@@ -722,7 +722,7 @@ def chart_of_accounts(book):
 
     from .models_accounts import CurrentAccountMovement
     from .models_ledger import ChartAccount
-    from .services_ledger import STANDARD_CHART, trial_balance
+    from .services_ledger import PARENT_ACCOUNT, STANDARD_CHART, trial_balance
 
     labels = dict(CurrentAccountMovement.MOVEMENT_TYPES)
     feeds = {}
@@ -767,6 +767,13 @@ def chart_of_accounts(book):
     for a in ChartAccount.objects.filter(is_active=True):
         chart[a.code] = (a.name, a.type, a.is_control)
 
+    def depth(code):
+        level = 0
+        while code in PARENT_ACCOUNT:
+            code = PARENT_ACCOUNT[code]
+            level += 1
+        return level
+
     rows = []
     for code in sorted(chart):
         name, kind, control = chart[code]
@@ -781,6 +788,7 @@ def chart_of_accounts(book):
             "meaning": meanings.get(code, ""),
             "feeds": feeds.get(code, []),
             "balance": balances.get(code, ZERO),
+            "depth": depth(code),
         })
     return rows
 

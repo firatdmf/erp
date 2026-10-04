@@ -59,11 +59,17 @@ tables themselves — see services_posting.chart_of_accounts.
   .coa-feeds { display:flex; flex-wrap:wrap; gap:4px; }
   .coa-feed { padding:2px 8px; border-radius:6px; background:#EEF1F5; color:var(--gray-700); font:500 11.5px var(--font-sans); }
   .coa-none { color:var(--gray-400); font-size:12px; }
+  /* A sub-account sits under its parent: indented, with a hook back up. */
+  .coa-tbl tr.sub td.code, .coa-tbl tr.sub td.acct { padding-left: calc(20px + var(--depth) * 22px); }
+  .coa-tbl tr.sub td.code .coa-code { font-size:13px; color:var(--nejum-teal-500); }
+  .coa-tbl tr.sub td.code .coa-code::before { content:"└ "; color:var(--gray-400); font-weight:400; }
+  .coa-tbl tr.sub .coa-name { font-weight:600; }
 
   @media (max-width: 760px) {
     .coa { padding: 16px 16px 80px; }
     .coa-tbl th.side, .coa-tbl td.side { display:none; }
     .coa-tbl th, .coa-tbl td { padding-left:12px; padding-right:12px; }
+    .coa-tbl tr.sub td.code, .coa-tbl tr.sub td.acct { padding-left: calc(12px + var(--depth) * 14px); }
     .coa-search { min-width:0; width:100%; }
   }
 </style>
@@ -109,9 +115,9 @@ tables themselves — see services_posting.chart_of_accounts.
       </thead>
       <tbody>
         {% for r in group.rows %}
-        <tr id="code-{{ r.code }}" data-search="{{ r.code }} {{ r.name|lower }} {{ r.meaning|lower }}">
-          <td><a class="coa-code" href="{% url 'accounts:report_ledger_account' current_book.pk r.code %}" title="{% trans 'See the entries behind this balance' %}">{{ r.code }}</a></td>
-          <td>
+        <tr id="code-{{ r.code }}" data-search="{{ r.code }} {{ r.name|lower }} {{ r.meaning|lower }}"{% if r.depth %} class="sub" style="--depth: {{ r.depth }}"{% endif %}>
+          <td class="code"><a class="coa-code" href="{% url 'accounts:report_ledger_account' current_book.pk r.code %}" title="{% trans 'See the entries behind this balance' %}">{{ r.code }}</a></td>
+          <td class="acct">
             <span class="coa-name">{{ r.name }}</span>
             {% if r.is_control %}<span class="coa-tag control" title="{% trans 'Summarises a subsidiary ledger (current accounts, cash accounts).' %}">{% trans "Control" %}</span>{% endif %}
             {% if r.is_parked %}<span class="coa-tag parked">{% trans "Should end up empty" %}</span>{% endif %}

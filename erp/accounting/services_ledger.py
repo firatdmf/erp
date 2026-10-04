@@ -87,6 +87,14 @@ STANDARD_CHART = [
     ("5900", "Foreign Exchange Gain/Loss", "expense",   False),
 ]
 
+# Which line a sub-account belongs under, for display only. Written out
+# rather than read off the digits: 1950 is not part of Suspense, however
+# its code looks. Balances stay on their own line either way.
+PARENT_ACCOUNT = {
+    "5110": "5100",
+    "5150": "5100",
+}
+
 
 def ensure_chart():
     """Create any missing standard accounts. Idempotent.

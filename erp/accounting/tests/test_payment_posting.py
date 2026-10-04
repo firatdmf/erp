@@ -396,6 +396,15 @@ class TheChartOfAccountsPage(_Base):
         for code, _name, kind, _c in STANDARD_CHART:
             self.assertEqual(listed[code], kind)
 
+    def test_a_sub_account_is_indented_under_its_parent(self):
+        r = self._get()
+        self.assertEqual(self._row(r, "5100")["depth"], 0)
+        self.assertEqual(self._row(r, "5110")["depth"], 1)
+        # 1950 only looks like part of Suspense.
+        self.assertEqual(self._row(r, "1950")["depth"], 0)
+        self.assertContains(r, 'id="code-5110" data-search')
+        self.assertContains(r, 'class="sub" style="--depth: 1"')
+
     def test_it_says_what_posts_to_each_code(self):
         r = self._get()
         sales = self._row(r, "4000")["feeds"]

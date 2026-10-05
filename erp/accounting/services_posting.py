@@ -814,9 +814,15 @@ def chart_of_accounts(book):
 # Only stock going OUT posts here, plus the "in" that undoes one. Stock
 # ARRIVING is deliberately left alone: intake writes a purchase invoice,
 # whose current-account movement already debits 1300, and posting the stock
-# row as well would count every purchase twice. Stock that arrives with no
-# purchase behind it raises the shelves and not the ledger — which is the
-# gap the reconciliation reports, and the next job.
+# row as well would count every purchase twice.
+#
+# Stock that arrives with NO purchase behind it says which of two things it
+# is, and posts by that. A warehouse's stock recorded for the first time
+# came in with the business: opening balance equity, the contra the
+# book-wide opening entry uses. An item found after that was done was
+# missing from the count: it comes back off inventory shrinkage, where a
+# re-measure that finds more goes. An arrival that says neither still
+# raises the shelves and not the ledger, and the reconciliation reports it.
 #
 # One kind of adjustment posts too: an item re-measured, and the quantity it
 # was received at corrected to what it measures. The shelves
@@ -829,6 +835,13 @@ COST_OF_GOODS_SOLD = "5000"
 MARKETING_EXPENSES = "5110"
 INVENTORY_SHRINKAGE = "5120"
 INVENTORY = "1300"
+OPENING_BALANCE_EQUITY = "3100"
+# Where the value of stock that arrived without a purchase comes from, by
+# the purpose on its stock-in (StockMovement.UNPURCHASED_PURPOSES).
+UNPURCHASED_STOCK_CONTRA = {
+    "opening": OPENING_BALANCE_EQUITY,
+    "found": INVENTORY_SHRINKAGE,
+}
 
 
 def stock_unit_cost(item, product=None):
@@ -865,17 +878,24 @@ def lines_for_stock_movement(movement):
     Back in, when it is an order being unshipped or edited, the same cost
     goes back on the shelf. An item corrected because the stock is not what
     was recorded goes to inventory shrinkage, and comes back off it when the
-    item turns out to hold more. Anything else — an arrival, a transfer
+    item turns out to hold more. Stock arriving with no purchase behind it
+    goes on the shelf against opening balance equity when it is a
+    warehouse's opening stock, and against inventory shrinkage when it was
+    found afterwards. Anything else — a purchased arrival, a transfer
     between two products, a correction the purchase already carries —
     returns no lines; see the note above.
     """
     kind = movement.movement_type
+    purpose = getattr(movement, "purpose", "")
     is_return = kind == "in" and movement.order_id is not None
+    unpurchased_contra = (UNPURCHASED_STOCK_CONTRA.get(purpose)
+                          if kind == "in" and not is_return else None)
     # The one adjustment whose quantity is signed on purpose: negative is
     # stock gone, positive is stock found.
     is_correction = (kind == "adjustment"
                      and getattr(movement, "purpose", "") == "correction")
-    if kind != "out" and not is_return and not is_correction:
+    if (kind != "out" and not is_return and not is_correction
+            and unpurchased_contra is None):
         return []
 
     signed = Decimal(movement.quantity or 0)
@@ -893,6 +913,9 @@ def lines_for_stock_movement(movement):
     if is_return:
         return [debit(INVENTORY, value, memo=memo),
                 credit(COST_OF_GOODS_SOLD, value, memo=memo)]
+    if unpurchased_contra is not None:
+        return [debit(INVENTORY, value, memo=memo),
+                credit(unpurchased_contra, value, memo=memo)]
     if is_correction:
         if signed < ZERO:
             return [debit(INVENTORY_SHRINKAGE, value, memo=memo),
@@ -907,7 +930,6 @@ def lines_for_stock_movement(movement):
     # Stock lost, damaged or defective was not sold either, and is not
     # spending on anybody: it is shrinkage, on the line a re-measure's
     # difference goes to.
-    purpose = getattr(movement, "purpose", "")
     if purpose in ("sample", "display"):
         expense = MARKETING_EXPENSES
     elif purpose == "loss":

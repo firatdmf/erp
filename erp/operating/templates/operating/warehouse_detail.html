@@ -1065,6 +1065,76 @@
   .rs-match.new {
     background: #FEF3C7; color: #8B5A00; border-color: #F5D78B;
   }
+  /* Why an item is being added with no purchase behind it: two answers,
+     each with the sentence that tells them apart, picked before saving. */
+  .rs-why { margin-bottom: 12px; }
+  .rs-why-h {
+    font: 600 11px var(--font-sans); color: var(--gray-700);
+    letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .rs-why-opt {
+    display: flex; align-items: flex-start; gap: 9px;
+    padding: 9px 11px; margin-bottom: 6px;
+    background: white; border: 1px solid #E0E6EE; border-radius: 9px;
+    cursor: pointer; transition: border-color 140ms, background 140ms;
+  }
+  .rs-why-opt input { width: auto; margin: 2px 0 0; flex: 0 0 auto; cursor: pointer; }
+  .rs-why-opt b { display: block; font: 700 12.5px var(--font-sans); color: #0F1419; }
+  .rs-why-opt small { display: block; margin-top: 2px; font: 500 11.5px/1.4 var(--font-sans); color: var(--gray-600); }
+  .rs-why-opt:has(input:checked) { border-color: var(--nejum-teal-500); background: #F3FAF8; }
+  /* The entry the item will post, under the fields that decide it — the
+     same box the item's edit dialog draws for a changed quantity. */
+  .rs-entry { margin: 12px 0 0; padding: 12px; border: 1px solid #CFE3DF; border-radius: 10px; background: #F3FAF8; }
+  .rs-entry h4 { margin: 0 0 8px; font: 700 11px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--nejum-teal-700); }
+  .rs-entry table { width: 100%; border-collapse: collapse; font: 500 12.5px var(--font-sans); }
+  .rs-entry td { padding: 5px 0; vertical-align: top; border-bottom: 1px dashed #CFE3DF; }
+  .rs-entry td.side { width: 52px; font-weight: 700; color: var(--gray-600); }
+  .rs-entry td.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 700; padding-left: 8px; }
+  .rs-entry p { margin: 8px 0 0; font: 500 12px/1.45 var(--font-sans); color: var(--gray-600); }
+  .rs-idle .rs-btn { flex: 0 0 auto; margin-top: 6px; padding: 8px 14px; }
+  /* The SKU is picked the way the order form picks its customer
+     (partials/create_order_form.html): type to search, results drop over
+     the form, and the pick becomes a chip whose × gives the field back.
+     Same class names as there, so the two read alike. */
+  .co-sup { position: relative; }
+  .co-sup[hidden] { display: none; }
+  .co-sup-results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40; }
+  .co-autocomplete-results .customer-autocomplete-list {
+    list-style: none; margin: 0; padding: 4px; background: #fff;
+    border: 1px solid #DDE3EA; border-radius: 10px;
+    box-shadow: 0 10px 26px rgba(15,20,25,.13); max-height: 236px; overflow-y: auto;
+  }
+  .co-autocomplete-results .customer-ac-item,
+  .co-autocomplete-results .customer-ac-create,
+  .co-autocomplete-results .customer-ac-empty {
+    padding: 9px 10px; cursor: pointer; font: 600 13px var(--font-sans, sans-serif); color: #0F1419;
+    border-radius: 7px; display: flex; align-items: center; gap: 10px; margin: 0; transition: background .12s;
+  }
+  .co-autocomplete-results .customer-ac-item i,
+  .co-autocomplete-results .customer-ac-create i { color: #147F74; font-size: 12px; }
+  .co-autocomplete-results .customer-ac-item:hover,
+  .co-autocomplete-results .customer-ac-create:hover { background: #EFF6F5; }
+  .co-autocomplete-results .customer-ac-empty { cursor: default; color: #6B7280; justify-content: center; font-style: italic; font-weight: 500; }
+  /* A product row: its SKU, the name beside it, and on the right what the
+     warehouse holds of it. */
+  .co-autocomplete-results .rs-sku-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .co-autocomplete-results .rs-sku-what small { margin-left: 6px; font: 500 12px var(--font-sans); color: var(--gray-500); }
+  .co-autocomplete-results .rs-sku-qty { flex: 0 0 auto; font: 500 11.5px var(--font-sans); color: var(--gray-500); font-variant-numeric: tabular-nums; }
+  .co-sup-chip { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 12px; border: 1px solid #BFE0DB; background: #EFF6F5; border-radius: 9px; font: 700 13.5px var(--font-sans, sans-serif); color: #0B5F60; }
+  .co-sup-chip[hidden] { display: none; }
+  .co-sup-chip i { color: #147F74; }
+  .co-sup-chip > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Drawn, not typed: a "×" glyph sits on the baseline, never centred. */
+  .co-sup-clear { flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 6px; cursor: pointer; background: transparent; color: #0B5F60; padding: 0; position: relative; font-size: 0; line-height: 0; }
+  .co-sup-clear::before, .co-sup-clear::after { content: ''; position: absolute; top: 50%; left: 50%; width: 11px; height: 1.8px; background: currentColor; border-radius: 2px; }
+  .co-sup-clear::before { transform: translate(-50%,-50%) rotate(45deg); }
+  .co-sup-clear::after { transform: translate(-50%,-50%) rotate(-45deg); }
+  .co-sup-clear:hover { background: #DCEBE9; }
+  /* A finger needs more than the 24px the chip's × is drawn at. */
+  @media (max-width: 600px) { .co-sup-chip { height: 44px; } .co-sup-clear { width: 36px; height: 36px; } }
+  /* The name of a product that already exists is shown, not asked for. */
+  .rs-input[readonly] { background: #F1F5F9; color: var(--gray-600); cursor: not-allowed; }
+  .rs-input[readonly]:focus { border-color: #E0E6EE; box-shadow: none; }
   /* Catalog main-product autocomplete dropdown */
   .rs-ac-drop {
     position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 30;
@@ -1847,6 +1917,17 @@
   .bl-tile.hero .t-value .t-unit { color: rgba(255,255,255,0.75); font-size: 14px; }
   .bl-tile.hero .t-sub { margin-top: 3px; color: rgba(255,255,255,0.88); font: 600 12px var(--font-sans); }
   .bl-actions { display: flex; gap: 10px; margin-top: 18px; }
+  /* A barcode nobody has recorded: the two ways it can be added, each a
+     button that says what it means. padding is set outright — base.css
+     pads every <button>. */
+  .bl-add { margin-top: 16px; text-align: left; }
+  .bl-add-h { color: #CBD5E1; font: 700 11px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+  .bl-add-opt { width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; margin-bottom: 8px; border-radius: 12px; border: 1px solid rgba(94,234,212,0.22); background: rgba(45,212,191,0.07); color: #fff; text-align: left; cursor: pointer; transition: background 140ms, border-color 140ms; }
+  .bl-add-opt:hover { background: rgba(45,212,191,0.14); border-color: rgba(94,234,212,0.45); }
+  .bl-add-opt > i { flex: 0 0 auto; margin-top: 2px; color: #2DD4BF; font-size: 16px; width: 18px; text-align: center; }
+  .bl-add-opt b { display: block; font: 700 13.5px var(--font-sans); }
+  .bl-add-opt small { display: block; margin-top: 3px; font: 500 12px/1.4 var(--font-sans); color: #94A3B8; }
+  .bl-add-note { margin-top: 10px; color: #94A3B8; font: 500 11.5px/1.45 var(--font-sans); }
   .bl-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 14px; border-radius: 12px; font: 700 13px var(--font-sans); cursor: pointer; border: none; text-decoration: none; transition: filter 140ms, background 140ms; }
   .bl-btn.primary { background: linear-gradient(135deg, #0D9488, #0F766E); color: #fff; box-shadow: 0 6px 18px rgba(13,148,136,0.35); }
   .bl-btn.primary:hover { filter: brightness(1.08); }
@@ -2097,9 +2178,41 @@
         <!-- Confirm card (appears after OCR) -->
         <div id="rsConfirm" class="rs-confirm" hidden>
           <div class="rs-confirm-h">{% trans "Confirm & save" %}</div>
+          {% comment %} Nothing added here was bought on the way in — a purchase
+             is received on the goods receipt page. So the item says which of
+             two things it is, and that is where its value comes from in the
+             ledger. Asked first, and kept for the next item: a warehouse
+             being recorded for the first time answers the same way all day. {% endcomment %}
+          <div class="rs-why">
+            <div class="rs-why-h">{% trans "Why is it being added?" %} <span class="rs-required">*</span></div>
+            <label class="rs-why-opt">
+              <input type="radio" name="rsReason" value="opening" onchange="rsSyncReason()">
+              <span><b>{% trans "Opening stock" %}</b>
+                <small>{% trans "This warehouse's stock is being recorded for the first time." %}</small></span>
+            </label>
+            <label class="rs-why-opt">
+              <input type="radio" name="rsReason" value="found" onchange="rsSyncReason()">
+              <span><b>{% trans "Found item" %}</b>
+                <small>{% trans "The stock was already recorded, and this one was missed." %}</small></span>
+            </label>
+          </div>
           <div class="rs-fld">
             <label>{% trans "SKU" %}</label>
-            <input id="rsSku" type="text" class="rs-input">
+            {% comment %} Picked the way the order form picks its customer
+               (partials/create_order_form.html): type to search, the results
+               drop over the form, and the pick becomes a chip whose × gives
+               the field back. Same class names, so the two read alike. {% endcomment %}
+            <div class="co-sup" id="rsSkuBox">
+              <input id="rsSku" type="text" class="rs-input" autocomplete="off"
+                     placeholder="{% trans 'Search a SKU or product name...' %}"
+                     oninput="rsSkuInput()">
+              <div id="rsSkuResults" class="co-autocomplete-results co-sup-results"></div>
+            </div>
+            <div id="rsSkuChip" class="co-sup-chip" hidden>
+              <i class="fa fa-box"></i>
+              <span></span>
+              <button type="button" class="co-sup-clear" title="{% trans 'Change product' %}" onclick="rsClearSku(true)">&times;</button>
+            </div>
           </div>
           <div class="rs-fld">
             <label>{% trans "Name" %}</label>
@@ -2107,7 +2220,7 @@
           </div>
           <div class="rs-fld">
             <label>{% trans "Meters" %} <span class="rs-required">*</span></label>
-            <input id="rsMeters" type="number" step="0.01" class="rs-input">
+            <input id="rsMeters" type="number" step="0.01" class="rs-input" oninput="rsRenderEntry()">
           </div>
           <div class="rs-fld">
             <label>
@@ -2125,27 +2238,35 @@
             <label>{% trans "Lot number (optional)" %}</label>
             <input id="rsLot" type="text" class="rs-input" autocomplete="off">
           </div>
-
-          <!-- Catalog: opt-in (default ON) to also add this roll to the
-               marketing catalog as a hidden variant of a main product. -->
-          <div class="rs-fld" style="border-top:1px dashed #E2E8EE; padding-top:12px;">
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
-              <input type="checkbox" id="rsCatSync" checked onchange="toggleCatSync()" style="width:auto; cursor:pointer;">
-              <span>{% trans "Also add to catalog (Products)" %}</span>
+          <div class="rs-fld">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; letter-spacing:0; font-size:12.5px;">
+              <input type="checkbox" id="rsSecond" style="width:auto; cursor:pointer;">
+              <span>{% trans "Factory second (2nd quality)" %}</span>
             </label>
           </div>
-          <div id="rsCatFields">
+
+          {% comment %} Shown for a SKU nobody has recorded, and only then
+             (rsSyncCatalog). A new SKU always gets its catalogue product —
+             a warehouse product without one has no main product and no unit
+             of its own — so this asks where it belongs, not whether. An
+             existing SKU has its place already and is asked nothing. {% endcomment %}
+          <div id="rsCatFields" style="border-top:1px dashed #E2E8EE; padding-top:12px;">
+            <div class="rs-why-h">{% trans "New product" %}</div>
+            <p style="margin:0 0 10px; font:500 12px/1.45 var(--font-sans); color:var(--gray-600);">
+              {% trans "This SKU is new, so it is added to the catalogue too. Choose the main product it is a variant of, or leave that empty and one is opened from the SKU." %}
+            </p>
             <div class="rs-fld">
-              <label>
-                {% trans "Catalog — main product" %}
-                <span id="rsCatBadge" class="rs-match" style="display:none; margin-left:6px;"></span>
-              </label>
-              <div style="position:relative;">
+              <label>{% trans "Main product" %}</label>
+              <div class="co-sup" id="rsCatBox">
                 <input id="rsCatBase" type="text" class="rs-input" autocomplete="off"
-                       placeholder="{% trans 'Search or type a main product (e.g. MT-3016)' %}"
-                       oninput="onCatBaseInput()" onfocus="onCatBaseInput()"
-                       onblur="setTimeout(function(){var d=document.getElementById('rsCatDrop'); if(d)d.style.display='none';},160)">
-                <div id="rsCatDrop" class="rs-ac-drop" style="display:none;"></div>
+                       placeholder="{% trans 'Search a main product (e.g. MT-3016)' %}"
+                       oninput="onCatBaseInput()">
+                <div id="rsCatResults" class="co-autocomplete-results co-sup-results"></div>
+              </div>
+              <div id="rsCatChip" class="co-sup-chip" hidden>
+                <i class="fa fa-cube"></i>
+                <span></span>
+                <button type="button" class="co-sup-clear" title="{% trans 'Change main product' %}" onclick="rsClearCatBase(true)">&times;</button>
               </div>
             </div>
             <div class="rs-fld">
@@ -2171,15 +2292,21 @@
             </label>
             <div style="display:flex; gap:6px;">
               <input id="rsPrice" type="number" step="0.01" min="0" class="rs-input"
-                     placeholder="0.00" autocomplete="off" style="flex:1;">
-              <select id="rsCurrency" class="rs-input" style="flex:0 0 80px; cursor:pointer;">
+                     placeholder="0.00" autocomplete="off" style="flex:1;" oninput="rsRenderEntry()">
+              <select id="rsCurrency" class="rs-input" style="flex:0 0 80px; cursor:pointer;" onchange="rsRenderEntry()">
+                {% comment %} Starts on the currency this warehouse's book is kept in
+                   (RS_PRICE_CURRENCY), set by script so a reset lands on it too. {% endcomment %}
                 <option value="USD">USD</option>
-                <option value="TRY" selected>TRY</option>
+                <option value="TRY">TRY</option>
                 <option value="EUR">EUR</option>
               </select>
             </div>
           </div>
           <div id="rsMatchBadge" class="rs-match" hidden></div>
+          <div class="rs-entry">
+            <h4>{% trans "What this will post" %}</h4>
+            <div id="rsEntryBody"></div>
+          </div>
           <div class="rs-confirm-actions">
             <button type="button" class="rs-btn ghost" onclick="cancelConfirm()">
               <i class="fa fa-times"></i> {% trans "Discard" %}
@@ -2188,7 +2315,7 @@
               <i class="fa fa-check"></i> {% trans "Save & next" %}
             </button>
           </div>
-          <details class="rs-debug">
+          <details class="rs-debug" id="rsRawBox">
             <summary>{% trans "Raw OCR text" %}</summary>
             <pre id="rsRaw"></pre>
           </details>
@@ -2198,6 +2325,9 @@
         <div id="rsIdle" class="rs-idle">
           <i class="fa fa-camera-retro"></i>
           <div>{% trans "Capture a label to start" %}</div>
+          <button type="button" class="rs-btn ghost" onclick="rsOpenManual('')">
+            <i class="fa fa-keyboard"></i> {% trans "Type it in" %}
+          </button>
         </div>
 
         <!-- Recent scans (session) -->
@@ -2570,48 +2700,321 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  // The main product a new SKU is a variant of, picked like the SKU itself:
+  // type to search the catalogue, pick a row or keep what was typed as a
+  // new main product, and the choice becomes a chip.
   function onCatBaseInput() {
     rsCatBaseId = '';   // typing = free text unless a suggestion is picked
     const inp = document.getElementById('rsCatBase');
-    const drop = document.getElementById('rsCatDrop');
+    const results = document.getElementById('rsCatResults');
     const q = (inp.value || '').trim();
     clearTimeout(rsCatSearchTimer);
-    if (q.length < 1) { drop.style.display = 'none'; drop.innerHTML = ''; return; }
+    const mine = ++rsCatSeq;
+    if (q.length < 1) { results.innerHTML = ''; return; }
     rsCatSearchTimer = setTimeout(function () {
       fetch(catalogSearchUrl + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function (d) {
+          if (mine !== rsCatSeq) return;
           const items = (d && d.results) || [];
-          if (!items.length) { drop.style.display = 'none'; drop.innerHTML = ''; return; }
-          drop.innerHTML = items.map(function (it) {
+          const exact = items.some(function (it) { return (it.title || '').toLowerCase() === q.toLowerCase(); });
+          let rows = items.map(function (it) {
             const t = rsEscapeHtml(it.title);
-            return '<div class="rs-ac-item" data-id="' + it.id + '" data-title="' + t + '" '
-              + 'onmousedown="pickCatBase(this)"><span>' + t + '</span>'
-              + '<span class="rs-ac-vc">' + it.variants + ' var.</span></div>';
+            return '<li class="customer-ac-item" data-id="' + it.id + '" data-title="' + t + '">' +
+              '<i class="fa fa-cube"></i><span class="rs-sku-what">' + t + '</span>' +
+              '<span class="rs-sku-qty">' + it.variants + ' var.</span></li>';
           }).join('');
-          drop.style.display = '';
-        }).catch(function () { drop.style.display = 'none'; });
+          if (!items.length) rows += '<li class="customer-ac-empty">{% filter escapejs %}{% trans "No results found." %}{% endfilter %}</li>';
+          if (!exact) {
+            rows += '<li class="customer-ac-create"><i class="fa fa-plus-circle"></i> ' +
+              '{% filter escapejs %}{% trans "New main product:" %}{% endfilter %} ' + rsEscapeHtml(q) + '</li>';
+          }
+          results.innerHTML = '<ul class="customer-autocomplete-list">' + rows + '</ul>';
+        }).catch(function () { results.innerHTML = ''; });
     }, 250);
   }
-  function pickCatBase(el) {
-    rsCatBaseId = el.getAttribute('data-id') || '';
-    document.getElementById('rsCatBase').value = el.getAttribute('data-title') || '';
-    document.getElementById('rsCatDrop').style.display = 'none';
-    const cb = document.getElementById('rsCatBadge');
-    if (cb) { cb.style.display = ''; cb.className = 'rs-match'; cb.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "existing" %}'; }
+  let rsCatSeq = 0;
+  // id '' keeps the name as typed: the server matches it by title, and
+  // opens a new main product when nothing has it.
+  function rsShowCatChip(icon, title, id) {
+    rsCatSeq++;
+    clearTimeout(rsCatSearchTimer);
+    rsCatBaseId = id || '';
+    document.getElementById('rsCatBase').value = title;
+    const chip = document.getElementById('rsCatChip');
+    chip.querySelector('i').className = 'fa ' + icon;
+    chip.querySelector('span').textContent = title;
+    chip.hidden = false;
+    document.getElementById('rsCatBox').hidden = true;
+    document.getElementById('rsCatResults').innerHTML = '';
   }
-  // Show/hide the catalog detail fields when the "add to catalog" box toggles.
-  function toggleCatSync() {
-    const on = document.getElementById('rsCatSync')?.checked;
+  function rsClearCatBase(focus) {
+    rsCatSeq++;
+    clearTimeout(rsCatSearchTimer);
+    rsCatBaseId = '';
+    const input = document.getElementById('rsCatBase');
+    input.value = '';
+    document.getElementById('rsCatResults').innerHTML = '';
+    document.getElementById('rsCatChip').hidden = true;
+    document.getElementById('rsCatBox').hidden = false;
+    if (focus) input.focus();
+  }
+  document.getElementById('rsCatResults').addEventListener('click', function (e) {
+    if (e.target.closest('.customer-ac-create')) {
+      const typed = (document.getElementById('rsCatBase').value || '').trim();
+      if (typed) rsShowCatChip('fa-plus-circle', typed, '');
+      return;
+    }
+    const row = e.target.closest('.customer-ac-item');
+    if (row) rsShowCatChip('fa-cube', row.getAttribute('data-title') || '', row.getAttribute('data-id') || '');
+  });
+  document.getElementById('rollScannerOverlay').addEventListener('click', function (e) {
+    if (!e.target.closest('#rsCatBox')) document.getElementById('rsCatResults').innerHTML = '';
+  });
+  // The catalogue questions are asked of a new SKU and of nothing else.
+  function rsSyncCatalog() {
     const fields = document.getElementById('rsCatFields');
-    if (fields) fields.style.display = on ? '' : 'none';
+    if (fields) fields.style.display = rsMatched ? 'none' : '';
   }
 
-  function openRollScanner() {
+  // ── Why the item is being added, and what that posts ────────
+  // Nothing saved here came on a purchase, so its value has to come from
+  // somewhere: opening balance equity for a warehouse recorded for the
+  // first time, inventory shrinkage for an item that count missed. The
+  // server posts by the reason (services_posting.UNPURCHASED_STOCK_CONTRA);
+  // this draws the same entry before it is made.
+  const productSearchUrl = "{% url 'operating:warehouse_product_search' warehouse.pk %}";
+  const RS_COST_SIGN = "{{ cost_sign|escapejs }}";
+  // A sales rep is shown the accounts and not the amounts.
+  const RS_SHOW_AMOUNTS = {% if is_sales_rep %}false{% else %}true{% endif %};
+  const RS_HAS_BOOK = {% if warehouse.accounting_book_id %}true{% else %}false{% endif %};
+  // What the server turns a typed price into (cost_usd). A price in any
+  // other currency is converted there, at a rate this page does not hold.
+  const RS_COST_CURRENCY = 'USD';
+  // The currency a typed price starts in: the one this warehouse's book is
+  // kept in, when the list offers it. A warehouse in no book, or a book in
+  // a currency the list lacks, starts on the one costs are held in.
+  const RS_PRICE_CURRENCY = (function () {
+    const code = "{{ warehouse.accounting_book.effective_base_currency.code|default:''|escapejs }}";
+    const sel = document.getElementById('rsCurrency');
+    const offered = sel && Array.prototype.some.call(sel.options, function (o) { return o.value === code; });
+    const start = offered ? code : RS_COST_CURRENCY;
+    if (sel) sel.value = start;
+    return start;
+  })();
+  const RS_ACC = {
+    inventory: '1300 {% trans "Inventory" %}',
+    opening:   '3100 {% trans "Opening Balance Equity" %}',
+    found:     '5120 {% trans "Inventory Shrinkage" %}',
+  };
+  const RS_REASON_HINT = {
+    opening: '{% filter escapejs %}{% trans "It came in with the business, not on a purchase: its value goes on the shelf against opening balance equity. Nobody is owed for it." %}{% endfilter %}',
+    found:   '{% filter escapejs %}{% trans "The recorded stock was short by this item: its value goes back on the shelf and comes off inventory shrinkage. Nobody is owed for it." %}{% endfilter %}',
+  };
+  // The barcode the lookup already read, so the item it belongs to is not
+  // asked for it again — and a label photographed afterwards cannot swap it.
+  let rsCarryBarcode = '';
+  // The product in this warehouse the typed SKU names, or null for a new one.
+  let rsMatched = null;
+  let rsSkuTimer = null, rsSkuSeq = 0;
+
+  function rsReason() {
+    const picked = document.querySelector('input[name="rsReason"]:checked');
+    return picked ? picked.value : '';
+  }
+  function rsSetReason(value) {
+    document.querySelectorAll('input[name="rsReason"]').forEach(function (el) {
+      el.checked = (el.value === value);
+    });
+    rsSyncReason();
+  }
+  function rsSyncReason() {
+    // Save stays shut until the question is answered.
+    const save = document.getElementById('rsSaveBtn');
+    if (save) save.disabled = !rsReason();
+    rsRenderEntry();
+  }
+  function rsRenderEntry() {
+    const body = document.getElementById('rsEntryBody');
+    if (!body) return;
+    const reason = rsReason();
+    if (!reason) {
+      body.innerHTML = '<p style="margin:0;">{% filter escapejs %}{% trans "Choose why it is being added to see where it goes." %}{% endfilter %}</p>';
+      return;
+    }
+    if (!RS_HAS_BOOK) {
+      body.innerHTML = '<p style="margin:0;">{% filter escapejs %}{% trans "This warehouse belongs to no book, so the item is added and nothing is posted." %}{% endfilter %}</p>';
+      return;
+    }
+    const qty = parseFloat(document.getElementById('rsMeters').value) || 0;
+    const price = parseFloat(document.getElementById('rsPrice').value);
+    const currency = document.getElementById('rsCurrency').value;
+    const typed = !isNaN(price) && price > 0;
+    let amount = '', note = '';
+    if (typed) {
+      if (currency === RS_COST_CURRENCY) { if (RS_SHOW_AMOUNTS) amount = RS_COST_SIGN + fmtNum(qty * price); }
+      else note = ' {% filter escapejs %}{% trans "Valued at the typed price, at today's rate." %}{% endfilter %}';
+    } else if (rsMatched && rsMatched.cost != null) {
+      amount = RS_COST_SIGN + fmtNum(qty * rsMatched.cost);
+      note = ' {% filter escapejs %}{% trans "Valued at what this product already costs." %}{% endfilter %}';
+    } else if (RS_SHOW_AMOUNTS) {
+      body.innerHTML = '<p style="margin:0;">{% filter escapejs %}{% trans "No cost is known for this item, so it is added to the stock and nothing is posted. Type a price to value it." %}{% endfilter %}</p>';
+      return;
+    }
+    body.innerHTML =
+      '<table>' +
+        '<tr><td class="side">{% trans "Debit" %}</td><td>' + RS_ACC.inventory + '</td><td class="amt">' + amount + '</td></tr>' +
+        '<tr><td class="side">{% trans "Credit" %}</td><td>' + RS_ACC[reason] + '</td><td class="amt">' + amount + '</td></tr>' +
+      '</table>' +
+      '<p>' + RS_REASON_HINT[reason] + note + '</p>';
+  }
+  function rsShowMatch(product) {
+    const wasMatched = !!rsMatched;
+    rsMatched = product || null;
+    // An existing product has a name already: it is filled in and shut,
+    // since nothing typed here would change it. Moving on to a SKU nobody
+    // has seen opens the box again, emptied of the other product's name.
+    const nameEl = document.getElementById('rsName');
+    if (rsMatched) { nameEl.value = rsMatched.name || rsMatched.sku || ''; nameEl.readOnly = true; }
+    else { if (wasMatched) nameEl.value = ''; nameEl.readOnly = false; }
+    rsSyncCatalog();
+    const badge = document.getElementById('rsMatchBadge');
+    badge.hidden = false;
+    if (rsMatched) {
+      badge.classList.remove('new');
+      badge.innerHTML = '<i class="fa fa-check-circle"></i> {% filter escapejs %}{% trans "Matched" %}{% endfilter %}: <b>' +
+        rsEscapeHtml(rsMatched.name || rsMatched.sku || '') + '</b> (' +
+        (rsMatched.in_warehouse === false
+          ? '{% filter escapejs %}{% trans "not in this warehouse yet" %}{% endfilter %}'
+          : fmtNum(rsMatched.quantity || 0) + ' ' + rsEscapeHtml(rsMatched.unit_short || 'm') + ' {% filter escapejs %}{% trans "currently" %}{% endfilter %}') + ')';
+    } else {
+      badge.classList.add('new');
+      badge.innerHTML = '<i class="fa fa-plus-circle"></i> {% filter escapejs %}{% trans "No match — will create a new product" %}{% endfilter %}';
+    }
+    rsRenderEntry();
+  }
+  // The SKU box searches as it is typed: this warehouse's products first,
+  // then SKUs the catalogue knows that are not held here yet. A row picked
+  // becomes a chip in the field's place, the way the order form's customer
+  // does. A SKU typed in full is matched without a click too — the server
+  // files the item under it either way — and one nobody has seen is offered
+  // as a new product on the last row.
+  function rsSkuInput() {
+    const inp = document.getElementById('rsSku');
+    const results = document.getElementById('rsSkuResults');
+    const q = (inp.value || '').trim();
+    clearTimeout(rsSkuTimer);
+    const mine = ++rsSkuSeq;
+    if (!q) { results.innerHTML = ''; rsShowMatch(null); document.getElementById('rsMatchBadge').hidden = true; return; }
+    rsSkuTimer = setTimeout(function () {
+      fetch(productSearchUrl + '?q=' + encodeURIComponent(q), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (mine !== rsSkuSeq) return;
+          const items = (d && d.results) || [];
+          const exact = items.filter(function (it) { return (it.sku || '').toLowerCase() === q.toLowerCase(); })[0];
+          results._items = items;
+          let rows = items.map(function (it, i) {
+            return '<li class="customer-ac-item" data-i="' + i + '">' +
+              '<i class="fa fa-box"></i>' +
+              '<span class="rs-sku-what">' + rsEscapeHtml(it.sku || it.name) +
+                (it.sku && it.name && it.name !== it.sku ? '<small>' + rsEscapeHtml(it.name) + '</small>' : '') +
+              '</span>' +
+              '<span class="rs-sku-qty">' + (it.in_warehouse === false
+                ? '{% filter escapejs %}{% trans "not in this warehouse yet" %}{% endfilter %}'
+                : fmtNum(it.quantity || 0) + ' ' + rsEscapeHtml(it.unit_short || 'm')) + '</span></li>';
+          }).join('');
+          if (!items.length) rows += '<li class="customer-ac-empty">{% filter escapejs %}{% trans "No results found." %}{% endfilter %}</li>';
+          if (!exact) {
+            rows += '<li class="customer-ac-create"><i class="fa fa-plus-circle"></i> ' +
+              '{% filter escapejs %}{% trans "Add as a new product:" %}{% endfilter %} ' + rsEscapeHtml(q) + '</li>';
+          }
+          results.innerHTML = '<ul class="customer-autocomplete-list">' + rows + '</ul>';
+          rsShowMatch(exact || null);
+        }).catch(function () { results.innerHTML = ''; });
+    }, 250);
+  }
+  // The chip that stands in for the SKU field once one is chosen; its ×
+  // (rsClearSku) brings the field back.
+  function rsShowSkuChip(icon, sku) {
+    rsSkuSeq++;
+    clearTimeout(rsSkuTimer);
+    const chip = document.getElementById('rsSkuChip');
+    chip.querySelector('i').className = 'fa ' + icon;
+    chip.querySelector('span').textContent = sku;
+    chip.hidden = false;
+    document.getElementById('rsSkuBox').hidden = true;
+    document.getElementById('rsSkuResults').innerHTML = '';
+  }
+  function rsPickSku(it) {
+    document.getElementById('rsSku').value = it.sku || '';
+    rsShowSkuChip('fa-box', it.sku || it.name || '');
+    rsShowMatch(it);
+    document.getElementById('rsMeters').focus();
+  }
+  // The typed SKU, kept as a product nobody has recorded yet.
+  function rsPickNewSku() {
+    const sku = (document.getElementById('rsSku').value || '').trim();
+    if (!sku) return;
+    document.getElementById('rsSku').value = sku;
+    rsShowSkuChip('fa-plus-circle', sku);
+    rsShowMatch(null);
+    document.getElementById('rsName').focus();
+  }
+  function rsClearSku(focus) {
+    rsSkuSeq++;
+    clearTimeout(rsSkuTimer);
+    const input = document.getElementById('rsSku');
+    input.value = '';
+    document.getElementById('rsSkuResults').innerHTML = '';
+    document.getElementById('rsSkuChip').hidden = true;
+    document.getElementById('rsSkuBox').hidden = false;
+    rsShowMatch(null);
+    document.getElementById('rsMatchBadge').hidden = true;
+    if (focus) input.focus();
+  }
+  // One listener for every row the search returns, and the list shuts when
+  // the click lands anywhere else in the scanner.
+  document.getElementById('rsSkuResults').addEventListener('click', function (e) {
+    if (e.target.closest('.customer-ac-create')) { rsPickNewSku(); return; }
+    const row = e.target.closest('.customer-ac-item');
+    if (!row) return;
+    const it = (this._items || [])[parseInt(row.getAttribute('data-i'), 10)];
+    if (it) rsPickSku(it);
+  });
+  document.getElementById('rollScannerOverlay').addEventListener('click', function (e) {
+    if (!e.target.closest('#rsSkuBox')) document.getElementById('rsSkuResults').innerHTML = '';
+  });
+  // The form with no label photographed: what the lookup read is filled
+  // in, and the rest is typed. Capturing a label afterwards still fills the
+  // fields from it.
+  function rsOpenManual(barcode) {
+    cancelConfirm();
+    rsCarryBarcode = barcode || '';
+    rsPending = { blob: null, ocr_raw: '' };
+    document.getElementById('rsIdle').hidden = true;
+    document.getElementById('rsConfirm').hidden = false;
+    document.getElementById('rsBarcode').value = rsCarryBarcode;
+    document.getElementById('rsMatchBadge').hidden = true;
+    document.getElementById('rsRawBox').hidden = true;
+    rsSyncReason();
+    setTimeout(function () {
+      const form = document.getElementById('rsConfirm');
+      if (form.scrollIntoView) form.scrollIntoView({ block: 'start' });
+      document.getElementById(rsCarryBarcode ? 'rsSku' : 'rsBarcode').focus();
+    }, 50);
+  }
+
+  // opts.reason — 'opening' or 'found', when the lookup already asked;
+  // opts.barcode — the code the lookup read, which opens the form on it.
+  function openRollScanner(opts) {
+    opts = opts || {};
     const overlay = document.getElementById('rollScannerOverlay');
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
+    rsSetReason(opts.reason || '');
     startRollCamera();
+    if (opts.barcode) rsOpenManual(opts.barcode);
   }
   function closeRollScanner() {
     document.getElementById('rollScannerOverlay').classList.remove('show');
@@ -2628,6 +3031,7 @@
     document.getElementById('rsConfirm').hidden = true;
     document.getElementById('rsIdle').hidden = false;
     rsPending = null;
+    rsCarryBarcode = '';
     // Drop any frozen preview to release the blob URL.
     try {
       const frozen = document.getElementById('rsFrozen');
@@ -3028,48 +3432,46 @@
     rsPending = { blob: imageBlob, ocr_raw: data.ocr_raw || '' };
     document.getElementById('rsIdle').hidden = true;
     document.getElementById('rsConfirm').hidden = false;
+    // A label read over a form already begun starts the SKU field afresh.
+    document.getElementById('rsSkuChip').hidden = true;
+    document.getElementById('rsSkuBox').hidden = false;
+    document.getElementById('rsSkuResults').innerHTML = '';
     document.getElementById('rsSku').value = parsed.sku || '';
+    document.getElementById('rsName').readOnly = false;
     document.getElementById('rsName').value = parsed.name || '';
     document.getElementById('rsMeters').value = parsed.quantity || '';
     // Barcode: PREFER the live barcode decoded by the camera scanner
     // (accurate) over the AI's reading (the AI sometimes misreads it).
     // Fall back to the AI value if the live scanner caught nothing.
+    // A code carried in from the lookup outranks all three: it is the one
+    // that was looked up and found missing.
     const bcInp = document.getElementById('rsBarcode');
-    if (bcInp) bcInp.value = (capturedBarcode || rsLiveBarcode || parsed.barcode || '');
+    if (bcInp) bcInp.value = (rsCarryBarcode || capturedBarcode || rsLiveBarcode || parsed.barcode || '');
+    document.getElementById('rsRawBox').hidden = false;
     const lotInp = document.getElementById('rsLot');
     if (lotInp) lotInp.value = parsed.lot_number || parsed.coupon || '';
     document.getElementById('rsRaw').textContent = data.ocr_raw || '(no text recognised)';
-    // Match badge
-    const badge = document.getElementById('rsMatchBadge');
-    if (data.matched_product) {
-      badge.hidden = false;
-      badge.classList.remove('new');
-      badge.innerHTML = '<i class="fa fa-check-circle"></i> Matched: <b>' +
-        (data.matched_product.name || '') + '</b> (' +
-        fmtNum(data.matched_product.quantity || 0) + 'm currently)';
-    } else {
-      badge.hidden = false;
-      badge.classList.add('new');
-      badge.innerHTML = '<i class="fa fa-plus-circle"></i> No match — will create a new product';
-    }
+    // Match badge, and with it the entry: a matched product's cost is
+    // what the item is valued at unless a price is typed.
+    // Only when it is the product the save will file the item under: the
+    // server matches on the SKU, and on the name alone for a label with none.
+    const m = data.matched_product;
+    const same = function (a, b) { return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase(); };
+    rsMatched = null;
+    const filed = (m && (parsed.sku ? same(m.sku, parsed.sku) : same(m.name, parsed.name))) ? m : null;
+    rsShowMatch(filed);
+    if (filed && filed.sku) rsShowSkuChip('fa-box', filed.sku);
+    rsSyncReason();
     // Catalog preview: base product (new/existing) + variant attribute.
     const cp = data.catalog_preview || {};
-    rsCatBaseId = '';  // free text by default — backend matches by title
-    var catSyncEl = document.getElementById('rsCatSync');
-    if (catSyncEl) catSyncEl.checked = true;   // default ON for every new scan
-    toggleCatSync();
-    document.getElementById('rsCatDrop').style.display = 'none';
-    document.getElementById('rsCatBase').value = cp.base_name || '';
+    // The main product read off the label lands in the chip — a box for
+    // one the catalogue has, a plus for one it would open. No id either
+    // way: the server matches it by title.
+    rsClearCatBase(false);
+    if (cp.base_name) rsShowCatChip(cp.base_exists ? 'fa-cube' : 'fa-plus-circle', cp.base_name, '');
+    rsSyncCatalog();
     document.getElementById('rsCatAttr').value = cp.attribute_name || 'color';
     document.getElementById('rsCatValue').value = cp.attribute_value || '';
-    const cb = document.getElementById('rsCatBadge');
-    if (cp.base_name) {
-      cb.style.display = '';
-      cb.className = 'rs-match' + (cp.base_exists ? '' : ' new');
-      cb.innerHTML = cp.base_exists
-        ? '<i class="fa fa-check-circle"></i> {% trans "existing" %}'
-        : '<i class="fa fa-plus-circle"></i> {% trans "new" %}';
-    } else { cb.style.display = 'none'; }
     const hint = document.getElementById('rsCatHint');
     if (cp.variant_exists) {
       // Same variant scanned before — main product + colour/model were
@@ -3110,27 +3512,37 @@
       }
     } catch (_) {}
     // Clear the per-roll fields so the next scan doesn't inherit them.
+    // The reason is NOT cleared: the next item of the same session is being
+    // added for the same reason, and it can be changed on any of them.
     ['rsSku','rsName','rsMeters','rsBarcode','rsLot','rsPrice','rsCatBase','rsCatValue','rsCatHint'].forEach(function(id){
       var el = document.getElementById(id);
       if (el) { if (el.tagName === 'DIV') el.textContent = ''; else el.value = ''; }
     });
+    rsCarryBarcode = '';
+    rsMatched = null;
+    document.getElementById('rsName').readOnly = false;
+    rsSkuSeq++;
+    clearTimeout(rsSkuTimer);
+    document.getElementById('rsSkuResults').innerHTML = '';
+    document.getElementById('rsSkuChip').hidden = true;
+    document.getElementById('rsSkuBox').hidden = false;
+    var secondEl = document.getElementById('rsSecond');
+    if (secondEl) secondEl.checked = false;
     var attrEl = document.getElementById('rsCatAttr');
     if (attrEl) attrEl.value = 'color';
-    var cbEl = document.getElementById('rsCatBadge');
-    if (cbEl) cbEl.style.display = 'none';
-    rsCatBaseId = '';
-    var dropEl = document.getElementById('rsCatDrop');
-    if (dropEl) { dropEl.style.display = 'none'; dropEl.innerHTML = ''; }
-    var catSyncEl2 = document.getElementById('rsCatSync');
-    if (catSyncEl2) catSyncEl2.checked = true;   // reset to default ON
-    toggleCatSync();
-    // Reset currency to the default (TRY) for the next entry.
+    rsClearCatBase(false);
+    rsSyncCatalog();
+    // Reset currency to the book's own for the next entry.
     var curEl = document.getElementById('rsCurrency');
-    if (curEl) curEl.value = 'TRY';
+    if (curEl) curEl.value = RS_PRICE_CURRENCY;
   }
 
   function saveRoll() {
     if (!rsPending) return;
+    const reason = rsReason();
+    // Save is shut while this holds (rsSyncReason); this is for anything
+    // that gets here without the button.
+    if (!reason) return;
     const saveBtn = document.getElementById('rsSaveBtn');
     saveBtn.disabled = true;
     const origLabel = saveBtn.innerHTML;
@@ -3142,7 +3554,7 @@
     const barcode = (document.getElementById('rsBarcode')?.value || '').trim();
     const lot = (document.getElementById('rsLot')?.value || '').trim();
     const price = (document.getElementById('rsPrice')?.value || '').trim();
-    const currency = (document.getElementById('rsCurrency')?.value || '').trim() || 'TRY';
+    const currency = (document.getElementById('rsCurrency')?.value || '').trim() || RS_PRICE_CURRENCY;
     if (!meters || parseFloat(meters) <= 0) {
       alert('{% trans "Please enter a positive meters value" %}');
       saveBtn.disabled = false;
@@ -3174,8 +3586,11 @@
     }
 
     const fd = new FormData();
-    fd.append('image', rsPending.blob, 'capture.jpg');
+    // No photo when the item was typed in from a barcode the lookup read.
+    if (rsPending.blob) fd.append('image', rsPending.blob, 'capture.jpg');
     fd.append('commit', 'true');
+    fd.append('reason', reason);
+    if (document.getElementById('rsSecond')?.checked) fd.append('is_second', '1');
     fd.append('sku', sku);
     fd.append('name', name);
     fd.append('quantity', meters);
@@ -3185,7 +3600,6 @@
     if (currency) fd.append('purchase_currency', currency);
     fd.append('ocr_raw', rsPending.ocr_raw);
     // Catalog (main product + variant) overrides from the confirm panel.
-    fd.append('catalog_sync', document.getElementById('rsCatSync')?.checked ? '1' : '0');
     fd.append('catalog_base_name', (document.getElementById('rsCatBase')?.value || '').trim());
     fd.append('catalog_attribute', (document.getElementById('rsCatAttr')?.value || '').trim());
     fd.append('catalog_value', (document.getElementById('rsCatValue')?.value || '').trim());
@@ -3761,12 +4175,36 @@
           '<span class="bl-status notfound"><i class="fa fa-circle-xmark"></i> {% trans "Not in this warehouse" %}</span>' +
           '<div class="bl-bc-chip"><i class="fa fa-barcode"></i>' + blEsc(code) + '</div>' +
           '<p style="color:#94A3B8; font:500 13px var(--font-sans); margin:0 0 4px;">{% trans "This barcode has not been added yet." %}</p>' +
+          // Two ways an item gets here with no purchase behind it, and they
+          // post differently — so the question is asked where "Add it" was.
+          '<div class="bl-add">' +
+            '<div class="bl-add-h">{% filter escapejs %}{% trans "Add it to this warehouse" %}{% endfilter %}</div>' +
+            '<button type="button" class="bl-add-opt" onclick="blAddItem(\'opening\')">' +
+              '<i class="fa fa-boxes-stacked"></i>' +
+              '<span><b>{% filter escapejs %}{% trans "Opening stock" %}{% endfilter %}</b>' +
+              '<small>{% filter escapejs %}{% trans "This warehouse's stock is being recorded for the first time." %}{% endfilter %}</small></span>' +
+            '</button>' +
+            '<button type="button" class="bl-add-opt" onclick="blAddItem(\'found\')">' +
+              '<i class="fa fa-magnifying-glass-plus"></i>' +
+              '<span><b>{% filter escapejs %}{% trans "Found item" %}{% endfilter %}</b>' +
+              '<small>{% filter escapejs %}{% trans "The stock was already recorded, and this one was missed." %}{% endfilter %}</small></span>' +
+            '</button>' +
+            '<div class="bl-add-note"><i class="fa fa-circle-info"></i> ' +
+              '{% filter escapejs %}{% trans "Bought from a supplier? Receive it on a goods receipt instead, so what is owed for it is recorded." %}{% endfilter %}</div>' +
+          '</div>' +
           '<div class="bl-actions">' +
             '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
-            '<button type="button" class="bl-btn primary" onclick="closeBarcodeLookup(); openRollScanner();"><i class="fa fa-camera"></i> {% trans "Add it" %}</button>' +
           '</div>' +
         '</div>';
     }
+  }
+  // Opens the add form on the barcode that was just looked up, already
+  // answered for why. The code is read before the lookup closes: closing
+  // clears it.
+  function blAddItem(reason) {
+    var code = blLastCode;
+    closeBarcodeLookup();
+    openRollScanner({ reason: reason, barcode: code });
   }
   function moveRollToThisWarehouse(rollId, btn) {
     var orig = btn.innerHTML;

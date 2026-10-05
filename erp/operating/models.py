@@ -2422,13 +2422,24 @@ class StockMovement(models.Model):
     # re-measured and the quantity it was RECEIVED at is corrected, so
     # nothing left it at all. The difference is inventory shrinkage too, and
     # its quantity is signed — negative is shorter, positive is longer.
+    #
+    # Two purposes belong to stock coming IN with no purchase behind it, and
+    # say where its value comes from. "opening" is a warehouse's stock being
+    # recorded for the first time: it came in with the business, so it is
+    # opening balance equity. "found" is an item that turned up after that
+    # was done: the count was short by it, so it comes back off inventory
+    # shrinkage, the way a re-measure that finds more does.
     PURPOSE_CHOICES = [
         ("", "—"),
         ("sample", "Sample for a client"),
         ("display", "Display — showroom or trade show"),
         ("loss", "Lost, damaged or defective"),
         ("correction", "Re-measured"),
+        ("opening", "Opening stock"),
+        ("found", "Found after the stock was recorded"),
     ]
+    # The purposes stock can ARRIVE with when no purchase brought it.
+    UNPURCHASED_PURPOSES = ("opening", "found")
     purpose = models.CharField(max_length=16, choices=PURPOSE_CHOICES,
                                blank=True, default="")
     reference = models.CharField(

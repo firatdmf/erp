@@ -2431,6 +2431,88 @@ def warehouse_barcode_lookup(request, pk):
 
 
 @login_required
+def warehouse_product_search(request, pk):
+    """The existing SKUs that match what was typed, for the add-an-item
+    form: an item with no purchase behind it is nearly always one more of
+    something already known, and picking it is what stops a mistyped SKU
+    opening a second product beside the first.
+
+    This warehouse's own products come first. After them, SKUs the
+    catalogue knows that this warehouse does not hold yet — the same cloth
+    kept in another warehouse, say — marked `in_warehouse: False`; saving
+    one opens its row here, linked to that catalogue variant.
+
+    Each row carries what the product costs, which is what the new item
+    will be carried at unless a price is typed for it — the form shows the
+    entry that makes before anything is saved. For a SKU not held here that
+    is what it costs in another warehouse of the same book, when there is
+    one. A sales rep is not shown costs anywhere, so theirs come back empty."""
+    from functools import reduce
+    import operator
+
+    from erp.roles import is_sales_rep
+    from marketing.models import ProductVariant
+
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+    show_cost = not is_sales_rep(request.user)
+    limit = 8
+
+    def _cost(wp):
+        return float(wp.cost_usd) if (show_cost and wp is not None and wp.cost_usd is not None) else None
+
+    here = list(WarehouseProduct.objects
+                .filter(warehouse=warehouse)
+                .filter(warehouse_search_q(q, [warehouse.pk]))
+                .select_related("catalog_variant__product")
+                .order_by("sku", "name")[:limit])
+    results = [{
+        "id": wp.pk,
+        "sku": wp.sku or "",
+        "name": wp.name or "",
+        "quantity": float(wp.quantity or 0),
+        "unit_short": wp.unit_short,
+        "cost": _cost(wp),
+        "in_warehouse": True,
+    } for wp in here]
+
+    if len(results) < limit:
+        held_skus = {(r["sku"] or "").lower() for r in results}
+        terms = _tr_ci_variants(q)
+        match = reduce(operator.or_, (
+            Q(variant_sku__icontains=t) | Q(product__title__icontains=t) for t in terms))
+        variants = (ProductVariant.objects
+                    .filter(match)
+                    .exclude(warehouse_products__warehouse=warehouse)
+                    .select_related("product")
+                    .order_by("variant_sku")[:limit * 2])
+        for variant in variants:
+            if len(results) >= limit:
+                break
+            if variant.variant_sku.lower() in held_skus:
+                continue
+            # What the warehouse calls it elsewhere, which is the name staff
+            # know it by; a row in this book first, since its cost is in
+            # this book's currency.
+            rows = list(variant.warehouse_products.select_related("warehouse"))
+            same_book = [r for r in rows
+                         if r.warehouse.accounting_book_id == warehouse.accounting_book_id]
+            sibling = (same_book or rows or [None])[0]
+            results.append({
+                "id": None,
+                "sku": variant.variant_sku,
+                "name": (sibling.name if sibling is not None else "") or variant.product.title or "",
+                "quantity": 0.0,
+                "unit_short": units.unit_short(variant.product.unit),
+                "cost": _cost(same_book[0]) if same_book else None,
+                "in_warehouse": False,
+            })
+    return JsonResponse({"results": results})
+
+
+@login_required
 def warehouse_roll_move_here(request, pk, roll_pk):
     """Move ONE physical stock item (roll) that currently belongs to a DIFFERENT
     warehouse into THIS one — reached from the barcode-lookup "found
@@ -6518,7 +6600,7 @@ def _movement_is_order(m):
 _REASON_CONTEXT = "stock movement reason"
 _REASON_PREFIXES = [
     "Order edit · reversed", "Order un-ship", "Order ship", "Web order", "Order",
-    "Roll scanned", "Manual add", "Manual stock-out", "Bulk roll delete",
+    "Roll scanned", "Opening stock", "Found item", "Manual add", "Manual stock-out", "Bulk roll delete",
     "Roll deleted", "Roll meters edited", "Manual adjustment", "Product edited",
     "⚠️ Shortage",
 ]
@@ -7188,6 +7270,9 @@ _ROLL_TAKE_OUT_PURPOSE = {"sample": "sample", "display": "display", "loss": "los
 # What the bare stock-out endpoint also takes: no purpose at all, which is
 # the unspecified stock-out it has always recorded as cost of goods sold.
 _STOCK_OUT_PURPOSES = ("", *_ROLL_TAKE_OUT_PURPOSE.values())
+# The stored reason of a stock-in that no purchase brought, by its purpose
+# (StockMovement.UNPURCHASED_PURPOSES). Both are _REASON_PREFIXES entries.
+_UNPURCHASED_REASON = {"opening": "Opening stock", "found": "Found item"}
 
 
 def _purchase_behind(roll):
@@ -7605,11 +7690,24 @@ class WarehouseRollScan(View):
       - image: the captured frame (JPEG/PNG)
       - sku, name, meters (optional overrides if user has already confirmed in UI)
       - commit: 'true' to actually save; otherwise just OCR + return.
+      - reason: on commit, why the item is being added with no purchase
+        behind it (StockMovement.UNPURCHASED_PURPOSES). REQUIRED.
 
-    Two-phase flow so the UI can confirm OCR'd values before writing.
+    Two-phase flow so the UI can confirm OCR'd values before writing. The
+    image is optional on commit: an item whose barcode was scanned in the
+    lookup can be typed in without photographing its label.
+
+    Stock added here was not bought on the way in — a purchase is received
+    on the goods receipt page, which posts what is owed for it. So the item
+    says which of two things it is, and that decides where its value comes
+    from in the ledger (services_posting.UNPURCHASED_STOCK_CONTRA):
+
+      opening   the warehouse's stock is being recorded for the first time
+      found     that was already done, and this item was missed
     """
 
     def post(self, request, pk):
+        from erp.roles import is_sales_rep as _is_sales_rep
         warehouse = get_object_or_404(Warehouse, pk=pk)
         image = request.FILES.get("image")
         commit = (request.POST.get("commit") or "").lower() == "true"
@@ -7735,6 +7833,13 @@ class WarehouseRollScan(View):
                         "sku": match.sku,
                         "quantity": float(match.quantity or 0),
                         "rolls_count": match.stock_items.count(),
+                        "unit_short": match.unit_short,
+                        # What the item will be carried at unless a price
+                        # is typed — the form draws its entry from this.
+                        # Not sent to a sales rep, who is shown no costs.
+                        "cost": (float(match.cost_usd)
+                                 if (match.cost_usd is not None
+                                     and not _is_sales_rep(request.user)) else None),
                     } if match else None
                 ),
             })
@@ -7754,16 +7859,32 @@ class WarehouseRollScan(View):
         if _is_negative_price(request.POST.get("purchase_price")):
             return JsonResponse(
                 {"success": False, "error": _negative_price_message()}, status=400)
+        reason = (request.POST.get("reason") or "").strip()
+        if reason not in StockMovement.UNPURCHASED_PURPOSES:
+            return JsonResponse({
+                "success": False,
+                "error": _gettext("Say why this item is being added: opening stock, or found "
+                                  "after the stock was recorded."),
+            }, status=400)
 
         # Reject a re-scan of the SAME roll: each physical roll's barcode is
-        # unique, so if one already exists in this warehouse it's a duplicate
-        # scan — don't add it again. (Same SKU with a DIFFERENT barcode is a
-        # different roll of the same product and is allowed.)
+        # unique, so if one already exists it's a duplicate scan — don't add
+        # it again. (Same SKU with a DIFFERENT barcode is a different roll of
+        # the same product and is allowed.) Checked across every warehouse,
+        # as the column's unique constraint is: a code held in another
+        # warehouse used to pass this and fail in the database.
         dup_barcode = (request.POST.get("barcode") or "").strip()
         if dup_barcode:
             existing_roll = (WarehouseProductItem.objects
-                             .filter(product__warehouse=warehouse, barcode=dup_barcode)
-                             .select_related("product").first())
+                             .filter(barcode__iexact=dup_barcode)
+                             .select_related("product", "product__warehouse").first())
+            if existing_roll and existing_roll.product.warehouse_id != warehouse.pk:
+                return JsonResponse({
+                    "success": False,
+                    "duplicate": True,
+                    "error": _gettext("This barcode is already on an item in %(warehouse)s.") % {
+                        "warehouse": existing_roll.product.warehouse.name},
+                })
             if existing_roll:
                 return JsonResponse({
                     "success": False,
@@ -7771,33 +7892,6 @@ class WarehouseRollScan(View):
                     "error": _gettext("This barcode was already scanned — not added again (%s).") % (
                         existing_roll.product.name or existing_roll.product.sku or "?"),
                 })
-
-        # Find or create the WarehouseProduct in this warehouse.
-        #
-        # Match by SKU ONLY when a SKU is present. Physically different
-        # products often share the same descriptive NAME — "GREK TÜL" is
-        # printed on K24620İ.G52, K24620İ.G47, K24892İ.G157, K24620.G33 …
-        # They are DIFFERENT products, distinguished by their SKU. The old
-        # name fallback merged every "GREK TÜL" roll onto the first one
-        # found (e.g. K24620.G33), so new rolls were saved under the wrong
-        # product. Only use the name as the key when the label has NO SKU.
-        product = None
-        if sku:
-            product = WarehouseProduct.objects.filter(
-                warehouse=warehouse, sku__iexact=sku,
-            ).first()
-        elif name:
-            product = WarehouseProduct.objects.filter(
-                warehouse=warehouse, name__iexact=name,
-            ).first()
-        if not product:
-            # No existing product for this SKU (or nameless label) → new one.
-            product = WarehouseProduct.objects.create(
-                warehouse=warehouse,
-                name=name or sku,
-                sku=sku or None,
-                quantity=Decimal("0"),
-            )
 
         # Barcode (per-roll) is REQUIRED. It is what picking and stock-out
         # scan, what keeps a re-scan from counting the same stock item twice, and —
@@ -7810,71 +7904,138 @@ class WarehouseRollScan(View):
                 "success": False,
                 "error": _gettext("A barcode is required — this stock item can't be saved without one."),
             }, status=400)
-        # Price is optional. Barcode is not.
-        purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
-        purchase_currency = (request.POST.get("purchase_currency") or "").strip().upper() or product.purchase_currency or "USD"
-        if purchase_price_raw:
-            try:
-                purchase_price = Decimal(purchase_price_raw)
-                product.purchase_price = purchase_price
-                product.purchase_currency = purchase_currency
-                # ALSO populate cost_usd / cost_try so the warehouse
-                # value rollup actually reflects the price (the
-                # rollup multiplies quantity * cost_usd; if only
-                # purchase_price is set the rollup stays $0).
-                product.cost_usd, product.cost_try = _PurchaseRates().costs(
-                    purchase_price, purchase_currency)
-            except (InvalidOperation, TypeError):
-                pass
-        # Update product-level barcode if it didn't have one (per-roll
-        # barcode is the source of truth for stock-out scanning, but
-        # the product-level field stays handy for product search).
-        if barcode and not product.barcode:
-            product.barcode = barcode[:64]
 
-        # Save the roll.
-        cdn_url, local_image = _store_roll_label_image(image, product, barcode)
-        roll = WarehouseProductItem.objects.create(
-            product=product,
-            quantity=meters,
-            quantity_remaining=meters,
-            barcode=barcode[:64] if barcode else None,
-            lot_number=(request.POST.get("lot_number") or "").strip() or None,
-            scanned_by=request.user if request.user.is_authenticated else None,
-            image_url=cdn_url,
-            source_image=local_image,
-            ocr_raw=(request.POST.get("ocr_raw") or "")[:5000] or None,
-        )
+        from django.db import transaction
+        user = request.user if request.user.is_authenticated else None
+        # One transaction: the product, the item and its stock-in are one
+        # arrival, and the stock-in is what posts it.
+        with transaction.atomic():
+            # Find or create the WarehouseProduct in this warehouse.
+            #
+            # Match by SKU ONLY when a SKU is present. Physically different
+            # products often share the same descriptive NAME — "GREK TÜL" is
+            # printed on K24620İ.G52, K24620İ.G47, K24892İ.G157, K24620.G33 …
+            # They are DIFFERENT products, distinguished by their SKU. The old
+            # name fallback merged every "GREK TÜL" roll onto the first one
+            # found (e.g. K24620.G33), so new rolls were saved under the wrong
+            # product. Only use the name as the key when the label has NO SKU.
+            product = None
+            if sku:
+                product = WarehouseProduct.objects.filter(
+                    warehouse=warehouse, sku__iexact=sku,
+                ).first()
+            elif name:
+                product = WarehouseProduct.objects.filter(
+                    warehouse=warehouse, name__iexact=name,
+                ).first()
+            if not product:
+                # No existing product for this SKU (or nameless label) → new one.
+                product = WarehouseProduct.objects.create(
+                    warehouse=warehouse,
+                    name=name or sku,
+                    sku=sku or None,
+                    quantity=Decimal("0"),
+                )
+            # A SKU the catalogue already knows IS that variant: its row
+            # here is linked to it outright, and takes what it is carried
+            # at from the same book's other warehouses when no price is
+            # typed. The catalogue sync below is for a SKU nobody has seen —
+            # run on a known one it would rewrite that variant's details
+            # from whatever this form happened to hold.
+            linked_existing_variant = False
+            if sku and not product.catalog_variant_id:
+                from marketing.models import ProductVariant as _Variant
+                known = _Variant.objects.filter(variant_sku__iexact=sku).first()
+                if known is not None:
+                    product.catalog_variant = known
+                    linked_existing_variant = True
+                    if product.cost_usd is None:
+                        sibling = (WarehouseProduct.objects
+                                   .filter(catalog_variant=known, cost_usd__isnull=False,
+                                           warehouse__accounting_book_id=warehouse.accounting_book_id)
+                                   .exclude(pk=product.pk).order_by("-updated_at").first())
+                        if sibling is not None:
+                            product.purchase_price = sibling.purchase_price
+                            product.purchase_currency = sibling.purchase_currency
+                            product.cost_usd = sibling.cost_usd
+                            product.cost_try = sibling.cost_try
 
-        # Bump the parent quantity (denormalised cache).
-        product.quantity = (product.quantity or Decimal("0")) + meters
-        product.save(update_fields=[
-            "quantity", "updated_at", "barcode",
-            "purchase_price", "purchase_currency",
-            "cost_usd", "cost_try",
-        ])
+            # Price is optional. Barcode is not.
+            purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
+            purchase_currency = (request.POST.get("purchase_currency") or "").strip().upper() or product.purchase_currency or "USD"
+            if purchase_price_raw:
+                try:
+                    purchase_price = Decimal(purchase_price_raw)
+                    product.purchase_price = purchase_price
+                    product.purchase_currency = purchase_currency
+                    # ALSO populate cost_usd / cost_try so the warehouse
+                    # value rollup actually reflects the price (the
+                    # rollup multiplies quantity * cost_usd; if only
+                    # purchase_price is set the rollup stays $0).
+                    product.cost_usd, product.cost_try = _PurchaseRates().costs(
+                        purchase_price, purchase_currency)
+                except (InvalidOperation, TypeError):
+                    pass
+            # Update product-level barcode if it didn't have one (per-roll
+            # barcode is the source of truth for stock-out scanning, but
+            # the product-level field stays handy for product search).
+            if barcode and not product.barcode:
+                product.barcode = barcode[:64]
 
-        # Stock-in ledger entry — drives the product detail timeline.
-        StockMovement.objects.create(
-            product=product,
-            stock_item=roll,
-            movement_type="in",
-            quantity=meters,
-            reason="Roll scanned",
-            reference=barcode or roll.lot_number or "",
-            created_by=request.user if request.user.is_authenticated else None,
-        )
+            # Save the roll.
+            cdn_url, local_image = _store_roll_label_image(image, product, barcode)
+            roll = WarehouseProductItem.objects.create(
+                product=product,
+                quantity=meters,
+                quantity_remaining=meters,
+                barcode=barcode[:64] if barcode else None,
+                lot_number=(request.POST.get("lot_number") or "").strip() or None,
+                is_second=(request.POST.get("is_second") or "").strip().lower() in ("1", "true", "on"),
+                scanned_by=user,
+                image_url=cdn_url,
+                source_image=local_image,
+                ocr_raw=(request.POST.get("ocr_raw") or "")[:5000] or None,
+                # What it is carried at, stamped like any other arrival: the
+                # price typed for it, else what the product already costs.
+                # None leaves it unvalued, and nothing is posted for it.
+                unit_cost_base=product.cost_usd,
+            )
+
+            # Bump the parent quantity (denormalised cache).
+            product.quantity = (product.quantity or Decimal("0")) + meters
+            product.save(update_fields=[
+                "quantity", "updated_at", "barcode",
+                "purchase_price", "purchase_currency",
+                "cost_usd", "cost_try", "catalog_variant",
+            ])
+
+            # Stock-in ledger entry — drives the product detail timeline, and
+            # its purpose is what posts the item's value (post_stock_movement).
+            StockMovement.objects.create(
+                product=product,
+                stock_item=roll,
+                movement_type="in",
+                purpose=reason,
+                quantity=meters,
+                reason=_UNPURCHASED_REASON[reason],
+                reference=barcode or roll.lot_number or "",
+                created_by=user,
+            )
 
         # ── Mirror into the hidden marketing catalog as a variant of a
-        #    main product — ONLY if the user left the "Also add to catalog"
-        #    box ticked (default ON). Unchecked → warehouse-only.
+        #    main product. ALWAYS, for a SKU the catalogue has not got: a
+        #    warehouse product with no catalogue product behind it has no
+        #    main product, no unit of its own and nothing to be found by, so
+        #    it is not something the form offers to leave out. A product
+        #    that already has its variant — linked just above, or on an
+        #    earlier arrival — has nothing to add, and is not re-synced from
+        #    whatever this form happened to hold.
         #    Never let a catalog hiccup roll back the stock write. ──
         catalog_info = None
         catalog_warning = None
-        do_catalog = (request.POST.get("catalog_sync", "1") or "1").strip().lower() not in ("0", "false", "no", "off")
         variant_sku = (request.POST.get("catalog_variant_sku") or sku or "").strip()
-        if not do_catalog:
-            variant_sku = ""   # skip catalog sync entirely
+        if linked_existing_variant or product.catalog_variant_id:
+            variant_sku = ""
         if variant_sku and len(variant_sku) > 20:
             catalog_warning = (_gettext("SKU '%(sku)s' is longer than 20 characters — no catalogue variant was created.")
                                % {"sku": variant_sku})

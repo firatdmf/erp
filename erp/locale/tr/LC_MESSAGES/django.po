@@ -13542,3 +13542,104 @@ msgstr "Varsayılan dil"
 
 msgid "Used for customers from any other country, e.g. tr or en_US. The template must be approved in it."
 msgstr "Diğer tüm ülkelerdeki müşteriler için kullanılır, ör. tr veya en_US. Şablonun bu dilde onaylanmış olması gerekir."
+
+msgid "Why is it being added?"
+msgstr "Neden ekleniyor?"
+
+msgid "Opening stock"
+msgstr "Açılış stoku"
+
+msgid "This warehouse's stock is being recorded for the first time."
+msgstr "Bu deponun stoku ilk kez kaydediliyor."
+
+msgid "Found item"
+msgstr "Bulunan ürün"
+
+msgid "The stock was already recorded, and this one was missed."
+msgstr "Stok daha önce kaydedilmişti, bu ürün atlanmış."
+
+msgid "Factory second (2nd quality)"
+msgstr "Defolu (2. kalite)"
+
+msgid "Type it in"
+msgstr "Elle girin"
+
+msgid "It came in with the business, not on a purchase: its value goes on the shelf against opening balance equity. Nobody is owed for it."
+msgstr "İşletmeyle birlikte geldi, bir alımla değil: değeri açılış bakiyesi özkaynağı karşılığında stoka yazılır. Kimseye borç doğmaz."
+
+msgid "The recorded stock was short by this item: its value goes back on the shelf and comes off inventory shrinkage. Nobody is owed for it."
+msgstr "Kayıtlı stok bu ürün kadar eksikti: değeri stoka geri yazılır ve stok firesinden düşülür. Kimseye borç doğmaz."
+
+msgid "Choose why it is being added to see where it goes."
+msgstr "Nereye yazılacağını görmek için neden eklendiğini seçin."
+
+msgid "This warehouse belongs to no book, so the item is added and nothing is posted."
+msgstr "Bu depo hiçbir deftere bağlı değil; ürün eklenir ve hiçbir kayıt yapılmaz."
+
+msgid "Valued at the typed price, at today's rate."
+msgstr "Girilen fiyat üzerinden, bugünün kuruyla değerlenir."
+
+msgid "Valued at what this product already costs."
+msgstr "Bu ürünün mevcut maliyeti üzerinden değerlenir."
+
+msgid "No cost is known for this item, so it is added to the stock and nothing is posted. Type a price to value it."
+msgstr "Bu ürün için bilinen bir maliyet yok; stoka eklenir ve hiçbir kayıt yapılmaz. Değerlemek için bir fiyat girin."
+
+msgid "Matched"
+msgstr "Eşleşti"
+
+msgid "currently"
+msgstr "şu anda"
+
+msgid "No match — will create a new product"
+msgstr "Eşleşme yok — yeni bir ürün oluşturulacak"
+
+msgid "Add it to this warehouse"
+msgstr "Bu depoya ekle"
+
+msgid "Bought from a supplier? Receive it on a goods receipt instead, so what is owed for it is recorded."
+msgstr "Tedarikçiden mi alındı? Borcun kaydedilmesi için mal kabul ile girin."
+
+msgid "Say why this item is being added: opening stock, or found after the stock was recorded."
+msgstr "Bu ürünün neden eklendiğini belirtin: açılış stoku ya da stok kaydedildikten sonra bulundu."
+
+msgid "This barcode is already on an item in %(warehouse)s."
+msgstr "Bu barkod %(warehouse)s deposundaki bir üründe zaten kayıtlı."
+
+msgid "Found after the stock was recorded"
+msgstr "Stok kaydedildikten sonra bulundu"
+
+msgctxt "stock movement reason"
+msgid "Opening stock"
+msgstr "Açılış stoku"
+
+msgctxt "stock movement reason"
+msgid "Found item"
+msgstr "Bulunan ürün"
+
+msgid "not in this warehouse yet"
+msgstr "henüz bu depoda yok"
+
+msgid "Search a SKU or product name..."
+msgstr "SKU veya ürün adı arayın..."
+
+msgid "Change product"
+msgstr "Ürünü değiştir"
+
+msgid "Add as a new product:"
+msgstr "Yeni ürün olarak ekle:"
+
+msgid "No results found."
+msgstr "Sonuç bulunamadı."
+
+msgid "This SKU is new, so it is added to the catalogue too. Choose the main product it is a variant of, or leave that empty and one is opened from the SKU."
+msgstr "Bu SKU yeni, bu yüzden kataloğa da eklenir. Varyantı olduğu ana ürünü seçin; boş bırakırsanız SKU'dan yeni bir ana ürün açılır."
+
+msgid "Search a main product (e.g. MT-3016)"
+msgstr "Ana ürün arayın (ör. MT-3016)"
+
+msgid "Change main product"
+msgstr "Ana ürünü değiştir"
+
+msgid "New main product:"
+msgstr "Yeni ana ürün:"

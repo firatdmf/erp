@@ -13267,3 +13267,278 @@ msgstr "Hâlâ teslimat bekleyen tedarikçi alımları onlarla birlikte iptal ed
 
 msgid "Supplier purchases cancelled with the deleted orders:"
 msgstr "Silinen siparişlerle birlikte iptal edilen tedarikçi alımları:"
+
+msgid "Why did it change?"
+msgstr "Neden değişti?"
+
+msgid "Choose a reason…"
+msgstr "Bir neden seçin…"
+
+msgid "Sold or used"
+msgstr "Satıldı veya kullanıldı"
+
+msgid "Its cost goes to the cost of goods sold."
+msgstr "Maliyeti satılan malın maliyetine yazılır."
+
+msgid "Lost, damaged or re-measured"
+msgstr "Kayıp, hasarlı veya yeniden ölçüldü"
+
+msgid "Its cost goes to inventory shrinkage. What the supplier is owed stays as it is."
+msgstr "Maliyeti stok firesine yazılır. Tedarikçiye olan borç olduğu gibi kalır."
+
+msgid "Re-measured — there is more"
+msgstr "Yeniden ölçüldü — daha fazla var"
+
+msgid "The extra goes back into stock, off inventory shrinkage. What the supplier is owed stays as it is."
+msgstr "Fazlası stoka geri eklenir ve stok firesinden düşülür. Tedarikçiye olan borç olduğu gibi kalır."
+
+msgid "The supplier delivered a different quantity"
+msgstr "Tedarikçi farklı miktar teslim etti"
+
+msgid "The purchase is corrected by the same amount, and what the supplier is owed with it:"
+msgstr "Alım aynı miktarda düzeltilir, tedarikçiye olan borç da onunla birlikte:"
+
+msgid "Choose why the quantity changed."
+msgstr "Miktarın neden değiştiğini seçin."
+
+msgid "Unknown reason."
+msgstr "Bilinmeyen neden."
+
+msgid "Only a smaller quantity can be taken out."
+msgstr "Yalnızca daha küçük bir miktar çıkarılabilir."
+
+msgid "Only %(left)s is left on this item."
+msgstr "Bu üründe yalnızca %(left)s kaldı."
+
+msgid "This item is not on a received purchase, so there is no supplier to correct it with."
+msgstr "Bu ürün teslim alınmış bir alıma bağlı değil, bu yüzden düzeltilecek bir tedarikçi yok."
+
+msgid "Some of this item has already gone out, so its purchase can't be corrected by it."
+msgstr "Bu ürünün bir kısmı zaten çıkmış, bu yüzden alımı bununla düzeltilemez."
+
+msgid "That would leave nothing on the purchase line. Correct it on the purchase instead."
+msgstr "Bu, alım satırında hiçbir şey bırakmaz. Bunun yerine alım üzerinde düzeltin."
+
+msgid "Choose the item it was taken from."
+msgstr "Hangi üründen alındığını seçin."
+
+msgid "Inventory Shrinkage"
+msgstr "Stok Firesi"
+
+msgid "Stock paid for and not there to sell: lost, damaged, or shorter on a re-measure."
+msgstr "Parası ödenmiş ama satılacak yerde olmayan stok: kayıp, hasarlı veya yeniden ölçümde kısa çıkan."
+
+msgid "Stock item corrected — lost, damaged or re-measured"
+msgstr "Stok ürünü düzeltildi — kayıp, hasarlı veya yeniden ölçüldü"
+
+msgid "What this will post"
+msgstr "Bunun yapacağı kayıt"
+
+msgid "Choose a reason to see where it goes."
+msgstr "Nereye yazılacağını görmek için bir neden seçin."
+
+msgid "This item has no cost on record, so the stock changes and nothing is posted."
+msgstr "Bu ürünün kayıtlı maliyeti yok; stok değişir ama muhasebe kaydı oluşmaz."
+
+msgid "Display — showroom or trade show"
+msgstr "Teşhir — mağaza veya fuar"
+
+msgid "Its cost goes to marketing expenses. Nobody is billed for it."
+msgstr "Maliyeti pazarlama giderlerine yazılır. Kimseye fatura edilmez."
+
+msgid "Marketing Expenses"
+msgstr "Pazarlama Giderleri"
+
+msgid "The supplier account"
+msgstr "Tedarikçi hesabı"
+
+msgid "Choose a reason below"
+msgstr "Aşağıdan bir neden seçin"
+
+msgid "Taken out now:"
+msgstr "Şimdi çıkarılan:"
+
+msgid "Received quantity stays:"
+msgstr "Teslim alınan miktar aynı kalır:"
+
+msgid "Received quantity corrected, was:"
+msgstr "Teslim alınan miktar düzeltildi, önceki:"
+
+msgid "Use as typed:"
+msgstr "Yazıldığı gibi kullan:"
+
+msgid "Contact or company name..."
+msgstr "Kişi veya firma adı..."
+
+msgid "Samples sent"
+msgstr "Gönderilen numuneler"
+
+msgid "No samples sent yet."
+msgstr "Henüz numune gönderilmedi."
+
+msgid "Choose the client the sample went to."
+msgstr "Numunenin gittiği müşteriyi seçin."
+
+msgid "New sample package"
+msgstr "Yeni numune paketi"
+
+msgid "Sample package"
+msgstr "Numune paketi"
+
+msgid "Add an item"
+msgstr "Ürün ekle"
+
+msgid "Scan or type a barcode, SKU or product name"
+msgstr "Barkod okutun veya barkod, SKU ya da ürün adı yazın"
+
+msgid "Nothing in the package yet."
+msgstr "Pakette henüz bir şey yok."
+
+msgid "Saving cuts each piece off its item now. Its cost goes to 5110 Marketing Expenses, out of 1300 Inventory."
+msgstr "Kaydedince her parça ürününden şimdi kesilir. Maliyeti 1300 Stok hesabından 5110 Pazarlama Giderlerine yazılır."
+
+msgid "Tracking number"
+msgstr "Takip numarası"
+
+msgid "Already sent"
+msgstr "Gönderildi"
+
+msgid "No item in stock matches."
+msgstr "Stokta eşleşen ürün yok."
+
+msgid "Prepared"
+msgstr "Hazırlandı"
+
+msgid "Add at least one item to the package."
+msgstr "Pakete en az bir ürün ekleyin."
+
+msgid "An item on the package no longer exists — search for it again."
+msgstr "Paketteki bir ürün artık yok — yeniden arayın."
+
+msgid "%(item)s: enter how much is taken."
+msgstr "%(item)s: ne kadar alındığını girin."
+
+msgid "%(item)s: only %(left)s is left on it."
+msgstr "%(item)s: üzerinde yalnızca %(left)s kaldı."
+
+msgid "Invalid request."
+msgstr "Geçersiz istek."
+
+msgid "piece"
+msgid_plural "pieces"
+msgstr[0] "parça"
+msgstr[1] "parça"
+
+msgid "Lost, damaged or defective"
+msgstr "Kayıp, hasarlı veya kusurlu"
+
+msgid "Re-measured"
+msgstr "Yeniden ölçüldü"
+
+msgid "Nothing left the item: the quantity it was received at is corrected. The difference goes to inventory shrinkage, or comes back off it when there is more. What the supplier is owed stays as it is."
+msgstr "Üründen bir şey çıkmadı: teslim alındığı miktar düzeltilir. Fark stok firesine yazılır, fazla çıkarsa fireden düşülür. Tedarikçiye olan borç olduğu gibi kalır."
+
+msgid "Stock lost, damaged or defective"
+msgstr "Kayıp, hasarlı veya kusurlu stok"
+
+msgid "Stock item re-measured"
+msgstr "Stok ürünü yeniden ölçüldü"
+
+msgid "Re-measured — the supplier corrects the invoice"
+msgstr "Yeniden ölçüldü — tedarikçi faturayı düzeltir"
+
+msgid "Re-measured — we absorb the difference"
+msgstr "Yeniden ölçüldü — farkı biz üstleniriz"
+
+msgid "Nothing left the item: the quantity it was received at is corrected. The purchase is corrected by the same amount, and the supplier account follows it — what is owed to them changes. Purchase:"
+msgstr "Üründen bir şey çıkmadı: teslim alındığı miktar düzeltilir. Alım aynı miktarda düzeltilir ve tedarikçi hesabı da onu izler — onlara olan borç değişir. Alım:"
+
+msgid "Nothing left the item: the quantity it was received at is corrected. The difference goes to inventory shrinkage, or comes back off it when there is more. The purchase and the supplier account stay as they are."
+msgstr "Üründen bir şey çıkmadı: teslim alındığı miktar düzeltilir. Fark stok firesine yazılır, fazla çıkarsa fireden düşülür. Alım ve tedarikçi hesabı olduğu gibi kalır."
+
+msgid "WhatsApp — Shipping Notifications"
+msgstr "WhatsApp — Kargo Bildirimleri"
+
+msgid "Messages the customer when an order is marked shipped, on orders set to notify the customer."
+msgstr "Müşteriye bildirim açık olan siparişlerde, sipariş kargoya verildi olarak işaretlendiğinde müşteriye mesaj gönderir."
+
+msgid "Switched off"
+msgstr "Kapalı"
+
+msgid "Not configured"
+msgstr "Yapılandırılmadı"
+
+msgid "Configure"
+msgstr "Yapılandır"
+
+msgid "Send a WhatsApp message when an order ships"
+msgstr "Sipariş kargoya verildiğinde WhatsApp mesajı gönder"
+
+msgid "Access token"
+msgstr "Erişim anahtarı"
+
+msgid "Saved — leave blank to keep it"
+msgstr "Kayıtlı — korumak için boş bırakın"
+
+msgid "A permanent system-user token from Meta Business. It is never shown again after saving."
+msgstr "Meta Business'tan alınan kalıcı sistem kullanıcısı anahtarı. Kaydedildikten sonra bir daha gösterilmez."
+
+msgid "Phone number ID"
+msgstr "Telefon numarası kimliği"
+
+msgid "The ID of the sending number in WhatsApp Manager, not the number itself."
+msgstr "Gönderen numaranın WhatsApp Manager'daki kimliği; numaranın kendisi değil."
+
+msgid "Shipped template name"
+msgstr "Kargo şablonunun adı"
+
+msgid "An approved template with four body variables: customer name, order number, carrier, tracking number."
+msgstr "Dört gövde değişkeni olan onaylı bir şablon: müşteri adı, sipariş numarası, kargo firması, takip numarası."
+
+msgid "Template language"
+msgstr "Şablon dili"
+
+msgid "The language code the template was approved in, e.g. tr or en_US."
+msgstr "Şablonun onaylandığı dil kodu, ör. tr veya en_US."
+
+msgid "Default country code"
+msgstr "Varsayılan ülke kodu"
+
+msgid "Added to a customer's number saved without a country code."
+msgstr "Ülke kodu olmadan kaydedilmiş müşteri numarasının başına eklenir."
+
+msgid "Test phone number"
+msgstr "Deneme telefon numarası"
+
+msgid "Optional. “Save & send test” sends the template with made-up order details to this number."
+msgstr "İsteğe bağlı. “Kaydet ve deneme gönder”, şablonu örnek sipariş bilgileriyle bu numaraya gönderir."
+
+msgid "Save & send test"
+msgstr "Kaydet ve deneme gönder"
+
+msgid "Only an administrator can change the WhatsApp settings."
+msgstr "WhatsApp ayarlarını yalnızca bir yönetici değiştirebilir."
+
+msgid "Saved. Meta accepted a test message to %(phone)s."
+msgstr "Kaydedildi. Meta, %(phone)s numarasına gönderilen deneme mesajını kabul etti."
+
+msgid "Saved, but the test message was not sent: %(reason)s"
+msgstr "Kaydedildi, ancak deneme mesajı gönderilemedi: %(reason)s"
+
+msgid "WhatsApp settings saved."
+msgstr "WhatsApp ayarları kaydedildi."
+
+msgid "WhatsApp settings"
+msgstr "WhatsApp ayarları"
+
+msgid "Template languages"
+msgstr "Şablon dilleri"
+
+msgid "Every language code the template is approved in, separated by commas. Each customer gets the language of their phone number's country when it is listed here."
+msgstr "Şablonun onaylandığı tüm dil kodları, virgülle ayrılmış olarak. Her müşteriye, burada listeleniyorsa telefon numarasının ülkesinin dilinde mesaj gönderilir."
+
+msgid "Fallback language"
+msgstr "Varsayılan dil"
+
+msgid "Used for customers from any other country, e.g. tr or en_US. The template must be approved in it."
+msgstr "Diğer tüm ülkelerdeki müşteriler için kullanılır, ör. tr veya en_US. Şablonun bu dilde onaylanmış olması gerekir."

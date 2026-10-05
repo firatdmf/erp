@@ -37,6 +37,7 @@
       {% for b in my_books %}
       <a class="nj-book-opt{% if b.pk == current_book.pk %} is-current{% endif %}"
          href="{% url 'accounting:book_detail' b.pk %}"
+         data-book="{{ b.pk }}"
          data-work-url="{% url 'accounting:set_my_working_book' b.pk %}">{{ b.name }}</a>
       {% endfor %}
     </div>
@@ -223,13 +224,32 @@
 </script>
 
 <script>
-  // The book switcher. Picking a book both opens that book — its own
-  // detail page, which is what the reader asked to see, rather than one
-  // of the ledgers inside it — and records it as the member's working
+  // The book switcher. Picking a book records it as the member's working
   // book, so every book-less entry point afterwards — the sidebar, a CRM
   // record, a cron-less import — resolves to the same place the reader
-  // last chose.
+  // last chose, and then shows the page the reader was already on in
+  // that book, rather than throwing them out to the book's detail page.
   (function () {
+    // Where "the same page" is once the book has changed. A page that
+    // names its book — /books/5/accounts/, ?book=5 — has to name the new
+    // one, or it would reload still showing the old book. A record
+    // inside the old book (/books/5/expenses/12/) has no counterpart in
+    // the new one, so that falls back to the book's own page.
+    function samePageIn(bookId, fallback) {
+      var loc = window.location;
+      var path = loc.pathname;
+      var m = path.match(/\/books\/\d+\//);
+      if (m) {
+        var rest = path.slice(m.index + m[0].length);
+        if (/(^|\/)\d+(\/|$)/.test(rest)) return fallback;
+        path = path.slice(0, m.index) + '/books/' + bookId + '/' + rest;
+      }
+      var params = new URLSearchParams(loc.search);
+      if (params.has('book')) params.set('book', bookId);
+      var query = params.toString();
+      return path + (query ? '?' + query : '') + loc.hash;
+    }
+
     var root = document.querySelector('.nj-book');
     if (!root) return;
     var btn = root.querySelector('.nj-book-btn:not(.is-static)');
@@ -261,7 +281,9 @@
           // Navigate either way: the page the reader asked for is the
           // point, and a working book that failed to save is a
           // preference lost, not a page they may not see.
-          .finally(function () { window.location.href = a.href; });
+          .finally(function () {
+            window.location.href = samePageIn(a.dataset.book, a.href);
+          });
       });
     });
   })();

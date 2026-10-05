@@ -76,3 +76,53 @@ class BrandProfile(models.Model):
             row = cls.objects.create(
                 nejum_credit=bool(getattr(settings, "NEJUM_CREDIT", True)))
         return row
+
+
+class WhatsAppSettings(models.Model):
+    """The WhatsApp Business connection the "order shipped" message goes
+    out through — see operating/order_whatsapp.py for how it is read.
+
+    One row, edited under Integrations on the Settings page. A blank
+    language or country code means the default (order_whatsapp.CONFIG_FIELDS).
+    """
+    class Meta:
+        verbose_name = _("WhatsApp settings")
+        verbose_name_plural = _("WhatsApp settings")
+
+    # The switch: off keeps what was typed but sends nothing.
+    enabled = models.BooleanField(default=True)
+    # Meta's permanent (system user) token. Never shown back on the page.
+    access_token = models.TextField(blank=True)
+    phone_number_id = models.CharField(max_length=40, blank=True)
+    # The approved template's name; every language code it is approved
+    # in, comma-separated ("tr, en, ru"), from which a customer gets the
+    # one for their phone number's country; and the language for every
+    # other country.
+    shipped_template = models.CharField(max_length=120, blank=True)
+    template_languages = models.CharField(max_length=200, blank=True)
+    template_language = models.CharField(max_length=10, blank=True)
+    # Put in front of a customer's number typed without one ("0532 …").
+    default_country_code = models.CharField(max_length=4, blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="+",
+    )
+
+    def __str__(self):
+        return "WhatsApp settings"
+
+    def save(self, *args, **kwargs):
+        # One row, always — same reasoning as BrandProfile.save.
+        if not self.pk:
+            existing = WhatsAppSettings.objects.values_list("pk", flat=True).first()
+            if existing:
+                self.pk = existing
+                kwargs.pop("force_insert", None)
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        """The row, created empty on first use."""
+        return cls.objects.first() or cls.objects.create()

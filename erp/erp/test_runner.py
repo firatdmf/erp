@@ -26,8 +26,14 @@ class NoCdnTestRunner(DiscoverRunner):
     def run_tests(self, *args, **kwargs):
         patcher = patch("marketing.utils.bunny_storage.upload_to_bunny",
                         return_value="https://mock-cdn.invalid/test.png")
+        # WhatsApp too: nothing in the suite may reach Meta, whatever a
+        # test has configured.
+        whatsapp = patch("operating.order_whatsapp._post",
+                         side_effect=AssertionError("WhatsApp is off limits in tests"))
         patcher.start()
+        whatsapp.start()
         try:
             return super().run_tests(*args, **kwargs)
         finally:
+            whatsapp.stop()
             patcher.stop()

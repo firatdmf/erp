@@ -455,6 +455,104 @@
               </div>
             </div>
 
+            <!-- WhatsApp -->
+            <div class="st-row">
+              <div class="st-row-info">
+                <span class="st-row-icon" style="background:#25D366;color:#fff;"><i class="fab fa-whatsapp"></i></span>
+                <div class="st-row-text">
+                  <h3 class="st-row-name">{% trans "WhatsApp — Shipping Notifications" %}</h3>
+                  <p class="st-row-desc">{% trans "Messages the customer when an order is marked shipped, on orders set to notify the customer." %}</p>
+                  <div class="st-row-meta">
+                    {% if whatsapp_ready and whatsapp_enabled %}
+                      <span class="st-status is-active"><i class="fas fa-circle"></i> {% trans "Active" %}</span>
+                    {% elif whatsapp_ready %}
+                      <span class="st-status is-inactive"><i class="fas fa-circle"></i> {% trans "Switched off" %}</span>
+                    {% else %}
+                      <span class="st-status is-inactive"><i class="fas fa-circle"></i> {% trans "Not configured" %}</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              {% if is_brand_admin %}
+              <div class="st-row-actions">
+                <button type="button" class="st-btn st-btn--secondary"
+                        onclick="document.getElementById('whatsappConfig').hidden = !document.getElementById('whatsappConfig').hidden">
+                  <i class="fas fa-cog"></i> {% trans "Configure" %}
+                </button>
+              </div>
+              {% endif %}
+            </div>
+            {% if is_brand_admin %}
+            <div id="whatsappConfig" hidden style="padding-top:16px;">
+              <form hx-post="{% url 'whatsapp_settings_update' %}" hx-target="#settings-messages" hx-swap="innerHTML">
+                {% csrf_token %}
+                <div class="st-form-grid">
+                  <div class="st-form-group is-full">
+                    <label style="display:flex;align-items:center;gap:10px;font-size:13.5px;">
+                      <input type="checkbox" name="enabled" {% if whatsapp_enabled %}checked{% endif %}>
+                      {% trans "Send a WhatsApp message when an order ships" %}
+                    </label>
+                  </div>
+                  <div class="st-form-group is-full">
+                    <label class="st-form-label" for="id_wa_access_token">{% trans "Access token" %}</label>
+                    <input type="password" name="access_token" id="id_wa_access_token" class="st-input"
+                           autocomplete="new-password"
+                           placeholder="{% if whatsapp_has_token %}{% trans "Saved — leave blank to keep it" %}{% endif %}">
+                    <p class="st-help">{% trans "A permanent system-user token from Meta Business. It is never shown again after saving." %}</p>
+                  </div>
+                  <div class="st-form-group">
+                    <label class="st-form-label" for="id_wa_phone_number_id">{% trans "Phone number ID" %}</label>
+                    <input type="text" name="phone_number_id" id="id_wa_phone_number_id" class="st-input"
+                           value="{{ whatsapp.phone_number_id.value }}"
+                           placeholder="{{ whatsapp.phone_number_id.effective }}">
+                    <p class="st-help">{% trans "The ID of the sending number in WhatsApp Manager, not the number itself." %}</p>
+                  </div>
+                  <div class="st-form-group">
+                    <label class="st-form-label" for="id_wa_shipped_template">{% trans "Shipped template name" %}</label>
+                    <input type="text" name="shipped_template" id="id_wa_shipped_template" class="st-input"
+                           value="{{ whatsapp.shipped_template.value }}"
+                           placeholder="{{ whatsapp.shipped_template.effective }}">
+                    <p class="st-help">{% trans "An approved template with four body variables: customer name, order number, carrier, tracking number." %}</p>
+                  </div>
+                  <div class="st-form-group is-full">
+                    <label class="st-form-label" for="id_wa_template_languages">{% trans "Template languages" %}</label>
+                    <input type="text" name="template_languages" id="id_wa_template_languages" class="st-input"
+                           value="{{ whatsapp.template_languages.value }}"
+                           placeholder="tr, en, ru, ar">
+                    <p class="st-help">{% trans "Every language code the template is approved in, separated by commas. Each customer gets the language of their phone number's country when it is listed here." %}</p>
+                  </div>
+                  <div class="st-form-group">
+                    <label class="st-form-label" for="id_wa_template_language">{% trans "Fallback language" %}</label>
+                    <input type="text" name="template_language" id="id_wa_template_language" class="st-input"
+                           value="{{ whatsapp.template_language.value }}"
+                           placeholder="{{ whatsapp.template_language.effective }}">
+                    <p class="st-help">{% trans "Used for customers from any other country, e.g. tr or en_US. The template must be approved in it." %}</p>
+                  </div>
+                  <div class="st-form-group">
+                    <label class="st-form-label" for="id_wa_default_country_code">{% trans "Default country code" %}</label>
+                    <input type="text" name="default_country_code" id="id_wa_default_country_code" class="st-input"
+                           value="{{ whatsapp.default_country_code.value }}"
+                           placeholder="{{ whatsapp.default_country_code.effective }}">
+                    <p class="st-help">{% trans "Added to a customer's number saved without a country code." %}</p>
+                  </div>
+                  <div class="st-form-group is-full">
+                    <label class="st-form-label" for="id_wa_test_phone">{% trans "Test phone number" %}</label>
+                    <input type="text" name="test_phone" id="id_wa_test_phone" class="st-input" placeholder="+90 5…">
+                    <p class="st-help">{% trans "Optional. “Save & send test” sends the template with made-up order details to this number." %}</p>
+                  </div>
+                </div>
+                <div class="st-form-actions">
+                  <button type="submit" class="st-btn st-btn--primary">
+                    <i class="fas fa-save"></i> {% trans "Save" %}
+                  </button>
+                  <button type="submit" name="action" value="test" class="st-btn st-btn--secondary">
+                    <i class="fab fa-whatsapp"></i> {% trans "Save & send test" %}
+                  </button>
+                </div>
+              </form>
+            </div>
+            {% endif %}
+
           </div>
         </div>
       </section>

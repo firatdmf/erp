@@ -51,7 +51,24 @@ class user_settings(View):
             }
             for field, setting in TEXT_FIELDS.items()
         ]
+        # WhatsApp, under Integrations: what was typed, with the default
+        # as a placeholder. The token itself never goes back to the page.
+        from erp.models import WhatsAppSettings
+        from operating.order_whatsapp import CONFIG_FIELDS, whatsapp_config
+        wa_row = WhatsAppSettings.objects.first()
+        wa_cfg = whatsapp_config()
+        whatsapp = {
+            field: {
+                "value": (getattr(wa_row, field, "") or "") if wa_row else "",
+                "effective": wa_cfg[field],
+            }
+            for field in CONFIG_FIELDS if field != "access_token"
+        }
         return render(request, self.template_name, {
+            "whatsapp": whatsapp,
+            "whatsapp_enabled": wa_cfg["enabled"],
+            "whatsapp_ready": wa_cfg["ready"],
+            "whatsapp_has_token": bool(wa_cfg["access_token"]),
             "google_creds": google_creds,
             "is_google_connected": google_creds is not None,
             "user": request.user,
@@ -101,6 +118,66 @@ class BrandProfileUpdate(View):
                 f"{f}: {' '.join(m)}" for f, m in exc.message_dict.items()))
         row.save()
         return banner(True, _("Company profile updated."))
+
+
+@method_decorator(login_required, name="dispatch")
+class WhatsAppSettingsUpdate(View):
+    """Save the WhatsApp connection, and optionally try it.
+
+    Admin only — it holds the token that sends messages in the company's
+    name. "Save & send test" saves first, then sends the shipped template
+    to the number typed beside it and reports what Meta answered, since a
+    refused order message is otherwise only a line in the server log.
+    """
+
+    def post(self, request):
+        from django.utils.html import escape
+        from django.utils.translation import gettext as _
+        from erp.models import WhatsAppSettings
+        from operating.order_whatsapp import CONFIG_FIELDS, send_test_whatsapp
+        from operating.views_warehouse import _is_admin
+
+        def banner(ok, text):
+            colour = ("#d1fae5", "#065f46") if ok else ("#fee2e2", "#991b1b")
+            icon = "check-circle" if ok else "exclamation-circle"
+            return HttpResponse(
+                f'<div class="alert" role="alert" style="padding:1rem;'
+                f'background-color:{colour[0]};color:{colour[1]};'
+                f'border-radius:0.5rem;margin-bottom:1rem;">'
+                f'<i class="fas fa-{icon}"></i> {escape(text)}</div>')
+
+        if not _is_admin(request.user):
+            return banner(False, _("Only an administrator can change the WhatsApp settings."))
+
+        row = WhatsAppSettings.get()
+        for field in CONFIG_FIELDS:
+            if field not in request.POST:
+                continue
+            value = (request.POST.get(field) or "").strip()
+            # The token box is always empty on the page: leaving it so
+            # keeps the token already saved.
+            if field == "access_token" and not value:
+                continue
+            if field == "default_country_code":
+                value = value.lstrip("+")
+            setattr(row, field, value)
+        row.enabled = request.POST.get("enabled") == "on"
+        row.updated_by = request.user
+        try:
+            row.full_clean()
+        except ValidationError as exc:
+            return banner(False, "; ".join(
+                f"{f}: {' '.join(m)}" for f, m in exc.message_dict.items()))
+        row.save()
+
+        if request.POST.get("action") == "test":
+            sent, detail = send_test_whatsapp(request.POST.get("test_phone"))
+            if sent:
+                return banner(True, _("Saved. Meta accepted a test message to %(phone)s.")
+                              % {"phone": detail})
+            return banner(False, _("Saved, but the test message was not sent: %(reason)s")
+                          % {"reason": detail})
+        return banner(True, _("WhatsApp settings saved."))
 
 
 class test_page(TemplateView):

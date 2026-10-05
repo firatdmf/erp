@@ -85,6 +85,15 @@ def email_customer_on_status_change(sender, instance, created, **kwargs):
     except Exception as _exc:
         import traceback as _tb
         _tb.print_exc()
+    # The same news over WhatsApp, for the one event a customer is
+    # waiting on. Does nothing until WhatsApp is set up on the Settings page.
+    if new_status == "shipped":
+        try:
+            from .order_whatsapp import send_order_shipped_whatsapp
+            send_order_shipped_whatsapp(instance)
+        except Exception as _exc:
+            import traceback as _tb
+            _tb.print_exc()
 
 
 @receiver([post_save, post_delete], sender=OrderItem)

@@ -4118,6 +4118,8 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         # ── The lines ──
         cost_rates = _PurchaseRates(billing, data.get("rates"))
         warnings, trimmed, line_updates = [], [], []
+        # Rolls whose cost this edit changes, for the re-posting at the end.
+        repriced_roll_ids = set()
         line_wps = {}
         for card in resolved:
             main_product = _intake_main_product(card, prefix, invoice=invoice)
@@ -4260,6 +4262,8 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                     # cost — a corrected price is the one that was paid.
                     WarehouseProductItem.objects.filter(pk__in=line_roll_ids).update(
                         unit_cost_base=target["cost_usd"])
+                    if item is not None:
+                        repriced_roll_ids.update(line_roll_ids)
                     # The product's last-purchase price follows too, unless a
                     # later delivery has already moved it on.
                     if not wp.stock_items.filter(pk__gt=max(line_roll_ids)).exists():
@@ -4328,6 +4332,26 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         if account_changed:
             old_account.recompute_balance(save=True)
             mark_as_supplier(account)
+
+        # A corrected price is what the goods cost all along, including the
+        # metres that have already left. Those were taken out of stock at
+        # the old price when they shipped, and the purchase has just put the
+        # whole difference into 1300 — so without this the part belonging to
+        # goods already gone would sit in stock for ever, and their cost of
+        # goods sold (or sample, or loss) would stay at a price nobody paid.
+        # Re-posting replaces each entry with the same one at the new cost;
+        # a movement that posts nothing still posts nothing.
+        #
+        # Corrected there and then, whenever the goods left — the same as
+        # the purchase's own entry, which is replaced on every save. No
+        # period is held apart: the books are corrected in place throughout
+        # (services_posting.unpost), and this follows them.
+        if repriced_roll_ids:
+            from accounting.signals_ledger import post_bulk_stock_movements
+            post_bulk_stock_movements(list(
+                StockMovement.objects.filter(stock_item_id__in=repriced_roll_ids)
+                .select_related("stock_item__purchase_invoice_item",
+                                "product__warehouse__accounting_book")))
 
     return {"invoice": invoice, "warnings": warnings, "reservations_trimmed": trimmed}
 
@@ -6331,13 +6355,16 @@ class WarehouseProductDetail(View):
         warehouse = product.warehouse
         # Hide fully-consumed rolls — their stock is 0 and they only clutter
         # the list. Movement history below still preserves them.
-        rolls = list(product.stock_items.exclude(status="consumed").order_by("-scanned_at"))
+        rolls = list(product.stock_items.exclude(status="consumed")
+                     .select_related("purchase_invoice_item__invoice__currency")
+                     .order_by("-scanned_at"))
         movements = _decorate_movements(list(
             product.movements.all().select_related("stock_item", "created_by", "order")[:200]))
 
         # Aggregate quick stats — in/out totals in a single query.
         from django.db.models import Sum, Q as _Q
         from decimal import Decimal as _Dec
+        from accounting.services_posting import stock_unit_cost
         from .models import OrderStockReservation
         _io = product.movements.aggregate(
             i=Sum("quantity", filter=_Q(movement_type="in")),
@@ -6375,6 +6402,17 @@ class WarehouseProductDetail(View):
         for r in rolls:
             r.reserved_m = reserved_by_roll.get(r.id, _Dec("0"))
             r.reservation_list = reservations_by_roll.get(r.id, [])
+            # The purchase a change in this item's quantity could be the
+            # supplier's doing — named in the edit box, or not offered.
+            _purchase = _purchase_behind(r)
+            r.purchase_number = _purchase.display_number if _purchase else ""
+            # What the edit box needs to show the entry a change will post
+            # before it is saved: the cost the ledger will take the item at
+            # (the same lookup the posting makes), and for a supplier's
+            # correction the price the purchase bills it at.
+            r.posting_cost = stock_unit_cost(r, product)
+            r.purchase_price = r.purchase_invoice_item.unit_price if _purchase else None
+            r.purchase_currency = _purchase.currency.code if _purchase else ""
             # What the quantity still on this item is worth, at what the
             # item itself cost. None where no cost was ever recorded — the
             # template shows a dash there, because an item nobody priced
@@ -7124,18 +7162,161 @@ class WarehouseRollBulkDelete(View):
         })
 
 
+# Why a stock item's quantity changed, as its edit box asks. The box holds
+# one number, but different things can be behind it moving, and each
+# belongs somewhere else in the ledger:
+#   correction — re-measured: the item never held what was recorded. Ours
+#                to bear, so the difference is inventory shrinkage (5120),
+#                either way, and the purchase is left alone
+#   supplier   — the supplier delivered a different quantity: the purchase
+#                line moves by the same amount, and with it what they are owed
+#   sample     — taken out for a client (5110)
+#   display    — cut for the showroom or a trade show (5110)
+#   loss       — lost, damaged or defective (5120)
+# The first two correct what was RECEIVED. The rest take stock out of an
+# item whose received quantity stays as it was.
+#
+# A sale is not on the list. Goods sold leave on an order, which posts
+# their cost when it ships; a second way to say "sold" here would put cost
+# in 5000 with no revenue beside it.
+#
+# Nobody but the person at the shelf can tell these apart, which is why the
+# box asks rather than guesses: invoice 117 is what guessing "supplier" cost,
+# and guessing nothing at all is how 1300 came to disagree with the shelves.
+ROLL_CHANGE_REASONS = ("correction", "supplier", "sample", "display", "loss")
+_ROLL_TAKE_OUT_PURPOSE = {"sample": "sample", "display": "display", "loss": "loss"}
+# What the bare stock-out endpoint also takes: no purpose at all, which is
+# the unspecified stock-out it has always recorded as cost of goods sold.
+_STOCK_OUT_PURPOSES = ("", *_ROLL_TAKE_OUT_PURPOSE.values())
+
+
+def _purchase_behind(roll):
+    """The received purchase this stock item arrived on, or None.
+
+    A draft is still an order and a cancelled one is nothing, so neither
+    has a debt a correction could move."""
+    line = roll.purchase_invoice_item
+    if line is None:
+        return None
+    invoice = line.invoice
+    if invoice.type != "purchase" or invoice.status in ("draft", "cancelled"):
+        return None
+    return invoice
+
+
+def _move_purchase_line(roll, delta, *, user=None, member=None):
+    """Move the purchase line a stock item arrived on by `delta`, and what
+    the supplier is owed with it.
+
+    The same steps the purchase form takes for a re-measured roll
+    (perform_purchase_edit), for the one line: the posted debt is refreshed
+    in place, and it is that movement which carries the change to 1300 — so
+    the stock row written beside this posts nothing."""
+    from accounting.models_accounts import Invoice
+    from accounting.purchase_audit import log_purchase
+    from accounting.services_accounts import sync_purchase_invoice_items
+
+    line = roll.purchase_invoice_item
+    invoice = Invoice.objects.select_for_update().get(pk=line.invoice_id)
+    was = line.quantity
+    sync_purchase_invoice_items(
+        invoice, [{"invoice_item_id": line.pk, "quantity": was + delta}], member=member)
+    invoice.refresh_from_db()
+    invoice.recompute_payment(save=True)
+    invoice.resync_posted_movement(user=user)
+    log_purchase(invoice, "item_updated", field="quantity", item_label=line.description,
+                 old=was, new=was + delta, user=user)
+    return invoice
+
+
+def _sample_client(request):
+    """(contact, company, name) for the client a sample is posted with.
+
+    A sample names a CRM record, not a name typed in a box: what a client
+    has been given is only worth knowing if it can be read back off their
+    page, and a name cannot be joined on. All three are None when the post
+    names nobody the CRM knows."""
+    from .samples import sample_client
+
+    contact, company = sample_client(request.POST.get("client_type"),
+                                     request.POST.get("client_pk"))
+    client = contact or company
+    return contact, company, (client.name if client else None)
+
+
+def _record_stock_out(product, roll, amount, *, purpose="", reference="", note="", user=None,
+                      contact=None, company=None, package=None):
+    """Take `amount` out of a product — off `roll`, when one is named — and
+    write the stock-out. The caller has checked all of it.
+
+    Returns the holds trimmed to fit what is left on the item."""
+    trimmed = []
+    if roll is not None:
+        roll_rem = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
+        roll.quantity_remaining = (roll_rem or Decimal("0")) - amount
+        # Update status based on remaining.
+        if roll.quantity_remaining <= Decimal("0"):
+            roll.status = "consumed"
+        elif roll.quantity_remaining < (roll.quantity or Decimal("0")):
+            roll.status = "partial"
+        roll.save(update_fields=["quantity_remaining", "status"])
+        # Same rule as the roll edit: metres taken off by hand cannot
+        # stay reserved for an order.
+        trimmed = _clamp_reservations_to_roll(roll, user=user)
+
+    # Drop the parent quantity.
+    product.quantity = (product.quantity or Decimal("0")) - amount
+    product.save(update_fields=["quantity", "updated_at"])
+
+    if purpose == "sample":
+        reason = f"Sample for {reference}" + (f" — {note}" if note else "")
+    elif purpose == "display":
+        reason = "Display" + (f" — {note}" if note else "")
+    elif purpose == "loss":
+        reason = "Lost, damaged or defective" + (f" — {note}" if note else "")
+    else:
+        reason = note or "Manual stock-out"
+    StockMovement.objects.create(
+        product=product,
+        stock_item=roll,
+        movement_type="out",
+        purpose=purpose,
+        quantity=amount,
+        reason=reason[:255],
+        reference=reference or None,
+        contact=contact,
+        company=company,
+        sample_package=package,
+        created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+    )
+    return trimmed
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseRollEdit(View):
     """Edit ONE roll: barcode, meters, lot_number. Changing meters
     re-rolls the parent product.quantity (recomputed from all rolls) and
-    logs an adjustment; the linked catalog variant quantity follows."""
+    logs an adjustment; the linked catalog variant quantity follows.
+
+    A changed quantity comes with `change_reason` (ROLL_CHANGE_REASONS)
+    and a free `note`; a sample also names the CRM record it went to, as
+    `client_type` (contact / company) and `client_pk`. A caller that sends
+    no reason is correcting the item, which is what this endpoint did
+    before it asked."""
 
     def post(self, request, warehouse_pk, product_pk, roll_pk):
+        from django.db import transaction
         from django.db.models import Sum, F
         from django.db.models.functions import Coalesce
         warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
         product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
         roll = get_object_or_404(WarehouseProductItem, pk=roll_pk, product=product)
+
+        change_reason = (request.POST.get("change_reason") or "correction").strip()
+        if change_reason not in ROLL_CHANGE_REASONS:
+            return JsonResponse({"success": False, "error": _gettext("Unknown reason.")}, status=400)
+        note = (request.POST.get("note") or "").strip()
+        contact = company = reference = None
 
         changes = []
         roll_fields = []
@@ -7176,6 +7357,8 @@ class WarehouseRollEdit(View):
         # ── Meters (full length); keep any already-consumed amount ──
         meters_raw = (request.POST.get("quantity") or "").strip().replace(",", ".")
         meters_changed = False
+        take_out = Decimal("0")      # what leaves, when the reason is a stock-out
+        purchase = None              # the purchase to correct, when it is the supplier's
         old_full = new_full = roll.quantity or Decimal("0")
         old_remaining = roll.quantity_remaining if roll.quantity_remaining is not None else old_full
         if meters_raw:
@@ -7183,53 +7366,130 @@ class WarehouseRollEdit(View):
                 new_full = Decimal(meters_raw)
             except (InvalidOperation, TypeError):
                 return JsonResponse({"success": False, "error": _gettext("Invalid metre value.")}, status=400)
-            try:
-                meters_changed = _set_roll_length(roll, new_full)
-            except RollLengthError as exc:
-                return JsonResponse({"success": False, "error": str(exc)}, status=400)
-            if meters_changed:
-                roll_fields.extend(["quantity", "quantity_remaining", "status"])
+            if new_full != old_full and change_reason in _ROLL_TAKE_OUT_PURPOSE:
+                # Stock taken out: the item was received at the length it
+                # has, and the difference is what left it.
+                take_out = old_full - new_full
+                if take_out <= 0:
+                    return JsonResponse({"success": False,
+                                         "error": _gettext("Only a smaller quantity can be taken out.")},
+                                        status=400)
+                if take_out > old_remaining:
+                    return JsonResponse({"success": False,
+                                         "error": _gettext("Only %(left)s is left on this item.")
+                                                  % {"left": f"{old_remaining:.2f}"}},
+                                        status=400)
+                if change_reason == "sample":
+                    contact, company, reference = _sample_client(request)
+                    if reference is None:
+                        return JsonResponse({"success": False,
+                                             "error": _gettext("Choose the client the sample went to.")},
+                                            status=400)
+            else:
+                if new_full != old_full and change_reason == "supplier":
+                    purchase = _purchase_behind(roll)
+                    if purchase is None:
+                        return JsonResponse({
+                            "success": False,
+                            "error": _gettext("This item is not on a received purchase, so there is "
+                                              "no supplier to correct it with.")}, status=400)
+                    # The same line the purchase form draws: once metres
+                    # have gone out, the item's length is that shipment's
+                    # record too.
+                    if _roll_metres_out(roll) > 0:
+                        return JsonResponse({
+                            "success": False,
+                            "error": _gettext("Some of this item has already gone out, so its "
+                                              "purchase can't be corrected by it.")}, status=400)
+                    if roll.purchase_invoice_item.quantity + (new_full - old_full) <= 0:
+                        return JsonResponse({
+                            "success": False,
+                            "error": _gettext("That would leave nothing on the purchase line. "
+                                              "Correct it on the purchase instead.")}, status=400)
+                try:
+                    meters_changed = _set_roll_length(roll, new_full)
+                except RollLengthError as exc:
+                    return JsonResponse({"success": False, "error": str(exc)}, status=400)
+                if meters_changed:
+                    roll_fields.extend(["quantity", "quantity_remaining", "status"])
+                    changes.append("quantity")
+
+        user = request.user if request.user.is_authenticated else None
+        trimmed, grown = [], []
+        # One transaction: the item, its product, the stock row and — for a
+        # supplier's correction — the purchase either all move or none do.
+        with transaction.atomic():
+            if roll_fields:
+                roll.save(update_fields=list(set(roll_fields)))
+
+            if take_out:
+                trimmed = _record_stock_out(
+                    product, roll, take_out,
+                    purpose=_ROLL_TAKE_OUT_PURPOSE[change_reason],
+                    reference=reference or "", note=note, user=user,
+                    contact=contact, company=company)
                 changes.append("quantity")
 
-        if roll_fields:
-            roll.save(update_fields=list(set(roll_fields)))
+            if meters_changed:
+                # A shortened roll cannot keep holding the metres it no longer
+                # has. Without this the order goes on displaying the old reserved
+                # figure and the metres stay blocked for everyone else.
+                trimmed = _clamp_reservations_to_roll(roll, user=request.user)
+                # ...and a roll sold whole takes its order with it when it turns
+                # out longer.
+                grown = _grow_whole_roll_hold(roll, old_remaining, user=request.user)
 
-        # A shortened roll cannot keep holding the metres it no longer
-        # has. Without this the order goes on displaying the old reserved
-        # figure and the metres stay blocked for everyone else.
-        trimmed = _clamp_reservations_to_roll(roll, user=request.user) if meters_changed else []
-        # ...and a roll sold whole takes its order with it when it turns
-        # out longer.
-        grown = (_grow_whole_roll_hold(roll, old_remaining, user=request.user)
-                 if meters_changed else [])
+                # Recompute the parent quantity authoritatively from its rolls
+                # (current stock = remaining meters, falling back to full meters).
+                total = product.stock_items.aggregate(
+                    s=Coalesce(Sum(Coalesce(F("quantity_remaining"), F("quantity"))),
+                               Decimal("0"),
+                               output_field=DecimalField(max_digits=18, decimal_places=2)))["s"]
+                old_qty = product.quantity or Decimal("0")
+                if total != old_qty:
+                    product.quantity = total
+                    product.save(update_fields=["quantity", "updated_at"])
+                # No catalog mirror: the variant reads this WarehouseProduct
+                # (and every other row for the same SKU) through live_quantity.
 
-        # Recompute the parent quantity authoritatively from its rolls
-        # (current stock = remaining meters, falling back to full meters).
-        if meters_changed:
-            total = product.stock_items.aggregate(
-                s=Coalesce(Sum(Coalesce(F("quantity_remaining"), F("quantity"))),
-                           Decimal("0"),
-                           output_field=DecimalField(max_digits=18, decimal_places=2)))["s"]
-            old_qty = product.quantity or Decimal("0")
-            if total != old_qty:
-                product.quantity = total
-                product.save(update_fields=["quantity", "updated_at"])
-                StockMovement.objects.create(
-                    product=product, stock_item=roll, movement_type="adjustment",
-                    quantity=abs(total - old_qty),
-                    reason=(
-                        f"Roll meters edited (roll: {old_full:.2f}m → {new_full:.2f}m; "
-                        f"total: {old_qty:.2f}m → {total:.2f}m)"
-                    ),
-                    reference=roll.barcode or f"Roll #{roll.pk}",
-                    created_by=request.user if request.user.is_authenticated else None,
-                )
-            # No catalog mirror: the variant reads this WarehouseProduct
-            # (and every other row for the same SKU) through live_quantity.
+                # What is left on the item moved by this much, and that —
+                # not the product total, which also absorbs whatever else
+                # had drifted — is what the stock is worth less or more.
+                delta = (roll.quantity_remaining or Decimal("0")) - old_remaining
+                if purchase is not None:
+                    StockMovement.objects.create(
+                        product=product, stock_item=roll, movement_type="adjustment",
+                        quantity=delta,
+                        reason=(f"Roll length corrected on purchase {purchase.display_number} "
+                                f"({old_full:.2f} → {new_full:.2f})"
+                                + (f" — {note}" if note else ""))[:255],
+                        reference=roll.barcode or f"Roll #{roll.pk}",
+                        created_by=user,
+                    )
+                    purchase = _move_purchase_line(
+                        roll, new_full - old_full, user=user,
+                        member=getattr(request.user, "member", None))
+                else:
+                    StockMovement.objects.create(
+                        product=product, stock_item=roll, movement_type="adjustment",
+                        purpose="correction", quantity=delta,
+                        reason=(
+                            f"Roll meters edited (roll: {old_full:.2f}m → {new_full:.2f}m; "
+                            f"total: {old_qty:.2f}m → {total:.2f}m)"
+                            + (f" — {note}" if note else "")
+                        )[:255],
+                        reference=roll.barcode or f"Roll #{roll.pk}",
+                        created_by=user,
+                    )
 
         return JsonResponse({
             "success": True,
             "changes": changes,
+            # The purchase a supplier's correction moved, so the page can
+            # say what it now comes to.
+            "purchase": ({"number": purchase.display_number,
+                          "total": float(purchase.total or 0)}
+                         if (purchase is not None and meters_changed) else None),
             "roll": {
                 "id": roll.pk,
                 "barcode": roll.barcode,
@@ -7254,12 +7514,13 @@ class WarehouseStockOut(View):
         stock_item_id (optional): consume from a specific stock item
         purpose (optional): "sample" for a sample given to a client
         reason (optional)
-        reference (optional): for a sample, the client it went to
+        client_type, client_pk: for a sample, the CRM record it went to
+        reference (optional): free reference for any other stock-out
     Returns JSON with the updated totals.
 
     A sample needs its stock item and its client. The item is what values
     it — its cost goes to marketing expenses, not cost of goods sold — and
-    the client is the only thing that says later why it left."""
+    the client is what lets it be read back off that client's page."""
 
     def post(self, request, warehouse_pk, product_pk):
         warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
@@ -7280,9 +7541,10 @@ class WarehouseStockOut(View):
             }, status=400)
 
         purpose = (request.POST.get("purpose") or "").strip()
-        if purpose not in dict(StockMovement.PURPOSE_CHOICES):
+        if purpose not in _STOCK_OUT_PURPOSES:
             return JsonResponse({"success": False, "error": "Unknown purpose"}, status=400)
         reference = (request.POST.get("reference") or "").strip()
+        contact = company = None
 
         roll = None
         trimmed = []
@@ -7295,9 +7557,10 @@ class WarehouseStockOut(View):
                 return JsonResponse({"success": False,
                                      "error": str(gettext_lazy("Choose the item the sample was taken from."))},
                                     status=400)
-            if not reference:
+            contact, company, reference = _sample_client(request)
+            if reference is None:
                 return JsonResponse({"success": False,
-                                     "error": str(gettext_lazy("Name the client the sample went to."))},
+                                     "error": _gettext("Choose the client the sample went to.")},
                                     status=400)
         if stock_item_id:
             roll = product.stock_items.filter(pk=stock_item_id).first()
@@ -7309,36 +7572,18 @@ class WarehouseStockOut(View):
                     "success": False,
                     "error": f"Only {roll_rem}m left on this roll",
                 }, status=400)
-            roll.quantity_remaining = (roll_rem or Decimal("0")) - amount
-            # Update status based on remaining.
-            if roll.quantity_remaining <= Decimal("0"):
-                roll.status = "consumed"
-            elif roll.quantity_remaining < (roll.quantity or Decimal("0")):
-                roll.status = "partial"
-            roll.save(update_fields=["quantity_remaining", "status"])
-            # Same rule as the roll edit: metres taken off by hand cannot
-            # stay reserved for an order.
-            trimmed = _clamp_reservations_to_roll(roll, user=request.user)
+        elif product.stock_items.exclude(status="consumed").exists():
+            # The shelves are valued item by item. Taken off the product's
+            # total alone, the stock would leave the ledger and stay on
+            # every item — and the two would disagree by exactly this much.
+            return JsonResponse({"success": False,
+                                 "error": _gettext("Choose the item it was taken from.")},
+                                status=400)
 
-        # Drop the parent quantity.
-        product.quantity = (product.quantity or Decimal("0")) - amount
-        product.save(update_fields=["quantity", "updated_at"])
-
-        note = (request.POST.get("reason") or "").strip()
-        if purpose == "sample":
-            reason = f"Sample for {reference}" + (f" — {note}" if note else "")
-        else:
-            reason = note or "Manual stock-out"
-        StockMovement.objects.create(
-            product=product,
-            stock_item=roll,
-            movement_type="out",
-            purpose=purpose,
-            quantity=amount,
-            reason=reason[:255],
-            reference=reference or None,
-            created_by=request.user if request.user.is_authenticated else None,
-        )
+        trimmed = _record_stock_out(
+            product, roll, amount, purpose=purpose, reference=reference,
+            note=(request.POST.get("reason") or "").strip(), user=request.user,
+            contact=contact, company=company)
 
         return JsonResponse({
             "success": True,

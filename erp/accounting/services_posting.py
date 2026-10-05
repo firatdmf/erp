@@ -631,6 +631,7 @@ def _account_meanings():
         "5000": _g("What the goods sold cost when they were bought."),
         "5100": _g("Running costs: rent, wages, freight and the like."),
         "5110": _g("What winning customers costs: samples given away, fairs, catalogues."),
+        "5120": _g("Stock paid for and not there to sell: lost, damaged, or shorter on a re-measure."),
         "5150": _g("Small differences let go to bring a settled account to zero."),
         "5200": _g("A loss: a debt the book has given up on."),
         "5900": _g("Gains and losses from exchange rates moving."),
@@ -706,6 +707,7 @@ _CHART_NAMES = (
     gettext_noop("Dividends"), gettext_noop("Sales"), gettext_noop("Other Income"),
     gettext_noop("Cost of Goods Sold"), gettext_noop("Operating Expenses"),
     gettext_noop("Bad Debts Written Off"), gettext_noop("Foreign Exchange Gain/Loss"),
+    gettext_noop("Inventory Shrinkage"),
 )
 
 
@@ -757,6 +759,9 @@ def chart_of_accounts(book):
     feed(FX_GAIN_LOSS, _g("Payment at a typed rate — its gap to the published rate"))
     feed(COST_OF_GOODS_SOLD, _g("Stock leaving the warehouse"))
     feed(INVENTORY, _g("Stock leaving the warehouse"))
+    feed(INVENTORY_SHRINKAGE, _g("Stock lost, damaged or defective"))
+    feed(INVENTORY_SHRINKAGE, _g("Stock item re-measured"))
+    feed(INVENTORY, _g("Stock item re-measured"))
     feed(RETAINED_EARNINGS, _g("Closing a period"))
     feed("2000", _g("Moving credit balances out of receivables"))
 
@@ -812,9 +817,17 @@ def chart_of_accounts(book):
 # row as well would count every purchase twice. Stock that arrives with no
 # purchase behind it raises the shelves and not the ledger — which is the
 # gap the reconciliation reports, and the next job.
+#
+# One kind of adjustment posts too: an item re-measured, and the quantity it
+# was received at corrected to what it measures. The shelves
+# are valued by what is left on each item, so a correction moves that value
+# and nothing else would move 1300 with it. Every other adjustment is a note
+# on the timeline (a hold trimmed, an item moved between two products) or
+# is already carried by the purchase it corrects, and posts nothing.
 # ---------------------------------------------------------------------------
 COST_OF_GOODS_SOLD = "5000"
 MARKETING_EXPENSES = "5110"
+INVENTORY_SHRINKAGE = "5120"
 INVENTORY = "1300"
 
 
@@ -847,17 +860,26 @@ def lines_for_stock_movement(movement):
     """The two lines this stock movement implies, balanced.
 
     Out of the warehouse: the cost of what left becomes cost of goods sold,
-    or marketing expense when it left as a sample for a client.
+    marketing expense when it left as a sample for a client or was put on
+    display, or inventory shrinkage when it was lost, damaged or defective.
     Back in, when it is an order being unshipped or edited, the same cost
-    goes back on the shelf. Anything else — an arrival, a correction, a
-    transfer between two products — returns no lines; see the note above.
+    goes back on the shelf. An item corrected because the stock is not what
+    was recorded goes to inventory shrinkage, and comes back off it when the
+    item turns out to hold more. Anything else — an arrival, a transfer
+    between two products, a correction the purchase already carries —
+    returns no lines; see the note above.
     """
     kind = movement.movement_type
     is_return = kind == "in" and movement.order_id is not None
-    if kind != "out" and not is_return:
+    # The one adjustment whose quantity is signed on purpose: negative is
+    # stock gone, positive is stock found.
+    is_correction = (kind == "adjustment"
+                     and getattr(movement, "purpose", "") == "correction")
+    if kind != "out" and not is_return and not is_correction:
         return []
 
-    quantity = abs(Decimal(movement.quantity or 0))
+    signed = Decimal(movement.quantity or 0)
+    quantity = abs(signed)
     if quantity == ZERO:
         return []
     unit = stock_unit_cost(movement.stock_item, movement.product)
@@ -871,11 +893,27 @@ def lines_for_stock_movement(movement):
     if is_return:
         return [debit(INVENTORY, value, memo=memo),
                 credit(COST_OF_GOODS_SOLD, value, memo=memo)]
+    if is_correction:
+        if signed < ZERO:
+            return [debit(INVENTORY_SHRINKAGE, value, memo=memo),
+                    credit(INVENTORY, value, memo=memo)]
+        return [debit(INVENTORY, value, memo=memo),
+                credit(INVENTORY_SHRINKAGE, value, memo=memo)]
     # A sample given to a client was not sold: its cost is what it took to
     # win the client, so it goes to marketing rather than into the cost of
-    # the sales it sits beside.
-    expense = (MARKETING_EXPENSES if getattr(movement, "purpose", "") == "sample"
-               else COST_OF_GOODS_SOLD)
+    # the sales it sits beside. A piece cut for the showroom or a trade show
+    # is the same spending with nobody's name on it.
+    #
+    # Stock lost, damaged or defective was not sold either, and is not
+    # spending on anybody: it is shrinkage, on the line a re-measure's
+    # difference goes to.
+    purpose = getattr(movement, "purpose", "")
+    if purpose in ("sample", "display"):
+        expense = MARKETING_EXPENSES
+    elif purpose == "loss":
+        expense = INVENTORY_SHRINKAGE
+    else:
+        expense = COST_OF_GOODS_SOLD
     return [debit(expense, value, memo=memo),
             credit(INVENTORY, value, memo=memo)]
 

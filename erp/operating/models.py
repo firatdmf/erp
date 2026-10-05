@@ -2411,9 +2411,23 @@ class StockMovement(models.Model):
     # Blank is the old meaning — a sale or an unspecified stock-out, posted
     # as cost of goods sold. A sample given to a client is marketing, not
     # the cost of anything sold (services_posting.lines_for_stock_movement).
+    # So is a piece cut for the showroom or a trade show, which goes to
+    # nobody in particular.
+    #
+    # Stock that was there and is not there to sell any more — lost, damaged,
+    # defective — is a "loss": it left the item like any other stock-out, and
+    # its cost is inventory shrinkage rather than the cost of a sale.
+    #
+    # "correction" is the one purpose an ADJUSTMENT carries: the item was
+    # re-measured and the quantity it was RECEIVED at is corrected, so
+    # nothing left it at all. The difference is inventory shrinkage too, and
+    # its quantity is signed — negative is shorter, positive is longer.
     PURPOSE_CHOICES = [
         ("", "—"),
         ("sample", "Sample for a client"),
+        ("display", "Display — showroom or trade show"),
+        ("loss", "Lost, damaged or defective"),
+        ("correction", "Re-measured"),
     ]
     purpose = models.CharField(max_length=16, choices=PURPOSE_CHOICES,
                                blank=True, default="")
@@ -2449,6 +2463,37 @@ class StockMovement(models.Model):
         related_name="stock_movements",
         help_text="The reservation this deduction realised, when applicable.",
     )
+    # Who a sample went to, as a record rather than a name. `reference`
+    # still carries the name as it was typed that day, but a name cannot be
+    # joined on: these two are what let a client's page list every sample
+    # they have been given (operating.samples.samples_sent). One of the two,
+    # never both — the picker offers contacts and companies in one list.
+    #
+    # SET_NULL, like the order: deleting a CRM record must not delete the
+    # record that the stock left.
+    contact = models.ForeignKey(
+        Contact,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="stock_movements",
+        help_text="The contact a sample went to, when it went to a person.",
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="stock_movements",
+        help_text="The company a sample went to, when it went to a company.",
+    )
+    # The package a sample went out in, when several were put together and
+    # sent as one. A single cut made from the item's own edit box has none.
+    sample_package = models.ForeignKey(
+        "SamplePackage",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="movements",
+        help_text="The sample package this cut went out in, when it went in one.",
+    )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey(
         "auth.User",
@@ -2468,6 +2513,64 @@ class StockMovement(models.Model):
         return (f"{sign}{self.quantity} {self.product.unit_short}"
                 f" · {self.product.sku or self.product.name}"
                 f" · {self.created_at:%Y-%m-%d}")
+
+
+class SamplePackage(models.Model):
+    """Several samples put together and sent to one client in one go.
+
+    Not an order: nothing is billed and nothing is reserved. The package is
+    only what the pieces have in common — who they went to, when, and how
+    they travelled. Each piece is its own stock-out off its own item
+    (StockMovement.sample_package), which is where its quantity, its cost
+    and its ledger entry live, so a package adds nothing to the books that
+    its pieces had not already put there.
+
+    The stock leaves when the package is made, not when it is sent: the
+    cuts are taken off the rolls to put it together, and `status` only
+    follows the parcel afterwards.
+    """
+
+    STATUS_CHOICES = [
+        ("prepared", _("Prepared")),
+        ("sent", _("Sent")),
+        ("delivered", _("Delivered")),
+    ]
+
+    # One of the two, as on the pieces themselves.
+    contact = models.ForeignKey(
+        Contact, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="sample_packages",
+    )
+    company = models.ForeignKey(
+        Company, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="sample_packages",
+    )
+    date = models.DateField(default=timezone.localdate, db_index=True)
+    note = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="prepared")
+    # A Carrier.code, as an order stores it.
+    carrier = models.CharField(max_length=50, blank=True, default="")
+    tracking_number = models.CharField(max_length=100, blank=True, default="")
+    shipped_at = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="sample_packages",
+    )
+
+    class Meta:
+        ordering = ["-date", "-id"]
+
+    def __str__(self):
+        return self.number
+
+    @property
+    def number(self):
+        return f"SP-{self.pk:04d}" if self.pk else "SP"
+
+    @property
+    def carrier_name(self):
+        return Carrier.label_for(self.carrier)
 
 
 class OrderStockReservation(models.Model):

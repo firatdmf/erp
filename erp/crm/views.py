@@ -479,6 +479,10 @@ class ContactDetail(generic.DetailView):
             Order.objects.filter(contact=contact).order_by("-created_at")
         )[:25]
 
+        # ── Samples this contact has been given ───────────────
+        from operating.samples import sample_card_context
+        context.update(sample_card_context(contact=contact))
+
         # ── Ledger accounts across every book ─────────────────
         # One client can hold an account in more than one book — the
         # factory and the wholesaler trade with the same people — so
@@ -630,6 +634,12 @@ class CompanyDetail(generic.DetailView):
             Order.objects.filter(company=company)
             .order_by("-created_at")[:25]
         )
+
+        # ── Samples this company has been given ───────────────
+        # Its own and its people's: a sample handed to the buyer is a
+        # sample the company has.
+        from operating.samples import sample_card_context
+        context.update(sample_card_context(company=company))
 
         # ── Ledger accounts across every book ─────────────────
         # One client can hold an account in more than one book — the

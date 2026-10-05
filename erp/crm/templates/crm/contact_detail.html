@@ -608,6 +608,9 @@
               <button type="button" onclick="window.location.href='{% url 'marketing:quote_create' %}?contact={{ contact.id }}'">
                 <i class="fa fa-file-signature"></i>{% trans "Quote" %}
               </button>
+              <button type="button" onclick="document.getElementById('attachMenu').hidden = true; openSamplePackage();">
+                <i class="fa fa-scissors"></i>{% trans "Sample package" %}
+              </button>
             </div>
           </div>
         </div>
@@ -904,6 +907,9 @@
             {% endfor %}
           </div>
         </section>
+
+        <!-- SAMPLES SENT -->
+        {% include "crm/components/_samples_card.html" with show_contact=False client_type="contact" client_pk=contact.pk %}
 
         <!-- ACCOUNT HISTORY (every book, pickable) — not for sales reps -->
         {% if not is_sales_rep %}

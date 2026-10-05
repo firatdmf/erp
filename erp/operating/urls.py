@@ -1,6 +1,7 @@
 from django.urls import path, include
 from . import views
 from . import views_warehouse
+from . import views_samples
 from . import order_excel
 from . import picking_list
 from . import warehouse_label
@@ -63,6 +64,10 @@ urlpatterns = [
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/bulk-delete/", views_warehouse.WarehouseRollBulkDelete.as_view(), name="warehouse_roll_bulk_delete"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/<int:roll_pk>/edit/", views_warehouse.WarehouseRollEdit.as_view(), name="warehouse_roll_edit"),
     path("warehouses/<int:warehouse_pk>/movements/", views_warehouse.WarehouseMovements.as_view(), name="warehouse_movements"),
+    # Sample packages, made from a client's CRM page.
+    path("samples/rolls/", views_samples.sample_roll_search, name="sample_roll_search"),
+    path("samples/packages/create/", views_samples.sample_package_create, name="sample_package_create"),
+    path("samples/packages/<int:pk>/shipping/", views_samples.sample_package_shipping, name="sample_package_shipping"),
     path("orders/create/", views.create_web_order, name="create_web_order"),
     # Creating an order is a PAGE, like editing one. Book-scoped, because
     # every line that names no book of its own is filed under the book the

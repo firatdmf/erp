@@ -12,6 +12,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_ledger import JournalEntry
 from accounting.services_ledger import balance_sheet, ensure_chart
+from crm.models import Contact
 from operating.models import (StockMovement, Warehouse, WarehouseProduct,
                               WarehouseProductItem)
 
@@ -63,11 +64,14 @@ class SampleStockOut(TestCase):
 
     # ── the stock-out form ───────────────────────────────────────
     def test_a_sample_is_recorded_against_its_item_and_client(self):
+        georgiana = Contact.objects.create(name="Georgiana")
         r = self._post(amount="3", purpose="sample", stock_item_id=self.item.pk,
-                       reference="Georgiana", reason="for the new collection")
+                       client_type="contact", client_pk=georgiana.pk,
+                       reason="for the new collection")
         self.assertEqual(r.status_code, 200, r.content)
         mv = StockMovement.objects.get()
         self.assertEqual((mv.purpose, mv.stock_item, mv.reference), ("sample", self.item, "Georgiana"))
+        self.assertEqual(mv.contact, georgiana)
         self.assertEqual(mv.reason, "Sample for Georgiana — for the new collection")
         self.item.refresh_from_db(); self.product.refresh_from_db()
         self.assertEqual(self.item.quantity_remaining, Decimal("97"))
@@ -84,9 +88,24 @@ class SampleStockOut(TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertFalse(StockMovement.objects.exists())
 
+    def test_a_typed_name_is_not_a_client(self):
+        r = self._post(amount="3", purpose="sample", stock_item_id=self.item.pk,
+                       reference="Georgiana")
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(StockMovement.objects.exists())
+
     def test_an_unknown_purpose_is_refused(self):
         r = self._post(amount="3", purpose="gift", stock_item_id=self.item.pk)
         self.assertEqual(r.status_code, 400)
+
+    def test_any_stock_out_needs_the_item_it_came_from(self):
+        """The shelves are valued item by item: taken off the product alone,
+        the stock would leave the ledger and stay on every item."""
+        r = self._post(amount="5", reason="damaged")
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(StockMovement.objects.exists())
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.quantity, Decimal("100"))
 
     def test_the_item_picked_on_the_old_form_field_is_used(self):
         """The form sent the item as roll_id while the view read
@@ -101,7 +120,9 @@ class SampleStockOut(TestCase):
 
 class TakeOutLivesOnTheItem(TestCase):
     """Stock-out is recorded from the item's own pop-up, which speaks the
-    product's packaging — a box of curtain sets is not a roll of metres."""
+    product's packaging — a box of curtain sets is not a roll of metres.
+    It is asked for when the item's quantity is changed there, not laid out
+    beside it (test_roll_change_reason)."""
 
     def setUp(self):
         from operating.tests.test_stock_unit import _stock
@@ -129,7 +150,7 @@ class TakeOutLivesOnTheItem(TestCase):
     def test_the_pop_up_speaks_boxes_not_rolls(self):
         html = self._page()
         for phrase in ("Edit box", "(this box)", "(the whole box, as received)",
-                       "Take out of this box", "Delete box"):
+                       "Delete box"):
             self.assertIn(phrase, html)
         for phrase in ("Edit roll", "(this roll)", "Total length (m)", "Delete roll"):
             self.assertNotIn(phrase, html)
@@ -138,4 +159,4 @@ class TakeOutLivesOnTheItem(TestCase):
         html = self._page()
         self.assertNotIn('id="soOverlay"', html)
         self.assertNotIn("Record stock out", html)
-        self.assertIn('id="reOutPurpose"', html)
+        self.assertIn('id="reReason"', html)

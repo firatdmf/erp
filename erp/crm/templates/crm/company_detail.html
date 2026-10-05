@@ -649,6 +649,9 @@
           </div>
         </section>
 
+        <!-- SAMPLES SENT -->
+        {% include "crm/components/_samples_card.html" with show_contact=True client_type="company" client_pk=company.pk %}
+
         <!-- ACCOUNT HISTORY (every book, pickable) — not for sales reps -->
         {% if not is_sales_rep %}
         <section class="od-card">
@@ -736,6 +739,10 @@
               <i class="fa fa-file-signature"></i>
               <span>{% trans "Quote" %}</span>
             </a>
+            <button type="button" class="od-attach-btn attach-option-btn" onclick="openSamplePackage()">
+              <i class="fa fa-scissors"></i>
+              <span>{% trans "Sample package" %}</span>
+            </button>
           </div>
 
           <!-- Note Attach Section -->

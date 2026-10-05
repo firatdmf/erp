@@ -358,6 +358,56 @@
   .re-out h4 { margin: 0 0 10px; font: 700 12px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-700); }
   .re-out-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   @media (max-width: 480px) { .re-out-row { grid-template-columns: 1fr; } }
+  /* The client a sample went to is picked the way the order form picks its
+     customer (partials/create_order_form.html): type to search, results
+     drop over the form, and the pick becomes a chip whose × gives the
+     field back. Same class names, so the two read alike. */
+  .co-sup { position: relative; }
+  .co-sup-results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40; }
+  .co-autocomplete-results .customer-autocomplete-list {
+    list-style: none; margin: 0; padding: 4px; background: #fff;
+    border: 1px solid #DDE3EA; border-radius: 10px;
+    box-shadow: 0 10px 26px rgba(15,20,25,.13); max-height: 236px; overflow-y: auto;
+  }
+  .co-autocomplete-results .customer-ac-item,
+  .co-autocomplete-results .customer-ac-empty {
+    padding: 9px 10px; cursor: pointer; font: 600 13px var(--font-sans, sans-serif); color: #0F1419;
+    border-radius: 7px; display: flex; align-items: center; gap: 10px; margin: 0; transition: background .12s;
+  }
+  .co-autocomplete-results .customer-ac-item i { color: #147F74; font-size: 12px; }
+  .co-autocomplete-results .customer-ac-item:hover { background: #EFF6F5; }
+  .co-autocomplete-results .customer-ac-empty { cursor: default; color: #6B7280; justify-content: center; font-style: italic; font-weight: 500; }
+  .co-sup-chip { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 12px; border: 1px solid #BFE0DB; background: #EFF6F5; border-radius: 9px; font: 700 13.5px var(--font-sans, sans-serif); color: #0B5F60; }
+  .co-sup-chip[hidden] { display: none; }
+  .co-sup-chip i { color: #147F74; }
+  .co-sup-chip > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Drawn, not typed: a "×" glyph sits on the baseline, never centred. */
+  .co-sup-clear { flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 6px; cursor: pointer; background: transparent; color: #0B5F60; padding: 0; position: relative; font-size: 0; line-height: 0; }
+  .co-sup-clear::before, .co-sup-clear::after { content: ''; position: absolute; top: 50%; left: 50%; width: 11px; height: 1.8px; background: currentColor; border-radius: 2px; }
+  .co-sup-clear::before { transform: translate(-50%,-50%) rotate(45deg); }
+  .co-sup-clear::after { transform: translate(-50%,-50%) rotate(-45deg); }
+  .co-sup-clear:hover { background: #DCEBE9; }
+  /* The entry a quantity change will post, beside the form that causes it. */
+  .re-entry { padding: 14px; border: 1px solid #CFE3DF; border-radius: 10px; background: #F3FAF8; }
+  .re-entry h4 { margin: 0 0 10px; font: 700 12px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--nejum-teal-700); }
+  .re-entry table { width: 100%; border-collapse: collapse; font: 500 12.5px var(--font-sans); }
+  .re-entry td { padding: 5px 0; vertical-align: top; border-bottom: 1px dashed #CFE3DF; }
+  .re-entry td.side { width: 52px; font-weight: 700; color: var(--gray-600); }
+  .re-entry td.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 700; padding-left: 8px; }
+  .re-entry p { margin: 10px 0 0; font: 500 12px/1.45 var(--font-sans); color: var(--gray-600); }
+  @media (min-width: 761px) {
+    #reOverlay .so-card.re-wide { max-width: 800px; display: grid; grid-template-columns: minmax(0, 1fr) 330px; column-gap: 20px; }
+    #reOverlay .so-card.re-wide > * { grid-column: 1; }
+    #reOverlay .so-card.re-wide > .re-side { grid-column: 2; grid-row: 2 / span 12; align-self: start; }
+  }
+  @media (max-width: 760px) { .re-entry { margin-bottom: 14px; } }
+  /* With the side panel stacked under the form the box is taller than a
+     phone held sideways, or a short laptop window. It scrolls inside itself
+     at every width, so Save can always be reached — the phone-sized rule
+     below already did this, but only up to 600px. */
+  #reOverlay .so-card { max-height: calc(100vh - 24px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  /* A finger needs more than the 24px the chip's × is drawn at. */
+  @media (max-width: 600px) { .co-sup-chip { height: 44px; } .co-sup-clear { width: 36px; height: 36px; } }
   .so-input {
     width: 100%; padding: 9px 12px;
     background: white; border: 1px solid #E0E6EE; border-radius: 9px;
@@ -799,6 +849,12 @@
                           data-remaining="{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|stringformat:'.2f' }}{% else %}{{ r.quantity|default_if_none:0|stringformat:'.2f' }}{% endif %}"
                           data-lot="{{ r.lot_number|default:'' }}"
                           data-is-second="{% if r.is_second %}1{% else %}0{% endif %}"
+                          data-purchase="{{ r.purchase_number }}"
+                          {% if not is_sales_rep %}
+                          data-cost="{% if r.posting_cost is not None %}{{ r.posting_cost|stringformat:'.6f' }}{% endif %}"
+                          data-purchase-price="{% if r.purchase_price is not None %}{{ r.purchase_price|stringformat:'.6f' }}{% endif %}"
+                          data-purchase-currency="{{ r.purchase_currency }}"
+                          {% endif %}
                           {% comment %}Held metres and who holds them, so the edit box can
                           warn BEFORE saving that shortening this roll will trim
                           somebody's order down with it.{% endcomment %}
@@ -868,7 +924,7 @@
               </div>
             </div>
             <div class="mv-qty {{ m.movement_type }}">
-              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:"2g" }} {{ product.unit_short }}
+              {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% elif m.purpose == 'correction' %}{% if m.quantity > 0 %}+{% endif %}{% else %}±{% endif %}{{ m.quantity|floatformat:"2g" }} {{ product.unit_short }}
             </div>
           </div>
           {% endfor %}
@@ -1046,37 +1102,53 @@
         {% blocktrans with n=product.item_noun %}Imperfect {{ n }} — sold as-is, kept separate from first-quality stock counts.{% endblocktrans %}
       </small>
     </div>
-    {% comment %} Stock leaving this item is recorded here, on the item it
-       leaves from, rather than from the product header: the item is what the
-       cost comes from, and a sample has to name both it and the client. {% endcomment %}
-    <div class="re-out" id="reOut">
-      <h4>{% blocktrans with n=product.item_noun %}Take out of this {{ n }}{% endblocktrans %}</h4>
-      <div class="re-out-row">
-        <div class="so-fld">
-          <label>{% trans "Purpose" %}</label>
-          <select class="so-input" id="reOutPurpose" onchange="syncTakeOut()">
-            <option value="sample">{% trans "Sample for a client" %}</option>
-            <option value="">{% trans "Other — sold, used, damaged…" %}</option>
-          </select>
-        </div>
-        <div class="so-fld">
-          <label>{% trans "Quantity" %} ({{ product.unit_short }})</label>
-          <input class="so-input" type="number" step="0.01" min="0.01" id="reOutAmount" placeholder="0.00">
-        </div>
-      </div>
+    {% comment %} Everything about a changed quantity sits together beside the
+       form: why it changed on top, and under it the entry that answer makes.
+       The question and its consequence are read in one glance, and the form
+       on the left stays what it is on every other visit — a barcode, a
+       length, a lot number.
+
+       Shut until the number moves, because most visits have nothing to
+       answer. Once it moves there is always something to answer: a sample,
+       a loss, a re-measure and a supplier's short delivery all look the
+       same on the shelf and belong in different places in the ledger, and
+       the item is the only place that knows which it was. {% endcomment %}
+    <aside class="re-side" id="reSide" hidden>
+    <div class="re-out" id="reWhy" hidden>
+      <h4>{% trans "Why did it change?" %}
+        <span id="reWhyDelta" style="float:right; letter-spacing:0; text-transform:none; font-variant-numeric:tabular-nums;"></span>
+      </h4>
       <div class="so-fld">
-        <label id="reOutRefLabel">{% trans "Client" %} *</label>
-        <input class="so-input" type="text" id="reOutRef">
+        <label>{% trans "Reason" %} *</label>
+        <select class="so-input" id="reReason" onchange="syncRollReason()"></select>
+      </div>
+      <div class="so-fld" id="reReasonRefFld" style="display:none;">
+        <label>{% trans "Client" %} *</label>
+        <div class="co-sup" id="reClientBox">
+          <input class="so-input" type="text" id="reClientSearch" autocomplete="off"
+                 placeholder="{% trans 'Contact or company name...' %}" oninput="reClientSearch()">
+          <div id="reClientResults" class="co-autocomplete-results co-sup-results"></div>
+        </div>
+        <div id="reClientChip" class="co-sup-chip" hidden>
+          <i class="fa fa-user"></i>
+          <span></span>
+          <button type="button" class="co-sup-clear" title="{% trans 'Change customer' %}" onclick="reClearClient(true)">&times;</button>
+        </div>
       </div>
       <div class="so-fld">
         <label>{% trans "Note" %}</label>
-        <input class="so-input" type="text" id="reOutNote" placeholder="{% trans 'Optional' %}">
-        <small class="so-hint" id="reOutHint">{% trans "Its cost goes to marketing expenses, not to the cost of goods sold." %}</small>
+        <input class="so-input" type="text" id="reReasonNote" placeholder="{% trans 'Optional' %}">
       </div>
-      <button type="button" class="ord-btn danger" id="reOutSubmit" onclick="submitTakeOut()">
-        <i class="fa fa-arrow-up-from-bracket"></i> {% trans "Take out" %}
-      </button>
     </div>
+    {% comment %} The entry the change will make, drawn before it is made: both
+       sides, the amount, and in words what it does to the books. A loss
+       picked as a sample reads here as marketing expenses, which is the
+       moment to catch it. {% endcomment %}
+    <div class="re-entry" id="reEntry" hidden>
+      <h4>{% trans "What this will post" %}</h4>
+      <div id="reEntryBody"></div>
+    </div>
+    </aside>
     <div class="so-actions">
       <button type="button" class="ord-btn ghost" onclick="closeRE()">{% trans "Cancel" %}</button>
       <button type="button" class="ord-btn primary" id="reSubmit" onclick="submitRollEdit()">
@@ -1095,7 +1167,6 @@
     return (Number(n) || 0).toLocaleString(tr ? 'tr-TR' : 'en-US',
       { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
-  const stockOutUrl = "{% url 'operating:warehouse_stock_out' warehouse.pk product.pk %}";
   const rollDeleteUrlPattern = "{% url 'operating:warehouse_roll_delete' warehouse.pk product.pk 0 %}";
   const rollEditUrlPattern = "{% url 'operating:warehouse_roll_edit' warehouse.pk product.pk 0 %}";
   const rollBulkDeleteUrl = "{% url 'operating:warehouse_roll_bulk_delete' warehouse.pk product.pk %}";
@@ -1206,6 +1277,23 @@
     if(e.key==='Escape') closeRD();
   });
 
+  // A click on a dialog's backdrop closes it — but a browser also calls it a
+  // click on the backdrop when the mouse went DOWN inside the dialog and came
+  // up outside, which is what selecting the text in a field by dragging past
+  // the edge does. That drag closed the dialog and threw away what was in
+  // it. Only a press that started on the backdrop is allowed through to the
+  // overlays' own onclick.
+  (function () {
+    let pressedOn = null;
+    document.addEventListener('mousedown', function (e) { pressedOn = e.target; }, true);
+    document.addEventListener('click', function (e) {
+      const t = e.target;
+      if (t && t.classList && t.classList.contains('so-overlay') && pressedOn !== t) {
+        e.stopPropagation();
+      }
+    }, true);
+  })();
+
   // ── Roll edit ────────────────────────────────────────────────
   let _reRollId = null;
   let _reOut = 0;            // metres already gone — fixed while editing
@@ -1218,9 +1306,9 @@
   // box. Typing below the floor fills the bar red and shows 0 m left — the
   // same answer the server gives, without waiting for the round trip.
   //
-  // No "did you mean stock out?" offer here: this dialog corrects what was
-  // RECORDED about a roll, while a stock-out changes what is physically on
-  // it, and metres normally leave on an order anyway.
+  // The box does not say whether a smaller figure corrects what was RECORDED
+  // about the roll or records stock physically leaving it — the panel under
+  // it asks, as soon as the figure moves (syncRollWhy).
   function renderRollMetersHint() {
     const mInput = document.getElementById('reMeters');
     const hint = document.getElementById('reMetersHint');
@@ -1240,17 +1328,25 @@
     const floor = _reOut > 0 ? _reOut : 0.01;
     const invalid = raw !== '' && (!isFinite(typed) || typed < floor);
 
+    _reInvalid = invalid;
+    syncRollWhy(invalid || !hasTyped ? 0 : Math.round((typed - _reStoredTotal) * 100) / 100);
+    reSyncSave();
+
+    // The same typed figure means two different things, and the reason is
+    // what says which. Taken out (a sample, a display piece, a sale): the
+    // item was received at the length on record and the difference has now
+    // been used. Corrected (a loss, a re-measure, the supplier's doing): the
+    // received length itself becomes the typed one. Either way the same
+    // amount is left — only what is called "received" and "used" differs.
+    const changed = !invalid && !!_reWhyDir;
+    const why = changed ? reReasonPicked() : null;
+    const takeOut = !!(why && why.takeOut);
+    const received = takeOut ? _reStoredTotal : total;
+    const used = takeOut ? Math.round((_reOut + _reStoredTotal - total) * 100) / 100 : _reOut;
     const left = Math.max(0, Math.round((total - _reOut) * 100) / 100);
-    const pct = total > 0 ? Math.min(100, (_reOut / total) * 100) : 0;
+    const pct = received > 0 ? Math.min(100, (used / received) * 100) : 0;
     const colour = (invalid || pct >= 85) ? '#C0392B'
                  : (pct >= 50 ? '#D97706' : '#147F74');
-
-    const save = document.getElementById('reSubmit');
-    if (save) {
-      save.disabled = invalid;
-      save.style.opacity = invalid ? '0.45' : '';
-      save.style.cursor = invalid ? 'not-allowed' : '';
-    }
 
     // A length that no longer covers what orders are holding. Not a
     // refusal — the roll is the truth and the holds get trimmed to fit —
@@ -1293,19 +1389,35 @@
           '{% trans "Cannot be below" %} <b>' + pUnit(fmtNum(floor)) + '</b>' +
           (_reOut > 0 ? ' — {% blocktrans with n=product.item_noun %}that much has already gone out of this {{ n }}{% endblocktrans %}' : '') +
         '</div>';
-    } else if (_reOut > 0) {
-      hint.innerHTML = bar +
-        '<span style="color:' + colour + ';"><b>' + pUnit(fmtNum(_reOut)) + '</b> {% trans "used" %}</span>' +
-        ' · <b>' + pUnit(fmtNum(left)) + '</b> {% trans "left" %}' +
-        '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "As received, not what is left" %} · {% trans "min" %} ' +
-          '<b>' + pUnit(fmtNum(_reOut)) + '</b>' +
-        '</div>' + trimNote;
     } else {
-      hint.innerHTML = bar +
-        '<b>' + pUnit(fmtNum(total)) + '</b> · {% trans "none used" %}' +
-        '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "As received, not what is left" %}</div>' + trimNote;
+      const was = '<b>' + pUnit(fmtNum(_reStoredTotal)) + '</b>';
+      // The line under the figures: what the box is being read as.
+      let reading;
+      if (!changed) {
+        reading = '{% trans "As received, not what is left" %}';
+      } else if (!why) {
+        reading = '{% trans "Choose a reason below" %}';
+      } else if (takeOut) {
+        reading = '{% trans "Taken out now:" %} <b>' + pUnit(fmtNum(_reStoredTotal - total)) + '</b>' +
+                  ' · {% trans "Received quantity stays:" %} ' + was;
+      } else {
+        reading = '{% trans "Received quantity corrected, was:" %} ' + was;
+      }
+      if (_reOut > 0) reading += ' · {% trans "min" %} <b>' + pUnit(fmtNum(_reOut)) + '</b>';
+
+      let figures;
+      if (changed && !why) {
+        // Not yet known whether this corrects the item or takes from it,
+        // so neither "received" nor "used" can be claimed for it.
+        figures = was + ' → <b>' + pUnit(fmtNum(total)) + '</b>';
+      } else if (used > 0) {
+        figures = '<span style="color:' + colour + ';"><b>' + pUnit(fmtNum(used)) + '</b> {% trans "used" %}</span>' +
+                  ' · <b>' + pUnit(fmtNum(left)) + '</b> {% trans "left" %}';
+      } else {
+        figures = '<b>' + pUnit(fmtNum(received)) + '</b> · {% trans "none used" %}';
+      }
+      hint.innerHTML = bar + figures +
+        '<div style="margin-top:3px;color:var(--gray-500);">' + reading + '</div>' + trimNote;
     }
   }
 
@@ -1329,66 +1441,230 @@
     _reReservedFor = btn.dataset.reservedOrders || '';
     document.getElementById('reMeters').min = _reOut > 0 ? _reOut.toFixed(2) : '0.01';
 
+    // Which purchase a change could be the supplier's doing. Offered only
+    // while nothing has gone out of the item — the purchase form refuses a
+    // length change after that, and so does the server here.
+    _rePurchase = _reOut > 0 ? '' : (btn.dataset.purchase || '');
+    _reCost = btn.dataset.cost ? parseFloat(btn.dataset.cost) : null;
+    _rePurchasePrice = btn.dataset.purchasePrice ? parseFloat(btn.dataset.purchasePrice) : null;
+    _rePurchaseCurrency = btn.dataset.purchaseCurrency || '';
+    _reWhyDir = '';
+    reClearClient(false);
+    document.getElementById('reReasonNote').value = '';
+
     renderRollMetersHint();
-    _reLeft = left;
-    document.getElementById('reOutAmount').value = '';
-    document.getElementById('reOutAmount').max = left.toFixed(2);
-    document.getElementById('reOutRef').value = '';
-    document.getElementById('reOutNote').value = '';
-    document.getElementById('reOutPurpose').value = 'sample';
-    // Nothing left means nothing to take out.
-    document.getElementById('reOut').hidden = !(left > 0);
-    syncTakeOut();
     document.getElementById('reOverlay').classList.add('show');
   }
-  // A sample is valued at this item and has to say who it went to; any
-  // other stock-out takes a free note instead.
-  let _reLeft = 0;
-  function syncTakeOut() {
-    const sample = document.getElementById('reOutPurpose').value === 'sample';
-    document.getElementById('reOutRefLabel').textContent = sample
-      ? '{% trans "Client" %} *' : '{% trans "Reference" %}';
-    document.getElementById('reOutHint').hidden = !sample;
-  }
-  function submitTakeOut() {
-    if (!_reRollId) return;
-    const amount = parseFloat((document.getElementById('reOutAmount').value || '').replace(',', '.'));
-    const purpose = document.getElementById('reOutPurpose').value;
-    const ref = document.getElementById('reOutRef').value.trim();
-    if (!(amount > 0)) { alert('{% trans "Enter how much is taken out." %}'); return; }
-    if (amount > _reLeft + 1e-9) {
-      alert('{% trans "Only this much is left:" %} ' + pUnit(fmtNum(_reLeft))); return;
-    }
-    if (purpose === 'sample' && !ref) { alert('{% trans "Name the client the sample went to." %}'); return; }
-    const btn = document.getElementById('reOutSubmit');
-    const orig = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
-    const fd = new FormData();
-    fd.append('stock_item_id', _reRollId);
-    fd.append('amount', amount.toFixed(2));
-    fd.append('purpose', purpose);
-    fd.append('reference', ref);
-    fd.append('reason', document.getElementById('reOutNote').value.trim());
-    fetch(stockOutUrl, {
-      method: 'POST', body: fd, credentials: 'same-origin',
-      headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
-    }).then(r => r.json()).then(data => {
-      btn.disabled = false; btn.innerHTML = orig;
-      if (!data.success) { alert(data.error || '{% trans "Failed" %}'); return; }
-      const trimmed = data.reservations_trimmed || [];
-      if (trimmed.length) {
-        alert('{% blocktrans with n=product.item_noun %}Reserved amounts were trimmed to fit this {{ n }}:{% endblocktrans %}\n\n' +
-              trimmed.map(function(t){
-                return '• ' + t.label + ': ' + pUnit(fmtNum(t.was)) + ' → ' + pUnit(fmtNum(t.now));
-              }).join('\n'));
-      }
-      closeRE();
-      window.location.reload();
-    }).catch(() => {
-      btn.disabled = false; btn.innerHTML = orig;
-      alert('{% trans "Network error" %}');
+
+  // ── Why the quantity changed ─────────────────────────────────
+  // Each reason is offered for the direction it can happen in: stock is
+  // taken out or lost only downwards, found only upwards, and a supplier
+  // can have delivered either more or less than they billed.
+  let _rePurchase = '';      // the purchase this item arrived on, if one can be corrected
+  let _reWhyDir = '';        // 'down' / 'up' while the panel is open, '' while shut
+  let _reDelta = 0;          // how far the typed figure is from the one on record
+  let _reInvalid = false;    // the typed figure is one the server would refuse
+  // What the entry is valued at. All three stay empty for a sales rep, who
+  // is shown the accounts and not the amounts.
+  let _reCost = null;
+  let _rePurchasePrice = null;
+  let _rePurchaseCurrency = '';
+  const RE_COST_SIGN = "{{ cost_sign|escapejs }}";
+  const RE_SHOW_AMOUNTS = {% if is_sales_rep %}false{% else %}true{% endif %};
+  const RE_ACC = {
+    inventory: '1300 {% trans "Inventory" %}',
+    marketing: '5110 {% trans "Marketing Expenses" %}',
+    shrinkage: '5120 {% trans "Inventory Shrinkage" %}',
+    supplier:  '{% trans "The supplier account" %}',
+  };
+  // dr/cr are the two sides when the figure goes DOWN; a reason that also
+  // runs upwards posts the same two accounts the other way round.
+  // takeOut marks stock leaving an item whose received quantity stays as it
+  // was; the rest correct the received quantity itself.
+  const RE_REASONS = [
+    { value: 'sample', dir: 'down', takeOut: true, needsClient: true, dr: 'marketing', cr: 'inventory',
+      label: '{% trans "Sample for a client" %}',
+      hint: '{% trans "Its cost goes to marketing expenses, not to the cost of goods sold." %}' },
+    { value: 'display', dir: 'down', takeOut: true, dr: 'marketing', cr: 'inventory',
+      label: '{% trans "Display — showroom or trade show" %}',
+      hint: '{% trans "Its cost goes to marketing expenses. Nobody is billed for it." %}' },
+    // No "sold": goods sold leave on an order, which posts their cost when
+    // it ships. Offering it here too would put cost in 5000 with no revenue.
+    { value: 'loss', dir: 'down', takeOut: true, dr: 'shrinkage', cr: 'inventory',
+      label: '{% trans "Lost, damaged or defective" %}',
+      hint: '{% trans "Its cost goes to inventory shrinkage. What the supplier is owed stays as it is." %}' },
+    // Not stock leaving: the item never held what was recorded, so the
+    // received quantity itself is corrected — in either direction. Two
+    // answers to one question, who bears the difference, and they read as a
+    // pair. The supplier's comes first: where the item is on a purchase and
+    // untouched it is the usual answer, and it is not offered otherwise.
+    { value: 'supplier', dir: 'any', needsPurchase: true, dr: 'supplier', cr: 'inventory',
+      label: '{% trans "Re-measured — the supplier corrects the invoice" %}',
+      hint: '{% trans "Nothing left the item: the quantity it was received at is corrected. The purchase is corrected by the same amount, and the supplier account follows it — what is owed to them changes. Purchase:" %}' },
+    { value: 'correction', dir: 'any', dr: 'shrinkage', cr: 'inventory',
+      label: '{% trans "Re-measured — we absorb the difference" %}',
+      hint: '{% trans "Nothing left the item: the quantity it was received at is corrected. The difference goes to inventory shrinkage, or comes back off it when there is more. The purchase and the supplier account stay as they are." %}' },
+  ];
+  function reReasonsFor(dir) {
+    return RE_REASONS.filter(function (r) {
+      return (r.dir === dir || r.dir === 'any') && (!r.needsPurchase || _rePurchase);
     });
+  }
+  // Called on every keystroke in the quantity box with how far the typed
+  // figure is from the one on record. Zero shuts the panel; anything else
+  // opens it, and the choice already made survives further typing as long
+  // as the change still goes the same way.
+  function syncRollWhy(delta) {
+    const panel = document.getElementById('reWhy');
+    const dir = delta < 0 ? 'down' : (delta > 0 ? 'up' : '');
+    _reDelta = delta;
+    panel.hidden = !dir;
+    if (!dir) { _reWhyDir = ''; renderRollEntry(); return; }
+    document.getElementById('reWhyDelta').textContent =
+      (delta > 0 ? '+' : '−') + pUnit(fmtNum(Math.abs(delta)));
+    if (dir === _reWhyDir) { renderRollEntry(); return; }
+    _reWhyDir = dir;
+    const sel = document.getElementById('reReason');
+    sel.innerHTML = '';
+    const blank = document.createElement('option');
+    blank.value = ''; blank.textContent = '{% trans "Choose a reason…" %}';
+    sel.appendChild(blank);
+    reReasonsFor(dir).forEach(function (r) {
+      const o = document.createElement('option');
+      o.value = r.value; o.textContent = r.label;
+      sel.appendChild(o);
+    });
+    syncRollReason();
+  }
+  function reReasonPicked() {
+    const value = document.getElementById('reReason').value;
+    return reReasonsFor(_reWhyDir).find(function (r) { return r.value === value; }) || null;
+  }
+  function syncRollReason() {
+    const r = reReasonPicked();
+    document.getElementById('reReasonRefFld').style.display = (r && r.needsClient) ? '' : 'none';
+    // The hint under the quantity reads the figure the way this reason
+    // does, and redrawing it redraws the entry and Save with it.
+    renderRollMetersHint();
+  }
+  // Save stays shut until the change is settled: a figure the server would
+  // take, and — once the figure has moved — a reason, with the client a
+  // sample went to. Shut here rather than refused after the click, so the
+  // box never looks finished while it is not.
+  function reSyncSave() {
+    const r = _reWhyDir ? reReasonPicked() : null;
+    const unsettled = !!_reWhyDir && (!r || (r.needsClient && !_reClient));
+    const blocked = !!(_reInvalid || unsettled);
+    const save = document.getElementById('reSubmit');
+    if (!save) return;
+    save.disabled = blocked;
+    save.style.opacity = blocked ? '0.45' : '';
+    save.style.cursor = blocked ? 'not-allowed' : '';
+  }
+  // ── The client a sample went to ──────────────────────────────
+  // The order form's picker: the same search (crm:customer_autocomplete),
+  // the same list, the same chip. Only a record the CRM has can be picked —
+  // the sample is filed against it and shows on that client's page — so a
+  // name it does not know is not taken as typed and is not created here.
+  const reClientUrl = "{% url 'crm:customer_autocomplete' %}";
+  let _reClient = null;       // { type, pk, name } once picked
+  let _reClientSeq = 0;       // drops a slow answer to an older keystroke
+  let _reClientTimer = null;
+  function reClientSearch() {
+    const q = document.getElementById('reClientSearch').value.trim();
+    const results = document.getElementById('reClientResults');
+    clearTimeout(_reClientTimer);
+    const mine = ++_reClientSeq;
+    if (!q) { results.innerHTML = ''; return; }
+    _reClientTimer = setTimeout(function () {
+      fetch(reClientUrl + '?customer=' + encodeURIComponent(q),
+            { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          if (mine !== _reClientSeq) return;
+          results.innerHTML = html;
+          // The list offers to create a customer, which this box does not
+          // do: the row is taken out, and what is left says nobody matched.
+          const create = results.querySelector('.customer-ac-create');
+          if (create) create.remove();
+        }).catch(function () {});
+    }, 300);
+  }
+  function rePickClient(type, pk, name) {
+    if (!pk || !name) return;
+    _reClientSeq++;
+    _reClient = { type: type || '', pk: pk || '', name: name };
+    const chip = document.getElementById('reClientChip');
+    chip.querySelector('i').className = 'fa ' + (type === 'company' ? 'fa-briefcase' : 'fa-user');
+    chip.querySelector('span').textContent = name;
+    chip.hidden = false;
+    document.getElementById('reClientBox').hidden = true;
+    document.getElementById('reClientResults').innerHTML = '';
+    reSyncSave();
+  }
+  function reClearClient(focus) {
+    _reClientSeq++;
+    clearTimeout(_reClientTimer);
+    _reClient = null;
+    const input = document.getElementById('reClientSearch');
+    input.value = '';
+    document.getElementById('reClientResults').innerHTML = '';
+    document.getElementById('reClientChip').hidden = true;
+    document.getElementById('reClientBox').hidden = false;
+    reSyncSave();
+    if (focus) input.focus();
+  }
+  // One listener for every row the search returns: the rows carry their
+  // record in data attributes, so nothing is interpolated into a handler.
+  document.getElementById('reClientResults').addEventListener('click', function (e) {
+    const item = e.target.closest('.customer-ac-item');
+    if (!item) return;
+    rePickClient(item.dataset.type, item.dataset.pk, item.dataset.name);
+  });
+  // The list shuts when the click lands anywhere else in the box.
+  document.getElementById('reOverlay').addEventListener('click', function (e) {
+    if (!e.target.closest('#reClientBox')) document.getElementById('reClientResults').innerHTML = '';
+  });
+
+  // Draws the entry beside the form: both sides, the amount, and in words
+  // what it does — before anything is saved, so a loss picked as a sale, or
+  // the other way round, is caught here and not in the ledger.
+  function renderRollEntry() {
+    const box = document.getElementById('reEntry');
+    const side = document.getElementById('reSide');
+    const card = side.parentNode;
+    side.hidden = !_reWhyDir;
+    box.hidden = !_reWhyDir;
+    if (card && card.classList) card.classList.toggle('re-wide', !!_reWhyDir);
+    if (!_reWhyDir) return;
+    const body = document.getElementById('reEntryBody');
+    const r = reReasonPicked();
+    if (!r) {
+      body.innerHTML = '<p style="margin:0;">{% trans "Choose a reason to see where it goes." %}</p>';
+      return;
+    }
+    // Upwards, a reason that runs both ways swaps its two sides.
+    const flip = r.dir === 'any' && _reWhyDir === 'up';
+    const dr = RE_ACC[flip ? r.cr : r.dr], cr = RE_ACC[flip ? r.dr : r.cr];
+    const qty = Math.abs(_reDelta);
+    let amount = '', uncosted = false;
+    if (r.value === 'supplier') {
+      if (_rePurchasePrice != null) amount = fmtNum(qty * _rePurchasePrice) + ' ' + _rePurchaseCurrency;
+    } else if (_reCost != null) {
+      amount = RE_COST_SIGN + fmtNum(qty * _reCost);
+    } else if (RE_SHOW_AMOUNTS) {
+      uncosted = true;
+    }
+    if (uncosted) {
+      body.innerHTML = '<p style="margin:0;">{% trans "This item has no cost on record, so the stock changes and nothing is posted." %}</p>';
+      return;
+    }
+    body.innerHTML =
+      '<table>' +
+        '<tr><td class="side">{% trans "Debit" %}</td><td>' + dr + '</td><td class="amt">' + amount + '</td></tr>' +
+        '<tr><td class="side">{% trans "Credit" %}</td><td>' + cr + '</td><td class="amt">' + amount + '</td></tr>' +
+      '</table>' +
+      '<p>' + r.hint + (r.needsPurchase ? ' <b>' + _rePurchase + '</b>' : '') + '</p>';
   }
 
   function closeRE() {
@@ -1398,6 +1674,11 @@
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeRE(); });
   function submitRollEdit() {
     if (!_reRollId) return;
+    const why = _reWhyDir ? reReasonPicked() : null;
+    const client = _reClient;
+    // Save is shut while either of these holds (reSyncSave); this is for
+    // the Enter key and anything else that gets here without the button.
+    if (_reWhyDir && (!why || (why.needsClient && !client))) return;
     const btn = document.getElementById('reSubmit');
     const orig = btn.innerHTML;
     btn.disabled = true;
@@ -1408,6 +1689,14 @@
     fd.append('quantity', document.getElementById('reMeters').value || '');
     fd.append('lot_number', document.getElementById('reLot').value || '');
     if (document.getElementById('reIsSecond').checked) fd.append('is_second', '1');
+    if (why) {
+      fd.append('change_reason', why.value);
+      if (why.needsClient) {
+        fd.append('client_type', client.type);
+        fd.append('client_pk', client.pk);
+      }
+      fd.append('note', document.getElementById('reReasonNote').value.trim());
+    }
     fetch(url, {
       method: 'POST', body: fd, credentials: 'same-origin',
       headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }

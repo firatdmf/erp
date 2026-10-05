@@ -1,0 +1,447 @@
+{% load i18n %}
+{% comment %}
+  Samples this client has been given — what, how much and when — so whoever
+  talks to them next knows what is already on their desk. Read off the stock
+  movements that sent them (operating.samples); a company's list includes
+  what went to its people, and names them.
+
+  Several pieces sent together are a sample package, made here: each piece
+  is cut off its own stock item the moment the package is saved, and the
+  package only adds what they share — the date, a note, and how the parcel
+  travelled. A single cut made from an item's own edit box shows as a row
+  of its own.
+
+  Expects: sample_history, samples, sample_carriers, sample_statuses,
+           client_type ("contact" / "company"), client_pk,
+           show_contact (True on a company's page).
+{% endcomment %}
+<style>
+  .smp-list { display: flex; flex-direction: column; gap: 8px; }
+  .smp-row {
+    display: flex; align-items: flex-start; gap: 12px; padding: 11px 12px;
+    border: 1px solid #E5E7EB; border-radius: 10px; background: #fff;
+    text-decoration: none; color: inherit; transition: border-color .12s, background .12s;
+  }
+  a.smp-row:hover { border-color: #BFE0DB; background: #F3FAF8; }
+  .smp-what { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .smp-name { font: 700 13px var(--font-sans); color: #0F1419; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .smp-meta { font: 500 11px var(--font-sans); color: var(--gray-500); }
+  .smp-meta .mono { font-family: var(--font-mono); }
+  .smp-note { font: 500 11.5px var(--font-sans); color: var(--gray-600); font-style: italic; }
+  .smp-qty { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .smp-qty span { font-weight: 500; color: var(--gray-500); font-size: 11px; }
+  .smp-new { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid #BFE0DB; border-radius: 8px; background: #EFF6F5; color: #0B5F60; font: 700 12px var(--font-sans); cursor: pointer; }
+  .smp-new:hover { background: #DCEBE9; }
+  /* A package: its pieces fold away under one line. */
+  .smp-pkg { border: 1px solid #D5E3E0; border-radius: 10px; background: #F8FBFA; }
+  .smp-pkg > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 11px 12px; cursor: pointer; }
+  .smp-pkg > summary::-webkit-details-marker { display: none; }
+  .smp-pkg-body { display: flex; flex-direction: column; gap: 6px; padding: 0 10px 10px; }
+  .smp-pkg-body .smp-row { padding: 9px 10px; }
+  .smp-pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font: 700 10.5px var(--font-sans); letter-spacing: .03em; text-transform: uppercase; }
+  .smp-pill.prepared { background: #FEF3C7; color: #8B5A00; }
+  .smp-pill.sent { background: #DBEAFE; color: #1E40AF; }
+  .smp-pill.delivered { background: #DCFCE7; color: #166534; }
+  .smp-ship { border: 0; background: transparent; color: var(--nejum-teal-700, #147F74); font: 700 11.5px var(--font-sans); cursor: pointer; padding: 4px 6px; border-radius: 6px; white-space: nowrap; }
+  .smp-ship:hover { background: #E6F4F1; }
+  /* The two dialogs. */
+  .smp-overlay { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; background: rgba(15,23,31,.55); backdrop-filter: blur(4px); padding: 16px; }
+  .smp-overlay.show { display: flex; }
+  .smp-dialog { background: #fff; border-radius: 14px; padding: 22px 24px; width: 100%; max-width: 620px; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+  .smp-dialog.narrow { max-width: 420px; }
+  .smp-dialog h3 { margin: 0 0 14px; font: 800 16px var(--font-sans); color: #0F1419; }
+  .smp-fld { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .smp-fld label { font: 700 11px var(--font-sans); letter-spacing: .05em; text-transform: uppercase; color: var(--gray-600); }
+  .smp-input { height: 38px; padding: 0 10px; border: 1px solid #DDE3EA; border-radius: 9px; font: 500 13.5px var(--font-sans); color: #0F1419; background: #fff; width: 100%; box-sizing: border-box; }
+  .smp-input:focus { outline: none; border-color: #147F74; box-shadow: 0 0 0 3px rgba(20,127,116,.12); }
+  .smp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 520px) { .smp-grid { grid-template-columns: 1fr; } }
+  .smp-search { position: relative; }
+  .smp-results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; background: #fff; border: 1px solid #DDE3EA; border-radius: 10px; box-shadow: 0 10px 26px rgba(15,20,25,.13); max-height: 240px; overflow-y: auto; padding: 4px; }
+  .smp-results:empty { display: none; }
+  .smp-result { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+  .smp-result:hover { background: #EFF6F5; }
+  .smp-result.none { cursor: default; color: var(--gray-500); font: italic 500 12.5px var(--font-sans); justify-content: center; }
+  .smp-result.none:hover { background: transparent; }
+  .smp-lines { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .smp-line { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #E5E7EB; border-radius: 9px; }
+  .smp-line input { width: 96px; flex: none; text-align: right; }
+  .smp-line.bad input { border-color: #C0392B; }
+  .smp-x { flex: none; width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--gray-500); cursor: pointer; font-size: 14px; }
+  .smp-x:hover { background: #FEE2E2; color: #B91C1C; }
+  .smp-empty { padding: 12px; border: 1px dashed #DDE3EA; border-radius: 9px; text-align: center; color: var(--gray-500); font: 500 12.5px var(--font-sans); margin-bottom: 12px; }
+  .smp-posts { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #CFE3DF; border-radius: 9px; background: #F3FAF8; font: 500 12px/1.45 var(--font-sans); color: var(--gray-600); }
+  .smp-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+  .smp-btn { height: 38px; padding: 0 16px; border-radius: 9px; border: 1px solid #DDE3EA; background: #fff; font: 700 13px var(--font-sans); color: #0F1419; cursor: pointer; }
+  .smp-btn.primary { border-color: #147F74; background: #147F74; color: #fff; }
+  .smp-btn:disabled { opacity: .45; cursor: not-allowed; }
+  /* On a phone: the dialog rises from the bottom edge, fields are tall
+     enough for a finger, and their text is 16px — anything smaller makes
+     iOS zoom the page in on every tap into a field. */
+  @media (max-width: 600px) {
+    .smp-overlay { align-items: flex-end; padding: 0; }
+    .smp-dialog, .smp-dialog.narrow { max-width: 100%; max-height: 92vh; padding: 16px; border-radius: 14px 14px 0 0; }
+    .smp-input { height: 44px; font-size: 16px; }
+    .smp-line { flex-wrap: wrap; }
+    .smp-line .smp-what { flex-basis: 100%; }
+    .smp-line input { flex: 1; width: auto; }
+    .smp-x { width: 40px; height: 40px; }
+    .smp-result { padding: 11px 10px; }
+    .smp-actions { flex-direction: column-reverse; }
+    .smp-btn { height: 46px; width: 100%; }
+    .smp-new { padding: 9px 12px; }
+    .smp-ship { padding: 9px 8px; }
+    .smp-pkg > summary { flex-wrap: wrap; }
+  }
+</style>
+
+<section class="od-card" id="samplesCard">
+  <div class="od-card-h">
+    <i class="fa fa-scissors card-ico"></i>
+    <h3>{% trans "Samples sent" %}</h3>
+    <span class="od-card-sub">{{ samples|length }}</span>
+    <button type="button" class="smp-new" onclick="openSamplePackage()">
+      <i class="fa fa-plus"></i>{% trans "New sample package" %}
+    </button>
+  </div>
+  <div class="smp-list">
+    {% for entry in sample_history %}
+      {% if entry.package %}
+        {% with p=entry.package %}
+        <details class="smp-pkg">
+          <summary>
+            <div class="smp-what">
+              <div class="smp-name">{{ p.number }} · {{ entry.items|length }} {% blocktrans count counter=entry.items|length %}piece{% plural %}pieces{% endblocktrans %}</div>
+              <div class="smp-meta">
+                {{ p.date|date:"M d, Y" }}
+                {% if p.carrier %} · {{ p.carrier_name }}{% endif %}
+                {% if p.tracking_number %} · <span class="mono">{{ p.tracking_number }}</span>{% endif %}
+              </div>
+              {% if p.note %}<div class="smp-note">{{ p.note }}</div>{% endif %}
+            </div>
+            <span class="smp-pill {{ p.status }}">{{ p.get_status_display }}</span>
+            <button type="button" class="smp-ship"
+                    data-pk="{{ p.pk }}" data-number="{{ p.number }}" data-carrier="{{ p.carrier_name }}"
+                    data-tracking="{{ p.tracking_number }}" data-status="{{ p.status }}"
+                    onclick="event.preventDefault(); event.stopPropagation(); openSampleShipping(this);">
+              <i class="fa fa-truck"></i> {% trans "Shipping" %}
+            </button>
+          </summary>
+          <div class="smp-pkg-body">
+            {% for s in entry.items %}
+              <a class="smp-row" href="{% url 'operating:warehouse_product_detail' s.product.warehouse_id s.product_id %}">
+                <div class="smp-what">
+                  <div class="smp-name">{{ s.product.name|default:s.product.sku }}</div>
+                  <div class="smp-meta">
+                    {% if s.product.sku %}<span class="mono">{{ s.product.sku }}</span>{% endif %}
+                    {% if s.stock_item and s.stock_item.barcode %} · <span class="mono">{{ s.stock_item.barcode }}</span>{% endif %}
+                    {% if show_contact and s.contact %} · {{ s.contact.name }}{% endif %}
+                  </div>
+                </div>
+                <div class="smp-qty">{{ s.quantity|floatformat:"2g" }} <span>{{ s.product.unit_short }}</span></div>
+              </a>
+            {% endfor %}
+          </div>
+        </details>
+        {% endwith %}
+      {% else %}
+        {% for s in entry.items %}
+          <a class="smp-row" href="{% url 'operating:warehouse_product_detail' s.product.warehouse_id s.product_id %}">
+            <div class="smp-what">
+              <div class="smp-name">{{ s.product.name|default:s.product.sku }}</div>
+              <div class="smp-meta">
+                {{ s.created_at|date:"M d, Y" }}
+                {% if s.product.sku %} · <span class="mono">{{ s.product.sku }}</span>{% endif %}
+                {% if s.stock_item and s.stock_item.barcode %} · <span class="mono">{{ s.stock_item.barcode }}</span>{% endif %}
+                {% if show_contact and s.contact %} · {{ s.contact.name }}{% endif %}
+              </div>
+              {% if s.sample_note %}<div class="smp-note">{{ s.sample_note }}</div>{% endif %}
+            </div>
+            <div class="smp-qty">{{ s.quantity|floatformat:"2g" }} <span>{{ s.product.unit_short }}</span></div>
+          </a>
+        {% endfor %}
+      {% endif %}
+    {% empty %}
+      <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "No samples sent yet." %}</p>
+    {% endfor %}
+  </div>
+</section>
+
+<datalist id="smpCarriers">
+  {% for code, name in sample_carriers %}<option value="{{ name }}"></option>{% endfor %}
+</datalist>
+
+<!-- New sample package -->
+<div class="smp-overlay" id="smpOverlay">
+  <div class="smp-dialog">
+    <h3><i class="fa fa-scissors" style="color:#147F74; margin-right:8px;"></i>{% trans "New sample package" %}</h3>
+    <div class="smp-fld">
+      <label>{% trans "Add an item" %}</label>
+      <div class="smp-search">
+        <input class="smp-input" type="text" id="smpSearch" autocomplete="off"
+               placeholder="{% trans 'Scan or type a barcode, SKU or product name' %}">
+        <div class="smp-results" id="smpResults"></div>
+      </div>
+    </div>
+    <div class="smp-empty" id="smpEmpty">{% trans "Nothing in the package yet." %}</div>
+    <div class="smp-lines" id="smpLines"></div>
+    <div class="smp-posts">
+      {% trans "Saving cuts each piece off its item now. Its cost goes to 5110 Marketing Expenses, out of 1300 Inventory." %}
+    </div>
+    <div class="smp-grid">
+      <div class="smp-fld">
+        <label>{% trans "Date" %}</label>
+        <input class="smp-input" type="date" id="smpDate" value="{% now 'Y-m-d' %}">
+      </div>
+      <div class="smp-fld">
+        <label>{% trans "Note" %}</label>
+        <input class="smp-input" type="text" id="smpNote" maxlength="255" placeholder="{% trans 'Optional' %}">
+      </div>
+      <div class="smp-fld">
+        <label>{% trans "Carrier" %}</label>
+        <input class="smp-input" type="text" id="smpCarrier" list="smpCarriers" maxlength="100" placeholder="{% trans 'Optional' %}">
+      </div>
+      <div class="smp-fld">
+        <label>{% trans "Tracking number" %}</label>
+        <input class="smp-input" type="text" id="smpTracking" maxlength="100" placeholder="{% trans 'Optional' %}">
+      </div>
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; font: 600 13px var(--font-sans); cursor:pointer;">
+      <input type="checkbox" id="smpSent"> {% trans "Already sent" %}
+    </label>
+    <div class="smp-actions">
+      <button type="button" class="smp-btn" onclick="closeSamplePackage()">{% trans "Cancel" %}</button>
+      <button type="button" class="smp-btn primary" id="smpSave" onclick="saveSamplePackage()" disabled>{% trans "Save" %}</button>
+    </div>
+  </div>
+</div>
+
+<!-- A package's shipping -->
+<div class="smp-overlay" id="smpShipOverlay">
+  <div class="smp-dialog narrow">
+    <h3><i class="fa fa-truck" style="color:#147F74; margin-right:8px;"></i><span id="smpShipTitle"></span></h3>
+    <div class="smp-fld">
+      <label>{% trans "Status" %}</label>
+      <select class="smp-input" id="smpShipStatus">
+        {% for value, label in sample_statuses %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="smp-fld">
+      <label>{% trans "Carrier" %}</label>
+      <input class="smp-input" type="text" id="smpShipCarrier" list="smpCarriers" maxlength="100">
+    </div>
+    <div class="smp-fld">
+      <label>{% trans "Tracking number" %}</label>
+      <input class="smp-input" type="text" id="smpShipTracking" maxlength="100">
+    </div>
+    <div class="smp-actions">
+      <button type="button" class="smp-btn" onclick="closeSampleShipping()">{% trans "Cancel" %}</button>
+      <button type="button" class="smp-btn primary" id="smpShipSave" onclick="saveSampleShipping()">{% trans "Save" %}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const SEARCH_URL = "{% url 'operating:sample_roll_search' %}";
+  const CREATE_URL = "{% url 'operating:sample_package_create' %}";
+  const SHIPPING_URL = "{% url 'operating:sample_package_shipping' 0 %}";
+  const CLIENT = { type: "{{ client_type|escapejs }}", pk: "{{ client_pk|escapejs }}" };
+  const CSRF = "{{ csrf_token }}";
+  const T = {
+    none: "{% trans 'No item in stock matches.' %}",
+    left: "{% trans 'left' %}",
+    failed: "{% trans 'Failed' %}",
+    network: "{% trans 'Network error' %}",
+  };
+  const $ = function (id) { return document.getElementById(id); };
+  const num = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
+
+  // What is in the package: one line per stock item, in the order added.
+  let lines = [];
+  let found = [];        // the rolls the last search returned
+  let seq = 0, timer = null;
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  // ── Searching for an item ──
+  function search() {
+    const q = $('smpSearch').value.trim();
+    clearTimeout(timer);
+    const mine = ++seq;
+    if (q.length < 2) { found = []; $('smpResults').innerHTML = ''; return; }
+    timer = setTimeout(function () {
+      fetch(SEARCH_URL + '?q=' + encodeURIComponent(q),
+            { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (mine !== seq) return;
+          // An item already in the package is not offered twice.
+          found = (d.rolls || []).filter(function (r) {
+            return !lines.some(function (l) { return l.id === r.id; });
+          });
+          drawResults();
+        }).catch(function () {});
+    }, 250);
+  }
+  function drawResults() {
+    const box = $('smpResults');
+    box.innerHTML = '';
+    if (!found.length) { box.appendChild(el('div', 'smp-result none', T.none)); return; }
+    found.forEach(function (r) {
+      const row = el('div', 'smp-result');
+      const what = el('div', 'smp-what');
+      what.appendChild(el('div', 'smp-name', r.product));
+      what.appendChild(el('div', 'smp-meta',
+        [r.sku, r.barcode, r.warehouse].filter(Boolean).join(' · ')));
+      row.appendChild(what);
+      const qty = el('div', 'smp-qty', num(r.left) + ' ');
+      qty.appendChild(el('span', '', r.unit + ' ' + T.left));
+      row.appendChild(qty);
+      row.addEventListener('click', function () { add(r); });
+      box.appendChild(row);
+    });
+  }
+  function add(r) {
+    lines.push({ id: r.id, product: r.product, sku: r.sku, barcode: r.barcode,
+                 left: r.left, unit: r.unit, qty: '' });
+    seq++; found = [];
+    $('smpSearch').value = '';
+    $('smpResults').innerHTML = '';
+    drawLines();
+    const inputs = $('smpLines').querySelectorAll('input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }
+
+  // ── The lines ──
+  function lineOk(l) {
+    const q = parseFloat(String(l.qty).replace(',', '.'));
+    return isFinite(q) && q > 0 && q <= l.left + 1e-9;
+  }
+  function syncSave() {
+    $('smpSave').disabled = !(lines.length && lines.every(lineOk));
+  }
+  function drawLines() {
+    const box = $('smpLines');
+    box.innerHTML = '';
+    $('smpEmpty').style.display = lines.length ? 'none' : '';
+    lines.forEach(function (l, i) {
+      const row = el('div', 'smp-line');
+      const what = el('div', 'smp-what');
+      what.appendChild(el('div', 'smp-name', l.product));
+      what.appendChild(el('div', 'smp-meta',
+        [l.sku, l.barcode, num(l.left) + ' ' + l.unit + ' ' + T.left].filter(Boolean).join(' · ')));
+      row.appendChild(what);
+      const input = el('input', 'smp-input');
+      input.type = 'number'; input.step = '0.01'; input.min = '0.01'; input.max = String(l.left);
+      input.placeholder = l.unit; input.value = l.qty;
+      input.addEventListener('input', function () {
+        l.qty = input.value;
+        row.classList.toggle('bad', input.value !== '' && !lineOk(l));
+        syncSave();
+      });
+      row.appendChild(input);
+      const x = el('button', 'smp-x', '×');
+      x.type = 'button';
+      x.addEventListener('click', function () { lines.splice(i, 1); drawLines(); });
+      row.appendChild(x);
+      box.appendChild(row);
+    });
+    syncSave();
+  }
+
+  $('smpSearch').addEventListener('input', search);
+  // A scanner types the barcode and presses Enter: take the roll it read.
+  $('smpSearch').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const q = $('smpSearch').value.trim().toLowerCase();
+    const exact = found.filter(function (r) { return (r.barcode || '').toLowerCase() === q; });
+    if (exact.length === 1) add(exact[0]);
+    else if (found.length === 1) add(found[0]);
+  });
+
+  // ── Opening, closing, saving ──
+  window.openSamplePackage = function () {
+    lines = []; found = []; seq++;
+    ['smpSearch', 'smpNote', 'smpCarrier', 'smpTracking'].forEach(function (id) { $(id).value = ''; });
+    $('smpSent').checked = false;
+    $('smpResults').innerHTML = '';
+    drawLines();
+    $('smpOverlay').classList.add('show');
+    $('smpSearch').focus();
+  };
+  window.closeSamplePackage = function () { $('smpOverlay').classList.remove('show'); };
+  window.saveSamplePackage = function () {
+    if ($('smpSave').disabled) return;
+    const btn = $('smpSave');
+    btn.disabled = true;
+    fetch(CREATE_URL, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({
+        client_type: CLIENT.type, client_pk: CLIENT.pk,
+        date: $('smpDate').value, note: $('smpNote').value.trim(),
+        carrier: $('smpCarrier').value.trim(), tracking_number: $('smpTracking').value.trim(),
+        sent: $('smpSent').checked,
+        lines: lines.map(function (l) {
+          return { stock_item_id: l.id, quantity: String(l.qty).replace(',', '.') };
+        }),
+      }),
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.success) { btn.disabled = false; alert(d.error || T.failed); return; }
+      window.location.reload();
+    }).catch(function () { btn.disabled = false; alert(T.network); });
+  };
+
+  let shipPk = null;
+  window.openSampleShipping = function (btn) {
+    shipPk = btn.dataset.pk;
+    $('smpShipTitle').textContent = btn.dataset.number || '';
+    $('smpShipStatus').value = btn.dataset.status || 'prepared';
+    $('smpShipCarrier').value = btn.dataset.carrier || '';
+    $('smpShipTracking').value = btn.dataset.tracking || '';
+    $('smpShipOverlay').classList.add('show');
+  };
+  window.closeSampleShipping = function () { $('smpShipOverlay').classList.remove('show'); shipPk = null; };
+  window.saveSampleShipping = function () {
+    if (!shipPk) return;
+    const btn = $('smpShipSave');
+    btn.disabled = true;
+    const fd = new FormData();
+    fd.append('status', $('smpShipStatus').value);
+    fd.append('carrier', $('smpShipCarrier').value.trim());
+    fd.append('tracking_number', $('smpShipTracking').value.trim());
+    fetch(SHIPPING_URL.replace('/0/', '/' + shipPk + '/'), {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      btn.disabled = false;
+      if (!d.success) { alert(d.error || T.failed); return; }
+      window.location.reload();
+    }).catch(function () { btn.disabled = false; alert(T.network); });
+  };
+
+  // A press that starts on the backdrop closes the dialog; a drag that
+  // starts inside it (selecting text) and ends outside does not.
+  ['smpOverlay', 'smpShipOverlay'].forEach(function (id) {
+    const overlay = $(id);
+    let pressedOnBackdrop = false;
+    overlay.addEventListener('mousedown', function (e) { pressedOnBackdrop = e.target === overlay; });
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay && pressedOnBackdrop) overlay.classList.remove('show');
+      if (!e.target.closest('.smp-search')) { $('smpResults').innerHTML = ''; }
+    });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    $('smpOverlay').classList.remove('show');
+    $('smpShipOverlay').classList.remove('show');
+  });
+})();
+</script>

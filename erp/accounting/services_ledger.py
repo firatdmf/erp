@@ -75,6 +75,11 @@ STANDARD_CHART = [
     # Part of operating expenses, kept apart so what winning customers costs
     # can be read on its own: samples given to clients, fairs, catalogues.
     ("5110", "Marketing Expenses",         "expense",   False),
+    # Also part of operating expenses: stock that was paid for and is not
+    # there to sell — lost, damaged, or shorter on a re-measure than the
+    # length it was received at. Apart from cost of goods sold so the margin
+    # on what was sold is not carrying what was never sold at all.
+    ("5120", "Inventory Shrinkage",        "expense",   False),
     # Also part of operating expenses: the few units let go to bring a
     # settled account to zero. Apart so the year's total can be read off,
     # and so a closing difference used for what was really bad debt shows.
@@ -92,6 +97,7 @@ STANDARD_CHART = [
 # its code looks. Balances stay on their own line either way.
 PARENT_ACCOUNT = {
     "5110": "5100",
+    "5120": "5100",
     "5150": "5100",
 }
 

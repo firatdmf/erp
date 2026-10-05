@@ -81,12 +81,34 @@ class StockLeavingPostsItsCost(TestCase):
             quantity=Decimal("50"), reason="Manual add")
         self.assertEqual(JournalEntry.objects.count(), 0)
 
-    def test_a_correction_posts_nothing_yet(self):
+    def test_an_adjustment_that_says_nothing_posts_nothing(self):
+        """A hold trimmed, an item moved between two products, a length the
+        purchase already carries: notes on the timeline, not entries."""
         StockMovement.objects.create(
             product=self.product, stock_item=self.roll,
             movement_type="adjustment", quantity=Decimal("-5"),
             reason="Manual adjustment: 100m → 95m")
         self.assertEqual(JournalEntry.objects.count(), 0)
+
+    def test_a_correction_goes_to_inventory_shrinkage(self):
+        StockMovement.objects.create(
+            product=self.product, stock_item=self.roll,
+            movement_type="adjustment", purpose="correction",
+            quantity=Decimal("-5"), reason="Roll meters edited")
+        b = self._balances()
+        self.assertEqual(b["5120"], Decimal("20.00"))     # 5m x 4.00
+        self.assertEqual(b["1300"], Decimal("-20.00"))
+        self.assertFalse(b.get("5000"))
+        self.assertTrue(balance_sheet(self.book)["balanced"])
+
+    def test_a_correction_upwards_comes_back_off_it(self):
+        StockMovement.objects.create(
+            product=self.product, stock_item=self.roll,
+            movement_type="adjustment", purpose="correction",
+            quantity=Decimal("2"), reason="Roll meters edited")
+        b = self._balances()
+        self.assertEqual(b["5120"], Decimal("-8.00"))
+        self.assertEqual(b["1300"], Decimal("8.00"))
 
     def test_deleting_the_row_takes_the_entry_with_it(self):
         self._out("25").delete()

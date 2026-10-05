@@ -72,7 +72,7 @@ class BrandNameEditor(TestCase):
     """Inline editor on the book detail page header."""
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
+        self.user = get_user_model().objects.create_superuser(
             username="brand_tester", password="pw")
         self.client.force_login(self.user)
         self.book = Book.objects.create(name="Demfirat", brand_name="Old Name")

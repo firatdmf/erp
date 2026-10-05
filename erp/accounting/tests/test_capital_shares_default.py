@@ -28,7 +28,7 @@ class CapitalDoesNotTouchSharesTest(TestCase):
 
     def setUp(self):
         User = get_user_model()
-        self.user = User.objects.create_user(username="cap_tester", password="pw")
+        self.user = User.objects.create_superuser(username="cap_tester", password="pw")
         self.client.force_login(self.user)
 
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")

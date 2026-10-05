@@ -38,7 +38,7 @@ class CashEntryTestBase(TestCase):
             book=self.book, name="Cash", currency=self.usd, balance=Decimal("0.00")
         )
         # A Member is created for every user by signal — take that one.
-        user = get_user_model().objects.create_user(username="teller", password="pw")
+        user = get_user_model().objects.create_superuser(username="teller", password="pw")
         self.member = user.member
 
     def _entry(self, amount, positive):

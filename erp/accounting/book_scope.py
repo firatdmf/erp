@@ -52,6 +52,30 @@ def book_scoped(view):
     return wrapper
 
 
+def book_page(view):
+    """`book_scoped` for the book's own pages — /accounting/books/5/ and
+    everything under it — which name their book as `pk` and whose views
+    read it from there, so it is checked and passed on rather than
+    swallowed.
+
+    These were the ledger's oldest routes and asked only for a login:
+    the collections and objects beside them were closed to unassigned
+    members while the book page itself, with its cash accounts and cap
+    table, opened to anyone who typed the id.
+    """
+    @wraps(view)
+    def wrapper(request, *args, pk=None, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        book = get_object_or_404(Book, pk=pk)
+        member = getattr(request.user, "member", None)
+        if not member_can_use_book(member, book):
+            raise Http404("No such book.")
+        request.book = book
+        return view(request, *args, pk=pk, **kwargs)
+    return wrapper
+
+
 def book_guarded(view, model, book_path="book"):
     """Refuse an OBJECT page whose row belongs to a book the viewer is
     not assigned, and put that row's book on `request.book`.

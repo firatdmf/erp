@@ -94,7 +94,11 @@ class index(generic.TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        books = Book.objects.all()
+        # Only the books this member works in — the same boundary the
+        # ledger pages behind each card enforce. Listing the rest told an
+        # unassigned member which other businesses run on this install.
+        from .services_accounts import member_books
+        books = member_books(getattr(self.request.user, "member", None))
         context["books"] = books
         return context
 
@@ -437,8 +441,8 @@ class SetMyWorkingBook(generic.detail.SingleObjectMixin, generic.View):
         member.default_book = book
         member.save(update_fields=["default_book"])
         # Say so on the page the caller lands on next. Both callers move
-        # immediately — the sidebar switcher navigates to the book it just
-        # picked, the book page reloads itself — so the app's own flash
+        # immediately — the sidebar switcher reloads the page it is on in the
+        # book it just picked, the book page reloads itself — so the app's own flash
         # carries this, rather than a second toast the JSON would have to
         # raise on its own.
         messages.success(
@@ -2151,6 +2155,11 @@ class EditFixedAsset(generic.edit.UpdateView):
     form_class = AssetFixedAssetForm
     template_name = "accounting/add_fixed_asset.html"
     pk_url_kwarg = "asset_pk"
+
+    def get_queryset(self):
+        # Scoped to the book in the URL: an asset reached through the
+        # wrong book's URL is a 404, not somebody else's row to edit.
+        return AssetFixedAsset.objects.filter(book_id=self.kwargs.get("pk"))
 
     def get_success_url(self) -> str:
         return reverse_lazy(

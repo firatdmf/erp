@@ -31,7 +31,7 @@ class ExpenseDetailPageTests(TestCase):
     """
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
+        self.user = get_user_model().objects.create_superuser(
             username="detail", password="pw"
         )
         self.client.force_login(self.user)

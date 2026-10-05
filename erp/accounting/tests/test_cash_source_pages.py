@@ -32,7 +32,7 @@ class EquityRevenuePageTests(TestCase):
         self.vault = CashAccount.objects.create(
             book=self.book, name="Vault", currency=self.usd, balance=Decimal("0.00")
         )
-        user = get_user_model().objects.create_user(username="teller", password="pw")
+        user = get_user_model().objects.create_superuser(username="teller", password="pw")
         self.client.force_login(user)
         self.revenue = EquityRevenue.objects.create(
             book=self.book, cash_account=self.kasa, currency=self.usd,
@@ -154,7 +154,7 @@ class CashSourceFixture(TestCase):
         self.euros = CashAccount.objects.create(
             book=self.book, name="Cash EUR", currency=self.eur, balance=Decimal("0.00")
         )
-        user = get_user_model().objects.create_user(username="teller", password="pw")
+        user = get_user_model().objects.create_superuser(username="teller", password="pw")
         self.member = user.member
         self.client.force_login(user)
 

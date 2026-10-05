@@ -12,7 +12,7 @@ from authentication.models import Member
 class SharesTestBase(TestCase):
     def setUp(self):
         User = get_user_model()
-        self.user = User.objects.create_user(username="shares_tester", password="pw")
+        self.user = User.objects.create_superuser(username="shares_tester", password="pw")
         self.client.force_login(self.user)
         self.book = Book.objects.create(name="Laleli Fabric", total_shares=10000000)
         self.cuma = self.stakeholder("cuma", "Cuma", "Öztürk")

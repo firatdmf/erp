@@ -21,7 +21,7 @@ class EquityExpenseListTest(TestCase):
     """The book's expense page — reached from Book Detail → View Expenses."""
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
+        self.user = get_user_model().objects.create_superuser(
             username="expense_tester", password="pw"
         )
         self.client.force_login(self.user)

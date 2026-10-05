@@ -27,7 +27,7 @@ class EquityFormFxTests(TestCase):
     """Expense, capital and dividend can each carry an entered rate."""
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
+        self.user = get_user_model().objects.create_superuser(
             username="equity_fx", password="pw"
         )
         self.client.force_login(self.user)

@@ -15,7 +15,7 @@ class RenameBookTest(TestCase):
     """Inline rename from the book detail page header."""
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
+        self.user = get_user_model().objects.create_superuser(
             username="rename_tester", password="pw"
         )
         self.client.force_login(self.user)

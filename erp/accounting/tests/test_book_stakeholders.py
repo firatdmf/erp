@@ -16,7 +16,7 @@ class BookHeaderStakeholdersTest(TestCase):
 
     def setUp(self):
         User = get_user_model()
-        self.user = User.objects.create_user(username="sh_tester", password="pw")
+        self.user = User.objects.create_superuser(username="sh_tester", password="pw")
         self.client.force_login(self.user)
         self.book = Book.objects.create(name="Laleli Fabric", total_shares=10000000)
 

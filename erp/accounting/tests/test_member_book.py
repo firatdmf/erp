@@ -95,6 +95,51 @@ class MemberWorkingBook(TestCase):
         self.assertEqual(current_account.book_id, self.ergene.pk)
 
 
+class LedgerIndexLists(TestCase):
+    def test_only_the_books_the_member_is_assigned(self):
+        mine = Book.objects.create(name="Ergene Fabric")
+        Book.objects.create(name="Laleli Fabric")
+        user = get_user_model().objects.create_user(username="staff", password="pw")
+        Member.objects.get(user=user).books.set([mine])
+        self.client.force_login(user)
+        resp = self.client.get(reverse("accounting:index"))
+        self.assertEqual([b.pk for b in resp.context["books"]], [mine.pk])
+        self.assertNotContains(resp, "Laleli Fabric")
+
+
+class BookPagesAreForItsMembers(TestCase):
+    """The book's own pages name it by id, and an id can be typed."""
+
+    def setUp(self):
+        self.mine = Book.objects.create(name="Ergene Fabric")
+        self.theirs = Book.objects.create(name="Laleli Fabric")
+        self.user = get_user_model().objects.create_user(username="staff", password="pw")
+        Member.objects.get(user=self.user).books.set([self.mine])
+        self.client.force_login(self.user)
+
+    def test_an_unassigned_book_is_not_found(self):
+        for name in ("book_detail", "book_shares", "equity_expense_list",
+                     "cash_transaction_entry_list", "add_equity_expense"):
+            with self.subTest(name):
+                url = reverse(f"accounting:{name}", kwargs={"pk": self.theirs.pk})
+                self.assertEqual(self.client.get(url).status_code, 404)
+        resp = self.client.post(
+            reverse("accounting:rename_book", kwargs={"pk": self.theirs.pk}),
+            {"name": "Mine now"})
+        self.assertEqual(resp.status_code, 404)
+        self.theirs.refresh_from_db()
+        self.assertEqual(self.theirs.name, "Laleli Fabric")
+
+    def test_their_own_book_still_opens(self):
+        url = reverse("accounting:book_detail", kwargs={"pk": self.mine.pk})
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_a_visitor_is_sent_to_sign_in(self):
+        self.client.logout()
+        url = reverse("accounting:book_detail", kwargs={"pk": self.mine.pk})
+        self.assertEqual(self.client.get(url).status_code, 302)
+
+
 class WorkingBookEndpoint(TestCase):
     def setUp(self):
         self.book = Book.objects.create(name="Ergene Fabric")

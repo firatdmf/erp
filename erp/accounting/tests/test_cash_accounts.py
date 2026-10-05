@@ -20,7 +20,7 @@ from accounting.models import (
 
 class CashAccountTestBase(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
+        self.user = get_user_model().objects.create_superuser(
             username="cash_tester", password="pw"
         )
         self.client.force_login(self.user)

@@ -25,7 +25,7 @@ from django.views.decorators.http import require_POST
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
-from accounting.services_accounts import member_books
+from accounting.services_accounts import get_default_book, member_books
 from crm.models import Company, Contact
 from marketing.models import Product, ProductVariant
 
@@ -274,7 +274,12 @@ class QuoteForm(View):
                     "unit": it.unit, "price": str(it.price),
                     "rolls": [r for r in by_line.get(it.pk, []) if r["id"]],
                 })
-        current_book = getattr(request, "book", None)
+        # A new quote starts in the member's working book. This route
+        # names no book, so there is no request.book to read it from.
+        my_books = _books_for(request)
+        current_book = None
+        if not quote and my_books.exists():
+            current_book = get_default_book(getattr(request.user, "member", None))
         currencies = list(CurrencyCategory.objects.order_by("code"))
         base = _base_currency()
         return render(request, self.template_name, {
@@ -286,7 +291,7 @@ class QuoteForm(View):
             "prefill": None if quote else _prefill_customer(request),
             "items_json": json.dumps(items),
             "currencies": currencies,
-            "my_books": _books_for(request),
+            "my_books": my_books,
             "default_book_id": (quote.book_id if quote else
                                 (current_book.pk if current_book else None)),
             "today": date.today().isoformat(),

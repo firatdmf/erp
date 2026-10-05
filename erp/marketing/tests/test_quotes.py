@@ -380,6 +380,17 @@ class QuoteTest(TestCase):
         form = self.client.get(reverse("marketing:quote_edit", args=[quote.pk]))
         self.assertContains(form, 'id="qf-valid" value=""')
 
+    def test_a_new_quote_starts_in_the_working_book(self):
+        """Not in whichever book sorts first: "Ergene" comes before
+        "Laleli", and Laleli is the one being worked in."""
+        Book.objects.create(name="Ergene Fabric")
+        member = self.admin.member
+        member.default_book = self.book
+        member.save(update_fields=["default_book"])
+        form = self.client.get(reverse("marketing:quote_create"))
+        self.assertEqual(form.context["default_book_id"], self.book.pk)
+        self.assertContains(form, '<option value="%s" selected>' % self.book.pk)
+
     def test_lines_without_rolls_get_their_own_section_beside_lines_with_them(self):
         roll = self._roll("R-800", "20")
         quote = Quote.objects.get(pk=self._save(self._body(items=[

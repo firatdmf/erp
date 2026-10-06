@@ -424,6 +424,13 @@
   .od-rcpt-item.pending span.od-rcpt-thumb:not(.pdf) {
     display: flex; align-items: center; justify-content: center; color: var(--gray-500);
   }
+  /* A receipt on its way up after Save: its preview, dimmed under a spinner. */
+  .od-rcpt-up { position: relative; display: inline-flex; flex-shrink: 0; }
+  .od-rcpt-up .od-rcpt-thumb { opacity: .45; }
+  .od-rcpt-up > .fa-spinner {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--nejum-teal-600, #0F766E); font-size: 13px;
+  }
   .od-rcpt-hint { display: none; font: 500 11.5px var(--font-sans); color: var(--gray-500); }
   .od-rcpt-hint i { margin-right: 5px; }
   /* Paste is a keyboard thing — say so where there is one. */
@@ -1321,7 +1328,7 @@
                   </div>
                   <div class="od-cbx-chip" {% if not order.carrier %}hidden{% endif %}>
                     <i class="fa fa-truck"></i>
-                    <span>{{ order.get_carrier_display|default:'' }}</span>
+                    <span>{% firstof carrier_label order.get_carrier_display %}</span>
                     <button type="button" class="od-cbx-clear" title="{% trans 'Change carrier' %}" aria-label="{% trans 'Change carrier' %}"></button>
                   </div>
                 </div>
@@ -2444,6 +2451,12 @@
       }
       inp.value = v;
     }
+    // A cargo save still in flight finishes first: its receipts are stored
+    // before the status moves, as the shipped email carries them.
+    let cargoSave = null;
+    function submitForm() {
+      (cargoSave || Promise.resolve()).then(() => statusForm.submit());
+    }
     function submitStatus(s) {
       if (SHIPPED.indexOf(s) !== -1) {
         // Cargo info is OPTIONAL for every order — completing without a
@@ -2455,12 +2468,12 @@
           if (!ok) return;
           setSkipCargo(noCargo ? '1' : '0');
           statusInput.value = s;
-          statusForm.submit();
+          submitForm();
         });
         return;
       }
       statusInput.value = s;
-      statusForm.submit();
+      submitForm();
     }
     // The cargo card. A completed order shows it read-only until "Edit
     // cargo info". Save and a receipt's × go in the background, and the
@@ -2526,30 +2539,118 @@
       if (data.message) showToast(data.message);
       if (data.warning) alert(data.warning);
     }
+    // What the receipts block below lends Save: the receipts waiting to
+    // upload, taken out of the form so no status change posts them too.
+    let takeReceipts = () => null;
+    // Leaving mid-save would drop a receipt still on its way up.
+    window.addEventListener('beforeunload', (e) => {
+      if (cargoSave) { e.preventDefault(); e.returnValue = ''; }
+    });
+    function uploadingThumb(taken, f) {
+      const wrap = document.createElement('span');
+      wrap.className = 'od-rcpt-up';
+      wrap.append(taken.thumb(f));
+      wrap.insertAdjacentHTML('beforeend', '<i class="fa fa-spinner fa-spin"></i>');
+      return wrap;
+    }
+    // The card as it will read once saved, drawn before the server answers
+    // (_cargo_summary.html, by hand): the carrier and number as typed, and
+    // each new receipt's preview under a spinner.
+    function drawSaving(carrierLabel, tracking, taken) {
+      const files = taken ? taken.files() : [];
+      if (shipView) {
+        const line = (icon, text) => {
+          const span = document.createElement('span');
+          span.innerHTML = '<i class="fa ' + icon + '"></i>';
+          span.append(text);
+          return span;
+        };
+        const parts = [];
+        if (carrierLabel) parts.push(line('fa-truck', carrierLabel));
+        if (tracking) parts.push(line('fa-barcode', tracking));
+        let rc = shipView.querySelector('.od-ship-sum-rc');
+        if (!rc) { rc = document.createElement('span'); rc.className = 'od-ship-sum-rc'; }
+        files.forEach(f => rc.append(uploadingThumb(taken, f)));
+        if (rc.children.length) parts.push(rc);
+        if (parts.length) shipView.replaceChildren(...parts);
+      }
+      if (rcptSaved && files.length) {
+        let list = rcptSaved.querySelector('.od-rcpt-list');
+        if (!list) { list = document.createElement('div'); list.className = 'od-rcpt-list'; rcptSaved.append(list); }
+        files.forEach(f => {
+          const item = document.createElement('div');
+          item.className = 'od-rcpt-item pending uploading';
+          const name = document.createElement('span');
+          name.className = 'od-rcpt-name';
+          name.textContent = f.name;
+          item.append(uploadingThumb(taken, f), name);
+          list.append(item);
+        });
+      }
+    }
     if (shipSave) {
       shipSave.addEventListener('click', (e) => {
         e.preventDefault();
+        if (cargoSave) return;
         const fd = new FormData(statusForm);
         fd.set('order_status', statusInput.defaultValue);  // Save never moves the status
         fd.delete('skip_cargo');
+        const taken = takeReceipts();
+        if (taken) fd.delete('cargo_receipts');  // appended below, once shrunk
+        const typed = { carrier: carrierSel ? carrierSel.value : '', tracking: trackingInp ? trackingInp.value : '' };
+        // A field left blank keeps what the order has: the server stores
+        // only what was entered.
+        const opts = carrierSel ? Array.from(carrierSel.options) : [];
+        const carrierOpt = typed.carrier ? carrierSel.selectedOptions[0] : opts.find(o => o.defaultSelected && o.value);
+        const before = shipView ? shipView.innerHTML : '';
+        // The card answers at once; the save itself goes on behind it.
+        drawSaving(carrierOpt ? carrierOpt.text : '',
+                   typed.tracking.trim() || (trackingInp ? trackingInp.defaultValue : ''), taken);
+        setEditing(false);
         shipSave.disabled = true;
-        postCargo(fd).then(data => {
+        if (unlockBtn) unlockBtn.disabled = true;
+        // Refused, or no answer: the card goes back to the edit it was sent from.
+        const takeBack = () => {
+          if (shipView) shipView.innerHTML = before;
+          if (rcptSaved) {
+            rcptSaved.querySelectorAll('.od-rcpt-item.uploading').forEach(el => el.remove());
+            const list = rcptSaved.querySelector('.od-rcpt-list');
+            if (list && !list.children.length) list.remove();
+          }
+          if (taken) taken.putBack();
+          setEditing(true);
+        };
+        cargoSave = (taken ? taken.ready : Promise.resolve()).then(() => {
+          if (taken) taken.files().forEach(f => fd.append('cargo_receipts', f, f.name));
+          return postCargo(fd);
+        }).then(data => {
           // What was saved becomes what Cancel edit returns to.
           if (trackingInp) trackingInp.defaultValue = data.tracking_number;
           if (hasCargoChk) hasCargoChk.defaultChecked = !!(data.carrier || data.tracking_number);
           statusForm.dispatchEvent(new CustomEvent('od-ship-saved', { detail: data }));
           applyCargo(data);
-          restoreSaved();
-          setEditing(false);
+          // An open order's fields stay on screen through the save: one
+          // retyped since, or a receipt added, is left for the next Save.
+          const untouched = (!carrierSel || carrierSel.value === typed.carrier)
+            && (!trackingInp || trackingInp.value === typed.tracking)
+            && !statusForm.querySelector('input.od-rcpt-parked');
+          if (untouched) restoreSaved();
         }).catch(err => {
+          takeBack();
           // No answer at all: save the ordinary way rather than lose the edit.
           if (err instanceof TypeError) {
+            cargoSave = null;
             statusInput.value = statusInput.defaultValue;
             statusForm.submit();
             return;
           }
           alert(err.message || SAVE_FAILED);
-        }).finally(() => { shipSave.disabled = false; });
+        }).finally(() => {
+          cargoSave = null;
+          shipSave.disabled = false;
+          if (unlockBtn) unlockBtn.disabled = false;
+          if (taken) taken.done();
+        });
       });
     }
     // A saved receipt's × removes it at once, edit or no edit.
@@ -2718,23 +2819,102 @@
       const REMOVE = '{% trans "Remove" %}';
       let previewUrls = [];
 
-      function park(files) {
-        if (!files.length) return;
+      // A phone photo is 3–5 MB and the server keeps a 2400 px JPEG of it
+      // (operating/receipt_images.py — the same edge and quality here), so
+      // it is made that size before it is sent: a tenth of the upload.
+      // What the browser can't draw (HEIC outside Safari, a damaged file)
+      // goes up as it is and the server converts it.
+      const SHRINK_EDGE = 2400, SHRINK_QUALITY = 0.82, ALREADY_SMALL_BYTES = 700000;
+      async function shrink(file) {
+        if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) return file;
+        const url = URL.createObjectURL(file);
+        try {
+          const img = new Image();
+          img.src = url;
+          await img.decode();
+          const w = img.naturalWidth, h = img.naturalHeight;
+          const scale = Math.min(1, SHRINK_EDGE / Math.max(w, h));
+          const isJpeg = file.type === 'image/jpeg';
+          if (isJpeg && scale === 1 && file.size <= ALREADY_SMALL_BYTES) return file;
+          const draw = (src, cw, ch, white) => {
+            const c = document.createElement('canvas');
+            c.width = cw; c.height = ch;
+            const ctx = c.getContext('2d');
+            // A transparent PNG goes onto white, as it would print.
+            if (white) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); }
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(src, 0, 0, cw, ch);
+            return c;
+          };
+          const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
+          // Halved in steps on the way down: one big jump blurs small print.
+          let src = img, sw = w, sh = h;
+          while (sw / 2 >= tw && sh / 2 >= th) {
+            sw = Math.floor(sw / 2); sh = Math.floor(sh / 2);
+            src = draw(src, sw, sh, false);
+          }
+          const blob = await new Promise(done => draw(src, tw, th, true).toBlob(done, 'image/jpeg', SHRINK_QUALITY));
+          if (!blob || (isJpeg && blob.size >= file.size)) return file;
+          return new File([blob], file.name.replace(/\.[^.]*$/, '') + '.jpg',
+                          { type: 'image/jpeg', lastModified: file.lastModified });
+        } catch (e) {
+          return file;
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+
+      function setFile(input, f) {
         const dt = new DataTransfer();
-        files.forEach(f => dt.items.add(f));
-        const input = document.createElement('input');
-        input.type = 'file'; input.name = 'cargo_receipts'; input.hidden = true;
-        input.className = 'od-rcpt-parked';
+        dt.items.add(f);
         input.files = dt.files;
-        rcptShots.insertBefore(input, pending);
+      }
+
+      function park(files) {
+        files.forEach(f => {
+          const input = document.createElement('input');
+          input.type = 'file'; input.name = 'cargo_receipts'; input.hidden = true;
+          input.className = 'od-rcpt-parked';
+          setFile(input, f);
+          rcptShots.insertBefore(input, pending);
+          // Shrunk while the rest of the card is filled in; Save waits for
+          // it, and a status change that doesn't posts the photo as it came.
+          input.shrunk = shrink(f).then(small => {
+            if (small === f) return;
+            setFile(input, small);
+            if (input.isConnected) renderPending();
+          });
+        });
         renderPending();
       }
 
-      function unpark(input, index) {
-        const dt = new DataTransfer();
-        Array.from(input.files).forEach((f, i) => { if (i !== index) dt.items.add(f); });
-        if (dt.files.length) input.files = dt.files; else input.remove();
+      function unpark(input) {
+        input.remove();
         renderPending();
+      }
+
+      // A file's preview; its object URL is noted in `urls` to be revoked.
+      function thumbFor(f, urls) {
+        if (f.type === 'application/pdf') {
+          const pdf = document.createElement('span');
+          pdf.className = 'od-rcpt-thumb pdf';
+          pdf.innerHTML = '<i class="fa fa-file-pdf"></i>';
+          return pdf;
+        }
+        const thumb = document.createElement('img');
+        thumb.className = 'od-rcpt-thumb';
+        thumb.alt = '';
+        const url = URL.createObjectURL(f);
+        urls.push(url);
+        thumb.src = url;
+        // HEIC won't draw outside Safari; it is converted on upload.
+        thumb.onerror = () => {
+          const icon = document.createElement('span');
+          icon.className = 'od-rcpt-thumb';
+          icon.innerHTML = '<i class="fa fa-image"></i>';
+          thumb.replaceWith(icon);
+        };
+        return thumb;
       }
 
       function renderPending() {
@@ -2742,29 +2922,10 @@
         previewUrls = [];
         pending.innerHTML = '';
         const parked = Array.from(rcptShots.querySelectorAll('input.od-rcpt-parked'));
-        parked.forEach(input => Array.from(input.files).forEach((f, i) => {
+        parked.forEach(input => {
+          const f = input.files[0];
           const item = document.createElement('div');
           item.className = 'od-rcpt-item pending';
-          let thumb;
-          if (f.type === 'application/pdf') {
-            thumb = document.createElement('span');
-            thumb.className = 'od-rcpt-thumb pdf';
-            thumb.innerHTML = '<i class="fa fa-file-pdf"></i>';
-          } else {
-            thumb = document.createElement('img');
-            thumb.className = 'od-rcpt-thumb';
-            thumb.alt = '';
-            const url = URL.createObjectURL(f);
-            previewUrls.push(url);
-            thumb.src = url;
-            // HEIC won't draw outside Safari; it is converted on upload.
-            thumb.onerror = () => {
-              const icon = document.createElement('span');
-              icon.className = 'od-rcpt-thumb';
-              icon.innerHTML = '<i class="fa fa-image"></i>';
-              thumb.replaceWith(icon);
-            };
-          }
           const name = document.createElement('span');
           name.className = 'od-rcpt-name';
           name.textContent = f.name;
@@ -2773,12 +2934,30 @@
           del.className = 'od-rcpt-del';
           del.title = REMOVE; del.setAttribute('aria-label', REMOVE);
           del.innerHTML = '<i class="fa fa-xmark"></i>';
-          del.addEventListener('click', () => unpark(input, i));
-          item.append(thumb, name, del);
+          del.addEventListener('click', () => unpark(input));
+          item.append(thumbFor(f, previewUrls), name, del);
           pending.appendChild(item);
-        }));
+        });
         rcptShots.hidden = !parked.length;
       }
+
+      // Save takes the waiting receipts with it. They leave the form (a
+      // status change pressed meanwhile must not post them a second time)
+      // and come back only if the save is refused.
+      takeReceipts = () => {
+        const inputs = Array.from(rcptShots.querySelectorAll('input.od-rcpt-parked'));
+        if (!inputs.length) return null;
+        inputs.forEach(i => i.remove());
+        renderPending();
+        const urls = [];
+        return {
+          ready: Promise.all(inputs.map(i => i.shrunk)),
+          files: () => inputs.map(i => i.files[0]),
+          thumb: (f) => thumbFor(f, urls),
+          putBack: () => { inputs.forEach(i => rcptShots.insertBefore(i, pending)); renderPending(); },
+          done: () => urls.forEach(u => URL.revokeObjectURL(u)),
+        };
+      };
 
       // Cancel edit: the receipts waiting to upload are dropped.
       statusForm.addEventListener('od-ship-reset', () => {
@@ -2873,7 +3052,7 @@
         }
         inp.value = reason;
         statusInput.value = 'cancelled';
-        statusForm.submit();
+        submitForm();
       });
     }
 
@@ -2903,7 +3082,7 @@
         }
         inp.value = reason.trim();
         statusInput.value = 'packaging';
-        statusForm.submit();
+        submitForm();
       });
     }
   }

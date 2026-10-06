@@ -145,7 +145,8 @@ def save_cargo_receipts(order, files, user=None):
         path = (f"operating/orders/{order.pk}/cargo/"
                 f"{uuid.uuid4().hex}.{OrderCargoReceipt.ALLOWED_TYPES[ctype]}")
         try:
-            url = upload_to_bunny(f, path, content_type=ctype)
+            # The name is a fresh uuid: nothing cached under it to purge.
+            url = upload_to_bunny(f, path, content_type=ctype, purge=False)
         except Exception:
             rejected.append(name)
             continue
@@ -443,6 +444,8 @@ class OrderDetail(DetailView):
             # Delivery, discounts: read by the totals block and by every
             # money method on the page.
             "adjustments",
+            # Listed twice on the cargo card: its summary and its edit grid.
+            "cargo_receipts",
         )
 
     def get_context_data(self, **kwargs):
@@ -551,6 +554,7 @@ class OrderDetail(DetailView):
         ]
         ctx["status_choices"]  = ORDER_STATUS_CHOICES
         ctx["carrier_choices"] = carrier_choices_for(self.object)
+        ctx["carrier_label"] = dict(ctx["carrier_choices"]).get(self.object.carrier, "")
         ctx["is_terminal"] = current in {"cancelled", "returned"}
         ctx["shipped"] = current in _SHIPPED_CLASS
         # Cargo info reads as sent once the order is done; the page unlocks it on request.
@@ -1109,16 +1113,22 @@ def _cargo_json(request, order, message, warning=None):
     """The order page's cargo card, redrawn after a background save or a
     receipt's removal: the saved carrier and tracking number, and the two
     parts of the card that list receipts."""
+    from django.db.models import prefetch_related_objects
     from django.template.loader import render_to_string
     from erp.roles import is_sales_rep
 
-    ctx = {"order": order, "is_sales_rep": is_sales_rep(request.user)}
+    # Both parts list the receipts and the summary names the carrier:
+    # each is read once here, not once per part.
+    prefetch_related_objects([order], "cargo_receipts")
+    carrier_label = order.get_carrier_display() if order.carrier else ""
+    ctx = {"order": order, "is_sales_rep": is_sales_rep(request.user),
+           "carrier_label": carrier_label}
     return JsonResponse({
         "ok": True,
         "message": message,
         "warning": warning or "",
         "carrier": order.carrier or "",
-        "carrier_label": order.get_carrier_display() if order.carrier else "",
+        "carrier_label": carrier_label,
         "tracking_number": order.tracking_number or "",
         "summary_html": render_to_string("operating/partials/_cargo_summary.html", ctx, request=request),
         "receipts_html": render_to_string("operating/partials/_cargo_receipts.html", ctx, request=request),

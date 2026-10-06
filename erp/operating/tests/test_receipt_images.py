@@ -6,6 +6,7 @@ iPhone is converted, a sideways photo is stood up, and a PDF or anything
 Pillow can't read is left exactly as it came.
 """
 import io
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase
@@ -60,6 +61,21 @@ class ReceiptPhotosBecomeJpegs(SimpleTestCase):
         small = _image_file("tiny.jpg", "JPEG", size=(200, 100), content_type="image/jpeg")
         small.size = 1
         self.assertIsNone(optimize_receipt_image(small))
+
+    def test_a_photo_the_order_page_already_shrank_is_not_encoded_again(self):
+        # What the page sends: a JPEG within the long edge, upright, light.
+        sent = _image_file("slip.jpg", "JPEG", size=(2400, 1800), content_type="image/jpeg")
+        with patch("PIL.Image.Image.save") as encode:
+            self.assertIsNone(optimize_receipt_image(sent))
+        encode.assert_not_called()
+        self.assertEqual(sent.tell(), 0)  # rewound for the upload
+
+    def test_a_small_photo_on_its_side_is_still_stood_up(self):
+        exif = Image.Exif()
+        exif[0x0112] = 6
+        photo = _image_file("side.jpg", "JPEG", size=(1200, 900),
+                            content_type="image/jpeg", exif=exif.tobytes())
+        self.assertEqual(_open(optimize_receipt_image(photo)).size, (900, 1200))
 
     def test_a_pdf_or_unreadable_file_is_left_alone(self):
         pdf = SimpleUploadedFile("slip.pdf", b"%PDF-1.4 receipt", content_type="application/pdf")

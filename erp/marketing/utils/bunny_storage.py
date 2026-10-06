@@ -29,7 +29,7 @@ def get_storage_url(config):
     return "https://storage.bunnycdn.com"
 
 
-def upload_to_bunny(file, path, content_type=None):
+def upload_to_bunny(file, path, content_type=None, purge=True):
     """
     Upload file to Bunny CDN Storage Zone
     
@@ -37,6 +37,8 @@ def upload_to_bunny(file, path, content_type=None):
         file: File object (can be InMemoryUploadedFile or file-like object)
         path: Path where file should be stored (e.g., 'product_images/product_123/image.jpg')
         content_type: Optional content type override
+        purge: False for a path that has never existed (a fresh uuid name):
+            no edge node holds an old copy, so the purge call is skipped
     
     Returns:
         CDN URL of uploaded file
@@ -70,7 +72,8 @@ def upload_to_bunny(file, path, content_type=None):
         # Return CDN URL
         cdn_url = f"{config['cdn_url']}/{path}"
         # Purge CDN cache so edge nodes serve the new version (not stale cache)
-        purge_bunny_cache(cdn_url)
+        if purge:
+            purge_bunny_cache(cdn_url)
         return cdn_url
     else:
         raise Exception(f"Bunny upload failed ({response.status_code}): {response.text}")

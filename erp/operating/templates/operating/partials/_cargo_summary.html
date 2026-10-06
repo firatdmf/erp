@@ -1,5 +1,5 @@
 {% load i18n %}{% comment %}A completed order's cargo info on one line. Drawn inside #od-ship-view on the order page, and again after a background save.{% endcomment %}
-{% if order.carrier %}<span title="{% trans "Carrier" %}"><i class="fa fa-truck"></i>{{ order.get_carrier_display }}</span>{% endif %}
+{% if order.carrier %}<span title="{% trans "Carrier" %}"><i class="fa fa-truck"></i>{% firstof carrier_label order.get_carrier_display %}</span>{% endif %}
 {% if order.tracking_number %}<span title="{% trans "Tracking or receipt number" %}"><i class="fa fa-barcode"></i>{{ order.tracking_number }}</span>{% endif %}
 {% with receipts=order.cargo_receipts.all %}
 {% if receipts %}

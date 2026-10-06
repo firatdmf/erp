@@ -11,7 +11,9 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
@@ -105,6 +107,11 @@ class CargoReceiptOnCompletion(_AnOrderToComplete, TestCase):
     def test_save_alone_attaches_a_receipt(self, upload):
         self._complete(_jpg(), status="pending")
         self.assertEqual(self.order.cargo_receipts.count(), 1)
+
+    def test_a_new_receipt_asks_the_cdn_for_no_purge(self, upload):
+        # Its name is a fresh uuid: no edge node holds an old copy.
+        self._complete(_pdf())
+        self.assertIs(upload.call_args.kwargs["purge"], False)
 
     @patch("marketing.utils.bunny_storage.delete_from_bunny")
     def test_a_receipt_can_be_removed(self, delete, upload):
@@ -232,6 +239,16 @@ class CargoSavedInTheBackground(_AnOrderToComplete, TestCase):
         self.assertIn(f'data-receipt-id="{receipt.pk}"', data["receipts_html"])
         self.order.refresh_from_db()
         self.assertEqual(self.order.order_status, "shipped")
+
+    def test_the_answer_reads_the_receipts_and_the_carrier_once(self, upload):
+        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        self._save(_pdf())
+        with CaptureQueriesContext(connection) as queries:
+            self._save(carrier="surat-kargo")
+        sql = [q["sql"] for q in queries]
+        self.assertEqual(sum('FROM "operating_ordercargoreceipt"' in q for q in sql), 1)
+        # Once to store what was picked, once to name it on the card.
+        self.assertEqual(sum('FROM "operating_carrier"' in q for q in sql), 2)
 
     def test_a_turned_away_file_comes_back_as_a_warning(self, upload):
         bad = SimpleUploadedFile("notes.txt", b"hi", content_type="text/plain")

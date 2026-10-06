@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 # Enough for the small print on a receipt shot at arm's length.
 MAX_LONG_EDGE_PX = 2400
 JPEG_QUALITY = 82
+# A JPEG this light that already fits the long edge has been shrunk once —
+# by the order page before it was sent (see order_detail.html) or by the
+# app it was forwarded from. Encoding it again costs time and detail.
+ALREADY_SMALL_BYTES = 700_000
 
 
 class ReceiptJpeg(io.BytesIO):
@@ -37,8 +41,9 @@ def optimize_receipt_image(uploaded):
     """`uploaded` as a JPEG ReceiptJpeg, or None to keep it as it came.
 
     None when it is not an image Pillow can read (a PDF, a damaged file),
-    or when the JPEG would come out no smaller than an original that was
-    already a JPEG — re-encoding a small, clean scan only loses detail.
+    when it is already a small upright JPEG (ALREADY_SMALL_BYTES), or when
+    the JPEG would come out no smaller than an original that was already
+    a JPEG — re-encoding a small, clean scan only loses detail.
     """
     try:
         from PIL import Image, ImageOps
@@ -51,6 +56,11 @@ def optimize_receipt_image(uploaded):
 
         uploaded.seek(0)
         img = Image.open(uploaded)
+        if (img.format == "JPEG" and img.mode == "RGB"
+                and max(img.size) <= MAX_LONG_EDGE_PX
+                and (getattr(uploaded, "size", 0) or 0) <= ALREADY_SMALL_BYTES
+                and img.getexif().get(0x0112, 1) == 1):  # not lying on its side
+            return None
         img = ImageOps.exif_transpose(img)
         if img.mode != "RGB":
             # A transparent PNG goes onto white, as it would print.

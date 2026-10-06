@@ -57,3 +57,83 @@ class TaskSidebarMarkupTests(TestCase):
         for gone in ("taskCompanySection", "taskContactSection",
                      "id_task_company_search", "id_task_contact_search"):
             self.assertNotIn(gone, body)
+
+
+class RecordDetailAttachTaskTests(TestCase):
+    """Attaching a task on a contact or a company opens the sidebar task
+    form with that record already picked, rather than a form of the
+    page's own."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="record-task-tester", password="pw"
+        )
+        cls.company = Company.objects.create(name="O'Neil Tekstil")
+        cls.contact = Contact.objects.create(name="Firat O'Neil", company=cls.company)
+
+    def _page(self, url_name, pk):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse(url_name, args=[pk]))
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
+
+    def test_contact_page_hands_the_sidebar_its_contact(self):
+        body = self._page("crm:contact_detail", self.contact.pk)
+        self.assertIn(
+            'taskAttach: {type: "contact", name: "Firat O\\u0027Neil"}', body)
+        self.assertIn("pk: %d," % self.contact.pk, body)
+        # The page's own inline task form is gone.
+        self.assertNotIn("attachTaskSection", body)
+        self.assertNotIn("action=add_task", body)
+
+    def test_company_page_hands_the_sidebar_its_company(self):
+        body = self._page("crm:company_detail", self.company.pk)
+        self.assertIn(
+            'taskAttach: {type: "company", name: "O\\u0027Neil Tekstil"}', body)
+        self.assertNotIn("attachTaskSection", body)
+        self.assertNotIn("action=add_task", body)
+
+    def test_both_pages_run_on_the_same_stylesheet_and_script(self):
+        for url_name, pk in (("crm:contact_detail", self.contact.pk),
+                             ("crm:company_detail", self.company.pk)):
+            body = self._page(url_name, pk)
+            self.assertIn("crm/css/record_detail.css", body)
+            self.assertIn("crm/js/record_detail.js", body)
+            # No page-private styles or copies of the shared functions.
+            self.assertNotIn("function confirmDelete", body)
+            self.assertNotIn(".od-card {", body)
+
+
+class CompanyAddContactSidebarTests(TestCase):
+    """A company's page adds a contact through the Add a Contact sidebar,
+    which then creates it already linked to that company."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="company-contact-tester", password="pw"
+        )
+        cls.company = Company.objects.create(name="O'Neil Tekstil")
+
+    def test_contact_item_opens_the_sidebar_with_the_company_set(self):
+        self.client.force_login(self.user)
+        body = self.client.get(
+            reverse("crm:company_detail", args=[self.company.pk])).content.decode()
+        self.assertIn(
+            "openMainContactSidebar({id: %d, name: 'O\\u0027Neil Tekstil'})"
+            % self.company.pk, body)
+        self.assertIn('name="company_id"', body)
+        self.assertNotIn("quickCreateContactForm", body)
+
+    def test_sidebar_post_links_the_new_contact_by_company_id(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("crm:create_contact"),
+            {"name": "New Person", "company_id": self.company.pk,
+             "emails_data": "[]", "phones_data": "[]"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertTrue(response.json()["success"], response.content)
+        self.assertEqual(
+            Contact.objects.get(name="New Person").company, self.company)

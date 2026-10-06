@@ -1024,6 +1024,16 @@
             <textarea name="address" id="id_main_contact_address" class="form-textarea" rows="2"></textarea>
           </div>
 
+          <!-- The company the contact is being added to. Shown only
+               when the sidebar was opened from that company's page. -->
+          <div class="form-group" id="mainContactCompanyRow" style="display: none;">
+            <label>{% trans "Company" %}</label>
+            <div class="attach-chips">
+              <span class="attach-chip"><i class="fas fa-building"></i><span id="mainContactCompanyName"></span></span>
+            </div>
+            <input type="hidden" name="company_id" id="id_main_contact_company" value="">
+          </div>
+
           <!-- Attach an item section -->
           <div class="attach-section">
             <div class="attach-header">
@@ -1836,6 +1846,10 @@
             if (data.success) {
               closeTaskSidebar();
 
+              // A page showing its own task list (a contact's Attached
+              // items) listens for this to pick the new task up.
+              document.dispatchEvent(new CustomEvent('task:created', { detail: data }));
+
               // If we're on a list that should reflect the new task, refresh it
               const onTeamTasks = window.location.href.includes('team/tasks');
               const onDashboard = ['/dashboard', '/', '/home'].some(p => window.location.pathname.startsWith(p));
@@ -2012,15 +2026,21 @@
     };
 
     // Main Contact Sidebar Functions
-    function openMainContactSidebar() {
+    // `company` ({id, name}) is passed by a company's own page: the new
+    // contact is then created already linked to it.
+    function setMainContactCompany(company) {
+      document.getElementById('id_main_contact_company').value = company ? company.id : '';
+      document.getElementById('mainContactCompanyName').textContent = company ? company.name : '';
+      document.getElementById('mainContactCompanyRow').style.display = company ? '' : 'none';
+    }
+
+    function openMainContactSidebar(company = null) {
       document.getElementById('mainContactSidebarOverlay').classList.add('active');
       document.body.style.overflow = 'hidden';
+      setMainContactCompany(company);
       // Initialize dynamic email/phone fields
       initDynamicFields('main_contact_emails_container', 'contact_emails_data', 'email', []);
       initDynamicFields('main_contact_phones_container', 'contact_phones_data', 'phone', []);
-      // Set today's date for task
-      const today = new Date().toISOString().split('T')[0];
-      document.getElementById('id_main_contact_task_due').value = today;
       // Initialize form tracking and focus
       setTimeout(() => {
         initializeFormTracking('mainContactForm');
@@ -2034,6 +2054,8 @@
       document.body.style.overflow = '';
       // Reset form
       document.getElementById('mainContactForm').reset();
+      // reset() leaves a hidden field's value alone, so clear it by hand.
+      setMainContactCompany(null);
       // Hide all attachment sections
       document.getElementById('mainContactNoteSection').style.display = 'none';
       document.getElementById('mainContactTaskSection').style.display = 'none';
@@ -2148,6 +2170,13 @@
 
             // Close sidebar
             closeMainContactSidebar();
+
+            // A page that lists contacts itself (a company's linked
+            // contacts) takes the new one and cancels the event; anywhere
+            // else, go to the new contact's page.
+            const stayHere = !document.dispatchEvent(
+              new CustomEvent('contact:created', { detail: data, cancelable: true }));
+            if (stayHere) return;
 
             // Redirect to contact detail page
             setTimeout(() => {

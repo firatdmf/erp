@@ -1,0 +1,70 @@
+{% load i18n accounts_tags %}
+{% comment %}
+  A client's ledger account in every book, pickable for one combined
+  statement. Renders nothing for a sales rep.
+
+  Expects: current_account_accounts, current_account_total, is_sales_rep.
+{% endcomment %}
+{% if not is_sales_rep %}
+<section class="od-card">
+  <div class="od-card-h">
+    <i class="fa fa-book card-ico"></i>
+    <h3>{% trans "Account history" %}{% if current_account_accounts %} <span class="od-account-total">({{ current_account_accounts.0.display_currency_symbol }}{{ current_account_total|money }})</span>{% endif %}</h3>
+    <span class="od-card-sub">{{ current_account_accounts|length }} {% blocktrans count counter=current_account_accounts|length %}account{% plural %}accounts{% endblocktrans %}</span>
+  </div>
+  {% comment %}
+    Pick accounts, print or export — the same gesture as Order
+    history, because it answers the same question. A client holds
+    one account per book, which is OUR arrangement:
+    picking both and printing gives them the single statement they
+    would recognise, with no book named on it. See
+    accounting.views_accounts.CurrentAccountStatementPrintCombined.
+  {% endcomment %}
+  {% if current_account_accounts %}
+    <div class="od-card-tools">
+      <button type="button" id="printAccountsBtn" class="od-print-orders" disabled
+              onclick="printSelectedAccounts()"
+              data-label-idle="{% trans 'Print selected' %}"
+              data-label-picked="{% trans 'Print' %}">
+        <i class="fa fa-print"></i>
+        <span id="printAccountsLabel">{% trans "Print selected" %}</span>
+      </button>
+      <button type="button" id="excelAccountsBtn" class="od-print-orders" disabled
+              onclick="excelSelectedAccounts()"
+              data-label-idle="{% trans 'Excel' %}"
+              data-label-picked="{% trans 'Excel' %}"
+              title="{% trans 'Download the selected accounts as one statement' %}">
+        <i class="fa fa-file-excel"></i>
+        <span id="excelAccountsLabel">{% trans "Excel" %}</span>
+      </button>
+    </div>
+  {% endif %}
+
+  <div class="od-order-list">
+    {% for a in current_account_accounts %}
+      <div class="od-order-pick">
+        <input type="checkbox" class="od-account-check" value="{{ a.pk }}"
+               onchange="syncAccountSelection()"
+               aria-label="{% trans 'Include this account' %} {{ a.code }}">
+        <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
+          <div class="od-order-id">
+            <div class="od-order-num">{{ a.book.name }}</div>
+            <div class="od-order-date">{{ a.code }}</div>
+          </div>
+          <span class="ord-status {% if a.cached_balance > 0 %}pending{% elif a.cached_balance < 0 %}cancelled{% else %}completed{% endif %}">
+            <span class="ord-status-dot"></span>{{ a.balance_label }}
+          </span>
+          <div class="od-order-total">
+            <span>{{ a.display_currency_symbol }}</span>{{ a.cached_balance|money }}
+          </div>
+          <i class="fa fa-chevron-right od-order-chev"></i>
+        </a>
+      </div>
+    {% empty %}
+      <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
+        {% trans "No ledger account in any book yet." %}
+      </p>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

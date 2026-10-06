@@ -31,7 +31,6 @@ urlpatterns = [
     path("supplier/<int:pk>/notes_partial/", views.get_supplier_notes_partial, name="get_supplier_notes_partial"),
     path("supplier/search/companies/", views.supplier_search_companies, name="supplier_search_companies"),
     path("supplier/search/contacts/", views.supplier_search_contacts, name="supplier_search_contacts"),
-    path("company/<int:company_pk>/quick_create_contact/", views.quick_create_contact_for_company, name="quick_create_contact_for_company"),
 ]
 
 htmx_urlpatterns = [

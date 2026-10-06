@@ -1,0 +1,77 @@
+{% load i18n %}
+{% comment %}
+  A client's orders, newest first, each one a link to its order page.
+  Ticked rows print onto one sheet or download as one spreadsheet.
+
+  Expects: orders (through Order.with_pre_order_flag), empty_text.
+{% endcomment %}
+<section class="od-card">
+  <div class="od-card-h">
+    <i class="fa fa-shopping-bag card-ico"></i>
+    <h3>{% trans "Order history" %}</h3>
+    <span class="od-card-sub">{{ orders|length }} {% blocktrans count counter=orders|length %}order{% plural %}orders{% endblocktrans %}</span>
+  </div>
+  {% if orders %}
+    <div class="od-card-tools">
+      <button type="button" id="printOrdersBtn" class="od-print-orders" disabled
+              onclick="printSelectedOrders()"
+              data-label-idle="{% trans 'Print selected' %}"
+              data-label-picked="{% trans 'Print' %}">
+        <i class="fa fa-print"></i>
+        <span id="printOrdersLabel">{% trans "Print selected" %}</span>
+      </button>
+      <button type="button" id="excelOrdersBtn" class="od-print-orders" disabled
+              onclick="excelSelectedOrders()"
+              data-label-idle="{% trans 'Excel' %}"
+              data-label-picked="{% trans 'Excel' %}"
+              title="{% trans 'Download the selected orders as a spreadsheet' %}">
+        <i class="fa fa-file-excel"></i>
+        <span id="excelOrdersLabel">{% trans "Excel" %}</span>
+      </button>
+    </div>
+  {% endif %}
+
+  <div class="od-order-list">
+    {% for o in orders %}
+      <div class="od-order-pick">
+        <input type="checkbox" class="od-order-check" value="{{ o.pk }}"
+               onchange="syncPrintSelection()"
+               aria-label="{% trans 'Print this order' %} {{ o.order_number|default:o.pk }}">
+        <a class="od-order-row" href="{% url 'operating:order_detail' o.pk %}">
+        <div class="od-order-id">
+          <div class="od-order-num">{{ o.order_number|default:o.pk }}</div>
+          <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
+        </div>
+        {% with disp_status=o.order_status %}
+        <span class="ord-status {% if o.is_pre_order %}pre_order{% else %}{{ disp_status }}{% endif %}">
+          <span class="ord-status-dot"></span>
+          {% comment %} The customer-facing order_status, matching
+             order_list and order_detail — including their relabel of
+             "shipped" as Completed. This used to render the production
+             STATUS_CHOICES label instead, because ORDER_STATUS_CHOICES
+             was once hardcoded Turkish; it goes through gettext_lazy
+             now, so the .po file supplies the translation. Reading
+             `status` here meant an order set to Shipped still showed
+             "Pending" whenever its items had not been moved on. {% endcomment %}
+          {% if disp_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ o.status_label }}{% endif %}
+        </span>
+        {% endwith %}
+        <div class="od-order-total">
+          {% if o.paid_amount %}
+            {{ o.paid_amount }} <span>{{ o.paid_currency|default:"" }}</span>
+          {% elif o.original_price %}
+            {{ o.original_price }} <span>{{ o.original_currency|default:"" }}</span>
+          {% else %}
+            <span class="od-empty-mute">—</span>
+          {% endif %}
+        </div>
+        <i class="fa fa-chevron-right od-order-chev"></i>
+        </a>
+      </div>
+    {% empty %}
+      <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
+        {{ empty_text }}
+      </p>
+    {% endfor %}
+  </div>
+</section>

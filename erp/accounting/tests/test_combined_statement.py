@@ -359,9 +359,13 @@ class TheCardOnTheCrmPage(CombinedStatementBase):
         card silently carrying the other card's ticks."""
         self._both()
         r = self.client.get(reverse("crm:contact_detail", args=[self.contact.pk]))
-        body = r.content.decode()
-        self.assertIn("pickedAccountIds", body)
-        self.assertIn(".od-account-check:checked", body)
+        self.assertContains(r, "crm/js/record_detail.js")
+        # The page's script is the one the CRM record pages share.
+        with open("crm/static/crm/js/record_detail.js", encoding="utf-8") as fh:
+            script = fh.read()
+        self.assertIn("syncPickButtons('.od-account-check', 'Accounts')", script)
+        self.assertIn("pickedIds('.od-account-check')", script)
+        self.assertIn("syncPickButtons('.od-order-check', 'Orders')", script)
 
     def test_no_tools_are_drawn_when_there_is_nothing_to_pick(self):
         contact = Contact.objects.create(name="Nobody")

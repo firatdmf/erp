@@ -1,0 +1,63 @@
+{% load i18n static %}
+{% comment %}
+  What crm/js/record_detail.js needs from the server, then the script
+  itself. The three CRM record pages — contact, company, supplier —
+  include this once, at the end of their content, so they run the same
+  code and say the same things.
+
+  Expects: kind ("contact" / "company" / "supplier"), record,
+           notes_partial_url.
+  Optional: record_name      — passing it sends "Task" in the attach menu
+                               to the sidebar task form with this record
+                               already picked (a task can be attached to
+                               a contact or a company, not a supplier);
+            emails_url, shared_files_url — the Communication tab;
+            edit_name, edit_url — "Contact" / "Company": the edit
+                               sidebar whose handlers the script provides.
+{% endcomment %}
+<script>
+  window.RECORD_DETAIL = {
+    kind: "{{ kind }}",
+    pk: {{ record.pk }},
+    csrf: "{{ csrf_token }}",
+    taskAttach: {% if record_name %}{type: "{{ kind }}", name: "{{ record_name|escapejs }}"}{% else %}null{% endif %},
+    editSidebar: {% if edit_name %}{name: "{{ edit_name }}", url: "{{ edit_url }}"}{% else %}null{% endif %},
+    urls: {
+      notesPartial: "{{ notes_partial_url }}",
+      emails: "{{ emails_url|default:'' }}",
+      sharedFiles: "{{ shared_files_url|default:'' }}",
+      compose: "{% url 'marketing:compose_email' %}",
+      orderPrint: "{% url 'operating:order_print_combined' %}",
+      orderExcel: "{% url 'operating:order_excel_combined' %}",
+      statementPrint: "{% url 'accounts:statement_print_combined' %}",
+      statementExcel: "{% url 'accounts:statement_excel_combined' %}"
+    },
+    {# escapejs on every string: a translation may carry an apostrophe or a quote. #}
+    i18n: {
+      taskName: "{% filter escapejs %}{% trans 'Task Name' %}{% endfilter %}",
+      descriptionOptional: "{% filter escapejs %}{% trans 'Description (optional)' %}{% endfilter %}",
+      dueDate: "{% filter escapejs %}{% trans 'Due Date' %}{% endfilter %}",
+      save: "{% filter escapejs %}{% trans 'Save' %}{% endfilter %}",
+      cancel: "{% filter escapejs %}{% trans 'Cancel' %}{% endfilter %}",
+      taskNameEmpty: "{% filter escapejs %}{% trans 'Task name cannot be empty' %}{% endfilter %}",
+      dueDateRequired: "{% filter escapejs %}{% trans 'Due date is required' %}{% endfilter %}",
+      failedSaveTask: "{% filter escapejs %}{% trans 'Failed to save task' %}{% endfilter %}",
+      editing: "{% filter escapejs %}{% trans 'Editing...' %}{% endfilter %}",
+      noteEmpty: "{% filter escapejs %}{% trans 'Note content cannot be empty' %}{% endfilter %}",
+      failedSaveNote: "{% filter escapejs %}{% trans 'Failed to save note' %}{% endfilter %}",
+      delete: "{% filter escapejs %}{% trans 'Delete' %}{% endfilter %}",
+      areYouSure: "{% filter escapejs %}{% trans 'Are you sure?' %}{% endfilter %}",
+      complete: "{% filter escapejs %}{% trans 'Complete' %}{% endfilter %}",
+      markComplete: "{% filter escapejs %}{% trans 'Mark as complete?' %}{% endfilter %}",
+      cannotUndo: "{% filter escapejs %}{% trans 'This action cannot be undone.' %}{% endfilter %}",
+      completed: "{% filter escapejs %}{% trans 'Completed' %}{% endfilter %}",
+      comingSoon: "{% filter escapejs %}{% trans 'This feature is coming soon.' %}{% endfilter %}",
+      loading: "{% filter escapejs %}{% trans 'Loading...' %}{% endfilter %}",
+      emailDetail: "{% filter escapejs %}{% trans 'Email Detail' %}{% endfilter %}",
+      loadingForm: "{% filter escapejs %}{% trans 'Loading…' %}{% endfilter %}",
+      failedLoadForm: "{% filter escapejs %}{% trans 'Failed to load edit form.' %}{% endfilter %}",
+      failedSave: "{% filter escapejs %}{% trans 'Failed to save.' %}{% endfilter %}"
+    }
+  };
+</script>
+<script src="{% static 'crm/js/record_detail.js' %}"></script>

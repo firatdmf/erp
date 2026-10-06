@@ -148,7 +148,12 @@ class ContactCreate(generic.edit.CreateView):
             # If something fails (e.g., a database error), you won't end up with a partially saved contact or company.
             with transaction.atomic():
                 company_name = form.cleaned_data.get("company_name")
-                if company_name:
+                # The sidebar opened from a company's own page names that
+                # company by id, which no retyped name can miss.
+                company_id = self.request.POST.get("company_id")
+                if company_id:
+                    form.instance.company = get_object_or_404(Company, pk=company_id)
+                elif company_name:
                     # get the company object from database or create a new one if it does not exist.
                     # Found whatever its case: "woodline" typed here is
                     # the Woodline CRM already has, not a second company.
@@ -617,6 +622,9 @@ class CompanyDetail(generic.DetailView):
         # Filter tasks by current user's member
         current_member = self.request.user.member if hasattr(self.request.user, 'member') else None
         context["tasks"] = Task.objects.filter(company=company, member=current_member)
+        # The Attached items card shows only the open ones, and needs a
+        # count for its group header.
+        context["open_tasks"] = context["tasks"].filter(completed=False)
         
         # Add email campaign info if exists
         try:
@@ -630,10 +638,9 @@ class CompanyDetail(generic.DetailView):
 
         # ── Order history for this company ────────────────────
         from operating.models import Order
-        context["orders"] = (
-            Order.objects.filter(company=company)
-            .order_by("-created_at")[:25]
-        )
+        context["orders"] = Order.with_pre_order_flag(
+            Order.objects.filter(company=company).order_by("-created_at")
+        )[:25]
 
         # ── Samples this company has been given ───────────────
         # Its own and its people's: a sample handed to the buyer is a
@@ -1857,44 +1864,6 @@ def get_supplier_notes_partial(request, pk):
         },
     )
     return HttpResponse(f'<div id="notesSection">{history_html}</div>')
-
-
-def quick_create_contact_for_company(request, company_pk):
-    """Inline create-and-link a new contact from the company detail
-    page. Accepts POST with name (required), email (optional),
-    phone (optional), job_title (optional). Returns JSON with the
-    new contact so the front-end can splice a row into the list."""
-    from django.http import JsonResponse
-    if request.method != "POST":
-        return JsonResponse({"success": False, "error": "POST only"}, status=405)
-    company = get_object_or_404(Company, pk=company_pk)
-    name = (request.POST.get("name") or "").strip()
-    if not name:
-        return JsonResponse({"success": False, "error": "Name is required"}, status=400)
-    email = (request.POST.get("email") or "").strip()
-    phone = (request.POST.get("phone") or "").strip()
-    job_title = (request.POST.get("job_title") or "").strip()
-    try:
-        contact = Contact.objects.create(
-            name=name,
-            company=company,
-            job_title=job_title or "",
-            email=[email] if email else [],
-            phone=[phone] if phone else [],
-        )
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
-    return JsonResponse({
-        "success": True,
-        "contact": {
-            "id": contact.pk,
-            "name": contact.name,
-            "job_title": contact.job_title or "",
-            "email": contact.email[0] if contact.email else "",
-            "initials": (contact.name[:2] or "?").upper(),
-            "detail_url": reverse("crm:contact_detail", args=[contact.pk]),
-        },
-    })
 
 
 def supplier_search_companies(request):

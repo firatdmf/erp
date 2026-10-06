@@ -1,0 +1,97 @@
+{% load i18n todo_filters %}
+{% comment %}
+  The two groups every CRM record page has in its Attached items card:
+  upcoming tasks, and files. A page with a group of its own (a company's
+  linked contacts) puts it beside this include, inside the same card.
+
+  Expects: kind ("contact" / "company" / "supplier"), record, open_tasks.
+{% endcomment %}
+<!-- Group: upcoming tasks -->
+<div class="od-attach-group">
+  <div class="od-group-head" role="button" tabindex="0" aria-expanded="true"
+       onclick="toggleAttachGroup(this)"
+       onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAttachGroup(this); }">
+    <span class="od-group-ico green"><i class="fa fa-check-circle"></i></span>
+    <span class="od-group-name">{% trans "Upcoming tasks" %}</span>
+    <span class="od-group-count" id="grpTaskCount">({{ open_tasks|length }})</span>
+    <i class="fa fa-chevron-down od-group-chev"></i>
+  </div>
+  <div class="od-group-body">
+    <div id="tasksList" class="od-task-list">
+      {% for task in open_tasks|dictsortreversed:'due_date' %}
+        <div class="od-task" id="task-{{ task.id }}">
+          <div class="task-content" id="task-content-{{ task.id }}" style="flex:1; min-width:0;">
+            <div class="od-task-body">
+              <h3 class="od-task-name task-name">{{ task.name }}</h3>
+              {% if task.description %}
+                <p class="od-task-desc task-description">{{ task.description }}</p>
+              {% endif %}
+              <div class="od-task-meta task-meta">
+                <span class="pill due task-due"><i class="fa fa-calendar"></i>{{ task.due_date|date:"M d, Y" }}</span>
+                {% if task.due_date|days_since %}
+                  <span class="pill overdue task-overdue">{{ task.due_date|days_since }}</span>
+                {% endif %}
+                {% if task.member %}
+                  <span class="pill task-member"><i class="fa fa-user"></i>{{ task.member }}</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="od-task-actions task-actions">
+            <button type="button" class="od-icon-btn ok btn-icon-minimal" title="{% trans 'Complete' %}"
+                    onclick="confirmDelete('complete_task', {{ task.id }})">
+              <i class="fa fa-check"></i>
+            </button>
+            <button type="button" class="od-icon-btn btn-icon-minimal" title="{% trans 'Edit' %}"
+                    onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"Y-m-d" }}')">
+              <i class="fa fa-edit"></i>
+            </button>
+            <button type="button" class="od-icon-btn del btn-icon-minimal" title="{% trans 'Delete' %}"
+                    onclick="confirmDelete('delete_task', {{ task.id }})">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      {% empty %}
+        <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "No tasks available." %}</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Group: files — collapsed until asked for, so the drop zone
+     does not take up the card on every visit -->
+<div class="od-attach-group collapsed">
+  <div class="od-group-head" role="button" tabindex="0" aria-expanded="false"
+       onclick="toggleAttachGroup(this)"
+       onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAttachGroup(this); }">
+    <span class="od-group-ico blue"><i class="fa fa-paperclip"></i></span>
+    <span class="od-group-name">{% trans "Files" %}</span>
+    <span class="od-group-count" id="grpFileCount">({{ record.attachments.count }})</span>
+    <i class="fa fa-chevron-down od-group-chev"></i>
+  </div>
+  <div class="od-group-body">
+    <form id="attachUploadForm" class="od-file-drop"
+          hx-post="{% url 'crm:upload_attachments' kind record.id %}"
+          hx-encoding="multipart/form-data"
+          hx-target="#attachmentsList" hx-swap="innerHTML"
+          hx-trigger="change from:#attachFileInput"
+          hx-on::after-request="this.reset(); syncAttachedCounts(); expandAttachGroup('attachmentsList');"
+          ondragover="event.preventDefault(); this.classList.add('over');"
+          ondragleave="this.classList.remove('over');"
+          ondrop="dropAttachments(event, this);"
+          onclick="document.getElementById('attachFileInput').click();">
+      {% csrf_token %}
+      <input type="file" name="files" id="attachFileInput" multiple hidden>
+      <i class="fa fa-cloud-upload-alt"></i>
+      <span class="od-file-drop-t">{% trans "Drop files here, or click to choose" %}</span>
+      <span class="od-file-drop-s">{% trans "Up to 25 MB per file · programs and scripts are not accepted" %}</span>
+      <span class="od-file-drop-busy htmx-indicator">
+        <i class="fa fa-spinner fa-spin"></i> {% trans "Uploading…" %}
+      </span>
+    </form>
+    <div id="attachmentsList" class="od-file-list">
+      {% include "crm/components/_attachments.html" with attachments=record.attachments.all %}
+    </div>
+  </div>
+</div>

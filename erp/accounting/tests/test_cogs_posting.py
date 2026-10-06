@@ -139,3 +139,45 @@ class StockLeavingPostsItsCost(TestCase):
         self.assertEqual(row["ledger"], Decimal("300.00"))       # 400 - 100
         self.assertEqual(row["subsidiary"], Decimal("300.00"))   # 75m x 4.00
         self.assertTrue(row["reconciled"])
+
+    def test_a_cost_that_falls_between_cents_is_posted_whole(self):
+        """20.70 m at 3.35 is 69.345. Posted to the cent it left half a cent
+        between Inventory and the shelves, and six such rolls left a whole
+        one on Ergene (05.10.2026)."""
+        from accounting.services_posting import post_opening_inventory
+
+        rolls = []
+        for n, metres in enumerate(("34.30", "33.50", "30.70", "33.30")):
+            rolls.append(WarehouseProductItem.objects.create(
+                product=self.product, quantity=Decimal(metres),
+                quantity_remaining=Decimal(metres), barcode=f"HALF-{n}",
+                status="in_stock", unit_cost_base=Decimal("4.35")))
+        post_opening_inventory(self.book, date="2026-09-01")
+
+        for roll in rolls[:3]:
+            StockMovement.objects.create(
+                product=self.product, stock_item=roll, movement_type="out",
+                quantity=roll.quantity, reason="Order ship")
+            roll.quantity_remaining = Decimal("0")
+            roll.status = "consumed"
+            roll.save()
+
+        # 149.205 + 145.725 + 133.545, where the cent-rounded lines came
+        # to 428.46.
+        self.assertEqual(self._balances()["5000"], Decimal("428.475"))
+        row = reconcile(self.book)["rows"][2]
+        self.assertEqual(row["subsidiary"], Decimal("544.855"))  # 400 + 144.855
+        self.assertEqual(row["difference"], Decimal("0"))
+        self.assertTrue(row["reconciled"])
+        self.assertTrue(balance_sheet(self.book)["balanced"])
+
+    def test_closing_the_period_empties_a_fraction_of_a_cent_too(self):
+        from accounting.services_posting import close_period
+
+        self.roll.unit_cost_base = Decimal("3.35")
+        self.roll.save()
+        self._out("20.70")                                  # 69.345
+        close_period(self.book, date_to="2026-12-31")
+        b = self._balances()
+        self.assertEqual(b["5000"], Decimal("0"))
+        self.assertEqual(b["3200"], Decimal("-69.345"))

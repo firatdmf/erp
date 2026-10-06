@@ -167,12 +167,23 @@ def credit(code, amount, **kwargs):
     return _line(code, credit=amount, **kwargs)
 
 
+# What a ledger line can hold (JournalLine.debit), and what money entered
+# as money is rounded to on the way in.
+EXACT = Decimal("0.000001")
+CENT = Decimal("0.01")
+
+
 def _line(code, debit=ZERO, credit=ZERO, *, current_account=None, cash_account=None,
-          currency=None, amount_original=None, exchange_rate=None, memo=""):
+          currency=None, amount_original=None, exchange_rate=None, memo="",
+          exact=False):
+    # `exact` is for the cost of stock, which is a quantity times a unit
+    # cost and is kept to the fraction of a cent it comes to. Everything
+    # else is money somebody typed or was paid, and is cents.
+    places = EXACT if exact else CENT
     return {
         "code": code,
-        "debit": Decimal(debit or 0).quantize(Decimal("0.01")),
-        "credit": Decimal(credit or 0).quantize(Decimal("0.01")),
+        "debit": Decimal(debit or 0).quantize(places),
+        "credit": Decimal(credit or 0).quantize(places),
         "current_account": current_account,
         "cash_account": cash_account,
         "currency": currency,
@@ -504,6 +515,10 @@ def _inventory_value(book, warehouse=None):
 
     Only live items count — a consumed one is not an asset — and items
     with no cost basis at all are counted, not guessed at.
+
+    The value is not rounded to the cent. The ledger carries stock at the
+    same precision (JournalLine.debit), and the two are compared exactly;
+    rounding this side alone is a difference of its own making.
     """
     from django.db.models import DecimalField, ExpressionWrapper, F
     from django.db.models.functions import Coalesce
@@ -532,7 +547,7 @@ def _inventory_value(book, warehouse=None):
     unvalued = live.filter(unit_cost_base=None, purchase_invoice_item=None,
                            product__cost_usd=None)
     return (
-        Decimal(total).quantize(Decimal("0.01")),
+        Decimal(total).quantize(EXACT),
         unvalued.count(),
         unvalued.aggregate(m=Sum("quantity_remaining"))["m"] or ZERO,
     )

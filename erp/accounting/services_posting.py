@@ -386,8 +386,8 @@ def post_opening_inventory(book, *, date, reference="", warehouse=None,
     entry = post_entry(
         book=book, date=date,
         description=description,
-        lines=[debit("1300", value, memo=memo),
-               credit(contra, value, memo=memo)],
+        lines=[debit("1300", value, memo=memo, exact=True),
+               credit(contra, value, memo=memo, exact=True)],
         reference=reference,
     )
     return entry, unvalued_count, unvalued_qty
@@ -630,15 +630,20 @@ def close_period(book, *, date_to, description=None, reference="", member=None):
     lines, plug = [], ZERO
     for code, net in sorted(balances.items()):
         plug += net
+        # Exact, because the cost of stock sits in these accounts to the
+        # fraction of a cent, and an account closed to the nearest cent is
+        # not empty.
         if net > ZERO:                      # a debit balance — credit it away
-            lines.append(credit(code, net, memo="Closing entry"))
+            lines.append(credit(code, net, memo="Closing entry", exact=True))
         else:
-            lines.append(debit(code, -net, memo="Closing entry"))
+            lines.append(debit(code, -net, memo="Closing entry", exact=True))
 
     if plug > ZERO:                         # net debit: the period lost money
-        lines.append(debit(RETAINED_EARNINGS, plug, memo="Result for the period"))
+        lines.append(debit(RETAINED_EARNINGS, plug,
+                           memo="Result for the period", exact=True))
     else:
-        lines.append(credit(RETAINED_EARNINGS, -plug, memo="Result for the period"))
+        lines.append(credit(RETAINED_EARNINGS, -plug,
+                            memo="Result for the period", exact=True))
 
     entry = post_entry(
         book=book, date=date_to,
@@ -956,23 +961,26 @@ def lines_for_stock_movement(movement):
     unit = stock_unit_cost(movement.stock_item, movement.product)
     if unit is None:
         return []
-    value = (quantity * unit).quantize(Decimal("0.01"))
+    # Not rounded to the cent: the shelves are valued at quantity times
+    # unit cost, so that is what has to leave the ledger with the stock.
+    # See JournalLine.debit.
+    value = quantity * unit
     if value == ZERO:
         return []
 
     memo = (movement.reason or "")[:300]
     if is_return:
-        return [debit(INVENTORY, value, memo=memo),
-                credit(COST_OF_GOODS_SOLD, value, memo=memo)]
+        return [debit(INVENTORY, value, memo=memo, exact=True),
+                credit(COST_OF_GOODS_SOLD, value, memo=memo, exact=True)]
     if unpurchased_contra is not None:
-        return [debit(INVENTORY, value, memo=memo),
-                credit(unpurchased_contra, value, memo=memo)]
+        return [debit(INVENTORY, value, memo=memo, exact=True),
+                credit(unpurchased_contra, value, memo=memo, exact=True)]
     if is_correction:
         if signed < ZERO:
-            return [debit(INVENTORY_SHRINKAGE, value, memo=memo),
-                    credit(INVENTORY, value, memo=memo)]
-        return [debit(INVENTORY, value, memo=memo),
-                credit(INVENTORY_SHRINKAGE, value, memo=memo)]
+            return [debit(INVENTORY_SHRINKAGE, value, memo=memo, exact=True),
+                    credit(INVENTORY, value, memo=memo, exact=True)]
+        return [debit(INVENTORY, value, memo=memo, exact=True),
+                credit(INVENTORY_SHRINKAGE, value, memo=memo, exact=True)]
     # A sample given to a client was not sold: its cost is what it took to
     # win the client, so it goes to marketing rather than into the cost of
     # the sales it sits beside. A piece cut for the showroom or a trade show
@@ -987,8 +995,8 @@ def lines_for_stock_movement(movement):
         expense = INVENTORY_SHRINKAGE
     else:
         expense = COST_OF_GOODS_SOLD
-    return [debit(expense, value, memo=memo),
-            credit(INVENTORY, value, memo=memo)]
+    return [debit(expense, value, memo=memo, exact=True),
+            credit(INVENTORY, value, memo=memo, exact=True)]
 
 
 @transaction.atomic

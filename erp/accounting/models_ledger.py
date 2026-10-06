@@ -239,8 +239,15 @@ class JournalLine(models.Model):
     # Exactly one of these is non-zero. Two columns rather than one signed
     # amount because that is how a ledger is read, and because "which side"
     # then cannot be lost to a sign flip somewhere upstream.
-    debit = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO)
-    credit = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO)
+    #
+    # Six decimals, not two, because stock is valued at metres (two
+    # decimals) times unit cost (four), and a roll's cost is often not a
+    # whole number of cents: 20.70 m at 3.35 is 69.345. Posted to the cent,
+    # each such roll left half a cent between Inventory (1300) and the
+    # shelves, and enough of them left a whole one. Money that is entered
+    # as money still arrives in cents; only the pages round.
+    debit = models.DecimalField(max_digits=18, decimal_places=6, default=ZERO)
+    credit = models.DecimalField(max_digits=18, decimal_places=6, default=ZERO)
 
     # What was entered, before conversion. Null when the entry was already
     # in base currency.

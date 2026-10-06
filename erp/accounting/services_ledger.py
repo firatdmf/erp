@@ -605,8 +605,8 @@ def reconcile(book, date_to=None):
             "ledger": balance("1000"),
             "subsidiary": _cash_journal_total(book),
             "subsidiary_label": "Cash journal",
-            "note": "Transfers and currency exchanges move cash on both "
-                    "legs and are not posted yet, so they sit in this gap.",
+            "note": "Cash recorded before automatic posting began has "
+                    "not been replayed into the general ledger yet.",
         },
         {
             "label": "Inventory",

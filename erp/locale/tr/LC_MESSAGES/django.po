@@ -13239,8 +13239,8 @@ msgid "Movements recorded before automatic posting began have not been replayed 
 msgstr "Otomatik kayıt başlamadan önce girilen hareketler henüz büyük deftere işlenmedi."
 
 #: accounting/templates/accounts/report_balance_sheet.html
-msgid "Transfers and currency exchanges move cash on both legs and are not posted yet, so they sit in this gap."
-msgstr "Transferler ve döviz işlemleri kasayı iki tarafta da hareket ettirir ve henüz deftere işlenmez; bu fark onlardan oluşur."
+msgid "Cash recorded before automatic posting began has not been replayed into the general ledger yet."
+msgstr "Otomatik kayıt başlamadan önce girilen kasa hareketleri henüz büyük deftere işlenmedi."
 
 #: accounting/templates/accounts/report_balance_sheet.html
 msgid "Stock that arrives without a purchase invoice raises the shelves and not the ledger. Goods leaving on a sale do relieve stock, but only since that posting began: anything older is still in this difference."

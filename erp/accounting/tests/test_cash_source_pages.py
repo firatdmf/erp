@@ -251,6 +251,42 @@ class CurrencyExchangePageTests(CashSourceFixture):
         self.assertEqual(self.balance(self.kasa), Decimal("0.00"))
         self.assertEqual(self.balance(self.euros), Decimal("90.00"))
 
+    # ── the general ledger ───────────────────────────────────────
+    def _ledger(self):
+        from accounting.services_ledger import reconcile
+        cash = next(r for r in reconcile(self.book)["rows"] if r["control"] == "1000")
+        lines = {}
+        from accounting.models_ledger import JournalLine
+        for line in JournalLine.objects.filter(entry__book=self.book):
+            lines[line.account.code] = (lines.get(line.account.code, Decimal("0"))
+                                        + line.debit - line.credit)
+        return cash, lines
+
+    def test_an_exchange_posts_itself_and_cash_agrees_with_the_journal(self):
+        """Cash leaves one account and reaches another; what the two legs
+        are worth apart is the cost of the exchange."""
+        from accounting.models_ledger import JournalEntry
+        cash, lines = self._ledger()
+        self.assertEqual(JournalEntry.objects.filter(book=self.book).count(), 1)
+        self.assertEqual(cash["ledger"], cash["subsidiary"])
+        rows = {r.is_amount_positive: r.amount_in_base_currency
+                for r in self.entries(self.exchange)}
+        self.assertEqual(lines["1000"], rows[True] - rows[False])
+        self.assertEqual(lines.get("5900", Decimal("0")), rows[False] - rows[True])
+
+    def test_editing_an_exchange_replaces_its_entry(self):
+        from accounting.models_ledger import JournalEntry
+        self.edit(to_amount="80.00")
+        cash, _lines = self._ledger()
+        self.assertEqual(JournalEntry.objects.filter(book=self.book).count(), 1)
+        self.assertEqual(cash["ledger"], cash["subsidiary"])
+
+    def test_deleting_an_exchange_takes_its_entry_with_it(self):
+        from accounting.models_ledger import JournalEntry
+        self.client.post(self.url("delete_equity_exchange", self.exchange))
+        self.assertFalse(CurrencyExchange.objects.exists())
+        self.assertFalse(JournalEntry.objects.filter(book=self.book).exists())
+
     def edit(self, **changes):
         data = {
             "book": self.book.pk, "from_cash_account": self.kasa.pk,

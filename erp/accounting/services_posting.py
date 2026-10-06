@@ -504,6 +504,57 @@ def post_cash_entry(entry, *, reference=""):
     )
 
 
+@transaction.atomic
+def post_currency_exchange(exchange, *, reference=""):
+    """Make the ledger say what this currency exchange did. Idempotent.
+
+    An exchange is cash on both legs: one cash account gives, another
+    receives, and no account outside Cash and Bank is involved unless the
+    two legs are worth different amounts in base currency on the day —
+    which is what the exchange cost, or gained, and goes to Foreign
+    Exchange Gain/Loss.
+
+    Posted from its two cash rows, because those are what the cash journal
+    counts; an exchange with only one row written so far is left alone and
+    picked up when the second arrives. Returns the entry, or None.
+    """
+    from django.contrib.contenttypes.models import ContentType
+
+    from .models import CashTransactionEntry
+
+    rows = list(CashTransactionEntry.objects
+                .filter(content_type=ContentType.objects.get_for_model(exchange.__class__),
+                        content_pk=exchange.pk)
+                .select_related("currency", "cash_account"))
+    unpost(exchange)
+    given = [r for r in rows if not r.is_amount_positive]
+    received = [r for r in rows if r.is_amount_positive]
+    if len(given) != 1 or len(received) != 1:
+        return None
+    given, received = given[0], received[0]
+    out = Decimal(given.amount_in_base_currency or 0)
+    into = Decimal(received.amount_in_base_currency or 0)
+    if out == ZERO and into == ZERO:
+        return None
+
+    memo = (f"Exchanged {given.amount} {given.currency.code} "
+            f"for {received.amount} {received.currency.code}")
+    lines = [debit(CASH_CONTROL, into, cash_account=received.cash_account, memo=memo),
+             credit(CASH_CONTROL, out, cash_account=given.cash_account, memo=memo)]
+    if out > into:
+        lines.append(debit(FX_GAIN_LOSS, out - into, memo=memo))
+    elif into > out:
+        lines.append(credit(FX_GAIN_LOSS, into - out, memo=memo))
+    return post_entry(
+        book=given.book,
+        date=exchange.date or given.date,
+        description=memo,
+        lines=[line for line in lines if (line["debit"] or line["credit"])],
+        source=exchange,
+        reference=reference,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Closing the books
 #

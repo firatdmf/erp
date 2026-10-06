@@ -281,3 +281,38 @@ class RollEditTrimsReservations(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.roll.refresh_from_db()
         self.assertEqual(self.roll.quantity, Decimal("19.50"))
+
+
+class RollEditKeepsANote(RollEditTrimsReservations):
+    """A stock item carries a note — that its cost is an estimate, say —
+    and the product page shows it and lets it be changed."""
+
+    def _post(self, **extra):
+        data = {"barcode": self.roll.barcode, "quantity": "19.50"}
+        data.update(extra)
+        return self.client.post(
+            reverse("operating:warehouse_roll_edit",
+                    kwargs={"warehouse_pk": self.wh.pk, "product_pk": self.wp.pk,
+                            "roll_pk": self.roll.pk}), data)
+
+    def test_the_note_is_saved_and_shown(self):
+        self._post(item_notes="Cost is an estimate, not a purchase price.")
+        self.roll.refresh_from_db()
+        self.assertEqual(self.roll.notes, "Cost is an estimate, not a purchase price.")
+        page = self.client.get(reverse("operating:warehouse_product_detail",
+                                       kwargs={"warehouse_pk": self.wh.pk,
+                                               "product_pk": self.wp.pk}))
+        self.assertContains(page, 'data-notes="Cost is an estimate, not a purchase price."')
+        self.assertContains(page, 'id="reNotes"')
+
+    def test_an_edit_that_sends_no_note_leaves_it_alone(self):
+        WarehouseProductItem.objects.filter(pk=self.roll.pk).update(notes="keep me")
+        self._post()
+        self.roll.refresh_from_db()
+        self.assertEqual(self.roll.notes, "keep me")
+
+    def test_an_emptied_note_is_cleared(self):
+        WarehouseProductItem.objects.filter(pk=self.roll.pk).update(notes="old")
+        self._post(item_notes="")
+        self.roll.refresh_from_db()
+        self.assertIsNone(self.roll.notes)

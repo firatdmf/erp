@@ -840,6 +840,11 @@
                      target="_blank" rel="noopener" title="{% trans 'Print label' %}">
                     <i class="fa fa-qrcode"></i>
                   </a>
+                  {% if r.notes %}
+                  <span class="roll-delete-btn" style="color:#B45309; cursor:help;" title="{{ r.notes }}">
+                    <i class="fa fa-sticky-note"></i>
+                  </span>
+                  {% endif %}
                   <button type="button"
                           class="roll-delete-btn" style="color:var(--nejum-teal-700);"
                           title="{% blocktrans with n=product.item_noun %}Edit this {{ n }}{% endblocktrans %}"
@@ -848,6 +853,7 @@
                           data-quantity="{% if r.quantity is not None %}{{ r.quantity|stringformat:'.2f' }}{% endif %}"
                           data-remaining="{% if r.quantity_remaining is not None %}{{ r.quantity_remaining|stringformat:'.2f' }}{% else %}{{ r.quantity|default_if_none:0|stringformat:'.2f' }}{% endif %}"
                           data-lot="{{ r.lot_number|default:'' }}"
+                          data-notes="{{ r.notes|default:'' }}"
                           data-is-second="{% if r.is_second %}1{% else %}0{% endif %}"
                           data-purchase="{{ r.purchase_number }}"
                           {% if not is_sales_rep %}
@@ -1092,6 +1098,10 @@
     <div class="so-fld">
       <label>{% trans "Lot No" %}</label>
       <input class="so-input" type="text" id="reLot" placeholder="—">
+    </div>
+    <div class="so-fld">
+      <label>{% trans "Note" %}</label>
+      <textarea class="so-input" id="reNotes" rows="2" placeholder="—"></textarea>
     </div>
     <div class="so-fld">
       <label style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
@@ -1426,6 +1436,7 @@
     document.getElementById('reBarcode').value = btn.dataset.barcode || '';
     document.getElementById('reMeters').value  = btn.dataset.quantity || '';
     document.getElementById('reLot').value     = btn.dataset.lot || '';
+    document.getElementById('reNotes').value   = btn.dataset.notes || '';
     document.getElementById('reIsSecond').checked = btn.dataset.isSecond === '1';
 
     // The floor is the metres already OUT, not the metres left: a roll cannot
@@ -1688,6 +1699,7 @@
     fd.append('barcode', document.getElementById('reBarcode').value || '');
     fd.append('quantity', document.getElementById('reMeters').value || '');
     fd.append('lot_number', document.getElementById('reLot').value || '');
+    fd.append('item_notes', document.getElementById('reNotes').value || '');
     if (document.getElementById('reIsSecond').checked) fd.append('is_second', '1');
     if (why) {
       fd.append('change_reason', why.value);

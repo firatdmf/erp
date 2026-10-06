@@ -7434,6 +7434,15 @@ class WarehouseRollEdit(View):
             roll.lot_number = lot or None
             roll_fields.append("lot_number"); changes.append("lot")
 
+        # ── Note ──
+        # Only when the form sent one: other callers post to this view
+        # without the field, and their silence must not wipe a note.
+        if "item_notes" in request.POST:
+            notes = (request.POST.get("item_notes") or "").strip()
+            if notes != (roll.notes or ""):
+                roll.notes = notes or None
+                roll_fields.append("notes"); changes.append("note")
+
         # ── Factory-second flag ──
         # Checkbox posts "on"/"1"/"true" when ticked, absent when not.
         new_is_second = (request.POST.get("is_second") or "").strip().lower() in ("1", "true", "on")

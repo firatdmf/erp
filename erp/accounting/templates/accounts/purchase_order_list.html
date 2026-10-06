@@ -68,6 +68,15 @@
   .po-badge.paid { background:#D1FAE5; color:#065F46; }
   .po-badge.overdue { background:#FEE2E2; color:#B91C1C; }
   .po-badge.cancelled { background:#F1F5F9; color:#94A3B8; }
+  /* A cancelled purchase stays in the list, greyed out: it is there for
+     the record, and its amount is not in the total above. */
+  .po-row.cancelled td { background: #FAFBFC; }
+  .po-row.cancelled .po-num,
+  .po-row.cancelled .po-date,
+  .po-row.cancelled .po-supplier,
+  .po-row.cancelled .po-items-count,
+  .po-row.cancelled td a { color: #A0A8B0; }
+  .po-row.cancelled .po-total { color: #A0A8B0; font-weight: 600; text-decoration: line-through; }
 
   .po-empty { text-align:center; padding: 60px 20px; color: var(--gray-500); }
   .po-empty .ico { font-size: 34px; color: var(--gray-400); margin-bottom: 10px; }
@@ -116,11 +125,10 @@
       {% endfor %}
     </select>
     <select name="status" onchange="this.form.submit()">
-      <option value="">{% trans "All except cancelled" %}</option>
+      <option value="">{% trans "All statuses" %}</option>
       {% for code, label in status_choices %}
       <option value="{{ code }}" {% if filter_status == code %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
-      <option value="all" {% if filter_status == "all" %}selected{% endif %}>{% trans "All statuses" %}</option>
     </select>
     <button type="submit" class="po-btn ghost"><i data-lucide="search"></i>{% trans "Filter" %}</button>
   </form>
@@ -141,7 +149,7 @@
       </thead>
       <tbody>
         {% for inv in invoices %}
-        <tr class="po-row" data-href="{% url 'accounts:purchase_order_detail' inv.pk %}">
+        <tr class="po-row{% if inv.status == 'cancelled' %} cancelled{% endif %}" data-href="{% url 'accounts:purchase_order_detail' inv.pk %}">
           <td><a class="po-num" href="{% url 'accounts:purchase_order_detail' inv.pk %}">{{ inv.number }}</a></td>
           <td><span class="po-date">{{ inv.date|date:"d.m.Y" }}</span></td>
           <td>

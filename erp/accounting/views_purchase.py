@@ -86,17 +86,15 @@ class PurchaseOrderList(View):
         if supplier_id.isdigit():
             qs = qs.filter(current_account_id=int(supplier_id))
 
-        # No status chosen = the live list. A cancelled order is kept
-        # for the audit trail, not for reading, so it only shows when
-        # asked for by name or through "all"; the total follows the
-        # same rule, so a cancelled amount never sits in the sum.
+        # No status chosen = every status, cancelled ones included: they
+        # stay in the list where they happened, greyed out by the
+        # template. "all" is the same thing under the name the dropdown
+        # used to send, so links saved from then still work.
         status = (request.GET.get("status") or "").strip()
         if status == "all":
-            pass
-        elif status:
+            status = ""
+        if status:
             qs = qs.filter(status=status)
-        else:
-            qs = qs.exclude(status="cancelled")
 
         invoices = list(qs[:500])
         for inv in invoices:
@@ -115,7 +113,10 @@ class PurchaseOrderList(View):
         for inv in invoices:
             inv.warehouse_id_for_edit = warehouse_by_invoice.get(inv.pk)
 
-        totals = qs.aggregate(total_sum=Sum("total"))
+        # A cancelled amount never sits in the sum — except on the page
+        # that was asked for the cancelled ones and nothing else.
+        summed = qs if status == "cancelled" else qs.exclude(status="cancelled")
+        totals = summed.aggregate(total_sum=Sum("total"))
 
         # Scoped too: the filter dropdown must not offer a supplier
         # whose invoices this page can never show.

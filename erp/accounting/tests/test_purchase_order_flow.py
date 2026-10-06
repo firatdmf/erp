@@ -264,11 +264,18 @@ class PurchaseListBookScopeTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         return resp.context
 
-    def test_cancelled_orders_are_hidden_by_default(self):
+    def test_cancelled_orders_are_listed_by_default_but_not_summed(self):
         self._cancelled("Gone", "999.00")
         ctx = self._page(self.laleli)
-        self.assertEqual([i.current_account.name for i in ctx["invoices"]], ["Karven"])
+        self.assertEqual(
+            sorted(i.current_account.name for i in ctx["invoices"]), ["Gone", "Karven"])
         self.assertEqual(ctx["total_sum"], Decimal("600.00"))
+
+    def test_a_cancelled_row_is_greyed_out(self):
+        self._cancelled("Gone", "999.00")
+        resp = self.client.get(
+            reverse("accounts:purchase_order_list", kwargs={"book_id": self.laleli.pk}))
+        self.assertContains(resp, 'class="po-row cancelled"', count=1)
 
     def test_cancelled_orders_show_when_asked_for_by_status(self):
         self._cancelled("Gone", "999.00")
@@ -276,12 +283,18 @@ class PurchaseListBookScopeTest(TestCase):
         self.assertEqual([i.current_account.name for i in ctx["invoices"]], ["Gone"])
         self.assertEqual(ctx["total_sum"], Decimal("999.00"))
 
-    def test_all_statuses_includes_cancelled(self):
+    def test_a_status_filter_still_narrows_the_list(self):
+        self._cancelled("Gone", "999.00")
+        ctx = self._page_with(status="draft")
+        self.assertEqual([i.current_account.name for i in ctx["invoices"]], ["Karven"])
+
+    def test_the_old_all_link_is_the_default_list(self):
         self._cancelled("Gone", "999.00")
         ctx = self._page_with(status="all")
         self.assertEqual(
             sorted(i.current_account.name for i in ctx["invoices"]), ["Gone", "Karven"])
-        self.assertEqual(ctx["total_sum"], Decimal("1599.00"))
+        self.assertEqual(ctx["total_sum"], Decimal("600.00"))
+        self.assertEqual(ctx["filter_status"], "")
 
     def test_the_supplier_filter_offers_only_this_books_suppliers(self):
         """A supplier the page can never show must not sit in its

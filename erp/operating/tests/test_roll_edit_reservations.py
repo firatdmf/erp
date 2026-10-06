@@ -304,6 +304,11 @@ class RollEditKeepsANote(RollEditTrimsReservations):
                                                "product_pk": self.wp.pk}))
         self.assertContains(page, 'data-notes="Cost is an estimate, not a purchase price."')
         self.assertContains(page, 'id="reNotes"')
+        # Information, shown at once: not a button, and not the browser's
+        # own tooltip, which waits a second before it appears.
+        self.assertContains(page, 'class="item-note"')
+        self.assertContains(page, 'data-note="Cost is an estimate, not a purchase price."')
+        self.assertNotContains(page, 'title="Cost is an estimate')
 
     def test_an_edit_that_sends_no_note_leaves_it_alone(self):
         WarehouseProductItem.objects.filter(pk=self.roll.pk).update(notes="keep me")

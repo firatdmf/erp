@@ -405,6 +405,11 @@
      phone held sideways, or a short laptop window. It scrolls inside itself
      at every width, so Save can always be reached — the phone-sized rule
      below already did this, but only up to 600px. */
+  /* A stock item's note: information, not a button. Shown the moment the
+     pointer arrives — the browser's own tooltip waits a second first. */
+  .item-note { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; color:#B45309; cursor:default; outline:none; }
+  .item-note i { font-size:14px; }
+  #itemNoteTip { position:fixed; z-index:4000; display:none; max-width:280px; padding:8px 10px; background:#0F1419; color:#fff; border-radius:8px; font:500 12px/1.45 var(--font-sans); white-space:pre-wrap; box-shadow:0 6px 18px rgba(15,20,25,.25); pointer-events:none; }
   #reOverlay .so-card { max-height: calc(100vh - 24px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
   /* A finger needs more than the 24px the chip's × is drawn at. */
   @media (max-width: 600px) { .co-sup-chip { height: 44px; } .co-sup-clear { width: 36px; height: 36px; } }
@@ -841,8 +846,8 @@
                     <i class="fa fa-qrcode"></i>
                   </a>
                   {% if r.notes %}
-                  <span class="roll-delete-btn" style="color:#B45309; cursor:help;" title="{{ r.notes }}">
-                    <i class="fa fa-sticky-note"></i>
+                  <span class="item-note" tabindex="0" data-note="{{ r.notes }}" aria-label="{{ r.notes }}">
+                    <i class="fa fa-info-circle"></i>
                   </span>
                   {% endif %}
                   <button type="button"
@@ -1068,6 +1073,30 @@
 </div>
 
 <!-- Roll edit modal -->
+<div id="itemNoteTip" role="tooltip"></div>
+<script>
+  (function () {
+    const tip = document.getElementById('itemNoteTip');
+    function show(el) {
+      tip.textContent = el.dataset.note || '';
+      tip.style.display = 'block';
+      const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
+      let left = Math.min(r.right - t.width, window.innerWidth - t.width - 8);
+      let top = r.top - t.height - 6;
+      if (top < 8) top = r.bottom + 6;
+      tip.style.left = Math.max(8, left) + 'px';
+      tip.style.top = top + 'px';
+    }
+    function hide() { tip.style.display = 'none'; }
+    document.querySelectorAll('.item-note').forEach(function (el) {
+      el.addEventListener('mouseenter', function () { show(el); });
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('focus', function () { show(el); });
+      el.addEventListener('blur', hide);
+    });
+    window.addEventListener('scroll', hide, true);
+  })();
+</script>
 <div class="so-overlay" id="reOverlay" onclick="if(event.target===this){closeRE();}">
   <div class="so-card">
     <h3 style="display:flex; align-items:center; gap:10px;">

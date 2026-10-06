@@ -407,7 +407,7 @@
      below already did this, but only up to 600px. */
   /* A stock item's note: information, not a button. Shown the moment the
      pointer arrives — the browser's own tooltip waits a second first. */
-  .item-note { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; color:#B45309; cursor:default; outline:none; }
+  .item-note { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-right:6px; vertical-align:middle; color:#B45309; cursor:default; outline:none; }
   .item-note i { font-size:14px; }
   #itemNoteTip { position:fixed; z-index:4000; display:none; max-width:280px; padding:8px 10px; background:#0F1419; color:#fff; border-radius:8px; font:500 12px/1.45 var(--font-sans); white-space:pre-wrap; box-shadow:0 6px 18px rgba(15,20,25,.25); pointer-events:none; }
   #reOverlay .so-card { max-height: calc(100vh - 24px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -758,7 +758,7 @@
           <tbody>
             {% for r in rolls %}
             <tr id="roll-row-{{ r.pk }}">
-              <td><b>{{ r.pk }}</b></td>
+              <td style="white-space:nowrap;">{% if r.notes %}<span class="item-note" tabindex="0" data-note="{{ r.notes }}" aria-label="{{ r.notes }}"><i class="fa fa-info-circle"></i></span>{% endif %}<b>{{ r.pk }}</b></td>
               <td>
                 <div class="roll-code-cell">
                   <input type="checkbox" class="roll-cb" value="{{ r.pk }}" onchange="rollPickChanged()" aria-label="{% blocktrans with n=product.item_noun %}Select {{ n }}{% endblocktrans %}">
@@ -845,11 +845,6 @@
                      target="_blank" rel="noopener" title="{% trans 'Print label' %}">
                     <i class="fa fa-qrcode"></i>
                   </a>
-                  {% if r.notes %}
-                  <span class="item-note" tabindex="0" data-note="{{ r.notes }}" aria-label="{{ r.notes }}">
-                    <i class="fa fa-info-circle"></i>
-                  </span>
-                  {% endif %}
                   <button type="button"
                           class="roll-delete-btn" style="color:var(--nejum-teal-700);"
                           title="{% blocktrans with n=product.item_noun %}Edit this {{ n }}{% endblocktrans %}"
@@ -1081,7 +1076,7 @@
       tip.textContent = el.dataset.note || '';
       tip.style.display = 'block';
       const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
-      let left = Math.min(r.right - t.width, window.innerWidth - t.width - 8);
+      let left = Math.min(r.left, window.innerWidth - t.width - 8);
       let top = r.top - t.height - 6;
       if (top < 8) top = r.bottom + 6;
       tip.style.left = Math.max(8, left) + 'px';

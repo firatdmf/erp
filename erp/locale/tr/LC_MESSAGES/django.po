@@ -8577,6 +8577,21 @@ msgstr "Bu ürün için depoda top bulunamadı — aşağıdan metre girin."
 msgid "Add roll by barcode"
 msgstr "Barkodla top ekle"
 
+msgid "Scan any roll"
+msgstr "Herhangi bir topu okutun"
+
+msgid "Find a roll in this list"
+msgstr "Bu listede top arayın"
+
+msgid "Scan into this product"
+msgstr "Bu ürüne okutun"
+
+msgid "That roll belongs to another product — it was added to its own line."
+msgstr "Bu top başka bir ürüne ait — kendi satırına eklendi."
+
+msgid "Different product — goes on its own line"
+msgstr "Farklı ürün — kendi satırına eklenir"
+
 msgid "Loading rolls…"
 msgstr "Toplar yükleniyor…"
 

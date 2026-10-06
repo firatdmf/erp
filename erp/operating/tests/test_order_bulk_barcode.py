@@ -113,3 +113,30 @@ class TheBatchTakesTheToasts(SimpleTestCase):
         self.assertIn("failed.map(", batch)
         self.assertIn("esc(f.why)", batch)
         self.assertIn("esc(f.code)", batch)
+
+
+class TheTwoScannersAreToldApart(SimpleTestCase):
+    """The main scanner and a product card's own box used to be the same
+    box-and-Add-button twice, and were mistaken for each other."""
+
+    def test_the_main_scanner_is_its_own_band(self):
+        form = read_form()
+        band = re.search(r'<div class="co-main-scan">.*?<div id="co-bulk-result"', form, re.S)
+        self.assertIsNotNone(band, "the main scanner lost its band")
+        self.assertIn('id="co-global-bc"', band.group(0))
+        self.assertIn("coOpenRollCamera('global')", band.group(0))
+
+    def test_a_card_has_a_find_line_not_a_second_scanner(self):
+        block = body_of(read_form(), "function rollSectionHtml(item, i)")
+        self.assertIn('class="co-roll-find"', block)
+        self.assertIn("coFilterRolls(", block)
+        # No Add button of its own any more.
+        self.assertNotIn('class="ord-btn"', block)
+
+    def test_a_card_scan_of_another_products_roll_is_passed_on(self):
+        """Refusing it is what made using the wrong box cost something."""
+        add = body_of(read_form(), "window.coAddRoll = function (i, barcodeOverride, fromCard)")
+        self.assertIn("d.kind === 'wrong_product'", add)
+        self.assertIn("coScanAddByBarcode(barcode, true)", add)
+        # A row click or the main scanner never takes that path.
+        self.assertIn("fromCard &&", add)

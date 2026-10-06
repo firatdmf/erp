@@ -111,6 +111,45 @@
 .co-toast-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
 .co-toast-warning{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
 
+/* ── The two barcode boxes ───────────────────────────────────────
+   The MAIN scanner takes any roll and finds its product; it is a filled
+   teal band so it cannot be mistaken for anything else on the form. A
+   product card's own box is a quiet "find in this list" line under the
+   card's rolls — deliberately not another box-and-Add-button, which is
+   what the two used to share and what got them confused. */
+.co-main-scan{margin-top:6px;padding:12px;border-radius:11px;
+  background:linear-gradient(180deg,#147F74 0%,#0F6B63 100%);
+  border:1px solid #0B5F60;box-shadow:0 2px 8px rgba(15,107,99,.22);}
+.co-main-scan-h{display:flex;align-items:center;gap:10px;margin-bottom:9px;color:#fff;}
+.co-main-scan-ico{width:32px;height:32px;border-radius:9px;flex:none;display:inline-flex;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.16);font-size:15px;}
+.co-main-scan-t{font:800 13.5px var(--font-sans,sans-serif);letter-spacing:.01em;}
+.co-main-scan-s{font:500 10.5px var(--font-sans,sans-serif);color:rgba(255,255,255,.78);margin-top:1px;}
+.co-main-scan-row{display:flex;gap:6px;align-items:flex-start;}
+.co-main-scan-row textarea{flex:1;min-width:0;resize:vertical;min-height:40px;max-height:190px;
+  line-height:1.4;border:0;background:#fff;}
+.co-main-scan-btn{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 13px;
+  border-radius:8px;cursor:pointer;white-space:nowrap;font:700 12.5px var(--font-sans,sans-serif);
+  transition:background .14s;}
+.co-main-scan-btn.cam{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);color:#fff;}
+.co-main-scan-btn.cam:hover{background:rgba(255,255,255,.24);}
+.co-main-scan-btn.add{background:#fff;border:1px solid #fff;color:#0B5F60;}
+.co-main-scan-btn.add:hover{background:#E5F1F0;}
+/* Narrow: the box takes the row, the two buttons share the next. */
+@media (max-width:560px){
+  .co-main-scan-row{flex-wrap:wrap;}
+  .co-main-scan-row textarea{flex:1 1 100%;}
+  .co-main-scan-btn{flex:1;justify-content:center;}
+}
+.co-roll-find{display:flex;align-items:center;gap:7px;margin-top:6px;padding:0 4px 0 9px;
+  border-bottom:1px dashed #CBD5E1;color:#94A3B8;font-size:11.5px;}
+.co-roll-find input{flex:1;min-width:0;border:0;background:transparent;outline:none;padding:6px 0;
+  font:500 12px var(--font-sans,sans-serif);color:#0F1419;}
+.co-roll-find input::placeholder{color:#94A3B8;}
+.co-roll-find:focus-within{border-bottom-color:#147F74;color:#147F74;}
+.co-roll-find button{background:none;border:0;color:#64748B;cursor:pointer;padding:5px;font-size:12.5px;line-height:1;}
+.co-roll-find button:hover{color:#0F766E;}
+
 /* ── Barcode scanner popup ───────────────────────────────────────
    Same modal the warehouse page's "Find by barcode" uses, so the two
    readers are one thing to learn. It sits ABOVE the create sidebar
@@ -437,30 +476,29 @@
       unfindable code. Enter still submits, so a hardware scanner (which
       sends Enter after each read) behaves exactly as before; Shift+Enter
       adds a line by hand.{% endcomment %}
-      <div class="form-group" style="margin-top:2px;">
-        <label style="display:flex;align-items:center;gap:6px;">
-          <i class="fas fa-barcode" style="color:#0F766E;"></i>
-          {% trans "Add roll by barcode" %}
-          <span style="font-weight:500;color:#94A3B8;font-size:10.5px;">({% trans "no product needed — it finds the product itself" %})</span>
-        </label>
-        <div style="display:flex;gap:6px;">
-          <div style="position:relative;flex:1;">
-            <textarea id="co-global-bc" class="form-input" rows="1" style="padding-right:34px;resize:vertical;min-height:38px;max-height:190px;line-height:1.4;"
-                      placeholder="{% trans 'Scan, type, or paste a list of barcodes' %}" autocomplete="off"
-                      oninput="coScanGrow(this)"
-                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault(); coScanAdd();}"></textarea>
-            <button type="button" onclick="coOpenRollCamera('global')" title="{% trans 'Scan with the camera' %}"
-                    style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:0;color:#0F766E;cursor:pointer;padding:6px;font-size:15px;line-height:1;">
-              <i class="fas fa-camera"></i>
-            </button>
+      <div class="co-main-scan">
+        <div class="co-main-scan-h">
+          <span class="co-main-scan-ico"><i class="fas fa-barcode"></i></span>
+          <div>
+            <div class="co-main-scan-t">{% trans "Scan any roll" %}</div>
+            <div class="co-main-scan-s">{% trans "no product needed — it finds the product itself" %}</div>
           </div>
-          <button type="button" class="ord-btn" style="white-space:nowrap;align-self:flex-start;" onclick="coScanAdd()">{% trans "Add" %}</button>
+        </div>
+        <div class="co-main-scan-row">
+          <textarea id="co-global-bc" class="form-input" rows="1"
+                    placeholder="{% trans 'Scan, type, or paste a list of barcodes' %}" autocomplete="off"
+                    oninput="coScanGrow(this)"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault(); coScanAdd();}"></textarea>
+          <button type="button" class="co-main-scan-btn cam" onclick="coOpenRollCamera('global')" title="{% trans 'Scan with the camera' %}">
+            <i class="fas fa-camera"></i>{% trans "Camera" %}
+          </button>
+          <button type="button" class="co-main-scan-btn add" onclick="coScanAdd()">{% trans "Add" %}</button>
         </div>
         {% comment %}What a pasted list did. One code keeps the old plain
         toast; a batch reports here, because the codes that did NOT go on
         are the point and a toast takes them away before they can be read
         or copied.{% endcomment %}
-        <div id="co-bulk-result" style="display:none;margin-top:6px;padding:8px 10px;border-radius:7px;font:600 11.5px var(--font-sans,sans-serif);"></div>
+        <div id="co-bulk-result" style="display:none;margin-top:8px;padding:8px 10px;border-radius:7px;font:600 11.5px var(--font-sans,sans-serif);"></div>
       </div>
 
       <div id="co-products-list"></div>
@@ -1753,7 +1791,7 @@
     // like a freshly picked one, so the distinction never changes what
     // the row can do. A locked row does behave differently, and already
     // says so with its padlock and grey ground.
-    return '<div class="co-roll-row"' + toggleAttrs + ' style="display:flex;align-items:center;gap:8px;padding:8px 9px;margin-top:6px;font-size:12px;background:' + bg + ';border:1px solid ' + border + ';border-radius:7px;' + (locked ? '' : 'cursor:pointer;') + '">' +
+    return '<div class="co-roll-row" data-bc="' + escAttr((r.barcode || '').toLowerCase()) + '"' + toggleAttrs + ' style="display:flex;align-items:center;gap:8px;padding:8px 9px;margin-top:6px;font-size:12px;background:' + bg + ';border:1px solid ' + border + ';border-radius:7px;' + (locked ? '' : 'cursor:pointer;') + '">' +
       tickHtml +
       '<code style="background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;">' + esc(r.barcode || '—') + '</code>' +
       // Where this one is from. The warehouse always; the book too once
@@ -1803,16 +1841,18 @@
     // and point at the separate outsourced section below instead.
     var noStockAtAll = !item.rollsLoading && !existing.length && !picked.length && !candidates.length;
 
+    // Not a second scanner box: a quiet line that narrows this card's
+    // list as you type. Enter still adds the code — a handheld scanner
+    // aimed here by mistake keeps working, and a roll of some other
+    // product is passed on to its own line (see coAddRoll).
     var searchBlock = noStockAtAll ? '' :
-      '<div style="position:relative;display:flex;gap:6px;margin-top:6px;">' +
-        '<div style="position:relative;flex:1;">' +
-          '<input type="text" id="co-roll-bc-' + i + '" class="form-input co-roll-barcode-input" style="padding-right:34px;" placeholder="{% trans "Scan or type a barcode" %}" ' +
-            'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); coAddRoll(' + i + ');}">' +
-          '<button type="button" onclick="coOpenRollCamera(' + i + ')" title="{% trans "Scan with the camera" %}" ' +
-            'style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:0;color:#0F766E;cursor:pointer;padding:6px;font-size:15px;line-height:1;">' +
-            '<i class="fas fa-camera"></i></button>' +
-        '</div>' +
-        '<button type="button" class="ord-btn" style="white-space:nowrap;" onclick="coAddRoll(' + i + ')">{% trans "Add" %}</button>' +
+      '<div class="co-roll-find">' +
+        '<i class="fas fa-magnifying-glass"></i>' +
+        '<input type="text" id="co-roll-bc-' + i + '" class="co-roll-barcode-input" autocomplete="off" placeholder="{% trans "Find a roll in this list" %}" ' +
+          'oninput="coFilterRolls(' + i + ',this.value)" ' +
+          'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); coAddRoll(' + i + ', null, true);}">' +
+        '<button type="button" onclick="coOpenRollCamera(' + i + ')" title="{% trans "Scan into this product" %}">' +
+          '<i class="fas fa-camera"></i></button>' +
       '</div>';
 
     var rowsHtml = '';
@@ -1991,7 +2031,21 @@
     coAddBarcodeList(codes);
   };
 
-  window.coAddRoll = function (i, barcodeOverride) {
+  // Narrow a card's roll list to the codes containing what was typed.
+  // Done on the rows already drawn — a re-render would take the typing
+  // box, and its focus, away mid-word.
+  window.coFilterRolls = function (i, q) {
+    q = (q || '').trim().toLowerCase();
+    document.querySelectorAll('[data-roll-list-i="' + i + '"] .co-roll-row').forEach(function (row) {
+      row.style.display = (!q || (row.dataset.bc || '').indexOf(q) !== -1) ? 'flex' : 'none';
+    });
+  };
+
+  // `fromCard`: the code came from a product card's own box or camera,
+  // not from a row click or the main scanner. Only then can it be a roll
+  // of some OTHER product — and that is passed to the main scanner's
+  // path, which puts it on its own line, rather than refused.
+  window.coAddRoll = function (i, barcodeOverride, fromCard) {
     var item = orderItems[i];
     if (!item) return Promise.resolve(false);
     var inputEl = document.getElementById('co-roll-bc-' + i);
@@ -2031,6 +2085,12 @@
     return fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams())
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (!d.ok && fromCard && d.kind === 'wrong_product') {
+          return Promise.resolve(window.coScanAddByBarcode(barcode, true)).then(function (ok) {
+            if (ok) showToast('{% filter escapejs %}{% trans "That roll belongs to another product — it was added to its own line." %}{% endfilter %}', 'warning');
+            return ok;
+          });
+        }
         if (!d.ok) { showToast(d.error || '{% trans "Barcode could not be verified" %}', 'error'); return false; }
         if (!item.rolls) item.rolls = [];
         // Default to the WHOLE stock item — the scissors icon reveals a field
@@ -2221,6 +2281,9 @@
     // instantly instead of asking the browser for the camera a second
     // time, which is the slow part and, on iOS, the part that prompts.
     var camPending = '', camPrevOverflow = '';
+    // A card's camera read a roll of another product: it is confirmed
+    // and added the main scanner's way, onto that product's own line.
+    var camRerouted = false;
 
     function camPause() {
       camRunning = false;
@@ -2322,7 +2385,16 @@
       }
       camPanel('<div style="padding:22px 0;color:#CBD5E1;font:600 12.5px var(--font-sans,sans-serif);">' +
                '<i class="fas fa-spinner fa-spin"></i> ' + esc(code) + '</div>');
-      var url = (camTargetIndex === 'global')
+      camLookup(code, item, camTargetIndex === 'global');
+    }
+
+    // `asGlobal`: look the code up the main scanner's way — any product.
+    // The main camera always does; a card's camera falls back to it when
+    // the roll turns out to be another product's, so the panel can say
+    // where it will go instead of refusing it.
+    function camLookup(code, item, asGlobal) {
+      camRerouted = asGlobal && camTargetIndex !== 'global';
+      var url = asGlobal
         ? '{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(code) + coOrderParam() + coScopeParams()
         : '{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(code) +
           '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams();
@@ -2330,19 +2402,26 @@
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (!camPending) return;            // closed while in flight
+          if (d && !d.ok && !asGlobal && d.kind === 'wrong_product') {
+            camLookup(code, item, true);
+            return;
+          }
           if (!d || !d.ok) {
             camRefuse('bad', '{% trans "Cannot be added" %}',
                       esc((d && d.error) || '{% trans "Barcode could not be checked" %}'), code);
             return;
           }
           var facts = '', title = '';
-          if (camTargetIndex === 'global') {
+          if (asGlobal) {
             title = esc(d.title || d.sku || '');
             var roll = d.roll || {};
             facts = camFact('{% trans "SKU" %}', esc(d.sku || '—')) +
                     camFact('{% trans "Available" %}', fmtNum(Number(roll.available) || 0) + ' ' + esc(roll.unit || 'm')) +
                     (roll.warehouse ? camFact('{% trans "Warehouse" %}', esc(roll.warehouse)) : '') +
                     (roll.book ? camFact('{% trans "Book" %}', esc(roll.book)) : '');
+            if (camRerouted) {
+              facts = camPill('warn', '<i class="fas fa-shuffle"></i>{% trans "Different product — goes on its own line" %}') + facts;
+            }
           } else {
             title = esc((item && item.title) || '');
             facts = camFact('{% trans "Available" %}', fmtNum(Number(d.available) || 0) + ' ' + esc(d.unit || 'm')) +
@@ -2366,7 +2445,7 @@
       if (!code) return;
       camPanel('<div style="padding:22px 0;color:#CBD5E1;font:600 12.5px var(--font-sans,sans-serif);">' +
                '<i class="fas fa-spinner fa-spin"></i> ' + esc(code) + '</div>');
-      var done = (camTargetIndex === 'global')
+      var done = (camTargetIndex === 'global' || camRerouted)
         ? window.coScanAddByBarcode(code, true)
         : window.coAddRoll(camTargetIndex, code);
       Promise.resolve(done).then(function (ok) {

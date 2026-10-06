@@ -159,6 +159,20 @@ def post_stock_movement_to_ledger(sender, instance, raw=False, **kwargs):
     _safely(f"stock movement {instance.pk}", post_stock_movement, instance)
 
 
+def post_purchase_again(invoice):
+    """Post a purchase once more, now that its rolls are attached.
+
+    A received purchase is issued, and so posted, before the rolls it
+    brought in are linked to its lines. What the rolls are carried at is
+    part of the entry (services_posting._purchase_stock_value), so the
+    entry is only right once they are there."""
+    movement = getattr(invoice, "posted_movement", None)
+    if movement is None:
+        return
+    from .services_posting import post_movement
+    _safely(f"purchase {invoice.pk}", post_movement, movement)
+
+
 def post_bulk_stock_movements(movements):
     """What the receiver above does, for movements made by bulk_create —
     which sends no post_save. Absorbs a posting problem the same way."""

@@ -45,7 +45,8 @@ CONTRA_BY_TYPE = {
     "write_off":        "5200",
     # A difference let go to close an account (a credit on a customer) is a
     # cost of doing business, on its own line under operating expenses; one
-    # kept (a debit) is income — see DEBIT_CONTRA_BY_TYPE.
+    # kept (a debit) is income, on the line of the same name under other
+    # income — see DEBIT_CONTRA_BY_TYPE.
     "balance_close":    "5150",
     # Purchases land in stock, not in expense: the cost becomes COGS when
     # the goods leave, not when they arrive.
@@ -74,7 +75,7 @@ CONTRA_BY_TYPE = {
 # and taking it off stock would leave the shelves valued below cost.
 DEBIT_CONTRA_BY_TYPE = {
     "discount":         "4900",
-    "balance_close":    "4900",
+    "balance_close":    "4950",
 }
 
 # The types whose other leg nobody has decided, parked rather than guessed.
@@ -203,11 +204,87 @@ def lines_for_movement(movement):
         fx = realised_fx(payment, base_stated=abs(amount))
         if fx and fx["difference"] != ZERO:
             return _lines_with_realised_fx(movement, amount, contra, cash_account, memo, fx)
+    if kind == "invoice_purchase" and amount < ZERO:
+        stock = _purchase_stock_value(movement, -amount)
+        if stock is not None:
+            return _lines_with_purchase_fraction(movement, -amount, stock, memo)
     if amount > ZERO:
         return [debit(CURRENT_ACCOUNT_CONTROL, amount, current_account=movement.current_account, memo=memo),
                 credit(contra, amount, cash_account=cash_account, memo=memo)]
     return [credit(CURRENT_ACCOUNT_CONTROL, -amount, current_account=movement.current_account, memo=memo),
             debit(contra, -amount, cash_account=cash_account, memo=memo)]
+
+
+# What a closing difference is posted to: let go, and kept.
+CLOSING_DIFFERENCE_EXPENSE = "5150"
+CLOSING_DIFFERENCE_INCOME = "4950"
+
+# The most a purchase line's total can sit from its rolls' cost through
+# rounding alone: the line is billed in whole cents.
+_HALF_CENT = Decimal("0.005")
+
+
+def _purchase_stock_value(movement, owed):
+    """What this purchase's rolls are carried at, when that is `owed` give
+    or take the rounding of its lines. None otherwise.
+
+    The supplier is owed whole cents; a roll is carried at metres times
+    unit cost, which is often not (62.37 m at 3.40 is 212.058, billed
+    212.06). Posting the billed figure to Inventory (1300) leaves that
+    fraction between the ledger and the shelves, the same way a shipment
+    rounded to the cent did.
+
+    None for everything that is not that: a purchase whose rolls are not
+    attached yet, one with a roll nothing costs, one in another currency
+    whose conversion moved it further, one carrying a line that is not
+    stock. Those post what is owed to stock, as before, and the difference
+    stays where reconcile() can show it.
+    """
+    if _source_model_name(movement) != "invoice" or not movement.source_id:
+        return None
+    try:
+        from operating.models import WarehouseProductItem
+    except ImportError:
+        return None
+    from .models_accounts import InvoiceItem
+
+    rolls = list(WarehouseProductItem.objects
+                 .filter(purchase_invoice_item__invoice_id=movement.source_id)
+                 .select_related("product", "purchase_invoice_item"))
+    if not rolls:
+        return None
+    value = ZERO
+    for roll in rolls:
+        unit = stock_unit_cost(roll)
+        if unit is None:
+            return None
+        value += Decimal(roll.quantity or 0) * unit
+    lines = InvoiceItem.objects.filter(invoice_id=movement.source_id).count()
+    gap = owed - value
+    if gap == ZERO or abs(gap) > _HALF_CENT * lines:
+        return None
+    return value
+
+
+def _lines_with_purchase_fraction(movement, owed, stock, memo):
+    """Three lines instead of two, for a purchase billed a fraction of a
+    cent away from what its rolls are carried at.
+
+    The supplier's account takes what is owed, to the cent, and nothing
+    else: the fraction is not theirs. Stock takes what the rolls cost, and
+    the fraction between the two is a closing difference, on the expense
+    line when the bill is the larger and the income line when it is the
+    smaller.
+    """
+    gap = owed - stock
+    lines = [credit(CURRENT_ACCOUNT_CONTROL, owed,
+                    current_account=movement.current_account, memo=memo),
+             debit(INVENTORY, stock, memo=memo, exact=True)]
+    if gap > ZERO:
+        lines.append(debit(CLOSING_DIFFERENCE_EXPENSE, gap, memo=memo, exact=True))
+    else:
+        lines.append(credit(CLOSING_DIFFERENCE_INCOME, -gap, memo=memo, exact=True))
+    return lines
 
 
 def _lines_with_realised_fx(movement, amount, contra, cash_account, memo, fx):
@@ -684,6 +761,7 @@ def _account_meanings():
         "3300": _g("Money the owners took out of the business."),
         "4000": _g("This period's sales."),
         "4900": _g("Income that is not a sale."),
+        "4950": _g("Small differences kept when a settled account is brought to zero."),
         "5000": _g("What the goods sold cost when they were bought."),
         "5100": _g("Running costs: rent, wages, freight and the like."),
         "5110": _g("What winning customers costs: samples given away, fairs, catalogues."),
@@ -818,6 +896,8 @@ def chart_of_accounts(book):
     feed(INVENTORY_SHRINKAGE, _g("Stock lost, damaged or defective"))
     feed(INVENTORY_SHRINKAGE, _g("Stock item re-measured"))
     feed(INVENTORY, _g("Stock item re-measured"))
+    feed(CLOSING_DIFFERENCE_EXPENSE, _g("Purchase billed a fraction of a cent above its stock"))
+    feed(CLOSING_DIFFERENCE_INCOME, _g("Purchase billed a fraction of a cent below its stock"))
     feed(RETAINED_EARNINGS, _g("Closing a period"))
     feed("2000", _g("Moving credit balances out of receivables"))
 

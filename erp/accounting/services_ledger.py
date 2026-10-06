@@ -70,6 +70,10 @@ STANDARD_CHART = [
     ("3300", "Dividends",                  "equity",    False),
     ("4000", "Sales",                      "revenue",   False),
     ("4900", "Other Income",               "revenue",   False),
+    # Part of other income: the few units kept when a settled account is
+    # brought to zero. Named as its expense twin (5150) is, so a closing
+    # difference reads as one whichever way it went.
+    ("4950", "Balance Closing Differences", "revenue",  False),
     ("5000", "Cost of Goods Sold",         "expense",   False),
     ("5100", "Operating Expenses",         "expense",   False),
     # Part of operating expenses, kept apart so what winning customers costs
@@ -96,6 +100,7 @@ STANDARD_CHART = [
 # rather than read off the digits: 1950 is not part of Suspense, however
 # its code looks. Balances stay on their own line either way.
 PARENT_ACCOUNT = {
+    "4950": "4900",
     "5110": "5100",
     "5120": "5100",
     "5150": "5100",

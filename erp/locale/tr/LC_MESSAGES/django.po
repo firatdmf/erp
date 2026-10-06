@@ -11443,6 +11443,18 @@ msgstr ""
 msgid "Small differences let go to bring a settled account to zero."
 msgstr "Kapanan bir hesabı sıfırlamak için vazgeçilen küçük farklar."
 
+#: accounting/services_posting.py
+msgid "Small differences kept when a settled account is brought to zero."
+msgstr "Kapanan bir hesap sıfırlanırken bizde kalan küçük farklar."
+
+#: accounting/services_posting.py
+msgid "Purchase billed a fraction of a cent above its stock"
+msgstr "Stok değerinden kuruşun bir kesri kadar fazla faturalanan alış"
+
+#: accounting/services_posting.py
+msgid "Purchase billed a fraction of a cent below its stock"
+msgstr "Stok değerinden kuruşun bir kesri kadar az faturalanan alış"
+
 #: operating/templates/operating/order_picking_list.html
 msgid "Picking list"
 msgstr "Toplama listesi"

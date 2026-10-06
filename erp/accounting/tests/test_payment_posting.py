@@ -222,7 +222,7 @@ class TheTypeSetsTheDirection(_Base):
                                     kwargs={"pk": self.account.pk}))
         rule = r.context["posting_preview"]["rules"]["balance_close"]
         self.assertEqual(rule["code"], "5150")
-        self.assertEqual(rule["debit"]["code"], "4900")
+        self.assertEqual(rule["debit"]["code"], "4950")
         self.assertFalse(rule["parked"])
         self.assertNotIn("balance_close", r.context["fixed_directions"])
 

@@ -3829,6 +3829,8 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                     WarehouseProductItem.objects.filter(pk__in=stock_item_ids).update(
                         purchase_invoice_item=item
                     )
+            from accounting.signals_ledger import post_purchase_again
+            post_purchase_again(inv)
             if not any(l["unit_price"] > 0 for l in purchase_lines):
                 from django.utils.translation import gettext as _t
                 warnings.append(_t(

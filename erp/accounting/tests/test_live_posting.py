@@ -114,11 +114,15 @@ class SavingAMovementPostsIt(_Books):
 
     def test_an_overpayment_kept_to_close_an_account_is_other_income(self):
         """The customer overpaid and will not be refunded: debiting their
-        account back to zero is income, not a sale, and not Suspense."""
+        account back to zero is income, not a sale, and not Suspense. It
+        sits on its own line under other income, named as the expense is."""
+        from accounting.services_ledger import PARENT_ACCOUNT
         self._mv("balance_close", "12.40")
         b = self._balances()
         self.assertEqual(b["1200"], Decimal("12.40"))
-        self.assertEqual(b["4900"], Decimal("12.40"))
+        self.assertEqual(b["4950"], Decimal("12.40"))
+        self.assertFalse(b.get("4900"))
+        self.assertEqual(PARENT_ACCOUNT["4950"], "4900")
         self.assertFalse(b.get("1900"))
 
     def test_a_shortfall_let_go_to_close_an_account_is_an_operating_cost(self):

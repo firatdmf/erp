@@ -285,7 +285,13 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
-  @media (max-width: 600px) { .od-ship-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) {
+    .od-ship-grid { grid-template-columns: minmax(0, 1fr); }
+    /* The buttons are a row of their own that would not break, and on
+       the narrowest phones were wider than the card. */
+    .od-ship-actions > div { flex-wrap: wrap; min-width: 0; }
+    .od-ship-actions > div .ord-btn { flex: 1 1 auto; justify-content: center; }
+  }
   .od-ship-f { display: flex; flex-direction: column; gap: 5px; }
   .od-ship-l {
     font: 700 10px var(--font-sans);
@@ -620,7 +626,7 @@
   .od-savebar .ord-btn.primary:hover { filter: brightness(1.08); }
   @media (max-width: 600px) {
     .od-savebar { padding: 8px; }
-    .od-savebar-inner { gap: 6px; padding: 10px 12px; }
+    .od-savebar-inner { gap: 6px; padding: 10px 12px; flex-wrap: wrap; }
     .od-savebar .ord-btn { padding: 7px 10px; font-size: 11.5px; }
     .od-savebar-msg { font-size: 12px; }
   }
@@ -917,7 +923,10 @@
   .od-banner i { margin-right: 8px; }
 
   @media (max-width: 1100px) {
-    .od-grid { grid-template-columns: 1fr; }
+    /* minmax(0, …), not a bare 1fr: a bare 1fr column never goes
+       narrower than its widest content, so on a phone under ~410px the
+       whole page came out wider than the screen and sat off-centre. */
+    .od-grid { grid-template-columns: minmax(0, 1fr); }
     .od-tl { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 900px) {
@@ -947,7 +956,8 @@
     .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 72px; }   /* Price */
     .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 76px; }   /* Amount */
     .od-prod-img { width: 28px; height: 28px; flex-shrink: 0; }
-    .od-prod span:last-child { font-size: 12px; }
+    /* A long one-word title would otherwise run under the Qty column. */
+    .od-prod span:last-child { font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
     /* Add-item editor stacks: product full width, qty|price, then Add. */
     #od-add-item-row > div { grid-template-columns: 1fr 1fr !important; }
     #od-add-item-row > div > div:first-child,

@@ -72,6 +72,15 @@
     padding-top: 16px !important;
     margin-top: 20px !important;
   }
+
+  /* On a phone the page gutter and the card padding were each sized for
+     a desktop, and together took a fifth of the screen from the form. */
+  @media (max-width: 700px) {
+    .cop { padding: 14px 10px 110px; }
+    .cop-head { margin-bottom: 12px; }
+    .cop-head h1 { font-size: 19px; }
+    .cop-card { padding: 14px 12px; }
+  }
 </style>
 {% endblock %}
 

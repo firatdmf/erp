@@ -76,6 +76,10 @@
   .md-leg .amt { font: 700 16px var(--font-sans); font-variant-numeric: tabular-nums; }
   .md-leg .amt.pos { color: #B23B12; }
   .md-leg .amt.neg { color: #0E6E4A; }
+  /* Where the row left the account — a base-currency figure, like every
+     balance on the account pages. */
+  .md-leg .bal { display:block; margin-top: 4px; font: 500 12px var(--font-sans); color: var(--gray-600); font-variant-numeric: tabular-nums; }
+  .md-leg .bal b { font-weight: 700; color: var(--ink); }
   .md-leg .row-link { display:inline-block; margin-top: 8px; font: 600 11.5px var(--font-sans); color: var(--nejum-teal-700); text-decoration: none; }
   .md-leg .row-link:hover { text-decoration: underline; }
   .md-leg .gone { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-top: 8px; display:block; }
@@ -127,7 +131,7 @@
         <h3>{% trans "The two rows it wrote" %}</h3>
       </div>
       <div class="md-legs">
-        {% for side, current_account, mv in legs %}
+        {% for side, current_account, mv, balance_after in legs %}
           {% if side == 'to' %}
             <span class="arrow"><i data-lucide="arrow-right"></i></span>
           {% endif %}
@@ -139,6 +143,11 @@
             {% if mv %}
               <span class="amt {% if mv.amount > 0 %}pos{% else %}neg{% endif %}">
                 {% if mv.amount > 0 %}+{% endif %}{{ mv.amount|money }} {{ mv.currency.code }}
+              </span>
+              <span class="bal">
+                {% trans "Balance after" %}
+                <b>{{ current_account.display_currency_symbol }}{{ balance_after.amount|absval|format_money }}</b>
+                · {{ balance_after.label }}
               </span>
               <a class="row-link" href="{% url 'accounts:movement_detail' current_account.pk mv.pk %}">
                 {% trans "See this ledger row" %} &rarr;

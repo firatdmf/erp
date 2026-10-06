@@ -49,6 +49,21 @@ class TransferEditPageTest(TransferTestBase):
                                     args=[self.a.pk, self.transfer.from_movement.pk]))
         self.assertEqual(r.status_code, 302)
 
+    # --- the page itself -------------------------------------------------
+
+    def test_each_card_shows_the_balance_its_row_left_the_account_at(self):
+        """As of the row, not as of today: a later entry on either account
+        must not move the figure printed under this transfer."""
+        CurrentAccountMovement.objects.create(
+            book=self.book, current_account=self.a, date="2026-03-01",
+            amount=Decimal("50.00"), currency=self.usd, movement_type="adjustment",
+        )
+        r = self.client.get(self.detail_url())
+        self.assertEqual(r.status_code, 200)
+        after = {side: bal["amount"] for side, _, _, bal in r.context["legs"]}
+        self.assertEqual(after, {"from": Decimal("600.00"), "to": Decimal("400.00")})
+        self.assertContains(r, "Balance after", count=2)
+
     # --- correcting it ---------------------------------------------------
 
     def test_the_page_opens(self):

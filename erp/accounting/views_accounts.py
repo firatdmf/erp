@@ -1586,6 +1586,16 @@ def _own_movement_or_redirect(request, current_account, mv_pk):
     return None, redirect("accounts:statement", pk=current_account.pk)
 
 
+def _balance_as_of(current_account, mv):
+    """The account's balance as of one ledger row: everything up to and
+    including it, by the same rule the account page and the statement sum
+    by. A base-currency figure, like cached_balance.
+    """
+    return current_account.movements.live().filter(
+        Q(date__lt=mv.date) | Q(date=mv.date, id__lte=mv.id)
+    ).aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00")
+
+
 @method_decorator(login_required, name="dispatch")
 @method_decorator(login_required, name="dispatch")
 class CurrentAccountMovementDetail(View):
@@ -1615,13 +1625,9 @@ class CurrentAccountMovementDetail(View):
             pk=mv_pk, current_account=current_account,
         )
 
-        # The balance as of this row: everything up to and including it,
-        # by the same rule the account page and the statement sum by.
         # Rebuilt rather than passed in, so the figure is right whichever
         # page the user arrived from.
-        running = current_account.movements.live().filter(
-            Q(date__lt=mv.date) | Q(date=mv.date, id__lte=mv.id)
-        ).aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00")
+        running = _balance_as_of(current_account, mv)
 
         row = _attach_links([{"mv": mv, "balance_after": running}])[0]
         return render(request, self.template_name, {
@@ -1771,13 +1777,24 @@ class CurrentAccountTransferDetail(View):
             ),
             pk=pk,
         )
+        def balance_after(current_account, mv):
+            # None where unpost() has cleared the row.
+            if not mv:
+                return None
+            balance = _balance_as_of(current_account, mv)
+            return {"amount": balance, "label": CurrentAccount.label_for(balance)}
+
         return render(request, self.template_name, {
             "transfer": transfer,
             # The legs, paired with the account each one lands on, so the
             # template does not have to re-derive which is which.
+            # Each carries the balance its row left the account at.
             "legs": [
-                ("from", transfer.from_current_account, transfer.from_movement),
-                ("to", transfer.to_current_account, transfer.to_movement),
+                (side, current_account, mv, balance_after(current_account, mv))
+                for side, current_account, mv in (
+                    ("from", transfer.from_current_account, transfer.from_movement),
+                    ("to", transfer.to_current_account, transfer.to_movement),
+                )
             ],
         })
 

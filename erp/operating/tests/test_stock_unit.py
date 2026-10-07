@@ -428,3 +428,76 @@ class TheMainProductOwnsUnitAndPack(TestCase):
                     .filter(pk__in=[r.pk for r in self.rows]))
         with self.assertNumQueries(0):
             self.assertEqual({r.unit_short for r in rows}, {"m"})
+
+
+class LooseStockIsInNothing(TestCase):
+    """Pieces standing on a shelf are in no container. A product packed
+    "loose" shows its quantity and no count of boxes that are not there —
+    on the warehouse pages and on an order's printout."""
+
+    def setUp(self):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Almaty", base_currency=usd)
+        self.shelves = Warehouse.objects.create(
+            name="Almaty", accounting_book=self.book)
+        self.duvets = _stock(
+            self.shelves, name="Duvet set", sku="8681910572867",
+            quantity=Decimal("22"), unit="piece", pack_type="loose")
+        self.entry = WarehouseProductItem.objects.create(
+            product=self.duvets, quantity=Decimal("22"),
+            quantity_remaining=Decimal("22"), status="in_stock",
+            unit_cost_base=Decimal("44"))
+        user = get_user_model().objects.create_user("shelf_keeper", password="pw")
+        user.member.books.add(self.book)
+        user.member.default_book = self.book
+        user.member.save()
+        self.client.force_login(user)
+
+    def _page(self, **params):
+        resp = self.client.get(reverse(
+            "operating:warehouse_detail", args=[self.shelves.pk]), params)
+        self.assertEqual(resp.status_code, 200)
+        return _text(resp.content.decode())
+
+    def test_the_row_shows_the_pieces_and_counts_no_container(self):
+        for params in ({}, {"view": "grouped"}):
+            text = self._page(**params)
+            self.assertIn("22 pcs", text)
+            # A count of one or more: the scan panel's own "0 … scanned
+            # this session" counter is not a count of stock.
+            self.assertNotRegex(text, r"\b[1-9]\d* (box|boxes|batch|batches|rolls?)\b")
+
+    def test_a_shelf_with_cartons_beside_it_still_counts_them(self):
+        boxed = _stock(self.shelves, name="Towel set", sku="T-1",
+                       quantity=Decimal("3"), unit="pack", pack_type="box")
+        WarehouseProductItem.objects.create(
+            product=boxed, quantity=Decimal("3"), quantity_remaining=Decimal("3"),
+            status="in_stock", unit_cost_base=Decimal("13.5"))
+        text = self._page()
+        self.assertIn("1 box", text)
+        self.assertNotRegex(text, r"\b[1-9]\d* batch(es)?\b")
+
+    def test_the_product_page_still_lists_what_is_on_the_shelf(self):
+        resp = self.client.get(reverse("operating:warehouse_product_detail", kwargs={
+            "warehouse_pk": self.shelves.pk, "product_pk": self.duvets.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Batches", _text(resp.content.decode()))
+
+    def test_an_order_line_prints_no_pack_count(self):
+        from operating.models import Order, OrderItem, OrderStockReservation
+        from operating.views import build_order_print_rows, order_print_totals_units
+
+        order = Order.objects.create(order_number="950")
+        variant = self.duvets.catalog_variant
+        line = OrderItem.objects.create(
+            order=order, product=variant.product, product_variant=variant,
+            quantity=Decimal("2"), price=Decimal("60"))
+        OrderStockReservation.objects.create(
+            order=order, order_item=line, stock_item=self.entry,
+            warehouse_product=self.duvets, quantity=Decimal("2"))
+        items, _total, _qty, pack_ids = build_order_print_rows(order)
+        self.assertEqual(items[0].pack_count, 0)
+        self.assertEqual(len(pack_ids), 0)
+        self.assertEqual(items[0].unit_short, "pcs")
+        order_print_totals_units(items, len(pack_ids))   # must not trip on none

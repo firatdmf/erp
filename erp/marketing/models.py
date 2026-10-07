@@ -450,6 +450,12 @@ class Product(models.Model):
         return units.PACK_ICON.get(self.pack_type, "fa-layer-group")
 
     @property
+    def counts_packs(self):
+        """False for loose stock, whose page shows a quantity and no count
+        of containers (units.counts_packs)."""
+        return units.counts_packs(self.pack_type)
+
+    @property
     def quantity_label(self):
         return units.quantity_label(self.unit)
 

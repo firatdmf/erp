@@ -13723,3 +13723,12 @@ msgstr "Mal olarak ödenen sermayenin tutarı depodan alınır, bu yüzden düze
 
 msgid "Paid in goods — no cash moved. The ledger holds it as Inventory against Share Capital."
 msgstr "Mal olarak ödendi — nakit hareketi olmadı. Defterde Sermaye karşılığında Stok olarak durur."
+
+msgid "Loose"
+msgstr "Dökme"
+
+msgid "batch"
+msgstr "parti"
+
+msgid "batches"
+msgstr "parti"

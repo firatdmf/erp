@@ -1416,10 +1416,12 @@
         <span title="{% trans 'Variants' %}">
           <i class="fa fa-list-ul"></i>{{ variant_count|default:0|intcomma }} {% trans "variants" %}
         </span>
+        {% if counts_packs %}
         <span class="od-dot"></span>
         <span title="{{ item_noun_plural|capfirst }}">
           <i class="fa {{ item_icon }}"></i>{{ roll_count|default:0|intcomma }} {{ item_noun_plural }}
         </span>
+        {% endif %}
         <span class="od-dot"></span>
         <span>
           <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:"0g" }} {{ total_unit_short }} {% trans "in stock" %}
@@ -1779,10 +1781,12 @@
             <div class="val">{{ variant_count|default:0|intcomma }}</div>
             <div class="lbl">{% trans "Variants" %}</div>
           </div>
+          {% if counts_packs %}
           <div class="od-stat">
             <div class="val">{{ roll_count|default:0|intcomma }}</div>
             <div class="lbl">{{ item_noun_plural|capfirst }}</div>
           </div>
+          {% endif %}
           <div class="od-stat">
             <div class="val">{{ total_quantity|floatformat:"0g" }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> {{ total_unit_short }}</span></div>
             <div class="lbl">{% trans "Total stock" %}</div>
@@ -4108,10 +4112,12 @@
           '<div class="t-label"><i class="fa fa-warehouse"></i> {% trans "Current stock" %}</div>' +
           '<div class="t-value">' + fmtNum(p.quantity || 0) + '<span class="t-unit">' + (p.unit_short || 'm') + '</span></div>' +
         '</div>' +
+        // Loose stock is in no container, so there is none to count.
+        (p.counts_packs === false ? '' :
         '<div class="bl-tile">' +
           '<div class="t-label"><i class="fa fa-layer-group"></i> ' + blCap(p.item_noun_plural || 'rolls') + '</div>' +
           '<div class="t-value">' + (p.rolls_count || 0) + '<span class="t-unit">' + ((p.rolls_count == 1 ? p.item_noun : p.item_noun_plural) || 'rolls') + '</span></div>' +
-        '</div>';
+        '</div>');
       var used = d.roll && d.roll.consumed;
       r.innerHTML =
         '<div class="bl-rc ' + (used ? 'elsewhere' : 'found') + '">' +

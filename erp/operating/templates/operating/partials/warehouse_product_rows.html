@@ -59,7 +59,7 @@ links so that keeps working.{% endcomment %}
   <td class="num" data-label="{% trans 'Stock' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
       <div class="qty">{{ p.quantity|floatformat:"2g" }} {{ p.unit_short }}</div>
-      {% if p.roll_count %}<div class="tops-sub" title="{% blocktrans with n=p.item_noun_plural %}The {{ n }} this product is stored in{% endblocktrans %}">{{ p.roll_count }} {% if p.roll_count == 1 %}{{ p.item_noun }}{% else %}{{ p.item_noun_plural }}{% endif %}</div>{% endif %}
+      {% if p.roll_count and p.counts_packs %}<div class="tops-sub" title="{% blocktrans with n=p.item_noun_plural %}The {{ n }} this product is stored in{% endblocktrans %}">{{ p.roll_count }} {% if p.roll_count == 1 %}{{ p.item_noun }}{% else %}{{ p.item_noun_plural }}{% endif %}</div>{% endif %}
       {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} {{ p.unit_short }}</div>{% endif %}
     </a>
   </td>
@@ -131,7 +131,7 @@ links so that keeps working.{% endcomment %}
   {% endif %}
   <td class="num" data-label="{% trans 'Total' %}">
     <div class="qty">{{ g.total_qty|floatformat:"2g" }} {{ g.unit_short }}</div>
-    {% if g.roll_total %}<div class="tops-sub">{{ g.roll_total }} {% if g.roll_total == 1 %}{{ g.item_noun }}{% else %}{{ g.item_noun_plural }}{% endif %}</div>{% endif %}
+    {% if g.roll_total and g.counts_packs %}<div class="tops-sub">{{ g.roll_total }} {% if g.roll_total == 1 %}{{ g.item_noun }}{% else %}{{ g.item_noun_plural }}{% endif %}</div>{% endif %}
     {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ g.reserved_total|floatformat:"2g" }} {{ g.unit_short }}</div>{% endif %}
   </td>
   {% if is_sales_rep %}

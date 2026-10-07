@@ -40,8 +40,17 @@ PACK_CHOICES = [
     ("bag", _("Bag")),
     ("bundle", _("Bundle")),
     ("pallet", _("Pallet")),
+    # Not packed at all: pieces standing on a shelf. Still a pack TYPE,
+    # because every product has to say how its stock is kept — this is
+    # the answer "it isn't in anything".
+    ("loose", _("Loose")),
 ]
 DEFAULT_PACK = "roll"
+# Packs that are not containers, so there is nothing to count: "22 pcs" is
+# the whole of what there is to say, and "22 pcs · 1 box" would describe a
+# box nobody can find. One stock entry of such a product is a batch — the
+# pieces that arrived together at one cost.
+UNCOUNTED_PACKS = frozenset({"loose"})
 PACK_NOUN = {
     "roll": (_("roll"), _("rolls")),
     "box": (_("box"), _("boxes")),
@@ -49,12 +58,13 @@ PACK_NOUN = {
     "bag": (_("bag"), _("bags")),
     "bundle": (_("bundle"), _("bundles")),
     "pallet": (_("pallet"), _("pallets")),
+    "loose": (_("batch"), _("batches")),
 }
 # Font Awesome class to match. A scroll for a roll of cloth, a carton for a
 # box — the icon does as much of the telling as the word.
 PACK_ICON = {"roll": "fa-scroll", "box": "fa-box", "bale": "fa-cubes-stacked",
              "bag": "fa-sack-xmark", "bundle": "fa-boxes-stacked",
-             "pallet": "fa-pallet"}
+             "pallet": "fa-pallet", "loose": "fa-layer-group"}
 
 # The pack a unit starts on when nobody has said otherwise. A starting point,
 # not a rule: the two can be set independently.
@@ -77,6 +87,12 @@ def pack_noun(pack_type, count):
     """"roll" for one, "rolls" for any other count."""
     one, many = pack_nouns(pack_type)
     return one if count == 1 else many
+
+
+def counts_packs(pack_type):
+    """Whether a product packed this way has packs worth counting. False
+    for loose stock — see UNCOUNTED_PACKS."""
+    return pack_type not in UNCOUNTED_PACKS
 
 
 def quantity_label(unit):

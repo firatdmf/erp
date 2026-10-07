@@ -3015,6 +3015,11 @@ def build_order_print_rows(order):
         # ("rolls"), both facts of the product — see marketing/units.py.
         it.unit_short = it.product.unit_short
         it.pack_type = it.product.pack_type
+        # Loose stock comes off a shelf, not out of a container: the line
+        # prints its quantity and no pack count, and adds none to the foot.
+        if not units.counts_packs(it.pack_type):
+            all_pack_ids -= packs_by_item.get(it.pk, set())
+            it.pack_count = 0
         it.pack_noun = units.pack_noun(it.pack_type, it.pack_count)
         # What KIND of goods the line is ("Fabric"). Same helper the
         # packing list and the invoice print use, so a customer

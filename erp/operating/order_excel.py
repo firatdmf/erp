@@ -99,6 +99,13 @@ def _qty_format(unit):
     return f'#,##0.00" {unit}"' if unit else "#,##0.00"
 
 
+def _pack_cell(it):
+    """A line's pack count, or nothing at all for loose stock — which is in
+    no container, so "0 batches" would be an answer to a question the
+    goods do not pose."""
+    return (it.pack_count or 0) if units.counts_packs(it.pack_type) else None
+
+
 def _packs_format(pack_type):
     """A pack count that shows what the packs are: "1 roll", "3 rolls".
     None for a mix of pack types, which prints as plain "packs"."""
@@ -377,7 +384,7 @@ def build_order_workbook(order):
         cell(ws, r, 2, getattr(it.product, "sku", "") or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 3, vsku or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 4, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt=_qty_format(it.unit_short))
-        cell(ws, r, 5, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt=_packs_format(it.pack_type))
+        cell(ws, r, 5, _pack_cell(it), font=F_VAL, border=GRID, align=RIGHT, fmt=_packs_format(it.pack_type))
         cell(ws, r, 6, _dec(price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         cell(ws, r, 7, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         r += 1
@@ -543,7 +550,7 @@ def build_combined_workbook(orders):
         cell(ws, r, 4, vsku or "—", font=F_VAL, border=GRID, fmt=TEXT)
         cell(ws, r, 5, it.product_group_label or "—", font=F_VAL, border=GRID)
         cell(ws, r, C_QTY, _dec(qty), font=F_VAL, border=GRID, align=RIGHT, fmt=_qty_format(it.unit_short))
-        cell(ws, r, C_PACKS, it.pack_count or 0, font=F_VAL, border=GRID, align=RIGHT, fmt=_packs_format(it.pack_type))
+        cell(ws, r, C_PACKS, _pack_cell(it), font=F_VAL, border=GRID, align=RIGHT, fmt=_packs_format(it.pack_type))
         cell(ws, r, C_PRICE, _dec(it.price), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         cell(ws, r, C_AMOUNT, _dec(line), font=F_VAL, border=GRID, align=RIGHT, fmt=money)
         r += 1

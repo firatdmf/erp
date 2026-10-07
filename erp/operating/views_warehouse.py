@@ -1987,6 +1987,7 @@ class WarehouseDetail(View):
                 "unit_short": units.unit_short(g.get("unit") or units.DEFAULT_UNIT),
                 "item_noun": units.pack_nouns(g.get("pack_type") or units.DEFAULT_PACK)[0],
                 "item_noun_plural": units.pack_nouns(g.get("pack_type") or units.DEFAULT_PACK)[1],
+                "counts_packs": units.counts_packs(g.get("pack_type") or units.DEFAULT_PACK),
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "avg_cost_usd": g["avg_cost"],
@@ -2133,6 +2134,8 @@ def _warehouse_item_words(scope_ids):
         "item_noun": str(singular),
         "item_noun_plural": str(plural),
         "item_icon": WarehouseProduct.PACK_ICON.get(pack, "fa-layer-group"),
+        # A warehouse of loose stock only has no containers to total.
+        "counts_packs": units.counts_packs(pack),
     }
 
 
@@ -2440,6 +2443,7 @@ def warehouse_barcode_lookup(request, pk):
             "unit_short": product.unit_short,
             "item_noun": product.item_noun,
             "item_noun_plural": product.item_noun_plural,
+            "counts_packs": product.counts_packs,
             # Always the product's OWN warehouse — from a combined view the
             # match lives in a member, and the detail route 404s otherwise.
             "detail_url": reverse("operating:warehouse_product_detail",

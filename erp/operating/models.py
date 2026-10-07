@@ -2117,6 +2117,12 @@ class WarehouseProduct(models.Model):
         return units.PACK_ICON.get(self.pack_type, "fa-layer-group")
 
     @property
+    def counts_packs(self):
+        """False for loose stock: its rows show a quantity and no count of
+        containers (units.counts_packs)."""
+        return units.counts_packs(self.pack_type)
+
+    @property
     def quantity_label(self):
         """Column heading for this product's quantity — "Length" for cloth,
         "Weight" for anything sold by the kilo, "Quantity" for things that

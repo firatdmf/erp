@@ -2487,7 +2487,11 @@ def update_variant_image_order(request):
 
 
 def get_product_categories(request):
-    categories = ProductCategory.objects.all()
+    # Only the groups switched on for the storefront. The website draws a
+    # card for every group it is handed, so a group kept for stock that is
+    # not sold online — or pulled offline with its switch — must not be
+    # in the answer at all.
+    categories = ProductCategory.objects.filter(is_active=True)
     data = [
         {"pk": category.pk, "name": category.name, "image_url": category.image_url, "description": category.description}
         for category in categories

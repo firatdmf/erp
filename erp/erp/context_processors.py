@@ -68,10 +68,10 @@ def last_ten_entities(request):
     if not getattr(request, 'user', None) or not request.user.is_authenticated:
         return {'last_ten_entities': []}
     try:
-        contacts = list(Contact.objects.order_by('-created_at')[:10].annotate(
+        contacts = list(Contact.objects.here().order_by('-created_at')[:10].annotate(
             entry_type=Value("Contact", output_field=CharField())
         ))
-        companies = list(Company.objects.order_by('-created_at')[:10].annotate(
+        companies = list(Company.objects.here().order_by('-created_at')[:10].annotate(
             entry_type=Value("Company", output_field=CharField())
         ))
         combined_list = sorted(

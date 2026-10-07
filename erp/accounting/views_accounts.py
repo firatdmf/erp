@@ -461,10 +461,13 @@ class CurrentAccountCreate(View):
                 current_account = creator(linked, member=member, book=request.book)
                 current_account.name = name
             elif entity_type == "company":
-                if Company.objects.filter(name__iexact=name).exists():
+                if Company.objects.of_book(request.book).filter(name__iexact=name).exists():
                     messages.error(request, _g("A company with this name already exists."))
                     return redirect("accounts:create", book_id=request.book.pk)
+                # Filed in this book's directory, not in that of the book
+                # its author usually works in: the account is this book's.
                 entity = Company.objects.create(
+                    directory=request.book.directory,
                     name=name,
                     email=[email] if email else [],
                     phone=[phone] if phone else [],
@@ -475,6 +478,7 @@ class CurrentAccountCreate(View):
                     entity, member=member, book=request.book)
             elif entity_type == "contact":
                 entity = Contact.objects.create(
+                    directory=request.book.directory,
                     name=name,
                     email=[email] if email else [],
                     phone=[phone] if phone else [],
@@ -485,6 +489,7 @@ class CurrentAccountCreate(View):
                     entity, member=member, book=request.book)
             else:
                 entity = Supplier.objects.create(
+                    directory=request.book.directory,
                     company_name=name,
                     email=email, phone=phone,
                     address=address, country=country,
@@ -654,17 +659,17 @@ def _crm_candidates(book, q, exclude=None):
 
     found = {
         "contact": list(
-            Contact.objects.annotate(_f=tr_fold_expr("name"))
+            Contact.objects.of_book(book).annotate(_f=tr_fold_expr("name"))
             .filter(_f__contains=needle).order_by("name")[:limit]
         ),
         "company": list(
-            Company.objects.annotate(_f=tr_fold_expr("name"))
+            Company.objects.of_book(book).annotate(_f=tr_fold_expr("name"))
             .filter(_f__contains=needle).order_by("name")[:limit]
         ),
         # A supplier is named by whichever of the two columns is
         # filled — __str__ prefers company_name — so both are searched.
         "supplier": list(
-            Supplier.objects.annotate(_fc=tr_fold_expr("company_name"),
+            Supplier.objects.of_book(book).annotate(_fc=tr_fold_expr("company_name"),
                                       _fn=tr_fold_expr("contact_name"))
             .filter(Q(_fc__contains=needle) | Q(_fn__contains=needle))
             .order_by("company_name", "contact_name")[:limit]
@@ -827,7 +832,7 @@ class CurrentAccountCrmLink(View):
             # attaching to someone else's company because the names match
             # is a judgement only the reader can make, and the search box
             # above this button is how they make it.
-            if Company.objects.filter(name__iexact=name).exists():
+            if Company.objects.of_book(current_account.book).filter(name__iexact=name).exists():
                 messages.error(
                     request,
                     _g("A company named %(name)s already exists — search for it "
@@ -844,6 +849,8 @@ class CurrentAccountCrmLink(View):
         else:
             obj = Supplier(company_name=name, email=email, phone=phone,
                            address=address, country=country)
+        # Filed with the account it is made for, in that book's directory.
+        obj.directory = current_account.book.directory
 
         try:
             # full_clean rather than a silent truncation: Contact.name

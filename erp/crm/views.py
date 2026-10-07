@@ -6,7 +6,7 @@ from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonRespons
 from django.views import View, generic
 from .models import (
     Attachment, Contact, Company, DuplicateName, Note, CompanyFollowUp, Supplier,
-    content_type_for, validate_attachment_size, validate_attachment_type,
+    content_type_for, of_books_in_reach, validate_attachment_size, validate_attachment_type,
 )
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _gettext
@@ -71,7 +71,7 @@ class ContactList(generic.ListView):
     paginate_by = 25  # Show 25 contacts per page
     
     def get_queryset(self):
-        queryset = Contact.objects.select_related('company').order_by('name')
+        queryset = Contact.objects.here().select_related('company').order_by('name')
         
         # Get search query from URL parameter
         search_query = self.request.GET.get('search', '').strip()
@@ -103,7 +103,7 @@ class CompanyList(generic.ListView):
     paginate_by = 25  # Show 25 companies per page
     
     def get_queryset(self):
-        queryset = Company.objects.annotate(
+        queryset = Company.objects.here().annotate(
             contacts_count=Count('contacts')
         ).order_by('name')
         
@@ -157,7 +157,7 @@ class ContactCreate(generic.edit.CreateView):
                     # get the company object from database or create a new one if it does not exist.
                     # Found whatever its case: "woodline" typed here is
                     # the Woodline CRM already has, not a second company.
-                    company = (Company.objects.filter(name__iexact=company_name.strip()).first()
+                    company = (Company.objects.here().filter(name__iexact=company_name.strip()).first()
                                or Company.objects.create(name=company_name))
                     # set contact's company to the created or existing company.
                     form.instance.company = company
@@ -481,7 +481,7 @@ class ContactDetail(generic.DetailView):
         # full picture.
         from operating.models import Order
         context["orders"] = Order.with_pre_order_flag(
-            Order.objects.filter(contact=contact).order_by("-created_at")
+            of_books_in_reach(Order.objects.filter(contact=contact), "current_account__book").order_by("-created_at")
         )[:25]
 
         # ── Samples this contact has been given ───────────────
@@ -497,7 +497,7 @@ class ContactDetail(generic.DetailView):
         from accounting.models_accounts import CurrentAccount
         from erp.roles import is_sales_rep
         context["current_account_accounts"] = accounts = [] if is_sales_rep(self.request.user) else list(
-            CurrentAccount.objects.filter(contact=contact)
+            of_books_in_reach(CurrentAccount.objects.filter(contact=contact))
             .select_related("book", "default_currency")
             .order_by("book__name")
         )
@@ -639,7 +639,7 @@ class CompanyDetail(generic.DetailView):
         # ── Order history for this company ────────────────────
         from operating.models import Order
         context["orders"] = Order.with_pre_order_flag(
-            Order.objects.filter(company=company).order_by("-created_at")
+            of_books_in_reach(Order.objects.filter(company=company), "current_account__book").order_by("-created_at")
         )[:25]
 
         # ── Samples this company has been given ───────────────
@@ -657,7 +657,7 @@ class CompanyDetail(generic.DetailView):
         from accounting.models_accounts import CurrentAccount
         from erp.roles import is_sales_rep
         context["current_account_accounts"] = accounts = [] if is_sales_rep(self.request.user) else list(
-            CurrentAccount.objects.filter(company=company)
+            of_books_in_reach(CurrentAccount.objects.filter(company=company))
             .select_related("book", "default_currency")
             .order_by("book__name")
         )
@@ -979,7 +979,7 @@ def check_company_duplicate(request):
         return HttpResponse("")
     
     # Check for exact case-insensitive match
-    exists = Company.objects.filter(name__iexact=name).exists()
+    exists = Company.objects.here().filter(name__iexact=name).exists()
     
     if exists:
         return HttpResponse(
@@ -1007,7 +1007,7 @@ def check_contact_duplicate(request):
         return HttpResponse("")
     
     # Check for exact case-insensitive match
-    exists = Contact.objects.filter(name__iexact=name).exists()
+    exists = Contact.objects.here().filter(name__iexact=name).exists()
     
     if exists:
         return HttpResponse(
@@ -1036,14 +1036,14 @@ def search_contact(request):
     
     # Optimize: Use only() to fetch minimal fields, limit results
     # 1. Fast Contact search - only essential fields
-    contacts = Contact.objects.filter(
+    contacts = Contact.objects.here().filter(
         Q(name__icontains=search_text) |
         Q(email__icontains=search_text) |
         Q(phone__icontains=search_text)
     ).only('id', 'name', 'created_at').order_by('-created_at')[:15]
     
     # 2. Fast Company search - only essential fields
-    companies = Company.objects.filter(
+    companies = Company.objects.here().filter(
         Q(name__icontains=search_text) |
         Q(email__icontains=search_text) |
         Q(phone__icontains=search_text)
@@ -1082,7 +1082,7 @@ def search_contacts_only(request):
     company_id = request.POST.get("company_id")
     
     if search_text:
-        resultsContact = Contact.objects.filter(
+        resultsContact = Contact.objects.here().filter(
             Q(name__icontains=search_text) | 
             Q(email__icontains=search_text) |
             Q(phone__icontains=search_text)
@@ -1198,7 +1198,7 @@ class delete_company_from_contact(View):
 
 def company_search(request):
     q = request.GET.get("company_name", "")
-    companies = Company.objects.filter(unaccent_icontains(q, "name")) if q else []
+    companies = Company.objects.here().filter(unaccent_icontains(q, "name")) if q else []
     if companies:
         html = "<ul class='search-results-list'>"
         for company in companies:
@@ -1232,8 +1232,8 @@ def task_attach_search(request):
     if not query:
         return HttpResponse("")
 
-    companies = Company.objects.filter(unaccent_icontains(query, "name"))[:6]
-    contacts = Contact.objects.filter(
+    companies = Company.objects.here().filter(unaccent_icontains(query, "name"))[:6]
+    contacts = Contact.objects.here().filter(
         unaccent_icontains(query, "name")
     ).select_related("company")[:6]
 
@@ -1291,8 +1291,8 @@ def customer_autocomplete(request):
         return HttpResponse("")
     only_companies = request.GET.get("only") == "company"
     contacts = [] if only_companies else \
-        Contact.objects.filter(unaccent_icontains(query, "name"))[:5]
-    companies = Company.objects.filter(unaccent_icontains(query, "name"))[:8 if only_companies else 5]
+        Contact.objects.here().filter(unaccent_icontains(query, "name"))[:5]
+    companies = Company.objects.here().filter(unaccent_icontains(query, "name"))[:8 if only_companies else 5]
     if only_companies and not companies:
         return HttpResponse("")
 
@@ -1390,7 +1390,7 @@ def create_quick_customer(*, kind, name, phone="", email="", address="",
     if kind == "company":
         return Company.objects.create(**fields)
     if company:
-        fields["company"] = (Company.objects.filter(name__iexact=company).order_by("pk").first()
+        fields["company"] = (Company.objects.here().filter(name__iexact=company).order_by("pk").first()
                              or Company.objects.create(name=company))
     return Contact.objects.create(**fields)
 
@@ -1584,7 +1584,7 @@ class SupplierList(generic.ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = Supplier.objects.here().order_by(*self.ordering)
         search_query = self.request.GET.get('search', '').strip()
         
         if search_query:
@@ -1731,10 +1731,10 @@ class SupplierDetail(generic.DetailView):
         # accounts, so the link runs through the account.
         from accounting.models_accounts import CurrentAccount, Invoice
         purchases = list(
-            Invoice.objects.filter(
+            of_books_in_reach(Invoice.objects.filter(
                 type__in=("purchase", "purchase_return"),
                 current_account__supplier=supplier,
-            )
+            ))
             .select_related("book", "currency")
             .order_by("-date", "-id")[:25]
         )
@@ -1755,7 +1755,7 @@ class SupplierDetail(generic.DetailView):
         # are closed to the role anyway.
         from erp.roles import is_sales_rep
         context["current_account_accounts"] = accounts = [] if is_sales_rep(self.request.user) else list(
-            CurrentAccount.objects.filter(supplier=supplier)
+            of_books_in_reach(CurrentAccount.objects.filter(supplier=supplier))
             .select_related("book", "default_currency")
             .order_by("book__name")
         )
@@ -1875,7 +1875,7 @@ def supplier_search_companies(request):
     if not q:
         return JsonResponse({"results": []})
     qs = (
-        Company.objects
+        Company.objects.here()
         .filter(unaccent_icontains(q, "name"))
         .order_by("name")[:12]
     )
@@ -1897,7 +1897,7 @@ def supplier_search_contacts(request):
     if not q:
         return JsonResponse({"results": []})
     qs = (
-        Contact.objects.select_related("company")
+        Contact.objects.here().select_related("company")
         .filter(unaccent_icontains(q, "name", "job_title", "company__name"))
         .order_by("name")[:12]
     )
@@ -1936,6 +1936,40 @@ def _attachment_owner(kind, pk):
     if model is None:
         raise Http404("Unknown record type for attachments")
     return get_object_or_404(model, pk=pk)
+
+
+@login_required
+def share_record(request, kind, pk):
+    """Share a company, contact or supplier with another customer list,
+    or stop — the chips beside the record's name.
+
+    For someone who reads both the record's own list and the other one.
+    A record that was only shared WITH its reader is not theirs to pass
+    on, and a list they cannot read is not theirs to add to.
+    """
+    from .models import Directory, DuplicateName, visible_directory_ids
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    record = _attachment_owner(kind, pk)
+    directory = get_object_or_404(Directory, pk=request.POST.get("directory") or 0)
+    ids = visible_directory_ids()
+    if ids is not None and not {record.directory_id, directory.pk} <= ids:
+        raise Http404("No such record.")
+    if request.POST.get("share") == "1":
+        try:
+            record.share_with(directory)
+        except DuplicateName:
+            messages.error(request, _gettext(
+                "%(list)s already has a record of its own called %(name)s, so "
+                "sharing this one would show the two side by side. They are "
+                "the same customer entered twice and need merging first."
+            ) % {"list": directory.name, "name": str(record)})
+    else:
+        record.stop_sharing_with(directory)
+    return redirect(request.META.get("HTTP_REFERER")
+                    or reverse(f"crm:{'supplier_detail' if kind == 'supplier' else kind + '_detail'}",
+                               args=[record.pk]))
 
 
 def _render_attachment_list(request, kind, owner, errors=()):

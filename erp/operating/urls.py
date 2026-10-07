@@ -8,12 +8,27 @@ from . import warehouse_label
 from . import warehouse_excel
 from accounting import views_invoice
 from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped
-from .models import Order, Warehouse
+from crm.directories import customer_guarded
+from .models import Order, Pack, Warehouse
 from .split_orders import split_order_guarded
 from django.views.generic import TemplateView, RedirectView
 
 
 app_name = "operating"
+
+
+in_reach = views_warehouse.warehouse_in_reach
+
+
+def of_a_customer_in_reach(view):
+    """An order's printouts and its customer card name the customer, so
+    they open only for someone who may see that customer (crm.Directory).
+    Beside the book guards rather than instead of them: this one lets a
+    shop print the factory's half of an order they share a customer for.
+    """
+    return customer_guarded(view, Order, "contact", "company",
+                            book="current_account__book")
+
 urlpatterns = [
     # Purchasing, moved in from the old `procurement` app. Mounted here so its
     # names resolve as `operating:purchase_request_list`, and so the sales-rep
@@ -21,7 +36,10 @@ urlpatterns = [
     path("procurement/", include("operating.urls_procurement")),
 
     path("", views.index.as_view(), name="index"),
-    # Warehouse
+    # Warehouse. Every page under one warehouse is `in_reach`: open to
+    # whoever works with that warehouse's stock, 404 for anyone else
+    # (views_warehouse.warehouse_in_reach). The three pages about the
+    # warehouse itself keep the stricter warehouse_guarded.
     path("warehouses/", views_warehouse.WarehouseList.as_view(), name="warehouse_list"),
     # Global activity feed ("Son Hareketler") — all warehouses. Must sit
     # above warehouses/<int:pk>/ patterns (won't collide: int ≠ "movements").
@@ -31,40 +49,41 @@ urlpatterns = [
     path("warehouses/account-create/", views_warehouse.warehouse_account_create, name="warehouse_account_create"),
     path("warehouses/barcode-available/", views_warehouse.warehouse_barcode_available, name="warehouse_barcode_available"),
     path("warehouses/<int:pk>/", views_warehouse.warehouse_guarded(views_warehouse.WarehouseDetail.as_view()), name="warehouse_detail"),
-    path("warehouses/<int:pk>/excel/", warehouse_excel.warehouse_excel, name="warehouse_excel"),
-    path("warehouses/<int:pk>/group-variants/", views_warehouse.warehouse_group_variants, name="warehouse_group_variants"),
-    path("warehouses/<int:pk>/catalog-search/", views_warehouse.catalog_base_search, name="catalog_base_search"),
-    path("warehouses/<int:pk>/catalog-variants/<int:product_id>/", views_warehouse.catalog_product_variants, name="catalog_product_variants"),
-    path("warehouses/<int:pk>/customer-currency/", views_warehouse.warehouse_customer_currency, name="warehouse_customer_currency"),
+    path("warehouses/<int:pk>/excel/", in_reach(warehouse_excel.warehouse_excel), name="warehouse_excel"),
+    path("warehouses/<int:pk>/group-variants/", in_reach(views_warehouse.warehouse_group_variants), name="warehouse_group_variants"),
+    path("warehouses/<int:pk>/catalog-search/", in_reach(views_warehouse.catalog_base_search), name="catalog_base_search"),
+    path("warehouses/<int:pk>/catalog-variants/<int:product_id>/", in_reach(views_warehouse.catalog_product_variants), name="catalog_product_variants"),
+    path("warehouses/<int:pk>/customer-currency/", in_reach(views_warehouse.warehouse_customer_currency), name="warehouse_customer_currency"),
     path("customer-currency/", views_warehouse.customer_currency, name="customer_currency"),
-    path("warehouses/<int:pk>/catalog-variant-match/<int:product_id>/", views_warehouse.catalog_variant_match, name="catalog_variant_match"),
-    path("warehouses/<int:pk>/barcode-lookup/", views_warehouse.warehouse_barcode_lookup, name="warehouse_barcode_lookup"),
-    path("warehouses/<int:pk>/product-search/", views_warehouse.warehouse_product_search, name="warehouse_product_search"),
-    path("warehouses/<int:pk>/rolls/<int:roll_pk>/move-here/", views_warehouse.warehouse_roll_move_here, name="warehouse_roll_move_here"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/", views_warehouse.warehouse_product_rolls, name="warehouse_product_rolls"),
-    path("warehouses/<int:warehouse_pk>/rolls/<int:roll_pk>/photo/", views_warehouse.warehouse_roll_photo, name="warehouse_roll_photo"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/", warehouse_label.warehouse_product_label, name="warehouse_product_label"),
+    path("warehouses/<int:pk>/catalog-variant-match/<int:product_id>/", in_reach(views_warehouse.catalog_variant_match), name="catalog_variant_match"),
+    path("warehouses/<int:pk>/barcode-lookup/", in_reach(views_warehouse.warehouse_barcode_lookup), name="warehouse_barcode_lookup"),
+    path("warehouses/<int:pk>/product-search/", in_reach(views_warehouse.warehouse_product_search), name="warehouse_product_search"),
+    path("warehouses/<int:pk>/rolls/<int:roll_pk>/move-here/", in_reach(views_warehouse.warehouse_roll_move_here), name="warehouse_roll_move_here"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/", in_reach(views_warehouse.warehouse_product_rolls), name="warehouse_product_rolls"),
+    path("warehouses/<int:warehouse_pk>/rolls/<int:roll_pk>/photo/", in_reach(views_warehouse.warehouse_roll_photo), name="warehouse_roll_photo"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/", in_reach(warehouse_label.warehouse_product_label), name="warehouse_product_label"),
+    # Not in_reach: what a roll's QR opens, for anyone holding the label.
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/code/", warehouse_label.warehouse_product_code, name="warehouse_product_code"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/info/", warehouse_label.warehouse_product_info, name="warehouse_product_info"),
     # Convenience: a mistyped/stale "label/info" path still lands on the info screen.
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/info/", RedirectView.as_view(pattern_name="operating:warehouse_product_info", permanent=False)),
     path("warehouses/<int:pk>/edit/", views_warehouse.warehouse_guarded(views_warehouse.WarehouseEdit.as_view()), name="warehouse_edit"),
-    path("warehouses/<int:pk>/import/", views_warehouse.WarehouseProductImport.as_view(), name="warehouse_product_import"),
+    path("warehouses/<int:pk>/import/", in_reach(views_warehouse.WarehouseProductImport.as_view()), name="warehouse_product_import"),
     path("warehouses/<int:pk>/delete/", views_warehouse.warehouse_guarded(views_warehouse.WarehouseDelete.as_view()), name="warehouse_delete"),
-    path("warehouses/<int:pk>/scan/", views_warehouse.WarehouseRollScan.as_view(), name="warehouse_roll_scan"),
-    path("warehouses/<int:pk>/manual-add/", views_warehouse.WarehouseManualAdd.as_view(), name="warehouse_manual_add"),
-    path("warehouses/<int:pk>/purchase/<int:invoice_id>/edit/", views_warehouse.WarehousePurchaseEdit.as_view(), name="warehouse_purchase_edit"),
-    path("warehouses/<int:pk>/next-sku/", views_warehouse.warehouse_next_sku, name="warehouse_next_sku"),
-    path("warehouses/<int:pk>/next-barcode/", views_warehouse.warehouse_next_barcode, name="warehouse_next_barcode"),
-    path("warehouses/<int:pk>/merge-duplicates/", views_warehouse.WarehouseMergeDuplicates.as_view(), name="warehouse_merge_duplicates"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/", views_warehouse.WarehouseProductDetail.as_view(), name="warehouse_product_detail"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/edit/", views_warehouse.WarehouseProductEdit.as_view(), name="warehouse_product_edit"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/delete/", views_warehouse.WarehouseProductDelete.as_view(), name="warehouse_product_delete"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/stock-out/", views_warehouse.WarehouseStockOut.as_view(), name="warehouse_stock_out"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/<int:roll_pk>/delete/", views_warehouse.WarehouseRollDelete.as_view(), name="warehouse_roll_delete"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/bulk-delete/", views_warehouse.WarehouseRollBulkDelete.as_view(), name="warehouse_roll_bulk_delete"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/<int:roll_pk>/edit/", views_warehouse.WarehouseRollEdit.as_view(), name="warehouse_roll_edit"),
-    path("warehouses/<int:warehouse_pk>/movements/", views_warehouse.WarehouseMovements.as_view(), name="warehouse_movements"),
+    path("warehouses/<int:pk>/scan/", in_reach(views_warehouse.WarehouseRollScan.as_view()), name="warehouse_roll_scan"),
+    path("warehouses/<int:pk>/manual-add/", in_reach(views_warehouse.WarehouseManualAdd.as_view()), name="warehouse_manual_add"),
+    path("warehouses/<int:pk>/purchase/<int:invoice_id>/edit/", in_reach(views_warehouse.WarehousePurchaseEdit.as_view()), name="warehouse_purchase_edit"),
+    path("warehouses/<int:pk>/next-sku/", in_reach(views_warehouse.warehouse_next_sku), name="warehouse_next_sku"),
+    path("warehouses/<int:pk>/next-barcode/", in_reach(views_warehouse.warehouse_next_barcode), name="warehouse_next_barcode"),
+    path("warehouses/<int:pk>/merge-duplicates/", in_reach(views_warehouse.WarehouseMergeDuplicates.as_view()), name="warehouse_merge_duplicates"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/", in_reach(views_warehouse.WarehouseProductDetail.as_view()), name="warehouse_product_detail"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/edit/", in_reach(views_warehouse.WarehouseProductEdit.as_view()), name="warehouse_product_edit"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/delete/", in_reach(views_warehouse.WarehouseProductDelete.as_view()), name="warehouse_product_delete"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/stock-out/", in_reach(views_warehouse.WarehouseStockOut.as_view()), name="warehouse_stock_out"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/<int:roll_pk>/delete/", in_reach(views_warehouse.WarehouseRollDelete.as_view()), name="warehouse_roll_delete"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/bulk-delete/", in_reach(views_warehouse.WarehouseRollBulkDelete.as_view()), name="warehouse_roll_bulk_delete"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/<int:roll_pk>/edit/", in_reach(views_warehouse.WarehouseRollEdit.as_view()), name="warehouse_roll_edit"),
+    path("warehouses/<int:warehouse_pk>/movements/", in_reach(views_warehouse.WarehouseMovements.as_view()), name="warehouse_movements"),
     # Sample packages, made from a client's CRM page.
     path("samples/rolls/", views_samples.sample_roll_search, name="sample_roll_search"),
     path("samples/packages/create/", views_samples.sample_package_create, name="sample_package_create"),
@@ -85,8 +104,8 @@ urlpatterns = [
     # book_guarded, plus the split-order exception: a half in another book
     # leads to the half the viewer may open, which shows the whole order.
     path("orders/<int:pk>/", split_order_guarded(views.OrderDetail.as_view()), name="order_detail"),
-    path("orders/<int:pk>/customer/", views.order_customer_card_view, name="order_customer_card"),
-    path("orders/<int:pk>/print/", views.OrderPrint.as_view(), name="order_print"),
+    path("orders/<int:pk>/customer/", of_a_customer_in_reach(views.order_customer_card_view), name="order_customer_card"),
+    path("orders/<int:pk>/print/", of_a_customer_in_reach(views.OrderPrint.as_view()), name="order_print"),
     # The order's invoice — a printout of the order, nothing stored.
     path("orders/<int:pk>/invoice/", book_guarded(views_invoice.OrderInvoice.as_view(), Order, "current_account.book"), name="order_invoice"),
     path("orders/<int:pk>/invoice/excel/", book_guarded(views_invoice.order_invoice_excel, Order, "current_account.book"), name="order_invoice_excel"),
@@ -95,7 +114,7 @@ urlpatterns = [
     # viewer against each order's book itself.
     path("orders/print/combined/", views.OrderPrintCombined.as_view(), name="order_print_combined"),
     path("orders/print/combined/excel/", order_excel.combined_order_excel, name="order_excel_combined"),
-    path("orders/<int:pk>/changes/", views.order_changes, name="order_changes"),
+    path("orders/<int:pk>/changes/", of_a_customer_in_reach(views.order_changes), name="order_changes"),
     # The rolls to pull for an order, for the warehouse floor: no prices,
     # no customer name. Guarded the way the pack screen is — it is the
     # same people's sheet.
@@ -117,7 +136,7 @@ urlpatterns = [
     path("orders/create/barcode_check/", views.order_create_barcode_check, name="order_create_barcode_check"),
     path("orders/create/barcode_resolve/", views.order_create_barcode_resolve, name="order_create_barcode_resolve"),
     path("orders/create/roll_list/", views.order_create_roll_list, name="order_create_roll_list"),
-    path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
+    path("orders/<int:pk>/excel/", of_a_customer_in_reach(order_excel.order_excel), name="order_excel"),
     # An order's money lands in one book (through its current account), so the list
     # names the book the same way the ledger's collections do. The old
     # unscoped address stays as a redirect to the viewer's working book:
@@ -146,17 +165,18 @@ urlpatterns = [
     # path("product_list/",views.Product.as_view(),name="product_list"),
     path(
         "orders/<int:pk>/packing_list/export_excel/",
-        views.export_packing_list_excel,
+        of_a_customer_in_reach(views.export_packing_list_excel),
         name="export_packing_list_excel",
     ),
     path(
         "orders/<int:pk>/packing_list/pdf/",
-        views.order_packing_list_pdf,
+        of_a_customer_in_reach(views.order_packing_list_pdf),
         name="order_packing_list_pdf",
     ),
     path(
         "packs/<int:pack_pk>/pdf/",
-        views.pack_pdf,
+        customer_guarded(views.pack_pdf, Pack, "order__contact", "order__company",
+                         kwarg="pack_pk", book="order__current_account__book"),
         name="pack_pdf",
     ),
     path(

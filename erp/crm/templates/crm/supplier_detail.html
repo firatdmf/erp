@@ -73,6 +73,7 @@ or company record it doubles as.
           <span class="od-dot"></span>
         {% endif %}
         {% include "components/_record_creator.html" with obj=supplier %}
+        {% record_sharing "supplier" supplier %}
       </div>
     </div>
     <div class="od-head-r">

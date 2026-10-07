@@ -13670,3 +13670,21 @@ msgstr "Ana ürünü değiştir"
 
 msgid "New main product:"
 msgstr "Yeni ana ürün:"
+
+msgid "The customer list this record is kept in"
+msgstr "Bu kaydın tutulduğu müşteri listesi"
+
+msgid "Shared with"
+msgstr "Paylaşıldığı listeler"
+
+#, python-format
+msgid "Stop sharing with %(name)s"
+msgstr "%(name)s ile paylaşımı durdur"
+
+#, python-format
+msgid "Share with %(name)s"
+msgstr "%(name)s ile paylaş"
+
+#, python-format
+msgid "%(list)s already has a record of its own called %(name)s, so sharing this one would show the two side by side. They are the same customer entered twice and need merging first."
+msgstr "%(list)s listesinde zaten %(name)s adında ayrı bir kayıt var; bu kaydı paylaşmak ikisini yan yana gösterir. Aynı müşteri iki kez girilmiş, önce birleştirilmeleri gerekiyor."

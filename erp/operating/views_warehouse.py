@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum, F, DecimalField, Q
 from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -15,6 +15,7 @@ from django.utils.translation import gettext as _gettext, gettext_lazy, pgettext
 from django.views import View
 
 from .models import Warehouse, WarehouseProduct, WarehouseProductItem, StockMovement
+from crm.models import record_in_reach
 from marketing import units
 from marketing.models import SKU_MAX_LENGTH
 
@@ -621,7 +622,10 @@ def _roll_usage_info(roll):
         else:
             entries.append({
                 "kind": "movement",
-                "label": (mv.reason or mv.reference or "").strip() or None,
+                # The reason of a sample names who it went to, and this
+                # roll may be another business's.
+                "label": ((mv.reason or mv.reference or "").strip() or None)
+                         if record_in_reach(mv.contact, mv.company) else None,
                 "line": None,
                 "quantity": float(mv.quantity or 0),
                 "date": date,
@@ -1327,6 +1331,33 @@ def warehouse_guarded(view):
         if not warehouse.visible_to(getattr(request.user, "member", None)):
             raise Http404("No such record.")
         return view(request, *args, pk=pk, **kwargs)
+    return wrapper
+
+
+def warehouse_in_reach(view):
+    """warehouse_guarded for the stock pages UNDER a warehouse — its
+    products, rolls, movements, lookups — which name it as `pk` or
+    `warehouse_pk`.
+
+    Looser than warehouse_guarded by one step: a combined warehouse's
+    page links to its members' own product pages, so a member warehouse
+    opens for whoever may read the combined one (Warehouse.in_reach_of).
+    Anything else is 404 — a branch with its own book does not read
+    another business's shelves, movements or the customer names written
+    into them by typing a warehouse id."""
+    from functools import wraps
+    from django.contrib.auth.views import redirect_to_login
+    from django.http import Http404
+
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        pk = kwargs.get("pk", kwargs.get("warehouse_pk"))
+        warehouse = get_object_or_404(Warehouse, pk=pk)
+        if not warehouse.in_reach_of(getattr(request.user, "member", None)):
+            raise Http404("No such record.")
+        return view(request, *args, **kwargs)
     return wrapper
 
 
@@ -4462,6 +4493,11 @@ class WarehousePurchaseEdit(View):
             Invoice.objects.select_related("current_account", "currency"),
             pk=invoice_id, type="purchase",
         )
+        # The warehouse is checked in the URLconf; the purchase is named
+        # by its own id and is its book's.
+        from accounting.services_accounts import member_can_use_book
+        if not member_can_use_book(getattr(request.user, "member", None), invoice.book):
+            raise Http404("No such record.")
         if invoice.status == "cancelled":
             return JsonResponse({"success": False, "error": _gettext("A cancelled purchase can't be edited.")}, status=400)
 
@@ -4557,6 +4593,14 @@ class WarehousePurchaseEdit(View):
             return JsonResponse(
                 {"success": False,
                  "error": _gettext("You don't have goods-receipt permission — this purchase can't be edited.")}, status=403)
+
+        # As in get(): the purchase is its book's, whichever warehouse
+        # id it is posted under.
+        from accounting.models import Invoice
+        from accounting.services_accounts import member_can_use_book
+        purchase = get_object_or_404(Invoice, pk=invoice_id, type="purchase")
+        if not member_can_use_book(getattr(request.user, "member", None), purchase.book):
+            raise Http404("No such record.")
 
         warehouse = get_object_or_404(Warehouse, pk=pk)
         if warehouse.is_combined:
@@ -6684,7 +6728,11 @@ class WarehouseMovementsAll(View):
         from functools import reduce
         import operator
 
+        # Every warehouse the reader works with, not every warehouse: a
+        # movement's reason names the customer a sample went to.
+        in_reach = Warehouse.ids_in_reach_of(getattr(request.user, "member", None))
         qs = (StockMovement.objects
+              .filter(product__warehouse_id__in=in_reach)
               .select_related("product", "product__warehouse", "stock_item", "created_by",
                               "product__catalog_variant__product"))
 
@@ -6758,7 +6806,8 @@ class WarehouseMovementsAll(View):
             "out_total": out_total,
             "net": (in_total or 0) - (out_total or 0),
             "order_count": order_count,
-            "warehouses": list(Warehouse.objects.order_by("name").values("id", "name")),
+            "warehouses": list(Warehouse.objects.filter(pk__in=in_reach)
+                               .order_by("name").values("id", "name")),
             "filter_qs": filter_qs,
             "filters": {
                 "kind": kind,

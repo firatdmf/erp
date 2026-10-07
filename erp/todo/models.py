@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 from django.utils import timezone
 from django.urls import reverse
-from crm.models import Contact, Company, Supplier
+from crm.models import Contact, Company, LinkedRecordManager, Supplier
 
 # from authentication.models import Member
 from datetime import datetime, date
@@ -72,6 +72,12 @@ class Task(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True, related_name='assigned_tasks')
     assignees = models.ManyToManyField(Member, related_name='tasks', blank=True)
     created_by = models.ForeignKey(Member, on_delete=models.SET_NULL, blank=True, null=True, related_name='created_tasks')
+
+    # A task names the customer it is about wherever it is listed, so one
+    # about another directory's customer is left out — see
+    # crm.models.LinkedRecordManager. `everywhere` is unwalled.
+    objects = LinkedRecordManager("contact", "company", "supplier")
+    everywhere = models.Manager()
 
     def __str__(self):
         if self.company:

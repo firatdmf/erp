@@ -3435,7 +3435,7 @@ def _new_customer_currency_clash(new_customer, currency, groups):
     """
     from accounting.services_accounts import existing_customer_account
     name = new_customer.get("company")
-    company = name and Company.objects.filter(name__iexact=name).order_by("pk").first()
+    company = name and Company.objects.here().filter(name__iexact=name).order_by("pk").first()
     if not company:
         return None
     for book, _lines in groups:
@@ -6866,6 +6866,12 @@ class OrderAnalytics(LoginRequiredMixin, View):
         base_orders = Order.objects.filter(
             created_at__gte=start_date, created_at__lte=end_date
         ).exclude(order_status__in=EXCLUDED)
+        # The page ranks customers by name, so it counts only the orders
+        # of customers its reader may see (crm.Directory).
+        from crm.models import of_books_in_reach, within_directories
+        base_orders = of_books_in_reach(
+            within_directories(base_orders, "contact", "company"),
+            "current_account__book")
 
         # Channel predicates — partition EVERY order so web + manual
         # always reconciles with the total. Web = placed through the

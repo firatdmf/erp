@@ -320,7 +320,13 @@ class CompanyForm(ModelForm):
         "Woodline" got through and the list filled with doubles."""
         from django.utils.translation import gettext as _
         name = (self.cleaned_data.get("name") or "").strip()
-        taken = Company.objects.filter(name__iexact=name)
+        # Among its own directory's companies when it has one, else among
+        # those of the directory a new one would be filed in.
+        if self.instance.pk:
+            taken = self.instance.unique_name_scope()
+        else:
+            taken = Company.objects.here()
+        taken = taken.filter(name__iexact=name)
         if self.instance.pk:
             taken = taken.exclude(pk=self.instance.pk)
         if name and taken.exists():
@@ -353,7 +359,7 @@ class CompanyForm(ModelForm):
                 continue
             # One contact per name — said here, on the form, rather than
             # as a failed save after the company has been half made.
-            if name.lower() in seen or Contact.objects.filter(name__iexact=name).exists():
+            if name.lower() in seen or Contact.objects.here().filter(name__iexact=name).exists():
                 raise forms.ValidationError(
                     _("A contact named %(name)s already exists — pick them from "
                       "the search instead.") % {"name": name})

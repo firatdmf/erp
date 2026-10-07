@@ -582,6 +582,7 @@ class ReceivedPurchaseEditTest(TestCase):
 
     def test_it_needs_the_receiving_permission(self):
         plain = get_user_model().objects.create_user(username="plain_edit", password="pw")
+        plain.member.books.add(self.book)
         form = self._form()
         self.client.force_login(plain)
         self.assertEqual(self._save(form).status_code, 403)

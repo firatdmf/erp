@@ -1411,9 +1411,17 @@ class Order(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
+        # An order is named by its number and its customer, and this is
+        # what a roll lookup, a hold or a notification prints for it —
+        # sometimes to somebody who may see the roll and not the
+        # customer (crm.Directory). They get the number alone.
+        from crm.models import record_in_reach
+        number = f"Order {self.order_number}" if self.order_number else f"Order #{self.pk}"
+        if not record_in_reach(self.contact, self.company):
+            return number
         if self.order_number:
-            return f"Order {self.order_number} - {self.get_client()}"
-        return f"Order #{self.pk} - {self.contact or self.company} "
+            return f"{number} - {self.get_client()}"
+        return f"{number} - {self.contact or self.company} "
 
 
 class OrderItem(models.Model):
@@ -1848,6 +1856,31 @@ class Warehouse(models.Model):
                 from accounting.models import Book
                 self._owning_book = Book.objects.filter(pk=ids.pop()).first()
         return self._owning_book
+
+    def in_reach_of(self, member):
+        """Whether this member may work with the warehouse's stock at all:
+        it is one they may read, or a member of a combined warehouse they
+        may read — whose page links straight into each member's rolls.
+
+        Wider than visible_to on purpose. That one decides whose shelves
+        are LISTED; this one decides which warehouse ids a member may
+        hand to a stock page."""
+        if self.visible_to(member):
+            return True
+        return any(c.visible_to(member) for c in self.combined_views.all())
+
+    @classmethod
+    def ids_in_reach_of(cls, member):
+        """Ids of every warehouse in_reach_of(member)."""
+        from accounting.services_accounts import member_books
+        books = member_books(member)
+        own = set(cls.objects.filter(accounting_book__in=books)
+                  .values_list("pk", flat=True))
+        combined = set(cls.objects.filter(combined_sources__in=own)
+                       .values_list("pk", flat=True))
+        through = set(cls.objects.filter(combined_views__in=combined)
+                      .values_list("pk", flat=True))
+        return own | combined | through
 
     def visible_to(self, member):
         """Whether this member may read the warehouse's shelves: they must

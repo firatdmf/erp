@@ -18,6 +18,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q, Sum
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -26,6 +27,7 @@ from django.views import View
 
 from accounting.models import CashAccount, CurrencyCategory
 from .models import CurrentAccount, CheckOrPromissoryNote
+from .services_accounts import member_can_use_book
 
 
 def _D(val, default="0"):
@@ -207,6 +209,10 @@ class CheckEndorse(View):
             messages.error(request, _g("An account to endorse to must be selected."))
             return redirect("accounts:check_detail", pk=pk)
         target = get_object_or_404(CurrentAccount, pk=int(target_id))
+        # The check's own book is checked in the URLconf; the account it
+        # is handed to is named by a second id.
+        if not member_can_use_book(getattr(request.user, "member", None), target.book):
+            raise Http404("No such record.")
         try:
             check.endorse(to_current_account=target, user=request.user)
             messages.success(request, _g("Check endorsed to %(name)s.") % {"name": target.name})
@@ -236,6 +242,8 @@ class CheckClear(View):
             messages.error(request, _g("A cash account must be selected."))
             return redirect("accounts:check_detail", pk=pk)
         cash = get_object_or_404(CashAccount, pk=int(cash_id))
+        if not member_can_use_book(getattr(request.user, "member", None), cash.book):
+            raise Http404("No such record.")
         try:
             check.clear(cash_account=cash, user=request.user)
             messages.success(request, _g("Check cleared: %(name)s") % {"name": cash.name})

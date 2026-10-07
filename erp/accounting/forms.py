@@ -11,6 +11,17 @@ class BookForm(forms.ModelForm):
         model = Book
         fields = "__all__"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only the customer lists the person already reads: picking one
+        # here is how a book comes to share it, so offering them all
+        # would let anyone who can open a book open every list.
+        from crm.models import visible_directory_ids
+        ids = visible_directory_ids()
+        if ids is not None and "directory" in self.fields:
+            field = self.fields["directory"]
+            field.queryset = field.queryset.filter(pk__in=ids)
+
 
 class BookNameForm(forms.ModelForm):
     """Rename-only form for the book detail header.

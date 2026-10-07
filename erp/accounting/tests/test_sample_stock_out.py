@@ -32,6 +32,8 @@ class SampleStockOut(TestCase):
             quantity_remaining=Decimal("100"), barcode="BC-1",
             status="in_stock", unit_cost_base=Decimal("4.00"))
         self.user = get_user_model().objects.create_user(username="wh", password="pw")
+        # Assigned the book, so its customers are theirs to pick from.
+        self.user.member.books.add(self.book)
         self.client.force_login(self.user)
 
     def _balances(self):

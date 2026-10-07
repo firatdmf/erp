@@ -269,10 +269,10 @@ def search_contacts_and_companies(request):
     search_query = request.GET.get("search_query", "")
 
     # Query the database for contacts and companies with matching names
-    matching_contacts = Contact.objects.filter(
+    matching_contacts = Contact.objects.here().filter(
         unaccent_icontains(search_query, 'name')
     )
-    matching_companies = Company.objects.filter(
+    matching_companies = Company.objects.here().filter(
         unaccent_icontains(search_query, 'name')
     )
 

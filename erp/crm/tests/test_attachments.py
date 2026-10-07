@@ -26,6 +26,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from crm.models import Attachment, Company, Contact
+from crm.tests import works_in_a_book
 
 User = get_user_model()
 
@@ -33,6 +34,7 @@ User = get_user_model()
 class AttachmentUpload(TestCase):
     def setUp(self):
         self.user = User.objects.create_user("dilek", password="x")
+        works_in_a_book(self.user)
         self.client.force_login(self.user)
         self.contact = Contact.objects.create(name="Abbie Braker")
 
@@ -179,6 +181,7 @@ class AttachmentUpload(TestCase):
 class AttachmentDelete(TestCase):
     def setUp(self):
         self.user = User.objects.create_user("dilek", password="x")
+        works_in_a_book(self.user)
         self.client.force_login(self.user)
         self.contact = Contact.objects.create(name="Abbie Braker")
 
@@ -226,6 +229,7 @@ class AttachmentsOnThePage(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user("dilek", password="x")
+        works_in_a_book(self.user)
         self.client.force_login(self.user)
         self.contact = Contact.objects.create(name="Abbie Braker")
 
@@ -262,6 +266,7 @@ class AttachmentDownload(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user("dilek", password="x")
+        works_in_a_book(self.user)
         self.contact = Contact.objects.create(name="Abbie Braker")
         self.row = Attachment.objects.create(
             contact=self.contact, name="contract.pdf",

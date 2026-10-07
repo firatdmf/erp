@@ -201,8 +201,11 @@ class ManualAddPermissionTest(TestCase):
             content_type="application/json")
 
     def test_an_ungranted_user_cannot_receive(self):
-        self.client.force_login(
-            get_user_model().objects.create_user(username="plain", password="pw"))
+        # Of this warehouse's book, so the refusal is about the missing
+        # permission and not about whose shelves these are.
+        plain = get_user_model().objects.create_user(username="plain", password="pw")
+        plain.member.books.add(self.book)
+        self.client.force_login(plain)
         r = self._post()
         self.assertEqual(r.status_code, 403)
         self.assertFalse(WarehouseProduct.objects.exists())
@@ -212,6 +215,7 @@ class ManualAddPermissionTest(TestCase):
         user = get_user_model().objects.create_user(username="granted", password="pw")
         perm, _ = Permission.objects.get_or_create(name="purchase_confirm")
         user.member.permissions.add(perm)
+        user.member.books.add(self.book)
         self.client.force_login(user)
         self.assertEqual(self._post().status_code, 200)
         self.assertTrue(WarehouseProduct.objects.exists())

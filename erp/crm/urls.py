@@ -49,6 +49,7 @@ path('check_company_duplicate/', views.check_company_duplicate, name='check_comp
 path('check_contact_duplicate/', views.check_contact_duplicate, name='check_contact_duplicate'),
 
 # Attachments — one set of endpoints for contact/company/supplier records.
+path('<str:kind>/<int:pk>/share/', views.share_record, name='share_record'),
 path('<str:kind>/<int:pk>/attachments/upload/', views.upload_attachments, name='upload_attachments'),
 path('<str:kind>/<int:pk>/attachments/', views.attachments_partial, name='attachments_partial'),
 path('attachments/<int:pk>/download/', views.download_attachment, name='download_attachment'),

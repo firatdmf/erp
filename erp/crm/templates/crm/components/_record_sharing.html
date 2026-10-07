@@ -1,0 +1,38 @@
+{% load i18n %}
+{% comment %}
+Which customer list a record is in, and which others it is shared with.
+
+Rendered by the `record_sharing` tag, and only for someone who reads the
+record's own list and at least one other — for everybody else there is
+nothing to choose between, and the row stays as it was.
+
+Usage:  {% record_sharing "company" company %}
+{% endcomment %}
+{% if choices %}
+<style>
+  .rec-share { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .rec-share form { display: inline; margin: 0; }
+  /* base.css pads every button; these are chips in a meta row. */
+  .rec-share button {
+    padding: 1px 8px; border-radius: 999px; font: inherit; cursor: pointer;
+    border: 1px dashed currentColor; background: transparent; color: inherit; opacity: .7;
+  }
+  .rec-share button.on { border-style: solid; opacity: 1; font-weight: 600; }
+</style>
+<span class="od-dot"></span>
+<span class="rec-share">
+  <span title="{% trans "The customer list this record is kept in" %}"><i class="fa fa-address-book"></i> {{ home.name }}</span>
+  <span>· {% trans "Shared with" %}</span>
+  {% for directory, shared in choices %}
+    <form method="post" action="{% url 'crm:share_record' kind record.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="directory" value="{{ directory.pk }}">
+      <input type="hidden" name="share" value="{% if shared %}0{% else %}1{% endif %}">
+      <button type="submit" class="{% if shared %}on{% endif %}"
+              title="{% if shared %}{% blocktrans with name=directory.name %}Stop sharing with {{ name }}{% endblocktrans %}{% else %}{% blocktrans with name=directory.name %}Share with {{ name }}{% endblocktrans %}{% endif %}">
+        {% if shared %}<i class="fa fa-check"></i> {% endif %}{{ directory.name }}
+      </button>
+    </form>
+  {% endfor %}
+</span>
+{% endif %}

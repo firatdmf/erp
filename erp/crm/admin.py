@@ -16,6 +16,7 @@ class CompanyAdmin(admin.ModelAdmin):
     search_fields = ["name", "email", "phone"]
 
 admin.site.register(ClientGroup)
+admin.site.register(Directory)
 
 
 @admin.register(CompanyFollowUp)

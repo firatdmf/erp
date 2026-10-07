@@ -57,7 +57,7 @@ def dashboard(request):
     ).count()
     
     # Total qualified companies (all time)
-    qualified_companies = Company.objects.filter(status='qualified').count()
+    qualified_companies = Company.objects.here().filter(status='qualified').count()
     
     # Get recent campaigns
     recent_campaigns = campaigns.select_related('company').order_by('-created_at')[:10]
@@ -1392,7 +1392,7 @@ def api_recipients(request):
     results = []
     
     # Search contacts
-    contacts = Contact.objects.filter(
+    contacts = Contact.objects.here().filter(
         models.Q(name__icontains=query) | models.Q(email__icontains=query)
     ).select_related('company')[:10]
     
@@ -1413,7 +1413,7 @@ def api_recipients(request):
         })
     
     # Search companies
-    companies = Company.objects.filter(
+    companies = Company.objects.here().filter(
         models.Q(name__icontains=query) | models.Q(email__icontains=query)
     )[:10]
     

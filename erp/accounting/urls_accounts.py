@@ -126,42 +126,45 @@ urlpatterns = [
     owned("accounts/<int:pk>/crm-search/", views.CurrentAccountCrmSearch.as_view(), "crm_search", CurrentAccount),
     owned("accounts/<int:pk>/delete/", views.CurrentAccountDelete.as_view(), "delete", CurrentAccount),
     owned("accounts/<int:pk>/movements/new/", views.CurrentAccountMovementCreate.as_view(), "movement_create", CurrentAccount),
-    path("accounts/<int:pk>/movements/<int:mv_pk>/",        views.CurrentAccountMovementDetail.as_view(), name="movement_detail"),
-    path("accounts/<int:pk>/movements/<int:mv_pk>/edit/",   views.CurrentAccountMovementEdit.as_view(),   name="movement_edit"),
-    path("accounts/<int:pk>/movements/<int:mv_pk>/delete/", views.CurrentAccountMovementDelete.as_view(), name="movement_delete"),
+    owned("accounts/<int:pk>/movements/<int:mv_pk>/", views.CurrentAccountMovementDetail.as_view(), "movement_detail", CurrentAccount),
+    owned("accounts/<int:pk>/movements/<int:mv_pk>/edit/", views.CurrentAccountMovementEdit.as_view(), "movement_edit", CurrentAccount),
+    owned("accounts/<int:pk>/movements/<int:mv_pk>/delete/", views.CurrentAccountMovementDelete.as_view(), "movement_delete", CurrentAccount),
 
     # A transfer belongs to two accounts, so it is not nested under either.
-    path("accounts/transfers/<int:pk>/",      views.CurrentAccountTransferDetail.as_view(), name="transfer_detail"),
-    path("accounts/transfers/<int:pk>/edit/", views.CurrentAccountTransferEdit.as_view(),   name="transfer_edit"),
-    path("accounts/transfers/<int:pk>/undo/", views.CurrentAccountTransferUndo.as_view(),   name="transfer_undo"),
+    # Every route below that names a row by id is `owned`, the POST-only
+    # ones included: an action nobody can reach from a page they may open
+    # is still an action anybody can post to.
+    owned("accounts/transfers/<int:pk>/", views.CurrentAccountTransferDetail.as_view(), "transfer_detail", CurrentAccountTransfer),
+    owned("accounts/transfers/<int:pk>/edit/", views.CurrentAccountTransferEdit.as_view(), "transfer_edit", CurrentAccountTransfer),
+    owned("accounts/transfers/<int:pk>/undo/", views.CurrentAccountTransferUndo.as_view(), "transfer_undo", CurrentAccountTransfer),
 
     # Invoices are printouts of an order or a purchase (views_invoice); the
     # old invoice page only redirects to what it mirrored.
     owned("accounts/invoices/<int:pk>/", views_invoice.InvoiceRedirect.as_view(), "invoice_detail", Invoice),
 
-    path("accounts/purchases/<int:pk>/order/",   views_purchase.PurchaseOrderSave.as_view(),    name="purchase_order_update"),
-    path("accounts/purchases/<int:pk>/confirm/", views_purchase.PurchaseOrderConfirm.as_view(), name="purchase_order_confirm"),
-    path("accounts/purchases/<int:pk>/print/",   views_purchase.PurchaseOrderPrint.as_view(),   name="purchase_order_print"),
+    owned("accounts/purchases/<int:pk>/order/", views_purchase.PurchaseOrderSave.as_view(), "purchase_order_update", Invoice),
+    owned("accounts/purchases/<int:pk>/confirm/", views_purchase.PurchaseOrderConfirm.as_view(), "purchase_order_confirm", Invoice),
+    owned("accounts/purchases/<int:pk>/print/", views_purchase.PurchaseOrderPrint.as_view(), "purchase_order_print", Invoice),
     owned("accounts/purchases/<int:pk>/items/<int:item_pk>/labels/", views_purchase.PurchaseItemLabels.as_view(), "purchase_item_labels", Invoice),
     owned("accounts/purchases/<int:pk>/", views_purchase.PurchaseOrderDetail.as_view(), "purchase_order_detail", Invoice),
     owned("accounts/purchases/<int:pk>/invoice/", views_invoice.PurchaseInvoice.as_view(), "purchase_invoice", Invoice),
     owned("accounts/purchases/<int:pk>/invoice/excel/", views_invoice.purchase_invoice_excel, "purchase_invoice_excel", Invoice),
     owned("accounts/purchases/<int:pk>/edit/", views_purchase.GoodsReceipt.as_view(), "goods_receipt_edit", Invoice),
-    path("accounts/purchases/<int:pk>/cancel/",  views_purchase.PurchaseCancel.as_view(),       name="purchase_cancel"),
-    path("accounts/<int:pk>/fx/post/",   views_fx.FxPost.as_view(),                    name="fx_post"),
+    owned("accounts/purchases/<int:pk>/cancel/", views_purchase.PurchaseCancel.as_view(), "purchase_cancel", Invoice),
+    owned("accounts/<int:pk>/fx/post/", views_fx.FxPost.as_view(), "fx_post", CurrentAccount),
 
     owned("accounts/payments/<int:pk>/", views_payment.PaymentDetail.as_view(), "payment_detail", Payment),
     owned("accounts/payments/<int:pk>/edit/", views_payment.PaymentEdit.as_view(), "payment_edit", Payment),
-    path("accounts/payments/<int:pk>/confirm/", views_payment.PaymentConfirm.as_view(), name="payment_confirm"),
-    path("accounts/payments/<int:pk>/cancel/",  views_payment.PaymentCancel.as_view(),  name="payment_cancel"),
-    path("accounts/payments/<int:pk>/delete/",  views_payment.PaymentDelete.as_view(),  name="payment_delete"),
+    owned("accounts/payments/<int:pk>/confirm/", views_payment.PaymentConfirm.as_view(), "payment_confirm", Payment),
+    owned("accounts/payments/<int:pk>/cancel/", views_payment.PaymentCancel.as_view(), "payment_cancel", Payment),
+    owned("accounts/payments/<int:pk>/delete/", views_payment.PaymentDelete.as_view(), "payment_delete", Payment),
 
     owned("accounts/checks/<int:pk>/", views_check.CheckDetail.as_view(), "check_detail", CheckOrPromissoryNote),
-    path("accounts/checks/<int:pk>/endorse/", views_check.CheckEndorse.as_view(), name="check_endorse"),
-    path("accounts/checks/<int:pk>/deposit/", views_check.CheckDeposit.as_view(), name="check_deposit"),
-    path("accounts/checks/<int:pk>/clear/",   views_check.CheckClear.as_view(),   name="check_clear"),
-    path("accounts/checks/<int:pk>/bounce/",  views_check.CheckBounce.as_view(),  name="check_bounce"),
-    path("accounts/checks/<int:pk>/cancel/",  views_check.CheckCancel.as_view(),  name="check_cancel"),
+    owned("accounts/checks/<int:pk>/endorse/", views_check.CheckEndorse.as_view(), "check_endorse", CheckOrPromissoryNote),
+    owned("accounts/checks/<int:pk>/deposit/", views_check.CheckDeposit.as_view(), "check_deposit", CheckOrPromissoryNote),
+    owned("accounts/checks/<int:pk>/clear/", views_check.CheckClear.as_view(), "check_clear", CheckOrPromissoryNote),
+    owned("accounts/checks/<int:pk>/bounce/", views_check.CheckBounce.as_view(), "check_bounce", CheckOrPromissoryNote),
+    owned("accounts/checks/<int:pk>/cancel/", views_check.CheckCancel.as_view(), "check_cancel", CheckOrPromissoryNote),
 
     # ------------------------------------------------------------------
     # Book-independent.

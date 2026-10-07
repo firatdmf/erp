@@ -19,6 +19,7 @@ from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount, Invoice
 from authentication.models import Member
 from crm.models import Note, Supplier
+from crm.tests import works_in_a_book
 
 User = get_user_model()
 
@@ -180,6 +181,8 @@ class SupplierEditGuard(TestCase):
         cls.admin = User.objects.create_superuser("admin3", password="x", email="a3@x.c")
         cls.owner = User.objects.create_user("owner3", password="x")
         cls.other = User.objects.create_user("other3", password="x")
+        for user in (cls.owner, cls.other):
+            works_in_a_book(user)
         cls.legacy = Supplier.objects.create(company_name="Old Mill")
         cls.owned = Supplier.objects.create(company_name="New Mill", created_by=cls.owner)
 

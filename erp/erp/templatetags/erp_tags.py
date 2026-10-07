@@ -41,8 +41,8 @@ def dashboard_component(csrf_token,path,member):
     # ⚡ Single query for today's leads (contacts + companies)
     from django.db.models import Sum
     number_of_leads_added = (
-        Contact.objects.filter(created_at__date=today_date).count() +
-        Company.objects.filter(created_at__date=today_date).count()
+        Contact.objects.here().filter(created_at__date=today_date).count() +
+        Company.objects.here().filter(created_at__date=today_date).count()
     )
     
     # ⚡ Single query for all task counts (using aggregate)

@@ -176,6 +176,40 @@ class Book(models.Model):
                   "Blank → the deployment default.",
     )
 
+    # Whose customers and suppliers this book's people work with — see
+    # crm.Directory. Two books of one business point at the same one and
+    # share a customer list; a book with its own directory sees only its
+    # own, and is seen by nobody else.
+    #
+    # Left blank on a new book, it gets a directory of its own (save()
+    # below). Walled off is the safe way to start: sharing a list later
+    # is one change here, while un-sharing one means deciding record by
+    # record whose each customer was.
+    directory = models.ForeignKey(
+        "crm.Directory",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="books",
+        verbose_name="Customer and supplier list",
+        help_text="Customer and supplier list this book works with. "
+                  "Blank → a new one of its own.",
+    )
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if self.directory_id is None and (
+                update_fields is None or "directory" in update_fields):
+            from crm.models import Directory
+            # The very first book takes over the list that was kept
+            # before there was any book to keep it for; after that a
+            # book only ever gets a fresh one.
+            unclaimed = None
+            if not Book.objects.exists():
+                unclaimed = Directory.objects.filter(books__isnull=True).order_by("id").first()
+            self.directory = unclaimed or Directory.named_after(self.name)
+        super().save(*args, **kwargs)
+
     @property
     def effective_base_currency(self):
         """The currency this book reports in, falling back to the default."""

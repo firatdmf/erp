@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from crm.models import Supplier
+from crm.models import LinkedRecordManager, Supplier
 from marketing.models import Product, ProductVariant
 # RawMaterialGood lives in this same app now, so it is referenced by name:
 # importing operating.models from a module operating.models itself imports
@@ -92,6 +92,11 @@ class PurchaseOrder(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Listed and opened by its supplier's name, so one placed with a
+    # supplier of another directory is left out (crm.Directory).
+    objects = LinkedRecordManager("supplier")
+    everywhere = models.Manager()
 
     def __str__(self):
         return f"PO-{self.pk} - {self.supplier}"

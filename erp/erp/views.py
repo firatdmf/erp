@@ -463,7 +463,7 @@ class GlobalSearch(View):
             # For ArrayFields, cast to text and use ILIKE for partial matching
             from django.db.models.functions import Cast
             from django.db.models import TextField
-            contacts = Contact.objects.annotate(
+            contacts = Contact.objects.here().annotate(
                 email_text=Cast('email', TextField()),
                 phone_text=Cast('phone', TextField())
             ).filter(
@@ -488,7 +488,7 @@ class GlobalSearch(View):
         if search_type in ['all', 'contacts']:
             from django.db.models.functions import Cast
             from django.db.models import TextField
-            companies = Company.objects.annotate(
+            companies = Company.objects.here().annotate(
                 email_text=Cast('email', TextField()),
                 phone_text=Cast('phone', TextField())
             ).filter(
@@ -511,7 +511,7 @@ class GlobalSearch(View):
 
         # 2b. Suppliers (plain email/phone fields, unlike contacts)
         if search_type in ['all', 'contacts']:
-            suppliers = Supplier.objects.filter(
+            suppliers = Supplier.objects.here().filter(
                 unaccent_icontains(query, 'company_name', 'contact_name') |
                 Q(email__icontains=query) |
                 Q(phone__icontains=query)

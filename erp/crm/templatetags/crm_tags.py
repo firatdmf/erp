@@ -8,6 +8,28 @@ from django.http import JsonResponse
 
 register = template.Library()
 
+
+@register.inclusion_tag("crm/components/_record_sharing.html", takes_context=True)
+def record_sharing(context, kind, record):
+    """The other customer lists `record` could be shared with, for
+    someone who reads both its own list and theirs."""
+    from crm.models import Directory, visible_directory_ids
+
+    ids = visible_directory_ids()
+    others = Directory.objects.exclude(pk=record.directory_id).order_by("name")
+    if ids is not None:
+        # Sharing is for whoever sees both sides: not for somebody the
+        # record was merely shared WITH, who does not read its own list.
+        others = others.filter(pk__in=ids) if record.directory_id in ids else others.none()
+    shared = set(record.shared_with.values_list("pk", flat=True))
+    return {
+        "kind": kind,
+        "record": record,
+        "home": record.directory,
+        "choices": [(directory, directory.pk in shared) for directory in others],
+        "csrf_token": context.get("csrf_token"),
+    }
+
 # below works fine
 # @register.simple_tag
 # def history_component(company,note_form,csrf_token,notes,tasks):
@@ -77,8 +99,8 @@ def history_component(contact, company, note_form, csrf_token, current_url):
 @register.simple_tag
 def search_contacts_and_companies(request):
     query = request.GET.get("query", "")
-    contacts = Contact.objects.filter(name__icontains=query)
-    companies = Company.objects.filter(name__icontains=query)
+    contacts = Contact.objects.here().filter(name__icontains=query)
+    companies = Company.objects.here().filter(name__icontains=query)
     results = {
         "contacts": list(contacts.values("id", "name")),  # Example fields to return
         "companies": list(companies.values("id", "name")),  # Example fields to return

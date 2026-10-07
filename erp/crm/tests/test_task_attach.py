@@ -4,6 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from crm.models import Company, Contact
+from crm.tests import works_in_a_book
 
 
 class TaskAttachSearchTests(TestCase):
@@ -12,6 +13,7 @@ class TaskAttachSearchTests(TestCase):
         cls.user = get_user_model().objects.create_user(
             username="attach-tester", password="pw"
         )
+        works_in_a_book(cls.user)
         cls.company = Company.objects.create(name="Firat Kablo")
         cls.contact = Contact.objects.create(name="Firat Yilmaz", company=cls.company)
 
@@ -46,6 +48,7 @@ class TaskSidebarMarkupTests(TestCase):
         cls.user = get_user_model().objects.create_user(
             username="sidebar-tester", password="pw"
         )
+        works_in_a_book(cls.user)
 
     def test_sidebar_has_one_attach_box(self):
         self.client.force_login(self.user)
@@ -69,6 +72,7 @@ class RecordDetailAttachTaskTests(TestCase):
         cls.user = get_user_model().objects.create_user(
             username="record-task-tester", password="pw"
         )
+        works_in_a_book(cls.user)
         cls.company = Company.objects.create(name="O'Neil Tekstil")
         cls.contact = Contact.objects.create(name="Firat O'Neil", company=cls.company)
 
@@ -114,6 +118,7 @@ class CompanyAddContactSidebarTests(TestCase):
         cls.user = get_user_model().objects.create_user(
             username="company-contact-tester", password="pw"
         )
+        works_in_a_book(cls.user)
         cls.company = Company.objects.create(name="O'Neil Tekstil")
 
     def test_contact_item_opens_the_sidebar_with_the_company_set(self):

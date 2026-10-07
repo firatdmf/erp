@@ -25,6 +25,11 @@ def of_a_customer_in_reach(view):
     they open only for someone who may see that customer (crm.Directory).
     Beside the book guards rather than instead of them: this one lets a
     shop print the factory's half of an order they share a customer for.
+
+    Every action on an order named by id carries it too — packing,
+    completing, deleting. None of those prints a name, but an order
+    whose customer its reader may not see is another business's order,
+    and not theirs to pack or delete by typing its number.
     """
     return customer_guarded(view, Order, "contact", "company",
                             book="current_account__book")
@@ -118,7 +123,7 @@ urlpatterns = [
     # The rolls to pull for an order, for the warehouse floor: no prices,
     # no customer name. Guarded the way the pack screen is — it is the
     # same people's sheet.
-    path("orders/<int:pk>/picking_list/", book_guarded_for_sales_rep(picking_list.order_picking_list, Order, "current_account.book"), name="order_picking_list"),
+    path("orders/<int:pk>/picking_list/", of_a_customer_in_reach(book_guarded_for_sales_rep(picking_list.order_picking_list, Order, "current_account.book")), name="order_picking_list"),
     # Packing-scan flow (reserve warehouse rolls before shipping).
     #
     # The sales-rep role reaches these (erp.roles), and these routes name
@@ -126,13 +131,13 @@ urlpatterns = [
     # the order's book is checked against her assignments the way
     # order_detail's is. See book_guarded_for_sales_rep for why it is not
     # simply book_guarded for everybody.
-    path("orders/<int:pk>/pack/", book_guarded_for_sales_rep(views.order_pack_scan, Order, "current_account.book"), name="order_pack_scan"),
-    path("orders/<int:pk>/pack/add/", book_guarded_for_sales_rep(views.order_pack_reserve_add, Order, "current_account.book"), name="order_pack_reserve_add"),
-    path("orders/<int:pk>/pack/update/", views.order_pack_reserve_update, name="order_pack_reserve_update"),
-    path("orders/<int:pk>/pack/remove/", views.order_pack_reserve_remove, name="order_pack_reserve_remove"),
-    path("orders/<int:pk>/pack/assign_pack/", book_guarded_for_sales_rep(views.order_pack_reserve_assign_pack, Order, "current_account.book"), name="order_pack_reserve_assign_pack"),
-    path("orders/<int:pk>/pack/assign_item/", book_guarded_for_sales_rep(views.order_pack_assign_item, Order, "current_account.book"), name="order_pack_assign_item"),
-    path("orders/<int:pk>/pack/complete/", views.order_pack_complete, name="order_pack_complete"),
+    path("orders/<int:pk>/pack/", of_a_customer_in_reach(book_guarded_for_sales_rep(views.order_pack_scan, Order, "current_account.book")), name="order_pack_scan"),
+    path("orders/<int:pk>/pack/add/", of_a_customer_in_reach(book_guarded_for_sales_rep(views.order_pack_reserve_add, Order, "current_account.book")), name="order_pack_reserve_add"),
+    path("orders/<int:pk>/pack/update/", of_a_customer_in_reach(views.order_pack_reserve_update), name="order_pack_reserve_update"),
+    path("orders/<int:pk>/pack/remove/", of_a_customer_in_reach(views.order_pack_reserve_remove), name="order_pack_reserve_remove"),
+    path("orders/<int:pk>/pack/assign_pack/", of_a_customer_in_reach(book_guarded_for_sales_rep(views.order_pack_reserve_assign_pack, Order, "current_account.book")), name="order_pack_reserve_assign_pack"),
+    path("orders/<int:pk>/pack/assign_item/", of_a_customer_in_reach(book_guarded_for_sales_rep(views.order_pack_assign_item, Order, "current_account.book")), name="order_pack_assign_item"),
+    path("orders/<int:pk>/pack/complete/", of_a_customer_in_reach(views.order_pack_complete), name="order_pack_complete"),
     path("orders/create/barcode_check/", views.order_create_barcode_check, name="order_create_barcode_check"),
     path("orders/create/barcode_resolve/", views.order_create_barcode_resolve, name="order_create_barcode_resolve"),
     path("orders/create/roll_list/", views.order_create_roll_list, name="order_create_roll_list"),
@@ -146,19 +151,19 @@ urlpatterns = [
          name="order_list_scoped"),
     path("orders/", views.OrderListRedirect.as_view(), name="order_list"),
     path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),
-    path("orders/delete/<int:pk>/", views.delete_order, name="delete_order"),
+    path("orders/delete/<int:pk>/", of_a_customer_in_reach(views.delete_order), name="delete_order"),
     path("orders/bulk-delete/", views.bulk_delete_orders, name="bulk_delete_orders"),
     path(
         "orders/<int:pk>/production/",
-        views.OrderProduction.as_view(),
+        of_a_customer_in_reach(views.OrderProduction.as_view()),
         name="order_production",
     ),
     path(
         "orders/<int:pk>/packing_list/",
         # Guarded with the pack flow above, and for the same reason: the
         # packing screen POSTs its sack add/delete here.
-        book_guarded_for_sales_rep(
-            views.OrderPackingList.as_view(), Order, "current_account.book"),
+        of_a_customer_in_reach(book_guarded_for_sales_rep(
+            views.OrderPackingList.as_view(), Order, "current_account.book")),
         name="order_packing_list",
     ),
     # path("create_product/",views.CreateProduct.as_view(),name="create_product"),

@@ -72,6 +72,20 @@ def is_admin(user):
         return False
 
 
+def is_install_admin(user):
+    """Someone who runs the whole install: a Django superuser or staff.
+
+    Narrower than is_admin on purpose. A Member carrying 'admin' manages
+    the books they are assigned — their warehouses, their orders, their
+    purchases — and every one of those is checked against their books.
+    What belongs to no book, the company profile and the WhatsApp
+    settings every business on the install shares, is not theirs to
+    change: a branch's manager must not be able to rename the company.
+    """
+    return bool(getattr(user, "is_authenticated", False)
+                and (user.is_superuser or user.is_staff))
+
+
 def can_edit(user, obj):
     """May `user` change `obj`? Admins always; otherwise its creator.
 

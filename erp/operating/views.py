@@ -5178,7 +5178,13 @@ def bulk_delete_orders(request):
     allowed, err = _order_delete_allowed(request)
     if not allowed:
         return JsonResponse({"ok": False, "error": err}, status=403)
-    qs = Order.objects.filter(pk__in=ids)
+    # Only the orders of customers its reader may see, as delete_order is
+    # guarded in the URLconf: an id from another business is simply not
+    # among the orders found.
+    from crm.models import of_books_in_reach, within_directories
+    qs = of_books_in_reach(
+        within_directories(Order.objects.filter(pk__in=ids), "contact", "company"),
+        "current_account__book")
     # Same guard as delete_order: shipped orders must be re-opened first
     # (stock + money already posted). Skip them and tell the UI which.
     deletable = [o for o in qs if o.order_status not in _SHIPPED_CLASS]

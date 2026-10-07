@@ -91,7 +91,7 @@ class BrandProfileUpdate(View):
         from django.utils.translation import gettext as _
         from erp.branding import TEXT_FIELDS
         from erp.models import BrandProfile
-        from operating.views_warehouse import _is_admin
+        from erp.ownership import is_install_admin as _is_admin
 
         def banner(ok, text):
             colour = ("#d1fae5", "#065f46") if ok else ("#fee2e2", "#991b1b")
@@ -135,7 +135,7 @@ class WhatsAppSettingsUpdate(View):
         from django.utils.translation import gettext as _
         from erp.models import WhatsAppSettings
         from operating.order_whatsapp import CONFIG_FIELDS, send_test_whatsapp
-        from operating.views_warehouse import _is_admin
+        from erp.ownership import is_install_admin as _is_admin
 
         def banner(ok, text):
             colour = ("#d1fae5", "#065f46") if ok else ("#fee2e2", "#991b1b")

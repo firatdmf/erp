@@ -642,3 +642,70 @@ class TheShelvesAndTheLedgerKeepTheWallToo(TwoBusinesses):
                 continue
             guarded = getattr(pattern.callback, "__wrapped__", None) is not None
             self.assertTrue(guarded, f"accounts:{pattern.name} names a row by id unguarded")
+
+
+class ABranchManagerManagesTheBranch(TwoBusinesses):
+    """A Member carrying 'admin' manages the books they are assigned.
+    Nothing it unlocks reaches another business, or the install itself."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        from authentication.models import Permission
+        from operating.models import Order
+
+        admin, _ = Permission.objects.get_or_create(name="admin")
+        cls.aigerim.member.permissions.add(admin)
+        cls.theirs = Order.objects.create(company=cls.woodline, order_number="901")
+        cls.ours = Order.objects.create(company=cls.steppe, order_number="902")
+
+    def setUp(self):
+        self.client.force_login(self.aigerim)
+
+    def _exists(self, order):
+        from operating.models import Order
+        return Order.objects.filter(pk=order.pk).exists()
+
+    def test_deletes_the_branchs_orders_without_the_password(self):
+        response = self.client.post(reverse("operating:delete_order", args=[self.ours.pk]))
+        self.assertLess(response.status_code, 400)
+        self.assertFalse(self._exists(self.ours))
+
+    def test_cannot_delete_another_business_order(self):
+        response = self.client.post(reverse("operating:delete_order", args=[self.theirs.pk]))
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(self._exists(self.theirs))
+
+    def test_cannot_delete_it_in_bulk_either(self):
+        self.client.post(reverse("operating:bulk_delete_orders"),
+                         {"order_ids": [self.theirs.pk, self.ours.pk]})
+        self.assertTrue(self._exists(self.theirs))
+        self.assertFalse(self._exists(self.ours))
+
+    def test_cannot_act_on_another_business_order_by_its_id(self):
+        for route in ("operating:order_pack_scan", "operating:order_pack_complete",
+                      "operating:order_pack_reserve_update",
+                      "operating:order_pack_reserve_remove",
+                      "operating:order_production", "operating:order_packing_list",
+                      "operating:order_picking_list"):
+            for method in ("get", "post"):
+                response = getattr(self.client, method)(
+                    reverse(route, args=[self.theirs.pk]))
+                self.assertEqual(response.status_code, 404, f"{method} {route}")
+
+    def test_cannot_change_what_every_business_on_the_install_shares(self):
+        from erp.models import BrandProfile
+
+        before = BrandProfile.get().__dict__.copy()
+        for route in ("brand_profile_update", "whatsapp_settings_update"):
+            response = self.client.post(reverse(route), {"BRAND_NAME": "Hijacked"})
+            self.assertContains(response, "Only an administrator")
+        after = BrandProfile.get().__dict__.copy()
+        for key in ("_state",):
+            before.pop(key, None); after.pop(key, None)
+        self.assertEqual(before, after)
+
+    def test_the_owner_still_can(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse("brand_profile_update"), {})
+        self.assertNotContains(response, "Only an administrator")

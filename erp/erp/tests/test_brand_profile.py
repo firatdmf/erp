@@ -102,13 +102,17 @@ class TheCompanyTab(TestCase):
     def test_a_member_without_admin_rights_is_refused(self):
         resp = self.post(self.staff, display_name="Hijacked")
         self.assertContains(resp, "Only an administrator")
-        self.assertFalse(BrandProfile.objects.exists())
+        self.assertFalse(BrandProfile.objects.filter(display_name="Hijacked").exists())
 
-    def test_a_member_with_the_admin_permission_may(self):
+    def test_a_member_who_manages_a_book_is_refused_too(self):
+        # 'admin' on a Member is for the books they are assigned; the
+        # company profile belongs to every business on the install
+        # (erp.ownership.is_install_admin).
         perm, _ = Permission.objects.get_or_create(name="admin")
         self.staff.member.permissions.add(perm)
-        self.post(self.staff, display_name="Acme Textiles")
-        self.assertEqual(BrandProfile.objects.get().display_name, "Acme Textiles")
+        resp = self.post(self.staff, display_name="Acme Textiles")
+        self.assertContains(resp, "Only an administrator")
+        self.assertFalse(BrandProfile.objects.filter(display_name="Acme Textiles").exists())
 
     def test_a_bad_email_is_refused_with_its_reason(self):
         resp = self.post(self.admin, email="not-an-address")

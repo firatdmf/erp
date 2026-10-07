@@ -13688,3 +13688,38 @@ msgstr "%(name)s ile paylaş"
 #, python-format
 msgid "%(list)s already has a record of its own called %(name)s, so sharing this one would show the two side by side. They are the same customer entered twice and need merging first."
 msgstr "%(list)s listesinde zaten %(name)s adında ayrı bir kayıt var; bu kaydı paylaşmak ikisini yan yana gösterir. Aynı müşteri iki kez girilmiş, önce birleştirilmeleri gerekiyor."
+
+msgid "Paid in"
+msgstr "Ödeme şekli"
+
+msgid "Warehouse the goods are in"
+msgstr "Malların bulunduğu depo"
+
+msgid "The contribution is the stock standing in this warehouse that was not bought through a purchase. Its value is read off the shelves."
+msgstr "Katkı, bu depoda duran ve bir satın almayla alınmamış olan stoktur. Değeri raflardan okunur."
+
+msgid "Say which warehouse the goods are in."
+msgstr "Malların hangi depoda olduğunu belirtin."
+
+msgid "Please select a valid cash account."
+msgstr "Lütfen geçerli bir kasa hesabı seçin."
+
+msgid "Amount must be greater than 0."
+msgstr "Tutar 0'dan büyük olmalıdır."
+
+#, python-format
+msgid "%(warehouse)s holds no stock with a cost, so there is nothing to book. Add the goods to the warehouse first."
+msgstr "%(warehouse)s deposunda maliyeti olan stok yok, bu yüzden kaydedilecek bir şey yok. Önce malları depoya ekleyin."
+
+#, python-format
+msgid "The stock in %(warehouse)s is already in the ledger's Inventory — it was bought through a purchase or booked before — so it cannot be booked again as capital."
+msgstr "%(warehouse)s deposundaki stok zaten defterin Stok hesabında — bir satın almayla alınmış ya da daha önce kaydedilmiş — bu yüzden sermaye olarak yeniden kaydedilemez."
+
+msgid "Delete this capital contribution? The goods stay in the warehouse, but the ledger no longer counts them as capital."
+msgstr "Bu sermaye katkısı silinsin mi? Mallar depoda kalır, ancak defter artık onları sermaye olarak saymaz."
+
+msgid "Capital paid in goods takes its amount from the warehouse, so it is not edited. Delete it and add it again instead."
+msgstr "Mal olarak ödenen sermayenin tutarı depodan alınır, bu yüzden düzenlenmez. Bunun yerine silip yeniden ekleyin."
+
+msgid "Paid in goods — no cash moved. The ledger holds it as Inventory against Share Capital."
+msgstr "Mal olarak ödendi — nakit hareketi olmadı. Defterde Sermaye karşılığında Stok olarak durur."

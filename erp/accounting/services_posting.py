@@ -434,7 +434,8 @@ def post_movement(movement, *, reference=""):
 
 @transaction.atomic
 def post_opening_inventory(book, *, date, reference="", warehouse=None,
-                           contra="3100"):
+                           contra="3100", source=None, description=None,
+                           memo="Stock on hand at cutover"):
     """Put the stock standing in this book's warehouses on the books.
 
     Valued exactly as the balance sheet values it — each item at what it
@@ -457,17 +458,73 @@ def post_opening_inventory(book, *, date, reference="", warehouse=None,
     value, unvalued_count, unvalued_qty = _inventory_value(book, warehouse)
     if value <= ZERO:
         return None, unvalued_count, unvalued_qty
-    description = ("Opening inventory" if warehouse is None
-                   else f"Opening inventory — {warehouse.name}")
-    memo = "Stock on hand at cutover"
+    if description is None:
+        description = ("Opening inventory" if warehouse is None
+                       else f"Opening inventory — {warehouse.name}")
     entry = post_entry(
         book=book, date=date,
         description=description,
         lines=[debit("1300", value, memo=memo, exact=True),
                credit(contra, value, memo=memo, exact=True)],
+        source=source,
         reference=reference,
     )
     return entry, unvalued_count, unvalued_qty
+
+
+class GoodsNotCapital(ValidationError):
+    """A warehouse's stock cannot be booked as capital paid in goods."""
+
+
+def goods_capital_value(book, warehouse):
+    """What `warehouse` holds that could be booked as capital paid in goods.
+
+    Raises GoodsNotCapital, with the reason, where it cannot: the shelves
+    are empty or unvalued, or their stock is already in Inventory (1300)
+    — bought through a purchase, or counted by an earlier entry — and
+    booking it again would put the ledger above what exists.
+    """
+    from django.db.models import Sum
+    from django.utils.translation import gettext as _g
+    from .models_ledger import JournalLine
+    from .services_ledger import _inventory_value
+
+    value, _n, _q = _inventory_value(book, warehouse)
+    if value <= ZERO:
+        raise GoodsNotCapital(
+            _g("%(warehouse)s holds no stock with a cost, so there is nothing "
+               "to book. Add the goods to the warehouse first.")
+            % {"warehouse": warehouse.name})
+    shelves, _n, _q = _inventory_value(book)
+    rows = JournalLine.objects.filter(entry__book=book, account__code="1300")
+    totals = rows.aggregate(d=Sum("debit"), c=Sum("credit"))
+    ledger = (totals["d"] or ZERO) - (totals["c"] or ZERO)
+    if ledger + value > shelves:
+        raise GoodsNotCapital(
+            _g("The stock in %(warehouse)s is already in the ledger's Inventory "
+               "— it was bought through a purchase or booked before — so it "
+               "cannot be booked again as capital.")
+            % {"warehouse": warehouse.name})
+    return value
+
+
+@transaction.atomic
+def post_capital_in_goods(capital):
+    """Dr Inventory (1300) / Cr Share Capital (3000) for capital paid in
+    goods: the stock standing in the contribution's warehouse.
+
+    The entry carries the shelves' exact value and names the contribution
+    as its source, so deleting the contribution takes the entry with it
+    (unpost). `capital.amount` is that value to the cent, for display.
+    """
+    value = goods_capital_value(capital.book, capital.warehouse)
+    entry, _n, _q = post_opening_inventory(
+        capital.book, date=capital.date_invested, warehouse=capital.warehouse,
+        contra="3000", source=capital,
+        description=f"Capital paid in goods — {capital.warehouse.name}",
+        memo="Goods contributed as capital",
+        reference=f"CAPITAL-GOODS-{capital.pk}")
+    return entry
 
 
 @transaction.atomic

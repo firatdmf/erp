@@ -1012,12 +1012,14 @@ class AddEquityCapital(generic.edit.CreateView):
         # get the capital amount from form post data
         amount = form.cleaned_data.get("amount")
         cash_account = form.cleaned_data.get("cash_account")
-        if not cash_account:
+        in_goods = form.cleaned_data.get("paid_in") == EquityCapital.PAID_IN_GOODS
+        if not cash_account and not in_goods:
             form.add_error("cash_account", "Please select a valid cash account.")
             return self.form_invalid(form)
 
-        # Set the currency to the deposited_cash_account's currency
-        currency = cash_account.currency
+        # Set the currency to the deposited_cash_account's currency; goods
+        # are valued in the book's own.
+        currency = book.effective_base_currency if in_goods else cash_account.currency
 
         # The contributor must be a stakeholder of this book, but the
         # contribution does not move their holding: shares are issued as
@@ -1036,12 +1038,18 @@ class AddEquityCapital(generic.edit.CreateView):
         self.object.save()
         equity_pk = self.object.pk
         equity_instance = self.object
-        result = handle_equity_transaction(
-            book, amount, currency, equity_instance, equity_pk, cash_account
-        )
-        if result is not True:
-            form.add_error(None, "Form error: in handle_equity_transaction function")
-            return self.form_invalid(form)
+        if in_goods:
+            # No cash moves. The goods are already on the shelf; what is
+            # recorded is that they are the owner's capital.
+            from .services_posting import post_capital_in_goods
+            post_capital_in_goods(self.object)
+        else:
+            result = handle_equity_transaction(
+                book, amount, currency, equity_instance, equity_pk, cash_account
+            )
+            if result is not True:
+                form.add_error(None, "Form error: in handle_equity_transaction function")
+                return self.form_invalid(form)
 
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
@@ -1521,29 +1529,77 @@ class DeleteEquityRevenue(RevenueSource, CashSourceDelete):
 # --- Capital deposit -------------------------------------------------------
 
 class CapitalSource(CashInflowSource):
+    """A capital contribution: cash into one cash account, or goods.
+
+    Capital paid in goods moves no cash, so there is no cash row to take
+    back and no account that could be overdrawn; what it has instead is
+    a journal entry of its own (Inventory against Share Capital), which
+    goes with it.
+    """
+
     model = EquityCapital
     kind = "capital"
     label = _l("Capital deposit")
     delete_confirm = _l("Delete this capital deposit? The cash it added is taken back out of the account.")
+    goods_delete_confirm = _l(
+        "Delete this capital contribution? The goods stay in the warehouse, "
+        "but the ledger no longer counts them as capital.")
+
+    def unpost_entry(self, obj):
+        if obj.in_goods:
+            from .services_posting import unpost
+            unpost(obj)
+        else:
+            super().unpost_entry(obj)
+
+    def accounts(self, obj):
+        return [] if obj.in_goods else super().accounts(obj)
 
 
 @method_decorator(login_required, name="dispatch")
 class EquityCapitalDetail(CapitalSource, CashSourceDetail):
     def facts(self, obj):
+        warehouse = None
+        if obj.in_goods:
+            warehouse = (obj.warehouse.name,
+                         reverse("operating:warehouse_detail", args=[obj.warehouse_id]))
         return [f for f in [
             (_g("Date"), obj.date_invested.strftime("%d.%m.%Y"), None),
             (_g("Member"), str(obj.member), None),
+            (_g("Paid in"), _g("Goods") if obj.in_goods else _g("Cash"), None),
             (_g("Amount"), f"{format_money(obj.amount)} {obj.currency.code}", None),
+            (_g("Warehouse"), warehouse[0], warehouse[1]) if warehouse else None,
             self.conversion_fact(obj),
             (_g("Book"), obj.book.name, None),
             (_g("Recorded"), timezone.localtime(obj.created_at).strftime("%d.%m.%Y %H:%M"), None),
         ] if f]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.object.in_goods:
+            # Its figure is the shelves', not something typed, so there is
+            # nothing on it to correct: a wrong one is deleted and re-added.
+            context["edit_url"] = None
+            context["delete_confirm"] = self.goods_delete_confirm
+        return context
 
 
 @method_decorator(login_required, name="dispatch")
 class EditEquityCapital(CapitalSource, CashSourceEdit):
     form_class = EquityCapitalForm
     date_field = "date_invested"
+
+    def dispatch(self, request, *args, **kwargs):
+        capital = get_object_or_404(
+            EquityCapital, pk=kwargs.get("source_pk"), book_id=kwargs.get("pk"))
+        if capital.in_goods:
+            messages.error(request, _g(
+                "Capital paid in goods takes its amount from the warehouse, so "
+                "it is not edited. Delete it and add it again instead."))
+            return HttpResponseRedirect(reverse(
+                "accounting:equity_capital_detail",
+                kwargs={"pk": capital.book_id, "source_pk": capital.pk}))
+        return super().dispatch(request, *args, **kwargs)
 
 
 @method_decorator(login_required, name="dispatch")

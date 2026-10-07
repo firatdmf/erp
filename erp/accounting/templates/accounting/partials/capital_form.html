@@ -139,3 +139,27 @@
 </form>
 
 {% include "accounting/partials/fx_rate_field.html" with date_field="date_invested" %}
+
+<script>
+  // Cash asks for an account and an amount; goods ask only which warehouse
+  // they are standing in, and the amount is read off its shelves.
+  (function () {
+    var form = document.getElementById('addCapitalForm');
+    var kind = form && form.querySelector('[name="paid_in"]');
+    if (!kind) return;
+    function row(name) {
+      var field = form.querySelector('[name="' + name + '"]');
+      return field ? field.closest('p') || field.parentElement : null;
+    }
+    function sync() {
+      var goods = kind.value === 'goods';
+      [['cash_account', !goods], ['amount', !goods], ['exchange_rate', !goods],
+       ['warehouse', goods]].forEach(function (pair) {
+        var el = row(pair[0]);
+        if (el) el.style.display = pair[1] ? '' : 'none';
+      });
+    }
+    kind.addEventListener('change', sync);
+    sync();
+  })();
+</script>

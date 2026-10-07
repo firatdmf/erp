@@ -92,7 +92,7 @@
                 </span>
                 <span class="ci-date">{{ i.date|date:"d.m.Y" }}</span>
                 <span class="ci-reason">{{ i.get_reason_display }}</span>
-                {% if i.capital %}<span class="ci-capital"><i class="fas fa-link"></i> {{ i.capital.currency.symbol }}{{ i.capital.amount }}</span>{% endif %}
+                {% if i.capital %}<a class="ci-capital" href="{% url 'accounting:equity_capital_detail' pk=book.pk source_pk=i.capital.pk %}"><i class="fas fa-link"></i> {{ i.capital.currency.symbol }}{{ i.capital.amount }}{% if i.capital.in_goods %} · paid in goods{% endif %}</a>{% endif %}
                 {% if i.note %}<span class="ci-note">{{ i.note }}</span>{% endif %}
                 {% if i.created_by %}<span class="ci-by">by {{ i.created_by }}</span>{% endif %}
               </li>
@@ -155,7 +155,7 @@
           <option value="">— none —</option>
           {% for c in capital_entries %}
           <option value="{{ c.pk }}">
-            {{ c.currency.symbol }}{{ c.amount }} · {{ c.date_invested|date:"d.m.Y" }} · {{ c.member }}
+            {{ c.currency.symbol }}{{ c.amount }}{% if c.in_goods %} (goods){% endif %} · {{ c.date_invested|date:"d.m.Y" }} · {{ c.member }}
           </option>
           {% endfor %}
         </select>

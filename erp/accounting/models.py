@@ -691,9 +691,27 @@ class EquityCapital(models.Model):
     )
     date_invested = models.DateField()
 
-    # The cash account where the capital is deposited
+    # What the owner handed over. Money is the usual case; goods are the
+    # other one — a business can be started with a shipment of stock as
+    # easily as with a bank transfer, and that stock is capital exactly
+    # as the transfer would have been.
+    PAID_IN_CASH, PAID_IN_GOODS = "cash", "goods"
+    PAID_IN = [(PAID_IN_CASH, "Cash"), (PAID_IN_GOODS, "Goods")]
+    paid_in = models.CharField(max_length=5, choices=PAID_IN, default=PAID_IN_CASH)
+
+    # The cash account the money went into. Empty for capital paid in
+    # goods, which touches no cash account at all.
     cash_account = models.ForeignKey(
-        CashAccount, on_delete=models.CASCADE, blank=False, null=False
+        CashAccount, on_delete=models.CASCADE, blank=True, null=True
+    )
+    # For capital paid in goods: the warehouse the goods are standing in.
+    # The contribution IS that warehouse's stock that nobody bought — its
+    # value is read off the shelves, not typed, so the ledger's Inventory
+    # and the shelves cannot be made to disagree by a figure entered here
+    # (services_posting.post_capital_in_goods).
+    warehouse = models.ForeignKey(
+        "operating.Warehouse", on_delete=models.PROTECT, blank=True, null=True,
+        related_name="capital_contributions",
     )
     currency = models.ForeignKey(
         CurrencyCategory,
@@ -721,10 +739,31 @@ class EquityCapital(models.Model):
 
     note = models.TextField(null=True, blank=True)
 
+    @property
+    def in_goods(self):
+        return self.paid_in == self.PAID_IN_GOODS
+
     def clean(self):
         super().clean()
-        if self.amount <= 0:
+        if self.amount is None or self.amount <= 0:
             raise ValidationError({"amount": "Amount must be greater than 0."})
+        if self.in_goods:
+            if self.cash_account_id:
+                raise ValidationError(
+                    {"cash_account": "Capital paid in goods goes into no cash account."})
+            if not self.warehouse_id:
+                raise ValidationError(
+                    {"warehouse": "Say which warehouse the goods are in."})
+            if self.warehouse.accounting_book_id != self.book_id:
+                raise ValidationError(
+                    {"warehouse": "That warehouse belongs to another book."})
+        else:
+            if not self.cash_account_id:
+                raise ValidationError(
+                    {"cash_account": "Please select a valid cash account."})
+            if self.warehouse_id:
+                raise ValidationError(
+                    {"warehouse": "A cash deposit names no warehouse."})
 
     def __str__(self):
         return f"Capital | {self.currency}{self.amount} {self.member}"

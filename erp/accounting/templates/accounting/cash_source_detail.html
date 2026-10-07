@@ -86,9 +86,11 @@
       <h1 class="xd-title">{{ title }}<span class="xd-id">#{{ source.pk }}</span></h1>
     </div>
     <div class="xd-actions">
+      {% if edit_url %}
       <a href="{{ edit_url }}" class="xd-btn primary">
         <i data-lucide="pencil"></i> {% trans "Edit" %}
       </a>
+      {% endif %}
       {% comment %}
         POST, and its own form. A delete a crawler or a prefetch could
         follow would unwind a ledger entry on its own.
@@ -152,7 +154,7 @@
         </div>
       </div>
       {% empty %}
-      <div class="xd-posted"><div class="n"><span class="gone">{% trans "No cash entry is posted for this." %}</span></div></div>
+      <div class="xd-posted"><div class="n"><span class="gone">{% if source.in_goods %}{% trans "Paid in goods — no cash moved. The ledger holds it as Inventory against Share Capital." %}{% else %}{% trans "No cash entry is posted for this." %}{% endif %}</span></div></div>
       {% endfor %}
     </div>
   </div>

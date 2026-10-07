@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from django import forms
 from django.forms import formset_factory, inlineformset_factory
+from django.utils.translation import gettext_lazy as _
 from .models import *
 
 # from operating.models import Product
@@ -233,7 +236,11 @@ class ExchangeRateFormMixin:
 
 
 class EquityCapitalForm(ExchangeRateFormMixin, forms.ModelForm):
-    """Record cash going into a book.
+    """Record capital going into a book — cash into a cash account, or
+    goods standing in one of its warehouses.
+
+    For goods nothing is typed but which warehouse: the amount is what
+    those shelves hold, read off them when the form is checked.
 
     `new_shares_issued` is not asked for here. A contribution and an
     equity issuance are different events — most deposits issue nothing —
@@ -277,8 +284,51 @@ class EquityCapitalForm(ExchangeRateFormMixin, forms.ModelForm):
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
             ).select_related("currency", "book").order_by("name")
+            from operating.models import Warehouse
+            self.fields["warehouse"].queryset = Warehouse.objects.filter(
+                accounting_book=book, kind="normal").order_by("name")
+        self.book = book
+
+        # Which of these are needed depends on what is being paid in, so
+        # none is required on its own; clean() asks for the right ones.
+        # `paid_in` too: a form posted without it — an open tab from before
+        # the choice existed — is a cash deposit, as every one was.
+        for name in ("cash_account", "amount", "warehouse", "paid_in"):
+            self.fields[name].required = False
+        self.fields["paid_in"].label = _("Paid in")
+        self.fields["warehouse"].label = _("Warehouse the goods are in")
+        self.fields["warehouse"].help_text = _(
+            "The contribution is the stock standing in this warehouse that "
+            "was not bought through a purchase. Its value is read off the shelves.")
 
         self._setup_exchange_rate(book)
+
+    def clean(self):
+        cleaned = super().clean()
+        cleaned["paid_in"] = cleaned.get("paid_in") or EquityCapital.PAID_IN_CASH
+        if cleaned["paid_in"] == EquityCapital.PAID_IN_GOODS:
+            from .services_posting import GoodsNotCapital, goods_capital_value
+            warehouse = cleaned.get("warehouse")
+            cleaned["cash_account"] = None
+            cleaned["exchange_rate"] = None
+            if warehouse is None:
+                self.add_error("warehouse", _("Say which warehouse the goods are in."))
+                return cleaned
+            try:
+                value = goods_capital_value(self.book or warehouse.accounting_book, warehouse)
+            except GoodsNotCapital as exc:
+                self.add_error("warehouse", exc.messages[0])
+                return cleaned
+            cleaned["amount"] = value.quantize(Decimal("0.01"))
+            # Goods are valued in the book's own currency, as its stock is.
+            cleaned["currency"] = (self.book or warehouse.accounting_book).effective_base_currency
+        else:
+            cleaned["warehouse"] = None
+            if not cleaned.get("cash_account"):
+                self.add_error("cash_account", _("Please select a valid cash account."))
+            if not cleaned.get("amount"):
+                self.add_error("amount", _("Amount must be greater than 0."))
+        return cleaned
 
 
 class EquityRevenueForm(forms.ModelForm):

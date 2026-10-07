@@ -143,7 +143,7 @@ class Book(models.Model):
     # its own casing and need not be unique — two books of one company
     # can well trade under the same name.
     #
-    # Blank → falls back to settings.BRAND_DISPLAY_NAME, so a fresh
+    # Blank → falls back to the brand profile's display name, so a fresh
     # book still prints something sensible before anyone fills this in.
     brand_name = models.CharField(
         max_length=200, blank=True,
@@ -223,7 +223,7 @@ class Book(models.Model):
     def effective_brand_name(self) -> str:
         """What to print. Same override-then-default shape as
         Product.effective_*: the book's own value wins, else the brand
-        profile (Settings page, then settings.py), else the short
+        profile (Settings page), else the short
         internal name."""
         from erp.branding import brand
         return ((self.brand_name or "").strip()

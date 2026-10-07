@@ -34,11 +34,8 @@
 
   {% comment %}
     Nejum design system overlay, loaded after base.css so its overrides
-    win. Still written as a UI_THEME branch, but the sidebar it styles is
-    no longer optional: the pre-theme navbar was deleted, so clearing
-    UI_THEME now yields an unstyled sidebar rather than the old look.
+    win.
   {% endcomment %}
-  {% if UI_THEME == "nejum" %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@700&display=swap" rel="stylesheet">
@@ -50,7 +47,6 @@
     <link rel="stylesheet" href="{% static 'erp/css/nejum/responsive-content.css' %}?v=4" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dark.css' %}?v=9" />
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
-  {% endif %}
 
 
   <!-- jQuery -->
@@ -343,7 +339,6 @@
   <!-- Global Top Bar -->
   <div class="global-top-bar">
     <div class="top-bar-left">
-      {% if UI_THEME == "nejum" %}
         <div class="header-clock" aria-label="Saat" title="">
           <svg viewBox="0 0 40 40" class="clock-svg">
             <circle cx="20" cy="20" r="18" class="clock-face"/>
@@ -382,10 +377,6 @@
           <script id="fxMiniDefaults" type="application/json">{"from": "USD", "to": "{{ current_book.effective_base_currency.code|default:'TRY' }}"}</script>
 {% endif %}
         </div>
-      {% else %}
-        <span class="welcome-text">{% blocktrans with first=user.first_name last=user.last_name %}Welcome, {{ first }} {{ last }}!{% endblocktrans %}</span>
-        <span class="header-date">{% now 'F j, Y' %}</span>
-      {% endif %}
     </div>
 
     <div class="top-bar-center">
@@ -519,15 +510,7 @@
   </div>
 
   {% with member=user.member %}
-  {% comment %}
-    The navigation, unconditionally. This used to sit behind
-    {% if UI_THEME == "nejum" %} with a <nav class="navbar"> fallback
-    underneath for any brand that had not opted into the theme. No brand
-    ever did — demfirat is the only profile and it has UI_THEME=nejum —
-    so the fallback rendered nowhere while still collecting menu entries
-    that the real sidebar never showed. It is gone, and with it the
-    guard: there is no second navigation to fall back to.
-  {% endcomment %}
+  {% comment %}The navigation: there is one, and no second to fall back to.{% endcomment %}
   {% include "components/_sidebar_nejum.html" %}
   {% if user.is_authenticated %}
     {% include "components/_mobile_shell.html" %}
@@ -4768,7 +4751,6 @@
     </script>
     <script src="{% static 'operating/js/create_edit_order.js' %}"></script>
 
-    {% if UI_THEME == "nejum" %}
       {% comment %}Defer until Lucide CDN has loaded; sidebar.js calls lucide.createIcons() to swap data-lucide attributes for SVGs.{% endcomment %}
       <script src="{% static 'erp/js/nejum/sidebar.js' %}" defer></script>
       <script>
@@ -4807,7 +4789,6 @@
           });
         })();
       </script>
-    {% endif %}
 
     <script>
       // A mouse wheel over a FOCUSED number input silently changes its

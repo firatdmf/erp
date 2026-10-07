@@ -5,17 +5,12 @@ from itertools import chain
 from operator import attrgetter
 from django.db.models import Value, CharField
 from django.core.cache import cache
-from django.conf import settings as _settings
 from erp.branding import brand_values
 from erp.nejum_credit import NEJUM_URL, credit_html, credit_text
 
 
-def ui_theme(request):
-    """Expose the active UI theme name + brand identity to every template.
-
-    Settings.py reads these from the active env profile (.env or
-    .env.<ENV_PROFILE>) and stores them as Django constants. Templates
-    use `{{ UI_THEME }}`, `{{ DB_SCHEMA }}`, `{{ BRAND_NAME }}`.
+def brand_identity(request):
+    """Expose the company's identity to every template.
 
     BRAND_NAME is the SHORT label, for UI chrome. The name a customer-
     facing document signs with lives on the ledger Book instead
@@ -24,13 +19,10 @@ def ui_theme(request):
 
     BRAND_* (address/phone/email/etc.) are optional — used by the
     invoice/proforma document template for the issuer header block.
-    Leave them unset and the template falls back to dashes.
+    Leave them blank and the template falls back to dashes.
     """
     return {
-        "UI_THEME": getattr(_settings, "UI_THEME", ""),
-        "DB_SCHEMA": getattr(_settings, "DB_SCHEMA", "public"),
-        "BRAND_NAME": getattr(_settings, "BRAND_NAME", "Nejum"),
-        # Edited on the Settings page, falling back to settings.py.
+        # The brand profile row, edited on the Settings page.
         **brand_values(),
         # "" when the brand has the credit off, so templates just test it.
         # The HTML one carries each name in its own colour.

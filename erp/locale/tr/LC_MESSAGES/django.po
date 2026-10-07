@@ -10329,6 +10329,18 @@ msgstr "İşletmenin müşteri belgelerini hangi adla imzaladığı. Bir defter,
 msgid "Legal suffix"
 msgstr "Ünvan eki"
 
+msgid "Short name"
+msgstr "Kısa ad"
+
+msgid "The label on warehouse stickers, sheet headings and the app itself."
+msgstr "Depo etiketlerinde, tablo başlıklarında ve uygulamanın kendisinde görünen ad."
+
+msgid "Code prefix"
+msgstr "Kod ön eki"
+
+msgid "Starts an automatic product or roll code when the supplier's name gives none."
+msgstr "Tedarikçinin adından ön ek çıkmadığında otomatik ürün veya top kodunun başına gelir."
+
 msgid "Logo URL"
 msgstr "Logo adresi"
 

@@ -1,13 +1,14 @@
 """The company's own identity, edited on the Settings page.
 
-One row overrides the code defaults in settings.BRAND_DEFAULTS, field by
-field: what is typed wins, what is left blank falls through. Only an
-admin may change it, and an edit reaches every document at once.
+One row is the only place documents read it from: what is typed there
+prints, what is left blank prints blank. Only an admin may change it, and
+an edit reaches every document at once.
 """
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.conf import settings
+from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book
@@ -16,9 +17,6 @@ from erp.branding import brand, brand_flag, clear_cache
 from erp.models import BrandProfile
 
 
-@override_settings(BRAND_DISPLAY_NAME="DEMFIRAT® | Karven Home Collection",
-                   BRAND_ADDRESS="Ergene, Tekirdağ", BRAND_PHONE="+90 501",
-                   BRAND_TAX_NUMBER="", NEJUM_CREDIT=True)
 class BrandValues(TestCase):
     def setUp(self):
         clear_cache()
@@ -26,14 +24,27 @@ class BrandValues(TestCase):
     def tearDown(self):
         clear_cache()
 
-    def test_with_no_row_the_code_default_stands(self):
-        self.assertEqual(brand("BRAND_ADDRESS"), "Ergene, Tekirdağ")
-        self.assertTrue(brand_flag("NEJUM_CREDIT"))
+    def test_the_row_was_seeded_with_what_the_settings_used_to_say(self):
+        """erp 0006 ran when this database was built: the documents kept
+        their address on the day it stopped being a setting."""
+        self.assertTrue(BrandProfile.objects.get().address)
+        self.assertEqual(brand("BRAND_ADDRESS"), BrandProfile.objects.get().address)
 
-    def test_an_edited_field_wins_and_a_blank_one_does_not(self):
+    def test_with_no_row_nothing_is_answered(self):
+        BrandProfile.objects.all().delete()
+        self.assertEqual(brand("BRAND_ADDRESS"), "")
+        self.assertFalse(hasattr(settings, "BRAND_ADDRESS"))
+
+    def test_what_is_typed_prints_and_a_blank_field_prints_blank(self):
         BrandProfile.objects.create(address="Yeni adres 5", phone="")
         self.assertEqual(brand("BRAND_ADDRESS"), "Yeni adres 5")
-        self.assertEqual(brand("BRAND_PHONE"), "+90 501")
+        self.assertEqual(brand("BRAND_PHONE"), "")
+
+    def test_the_short_name_and_code_prefix_are_on_the_row_too(self):
+        BrandProfile.objects.create(short_name="Acme", code_prefix="ACM")
+        self.assertEqual(brand("BRAND_NAME"), "Acme")
+        self.assertEqual(brand("BRAND_CODE_PREFIX"), "ACM")
+        self.assertFalse(hasattr(settings, "BRAND_NAME"))
 
     def test_the_flag_can_be_turned_off(self):
         BrandProfile.objects.create(nejum_credit=False)
@@ -56,8 +67,8 @@ class BrandValues(TestCase):
         """The name a book signs with, and the invoice issuer block."""
         book = Book.objects.create(name="Laleli Fabric")   # no brand_name of its own
         from accounting.services_accounts import brand_name_for
-        self.assertEqual(book.effective_brand_name,
-                         "DEMFIRAT® | Karven Home Collection")
+        BrandProfile.objects.create(display_name="", short_name="Acme")
+        self.assertEqual(book.effective_brand_name, "Acme")
         BrandProfile.objects.create(display_name="Acme Textiles")
         book.refresh_from_db()
         self.assertEqual(book.effective_brand_name, "Acme Textiles")
@@ -120,16 +131,16 @@ class TheCompanyTab(TestCase):
         self.assertFalse(BrandProfile.objects.filter(email="not-an-address").exists())
 
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
-    def test_the_page_shows_the_fields_and_the_defaults(self, mock_upload):
+    def test_the_page_shows_the_fields_and_what_they_hold(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        BrandProfile.objects.create(display_name="Acme Textiles")
         self.client.force_login(self.admin)
         resp = self.client.get(reverse("user_settings"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Company Profile")
         self.assertContains(resp, 'name="display_name"')
         self.assertContains(resp, 'name="nejum_credit"')
-        # Nothing edited yet, so the code default shows as the placeholder.
-        self.assertContains(resp, 'placeholder="DEMFIRAT')
+        self.assertContains(resp, 'value="Acme Textiles"')
 
     def test_a_non_admin_sees_it_read_only(self):
         self.client.force_login(self.staff)

@@ -172,7 +172,7 @@ def brand_name_for(book=None) -> str:
     of their own, so they get the ledger's — the same book their money
     posts to.
 
-    Falls back to settings.BRAND_DISPLAY_NAME, then BRAND_NAME. It never
+    Falls back to the brand profile's display name, then BRAND_NAME. It never
     raises: a document must still print on a database with no books.
     """
     if book is None:
@@ -184,7 +184,7 @@ def brand_name_for(book=None) -> str:
         return book.effective_brand_name
     from erp.branding import brand
     return (brand("BRAND_DISPLAY_NAME")
-            or getattr(settings, "BRAND_NAME", "")
+            or brand("BRAND_NAME")
             or "Nejum")
 
 

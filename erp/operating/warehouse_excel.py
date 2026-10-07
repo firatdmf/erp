@@ -13,7 +13,6 @@ column and grand total, which are cost times quantity.
 """
 from io import BytesIO
 
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q
 from django.http import HttpResponse
@@ -102,7 +101,8 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
                              search_by="text", for_sales_rep=False):
     from openpyxl import Workbook
 
-    brand = (getattr(settings, "BRAND_NAME", "") or "Nejum")
+    from erp.branding import brand as brand_value
+    brand = brand_value("BRAND_NAME") or "Nejum"
     products = list(_filtered_products(warehouse, search, sort, search_by))
 
     # A combined (ortak) warehouse pools several members' shelves, so a row

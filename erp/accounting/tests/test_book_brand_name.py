@@ -13,6 +13,7 @@ from django.urls import reverse
 
 from accounting.models import Book
 from accounting.services_accounts import brand_name_for, get_default_book
+from erp.branding import brand, clear_cache
 
 
 class BookBrandNameField(TestCase):
@@ -29,7 +30,7 @@ class BookBrandNameField(TestCase):
     def test_blank_falls_back_to_the_brand_profile(self):
         self.book.brand_name = ""
         self.assertEqual(self.book.effective_brand_name,
-                         settings.BRAND_DISPLAY_NAME)
+                         brand("BRAND_DISPLAY_NAME"))
 
     def test_it_is_separate_from_the_ledger_name(self):
         """`name` is the short internal handle and stays unique; the
@@ -65,7 +66,7 @@ class SeedMigration(TestCase):
         # rather than on rows it can no longer see.
         book = Book.objects.create(name="Fresh Book")
         self.assertEqual(book.brand_name, "")
-        self.assertEqual(book.effective_brand_name, settings.BRAND_DISPLAY_NAME)
+        self.assertEqual(book.effective_brand_name, brand("BRAND_DISPLAY_NAME"))
 
 
 class BrandNameEditor(TestCase):
@@ -97,7 +98,7 @@ class BrandNameEditor(TestCase):
         self.assertEqual(resp.status_code, 200)
         body = json.loads(resp.content)
         self.assertEqual(body["brand_name"], "")
-        self.assertEqual(body["effective"], settings.BRAND_DISPLAY_NAME)
+        self.assertEqual(body["effective"], brand("BRAND_DISPLAY_NAME"))
 
     def test_it_leaves_the_ledger_name_alone(self):
         self.client.post(self.url(), {"brand_name": "X", "name": "Hijacked"})
@@ -133,19 +134,22 @@ class InvoiceIssuer(TestCase):
                          "Demfirat Export A.Ş.")
 
     def test_the_legal_suffix_is_not_pinned_onto_an_entered_name(self):
-        """BRAND_LEGAL_SUFFIX pads the settings fallback only — appending
+        """The legal suffix pads the short-name fallback only — appending
         it to a lockup would print "… Karven Home Collection SAN. TİC.
         LTD. ŞTİ." on a tax document."""
-        self.assertNotIn(settings.BRAND_LEGAL_SUFFIX,
-                         self.invoice.issuer_display_name)
+        clear_cache()
+        suffix = brand("BRAND_LEGAL_SUFFIX")
+        self.assertTrue(suffix)
+        self.assertNotIn(suffix, self.invoice.issuer_display_name)
 
-    def test_the_settings_fallback_still_carries_the_legal_suffix(self):
+    def test_the_short_name_fallback_still_carries_the_legal_suffix(self):
+        clear_cache()
         self.book.brand_name = ""
         self.book.save(update_fields=["brand_name"])
         self.invoice.refresh_from_db()
         self.assertEqual(
             self.invoice.issuer_display_name,
-            f"{settings.BRAND_NAME} {settings.BRAND_LEGAL_SUFFIX}".strip())
+            f"{brand('BRAND_NAME')} {brand('BRAND_LEGAL_SUFFIX')}".strip())
 
     def test_the_excel_and_the_printed_invoice_agree(self):
         from accounting.invoice_doc import build_purchase_doc

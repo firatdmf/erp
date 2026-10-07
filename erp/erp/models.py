@@ -1,10 +1,7 @@
 """The deployment's own identity — see erp/branding.py for how it is read.
 
-One row, edited on the Settings page. Every field is optional: blank
-means "no answer here", and the code default in settings.BRAND_DEFAULTS
-stands. That way a fresh install prints correctly before anyone has
-opened the page, and a company that licenses Nejum fills in what it
-wants to change.
+One row, edited on the Settings page. Every field is optional, and a
+blank one prints blank: there is no second source behind the row.
 """
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -16,6 +13,15 @@ class BrandProfile(models.Model):
     class Meta:
         verbose_name = _("Brand profile")
         verbose_name_plural = _("Brand profile")
+
+    # The short label the ERP's own chrome uses — the mobile title, a
+    # warehouse label, a sheet's heading.
+    short_name = models.CharField(max_length=60, blank=True)
+    # Last resort for an auto-minted product SKU or roll barcode, used
+    # when the supplier's name yields no consonants to abbreviate — see
+    # operating.views_warehouse._consonant_prefix. It reads as the
+    # house's own code because that is whose goods they became.
+    code_prefix = models.CharField(max_length=6, blank=True)
 
     # What customer documents sign with. A ledger Book can still override
     # it for its own paperwork (Book.brand_name), which is how two books
@@ -68,14 +74,8 @@ class BrandProfile(models.Model):
 
     @classmethod
     def get(cls):
-        """The row, created empty on first use. Empty is a valid state:
-        every field then falls back to settings."""
-        row = cls.objects.first()
-        if row is None:
-            from django.conf import settings
-            row = cls.objects.create(
-                nejum_credit=bool(getattr(settings, "NEJUM_CREDIT", True)))
-        return row
+        """The row, created empty on first use."""
+        return cls.objects.first() or cls.objects.create()
 
 
 class WhatsAppSettings(models.Model):

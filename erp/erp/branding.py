@@ -1,26 +1,25 @@
 """Who this deployment is, and what its documents say.
 
-The brand profile started life in settings.py (BRAND_DEFAULTS), which is
-fine for the house but not for a company that licenses Nejum: nobody
-edits a Python file to correct their own phone number. The values now
-live in a database row anyone with admin rights can edit on the Settings
-page, and settings.py holds the defaults that row falls back to.
+The brand profile started life in settings.py, but nobody edits a Python
+file to correct their own phone number. The values live in one database
+row (erp.models.BrandProfile) that anyone with admin rights edits on the
+Settings page, and that row is the only place a document reads them
+from: a field left blank there prints blank.
 
-    brand("BRAND_ADDRESS")   → the edited address, else the code default
+    brand("BRAND_ADDRESS")   → the address on the row
     brand_flag("NEJUM_CREDIT")
 
-Read through these two, never straight off `settings`, so an edit on the
-Settings page reaches every document at once. The row is cached, and
-saving it clears the cache.
+Read through these two so an edit on the Settings page reaches every
+document at once. The row is cached, and saving it clears the cache.
 """
-from django.conf import settings
 from django.core.cache import cache
 
 CACHE_KEY = "brand_profile_values"
 
-# field on BrandProfile → the settings name it falls back to. Text fields
-# only: blank means "not answered here", so the code default stands.
+# field on BrandProfile → the name its readers ask for it by. Text
+# fields only.
 TEXT_FIELDS = {
+    "short_name": "BRAND_NAME",
     "display_name": "BRAND_DISPLAY_NAME",
     "legal_suffix": "BRAND_LEGAL_SUFFIX",
     "address": "BRAND_ADDRESS",
@@ -31,17 +30,18 @@ TEXT_FIELDS = {
     "tax_number": "BRAND_TAX_NUMBER",
     "logo_url": "BRAND_LOGO_URL",
     "brand_color": "BRAND_COLOR",
+    "code_prefix": "BRAND_CODE_PREFIX",
 }
 SETTING_TO_FIELD = {v: k for k, v in TEXT_FIELDS.items()}
 
 
 def _values():
-    """{setting name: edited value} for whatever the row actually answers.
+    """{name: value} for whatever the row actually answers.
 
     Cached, because every printed document asks several times. A missing
     table (before the migration runs, or in a test database being built)
-    answers "nothing edited" rather than raising — a document must still
-    print.
+    answers "nothing filled in" rather than raising — a document must
+    still print.
     """
     cached = cache.get(CACHE_KEY)
     if cached is not None:
@@ -67,19 +67,14 @@ def clear_cache():
 
 
 def brand(name, default=""):
-    """A brand text value: what was edited, else what settings.py says."""
-    edited = _values().get(name)
-    if edited:
-        return edited
-    return (getattr(settings, name, "") or default or "").strip()
+    """A brand text value, off the profile row."""
+    return _values().get(name) or default
 
 
 def brand_flag(name, default=False):
-    """A brand on/off value, same precedence."""
+    """A brand on/off value, off the profile row."""
     value = _values().get(name)
-    if value is None:
-        value = getattr(settings, name, default)
-    return bool(value)
+    return bool(default if value is None else value)
 
 
 def brand_values():

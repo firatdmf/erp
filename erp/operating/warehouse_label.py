@@ -15,6 +15,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 
+from erp.branding import brand as brand_value
+
 from .models import Warehouse, WarehouseProduct
 
 
@@ -23,7 +25,6 @@ def warehouse_product_info(request, warehouse_pk, product_pk):
     scanned. PUBLIC (no login) so anyone scanning a physical label can see
     the product. Brand + DESEN/VARYANT/SKU/METRE + barcode, mobile-friendly.
     Admin actions on the page stay behind login."""
-    from django.conf import settings
     from .catalog_sync import derive_catalog
     product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse_id=warehouse_pk)
     cat = derive_catalog(product.sku, product.name)
@@ -31,7 +32,7 @@ def warehouse_product_info(request, warehouse_pk, product_pk):
         "product": product,
         "base": cat["base_name"] or product.name,
         "variant": cat["original_token"] or "",
-        "brand": (getattr(settings, "BRAND_NAME", "") or "Nejum"),
+        "brand": brand_value("BRAND_NAME") or "Nejum",
     })
 
 
@@ -53,7 +54,6 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import mm
     from reportlab.graphics.barcode import code128
-    from django.conf import settings
     import segno
     from PIL import Image
 
@@ -62,7 +62,7 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "DejaVuSans-Bold" if reg == "DejaVuSans" else "Helvetica-Bold"
-    brand = (getattr(settings, "BRAND_NAME", "") or "Nejum").upper()
+    brand = (brand_value("BRAND_NAME") or "Nejum").upper()
 
     W, H = 76 * mm, 58 * mm
     buf = BytesIO()

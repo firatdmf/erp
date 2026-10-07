@@ -146,8 +146,6 @@ def dashboard_component(csrf_token,path,member):
     # the design kit's ScreenHome 1:1. The old dashboard_new.html
     # fallback was deleted — no brand had selected it since demfirat
     # moved to the nejum theme, so it had stopped rendering anywhere.
-    from django.conf import settings as _dj_settings
-    _theme = getattr(_dj_settings, 'UI_THEME', '')
 
     # ALL of this user's OPEN tasks for the Nejum dashboard. Completed
     # tasks are filtered out at the DB query so they never show up on
@@ -188,7 +186,6 @@ def dashboard_component(csrf_token,path,member):
             _LOG(f"\n{'='*60}")
             _LOG(f"🐍 [HOME DASHBOARD] PID={_os.getpid()} Python={_sys.version.split()[0]} Django={_gv()}")
             _LOG(f"   __file__={__file__}")
-            _LOG(f"   THEME={_theme} BRAND={getattr(_set, 'BRAND', '?')} SCHEMA={getattr(_set, 'DB_SCHEMA', '?')}")
             _LOG(f"   DB.NAME={_set.DATABASES['default'].get('NAME')} HOST={_set.DATABASES['default'].get('HOST')}")
             _LOG(f"   Member={member} (id={getattr(member, 'id', '?')})")
             tasks_eval = list(qs)

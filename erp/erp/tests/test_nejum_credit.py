@@ -1,14 +1,14 @@
 """The "<house> is powered by Nejum" credit on customer documents.
 
-On by default for the house, off with settings.NEJUM_CREDIT — and when it
-is off, every document drops it. Invoices never carry it.
+On by default, off from the brand profile on the Settings page — and when
+it is off, every document drops it. Invoices never carry it.
 """
 import io
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
@@ -220,8 +220,14 @@ class TheCreditIsOn(NejumCreditBase):
         self.assertEqual(credit_runs(self.book)[0][1], "#123456")
 
 
-@override_settings(NEJUM_CREDIT=False)
 class TheCreditIsOff(NejumCreditBase):
+
+    def setUp(self):
+        super().setUp()
+        from erp.models import BrandProfile
+        row = BrandProfile.get()
+        row.nejum_credit = False
+        row.save()
 
     def test_no_document_carries_it(self):
         resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]),

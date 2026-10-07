@@ -104,8 +104,8 @@ def _s(name):
 
 
 def _issuer(book):
-    """Who the document is from: the book's brand name, else the brand
-    profile in settings — the same precedence the old invoice used."""
+    """Who the document is from: the book's brand name, else the short
+    BRAND_NAME — the same precedence the old invoice used."""
     name = ((getattr(book, "brand_name", "") or "").strip() if book else "")
     if not name:
         base = brand("BRAND_NAME") or "Nejum ERP"

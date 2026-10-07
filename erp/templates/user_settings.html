@@ -206,9 +206,8 @@
       <!-- ========== PREFERENCES ========== -->
       <!-- ========== COMPANY (brand profile) ========== -->
       {% comment %}What every customer document prints: the name it signs
-      with, the address block on the invoice, the tax numbers. Blank means
-      "use the built-in default", which the placeholder shows, so the page
-      never looks emptier than the documents read.{% endcomment %}
+      with, the address block on the invoice, the tax numbers. A field left
+      blank here prints blank.{% endcomment %}
       <section id="company-section" class="st-section">
         <div class="st-card">
           <div class="st-card-header">
@@ -235,6 +234,20 @@
                          placeholder="{{ brand_fields.display_name.effective }}"
                          {% if not is_brand_admin %}disabled{% endif %}>
                   <p class="st-help">{% trans "How the business signs its customer documents. A ledger book can override this for its own paperwork." %}</p>
+                </div>
+                <div class="st-form-group">
+                  <label class="st-form-label" for="id_short_name">{% trans "Short name" %}</label>
+                  <input type="text" name="short_name" id="id_short_name" class="st-input" maxlength="60"
+                         value="{{ brand_fields.short_name.value }}"
+                         {% if not is_brand_admin %}disabled{% endif %}>
+                  <p class="st-help">{% trans "The label on warehouse stickers, sheet headings and the app itself." %}</p>
+                </div>
+                <div class="st-form-group">
+                  <label class="st-form-label" for="id_code_prefix">{% trans "Code prefix" %}</label>
+                  <input type="text" name="code_prefix" id="id_code_prefix" class="st-input" maxlength="6"
+                         value="{{ brand_fields.code_prefix.value }}"
+                         {% if not is_brand_admin %}disabled{% endif %}>
+                  <p class="st-help">{% trans "Starts an automatic product or roll code when the supplier's name gives none." %}</p>
                 </div>
                 <div class="st-form-group">
                   <label class="st-form-label" for="id_legal_suffix">{% trans "Legal suffix" %}</label>

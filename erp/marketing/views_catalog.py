@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from django.conf import settings
+from erp.branding import brand
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -160,7 +160,7 @@ def _context(request=None):
         "page_title": "Catalog",
         "catalog_css": read_catalog_css(),
         "brand": {
-            "name": getattr(settings, "BRAND_NAME", "") or "Demfirat",
+            "name": brand("BRAND_NAME") or "Demfirat",
             "collection": "Karven Home Collection",
             "website": website,
             "qr_svg": _qr_svg(f"https://{website}"),

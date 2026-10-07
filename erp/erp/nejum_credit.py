@@ -6,9 +6,8 @@ what made it. It is a line of its own at the bottom of the page, never
 folded into the document's own footer: the house's name in the house's
 colour, Nejum in teal, small type.
 
-It is a brand-profile setting, edited on the Settings page (and defaulted
-by settings.NEJUM_CREDIT). A company that licenses Nejum under its own
-name can have it off, and then every document drops the line at once.
+It is a brand-profile setting, edited on the Settings page; switched off
+there, every document drops the line at once.
 Invoices and account statements never carry it: a software credit on a
 financial document reads as though someone else issued it.
 
@@ -45,7 +44,8 @@ def credit_runs(book=None):
     may trade under its own name — the name the top of the document
     signs with.
     """
-    if not brand_flag("NEJUM_CREDIT"):
+    # On unless the profile row says otherwise — the row's own default.
+    if not brand_flag("NEJUM_CREDIT", True):
         return []
     from accounting.services_accounts import brand_name_for
     try:

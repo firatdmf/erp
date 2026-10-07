@@ -37,9 +37,8 @@ class user_settings(View):
 
         from erp.branding import brand, brand_flag
         from operating.views_warehouse import _is_admin
-        # The company tab shows what documents currently print — the
-        # edited value or, where nothing was typed, the code default as
-        # a placeholder — so the page never looks emptier than reality.
+        # The company tab shows the brand profile row: what documents
+        # print.
         from erp.models import BrandProfile
         from erp.branding import TEXT_FIELDS
         row = BrandProfile.objects.first()
@@ -74,7 +73,7 @@ class user_settings(View):
             "user": request.user,
             "is_brand_admin": _is_admin(request.user),
             "brand_fields": {f["name"]: f for f in brand_fields},
-            "brand_nejum_credit": brand_flag("NEJUM_CREDIT"),
+            "brand_nejum_credit": brand_flag("NEJUM_CREDIT", True),
         })
 
 

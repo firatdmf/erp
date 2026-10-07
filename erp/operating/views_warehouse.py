@@ -128,8 +128,8 @@ def _get_usd_try_rate():
 # times over: it is the house's own code, and a second brand minting
 # DMF001 would be signing another company's goods.
 def _fallback_prefix():
-    from django.conf import settings as _s
-    return (getattr(_s, "BRAND_CODE_PREFIX", "DMF") or "DMF").upper()[:6]
+    from erp.branding import brand
+    return (brand("BRAND_CODE_PREFIX") or "DMF").upper()[:6]
 
 
 def _consonant_prefix(name):

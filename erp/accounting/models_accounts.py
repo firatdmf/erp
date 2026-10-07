@@ -988,7 +988,6 @@ class CurrentAccountSettings(models.Model):
         invoice type.
         """
         from django.utils import timezone
-        from django.conf import settings as _s
 
         with transaction.atomic():
             locked = CurrentAccountSettings.objects.select_for_update().get(pk=self.pk)
@@ -1000,13 +999,7 @@ class CurrentAccountSettings(models.Model):
                 locked.next_invoice_seq = 1
                 locked.invoice_seq_year = year
             seq = locked.next_invoice_seq
-            prefix = getattr(_s, "BRAND_INVOICE_PREFIX", "").strip()
-            if prefix:
-                # Karven-style: KRV20250000013 (no dashes, 7-digit seq)
-                number = f"{prefix}{year}{str(seq).zfill(7)}"
-            else:
-                # Legacy fallback so old fixtures / tests keep working.
-                number = f"{series}-{year}-{str(seq).zfill(6)}"
+            number = f"{series}-{year}-{str(seq).zfill(6)}"
             locked.next_invoice_seq += 1
             locked.save(update_fields=["next_invoice_seq", "invoice_seq_year"])
             return number
@@ -1163,9 +1156,9 @@ class Invoice(models.Model):
         """Who this invoice says it is from.
 
         Precedence: the per-invoice snapshot, then the issuing book's
-        brand name, then the brand profile in settings.
+        brand name, then the short BRAND_NAME.
 
-        BRAND_LEGAL_SUFFIX is appended only to that last, settings-level
+        The brand profile's legal suffix is appended only to that last
         fallback. A name typed on the invoice or on the book is taken as
         complete — otherwise a lockup like "DEMFIRAT® | Karven Home
         Collection" would print with a "SAN. TİC. LTD. ŞTİ." bolted onto
@@ -1192,8 +1185,8 @@ class Invoice(models.Model):
         once purchases were renamed, "Purchase-Purchase-2026-000072".
 
         Joining is kept as the fallback for rows whose number does NOT
-        embed the series: hand-typed numbers, and the brand-prefix shape
-        (BLN20260000013) used when BRAND_INVOICE_PREFIX is set."""
+        embed the series: hand-typed numbers, and the old brand-prefix
+        shape (BLN20260000013)."""
         num = (self.number or "").strip()
         series = (self.series or "").strip()
         if not num:

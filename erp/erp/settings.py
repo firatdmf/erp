@@ -248,59 +248,6 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "erp.urls"
 
-# ------------------------------------------------------------------
-# BRAND switch — in production, set ONE env var (BRAND=<tenant>) and
-# every brand-specific setting flips together. Individual env vars
-# (DB_SCHEMA, BRAND_NAME, …) still take precedence when set, so a
-# deployment can override any single value without losing the rest.
-# ------------------------------------------------------------------
-BRAND = config("BRAND", default="").strip().lower() or "demfirat"
-
-BRAND_DEFAULTS = {
-    "demfirat": {
-        "DB_SCHEMA": "public",
-        "BRAND_NAME": "Demfirat",
-        # How the brand signs the top of a customer-facing print — the
-        # full marketing lockup, where BRAND_NAME is the short internal
-        # label used in UI chrome. Blank → falls back to BRAND_NAME.
-        #
-        # This is only the DEFAULT: each ledger Book carries its own
-        # brand_name and overrides it, so two books of one deployment
-        # can trade under different names. See Book.effective_brand_name.
-        "BRAND_DISPLAY_NAME": "DEMFIRAT® | Karven Home Collection",
-        "BRAND_LEGAL_SUFFIX": "SAN. TİC. LTD. ŞTİ.",
-        "BRAND_ADDRESS": "Ergene 1. OSB Mahallesi, D100 Cad. no.38 Ergene / TEKİRDAĞ",
-        "BRAND_PHONE": "+90 (501) 057-1884",
-        "BRAND_FAX": "+90 (282) 675-1552",
-        "BRAND_EMAIL": "info@demfirat.com",
-        "BRAND_TAX_OFFICE": "",
-        "BRAND_TAX_NUMBER": "",
-        "BRAND_LOGO_URL": "",
-        # The house colour its documents print its name in.
-        "BRAND_COLOR": "#944F05",
-        # Empty → invoices use the legacy dashed format INV-YEAR-NNNNNN
-        # (see CurrentAccountSettings.next_invoice_number). Set a non-empty value
-        # to switch to the compact PREFIX+YEAR+SEQ shape.
-        "BRAND_INVOICE_PREFIX": "",
-        # Last resort for an auto-minted product SKU or roll barcode, used
-        # when the supplier's name yields no consonants to abbreviate — see
-        # operating.views_warehouse._consonant_prefix. It reads as the
-        # house's own code because that is whose goods they became.
-        "BRAND_CODE_PREFIX": "DMF",
-        # A small "Created with Nejum" credit at the foot of the
-        # documents a customer receives (see erp/nejum_credit.py). On for
-        # the house; a company that licenses Nejum under its own name can
-        # have it off.
-        "NEJUM_CREDIT": True,
-        "UI_THEME": "nejum",
-        "CLIENT_PUBLIC_URL": "http://localhost:3000",
-    },
-}
-_brand_cfg = BRAND_DEFAULTS.get(BRAND, BRAND_DEFAULTS["demfirat"])
-
-# Each setting: explicit env var wins, else the brand profile default.
-UI_THEME = config("UI_THEME", default=_brand_cfg["UI_THEME"]).strip()
-DB_SCHEMA = config("DB_SCHEMA", default=_brand_cfg["DB_SCHEMA"]).strip()
 # Which book new customer accounts and invoices post to when nothing
 # else says. An id, never a name: a book's name is edited from the UI
 # and a constant here cannot follow, so name-matching silently stopped
@@ -310,37 +257,15 @@ DB_SCHEMA = config("DB_SCHEMA", default=_brand_cfg["DB_SCHEMA"]).strip()
 # otherwise land on the lowest-id book.
 # See accounting.services_accounts.get_default_book().
 CURRENT_ACCOUNT_BOOK_ID = config("CURRENT_ACCOUNT_BOOK_ID", default="").strip()
-BRAND_NAME = config("BRAND_NAME", default=_brand_cfg["BRAND_NAME"]).strip()
-BRAND_DISPLAY_NAME = config(
-    "BRAND_DISPLAY_NAME", default=_brand_cfg.get("BRAND_DISPLAY_NAME", "")
-).strip() or BRAND_NAME
-BRAND_LEGAL_SUFFIX = config("BRAND_LEGAL_SUFFIX", default=_brand_cfg.get("BRAND_LEGAL_SUFFIX", "")).strip()
-BRAND_ADDRESS = config("BRAND_ADDRESS", default=_brand_cfg.get("BRAND_ADDRESS", "")).strip()
-BRAND_PHONE = config("BRAND_PHONE", default=_brand_cfg.get("BRAND_PHONE", "")).strip()
-BRAND_FAX = config("BRAND_FAX", default=_brand_cfg.get("BRAND_FAX", "")).strip()
-BRAND_EMAIL = config("BRAND_EMAIL", default=_brand_cfg.get("BRAND_EMAIL", "")).strip()
-BRAND_TAX_OFFICE = config("BRAND_TAX_OFFICE", default=_brand_cfg.get("BRAND_TAX_OFFICE", "")).strip()
-BRAND_TAX_NUMBER = config("BRAND_TAX_NUMBER", default=_brand_cfg.get("BRAND_TAX_NUMBER", "")).strip()
-BRAND_LOGO_URL = config("BRAND_LOGO_URL", default=_brand_cfg.get("BRAND_LOGO_URL", "")).strip()
-BRAND_COLOR = config("BRAND_COLOR", default=_brand_cfg.get("BRAND_COLOR", "#944F05")).strip()
-BRAND_INVOICE_PREFIX = config("BRAND_INVOICE_PREFIX", default=_brand_cfg.get("BRAND_INVOICE_PREFIX", "")).strip()
-BRAND_CODE_PREFIX = config(
-    "BRAND_CODE_PREFIX", default=_brand_cfg.get("BRAND_CODE_PREFIX", "DMF")
-).strip().upper() or "DMF"
-CLIENT_PUBLIC_URL = config("CLIENT_PUBLIC_URL", default=_brand_cfg["CLIENT_PUBLIC_URL"]).strip()
-NEJUM_CREDIT = config("NEJUM_CREDIT", default=_brand_cfg.get("NEJUM_CREDIT", True), cast=bool)
-print(f"[BRAND] Active brand: {BRAND} (schema={DB_SCHEMA})")
 
-_template_dirs = [os.path.join(BASE_DIR, "templates")]
-if UI_THEME:
-    _theme_dir = os.path.join(BASE_DIR, "templates", "themes", UI_THEME)
-    if os.path.isdir(_theme_dir):
-        _template_dirs.insert(0, _theme_dir)
+# Who the company is — its names, address, tax numbers, house colour,
+# code prefix — is not a setting: it is the BrandProfile row, edited on
+# the Settings page (see erp/branding.py).
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": _template_dirs,
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -352,7 +277,7 @@ TEMPLATES = [
                 "erp.context_processors.last_ten_entities",
                 "erp.context_processors.client_groups",
                 "erp.context_processors.all_members",
-                "erp.context_processors.ui_theme",
+                "erp.context_processors.brand_identity",
                 "erp.context_processors.role_flags",
                 # Currency codes for the top bar's mini converter.
                 "erp.context_processors.fx_mini",
@@ -399,17 +324,6 @@ DATABASES = {
         "OPTIONS": {
             # PostgreSQL specific optimizations
             "connect_timeout": 10,
-            # Per-brand schema isolation. Uses the already-resolved
-            # DB_SCHEMA constant (line ~258) which honours BRAND_DEFAULTS,
-            # so `BRAND=<tenant>` correctly scopes the connection to that
-            # brand's schema even when .env has no explicit DB_SCHEMA.
-            # NOTE: Re-calling config("DB_SCHEMA", default="public") here
-            # ignores BRAND_DEFAULTS and silently fell back to public —
-            # exactly the bug that hid a tenant's data behind the demfirat
-            # connection.
-            "options": (
-                f'-c search_path="{DB_SCHEMA}",public'
-            ),
         },
         "TEST": {
             "NAME": "nejum_test",  # test DB

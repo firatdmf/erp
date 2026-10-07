@@ -5,7 +5,7 @@ import json
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
@@ -471,10 +471,15 @@ class FallbackCodePrefixTest(TestCase):
         self.assertEqual(r.json()["prefix"], "DMF")
         self.assertTrue(r.json()["sku"].startswith("DMF"))
 
-    @override_settings(BRAND_CODE_PREFIX="XYZ")
     def test_another_brand_gets_its_own(self):
         """The point of reading it from the brand profile."""
+        from erp.branding import clear_cache
+        from erp.models import BrandProfile
         from operating.views_warehouse import _consonant_prefix, _fallback_prefix
+        row = BrandProfile.get()
+        row.code_prefix = "XYZ"
+        row.save()
+        self.addCleanup(clear_cache)
         self.assertEqual(_fallback_prefix(), "XYZ")
         self.assertEqual(_consonant_prefix("AEIOU"), "XYZ")
 

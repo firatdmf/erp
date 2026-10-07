@@ -114,6 +114,48 @@
     {% endif %}
   </div>
 
+  <!-- Capital contributions -->
+  {% comment %}
+    Every contribution, whether or not shares were issued against it. A
+    cash deposit also shows among the book's cash entries; one paid in
+    goods moves no cash, so without this card it would show nowhere but
+    the dropdown below.
+  {% endcomment %}
+  <div class="financial-overview-card">
+    <div class="card-header-title">
+      <i class="fas fa-hand-holding-dollar blue-icon"></i> Capital Contributions
+      <a class="cash-account-add" href="{% url 'accounting:add_equity_capital' book.pk %}">
+        <i class="fas fa-plus"></i> Add Capital
+      </a>
+    </div>
+    {% if capital_entries %}
+    <table class="assets-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Stakeholder</th>
+          <th>Paid in</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in capital_entries %}
+        <tr>
+          <td><a href="{% url 'accounting:equity_capital_detail' pk=book.pk source_pk=c.pk %}">{{ c.date_invested|date:"d.m.Y" }}</a></td>
+          <td>{{ c.member }}</td>
+          <td>{% if c.in_goods %}Goods · {{ c.warehouse.name }}{% else %}Cash · {{ c.cash_account.name }}{% endif %}</td>
+          <td class="num">{{ c.currency.symbol }}{{ c.amount|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="cash-accounts-empty">
+      No capital has been recorded for {{ book.name }} yet.
+    </div>
+    {% endif %}
+  </div>
+
   <!-- Record an issuance -->
   {% if rows %}
   <div class="financial-overview-card">

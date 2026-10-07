@@ -187,7 +187,7 @@ class BookShares(View):
             # have no contribution behind them at all.
             "capital_entries": (
                 EquityCapital.objects.filter(book=book)
-                .select_related("currency", "member__user")
+                .select_related("currency", "member__user", "cash_account", "warehouse")
                 .order_by("-date_invested", "-id")
             ),
         }

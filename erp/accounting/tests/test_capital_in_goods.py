@@ -127,3 +127,18 @@ class CapitalPaidInGoods(TestCase):
         response = self.add(paid_in="cash", warehouse="", amount="600.00")
         self.assertEqual(response.status_code, 400)
         self.assertFalse(EquityCapital.objects.exists())
+
+    def test_it_is_listed_on_the_shares_page_without_any_shares_issued(self):
+        # It moves no cash, so the cash entries never show it; this is the
+        # one list it is on.
+        self.add()
+        capital = EquityCapital.objects.get()
+        page = self.client.get(reverse("accounting:book_shares", kwargs={"pk": self.book.pk}))
+        self.assertContains(page, "Capital Contributions")
+        self.assertContains(page, self.url("equity_capital_detail", capital))
+        self.assertContains(page, "Goods · Almaty")
+
+    def test_a_cash_deposit_is_listed_there_too(self):
+        self.add(paid_in="cash", warehouse="", cash_account=self.cash.pk, amount="600.00")
+        page = self.client.get(reverse("accounting:book_shares", kwargs={"pk": self.book.pk}))
+        self.assertContains(page, "Cash · Cash")

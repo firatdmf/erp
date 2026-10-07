@@ -13,6 +13,7 @@ Run with:
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.templatetags.static import static
 from django.test import TestCase
 from django.urls import reverse
 
@@ -359,7 +360,9 @@ class TheCardOnTheCrmPage(CombinedStatementBase):
         card silently carrying the other card's ticks."""
         self._both()
         r = self.client.get(reverse("crm:contact_detail", args=[self.contact.pk]))
-        self.assertContains(r, "crm/js/record_detail.js")
+        # Through static(): a build with hashed file names serves it as
+        # record_detail.<hash>.js, and the plain name is not on the page.
+        self.assertContains(r, static("crm/js/record_detail.js"))
         # The page's script is the one the CRM record pages share.
         with open("crm/static/crm/js/record_detail.js", encoding="utf-8") as fh:
             script = fh.read()

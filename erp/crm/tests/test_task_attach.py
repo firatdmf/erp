@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.template.loader import get_template
+from django.templatetags.static import static
 from django.test import TestCase
 from django.urls import reverse
 
@@ -102,8 +103,10 @@ class RecordDetailAttachTaskTests(TestCase):
         for url_name, pk in (("crm:contact_detail", self.contact.pk),
                              ("crm:company_detail", self.company.pk)):
             body = self._page(url_name, pk)
-            self.assertIn("crm/css/record_detail.css", body)
-            self.assertIn("crm/js/record_detail.js", body)
+            # Through static(): a build with hashed file names serves
+            # them as record_detail.<hash>.css, not under the plain name.
+            self.assertIn(static("crm/css/record_detail.css"), body)
+            self.assertIn(static("crm/js/record_detail.js"), body)
             # No page-private styles or copies of the shared functions.
             self.assertNotIn("function confirmDelete", body)
             self.assertNotIn(".od-card {", body)

@@ -353,7 +353,9 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
         b = (base or "").strip()[:SKU_MAX_LENGTH]
         if not b:
             return None
-        if Product.objects.filter(sku__iexact=b).exists():
+        # `everywhere`: a SKU is one product's on the whole install, so
+        # this asks about every business's catalogue, not the reader's.
+        if Product.everywhere.filter(sku__iexact=b).exists():
             return None
         return b
 
@@ -400,7 +402,9 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
         Product.objects.select_for_update().filter(pk=product.id).first()
 
     # 2) Lock the variant row (concurrent scans of the same roll are safe).
-    existing = (ProductVariant.objects.select_for_update()
+    # `everywhere`, for the same reason: a variant SKU another business
+    # already uses must be met here as a conflict, not at the database.
+    existing = (ProductVariant.everywhere.select_for_update()
                 .filter(variant_sku=variant_sku).first())
     if existing and existing.product_id != product.id:
         raise CatalogSyncConflict(
@@ -473,7 +477,7 @@ def resync_warehouse_product(wp, base_override=None):
     old = wp.catalog_variant
     # Refuse if the (possibly new) sku already belongs to a DIFFERENT variant
     # — don't silently merge or destroy the existing link.
-    clash = (ProductVariant.objects.filter(variant_sku=sku)
+    clash = (ProductVariant.everywhere.filter(variant_sku=sku)
              .exclude(pk=old.pk if old else 0).first())
     if clash:
         return None, (_gettext("variant_sku '%(sku)s' already belongs to another variant "

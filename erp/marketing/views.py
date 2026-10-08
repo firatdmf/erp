@@ -2490,6 +2490,31 @@ def update_variant_image_order(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+@login_required
+def share_product(request, pk):
+    """Share a product with another business's catalogue, or stop — the
+    chips beside its name. For someone who reads both the product's own
+    directory and the other one, as crm.views.share_record is for a
+    customer: a product merely shared WITH its reader is not theirs to
+    pass on."""
+    from django.contrib import messages
+    from crm.models import Directory, visible_directory_ids
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    product = get_object_or_404(Product, pk=pk)
+    directory = get_object_or_404(Directory, pk=request.POST.get("directory") or 0)
+    ids = visible_directory_ids()
+    if ids is not None and not {product.directory_id, directory.pk} <= ids:
+        raise Http404("No such record.")
+    if request.POST.get("share") == "1":
+        product.share_with(directory)
+    else:
+        product.stop_sharing_with(directory)
+    return redirect(request.META.get("HTTP_REFERER")
+                    or reverse("marketing:product_detail", args=[product.pk]))
+
+
 def get_product_categories(request):
     # Only the groups switched on for the storefront. The website draws a
     # card for every group it is handed, so a group kept for stock that is

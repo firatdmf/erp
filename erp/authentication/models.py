@@ -35,6 +35,18 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "See cost and profit",
         "Can see cost of goods, gross profit and margin on orders and analytics.",
     ),
+    # A user type, not a single grant: whoever runs one business on an
+    # install that carries several. They manage the books they are
+    # assigned — its warehouses, orders and purchases, with their costs —
+    # and nothing that belongs to the install as a whole or to another
+    # business. One row instead of admin + purchase_confirm + view_profit
+    # handed out together, so what a branch's manager may do is decided in
+    # one place (erp.roles.is_middle_manager) and says what it is.
+    "middle_manager": (
+        "Middle manager",
+        "Manages the books they are assigned: warehouses, orders, purchases, "
+        "costs and profit. Nothing install-wide, nothing of another business.",
+    ),
 }
 
 # Convert dictionary to list of tuples for name choices

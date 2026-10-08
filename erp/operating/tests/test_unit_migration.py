@@ -47,8 +47,19 @@ class ProductTakesTheUnitItsStockSays(TransactionTestCase):
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
 
+    def _models(self, *names):
+        """The models as they stood right AFTER the migration under test.
+
+        Not today's: the database is at that point in history, and a
+        column added to a model since (a product's directory, say) is
+        not in it to be selected.
+        """
+        executor = MigrationExecutor(connection)
+        apps = executor.loader.project_state(AFTER).apps
+        return [apps.get_model(*name.split(".")) for name in names]
+
     def _product(self, sku):
-        from marketing.models import Product
+        (Product,) = self._models("marketing.Product")
         p = Product.objects.get(sku=sku)
         return p.unit, p.pack_type, p.unit_of_measurement
 
@@ -60,9 +71,11 @@ class ProductTakesTheUnitItsStockSays(TransactionTestCase):
         self.assertEqual(self._product("BD1"), ("piece", "box", "units"))
 
     def test_the_rows_read_the_same_answer_as_before(self):
-        from operating.models import WarehouseProduct
+        # A row reads its unit and pack off its main product now.
+        (WarehouseProduct,) = self._models("operating.WarehouseProduct")
         self.assertEqual(
-            {wp.sku: (wp.unit, wp.pack_type) for wp in WarehouseProduct.objects.all()},
+            {wp.sku: (wp.catalog_variant.product.unit, wp.catalog_variant.product.pack_type)
+             for wp in WarehouseProduct.objects.select_related("catalog_variant__product")},
             {"RN1.A": ("pack", "box"), "VN1.A": ("mt", "roll")})
 
     def test_new_rows_still_insert_without_naming_the_old_columns(self):

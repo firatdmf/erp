@@ -17,6 +17,7 @@ urlpatterns = [
     path("",views.Index.as_view(),name="index"),
     path("product_list/",views.ProductList.as_view(),name="product_list"),
     path("product_detail/<int:pk>/",views.ProductDetail.as_view(),name="product_detail"),
+    path("product/<int:pk>/share/", views.share_product, name="share_product"),
     path("product_create/",views.ProductCreate.as_view(),name="product_create"),
     path("product_edit/<int:pk>/",views.ProductEdit.as_view(),name="product_edit"),
     path("product/<int:pk>/variants/", views.product_variants, name="product_variants"),

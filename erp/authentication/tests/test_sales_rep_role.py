@@ -9,11 +9,14 @@ from django.test import Client, TestCase
 from django.utils import timezone
 
 from authentication.models import Member, Permission
+from crm.tests import works_in_a_book
 
 
 class SalesRepRoleTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user("ruzana_test", password="pw-for-test")
+        # She works in a book: its customers and products are hers to see.
+        works_in_a_book(self.user)
         member, _ = Member.objects.get_or_create(user=self.user)
         perm, _ = Permission.objects.get_or_create(name="sales_rep")
         member.permissions.add(perm)

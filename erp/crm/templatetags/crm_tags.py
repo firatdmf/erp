@@ -10,9 +10,12 @@ register = template.Library()
 
 
 @register.inclusion_tag("crm/components/_record_sharing.html", takes_context=True)
-def record_sharing(context, kind, record):
-    """The other customer lists `record` could be shared with, for
-    someone who reads both its own list and theirs."""
+def record_sharing(context, kind, record, separator=True):
+    """The other lists `record` could be shared with, for someone who
+    reads both its own list and theirs. `kind` is "company", "contact",
+    "supplier" — or "product", which is kept in a directory the same way
+    and shared through its own endpoint."""
+    from django.urls import reverse
     from crm.models import Directory, visible_directory_ids
 
     ids = visible_directory_ids()
@@ -27,6 +30,10 @@ def record_sharing(context, kind, record):
         "record": record,
         "home": record.directory,
         "choices": [(directory, directory.pk in shared) for directory in others],
+        "share_url": (reverse("marketing:share_product", args=[record.pk])
+                      if kind == "product"
+                      else reverse("crm:share_record", args=[kind, record.pk])),
+        "separator": separator,
         "csrf_token": context.get("csrf_token"),
     }
 

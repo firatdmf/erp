@@ -30,6 +30,7 @@ from django.urls import reverse
 
 from marketing.forms import _skus_with_negative_money
 from marketing.models import Product, ProductCategory, ProductVariant
+from crm.tests import works_in_a_book
 
 
 class TheFieldsRefuseANegativeValue(TestCase):
@@ -132,6 +133,8 @@ class TheProductFormChecksItsVariantsFirst(TestCase):
 class GroupRepricingRefusesAMarginThatGoesBelowZero(TestCase):
     def setUp(self):
         user = get_user_model().objects.create_user(username="pricer", password="x")
+        # Of a book, so its products are theirs to reprice.
+        works_in_a_book(user)
         self.client.force_login(user)
         self.group = ProductCategory.objects.create(name="Curtains", profit_margin=Decimal("40"))
         self.product = Product.objects.create(

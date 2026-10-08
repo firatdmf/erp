@@ -13812,3 +13812,6 @@ msgstr "Son alım"
 
 msgid "Remove this supplier from the variant? Its code and last price are forgotten."
 msgstr "Bu tedarikçi varyanttan kaldırılsın mı? Kodu ve son fiyatı silinir."
+
+msgid "This SKU is already in use."
+msgstr "Bu SKU zaten kullanılıyor."

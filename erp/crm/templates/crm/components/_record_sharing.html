@@ -9,6 +9,8 @@ nothing to choose between, and the row stays as it was.
 Usage:  {% record_sharing "company" company %}
 {% endcomment %}
 {% if choices %}
+{% comment %}`separator` is off where the control stands on its own
+rather than at the end of a row of facts.{% endcomment %}
 <style>
   .rec-share { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .rec-share form { display: inline; margin: 0; }
@@ -19,12 +21,12 @@ Usage:  {% record_sharing "company" company %}
   }
   .rec-share button.on { border-style: solid; opacity: 1; font-weight: 600; }
 </style>
-<span class="od-dot"></span>
+{% if separator %}<span class="od-dot"></span>{% endif %}
 <span class="rec-share">
   <span title="{% trans "The customer list this record is kept in" %}"><i class="fa fa-address-book"></i> {{ home.name }}</span>
   <span>· {% trans "Shared with" %}</span>
   {% for directory, shared in choices %}
-    <form method="post" action="{% url 'crm:share_record' kind record.pk %}">
+    <form method="post" action="{{ share_url }}">
       {% csrf_token %}
       <input type="hidden" name="directory" value="{{ directory.pk }}">
       <input type="hidden" name="share" value="{% if shared %}0{% else %}1{% endif %}">

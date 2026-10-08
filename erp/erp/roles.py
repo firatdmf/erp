@@ -48,6 +48,7 @@ from decimal import ROUND_CEILING, Decimal
 
 SALES_REP = "sales_rep"
 VIEW_PROFIT = "view_profit"
+MIDDLE_MANAGER = "middle_manager"
 
 
 # Paths any signed-in member may reach whatever their role: the shell
@@ -319,6 +320,22 @@ def is_sales_rep(actor):
     return _has_permission(member, SALES_REP)
 
 
+def is_middle_manager(actor):
+    """True for a Member of the Middle manager type: the person who runs
+    one business on an install carrying several.
+
+    It stands for three grants at once — managing (what Member 'admin'
+    means: erp.ownership.is_admin), confirming purchases, and seeing cost
+    and profit — and each of those is bounded by the books the member is
+    assigned, because every page it opens is. What it never is, is
+    erp.ownership.is_install_admin.
+    """
+    member, _user = _member_and_user(actor)
+    if member is None:
+        return False
+    return _has_permission(member, MIDDLE_MANAGER)
+
+
 def may_see_profit(actor):
     """Whether this member may read what an order cost us and what we
     made on it: COGS, gross profit, margin.
@@ -335,7 +352,7 @@ def may_see_profit(actor):
         return False
     if getattr(user, "is_superuser", False):
         return True
-    return _has_permission(member, VIEW_PROFIT)
+    return _has_permission(member, VIEW_PROFIT) or _has_permission(member, MIDDLE_MANAGER)
 
 
 def may_read(path):

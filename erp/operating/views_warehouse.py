@@ -54,7 +54,9 @@ def _is_admin(user):
     if user.is_superuser or user.is_staff:
         return True
     try:
-        return user.member.permissions.filter(name="admin").exists()
+        # A Middle manager manages too — see erp.roles.is_middle_manager.
+        return user.member.permissions.filter(
+            name__in=("admin", "middle_manager")).exists()
     except Exception:
         return False
 

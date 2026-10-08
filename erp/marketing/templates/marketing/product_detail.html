@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load l10n %}
 {% load static %}
+{% load crm_tags %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'erp/css/product_detail.css' %}?v=2.0" />
@@ -36,6 +37,7 @@
         {% if product.featured %}
         <span class="badge badge-featured"><i class="fa fa-star"></i> {% trans "Featured" %}</span>
         {% endif %}
+        {% record_sharing "product" product False %}
       </div>
     </div>
     <div class="header-right">

@@ -15,6 +15,49 @@ from . import units
 from .attributes import normalize_attribute_name, normalize_attribute_value
 
 
+def _directory_manager():
+    # crm.models imports nothing of marketing's, so this is safe at import
+    # time; kept in a function so the dependency reads as deliberate.
+    from crm.models import DirectoryManager
+    return DirectoryManager()
+
+
+def _reachable_products(directory_ids):
+    """The products someone reading `directory_ids` has, as a subquery —
+    for the models that hang off a product and are walled by it."""
+    from crm.models import reachable_from
+    return Product.everywhere.filter(reachable_from(Product, directory_ids))
+
+
+class ProductPartManager(models.Manager):
+    """Default manager for what belongs to a product — a variant, a file.
+
+    A product is kept in one directory (see Product.directory) and its
+    parts go where it goes: an id typed into a variant's or an image's
+    URL finds nothing unless the product behind it is one the reader may
+    open. `paths` are the foreign keys that lead to the product; a row
+    that names none is nobody's and passes.
+    """
+
+    def __init__(self, *paths):
+        super().__init__()
+        self.paths = paths
+
+    def get_queryset(self):
+        from crm.models import visible_directory_ids
+        qs = super().get_queryset()
+        ids = visible_directory_ids()
+        if ids is None:
+            return qs
+        mine = _reachable_products(ids)
+        reach = models.Q()
+        nobody = models.Q()
+        for path in self.paths:
+            reach |= models.Q(**{f"{path}__in": mine})
+            nobody &= models.Q(**{f"{path}__isnull": True})
+        return qs.filter(reach | nobody)
+
+
 
 # Create your functions here.
 # --------------------------------------------------------------------------------------------
@@ -228,6 +271,25 @@ class Product(models.Model):
     ]
     WEIGHT_UNIT_TYPE_CHOICES = [("lb", "lb"), ("oz", "oz"), ("kg", "kg"), ("g", "g")]
 
+    # Whose product this is. An install carries several businesses, and
+    # each keeps its own catalogue the way it keeps its own customers: a
+    # product is in one directory (crm.Directory), every book reads one,
+    # and people see the products of the books they are assigned — in the
+    # catalogue, in the order form's search, and by id. Two books of one
+    # business share a directory and so a catalogue. A superuser, and the
+    # storefront (which nobody is signed in to), see all of them.
+    #
+    # Not editable, so no form offers it: a product is filed by where its
+    # author works (save() below), and shown to another business only by
+    # sharing it (share_with).
+    directory = models.ForeignKey(
+        "crm.Directory", on_delete=models.PROTECT, related_name="products",
+        editable=False,
+    )
+    shared_with = models.ManyToManyField(
+        "crm.Directory", blank=True, related_name="shared_products", editable=False,
+    )
+
     title = models.CharField(max_length=255, null=False, blank=False, db_index=True)
 
     # This can be implement and used as html later.
@@ -392,6 +454,15 @@ class Product(models.Model):
         related_name="primary_for_products",
     )
 
+    # The default manager hands back only what the person behind the
+    # request may read (crm.models.DirectoryManager) — on the manager, as
+    # for customers, because products are read from over a hundred places
+    # and a wall each has to remember is a wall one will forget.
+    # `everywhere` is the unwalled one: the SKU check, the catalogue
+    # sync's "does this code exist at all", and data fixes.
+    objects = _directory_manager()
+    everywhere = models.Manager()
+
     class Meta:
         constraints = [
             models.CheckConstraint(
@@ -411,11 +482,44 @@ class Product(models.Model):
             return self.title
 
     def save(self, *args, **kwargs):
+        if self.directory_id is None:
+            from crm.models import working_directory
+            self.directory = working_directory()
         self.unit_of_measurement = units.UNIT_TO_STOREFRONT.get(self.unit, "units")
         update_fields = kwargs.get("update_fields")
         if update_fields is not None and "unit" in update_fields:
             kwargs["update_fields"] = {*update_fields, "unit_of_measurement"}
         super().save(*args, **kwargs)
+
+    def clean_fields(self, exclude=None):
+        # Settled before the fields are checked: a product validated
+        # before its first save has no directory yet.
+        if self.directory_id is None:
+            from crm.models import working_directory
+            self.directory = working_directory()
+        super().clean_fields(exclude=exclude)
+
+    def validate_unique(self, exclude=None):
+        super().validate_unique(exclude=exclude)
+        # A SKU is one product's on the whole install — the storefront
+        # is one catalogue — but the stock check above only looks where
+        # its reader can see. Without this, a code already used by
+        # another business passes validation and fails in the database.
+        sku = (self.sku or "").strip()
+        if sku and (exclude is None or "sku" not in exclude):
+            taken = Product.everywhere.filter(sku=sku)
+            if self.pk:
+                taken = taken.exclude(pk=self.pk)
+            if taken.exists():
+                raise ValidationError({"sku": _lz("This SKU is already in use.")})
+
+    def share_with(self, directory):
+        """Let `directory`'s people sell this product as well."""
+        if directory.pk != self.directory_id:
+            self.shared_with.add(directory)
+
+    def stop_sharing_with(self, directory):
+        self.shared_with.remove(directory)
 
     def set_unit(self, unit=None, pack_type=None):
         """Change what the product is counted in and/or how it is packed,
@@ -526,6 +630,22 @@ class Product(models.Model):
 
 
 class ProductVariant(models.Model):
+    # Walled by its product — see ProductPartManager.
+    objects = ProductPartManager("product")
+    everywhere = models.Manager()
+
+    def validate_unique(self, exclude=None):
+        super().validate_unique(exclude=exclude)
+        # As Product.validate_unique: a variant SKU is unique across the
+        # install, and the stock check only looks where its reader sees.
+        sku = (self.variant_sku or "").strip()
+        if sku and (exclude is None or "variant_sku" not in exclude):
+            taken = ProductVariant.everywhere.filter(variant_sku=sku)
+            if self.pk:
+                taken = taken.exclude(pk=self.pk)
+            if taken.exists():
+                raise ValidationError({"variant_sku": _lz("This SKU is already in use.")})
+
     class Meta:
         verbose_name_plural = "Product Variants"
         constraints = [
@@ -1062,6 +1182,11 @@ class ProductFile(models.Model):
         null=True,
         blank=True,
     )
+
+    # Walled by the product it pictures, reached directly or through a
+    # variant — see ProductPartManager.
+    objects = ProductPartManager("product", "product_variant__product")
+    everywhere = models.Manager()
 
     is_primary = models.BooleanField(default=False)
     sequence = models.PositiveIntegerField(default=0)

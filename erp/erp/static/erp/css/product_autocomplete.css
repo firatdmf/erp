@@ -215,7 +215,7 @@
 @media (max-width: 560px) {
   .product_autocomplete_list ul li.pa-row.pa-row {
     gap: 10px;
-    padding: 12px 10px;
+    padding: 9px 10px;
     border-radius: 0;
     border-bottom: 1px solid #E8EDF2;
   }
@@ -225,9 +225,9 @@
   .product_autocomplete_list .pa-main {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: 5px;
     min-width: 0;
-    font-size: 14px;
+    font-size: 12.5px;
     white-space: nowrap;
     word-break: normal;
   }
@@ -246,12 +246,12 @@
   .product_autocomplete_list .pa-main .pa-sku {
     flex: none;
     margin-left: 0;
-    font-size: 11px;
+    font-size: 10.5px;
   }
   .product_autocomplete_list .pa-meta .pa-stock {
     display: none;
   }
   .product_autocomplete_list .pa-meta .pa-price {
-    font-size: 14px;
+    font-size: 12.5px;
   }
 }

@@ -279,6 +279,8 @@
     details.eq-fold > summary > span:first-child::after { content: " ▸"; color: var(--gray-400, #A0A8B0); font-size: .8em; }
     details.eq-fold[open] > summary > span:first-child::after { content: " ▾"; }
     .eq-line.eq-sub { padding-left: 1.6em; font-size: .92em; color: var(--gray-600, #4B5563); }
+    /* What the tills hold, under Cash and Bank: detail, not another total. */
+    .eq-line.eq-cur, .eq-line.eq-cur .v { color: var(--gray-400, #A0A8B0); font-weight: 400; }
     a.eq-acct:hover { text-decoration: underline; }
     .eq-checks { margin-top: 12px; border-top: 1px solid #EEF1F5; padding-top: 10px; display: grid; gap: 6px; }
     .eq-checks-title { font: 700 11px var(--font-sans, sans-serif); letter-spacing: .06em; text-transform: uppercase; color: var(--gray-500, #6B7280); }
@@ -322,7 +324,7 @@
         {% for l in eq_assets_lines %}
         <div class="eq-line"><span><a class="eq-acct" href="{% url 'accounts:report_ledger_account' book.pk l.code %}">{{ l.label }}</a></span><span class="v">{{ l.amount|format_money }}</span></div>
         {% for c in l.parts %}
-        <div class="eq-line eq-sub"><span>{{ c.native|format_money }} {{ c.currency }}</span><span class="v">{{ c.amount|format_money }}</span></div>
+        <div class="eq-line eq-sub eq-cur"><span>{{ c.native|format_money }} {{ c.currency }}</span><span class="v">{{ c.amount|format_money }}</span></div>
         {% endfor %}
         {% empty %}
         <div class="eq-line"><span>—</span><span class="v">{{ 0|format_money }}</span></div>

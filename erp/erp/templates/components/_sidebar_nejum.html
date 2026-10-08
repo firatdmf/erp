@@ -32,7 +32,6 @@
        {% if my_books|length > 1 %}aria-haspopup="true" aria-expanded="false"{% endif %}>
       <i data-lucide="book-open"></i>
       <span class="nj-book-name">{{ current_book.name }}</span>
-      {% if my_books|length > 1 %}<i data-lucide="chevron-right" class="nj-book-caret"></i>{% endif %}
     </a>
     {% if my_books|length > 1 %}
     <div class="nj-book-menu" hidden>

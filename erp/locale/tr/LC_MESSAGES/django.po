@@ -13758,3 +13758,12 @@ msgstr "Stoktan alınacak miktar"
 #, python-format
 msgid "Only %(n)s are free in stock — the line takes those."
 msgstr "Stokta yalnızca %(n)s adet boşta — satır bunları alır."
+
+msgid "One fewer"
+msgstr "Bir azalt"
+
+msgid "One more"
+msgstr "Bir artır"
+
+msgid "From stock"
+msgstr "Stoktan"

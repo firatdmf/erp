@@ -532,7 +532,11 @@ class BookDetail(generic.DetailView):
         context["cash_accounts"] = (
             CashAccount.objects.filter(book=book)
             .select_related("currency")
-            .order_by("currency__code", "name")
+            # The book's own currency leads; the rest follow by code.
+            .order_by(
+                Case(When(currency=book.effective_base_currency, then=0), default=1),
+                "currency__code", "name",
+            )
         )
 
         # Who owes the book money and who it owes, read off the current account cards
@@ -2760,7 +2764,11 @@ class MakeCurrencyExchange(generic.edit.FormView):
         context["cash_accounts"] = (
             CashAccount.objects.filter(book=book)
             .select_related("currency")
-            .order_by("currency__code", "name")
+            # The book's own currency leads; the rest follow by code.
+            .order_by(
+                Case(When(currency=book.effective_base_currency, then=0), default=1),
+                "currency__code", "name",
+            )
         )
         return context
 

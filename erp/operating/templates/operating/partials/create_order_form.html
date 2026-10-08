@@ -2528,7 +2528,9 @@
       function open(c) { return navigator.mediaDevices.getUserMedia({ video: c, audio: false }); }
       return open({ facingMode: { ideal: 'environment' }, width: W, height: H }).then(function (stream) {
         if (!navigator.mediaDevices.enumerateDevices) return applyFocus(stream);
-        return navigator.mediaDevices.enumerateDevices().then(function (devices) {
+        // Not being able to list the lenses is no reason to give up the
+        // stream already in hand — it is read as "one camera" instead.
+        return navigator.mediaDevices.enumerateDevices().catch(function () { return []; }).then(function (devices) {
           var cams = devices.filter(function (d) { return d.kind === 'videoinput'; });
           if (cams.length < 2) return applyFocus(stream);
           var rear = cams.filter(function (d) { return /back|rear|environment|arka|tras|rück/i.test(d.label || ''); });
@@ -2540,10 +2542,17 @@
           try { curId = (stream.getVideoTracks()[0].getSettings() || {}).deviceId || ''; } catch (e) {}
           if (pick && pick.deviceId && pick.deviceId !== curId) {
             stream.getTracks().forEach(function (t) { t.stop(); });
-            return open({ deviceId: { exact: pick.deviceId }, width: W, height: H }).then(applyFocus);
+            // The first stream is stopped by now, so a lens that will not
+            // open cannot fall back to it: that handed the popup a dead
+            // stream and a black picture. Ask plainly for a rear camera
+            // again — the request the simple scan page makes, and the
+            // one a phone that refuses the rest still answers.
+            return open({ deviceId: { exact: pick.deviceId }, width: W, height: H })
+              .catch(function () { return open({ facingMode: { ideal: 'environment' } }); })
+              .then(applyFocus);
           }
           return applyFocus(stream);
-        }).catch(function () { return applyFocus(stream); });
+        });
       });
     }
     function roi() { if (!roiCanvas) { roiCanvas = document.createElement('canvas'); roiCanvas.getContext('2d', { willReadFrequently: true }); } return roiCanvas; }

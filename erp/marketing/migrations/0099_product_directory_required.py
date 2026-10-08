@@ -4,10 +4,10 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
 
-    # Apart from 0097 on purpose: Postgres will not alter a table the same
+    # Apart from 0098 on purpose: Postgres will not alter a table the same
     # transaction has just rewritten rows of.
     dependencies = [
-        ('marketing', '0097_product_directory'),
+        ('marketing', '0098_file_products_with_their_business'),
     ]
 
     operations = [

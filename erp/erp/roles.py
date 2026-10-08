@@ -381,12 +381,12 @@ def may_read(path):
 # role sees a sales price derived from it instead: the cost plus the
 # house markup, rounded UP to the next 0.05 so it is a price a person
 # would say out loud and never lands below cost-plus-markup.
-SALES_REP_MARKUP = Decimal("1.10")
+SALES_REP_MARKUP = Decimal("1.05")
 SALES_REP_PRICE_STEP = Decimal("0.05")
 
 
 def sales_rep_price(cost):
-    """`cost` marked up for a sales rep: cost × 1.10, up to the next 0.05.
+    """`cost` marked up for a sales rep: cost × 1.05, up to the next 0.05.
 
     None for None, so a missing cost stays missing rather than becoming a
     price of zero. A cost that already lands on a step stays put.

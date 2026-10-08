@@ -20,7 +20,7 @@ from authentication.models import Permission
 from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
 
 # 40 m at 7.3319: worth 293.276, and priced for a rep at
-# 7.3319 × 1.10 = 8.065… → 8.10.
+# 7.3319 × 1.05 = 7.698… → 7.70.
 UNIT_COST = Decimal("7.3319")
 METRES = Decimal("40")
 PURCHASE_PRICE = Decimal("6.1234")
@@ -139,7 +139,7 @@ class WarehouseCostIsHiddenFromSalesRep(TestCase):
                 self.assertNotIn("Net worth (USD)", html)
                 self.assertLacks(html, "7.33")
                 self.assertLacks(html, "293.2")
-                self.assertHas(html, "8.10")
+                self.assertHas(html, "7.70")
 
     def test_htmx_rows_match_the_rep_header(self):
         self._make_rep()
@@ -149,7 +149,7 @@ class WarehouseCostIsHiddenFromSalesRep(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertLacks(html, "7.33")
         self.assertLacks(html, "293.2")
-        self.assertHas(html, "8.10")
+        self.assertHas(html, "7.70")
         # One cell fewer than staff: no Total.
         self.assertNotIn("data-label=\"Total\"", html.split("wh-vrow", 1)[1].split("</tr>")[0])
 
@@ -159,13 +159,13 @@ class WarehouseCostIsHiddenFromSalesRep(TestCase):
         html = self._get(self.group_url + "?base=K24593")
         self.assertLacks(html, "7.33")
         self.assertLacks(html, "293.2")
-        self.assertHas(html, "8.10")
+        self.assertHas(html, "7.70")
 
     def test_roll_rows_show_a_rep_price(self):
         self._make_rep()
         html = self._get(self.rolls_url)
         self.assertLacks(html, "7.33")
-        self.assertHas(html, "8.10")
+        self.assertHas(html, "7.70")
 
     def test_product_detail_shows_a_rep_price_only(self):
         self._make_rep()
@@ -177,7 +177,7 @@ class WarehouseCostIsHiddenFromSalesRep(TestCase):
         self.assertLacks(html, "6.12")
         self.assertLacks(html, "7.33")
         self.assertLacks(html, "293.2")
-        self.assertHas(html, "8.10")
+        self.assertHas(html, "7.70")
 
     def test_excel_gives_a_rep_price_and_no_total(self):
         self._make_rep()
@@ -186,7 +186,7 @@ class WarehouseCostIsHiddenFromSalesRep(TestCase):
         self.assertNotIn("Total (USD)", values)
         self.assertIn("Unit price", values)
         self.assertFalse(any("7.33" in v or "293" in v for v in values), values)
-        self.assertTrue(any("8.10" in v for v in values), values)
+        self.assertTrue(any("7.70" in v for v in values), values)
 
     def _excel_values(self):
         from openpyxl import load_workbook

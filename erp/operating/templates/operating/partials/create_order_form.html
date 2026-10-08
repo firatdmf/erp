@@ -38,9 +38,10 @@
    height and let the outer sidebar scrollbar handle long lists. */
 .co-products-list{display:flex;flex-direction:column;gap:0}
 /* A line's note is shut behind this tick box until it is wanted. */
-.co-note-toggle{display:inline-flex;align-items:center;gap:7px;margin-top:10px;cursor:pointer;
-  font-size:12px;font-weight:600;color:var(--text-secondary);user-select:none;}
-.co-note-toggle input{width:16px;height:16px;margin:0;accent-color:#0F766E;cursor:pointer;}
+.co-note-toggle{display:inline-flex;align-items:center;gap:5px;margin-top:8px;cursor:pointer;
+  font-size:11px;font-weight:500;color:#94A3B8;user-select:none;}
+.co-note-toggle:hover{color:var(--text-secondary);}
+.co-note-toggle input{width:12px;height:12px;margin:0;accent-color:#94A3B8;cursor:pointer;}
 .co-note-input{display:block;width:100%;margin-top:6px;}
 /* Room between the scanner box and the first product card, which
    otherwise sit flush against each other. */
@@ -159,8 +160,15 @@
 .co-roll-find button:hover{color:#0F766E;}
 /* A product sold by count has no rolls to pick, so its card is one row:
    quantity, price, total. What is in stock is a hint on the label. */
-.co-qty-hint{font-weight:600;font-size:10.5px;color:#64748B;margin-left:5px;white-space:nowrap;}
-.co-qty-hint.short{color:#B45309;}
+/* What is in stock and what it cost, under the product's code: one
+   place on every counted card, whatever its fields are doing. */
+.co-stockline{display:block;margin-top:3px;font-size:11px;font-weight:600;color:#64748B;}
+.co-stockline.short{color:#B45309;}
+.co-stockline .sep{color:#CBD5E1;margin:0 5px;}
+.co-stockline .cost{font-weight:500;}
+/* The price field while it still holds the purchase cost nobody has
+   confirmed as a price. */
+.form-input.co-price-is-cost{border-color:#F59E0B;background:#FFFBEB;}
 /* Inputs line up along the bottom, so a label that wraps onto a second
    line (the stock hint, on a narrow card) does not push its field down
    past its neighbour's. */
@@ -180,9 +188,9 @@
     justify-content:space-between;margin:0;padding-top:8px;border-top:1px dashed var(--border-color);}
   .co-row-counted>.form-group:last-child label{margin:0;}
   .co-row-counted .co-item-total{font-size:17px;padding-top:0;}
-  .co-qty-hint{display:block;margin:2px 0 0;white-space:normal;}
-  .co-note-toggle{font-size:14px;min-height:36px;}
-  .co-note-toggle input{width:20px;height:20px;}
+  .co-stockline{font-size:12px;}
+  .co-note-toggle{font-size:12.5px;min-height:32px;}
+  .co-note-toggle input{width:15px;height:15px;}
 }
 
 /* ── Barcode scanner popup ───────────────────────────────────────
@@ -1765,12 +1773,12 @@
       const justAdded = (newestIdx && item.index === newestIdx) ? ' co-just-added' : '';
       return `<div class="co-product-card${justAdded}">
         <div class="co-product-head">
-          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${coCardBooksHtml(item, bookRun)}</div>
+          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${item.counted ? coStockLineHtml(item) : ''}${coCardBooksHtml(item, bookRun)}</div>
           <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
         </div>
         <div class="co-row${item.counted ? ' co-row-counted' : ''}">
           ${item.counted ? coCountedQtyHtml(item, i) : ''}
-          <div class="form-group"><label>{% trans "Unit Price" %}${item.is_cost_price ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
+          <div class="form-group"><label>{% trans "Unit Price" %}${(item.is_cost_price && !item.counted) ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input${(item.is_cost_price && item.counted) ? ' co-price-is-cost' : ''}" id="co-pricefield-${i}" value="${item.price}" min="0" step="0.01"${(item.is_cost_price && item.counted) ? ` title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}"` : ''} onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${fmtNum(item.quantity*item.price)}</div></div>
         </div>
         ${item.counted ? '' : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i)}
@@ -1982,25 +1990,47 @@
     return free;
   }
 
+  // Under a counted product's code: how many are free, and what they
+  // cost. Always there and always in the same place, so it is read at a
+  // glance and never moves with the fields below it.
+  function coStockLineHtml(item) {
+    if (item.rollsLoading) return '<span class="co-stockline">…</span>';
+    var free = coCountedFree(item);
+    var unit = esc(item.rollUnit || '');
+    var held = (item.existingRolls || []).reduce(function (s, r) { return s + (parseFloat(r.quantity) || 0); }, 0);
+    var text = free > 0
+      ? fmtNum(free) + ' ' + unit + ' {% trans "in stock" %}'
+      : '{% filter escapejs %}{% trans "none in stock" %}{% endfilter %}';
+    if (held > 0) text += ' · ' + fmtNum(held) + ' {% filter escapejs %}{% trans "already packed" %}{% endfilter %}';
+    // The cost of what is on the shelf — a range where batches differ.
+    // A sales rep is sent a price there instead and never the cost.
+    var costs = (item.availableRolls || []).map(function (r) {
+      return r.unit_cost != null ? r.unit_cost : r.unit_price;
+    }).filter(function (v) { return v != null; });
+    var costHtml = '';
+    if (costs.length) {
+      var lo = Math.min.apply(null, costs), hi = Math.max.apply(null, costs);
+      var sym = esc(item.costSymbol || '');
+      costHtml = '<span class="sep">·</span><span class="cost">' +
+        (item.rollCostIsPrice ? '{% trans "Price" %}' : '{% trans "Purchase cost" %}') + ' ' +
+        sym + fmtNum(lo) + (hi - lo > 0.005 ? '–' + sym + fmtNum(hi) : '') + '</span>';
+    }
+    var taken = coPickedTotal(item);
+    return '<span class="co-stockline' + ((free <= 0 || taken >= free) ? ' short' : '') + '">' + text + costHtml + '</span>';
+  }
+
   // The quantity field of a product sold by count — the first field of
   // its card's one row. There is nothing else to choose: the pieces are
   // alike and come off the oldest stock, so the card shows no list.
   function coCountedQtyHtml(item, i) {
     var free = coCountedFree(item);
-    var unit = esc(item.rollUnit || '');
-    var held = (item.existingRolls || []).reduce(function (s, r) { return s + (parseFloat(r.quantity) || 0); }, 0);
     // Nothing on the shelf: the quantity is still wanted, it is just not
     // held against any stock (what the outsourced box is for cloth).
     var value = free > 0 ? coPickedTotal(item) : (parseFloat(item.manualMeters) || 0);
-    // Until the stock list is in, the card does not know what is free:
-    // it says nothing rather than "none", and the field waits.
+    // The field waits for the stock list; what is free is said under the
+    // product's code (coStockLineHtml), not here.
     var loading = !!item.rollsLoading;
-    var hint = loading ? '…' : (free > 0
-      ? fmtNum(free) + ' ' + unit + ' {% trans "in stock" %}'
-      : '{% filter escapejs %}{% trans "none in stock" %}{% endfilter %}');
-    if (held > 0) hint += ' · ' + fmtNum(held) + ' {% filter escapejs %}{% trans "already packed" %}{% endfilter %}';
-    return '<div class="form-group"><label>{% trans "Quantity" %}' +
-        '<span class="co-qty-hint' + ((!loading && (free <= 0 || value >= free)) ? ' short' : '') + '">' + hint + '</span></label>' +
+    return '<div class="form-group"><label>{% trans "Quantity" %}</label>' +
       '<input type="number" class="form-input" id="co-qty-' + i + '" inputmode="numeric" min="0" step="1" ' +
         'value="' + (value || '') + '" placeholder="0" onfocus="this.select()" ' + (loading ? 'disabled ' : '') +
         'onchange="coCountedQty(' + i + ',this.value)" ' +
@@ -2896,6 +2926,8 @@
       orderItems[i].is_cost_price = false;
       const note = document.getElementById('co-costnote-'+i);
       if (note) note.remove();
+      const field = document.getElementById('co-pricefield-'+i);
+      if (field) { field.classList.remove('co-price-is-cost'); field.removeAttribute('title'); }
     }
     if (f==='quantity'||f==='price') {
       const t = document.getElementById('co-itotal-'+i);

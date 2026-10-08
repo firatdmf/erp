@@ -149,23 +149,10 @@
 .co-roll-find:focus-within{border-bottom-color:#147F74;color:#147F74;}
 .co-roll-find button{background:none;border:0;color:#64748B;cursor:pointer;padding:5px;font-size:12.5px;line-height:1;}
 .co-roll-find button:hover{color:#0F766E;}
-/* The quantity of a product sold by count: the one thing its card asks
-   for, so it is the largest thing on it. base.css pads every button, so
-   the steppers set their own. */
-.co-take{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;padding:10px 12px;
-  background:#fff;border:1.5px solid #147F74;border-radius:10px;}
-.co-take-label{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#0F766E;}
-.co-take-step{display:flex;align-items:center;border:1px solid #CBD5E1;border-radius:8px;overflow:hidden;background:#fff;}
-.co-take-step button{width:36px;height:40px;padding:0;border:0;background:#F1F5F9;color:#0F172A;
-  font-size:18px;font-weight:700;line-height:1;cursor:pointer;}
-.co-take-step button:hover{background:#D1FAE5;color:#0F766E;}
-.co-take-step input{width:78px;height:40px;padding:0 4px;border:0;border-left:1px solid #CBD5E1;border-right:1px solid #CBD5E1;
-  outline:none;text-align:center;font-size:19px;font-weight:800;color:#0F172A;background:#fff;-moz-appearance:textfield;}
-.co-take-step input::-webkit-outer-spin-button,.co-take-step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-.co-take-step input:focus{background:#ECFDF5;}
-.co-take-unit{font-size:14px;font-weight:700;color:#334155;}
-.co-take-free{margin-left:auto;font-size:12px;font-weight:600;color:#64748B;white-space:nowrap;}
-.co-take-free.short{color:#B45309;}
+/* A product sold by count has no rolls to pick, so its card is one row:
+   quantity, price, total. What is in stock is a hint on the label. */
+.co-qty-hint{font-weight:600;font-size:10.5px;color:#64748B;margin-left:5px;white-space:nowrap;}
+.co-qty-hint.short{color:#B45309;}
 
 /* ── Barcode scanner popup ───────────────────────────────────────
    Same modal the warehouse page's "Find by barcode" uses, so the two
@@ -1744,11 +1731,11 @@
           <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
         </div>
         <div class="co-row">
+          ${item.counted ? coCountedQtyHtml(item, i) : ''}
           <div class="form-group"><label>{% trans "Unit Price" %}${item.is_cost_price ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${fmtNum(item.quantity*item.price)}</div></div>
         </div>
-        ${rollSectionHtml(item, i)}
-        ${manualEntrySectionHtml(item, i)}
+        ${item.counted ? '' : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i)}
         <div class="form-group" style="margin-top:8px;margin-bottom:0"><label>{% trans "Description" %}</label><input type="text" class="form-input" value="${esc(item.description)}" placeholder="Note..." onchange="coUpd(${i},'description',this.value)"></div>
       </div>`;
     }).join('');
@@ -1787,10 +1774,7 @@
           : '<i class="far fa-circle" style="color:#CBD5E1;font-size:17px;flex-shrink:0;"></i>');
     var bg = locked ? '#F1F5F9' : (picked ? '#ECFDF5' : '#fff');
     var border = picked ? '#A7F3D0' : '#E2E8EE';
-    // Goods sold by count are taken by quantity (coTakeQuantity), oldest
-    // first: their batches are alike, so a row is shown, not chosen.
-    var counted = !!(orderItems[i] || {}).counted;
-    var toggleAttrs = (locked || counted) ? '' :
+    var toggleAttrs = locked ? '' :
       (' data-roll-toggle="1" data-i="' + i + '" data-barcode="' + escAttr(r.barcode) + '" data-state="' + state + '"' +
        (ri != null ? ' data-ri="' + ri + '"' : ''));
     var unit = esc((orderItems[i] || {}).rollUnit || 'm');
@@ -1810,7 +1794,7 @@
       meterHtml += '<span title="' + (costItem.rollCostIsPrice ? '{% trans "Price" %}' : '{% trans "Unit cost" %}') + '" style="color:#94A3B8;font-weight:500;white-space:nowrap;">· ' +
         esc(costItem.costSymbol || '') + fmtNum(+cost) + '/' + unit + '</span>';
     }
-    var scissorsBtn = (picked && !counted)
+    var scissorsBtn = picked
       ? '<button type="button" onclick="event.stopPropagation(); coToggleRollCut(' + i + ',' + ri + ')" title="{% trans "Cut part of it" %}" style="background:none;border:0;color:#B45309;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"><i class="fas fa-scissors"></i></button>'
       : '';
     // No "saved" tag: an already-saved roll unticks and re-cuts exactly
@@ -1900,6 +1884,63 @@
     return left === 0;
   };
 
+  // How many of a counted product this card could take: what stands free
+  // on the shelves, less what another line of this order already took,
+  // plus what this card holds itself.
+  function coCountedFree(item) {
+    var taken = {};
+    orderItems.forEach(function (other) {
+      if (other === item) return;
+      (other.existingRolls || []).concat(other.rolls || []).forEach(function (r) {
+        taken[(r.barcode || '').toLowerCase()] = true;
+      });
+    });
+    var mine = {};
+    (item.rolls || []).concat(item.existingRolls || []).forEach(function (r) {
+      mine[(r.barcode || '').toLowerCase()] = true;
+    });
+    var free = (item.availableRolls || []).reduce(function (s, r) {
+      var key = (r.barcode || '').toLowerCase();
+      return (taken[key] || mine[key]) ? s : s + Math.floor(parseFloat(r.available) || 0);
+    }, 0);
+    return free + coPickedTotal(item);
+  }
+
+  // The quantity field of a product sold by count — the first field of
+  // its card's one row. There is nothing else to choose: the pieces are
+  // alike and come off the oldest stock, so the card shows no list.
+  function coCountedQtyHtml(item, i) {
+    var free = coCountedFree(item);
+    var unit = esc(item.rollUnit || '');
+    var held = (item.existingRolls || []).reduce(function (s, r) { return s + (parseFloat(r.quantity) || 0); }, 0);
+    // Nothing on the shelf: the quantity is still wanted, it is just not
+    // held against any stock (what the outsourced box is for cloth).
+    var value = free > 0 ? coPickedTotal(item) : (parseFloat(item.manualMeters) || 0);
+    var hint = free > 0
+      ? fmtNum(free) + ' ' + unit + ' {% trans "in stock" %}'
+      : '{% filter escapejs %}{% trans "none in stock" %}{% endfilter %}';
+    if (held > 0) hint += ' · ' + fmtNum(held) + ' {% filter escapejs %}{% trans "already packed" %}{% endfilter %}';
+    return '<div class="form-group"><label>{% trans "Quantity" %}' +
+        '<span class="co-qty-hint' + ((free <= 0 || value >= free) ? ' short' : '') + '">' + hint + '</span></label>' +
+      '<input type="number" class="form-input" id="co-qty-' + i + '" inputmode="numeric" min="0" step="1" ' +
+        'value="' + (value || '') + '" placeholder="0" onfocus="this.select()" ' +
+        'onchange="coCountedQty(' + i + ',this.value)" ' +
+        'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}"></div>';
+  }
+
+  window.coCountedQty = function (i, raw) {
+    var item = orderItems[i];
+    if (!item) return false;
+    if (coCountedFree(item) > 0) {
+      item.manualMeters = 0;
+      return window.coTakeInput(i, raw);
+    }
+    item.manualMeters = Math.max(0, Math.floor(parseFloat(raw) || 0));
+    syncQtyFromRolls(i, true);
+    renderProducts();
+    return true;
+  };
+
   // What was typed into a counted card's quantity box. A handheld scanner
   // aimed there types the printed barcode and an Enter, and thirteen
   // digits read as a quantity would take the whole shelf — so a code is
@@ -1974,26 +2015,6 @@
           '<i class="fas fa-camera"></i></button>' +
       '</div>';
 
-    if (item.counted && !noStockAtAll) {
-      var freeTotal = candidates.reduce(function (s, r) { return s + (parseFloat(r.available) || 0); }, 0) + coPickedTotal(item);
-      var takenNow = coPickedTotal(item);
-      searchBlock =
-        '<div class="co-take">' +
-          '<span class="co-take-label">{% trans "Quantity" %}</span>' +
-          '<div class="co-take-step">' +
-            '<button type="button" onclick="coTakeQuantity(' + i + ',' + Math.max(0, takenNow - 1) + ')" aria-label="{% trans "One fewer" %}">&minus;</button>' +
-            '<input type="number" id="co-roll-bc-' + i + '" inputmode="numeric" min="0" step="1" ' +
-              'value="' + takenNow + '" aria-label="{% trans "Quantity to take from stock" %}" ' +
-              'onfocus="this.select()" onchange="coTakeInput(' + i + ',this.value)" ' +
-              'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}">' +
-            '<button type="button" onclick="coTakeQuantity(' + i + ',' + (takenNow + 1) + ')" aria-label="{% trans "One more" %}">+</button>' +
-          '</div>' +
-          '<span class="co-take-unit">' + esc(item.rollUnit || '') + '</span>' +
-          '<span class="co-take-free' + (takenNow >= freeTotal ? ' short' : '') + '">' +
-            fmtNum(freeTotal) + ' ' + esc(item.rollUnit || '') + ' {% trans "in stock" %}</span>' +
-        '</div>';
-    }
-
     var rowsHtml = '';
     if (noStockAtAll) {
       rowsHtml = '<div style="font-size:11.5px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;padding:7px 9px;border-radius:7px;">' +
@@ -2013,15 +2034,10 @@
 
     return '<div class="co-roll-section" style="margin-top:10px;padding:10px;background:#F8FAFC;border:1px solid #E2E8EE;border-radius:8px;">' +
       '<label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:11px;color:#0F766E;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;">' +
-        // A product sold by count is taken by quantity; its batches are
-        // shown below, not picked, so the heading does not offer a click.
-        (item.counted
-          ? '<i class="fas fa-boxes-stacked"></i> {% trans "From stock" %}'
-          : '<i class="fas fa-layer-group"></i> {% trans "Rolls" %}' +
-            '<span style="font-weight:500;color:#94A3B8;text-transform:none;letter-spacing:0;font-size:10.5px;">({% trans "click to pick" %})</span>') +
+        '<i class="fas fa-layer-group"></i> {% trans "Rolls" %}' +
+        '<span style="font-weight:500;color:#94A3B8;text-transform:none;letter-spacing:0;font-size:10.5px;">({% trans "click to pick" %})</span>' +
         '<span class="co-roll-count-badge" style="margin-left:auto;font-weight:800;font-size:10.5px;letter-spacing:0;text-transform:none;color:' + (selectedCount ? '#0F766E' : '#94A3B8') + ';background:' + (selectedCount ? '#D1FAE5' : '#F1F5F9') + ';padding:2px 8px;border-radius:999px;">' +
-          (item.counted ? fmtNum(coPickedTotal(item)) + ' ' + esc(item.rollUnit || '')
-                        : selectedCount + ' {% trans "rolls" %}') +
+          selectedCount + ' {% trans "rolls" %}' +
         '</span>' +
       '</label>' +
       searchBlock +

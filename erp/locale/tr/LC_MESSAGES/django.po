@@ -13767,3 +13767,9 @@ msgstr "Bir artır"
 
 msgid "From stock"
 msgstr "Stoktan"
+
+msgid "none in stock"
+msgstr "stokta yok"
+
+msgid "already packed"
+msgstr "zaten paketlendi"

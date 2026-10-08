@@ -721,8 +721,12 @@ class SupplierItem(models.Model):
     every roll, so it identifies a physical thing and can never say which
     PRODUCT arrived. Their article number is the stable one. A
     product-level GTIN goes in `supplier_barcode` when a supplier happens
-    to have one — plenty don't, which is why it is optional and the SKU
-    is not.
+    to have one — plenty don't. The SKU may be blank too, but only as
+    "not known yet": the row then says who sells the variant and for how
+    much, and waits for their code.
+
+    Rows are written by the purchase (see marketing.supplier_items), never
+    by hand as a separate chore.
 
     The roll serial lives on WarehouseProductItem.supplier_barcode
     instead; see that field for why the two are kept apart.
@@ -742,8 +746,11 @@ class SupplierItem(models.Model):
     )
 
     # ── Their names for it ────────────────────────────────────────
+    # Blank until somebody has their paper in hand: "we buy this from them,
+    # at this price" is worth recording before anyone knows their code for
+    # it, and every purchase made before the field existed is in that state.
     supplier_sku = models.CharField(
-        max_length=SKU_MAX_LENGTH, db_index=True,
+        max_length=SKU_MAX_LENGTH, db_index=True, blank=True, default="",
         help_text="Their article number, as printed on their invoice",
     )
     # Longer than our own 14-char barcode columns on purpose: a supplier
@@ -782,6 +789,10 @@ class SupplierItem(models.Model):
         validators=[MinValueValidator(Decimal("0"))],
         help_text="Their price per THEIR unit, when we last bought it",
     )
+    # The money that price is in. A supplier is billed in their account's
+    # currency, but a line can be priced in another, and a bare 1.60 says
+    # nothing next to another supplier's 68.
+    last_price_currency = models.CharField(max_length=4, blank=True, default="")
     last_purchased_at = models.DateField(null=True, blank=True)
     lead_time_days = models.PositiveIntegerField(null=True, blank=True)
     minimum_order_qty = models.DecimalField(
@@ -806,8 +817,11 @@ class SupplierItem(models.Model):
             # One supplier's article number means exactly one thing. The
             # reverse is deliberately NOT constrained: the same variant
             # may appear once per supplier, which is the whole point.
+            # Only once it is known — any number of rows may still be
+            # waiting for theirs.
             models.UniqueConstraint(
                 fields=["current_account", "supplier_sku"],
+                condition=~models.Q(supplier_sku=""),
                 name="marketing_supplieritem_unique_sku_per_account",
             ),
             # Same for a product-level GTIN, when there is one. NULLs
@@ -832,7 +846,7 @@ class SupplierItem(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.current_account} · {self.supplier_sku} → {self.variant.variant_sku}"
+        return f"{self.current_account} · {self.supplier_sku or '?'} → {self.variant.variant_sku}"
 
     def to_our_quantity(self, supplier_quantity):
         """Their quantity, restated in our unit of measure."""

@@ -261,7 +261,7 @@
   .np-attr-add { width: auto; min-width: 140px; height: 30px; font-size: 12px; }
   .np-v-attrs { flex: 2; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
   .np-v-attrs .np-col { flex: 1 1 110px; }
-  .np-main-sku, .np-v-sku { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
+  .np-main-sku, .np-v-sku, .np-v-supplier-sku { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
 
   /* Every input says what it is above itself, in the same voice as the
      section labels — one step quieter, since these sit inside a card. */
@@ -293,9 +293,16 @@
     font: 600 11px var(--font-sans); display: none; align-items: center; gap: 6px;
   }
   .np-v-match.show { display: flex; }
+  .np-v-clash { display: none; align-items: center; gap: 6px; margin: 6px 0 2px; padding: 5px 9px; border: 1px solid #F0C9C2; border-radius: 6px; background: #FDF3F2; color: #8C2D0E; font-size: 12px; }
+  .np-v-clash.show { display: flex; }
+  .np-v-suppliers { display: none; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; font-size: 12px; color: #5B6470; }
+  .np-v-suppliers.show { display: flex; }
+  .np-v-suppliers .np-vs-label { font-weight: 600; }
+  .np-v-suppliers .np-vs-chip { padding: 2px 8px; border: 1px solid #E3E6EA; border-radius: 999px; background: #F7F8FA; white-space: nowrap; }
+  .np-v-suppliers .np-vs-chip b { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; color: #1F2933; }
   .np-v-match.new { background: #FEF3C7; color: #8B5A00; border-color: #F5D78B; }
   .np-v-match.bad { background: #FDF3F2; color: #8C2D0E; border-color: #F0C9C2; }
-  .np-v-sku.bad { border-color: #C0392B; background: #FDF3F2; }
+  .np-v-sku.bad, .np-v-supplier-sku.bad { border-color: #C0392B; background: #FDF3F2; }
   .np-v-sale.bad { border-color: #C0392B; background: #FDF3F2; }
   .np-tops { display: flex; flex-direction: column; gap: 7px; }
   .np-top { display: flex; align-items: center; gap: 8px; }
@@ -785,6 +792,7 @@
   // template the URL with a "0" placeholder and swap it in per-call.
   const NP_VARIANTS_TPL = "{% url 'operating:catalog_product_variants' 0 0 %}";
   const NP_MATCH_TPL = "{% url 'operating:catalog_variant_match' 0 0 %}";
+  const NP_SUPPLIER_CODES = "{% url 'operating:supplier_codes' 0 %}";
   const NP_EDIT_TPL = "{% url 'operating:warehouse_purchase_edit' 0 0 %}";
   const NP_PURCHASE_DETAIL_TPL = "{% url 'accounts:purchase_order_detail' 0 %}";
   const NP_LIST_URL = "{% url 'accounts:purchase_order_list' current_book.pk %}";
@@ -793,6 +801,14 @@
   const NP_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="lock-ico"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
   // A price starts in the account's currency (see npDefaultCurrencies);
   // picking another marks it as chosen, so a change of account leaves it.
+  // The code on THEIR quotation or invoice for this row. The SKU beside it
+  // is ours, the one the catalog and the shelf both carry; this one is kept
+  // against the account, so the next purchase from them fills it in.
+  const NP_SUPPLIER_SKU = '<div class="np-col np-col-sku">' +
+      '<label>{% trans "Supplier SKU" %}</label>' +
+      '<input class="np-input np-v-supplier-sku" maxlength="{{ variant_sku_max_length }}" placeholder="{% trans "optional" %}" title="{% trans "What the supplier calls this, as printed on their invoice" %}" autocomplete="off" onfocus="npSuggestSupplierSkus(this)" oninput="this.dataset.touched = \'1\'; npCheckSupplierSku(this.closest(\'.np-variant\'), true)">' +
+      '<datalist class="np-v-supplier-codes"></datalist>' +
+    '</div>';
   const NP_CUR = '<select class="np-select np-v-cur" onchange="this.dataset.touched = \'1\'; npSummaryUpdate()"><option>USD</option><option>TRY</option><option>EUR</option></select>';
   // Roll rows repeat, so their columns are captioned once above the list.
   // The empty spans hold the gutter/unit/state/remove columns so each
@@ -1258,6 +1274,9 @@
       '</div>' +
       '<div class="np-no-variant" style="display:none;">' +
         '<div class="np-variant">' +
+          '<div class="np-variant-row">' + NP_SUPPLIER_SKU + '</div>' +
+          '<div class="np-v-clash"></div>' +
+      '<div class="np-v-suppliers"></div>' +
           '<div class="np-price-row">' +
             '<div class="np-col">' +
               '<label>{% trans "Purchase price" %}</label>' +
@@ -1365,6 +1384,8 @@
     // A different account can bill in a different currency, which changes
     // which lines need converting at all.
     npDefaultCurrencies();
+    // ...and calls the same variant by its own code.
+    if (window.npLoadSupplierCodes) { npLoadSupplierCodes(); npShowAllSuppliers(); }
     npSummaryUpdate();
   };
 
@@ -1697,6 +1718,7 @@
           npSuggestVariantSku(vEl);
         }
         npSyncVariantChips(card);
+        npShowSuppliers(vEl);
       }).catch(function () {
         if (vEl._npMatchToken !== reqToken) return;
         badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = '';
@@ -1739,8 +1761,11 @@
           '<label>{% trans "Variant SKU" %}</label>' +
           '<input class="np-input np-v-sku" maxlength="' + GR_VARIANT_SKU_MAX + '" placeholder="{% trans "auto" %}" oninput="npUnlockVariantSku(this)">' +
         '</div>' +
+        NP_SUPPLIER_SKU +
       '</div>' +
       '<div class="np-v-match"></div>' +
+      '<div class="np-v-clash"></div>' +
+      '<div class="np-v-suppliers"></div>' +
       '<div class="np-price-row">' +
         '<div class="np-col">' +
           '<label>{% trans "Purchase price" %}</label>' +
@@ -2249,6 +2274,7 @@
     npApplyProductFacts(cardEl, null);
     const box = cardEl.querySelector('.np-existing-variants');
     if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+    npShowAllSuppliers(cardEl);
     cardEl.querySelectorAll('.np-variants .np-v-match').forEach(function (m) {
       m.classList.remove('show', 'new', 'bad'); m.innerHTML = '';
     });
@@ -2326,6 +2352,7 @@
               (Math.round((v.variant_quantity || 0) * 100) / 100) + ')</button>';
           }).join('');
         npSyncVariantChips(cardEl);
+        npShowAllSuppliers(cardEl);
       }).catch(function () { npResetExistingVariants(cardEl); });
   };
 
@@ -2369,7 +2396,127 @@
         (Math.round((v.variant_quantity || 0) * 100) / 100) + ')';
     }
     npSyncVariantChips(cardEl);
+    npShowSuppliers(target);
     target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  function npSupplierSku(scope) {
+    return ((scope.querySelector('.np-v-supplier-sku') || {}).value || '').trim();
+  }
+  function npAccountId() {
+    return ((document.getElementById('npSupplier') || {}).value || '');
+  }
+  // Under a row that is an existing variant: fill in what the chosen account
+  // calls it, and list who else sells it, with their code and last price —
+  // typing our SKU is how anyone finds out what a mill calls the thing.
+  window.npShowSuppliers = function (vEl) {
+    const card = vEl.closest('.np-product-card');
+    const box = vEl.querySelector('.np-v-suppliers');
+    const input = vEl.querySelector('.np-v-supplier-sku');
+    if (!card || !box) return;
+    const skuI = vEl.querySelector('.np-v-sku');
+    const existing = card._npExistingVariants || [];
+    // A simple product is its one variant, and has no SKU box of its own.
+    const variant = skuI
+      ? existing.find(function (x) { return npSkuKey(x.variant_sku) === npSkuKey(skuI.value); })
+      : (card._npMode === 'existing' && !card._npHasVariants && existing.length === 1 ? existing[0] : null);
+    const suppliers = (variant && variant.suppliers) || [];
+    const mine = suppliers.find(function (x) { return String(x.account_id) === npAccountId(); });
+    if (input && !input.dataset.touched) input.value = (mine && mine.supplier_sku) || '';
+    npCheckSupplierSku(vEl);
+    const others = suppliers.filter(function (x) { return x !== mine; });
+    if (!others.length) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    box.classList.add('show');
+    box.innerHTML = '<span class="np-vs-label">{% trans "Also from" %}</span>' +
+      others.map(function (x) {
+        const price = x.last_price == null ? '' :
+          ' · ' + (Math.round(x.last_price * 100) / 100) + (x.currency ? ' ' + npEsc(x.currency) : '');
+        return '<span class="np-vs-chip"' + (x.last_purchased_at ? ' title="' + npEsc(x.last_purchased_at) + '"' : '') + '>' +
+          npEsc(x.account) + ' <b>' + (x.supplier_sku ? npEsc(x.supplier_sku) : '—') + '</b>' + price + '</span>';
+      }).join('');
+  };
+  // ── What the chosen account calls things ─────────────────────────
+  // Loaded once per account: { CODE: {variant_sku, product_id, product,
+  // product_sku} }. Another supplier's codes are never in it.
+  let npCodes = {}, npCodesFor = null;
+  window.npLoadSupplierCodes = function () {
+    const account = npAccountId();
+    if (account === npCodesFor) return;
+    npCodesFor = account;
+    npCodes = {};
+    if (!account || !npWhId()) { npCodesFor = null; return; }
+    fetch(npWhUrl(NP_SUPPLIER_CODES) + '?account=' + encodeURIComponent(account),
+          { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (npCodesFor !== account) return;
+        (d.codes || []).forEach(function (c) { npCodes[npSkuKey(c.supplier_sku)] = c; });
+        npShowAllSuppliers();
+      }).catch(function () { npCodesFor = null; });
+  };
+  // OUR SKU for a row: its own box, or the product's for a simple product.
+  function npRowOurSku(vEl) {
+    const skuI = vEl.querySelector('.np-v-sku');
+    if (skuI) return npSkuKey(skuI.value);
+    const card = vEl.closest('.np-product-card');
+    return npSkuKey(card._npMode === 'existing'
+      ? (card.querySelector('.np-main-existing-sku') || {}).value
+      : (card.querySelector('.np-main-sku') || {}).value);
+  }
+  // The box offers their codes for THIS product only — the product was
+  // chosen first, and a code for some other product can't go on this row.
+  window.npSuggestSupplierSkus = function (input) {
+    const card = input.closest('.np-product-card');
+    const list = input.parentNode.querySelector('.np-v-supplier-codes');
+    if (!card || !list) return;
+    npLoadSupplierCodes();
+    if (!list.id) { npVid += 1; list.id = 'npCodes' + npVid; input.setAttribute('list', list.id); }
+    const productId = card._npMode === 'existing' ? (card.querySelector('.np-main-id').value || '') : '';
+    list.innerHTML = Object.keys(npCodes).filter(function (k) {
+      return productId && String(npCodes[k].product_id) === String(productId);
+    }).map(function (k) {
+      const c = npCodes[k];
+      return '<option value="' + npEsc(c.supplier_sku) + '">' + npEsc(c.variant_sku) + '</option>';
+    }).join('');
+  };
+  // A code the account already uses means the variant it is used for.
+  // Typed on an empty row of that product, it fills the row in; anywhere
+  // else it is refused here, as the save would refuse it.
+  window.npCheckSupplierSku = function (vEl, typed) {
+    const input = vEl && vEl.querySelector('.np-v-supplier-sku');
+    const clash = vEl && vEl.querySelector('.np-v-clash');
+    if (!input || !clash) return;
+    const card = vEl.closest('.np-product-card');
+    const held = npCodes[npSkuKey(input.value)];
+    const ours = npRowOurSku(vEl);
+    let bad = !!(held && npSkuKey(held.variant_sku) !== ours);
+    if (bad && typed && card._npMode === 'existing' && !vEl.dataset.itemId &&
+        String(held.product_id) === String(card.querySelector('.np-main-id').value)) {
+      const skuI = vEl.querySelector('.np-v-sku');
+      const v = (card._npExistingVariants || []).find(function (x) {
+        return npSkuKey(x.variant_sku) === npSkuKey(held.variant_sku);
+      });
+      const free = skuI && !skuI.dataset.touched && !skuI.dataset.matchLocked &&
+                   !npVariantRowWithSku(card, held.variant_sku);
+      if (v && free) {
+        npFillRowAttrs(vEl, card, v.attributes || []);
+        skuI.value = v.variant_sku;
+        skuI.dataset.matchLocked = '1';
+        npQueueVariantMatch(vEl);
+        npSyncVariantChips(card);
+        bad = false;
+      }
+    }
+    input.classList.toggle('bad', bad);
+    clash.classList.toggle('show', bad);
+    clash.innerHTML = !bad ? '' :
+      '<i class="fa fa-exclamation-triangle"></i> {% trans "in use" %} — ' +
+      '{% trans "this account already uses this supplier SKU for" %} ' +
+      npEsc((held.product_sku || held.product) + ' · ' + held.variant_sku);
+  };
+
+  window.npShowAllSuppliers = function (scope) {
+    (scope || document).querySelectorAll('.np-variant').forEach(npShowSuppliers);
   };
 
   function npSkuKey(s) { return (s == null ? '' : String(s)).trim().toUpperCase(); }
@@ -2409,7 +2556,7 @@
     const q = (inputEl.value || '').trim();
     if (q.length < 2) { drop.classList.remove('show'); drop.innerHTML = ''; return; }
     card._npSearchTimer = setTimeout(function () {
-      fetch(npWhUrl(NP_SEARCH) + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      fetch(npWhUrl(NP_SEARCH) + '?q=' + encodeURIComponent(q) + '&account=' + encodeURIComponent(npAccountId()), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           const items = d.results || [];
@@ -2625,6 +2772,15 @@
       return;
     }
 
+    // And for a supplier SKU the account already uses for another variant.
+    const badTheirs = document.querySelectorAll('#npProducts .np-v-supplier-sku.bad');
+    if (badTheirs.length) {
+      alert('{% filter escapejs %}{% trans "This supplier SKU is already used for another variant" %}{% endfilter %}: ' +
+            Array.prototype.map.call(badTheirs, function (el) { return (el.value || '').trim(); }).join(', '));
+      badTheirs[0].focus();
+      return;
+    }
+
     // And a new variant the catalog couldn't tell apart from one it has —
     // the save refuses that too (the badge names the variant).
     const lookalike = Array.prototype.filter.call(
@@ -2678,6 +2834,7 @@
           npNeedsSale(v, tops);
           if (attrs.length || sku || tops.length) variants.push({
             name: npRowLabel(v), attributes: attrs, sku: sku, tops: tops,
+            supplier_sku: npSupplierSku(v),
             price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
             sale_price: (v.querySelector('.np-v-sale') || {}).value || '',
             invoice_item_id: npIdOf(v, 'itemId')
@@ -2692,6 +2849,7 @@
         const priceEl = block.querySelector('.np-nv-price');
         const curEl = block.querySelector('.np-v-cur');
         variants.push({ name: '', sku: '', tops: tops, price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
+                        supplier_sku: npSupplierSku(block),
                         sale_price: (block.querySelector('.np-v-sale') || {}).value || '',
                         invoice_item_id: npIdOf(block.querySelector('.np-variant'), 'itemId') });
       }
@@ -2977,6 +3135,8 @@
       }
       if (skuI && v.sku) { skuI.value = v.sku; skuI.dataset.touched = '1'; }
     }
+    const supI = vEl.querySelector('.np-v-supplier-sku');
+    if (supI && v.supplier_sku) { supI.value = v.supplier_sku; supI.dataset.touched = '1'; }
     const priceI = vEl.querySelector(noVariant ? '.np-nv-price' : '.np-v-price');
     if (priceI && v.price) priceI.value = v.price;
     const curI = vEl.querySelector('.np-v-cur');

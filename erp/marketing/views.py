@@ -353,6 +353,10 @@ class ProductDetail(generic.DetailView):
             held = [row for row in variant.warehouse_products.all() if row.quantity]
             variant.stock_locations = held if len(held) > 1 else []
         context['product_variants'] = variants  # Cache variants
+        # Who sells each variant, and what they call it.
+        from .views_suppliers import supplier_rows
+        context['product_suppliers'] = supplier_rows(
+            self.object, getattr(self.request.user, "member", None))
         context['product_collections'] = list(self.object.collections.all())  # Cache collections
         
         context_time = time.time() - context_start

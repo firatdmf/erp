@@ -131,6 +131,7 @@
   <thead>
     <tr>
       <th style="width:8mm;">#</th>
+      {% if show_supplier_sku %}<th>{% trans "Supplier SKU" %}</th>{% endif %}
       <th>{% trans "Description" %}</th>
       <th class="num">{% trans "Rolls" %}</th>
       <th class="num">{% trans "Quantity" %}</th>
@@ -142,6 +143,7 @@
     {% for it in items %}
     <tr>
       <td>{{ it.line_no }}</td>
+      {% if show_supplier_sku %}<td>{{ it.supplier_sku }}</td>{% endif %}
       <td class="desc">{{ it.description }}</td>
       <td class="num">{{ it.roll_count }}</td>
       <td class="num">{{ it.quantity|floatformat:"2g" }} {{ it.unit }}</td>

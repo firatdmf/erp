@@ -599,9 +599,12 @@ class PurchaseOrderSave(View):
             CustomerOrderError, parse_customer, plan_variant_skus,
             put_plan_in_catalog, sync_customer_order,
         )
-        from operating.views_warehouse import IntakeError, _intake_check_book
+        from operating.views_warehouse import (
+            IntakeError, _intake_check_book, _intake_check_supplier_skus,
+        )
         try:
             _intake_check_book(warehouse, current_account)
+            _intake_check_supplier_skus(data.get("products"), current_account)
         except IntakeError as exc:
             return JsonResponse(exc.payload, status=exc.status)
         try:
@@ -794,6 +797,10 @@ class PurchaseOrderPrint(View):
         # and from the real stock items once it has been received — the document
         # says the same thing either side of confirmation.
         rolls_by_line = {}
+        # Their own code for each line, which is the one they can look up —
+        # ours means nothing to them. From the plan while it is an order,
+        # from what the receipt recorded once it is in.
+        supplier_sku_by_line = {}
         if invoice.status == "draft":
             # Line order matches plan_lines(), which is what built the items.
             line_no = 0
@@ -805,11 +812,18 @@ class PurchaseOrderPrint(View):
                         continue
                     line_no += 1
                     rolls_by_line[line_no] = len(stock_items)
+                    supplier_sku_by_line[line_no] = str(v_in.get("supplier_sku") or "").strip()
         else:
+            from marketing.models import SupplierItem
+            theirs = dict(
+                SupplierItem.objects.filter(current_account_id=invoice.current_account_id)
+                .values_list("variant_id", "supplier_sku"))
             for it in items:
                 rolls_by_line[it.line_no] = it.warehouse_stock_items.count()
+                supplier_sku_by_line[it.line_no] = theirs.get(it.variant_id, "")
         for it in items:
             it.roll_count = rolls_by_line.get(it.line_no, 0)
+            it.supplier_sku = supplier_sku_by_line.get(it.line_no, "")
 
         return document_response(request, self.template_name, {
             "invoice": invoice,
@@ -817,6 +831,7 @@ class PurchaseOrderPrint(View):
             "warehouse": invoice.intake_warehouse,
             "brand_line": brand_name_for(invoice.book),
             "is_order": invoice.status == "draft",
+            "show_supplier_sku": any(it.supplier_sku for it in items),
         }, f"purchase_{invoice.display_number}.pdf")
 
 

@@ -225,3 +225,101 @@ class MovedVariantTakesItsLinesTest(TestCase):
         self.line.refresh_from_db()
         self.assertEqual(self.line.product_id, self.husk.pk)
         self.assertIn("+1 order, 1 invoice lines", " ".join(s["actions"]))
+
+
+class HandPlacedVariantStaysPutTest(TestCase):
+    """A SKU with no base code in it ("ONRLZK0000142") says nothing about
+    its main product, so the reconciler reads one off the first word of the
+    warehouse name. That is fine for filing a variant nobody has filed yet.
+    It also used to MOVE a variant that already had a product: the pleated
+    Grek rolls were given their own product "Grek Pilise" by hand, their
+    warehouse rows still say "Tülgrek Pilise EKRU", and a product whose sku
+    is "Tülgrek" exists — so every run wanted them back under it.
+    """
+
+    def setUp(self):
+        from operating.models import Order, OrderItem
+
+        book = Book.objects.get_or_create(name="Laleli Fabric")[0]
+        warehouse = Warehouse.objects.create(name="Laleli Fabrika", accounting_book=book)
+        self.plain = Product.objects.create(title="Tülgrek", sku="Tülgrek", featured=False)
+        self.pleated = Product.objects.create(
+            title="Grek Pilise", sku="Grek Pilise", featured=False)
+        self.variant = ProductVariant.objects.create(
+            product=self.pleated, variant_sku="ONRLZK0000142")
+        self.row = WarehouseProduct.objects.create(
+            warehouse=warehouse, name="Tülgrek Pilise EKRU", sku="ONRLZK0000142",
+            quantity=Decimal("14.30"), catalog_variant=self.variant)
+        self.line = OrderItem.objects.create(
+            order=Order.objects.create(), product=self.pleated,
+            product_variant=self.variant, quantity=Decimal("3"), price=Decimal("7.50"))
+
+    def test_the_variant_keeps_the_product_it_was_given(self):
+        s = reconcile_all_warehouse_links(apply=True)
+        self.variant.refresh_from_db()
+        self.line.refresh_from_db()
+        self.assertEqual(self.variant.product_id, self.pleated.pk)
+        self.assertEqual(self.line.product_id, self.pleated.pk)
+        self.assertEqual((s["variants_moved"], s["relinked_wps"], s["conflicts"]), (0, 0, []))
+
+    def test_the_preview_proposes_no_move(self):
+        s = reconcile_all_warehouse_links(apply=False)
+        self.assertEqual(s["variants_moved"], 0)
+        self.assertEqual(s["actions"], [])
+
+    def test_a_new_sibling_is_still_filed_by_its_name(self):
+        """The name is still how a variant nobody has placed finds a home."""
+        WarehouseProduct.objects.create(
+            warehouse=self.row.warehouse, name="Tülgrek GRİ", sku="KZL0000159",
+            quantity=Decimal("5.00"))
+        reconcile_all_warehouse_links(apply=True)
+        self.assertEqual(
+            ProductVariant.objects.get(variant_sku="KZL0000159").product_id, self.plain.pk)
+
+
+class LinkedRowIsNotRematchedTest(TestCase):
+    """Sable ecru sits on the shelf under a mill's code, "3002", linked to
+    our variant LZK0000120 — and "3002" happens to be the SKU of the WHITE
+    variant. Matching rows to variants by SKU text on every run wanted the
+    ecru metres on the white variant, and a second white variant minted for
+    the row whose code is "3002-Beyaz". A link somebody made is not
+    overruled by a coincidence of codes; the run says so and moves on.
+    """
+
+    def setUp(self):
+        book = Book.objects.get_or_create(name="Laleli Fabric")[0]
+        self.warehouse = Warehouse.objects.create(name="Laleli", accounting_book=book)
+        sable = Product.objects.create(title="Sable", sku="sable")
+        self.white = ProductVariant.objects.create(product=sable, variant_sku="3002")
+        self.ecru = ProductVariant.objects.create(product=sable, variant_sku="LZK0000120")
+        self.ecru_row = WarehouseProduct.objects.create(
+            warehouse=self.warehouse, name="SABLE EKRU", sku="3002",
+            quantity=Decimal("0"), catalog_variant=self.ecru)
+        self.white_row = WarehouseProduct.objects.create(
+            warehouse=self.warehouse, name="SABLE AVRUPA BEYAZI", sku="3002-Beyaz",
+            quantity=Decimal("0"), catalog_variant=self.white)
+
+    def test_the_links_and_the_catalog_are_left_alone(self):
+        s = reconcile_all_warehouse_links(apply=True)
+        self.ecru_row.refresh_from_db()
+        self.white_row.refresh_from_db()
+        self.assertEqual(self.ecru_row.catalog_variant_id, self.ecru.pk)
+        self.assertEqual(self.white_row.catalog_variant_id, self.white.pk)
+        self.assertEqual(ProductVariant.objects.count(), 2)
+        self.assertEqual((s["relinked_wps"], s["variants_created"]), (0, 0))
+
+    def test_both_rows_are_reported(self):
+        s = reconcile_all_warehouse_links(apply=False)
+        self.assertEqual(sorted(c["sku"] for c in s["conflicts"]), ["3002", "3002-Beyaz"])
+        self.assertIn("LZK0000120", " ".join(c["error"] for c in s["conflicts"]))
+
+    def test_an_unlinked_row_with_the_same_code_is_still_filed(self):
+        other = Warehouse.objects.create(
+            name="Laleli Fabrika", accounting_book=self.warehouse.accounting_book)
+        new = WarehouseProduct.objects.create(
+            warehouse=other, name="SABLE BEYAZ", sku="3002", quantity=Decimal("5"))
+        reconcile_all_warehouse_links(apply=True)
+        new.refresh_from_db()
+        self.ecru_row.refresh_from_db()
+        self.assertEqual(new.catalog_variant_id, self.white.pk)
+        self.assertEqual(self.ecru_row.catalog_variant_id, self.ecru.pk)

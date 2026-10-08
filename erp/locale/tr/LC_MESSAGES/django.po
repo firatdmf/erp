@@ -13779,3 +13779,36 @@ msgstr "Not ekle"
 
 msgid "Note for this line"
 msgstr "Bu satır için not"
+
+msgid "Also from"
+msgstr "Diğer tedarikçiler"
+
+msgid "What the supplier calls this, as printed on their invoice"
+msgstr "Tedarikçinin bu ürüne verdiği kod, faturasında yazdığı şekliyle"
+
+#, python-format
+msgid "%(account)s already uses supplier SKU '%(sku)s' for %(variant)s."
+msgstr "%(account)s, '%(sku)s' tedarikçi kodunu zaten %(variant)s için kullanıyor."
+
+#, python-format
+msgid "warehouse row %(row)s (%(warehouse)s) is linked to variant '%(variant)s', which has another SKU — left as it is"
+msgstr "%(row)s numaralı depo satırı (%(warehouse)s), SKU'su farklı olan '%(variant)s' varyantına bağlı — olduğu gibi bırakıldı"
+
+msgid "This supplier SKU is already used for another variant"
+msgstr "Bu tedarikçi kodu zaten başka bir varyant için kullanılıyor"
+
+msgid "this account already uses this supplier SKU for"
+msgstr "bu cari, bu tedarikçi kodunu zaten şunun için kullanıyor:"
+
+#, python-format
+msgid "Supplier SKU '%(sku)s' is on two different variants of this purchase — one of their codes means one of ours."
+msgstr "'%(sku)s' tedarikçi kodu bu alımda iki farklı varyantta yazılı — onların bir kodu bizim tek bir varyantımızı gösterir."
+
+msgid "Last price"
+msgstr "Son fiyat"
+
+msgid "Last purchase"
+msgstr "Son alım"
+
+msgid "Remove this supplier from the variant? Its code and last price are forgotten."
+msgstr "Bu tedarikçi varyanttan kaldırılsın mı? Kodu ve son fiyatı silinir."

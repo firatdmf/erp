@@ -10,6 +10,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _gettext, gettext_lazy, pgettext_lazy
 from django.views import View
@@ -2691,6 +2692,12 @@ def catalog_base_search(request, pk):
     with more than one colour."""
     from django.db.models import Q
     q = (request.GET.get("q") or "").strip()
+    # The purchase's account: its own code for a variant finds the product
+    # too, for the buyer who only has their paper to go by.
+    account_id = (request.GET.get("account") or "").strip()
+    theirs = (Q(variants__supplier_items__current_account_id=int(account_id),
+                variants__supplier_items__supplier_sku__icontains=q)
+              if account_id.isdigit() else Q(pk__in=[]))
     results = []
     if q:
         # NOTE: variant COUNT is fetched per-product below rather than via
@@ -2702,7 +2709,7 @@ def catalog_base_search(request, pk):
         qs = (_receivable_products()
               .filter(Q(title__icontains=q) | Q(sku__icontains=q) |
                       Q(variants__warehouse_products__name__icontains=q) |
-                      Q(variants__warehouse_products__sku__icontains=q))
+                      Q(variants__warehouse_products__sku__icontains=q) | theirs)
               .distinct().order_by("title")[:12])
         for p in qs:
             # The SKU is the product's identity, so it is what the row is
@@ -2769,6 +2776,9 @@ def catalog_product_variants(request, pk, product_id):
         .prefetch_related("product_variant_attribute_values__product_variant_attribute",
                           "warehouse_products")
         .distinct().order_by("variant_sku"))
+    from marketing.supplier_items import suppliers_of
+    variants = list(variants)
+    suppliers = suppliers_of(v.id for v in variants)
     results = []
     for v in variants:
         av = (v.product_variant_attribute_values.all()[:1] or [None])[0]
@@ -2790,6 +2800,9 @@ def catalog_product_variants(request, pk, product_id):
             # Live, not the stored mirror: a variant whose only roll was
             # deleted read "33.66" here long after its stock hit zero.
             "variant_quantity": float(v.live_quantity or 0),
+            # Who sells it and what each of them calls it — the row fills
+            # in the chosen account's code and lists the others.
+            "suppliers": suppliers.get(v.id, []),
         })
     # The product's own type, unit and pack, which the form states rather
     # than asks. `invoice` is the purchase being edited, whose own stock
@@ -2869,6 +2882,23 @@ def warehouse_customer_currency(request, pk):
     if facts is None:
         return JsonResponse({"error": "not found"}, status=404)
     return JsonResponse(facts)
+
+
+@login_required
+def supplier_codes(request, pk):
+    """The codes ONE account calls our variants by, for the purchase page:
+    what its Supplier SKU box suggests, and what a typed code is checked
+    against before the save refuses it (_intake_check_supplier_skus).
+
+    GET: account — the purchase's current account."""
+    from accounting.models import CurrentAccount
+    from marketing.supplier_items import codes_of
+    account_id = (request.GET.get("account") or "").strip()
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    account = (CurrentAccount.objects
+               .filter(pk=int(account_id), book_id=warehouse.accounting_book_id).first()
+               if account_id.isdigit() else None)
+    return JsonResponse({"codes": codes_of(account)})
 
 
 @login_required
@@ -3692,6 +3722,67 @@ def _intake_catalog_link(wp, target, main_product, base_name, first_barcode, war
     return cat_variant
 
 
+def _intake_check_supplier_skus(products_in, account):
+    """Refuse, before anything is written, a supplier SKU this account
+    already uses for a DIFFERENT variant of ours — or that the purchase
+    itself puts on two.
+
+    One of their codes means one of our variants. Letting a second through
+    used to be a warning on a receipt that went in anyway, with the code
+    quietly dropped — which left nothing to match their next invoice by."""
+    from marketing.models import Product
+    from marketing.supplier_items import SupplierSkuTaken, holder_of
+
+    def refuse(message):
+        raise IntakeError({"success": False, "error": str(message),
+                           "supplier_sku_taken": True}, status=409)
+
+    seen = {}
+    for p_in in products_in or []:
+        if not isinstance(p_in, dict):
+            continue
+        mp = p_in.get("main_product") or {}
+        main_sku = (mp.get("sku") or "").strip()
+        if mp.get("mode") == "existing" and str(mp.get("id") or "").isdigit():
+            main_sku = (Product.objects.filter(pk=int(mp["id"]))
+                        .values_list("sku", flat=True).first() or "")
+        simple = p_in.get("has_variants") is False
+        for v in (p_in.get("variants") or []):
+            code = str(v.get("supplier_sku") or "").strip()
+            if not code:
+                continue
+            # A simple product is its one variant, whose SKU is the product's.
+            ours = (main_sku if simple else (v.get("sku") or "")).strip().upper()
+            if code.upper() in seen and (not ours or seen[code.upper()] != ours):
+                refuse(_gettext("Supplier SKU '%(sku)s' is on two different variants of this "
+                                "purchase — one of their codes means one of ours.") % {"sku": code})
+            seen[code.upper()] = ours
+            holder = holder_of(account, code)
+            if holder is not None and holder.variant.variant_sku.upper() != ours:
+                refuse(SupplierSkuTaken(code, holder))
+
+
+def _intake_note_supplier(account, variant, v, target, on_date):
+    """Record on the catalog who sold this variant, what they call it and
+    what they charged (marketing.supplier_items). The row's SKU is OURS;
+    `supplier_sku` is the code on their paper, and absent from a payload
+    that predates the field, which leaves theirs as it was.
+
+    A code they already use for another variant was refused before any
+    writing began (_intake_check_supplier_skus); reaching it here means a
+    concurrent save took the code, and this one is rolled back the same."""
+    if variant is None:
+        return
+    from marketing.supplier_items import SupplierSkuTaken, record_purchase
+    try:
+        record_purchase(account, variant, supplier_sku=v.get("supplier_sku"),
+                        unit_price=target["price"], currency=target["currency"],
+                        on_date=on_date)
+    except SupplierSkuTaken as exc:
+        raise IntakeError({"success": False, "error": str(exc),
+                           "supplier_sku_taken": True}, status=409)
+
+
 def announce_order_hold(request, result):
     """Put perform_intake's customer-order hold outcome on the next page."""
     if result.get("order_hold"):
@@ -3729,6 +3820,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     prefix = _intake_prefix(data, account_name)
     _intake_check_rates(products_in, current_account_obj, data.get("rates"))
     _intake_check_prices(products_in)
+    _intake_check_supplier_skus(products_in, current_account_obj)
     resolved = _intake_resolve_products(products_in, prefix,
                                         default_unit=data.get("unit"))
     _intake_check_lookalikes(resolved)
@@ -3786,6 +3878,9 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
 
                     cat_variant_obj = _intake_catalog_link(
                         wp, target, main_product, base_name, first_barcode, warnings)
+                    _intake_note_supplier(
+                        current_account_obj, cat_variant_obj, v, target,
+                        invoice.date if invoice is not None else timezone.localdate())
                     created["variants"] += 1
                     created["variant_skus"].append(target["sku"])
 
@@ -4093,6 +4188,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
         old_account = invoice.current_account
         account = _intake_account(data)
+        _intake_check_supplier_skus(products_in, account)
         account_changed = account.pk != old_account.pk
         if account_changed and invoice.allocations.exists():
             raise IntakeError(
@@ -4374,6 +4470,9 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                     first_barcode = (WarehouseProductItem.objects.filter(pk__in=line_roll_ids)
                                      .order_by("id").values_list("barcode", flat=True).first())
                     _intake_catalog_link(wp, target, main_product, base_name, first_barcode, warnings)
+                _intake_note_supplier(
+                    account, wp.catalog_variant if wp.catalog_variant_id else None,
+                    v, target, invoice.date)
 
                 price_changed = item is None or billed["unit_price"] != item.unit_price
                 if price_changed and price and price > 0 and line_roll_ids:
@@ -4523,6 +4622,11 @@ class WarehousePurchaseEdit(View):
             .order_by("line_no")
         )
 
+        from marketing.models import SupplierItem
+        supplier_skus = dict(
+            SupplierItem.objects.filter(current_account_id=invoice.current_account_id)
+            .values_list("variant_id", "supplier_sku"))
+
         groups = {}
         order = []
         for it in items:
@@ -4554,6 +4658,8 @@ class WarehousePurchaseEdit(View):
                 "attributes": [{"name": n, "value": val} for n, val in variant_attributes(
                     wp.catalog_variant if wp is not None and wp.catalog_variant_id else None)],
                 "sku": (wp.sku or "") if wp is not None else "",
+                "supplier_sku": supplier_skus.get(
+                    wp.catalog_variant_id if wp is not None else None, ""),
                 "price": _plain_decimal(it.unit_price),
                 "currency": invoice.currency.code,
                 "tops": [

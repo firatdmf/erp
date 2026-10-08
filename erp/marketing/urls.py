@@ -5,6 +5,7 @@ from . import views_csv_stock
 from . import views_product_groups
 from . import views_catalog
 from . import views_quotes
+from . import views_suppliers
 app_name = "marketing"
 
 
@@ -19,6 +20,7 @@ urlpatterns = [
     path("product_create/",views.ProductCreate.as_view(),name="product_create"),
     path("product_edit/<int:pk>/",views.ProductEdit.as_view(),name="product_edit"),
     path("product/<int:pk>/variants/", views.product_variants, name="product_variants"),
+    path("supplier_item/<int:pk>/", views_suppliers.supplier_item_update, name="supplier_item_update"),
     path("product/<int:pk>/delete/",views.ProductDelete.as_view(),name="product_delete"),
     path("product/bulk-delete/", views.product_bulk_delete, name="product_bulk_delete"),
     # Product groups (ürün grupları) — group settings, margin-based pricing

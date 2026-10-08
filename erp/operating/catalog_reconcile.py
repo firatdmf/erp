@@ -11,7 +11,9 @@ first, Turkish-fold alphanumeric-only comparison as fallback):
      "Florenza" whose sku is "K12767"), the variant is MOVED under the
      real product — variant id preserved, and every order and invoice line
      on that variant has its product repointed too, so a line never names
-     one product while its variant lives under another.
+     one product while its variant lives under another. Only a base code
+     written in the SKU itself moves a variant; one guessed from the
+     warehouse name never does, so a variant placed by hand stays put.
   2. Else a Product owns the base code as its SKU → create the variant
      under it (variant_featured=False so it never leaks onto the site).
   3. Else fall back to a hidden product matched by title, creating one
@@ -19,6 +21,10 @@ first, Turkish-fold alphanumeric-only comparison as fallback):
 
 Existing variants of FEATURED products are never re-featured,
 re-attributed or moved away.
+
+Only rows with NO link are filed. A row already linked to a variant whose
+SKU is not its own is a disagreement for a person to settle, and is
+reported in `conflicts` rather than re-matched by text.
 
 NO quantities are written anywhere. Linking a warehouse row to a variant
 IS the stock: the variant's quantity is the sum of the WarehouseProduct
@@ -54,7 +60,7 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
     )
 
     wps_all = list(WarehouseProduct.objects.all()
-                   .select_related("catalog_variant__product"))
+                   .select_related("catalog_variant__product", "warehouse"))
     if skus is not None:
         wanted = {(s or "").strip().lower() for s in skus if (s or "").strip()}
         wps_all = [w for w in wps_all if (w.sku or "").strip().lower() in wanted]
@@ -132,6 +138,25 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
             continue
         parent = find_parent(base)
 
+        # A row somebody already linked stays where it is. Its SKU naming a
+        # different variant — or none — means the shelf and the catalog
+        # disagree about a code, and which of them is right is a person's
+        # call: the two Sable rows carry a mill's code where ours belongs,
+        # and re-matching them by that text put ecru stock on the white
+        # variant. So they are reported, and only unlinked rows are filed.
+        strays = [w for w in group if w.catalog_variant_id
+                  and (variant is None or w.catalog_variant_id != variant.id)]
+        for w in strays:
+            summary["conflicts"].append(
+                {"sku": sku,
+                 "error": (_gettext("warehouse row %(row)s (%(warehouse)s) is linked to variant "
+                                    "'%(variant)s', which has another SKU — left as it is")
+                           % {"row": w.pk, "warehouse": w.warehouse.name,
+                              "variant": w.catalog_variant.variant_sku})})
+        group = [w for w in group if w not in strays]
+        if not group:
+            continue
+
         # Each group gets its OWN savepoint. Without one, a single DB-level
         # error (a unique variant_sku collision, say) leaves the surrounding
         # transaction unusable, so every later group fails on
@@ -141,7 +166,14 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
         try:
             with (_tx.atomic() if apply else _nullcontext()):
                 if variant is not None:
-                    target = parent or variant.product
+                    # A variant that already exists is only moved on the
+                    # word of its own SKU ("K12767.G93" belongs under the
+                    # product whose sku is "K12767"). A base read off the
+                    # warehouse NAME is a guess good enough to file a new
+                    # variant, not to overrule where somebody put this one:
+                    # it wanted "Tülgrek Pilise EKRU" back under "Tülgrek"
+                    # after it had been given its own product by hand.
+                    target = (parent if "." in sku else None) or variant.product
                     if variant.product_id != target.id:
                         if variant.product.featured:
                             # Never yank a variant off a real web product.

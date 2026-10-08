@@ -352,6 +352,84 @@
     </div>
   </div>
   {% endif %}
+
+  <!-- Suppliers Section -->
+  {% if product_suppliers %}
+  <div class="variants-section" id="productSuppliers">
+    <h2>{% trans "Suppliers" %} ({{ product_suppliers|length }})</h2>
+    <div class="table-container">
+      <table class="variants-table">
+        <thead>
+          <tr>
+            <th>{% trans "SKU" %}</th>
+            <th>{% trans "Supplier" %}</th>
+            <th>{% trans "Supplier SKU" %}</th>
+            <th>{% trans "Last price" %}</th>
+            <th>{% trans "Last purchase" %}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in product_suppliers %}
+          <tr data-url="{% url 'marketing:supplier_item_update' row.pk %}">
+            <td><span class="variant-sku">{{ row.variant.variant_sku }}</span></td>
+            <td>{{ row.current_account.name }}</td>
+            <td>
+              <input type="text" class="form-input supplier-sku-input" value="{{ row.supplier_sku }}"
+                     data-saved="{{ row.supplier_sku }}" maxlength="64" placeholder="—"
+                     style="max-width:180px; font-family:var(--font-mono, ui-monospace, monospace);">
+              <span class="supplier-sku-note" style="font-size:12px; margin-left:6px;"></span>
+            </td>
+            <td>{% if row.last_unit_price is not None %}{{ row.last_unit_price|floatformat:"-2g" }} {{ row.last_price_currency }}{% else %}—{% endif %}</td>
+            <td>{{ row.last_purchased_at|date:"d.m.Y"|default:"—" }}</td>
+            <td>
+              <button type="button" class="supplier-remove" title="{% trans "Remove" %}"
+                      style="padding:0; border:0; background:none; color:#C0392B; cursor:pointer;">
+                <i class="fa fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+  // A supplier's code is corrected here: change it and leave the field.
+  (function () {
+    const box = document.getElementById('productSuppliers');
+    if (!box) return;
+    function send(row, body) {
+      return fetch(row.dataset.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify(body)
+      }).then(function (r) { return r.json(); });
+    }
+    box.querySelectorAll('.supplier-sku-input').forEach(function (input) {
+      input.addEventListener('change', function () {
+        const row = input.closest('tr'), note = row.querySelector('.supplier-sku-note');
+        send(row, { supplier_sku: input.value }).then(function (d) {
+          if (d.success) {
+            input.value = input.dataset.saved = d.supplier_sku;
+            note.style.color = '#1E7B4C'; note.textContent = '{% trans "Saved" %}';
+          } else {
+            input.value = input.dataset.saved;
+            note.style.color = '#C0392B'; note.textContent = d.error || '';
+          }
+        });
+      });
+    });
+    box.querySelectorAll('.supplier-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!confirm('{% filter escapejs %}{% trans "Remove this supplier from the variant? Its code and last price are forgotten." %}{% endfilter %}')) return;
+        const row = btn.closest('tr');
+        send(row, { remove: true }).then(function (d) { if (d.success) row.remove(); });
+      });
+    });
+  })();
+  </script>
+  {% endif %}
 </div>
 
 <script>

@@ -153,6 +153,27 @@
    quantity, price, total. What is in stock is a hint on the label. */
 .co-qty-hint{font-weight:600;font-size:10.5px;color:#64748B;margin-left:5px;white-space:nowrap;}
 .co-qty-hint.short{color:#B45309;}
+/* Inputs line up along the bottom, so a label that wraps onto a second
+   line (the stock hint, on a narrow card) does not push its field down
+   past its neighbour's. */
+.co-row-counted{align-items:flex-end;}
+/* On a phone: quantity and price share the first line as two full-size
+   fields, and the total gets a line of its own — a third column there
+   is three fields too narrow to read or tap. 16px in the fields, because
+   iOS zooms the page into any input set smaller. */
+@media (max-width:560px){
+  .co-product-card{padding:12px 10px;}
+  .co-product-head strong{font-size:14px;overflow-wrap:anywhere;}
+  .co-product-head .co-remove-btn{min-width:36px;min-height:36px;flex-shrink:0;}
+  .co-product-card .form-input{font-size:16px;min-height:44px;}
+  .co-row-counted{flex-wrap:wrap;gap:8px 10px;}
+  .co-row-counted>.form-group{flex:1 1 calc(50% - 5px);}
+  .co-row-counted>.form-group:last-child{flex:1 1 100%;display:flex;align-items:baseline;
+    justify-content:space-between;margin:0;padding-top:8px;border-top:1px dashed var(--border-color);}
+  .co-row-counted>.form-group:last-child label{margin:0;}
+  .co-row-counted .co-item-total{font-size:17px;padding-top:0;}
+  .co-qty-hint{display:block;margin:2px 0 0;white-space:normal;}
+}
 
 /* ── Barcode scanner popup ───────────────────────────────────────
    Same modal the warehouse page's "Find by barcode" uses, so the two
@@ -1730,7 +1751,7 @@
           <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${coCardBooksHtml(item, bookRun)}</div>
           <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
         </div>
-        <div class="co-row">
+        <div class="co-row${item.counted ? ' co-row-counted' : ''}">
           ${item.counted ? coCountedQtyHtml(item, i) : ''}
           <div class="form-group"><label>{% trans "Unit Price" %}${item.is_cost_price ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${fmtNum(item.quantity*item.price)}</div></div>

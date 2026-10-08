@@ -786,6 +786,7 @@
           price: parseFloat(it.price) || 0,
           quantity: qty || 1,
           description: it.description || '',
+          counted: it.counted === true,
           categoryName: '',
           is_custom_curtain: false,
           custom_width: '', custom_height: '',
@@ -1453,7 +1454,7 @@
     if (res) res.innerHTML = '';
   };
 
-  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
+  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost, counted) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
     // Stock is informational only — out-of-stock / low-stock products
     // can still be added (back-order). Catalog stock is deducted only
@@ -1483,7 +1484,11 @@
       // held; the book belongs to each stock item picked below, and the
       // save cuts the line along those lines.
       rolls: [], existingRolls: [], availableRolls: [], rollsLoading: true,
-      manualMeters: 0, manualNote: '', showManualEntry: false
+      manualMeters: 0, manualNote: '', showManualEntry: false,
+      // Known from the pick itself where the caller says so; the stock
+      // list confirms it when it arrives. Starting on the right card
+      // saves the one drawn first from changing shape a moment later.
+      counted: (counted === true || counted === 'true')
     });
     renderProducts({ highlightFirst: true });
     document.getElementById('co-product-search').value = '';
@@ -1544,7 +1549,9 @@
         // barcode, so the line takes a quantity and the stock it comes
         // off is chosen for it (coTakeQuantity) — oldest first, the order
         // this list is already in.
-        item.counted = !!(d && d.counted);
+        // `||`: a product with nothing on the shelf sends no stock item to
+        // read the answer off, and what the pick said must stand.
+        item.counted = item.counted || !!(d && d.counted);
         item.printedBarcode = (d && d.printed_barcode) || '';
         // Cost per unit by barcode, kept apart from availableRolls: a
         // ticked or saved roll is a different object that never carried
@@ -1985,14 +1992,17 @@
     // Nothing on the shelf: the quantity is still wanted, it is just not
     // held against any stock (what the outsourced box is for cloth).
     var value = free > 0 ? coPickedTotal(item) : (parseFloat(item.manualMeters) || 0);
-    var hint = free > 0
+    // Until the stock list is in, the card does not know what is free:
+    // it says nothing rather than "none", and the field waits.
+    var loading = !!item.rollsLoading;
+    var hint = loading ? '…' : (free > 0
       ? fmtNum(free) + ' ' + unit + ' {% trans "in stock" %}'
-      : '{% filter escapejs %}{% trans "none in stock" %}{% endfilter %}';
+      : '{% filter escapejs %}{% trans "none in stock" %}{% endfilter %}');
     if (held > 0) hint += ' · ' + fmtNum(held) + ' {% filter escapejs %}{% trans "already packed" %}{% endfilter %}';
     return '<div class="form-group"><label>{% trans "Quantity" %}' +
-        '<span class="co-qty-hint' + ((free <= 0 || value >= free) ? ' short' : '') + '">' + hint + '</span></label>' +
+        '<span class="co-qty-hint' + ((!loading && (free <= 0 || value >= free)) ? ' short' : '') + '">' + hint + '</span></label>' +
       '<input type="number" class="form-input" id="co-qty-' + i + '" inputmode="numeric" min="0" step="1" ' +
-        'value="' + (value || '') + '" placeholder="0" onfocus="this.select()" ' +
+        'value="' + (value || '') + '" placeholder="0" onfocus="this.select()" ' + (loading ? 'disabled ' : '') +
         'onchange="coCountedQty(' + i + ',this.value)" ' +
         'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}"></div>';
   }
@@ -2163,7 +2173,7 @@
         var skuL = (d.sku || '').toLowerCase();
         var idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         if (idx === -1) {
-          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost);
+          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost, d.counted);
           idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         }
         if (idx === -1) { showToast('{% trans "The product could not be added" %}', 'error'); return false; }

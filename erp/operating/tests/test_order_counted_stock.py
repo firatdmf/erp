@@ -126,6 +126,28 @@ class CountedStock(TestCase):
         self.assertFalse(data["counted"])
         self.assertEqual([r["barcode"] for r in data["rolls"]], [ROLL])
 
+    # ── the product search ──────────────────────────────────────
+    def test_the_search_says_at_once_that_a_product_is_sold_by_count(self):
+        """So the card is drawn in its own shape when the product is
+        picked. Left to the stock list, it was drawn as a roll card first
+        and changed a moment later."""
+        def picks(query):
+            body = self.client.get(reverse("operating:product_autocomplete"),
+                                   {"product": query, "book": self.book.pk}).content.decode()
+            return re.findall(r"selectProduct\(([^)]*)\)", body)
+        duvet = picks("Duvet")
+        self.assertEqual(len(duvet), 1, duvet)
+        self.assertTrue(duvet[0].endswith(",true"), duvet[0])
+        cloth = picks("Krep")
+        self.assertEqual(len(cloth), 1, cloth)
+        self.assertTrue(cloth[0].endswith(",false"), cloth[0])
+
+    def test_the_edit_form_is_told_too(self):
+        self.post([self.line([(self.key(self.old), 3)])])
+        order = Order.objects.get()
+        page = self.client.get(reverse("operating:edit_order", kwargs={"pk": order.pk}))
+        self.assertContains(page, '"counted": true')
+
     # ── checking one item ───────────────────────────────────────
     def test_a_batch_is_found_by_its_key(self):
         data = self.get("order_create_barcode_check",

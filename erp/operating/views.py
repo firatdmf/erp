@@ -4136,6 +4136,9 @@ class OrderEdit(UpdateView):
                     if it.outsourced_quantity is not None else None
                 ),
                 "price": float(it.price) if it.price is not None else 0,
+                # Sold by count: the edit form draws this line's card in
+                # its own shape from the start.
+                "counted": bool(it.product and units.sold_by_count(it.product.unit)),
                 # Stock items already reserved for this line — shown read-only in
                 # the product card. "available" excludes this reservation's
                 # OWN hold from the other-reservations subtraction (same
@@ -5644,7 +5647,11 @@ def product_autocomplete(request):
         js_args = (f"'{escape(js_str(sku))}',{'true' if variant else 'false'},"
                    f"'{title_js}',{price},'{cat_js}',{stock_arg},"
                    f"{'true' if allow_oversell else 'false'},"
-                   f"{'true' if is_cost else 'false'}")
+                   f"{'true' if is_cost else 'false'},"
+                   # Sold by count: said with the pick, so the card is drawn
+                   # in its own shape at once rather than as a roll card
+                   # that changes when the stock list arrives.
+                   f"{'true' if units.sold_by_count(product.unit) else 'false'}")
         return row(sku, base_title, qualifier, price, is_cost,
                    stock_cell(stock, allow_oversell), js_args, extra_class)
 
@@ -5698,7 +5705,8 @@ def product_autocomplete(request):
         # what was actually picked rather than by what the row guessed.
         js_args = (f"'{escape(js_str(sku))}',true,'{title_js}',{price},'{cat_js}',"
                    f"{float(total):g},{'true' if allow_oversell else 'false'},"
-                   f"{'true' if is_cost else 'false'}")
+                   f"{'true' if is_cost else 'false'},"
+                   f"{'true' if wp.sold_by_count else 'false'}")
         return row(sku, base_title, qualifier, price, is_cost,
                    book_cell(group["books"])
                    + warehouse_cells(group["stocks"], with_cost=is_cost),

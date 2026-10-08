@@ -311,40 +311,12 @@ def set_variant_attributes(variant, attributes, *, replace):
                                       productvariantattributevalue_id=value_obj.id)
 
 
-def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None,
-                         variant_sku, variant_barcode=None,
-                         cost=None, existing_base_product=None,
-                         attributes=None, refuse_lookalike=False):
-    """Idempotently create/link a HIDDEN catalog Product (main) + ProductVariant
-    (the scanned item). Returns (product, variant, product_created, variant_created).
+def _base_product(base_name, existing_base_product=None):
+    """The main product a variant belongs under, made hidden if there is
+    none. Returns (product, created)."""
+    from marketing.models import Product
 
-    - NO quantity is passed or written. The variant's stock is the sum of the
-      WarehouseProduct rows pointing at it, read through live_quantity; the
-      caller writes the warehouse row, and that IS the stock.
-    - A variant is its SKU: re-syncing the same variant_sku updates it in
-      place, and a different variant_sku is a different variant. (A new SKU
-      used to be folded into any variant with the same colour, which put
-      K24828İT.G50's stock on K24828İT.G137 because both are "gri_simli".)
-    - `attributes`: [(name, value), …] describing the variant, in order.
-      The older single `attribute_name`/`attribute_value` still works.
-    - `refuse_lookalike`: raise LookAlikeVariant rather than create a variant
-      whose values equal an existing one's.
-    - Raises CatalogSyncConflict if variant_sku already belongs to another product.
-    """
-    from marketing.models import Product, ProductVariant
-
-    variant_sku = (variant_sku or "").strip()
-    if not variant_sku:
-        raise CatalogSyncConflict("variant_sku is required")
-    pairs = _attribute_pairs(attributes, attribute_name, attribute_value)
-
-    base_name = (base_name or "").strip() or variant_sku
-    cost_dec = _to_decimal(cost)
-    # The catalogue refuses a negative cost at the database. The warehouse
-    # row the caller wrote keeps whatever was typed; the catalogue mirror
-    # just doesn't copy an impossible cost, rather than failing the intake.
-    if cost_dec is not None and cost_dec < 0:
-        cost_dec = None
+    base_name = (base_name or "").strip()
 
     def _safe_sku(base):
         """The main-product SKU is the base code (K1245.G13 → 'K1245').
@@ -396,6 +368,46 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
             if new_sku:
                 product.sku = new_sku
                 product.save(update_fields=["sku"])
+    return product, product_created
+
+
+def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None,
+                         variant_sku, variant_barcode=None,
+                         cost=None, existing_base_product=None,
+                         attributes=None, refuse_lookalike=False):
+    """Idempotently create/link a HIDDEN catalog Product (main) + ProductVariant
+    (the scanned item). Returns (product, variant, product_created, variant_created).
+
+    - NO quantity is passed or written. The variant's stock is the sum of the
+      WarehouseProduct rows pointing at it, read through live_quantity; the
+      caller writes the warehouse row, and that IS the stock.
+    - A variant is its SKU: re-syncing the same variant_sku updates it in
+      place, and a different variant_sku is a different variant. (A new SKU
+      used to be folded into any variant with the same colour, which put
+      K24828İT.G50's stock on K24828İT.G137 because both are "gri_simli".)
+    - `attributes`: [(name, value), …] describing the variant, in order.
+      The older single `attribute_name`/`attribute_value` still works.
+    - `refuse_lookalike`: raise LookAlikeVariant rather than create a variant
+      whose values equal an existing one's.
+    - Raises CatalogSyncConflict if variant_sku already belongs to another product.
+    """
+    from marketing.models import Product, ProductVariant
+
+    variant_sku = (variant_sku or "").strip()
+    if not variant_sku:
+        raise CatalogSyncConflict("variant_sku is required")
+    pairs = _attribute_pairs(attributes, attribute_name, attribute_value)
+
+    base_name = (base_name or "").strip() or variant_sku
+    cost_dec = _to_decimal(cost)
+    # The catalogue refuses a negative cost at the database. The warehouse
+    # row the caller wrote keeps whatever was typed; the catalogue mirror
+    # just doesn't copy an impossible cost, rather than failing the intake.
+    if cost_dec is not None and cost_dec < 0:
+        cost_dec = None
+
+    product, product_created = _base_product(base_name, existing_base_product)
+    if not product_created:
         # Lock the product row for the rest of this transaction, so two
         # concurrent syncs of new look-alike variants can't both pass the
         # look-alike check below.
@@ -457,11 +469,14 @@ def resync_warehouse_product(wp, base_override=None):
     """Re-sync ONE warehouse product into the catalog after an edit
     (sku / name / main-product change).
 
-    Re-links its catalog variant to the base product derived from the
-    CURRENT sku — or to ``base_override`` (an explicit main-product title) —
-    moving it OFF a wrong main product if needed and renaming the variant_sku
-    to match the corrected warehouse sku. The variant's colour/model is
-    preserved. Empty hidden products left behind are removed.
+    A SKU is one variant on every shelf, so a new SKU renames the catalog
+    variant IN PLACE — order lines, attributes and files stay on it — and
+    every other warehouse row of that variant that carried the old SKU
+    takes the new one. The variant moves to another main product only when
+    asked: ``base_override`` (an explicit main-product title), or a base
+    code written in the SKU itself ("K1245.G13" → "K1245"), never one
+    guessed from the name. An empty hidden product left behind is removed.
+    A row with no variant yet is filed under the one its SKU and name derive.
 
     Returns (variant, warning) — warning is a message string if the change
     couldn't be applied (e.g. the sku already belongs to another variant),
@@ -469,6 +484,7 @@ def resync_warehouse_product(wp, base_override=None):
     """
     from django.db import transaction as _tx
     from marketing.models import Product, ProductVariant
+    from operating.models import WarehouseProduct
 
     sku = (wp.sku or "").strip()
     if not sku:
@@ -484,29 +500,54 @@ def resync_warehouse_product(wp, base_override=None):
                                "(product #%(product)s).")
                       % {"sku": sku, "product": clash.product_id})
 
+    cat = derive_catalog(sku, wp.name or "")
     with _tx.atomic():
-        kept = variant_attributes(old)
-        if old:
-            old_pid = old.product_id
-            wp.catalog_variant = None
+        if old is None:
+            _p, variant, _pc, _vc = sync_roll_to_catalog(
+                base_name=(base_override or cat["base_name"] or "").strip(),
+                attribute_name=cat["attribute_name"],
+                attribute_value=cat["attribute_value"],
+                variant_sku=sku, variant_barcode=wp.barcode,
+                cost=wp.cost_usd,
+            )
+            wp.catalog_variant = variant
             wp.save(update_fields=["catalog_variant"])
-            old.delete()
-            if (Product.objects.filter(pk=old_pid, featured=False).exists()
-                    and not ProductVariant.objects.filter(product_id=old_pid).exists()):
-                Product.objects.filter(pk=old_pid).delete()
+            return variant, None
 
-        cat = derive_catalog(sku, wp.name or "")
-        base = (base_override or cat["base_name"] or "").strip()
-        _p, variant, _pc, _vc = sync_roll_to_catalog(
-            base_name=base,
-            attributes=kept or None,
-            attribute_name=cat["attribute_name"],
-            attribute_value=cat["attribute_value"],
+        variant = ProductVariant.everywhere.select_for_update().get(pk=old.pk)
+        was = (variant.variant_sku or "").strip()
+        home = variant.product
+        base = (base_override or (cat["base_name"] if "." in sku else "") or "").strip()
+        product = _base_product(base)[0] if base else home
+
+        changed = []
+        if was != sku:
+            variant.variant_sku = sku
+            changed.append("variant_sku")
+        if product.pk != home.pk:
+            variant.product = product
+            changed.append("product")
+        if changed:
+            variant.save(update_fields=changed)
+        if (product.pk != home.pk and not home.featured
+                and not ProductVariant.everywhere.filter(product_id=home.pk).exists()):
+            Product.everywhere.filter(pk=home.pk).delete()
+
+        # The other shelves holding this variant under the old SKU. A row
+        # spelled some other way was never this SKU's and is left alone.
+        if was and was != sku:
+            (WarehouseProduct.objects
+             .filter(catalog_variant_id=variant.pk, sku__iexact=was)
+             .exclude(pk=wp.pk).update(sku=sku))
+
+        described = bool(variant_attributes(variant))
+        sync_roll_to_catalog(
+            base_name=product.title, existing_base_product=product,
+            attribute_name=None if described else cat["attribute_name"],
+            attribute_value=None if described else cat["attribute_value"],
             variant_sku=sku, variant_barcode=wp.barcode,
             cost=wp.cost_usd,
         )
-        wp.catalog_variant = variant
-        wp.save(update_fields=["catalog_variant"])
         return variant, None
 
 

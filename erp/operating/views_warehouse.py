@@ -1203,11 +1203,9 @@ def _resync_wp_catalog(wp):
     in place, WITHOUT touching its identity (sku/attributes/product).
 
     Deliberately calls sync_roll_to_catalog(variant_sku=wp.sku, ...) rather
-    than resync_warehouse_product(wp) — the latter deletes and recreates the
-    ProductVariant row on every call, which would SET_NULL every
-    InvoiceItem.variant (and every other FK) pointing at it across ALL
-    invoices that ever referenced this variant, not just the one being
-    edited. sync_roll_to_catalog's existing-variant branch only updates
+    than resync_warehouse_product(wp) — the latter is for an edit of the
+    product itself and may rename the variant or move it to another main
+    product. sync_roll_to_catalog's existing-variant branch only updates
     variant_cost and the attributes in place."""
     if not wp.catalog_variant_id:
         return

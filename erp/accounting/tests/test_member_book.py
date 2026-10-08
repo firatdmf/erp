@@ -234,3 +234,43 @@ class RetailCurrentAccountIsNamedInEnglish(TestCase):
         self.assertEqual(current_account.code, "PERAKENDE")
         self.assertEqual(current_account.name, "Retail Sales")
         self.assertNotIn("Perakende", current_account.notes)
+
+
+class TheBookTileInTheSideMenu(TestCase):
+    """The tile under the logo is a link to the book you are in. With
+    several books it also carries the list of them, shown on hover."""
+
+    def setUp(self):
+        self.book = Book.objects.create(name="Ergene Fabric")
+        self.other = Book.objects.create(name="Laleli Fabric")
+        self.user = get_user_model().objects.create_user(
+            username="staff", password="pw")
+        self.member = Member.objects.get(user=self.user)
+        self.member.books.set([self.book, self.other])
+        self.member.default_book = self.book
+        self.member.save(update_fields=["default_book"])
+        self.client.force_login(self.user)
+
+    def _page(self):
+        resp = self.client.get(
+            reverse("accounting:book_detail", kwargs={"pk": self.book.pk}))
+        self.assertEqual(resp.status_code, 200)
+        return resp
+
+    def test_the_tile_links_to_the_books_own_page(self):
+        here = reverse("accounting:book_detail", kwargs={"pk": self.book.pk})
+        self.assertContains(self._page(), f'<a class="nj-book-btn" href="{here}"')
+
+    def test_several_books_are_listed_for_switching(self):
+        page = self._page()
+        self.assertContains(page, 'class="nj-book-menu"')
+        self.assertContains(page, reverse("accounting:set_my_working_book",
+                                          kwargs={"pk": self.other.pk}))
+
+    def test_one_book_is_still_a_link_and_has_no_list(self):
+        self.member.books.set([self.book])
+        page = self._page()
+        here = reverse("accounting:book_detail", kwargs={"pk": self.book.pk})
+        self.assertContains(page, f'<a class="nj-book-btn" href="{here}"')
+        self.assertNotContains(page, 'class="nj-book-menu"')
+

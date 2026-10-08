@@ -22,17 +22,19 @@
     be visible before you click — otherwise you find out which company's
     money you were looking at only afterwards.
 
-    Members with one book see a label; those with several get a switcher.
+    The tile is a link to that book's own page. Members with several
+    books also get the list of them on hover, to switch.
     `current_book` and `my_books` come from accounting.book_scope.
   {% endcomment %}
   {% if current_book %}
   <div class="nj-book" data-book="{{ current_book.pk }}">
-    {% if my_books|length > 1 %}
-    <button type="button" class="nj-book-btn" aria-haspopup="true" aria-expanded="false">
+    <a class="nj-book-btn" href="{% url 'accounting:book_detail' current_book.pk %}"
+       {% if my_books|length > 1 %}aria-haspopup="true" aria-expanded="false"{% endif %}>
       <i data-lucide="book-open"></i>
       <span class="nj-book-name">{{ current_book.name }}</span>
-      <i data-lucide="chevron-down" class="nj-book-caret"></i>
-    </button>
+      {% if my_books|length > 1 %}<i data-lucide="chevron-right" class="nj-book-caret"></i>{% endif %}
+    </a>
+    {% if my_books|length > 1 %}
     <div class="nj-book-menu" hidden>
       {% for b in my_books %}
       <a class="nj-book-opt{% if b.pk == current_book.pk %} is-current{% endif %}"
@@ -41,11 +43,6 @@
          data-work-url="{% url 'accounting:set_my_working_book' b.pk %}">{{ b.name }}</a>
       {% endfor %}
     </div>
-    {% else %}
-    <span class="nj-book-btn is-static">
-      <i data-lucide="book-open"></i>
-      <span class="nj-book-name">{{ current_book.name }}</span>
-    </span>
     {% endif %}
   </div>
   {% endif %}
@@ -252,19 +249,42 @@
 
     var root = document.querySelector('.nj-book');
     if (!root) return;
-    var btn = root.querySelector('.nj-book-btn:not(.is-static)');
+    var btn = root.querySelector('.nj-book-btn');
     var menu = root.querySelector('.nj-book-menu');
     if (!btn || !menu) return;
 
-    btn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      var open = !menu.hidden;
-      menu.hidden = open;
-      btn.setAttribute('aria-expanded', String(!open));
-    });
-    document.addEventListener('click', function () {
+    // Hovering the tile shows the other books; clicking it is a plain
+    // link to this book's page. The short delay lets the pointer cross
+    // the gap between the rail and the list without the list closing.
+    var closeTimer = null;
+    function show() {
+      if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+      menu.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+    }
+    function hide() {
       menu.hidden = true;
       btn.setAttribute('aria-expanded', 'false');
+    }
+    function hideSoon() {
+      if (closeTimer) clearTimeout(closeTimer);
+      closeTimer = setTimeout(hide, 160);
+    }
+    root.addEventListener('mouseenter', show);
+    root.addEventListener('mouseleave', hideSoon);
+    root.addEventListener('focusin', show);
+    root.addEventListener('focusout', function (e) {
+      if (!root.contains(e.relatedTarget)) hideSoon();
+    });
+
+    // A touch screen has no hover, so there the first tap opens the list
+    // and the second follows the link.
+    var noHover = window.matchMedia && window.matchMedia('(hover: none)').matches;
+    btn.addEventListener('click', function (e) {
+      if (noHover && menu.hidden) { e.preventDefault(); show(); }
+    });
+    document.addEventListener('click', function (e) {
+      if (!root.contains(e.target)) hide();
     });
 
     menu.querySelectorAll('.nj-book-opt').forEach(function (a) {

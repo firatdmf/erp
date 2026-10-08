@@ -1128,7 +1128,7 @@
   background: rgba(0, 128, 128, 0.14) !important;
   color: #DCE4E9 !important;
 }
-[data-theme="dark"] .nj-book-btn:not(.is-static):hover {
+[data-theme="dark"] .nj-book-btn:hover {
   background: rgba(0, 128, 128, 0.22) !important;
 }
 [data-theme="dark"] .nj-book-btn svg { color: var(--nejum-teal-400, #33ADAD) !important; }

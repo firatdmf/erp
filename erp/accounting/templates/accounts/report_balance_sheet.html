@@ -219,6 +219,7 @@ They are never totalled into an equation of their own: they hold no equity.
           <td>
             {% if line.url %}<a class="bs-acct" href="{{ line.url }}">{{ line.label }}</a>{% else %}{{ line.label }}{% endif %}
             {% if line.count is not None %}<span class="muted">× {{ line.count|intcomma }}</span>{% endif %}
+            {% if line.native is not None %}<span class="muted">— {{ line.native|floatformat:"2g" }} {{ line.currency }}</span>{% endif %}
           </td>
           <td class="num {% if line.amount < 0 %}neg{% endif %}">{{ line.amount|floatformat:"2g" }}</td>
         </tr>

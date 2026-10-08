@@ -231,8 +231,7 @@ def _subsidiary_ledgers(book, rec):
     from django.urls import reverse
     from django.utils.translation import gettext as _
 
-    from .models import CashTransactionEntry
-    from .services_ledger import _inventory_value, _signed_cash
+    from .services_ledger import _inventory_value, cash_by_account
 
     ZERO = Decimal("0.00")
     names = dict(ChartAccount.objects
@@ -257,15 +256,16 @@ def _subsidiary_ledgers(book, rec):
         }
 
     # ── Cash journal: one line per cash account ──────────────────────
+    base_code = book.base_currency.code if book.base_currency_id else ""
     cash_lines = [
-        {"label": (f'{r["cash_account__name"]} ({r["cash_account__currency__code"]})'
-                   if r["cash_account__name"] else _("No cash account")),
-         "amount": r["t"] or ZERO}
-        for r in (CashTransactionEntry.objects.filter(book=book)
-                  .values("cash_account__name", "cash_account__currency__code")
-                  .annotate(t=Sum(_signed_cash()))
-                  .order_by("cash_account__name"))
-        if r["t"]
+        {"label": (f'{r["name"]} ({r["currency"]})' if r["name"]
+                   else _("No cash account")),
+         "amount": r["base"],
+         # What a hand count would find, for a till not kept in the
+         # book's own currency — there the two figures are the same.
+         "native": r["native"] if r["currency"] != base_code else None,
+         "currency": r["currency"]}
+        for r in cash_by_account(book)
     ]
 
     # ── Current accounts: who owes us, and whom we owe ───────────────

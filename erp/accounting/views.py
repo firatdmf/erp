@@ -606,7 +606,7 @@ class BookDetail(generic.DetailView):
         control-account checks shown under it (services_ledger.reconcile).
         """
         from .services_ledger import (_inventory_value, balance_sheet,
-                                      reconcile)
+                                      cash_by_currency, reconcile)
 
         sheet = balance_sheet(book)
         groups = sheet["groups"]
@@ -644,10 +644,20 @@ class BookDetail(generic.DetailView):
             for part in l.get("parts") or []:
                 part["shown"] = abs(part["amount"]) if l.get("sign") == "−" else part["amount"]
 
+        # Cash and Bank is one figure in base currency; what is actually in
+        # the tills is so many dollars, so many euros, so many lira. Listed
+        # under it, each with what the ledger carries it at.
+        asset_lines = lines("asset")
+        for l in asset_lines:
+            if l["code"] == "1000":
+                l["parts"] = [{"native": c["native"], "currency": c["currency"],
+                               "amount": c["base"]}
+                              for c in cash_by_currency(book)]
+
         _value, unvalued_items, unvalued_qty = _inventory_value(book)
         checks = reconcile(book)["rows"]
         return {
-            "eq_assets_lines": lines("asset"),
+            "eq_assets_lines": asset_lines,
             "eq_liabilities_lines": lines("liability"),
             "eq_equity_lines": equity_lines,
             "eq_assets": sheet["assets"],

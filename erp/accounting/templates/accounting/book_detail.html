@@ -321,6 +321,9 @@
         <div class="eq-side-title">{% trans "Assets" %}</div>
         {% for l in eq_assets_lines %}
         <div class="eq-line"><span><a class="eq-acct" href="{% url 'accounts:report_ledger_account' book.pk l.code %}">{{ l.label }}</a></span><span class="v">{{ l.amount|format_money }}</span></div>
+        {% for c in l.parts %}
+        <div class="eq-line eq-sub"><span>{{ c.native|format_money }} {{ c.currency }}</span><span class="v">{{ c.amount|format_money }}</span></div>
+        {% endfor %}
         {% empty %}
         <div class="eq-line"><span>—</span><span class="v">{{ 0|format_money }}</span></div>
         {% endfor %}

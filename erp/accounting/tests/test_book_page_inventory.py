@@ -180,3 +180,54 @@ class BookPageEquationReadsTheLedger(TestCase):
 
     def test_the_card_links_to_the_balance_sheet(self):
         self.assertContains(self._page(), reverse("accounts:report_balance_sheet", args=[self.book.pk]))
+
+
+class CashIsListedByCurrency(TestCase):
+    """Cash and Bank is one figure in the book's currency. What is in the
+    tills is so many dollars and so many euros, and the card says both."""
+
+    def setUp(self):
+        from accounting.models import CashAccount, EquityCapital, StakeholderBook
+        from accounting.services_ledger import ensure_chart
+        from accounting.views import handle_equity_transaction
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.eur = CurrencyCategory.objects.create(code="EUR", name="Euro", symbol="€")
+        self.book = Book.objects.create(name="Laleli Fabric", base_currency=self.usd)
+        ensure_chart()
+        user = get_user_model().objects.create_superuser("owner", "o@x.com", "pw")
+        user.member.books.set([self.book])
+        user.member.default_book = self.book
+        user.member.save(update_fields=["default_book"])
+        self.client.force_login(user)
+        StakeholderBook.objects.get_or_create(member=user.member, book=self.book)
+        for currency, amount, rate in ((self.usd, "2290.00", None), (self.eur, "1297.00", "1.150000")):
+            till = CashAccount.objects.create(book=self.book, name="Cash", currency=currency,
+                                              balance=Decimal("0"))
+            capital = EquityCapital.objects.create(
+                book=self.book, member=user.member, cash_account=till, currency=currency,
+                amount=Decimal(amount), date_invested="2026-10-01",
+                **({"exchange_rate": Decimal(rate)} if rate else {}))
+            handle_equity_transaction(self.book, capital.amount, currency, capital,
+                                      capital.pk, till)
+
+    def test_the_card_opens_cash_into_its_currencies(self):
+        from accounting.services_ledger import cash_by_currency
+        by = {c["currency"]: c for c in cash_by_currency(self.book)}
+        self.assertEqual(by["USD"]["native"], Decimal("2290.00"))
+        self.assertEqual(by["EUR"]["native"], Decimal("1297.00"))
+        self.assertEqual(by["EUR"]["base"], Decimal("1491.55"))
+
+        r = self.client.get(reverse("accounting:book_detail", kwargs={"pk": self.book.pk}))
+        cash = next(l for l in r.context["eq_assets_lines"] if l["code"] == "1000")
+        self.assertEqual(sum(p["amount"] for p in cash["parts"]), cash["amount"])
+        self.assertContains(r, "1,297.00 EUR")
+        self.assertContains(r, "2,290.00 USD")
+
+    def test_the_balance_sheet_shows_a_foreign_till_in_its_own_money(self):
+        r = self.client.get(reverse("accounts:report_balance_sheet",
+                                    kwargs={"book_id": self.book.pk}))
+        lines = {l["label"]: l for l in r.context["ledgers"][0]["lines"]}
+        self.assertEqual(lines["Cash (EUR)"]["native"], Decimal("1297.00"))
+        self.assertIsNone(lines["Cash (USD)"]["native"])
+        self.assertContains(r, "1,297.00 EUR")
+

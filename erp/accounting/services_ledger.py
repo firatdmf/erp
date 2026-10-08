@@ -577,6 +577,42 @@ def _cash_journal_total(book):
             .aggregate(t=Sum(_signed_cash()))["t"] or ZERO)
 
 
+def cash_by_account(book):
+    """What each cash account holds, in its own currency and in base.
+
+    "native" is what somebody would count by hand; "base" is what the
+    cash journal carries it at, each movement converted on its own day.
+    A cash account whose movements net to nothing in both is left out.
+    """
+    from django.db.models import Case, DecimalField, F, When
+
+    from .models import CashTransactionEntry
+
+    native = Case(When(is_amount_positive=True, then=F("amount")),
+                  default=-F("amount"),
+                  output_field=DecimalField(max_digits=14, decimal_places=2))
+    rows = (CashTransactionEntry.objects.filter(book=book)
+            .values("cash_account__name", "cash_account__currency__code")
+            .annotate(native=Sum(native), base=Sum(_signed_cash()))
+            .order_by("cash_account__name", "cash_account__currency__code"))
+    return [{"name": r["cash_account__name"] or "",
+             "currency": r["cash_account__currency__code"] or "",
+             "native": r["native"] or ZERO,
+             "base": r["base"] or ZERO}
+            for r in rows if r["native"] or r["base"]]
+
+
+def cash_by_currency(book):
+    """cash_by_account, with the accounts of one currency added together."""
+    totals = {}
+    for row in cash_by_account(book):
+        t = totals.setdefault(row["currency"], {"currency": row["currency"],
+                                                "native": ZERO, "base": ZERO})
+        t["native"] += row["native"]
+        t["base"] += row["base"]
+    return sorted(totals.values(), key=lambda t: -t["base"])
+
+
 def _current_account_net(book):
     from .models_accounts import CurrentAccount
     return (CurrentAccount.objects.filter(book=book)

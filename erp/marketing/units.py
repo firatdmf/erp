@@ -89,6 +89,20 @@ def pack_noun(pack_type, count):
     return one if count == 1 else many
 
 
+# Units that count interchangeable things. A metre of cloth comes off one
+# particular roll, which has a barcode of its own; a duvet set is one of
+# many alike, and the barcode printed on it names the VARIANT — every set
+# of it carries the same one. So such a product is sold by a quantity and
+# its variant's barcode, never by picking out one labelled item.
+COUNTED_UNITS = frozenset({"piece", "pack"})
+
+
+def sold_by_count(unit):
+    """Whether a product in this unit is sold as a count of alike pieces
+    (see COUNTED_UNITS) rather than item by labelled item."""
+    return unit in COUNTED_UNITS
+
+
 def counts_packs(pack_type):
     """Whether a product packed this way has packs worth counting. False
     for loose stock — see UNCOUNTED_PACKS."""

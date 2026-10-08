@@ -2123,6 +2123,23 @@ class WarehouseProduct(models.Model):
         return units.counts_packs(self.pack_type)
 
     @property
+    def sold_by_count(self):
+        """True where the barcode names the variant, not one item of it
+        (units.sold_by_count): an order takes a quantity of this product
+        and the stock entries it comes off are chosen for it."""
+        return units.sold_by_count(self.unit)
+
+    @property
+    def printed_barcode(self):
+        """The barcode printed on every piece of this product: the row's
+        own, else its catalogue variant's."""
+        own = (self.barcode or "").strip()
+        if own:
+            return own
+        variant = self.catalog_variant if self.catalog_variant_id else None
+        return ((variant.variant_barcode or "").strip() if variant else "")
+
+    @property
     def quantity_label(self):
         """Column heading for this product's quantity — "Length" for cloth,
         "Weight" for anything sold by the kilo, "Quantity" for things that
@@ -2386,6 +2403,29 @@ class WarehouseProductItem(models.Model):
                 name="operating_warehouseproductitem_unit_cost_base_not_negative",
             ),
         ]
+
+    # How an order form names this stock item to the server and back.
+    #
+    # A roll of cloth has a barcode of its own and that is its name. A
+    # batch of alike pieces has none — the printed barcode is its
+    # product's (WarehouseProduct.printed_barcode) — so it goes by its id,
+    # marked with a "#" no real barcode starts with. The form treats the
+    # key as an opaque string, which is what lets one picker, one save
+    # path and one reconcile serve both kinds of stock.
+    PICK_KEY_PREFIX = "#"
+
+    @property
+    def pick_key(self):
+        return (self.barcode or "").strip() or f"{self.PICK_KEY_PREFIX}{self.pk}"
+
+    @classmethod
+    def matching_pick_key(cls, queryset, key):
+        """`queryset` narrowed to the stock item(s) `key` names: one by id
+        for a "#123" key, else every item carrying that barcode."""
+        key = (key or "").strip()
+        if key.startswith(cls.PICK_KEY_PREFIX) and key[1:].isdigit():
+            return queryset.filter(pk=int(key[1:]))
+        return queryset.filter(barcode__iexact=key)
 
     def __str__(self):
         return (f"Stock item #{self.pk} · {self.quantity} {self.product.unit_short}"

@@ -1291,14 +1291,28 @@ def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
     target = (target_sku or "").strip().lower()
     if not target:
         return None, "no_target"
-    qs = (WarehouseProductItem.objects
-          .select_related("product", "product__catalog_variant", "product__warehouse")
-          .filter(barcode__iexact=code))
+    qs = WarehouseProductItem.matching_pick_key(
+        WarehouseProductItem.objects
+        .select_related("product", "product__catalog_variant", "product__warehouse"),
+        code)
     if books is not None:
         qs = qs.filter(product__warehouse__accounting_book__in=books)
     rolls = list(qs)
     if not rolls:
-        return None, "not_found"
+        # Not a stock item's own code. For goods sold by count it may be
+        # the barcode printed on every piece — which names the product,
+        # and the oldest of its stock with anything free is the one.
+        batches = list(_batches_by_printed_barcode(code, books))
+        if not batches:
+            return None, "not_found"
+        mine = [b for b in batches if target in (
+            (getattr(b.product.catalog_variant, "variant_sku", "") or "").strip().lower()
+            if b.product.catalog_variant_id else "",
+            (b.product.sku or "").strip().lower())]
+        if not mine:
+            return None, "wrong_product"
+        free = next((b for b in mine if _roll_available_meters(b) > 0), None)
+        return (free or mine[0]), None
     for roll in rolls:
         wp = roll.product
         if wp is None:
@@ -1309,6 +1323,34 @@ def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
         if target in (vsku, wsku):
             return roll, None
     return None, "wrong_product"
+
+
+def _batches_by_printed_barcode(code, books=None):
+    """The live stock of whatever product(s) carry `code` as their
+    PRINTED barcode — oldest first, the order it should leave in.
+
+    Only for goods sold by count (marketing.units.sold_by_count). Cloth is
+    never found this way: each roll has a barcode of its own, and a code
+    that named a whole fabric would not say which roll was meant.
+
+    `books` confines it to those books' shelves, as everywhere else.
+    """
+    from django.db.models import Q
+    from django.db.models.functions import TruncDate
+    from .models import WarehouseProductItem
+    code = (code or "").strip()
+    if not code:
+        return WarehouseProductItem.objects.none()
+    qs = (WarehouseProductItem.objects
+          .select_related("product", "product__catalog_variant__product",
+                          "product__warehouse__accounting_book")
+          .filter(status__in=["in_stock", "partial"])
+          .filter(Q(product__barcode__iexact=code)
+                  | Q(product__catalog_variant__variant_barcode__iexact=code))
+          .filter(product__catalog_variant__product__unit__in=units.COUNTED_UNITS))
+    if books is not None:
+        qs = qs.filter(product__warehouse__accounting_book__in=books)
+    return qs.order_by(TruncDate("scanned_at"), "pk")
 
 
 def _create_roll_reservation(order, order_item, roll, req_meters, user):
@@ -1425,10 +1467,10 @@ def _order_edit_release_unticked(order, items_payload):
     while A still held it, see nothing available, and drop the pick. Doing
     all the releases first makes the freed metres visible to the adds.
 
-    Only lines actually present in the submission are considered, and only
-    stock items with a barcode — a hold with no barcode on its roll can't be
-    matched against the form's selection either way, so it is left alone
-    rather than silently released.
+    Only lines actually present in the submission are considered. A hold
+    is matched to the form's selection by its stock item's pick key
+    (WarehouseProductItem.pick_key) — the barcode where it has one, its id
+    where it is a batch of alike pieces with none.
     """
     from .models import OrderStockReservation
     submitted = {}
@@ -1447,7 +1489,7 @@ def _order_edit_release_unticked(order, items_payload):
     for r in (OrderStockReservation.objects
               .filter(order=order, consumed=False, order_item_id__in=submitted)
               .select_related("stock_item")):
-        bc = ((r.stock_item.barcode or "").strip().lower() if r.stock_item else "")
+        bc = (r.stock_item.pick_key.lower() if r.stock_item else "")
         if bc and bc not in submitted[r.order_item_id]:
             r.delete()
 
@@ -1488,7 +1530,7 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
 
     existing = {}
     for r in order_item.stock_reservations.filter(consumed=False).select_related("stock_item"):
-        key = ((r.stock_item.barcode or "").strip().lower() if r.stock_item else "")
+        key = (r.stock_item.pick_key.lower() if r.stock_item else "")
         if key:
             existing[key] = r
 
@@ -1707,6 +1749,20 @@ def order_pack_reserve_add(request, pk):
     rolls = list(WarehouseProductItem.objects
                  .select_related("product", "product__catalog_variant", "product__warehouse")
                  .filter(barcode__iexact=code))
+    if not rolls:
+        # Goods sold by count are scanned by the barcode printed on them,
+        # which is their product's. It stands for what THIS order holds of
+        # that product — still-unpacked holds first, so scanning into a
+        # sack places the next one rather than re-placing the last.
+        from django.db.models import F, Q
+        held = (OrderStockReservation.objects
+                .filter(order=order, consumed=False)
+                .filter(Q(warehouse_product__barcode__iexact=code)
+                        | Q(warehouse_product__catalog_variant__variant_barcode__iexact=code))
+                .select_related("stock_item__product__catalog_variant",
+                                "stock_item__product__warehouse")
+                .order_by(F("pack_id").asc(nulls_first=True), "pk"))
+        rolls = [r.stock_item for r in held if r.stock_item_id]
     if not rolls:
         return JsonResponse({"ok": False, "kind": "not_found",
                              "error": _gettext("No stock item (roll) was found with this barcode.")}, status=404)
@@ -1949,6 +2005,11 @@ def order_create_barcode_check(request):
     return JsonResponse({
         "ok": True,
         "stock_item_id": roll.pk,
+        # What the form must call this item from here on. The code that
+        # was typed is not always it: a printed barcode names a product,
+        # and the answer is one batch of it.
+        "key": roll.pick_key,
+        "counted": bool(roll.product and roll.product.sold_by_count),
         "available": float(avail),
         # What `available` counts: metres of cloth, packs of curtains.
         "unit": roll.product.unit_short if roll.product else "",
@@ -2446,13 +2507,20 @@ def order_create_barcode_resolve(request):
             .filter(barcode__iexact=code, status__in=["in_stock", "partial"])
             .filter(product__warehouse__accounting_book__in=_books_in_scope(request))
             .first())
+    editing = _editing_order_id(request)
+    if roll is None:
+        # The barcode printed on goods sold by count names their product;
+        # the oldest batch of it with anything free stands for it.
+        batches = list(_batches_by_printed_barcode(code, _books_in_scope(request)))
+        roll = (next((b for b in batches
+                      if _roll_available_meters(b, exclude_order_id=editing) > 0), None)
+                or (batches[0] if batches else None))
     if roll is None:
         other = _other_book_holding(code, request)
         if other is not None:
             return JsonResponse({"ok": False, "kind": "wrong_book",
                                  "error": _wrong_book_error(other, request)}, status=404)
         return JsonResponse({"ok": False, "error": _gettext("No stock item was found with this barcode.")}, status=404)
-    editing = _editing_order_id(request)
     avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
         return _roll_unavailable_response(roll, exclude_order_id=editing)
@@ -2502,9 +2570,12 @@ def order_create_barcode_resolve(request):
         "title": title,
         "price": float(price or 0),
         "is_cost": bool(is_cost),
+        # Sold by count: the scan named the product, so the form adds one
+        # to the line rather than picking out the stock item below.
+        "counted": bool(wp.sold_by_count),
         "roll": {
             "id": roll.pk,
-            "barcode": roll.barcode or "",
+            "barcode": roll.pick_key,
             "available": float(avail),
             "unit": wp.unit_short,
             "warehouse": (wp.warehouse.name if wp.warehouse_id else ""),
@@ -2587,7 +2658,7 @@ def free_rolls_response(request, books):
         .filter(Q(product__catalog_variant__variant_sku__iexact=sku) | Q(product__sku__iexact=sku))
         .annotate(unit_cost=unit_cost)
         .order_by(TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),
-                  F("unit_cost").asc(nulls_last=True))[:60]
+                  F("unit_cost").asc(nulls_last=True), "pk")[:60]
     )
     editing = _editing_order_id(request)
     rolls = list(rolls)
@@ -2621,7 +2692,10 @@ def free_rolls_response(request, books):
         wh = roll.product.warehouse if (roll.product and roll.product.warehouse_id) else None
         out.append({
             "id": roll.pk,
-            "barcode": roll.barcode or "",
+            # The KEY the form sends back for this item, not always a
+            # barcode: a batch of alike pieces has none of its own and
+            # goes by its id (WarehouseProductItem.pick_key).
+            "barcode": roll.pick_key,
             "warehouse": (wh.name if wh else ""),
             "book_id": (wh.accounting_book_id if wh else None),
             "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
@@ -2635,7 +2709,15 @@ def free_rolls_response(request, books):
                                if roll.unit_cost is not None else None)}),
         })
     from accounting.models_accounts import _base_currency_symbol
-    return JsonResponse({"ok": True, "rolls": out, "cost_symbol": _base_currency_symbol()})
+    # One card is one SKU, so what is true of its first stock item is
+    # true of the card: whether it is sold by count, and the barcode
+    # printed on every piece of it (which a scan may hand the card).
+    first = rolls[0].product if rolls else None
+    return JsonResponse({
+        "ok": True, "rolls": out, "cost_symbol": _base_currency_symbol(),
+        "counted": bool(first and first.sold_by_count),
+        "printed_barcode": (first.printed_barcode if first else ""),
+    })
 
 
 @login_required
@@ -4068,7 +4150,7 @@ class OrderEdit(UpdateView):
                         # user action, not the silent auto-release that
                         # was reverted earlier.
                         "reservation_id": r.pk,
-                        "barcode": r.stock_item.barcode or "" if r.stock_item else "",
+                        "barcode": r.stock_item.pick_key if r.stock_item else "",
                         "warehouse": (r.stock_item.product.warehouse.name
                                      if (r.stock_item and r.stock_item.product and r.stock_item.product.warehouse_id)
                                      else ""),

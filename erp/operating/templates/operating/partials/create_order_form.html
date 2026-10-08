@@ -1505,6 +1505,12 @@
         // rows say which, and the save groups the line by what was
         // actually ticked.
         item.availableRolls = (d && d.ok && d.rolls) ? d.rolls : [];
+        // Sold by count: every piece carries the product's one printed
+        // barcode, so the line takes a quantity and the stock it comes
+        // off is chosen for it (coTakeQuantity) — oldest first, the order
+        // this list is already in.
+        item.counted = !!(d && d.counted);
+        item.printedBarcode = (d && d.printed_barcode) || '';
         // Cost per unit by barcode, kept apart from availableRolls: a
         // ticked or saved roll is a different object that never carried
         // it, and the row still wants to show it. A sales rep is sent
@@ -1764,7 +1770,10 @@
           : '<i class="far fa-circle" style="color:#CBD5E1;font-size:17px;flex-shrink:0;"></i>');
     var bg = locked ? '#F1F5F9' : (picked ? '#ECFDF5' : '#fff');
     var border = picked ? '#A7F3D0' : '#E2E8EE';
-    var toggleAttrs = locked ? '' :
+    // Goods sold by count are taken by quantity (coTakeQuantity), oldest
+    // first: their batches are alike, so a row is shown, not chosen.
+    var counted = !!(orderItems[i] || {}).counted;
+    var toggleAttrs = (locked || counted) ? '' :
       (' data-roll-toggle="1" data-i="' + i + '" data-barcode="' + escAttr(r.barcode) + '" data-state="' + state + '"' +
        (ri != null ? ' data-ri="' + ri + '"' : ''));
     var unit = esc((orderItems[i] || {}).rollUnit || 'm');
@@ -1784,7 +1793,7 @@
       meterHtml += '<span title="' + (costItem.rollCostIsPrice ? '{% trans "Price" %}' : '{% trans "Unit cost" %}') + '" style="color:#94A3B8;font-weight:500;white-space:nowrap;">· ' +
         esc(costItem.costSymbol || '') + fmtNum(+cost) + '/' + unit + '</span>';
     }
-    var scissorsBtn = picked
+    var scissorsBtn = (picked && !counted)
       ? '<button type="button" onclick="event.stopPropagation(); coToggleRollCut(' + i + ',' + ri + ')" title="{% trans "Cut part of it" %}" style="background:none;border:0;color:#B45309;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"><i class="fas fa-scissors"></i></button>'
       : '';
     // No "saved" tag: an already-saved roll unticks and re-cuts exactly
@@ -1793,7 +1802,7 @@
     // says so with its padlock and grey ground.
     return '<div class="co-roll-row" data-bc="' + escAttr((r.barcode || '').toLowerCase()) + '"' + toggleAttrs + ' style="display:flex;align-items:center;gap:8px;padding:8px 9px;margin-top:6px;font-size:12px;background:' + bg + ';border:1px solid ' + border + ';border-radius:7px;' + (locked ? '' : 'cursor:pointer;') + '">' +
       tickHtml +
-      '<code style="background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;">' + esc(r.barcode || '—') + '</code>' +
+      '<code style="background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;">' + esc(coRollLabel(r)) + '</code>' +
       // Where this one is from. The warehouse always; the book too once
       // the card draws on more than one, because that is the moment the
       // shelf name stops being enough to tell them apart — and the moment
@@ -1813,6 +1822,99 @@
       'background:#D1FAE5;padding:1px 5px;border-radius:4px;white-space:nowrap;">' +
       esc(r.book) + '</span>';
   }
+
+  // What a stock item's row is labelled with. Its key is its barcode
+  // where it has one; a batch of alike pieces has none and is keyed by
+  // "#id", which is the server's name for it and nothing a person reads.
+  function coRollLabel(r) {
+    var key = r.barcode || '';
+    if (!key) return '—';
+    return key.charAt(0) === '#' ? '{% filter escapejs %}{% trans "On the shelf" %}{% endfilter %}' : key;
+  }
+
+  function coPickedTotal(item) {
+    return (item.rolls || []).reduce(function (s, r) { return s + (parseFloat(r.quantity) || 0); }, 0);
+  }
+
+  // Take `n` of a product sold by count, from the oldest stock first.
+  // Replaces the card's picks with whatever that comes to — the batches
+  // are alike, so which ones is not the user's decision to make. Saved
+  // holds keep their reservation ids; whatever cannot be covered is said.
+  window.coTakeQuantity = function (i, n) {
+    var item = orderItems[i];
+    if (!item) return false;
+    n = Math.max(0, Math.floor(parseFloat(n) || 0));
+    var old = {};
+    (item.rolls || []).forEach(function (r) { old[(r.barcode || '').toLowerCase()] = r; });
+    var taken = {};
+    orderItems.forEach(function (other) {
+      if (other === item) return;
+      (other.existingRolls || []).concat(other.rolls || []).forEach(function (r) {
+        taken[(r.barcode || '').toLowerCase()] = true;
+      });
+    });
+    (item.existingRolls || []).forEach(function (r) { taken[(r.barcode || '').toLowerCase()] = true; });
+    var pool = (item.availableRolls || []).filter(function (r) {
+      return !taken[(r.barcode || '').toLowerCase()];
+    });
+    // A saved pick the list no longer carries is still this line's.
+    (item.rolls || []).forEach(function (r) {
+      var key = (r.barcode || '').toLowerCase();
+      if (!pool.some(function (p) { return (p.barcode || '').toLowerCase() === key; })) pool.unshift(r);
+    });
+    var left = n, picked = [];
+    pool.forEach(function (p) {
+      if (left <= 0) return;
+      var take = Math.min(left, Math.floor(parseFloat(p.available) || 0));
+      if (take <= 0) return;
+      var prev = old[(p.barcode || '').toLowerCase()] || {};
+      picked.push({ reservation_id: prev.reservation_id || null, barcode: p.barcode,
+                    stock_item_id: p.id || prev.stock_item_id, available: p.available,
+                    warehouse: p.warehouse, book_id: p.book_id || null, book: p.book || '',
+                    quantity: take });
+      left -= take;
+    });
+    item.rolls = picked;
+    if (left > 0) {
+      showToast('{% filter escapejs %}{% trans "Only %(n)s are free in stock — the line takes those." %}{% endfilter %}'.replace('%(n)s', n - left), 'warning');
+    }
+    syncQtyFromRolls(i, true);
+    renderProducts();
+    return left === 0;
+  };
+
+  // What was typed into a counted card's quantity box. A handheld scanner
+  // aimed there types the printed barcode and an Enter, and thirteen
+  // digits read as a quantity would take the whole shelf — so a code is
+  // told from a count and means what a scan means: one more.
+  window.coTakeInput = function (i, raw) {
+    var item = orderItems[i];
+    if (!item) return false;
+    var text = String(raw == null ? '' : raw).trim();
+    var isCode = text.length >= 8
+      || (item.printedBarcode && text.toLowerCase() === item.printedBarcode.toLowerCase());
+    if (isCode) return window.coTakeMore(i, 1);
+    return window.coTakeQuantity(i, text);
+  };
+
+  // One more (or `by` more) of a product sold by count — what a scan of
+  // its printed barcode means. Waits for the card's stock list if the
+  // card was only just added.
+  window.coTakeMore = function (i, by, tries) {
+    var item = orderItems[i];
+    if (!item) return Promise.resolve(false);
+    if (item.rollsLoading || item.availableRolls === undefined) {
+      if ((tries || 0) > 40) return Promise.resolve(false);
+      var stable = item.index;
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          var at = orderItems.findIndex(function (it) { return it.index === stable; });
+          resolve(at === -1 ? false : window.coTakeMore(at, by, (tries || 0) + 1));
+        }, 150);
+      });
+    }
+    return Promise.resolve(window.coTakeQuantity(i, coPickedTotal(item) + (by || 1)));
+  };
 
   function rollSectionHtml(item, i) {
     var existing = item.existingRolls || [];
@@ -1854,6 +1956,20 @@
         '<button type="button" onclick="coOpenRollCamera(' + i + ')" title="{% trans "Scan into this product" %}">' +
           '<i class="fas fa-camera"></i></button>' +
       '</div>';
+
+    if (item.counted && !noStockAtAll) {
+      var freeTotal = candidates.reduce(function (s, r) { return s + (parseFloat(r.available) || 0); }, 0) + coPickedTotal(item);
+      searchBlock =
+        '<div class="co-roll-find" style="gap:8px;">' +
+          '<i class="fas fa-hashtag"></i>' +
+          '<input type="number" id="co-roll-bc-' + i + '" class="co-roll-barcode-input" min="0" step="1" ' +
+            'value="' + (coPickedTotal(item) || '') + '" placeholder="{% trans "Quantity to take from stock" %}" ' +
+            'onchange="coTakeInput(' + i + ',this.value)" ' +
+            'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}">' +
+          '<span style="white-space:nowrap;color:#64748B;font-size:11.5px;">' +
+            '{% trans "of" %} ' + fmtNum(freeTotal) + ' ' + esc(item.rollUnit || '') + ' {% trans "free" %}</span>' +
+        '</div>';
+    }
 
     var rowsHtml = '';
     if (noStockAtAll) {
@@ -1938,7 +2054,8 @@
           idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         }
         if (idx === -1) { showToast('{% trans "The product could not be added" %}', 'error'); return false; }
-        var added = coAddRoll(idx, barcode);
+        // Sold by count: the scan named the product. One more of it.
+        var added = d.counted ? window.coTakeMore(idx, 1) : coAddRoll(idx, barcode);
         var el = document.getElementById('co-global-bc');
         if (el) { el.value = ''; if (!noRefocus) el.focus(); }
         return added;
@@ -2051,6 +2168,14 @@
     var inputEl = document.getElementById('co-roll-bc-' + i);
     var barcode = (barcodeOverride != null ? barcodeOverride : (inputEl ? inputEl.value : '') || '').trim();
     if (!barcode) return Promise.resolve(false);
+    // The barcode printed on goods sold by count names the product, not
+    // one stock item: scanning it means "one more of these".
+    if (item.counted && barcode.charAt(0) !== '#') {
+      var scanned = barcode.toLowerCase();
+      if (scanned === (item.printedBarcode || '').toLowerCase() || scanned === (item.sku || '').toLowerCase()) {
+        return window.coTakeMore(i, 1);
+      }
+    }
     // Checked across EVERY line, not just this one: the order's own holds
     // no longer block its availability lookups, so nothing else stops the
     // same stock item being ticked on two lines — and the save would reserve it
@@ -2093,9 +2218,15 @@
         }
         if (!d.ok) { showToast(d.error || '{% trans "Barcode could not be verified" %}', 'error'); return false; }
         if (!item.rolls) item.rolls = [];
+        // The server's name for the item, which is not always the code
+        // that was typed: a printed barcode comes back as one batch.
+        var key = d.key || barcode;
+        if (d.counted && key.toLowerCase() !== bcL) {
+          return window.coTakeMore(i, 1);
+        }
         // Default to the WHOLE stock item — the scissors icon reveals a field
         // to cut less; leaving it alone keeps the full amount.
-        item.rolls.push({ barcode: barcode, stock_item_id: d.stock_item_id,
+        item.rolls.push({ barcode: key, stock_item_id: d.stock_item_id,
                           available: d.available, warehouse: d.warehouse,
                           book_id: d.book_id || null, book: d.book || '',
                           quantity: d.available });

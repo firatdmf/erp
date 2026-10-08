@@ -13748,3 +13748,13 @@ msgstr "parti"
 #: erp/templates/components/_mobile_shell.html
 msgid "Switch to"
 msgstr "Şuna geç"
+
+msgid "On the shelf"
+msgstr "Rafta"
+
+msgid "Quantity to take from stock"
+msgstr "Stoktan alınacak miktar"
+
+#, python-format
+msgid "Only %(n)s are free in stock — the line takes those."
+msgstr "Stokta yalnızca %(n)s adet boşta — satır bunları alır."

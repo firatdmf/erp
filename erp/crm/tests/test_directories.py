@@ -497,6 +497,30 @@ class WhoMayShare(TwoBusinesses):
         self._share(self.woodline, "company", self.almaty.directory, share="0")
         self.assertFalse(self.woodline.shared_with.exists())
 
+    def test_the_dialog_sets_exactly_the_lists_ticked(self):
+        self.client.force_login(self.owner)
+        url = reverse("crm:share_record", args=["company", self.woodline.pk])
+        self.client.post(url, {"set": "1", "directories": [self.almaty.directory.pk]},
+                         HTTP_REFERER="/crm/")
+        self.assertEqual(list(self.woodline.shared_with.all()), [self.almaty.directory])
+        page = self.client.get(reverse("crm:company_detail", args=[self.woodline.pk]))
+        self.assertContains(page, "Shared with Almaty")
+        # Saved with nothing ticked: shared with nobody.
+        self.client.post(url, {"set": "1"}, HTTP_REFERER="/crm/")
+        self.assertFalse(self.woodline.shared_with.exists())
+
+    def test_only_a_superuser_is_offered_it_or_may_do_it(self):
+        # Somebody who reads BOTH lists, and is still not the owner.
+        both = get_user_model().objects.create_user(username="both_d", password="pw")
+        both.member.books.set([self.laleli, self.almaty])
+        self.client.force_login(both)
+        page = self.client.get(reverse("crm:company_detail", args=[self.woodline.pk]))
+        self.assertEqual(page.status_code, 200)
+        self.assertNotContains(page, "/share/")
+        response = self._share(self.woodline, "company", self.almaty.directory)
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(self.woodline.shared_with.exists())
+
     def test_a_twin_is_reported_not_shared(self):
         Company.objects.create(name="Woodline", directory=self.almaty.directory)
         self.client.force_login(self.owner)

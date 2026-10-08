@@ -1,40 +1,54 @@
 {% load i18n %}
 {% comment %}
-Which customer list a record is in, and which others it is shared with.
+Sharing a record with another business's list — a quiet link, and only
+for a superuser.
 
-Rendered by the `record_sharing` tag, and only for someone who reads the
-record's own list and at least one other — for everybody else there is
-nothing to choose between, and the row stays as it was.
+Rendered by the `record_sharing` tag. The page shows nothing at all for
+anyone else; for a superuser it shows a small "Share…" link, and, where
+the record is already shared, with whom in plain words. The link opens a
+dialog with one tick box per other list.
 
 Usage:  {% record_sharing "company" company %}
+        {% record_sharing "product" product False %}   (no leading dot)
 {% endcomment %}
 {% if choices %}
-{% comment %}`separator` is off where the control stands on its own
-rather than at the end of a row of facts.{% endcomment %}
 <style>
-  .rec-share { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .rec-share form { display: inline; margin: 0; }
-  /* base.css pads every button; these are chips in a meta row. */
-  .rec-share button {
-    padding: 1px 8px; border-radius: 999px; font: inherit; cursor: pointer;
-    border: 1px dashed currentColor; background: transparent; color: inherit; opacity: .7;
-  }
-  .rec-share button.on { border-style: solid; opacity: 1; font-weight: 600; }
+  .rec-share { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #94A3B8; }
+  /* base.css pads every button; this one is a text link. */
+  .rec-share-open { padding: 0; border: 0; background: none; font: inherit; color: #94A3B8;
+    text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  .rec-share-open:hover { color: #475569; }
+  .rec-share-dlg { border: 1px solid #E2E8F0; border-radius: 12px; padding: 18px 20px; min-width: 260px;
+    max-width: 92vw; box-shadow: 0 20px 50px rgba(15, 23, 31, .18); color: #0F172A; }
+  .rec-share-dlg::backdrop { background: rgba(15, 23, 31, .35); }
+  .rec-share-dlg h3 { margin: 0 0 4px; font-size: 15px; font-weight: 700; }
+  .rec-share-dlg p { margin: 0 0 12px; font-size: 12px; color: #64748B; }
+  .rec-share-dlg label { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13.5px; cursor: pointer; }
+  .rec-share-dlg label input { width: 16px; height: 16px; margin: 0; }
+  .rec-share-dlg .rec-share-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .rec-share-dlg .rec-share-actions button { padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    border: 1px solid #CBD5E1; background: #fff; color: #334155; cursor: pointer; }
+  .rec-share-dlg .rec-share-actions button[type="submit"] { background: #0F766E; border-color: #0F766E; color: #fff; }
 </style>
 {% if separator %}<span class="od-dot"></span>{% endif %}
 <span class="rec-share">
-  <span title="{% trans "The customer list this record is kept in" %}"><i class="fa fa-address-book"></i> {{ home.name }}</span>
-  <span>· {% trans "Shared with" %}</span>
-  {% for directory, shared in choices %}
-    <form method="post" action="{{ share_url }}">
-      {% csrf_token %}
-      <input type="hidden" name="directory" value="{{ directory.pk }}">
-      <input type="hidden" name="share" value="{% if shared %}0{% else %}1{% endif %}">
-      <button type="submit" class="{% if shared %}on{% endif %}"
-              title="{% if shared %}{% blocktrans with name=directory.name %}Stop sharing with {{ name }}{% endblocktrans %}{% else %}{% blocktrans with name=directory.name %}Share with {{ name }}{% endblocktrans %}{% endif %}">
-        {% if shared %}<i class="fa fa-check"></i> {% endif %}{{ directory.name }}
-      </button>
-    </form>
-  {% endfor %}
+  {% if shared_names %}<span>{% blocktrans with names=shared_names|join:", " %}Shared with {{ names }}{% endblocktrans %}</span>{% endif %}
+  <button type="button" class="rec-share-open"
+          onclick="document.getElementById('rec-share-{{ kind }}-{{ record.pk }}').showModal()">{% trans "Share…" %}</button>
 </span>
+<dialog class="rec-share-dlg" id="rec-share-{{ kind }}-{{ record.pk }}">
+  <form method="post" action="{{ share_url }}">
+    {% csrf_token %}
+    <input type="hidden" name="set" value="1">
+    <h3>{% trans "Share with another business" %}</h3>
+    <p>{% blocktrans with name=home.name %}Kept in {{ name }}. Tick the lists that may also use it.{% endblocktrans %}</p>
+    {% for directory, shared in choices %}
+    <label><input type="checkbox" name="directories" value="{{ directory.pk }}"{% if shared %} checked{% endif %}> {{ directory.name }}</label>
+    {% endfor %}
+    <div class="rec-share-actions">
+      <button type="button" onclick="this.closest('dialog').close()">{% trans "Cancel" %}</button>
+      <button type="submit">{% trans "Save" %}</button>
+    </div>
+  </form>
+</dialog>
 {% endif %}

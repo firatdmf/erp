@@ -175,6 +175,27 @@ class AProductOfBoth(TwoCatalogues):
                          HTTP_REFERER="/marketing/")
         self.assertEqual(list(self.krep.shared_with.all()), [self.almaty.directory])
 
+    def test_the_dialog_sets_exactly_the_lists_ticked(self):
+        self.client.force_login(self.owner)
+        url = reverse("marketing:share_product", args=[self.krep.pk])
+        self.client.post(url, {"set": "1", "directories": [self.almaty.directory.pk]},
+                         HTTP_REFERER="/marketing/")
+        self.assertEqual(list(self.krep.shared_with.all()), [self.almaty.directory])
+        self.client.post(url, {"set": "1"}, HTTP_REFERER="/marketing/")
+        self.assertFalse(self.krep.shared_with.exists())
+
+    def test_someone_who_reads_both_is_still_not_offered_it(self):
+        both = get_user_model().objects.create_user(username="both_p", password="pw")
+        both.member.books.set([self.laleli, self.almaty])
+        self.client.force_login(both)
+        page = self.client.get(reverse("marketing:product_detail", args=[self.krep.pk]))
+        self.assertEqual(page.status_code, 200)
+        self.assertNotContains(page, "/share/")
+        response = self.client.post(
+            reverse("marketing:share_product", args=[self.krep.pk]),
+            {"directory": self.almaty.directory.pk, "share": "1"})
+        self.assertEqual(response.status_code, 404)
+
     def test_someone_on_one_side_cannot(self):
         self.client.force_login(self.burak)
         response = self.client.post(

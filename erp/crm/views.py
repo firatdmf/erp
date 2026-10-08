@@ -1940,36 +1940,60 @@ def _attachment_owner(kind, pk):
 
 @login_required
 def share_record(request, kind, pk):
-    """Share a company, contact or supplier with another customer list,
-    or stop — the chips beside the record's name.
+    """Share a company, contact or supplier with another business's
+    list, or stop — the "Share…" dialog on the record's page.
 
-    For someone who reads both the record's own list and the other one.
-    A record that was only shared WITH its reader is not theirs to pass
-    on, and a list they cannot read is not theirs to add to.
+    A superuser's to do, and nobody else's: what one business may see of
+    another's is decided by whoever owns the install, not by either side.
+    404 for anyone else, as everywhere a wall is.
     """
-    from .models import Directory, DuplicateName, visible_directory_ids
-
     if request.method != "POST":
         return HttpResponse(status=405)
-    record = _attachment_owner(kind, pk)
-    directory = get_object_or_404(Directory, pk=request.POST.get("directory") or 0)
-    ids = visible_directory_ids()
-    if ids is not None and not {record.directory_id, directory.pk} <= ids:
+    if not request.user.is_superuser:
         raise Http404("No such record.")
-    if request.POST.get("share") == "1":
-        try:
-            record.share_with(directory)
-        except DuplicateName:
-            messages.error(request, _gettext(
-                "%(list)s already has a record of its own called %(name)s, so "
-                "sharing this one would show the two side by side. They are "
-                "the same customer entered twice and need merging first."
-            ) % {"list": directory.name, "name": str(record)})
-    else:
-        record.stop_sharing_with(directory)
+    record = _attachment_owner(kind, pk)
+    for directory in apply_sharing(request, record):
+        messages.error(request, _gettext(
+            "%(list)s already has a record of its own called %(name)s, so "
+            "sharing this one would show the two side by side. They are "
+            "the same customer entered twice and need merging first."
+        ) % {"list": directory.name, "name": str(record)})
     return redirect(request.META.get("HTTP_REFERER")
                     or reverse(f"crm:{'supplier_detail' if kind == 'supplier' else kind + '_detail'}",
                                args=[record.pk]))
+
+
+def apply_sharing(request, record):
+    """Do what a share form asked of `record`; returns the lists that
+    refused (crm.models.DuplicateName), for the caller to report.
+
+    Two shapes of request: the dialog's — `set=1` with every ticked list
+    under `directories`, meaning "shared with exactly these" — and the
+    single switch `directory` + `share=1|0`.
+    """
+    from crm.models import Directory, DuplicateName
+
+    refused = []
+
+    def share(directory, on):
+        if not on:
+            record.stop_sharing_with(directory)
+            return
+        try:
+            record.share_with(directory)
+        except DuplicateName:
+            refused.append(directory)
+
+    if request.POST.get("set") == "1":
+        wanted = {int(v) for v in request.POST.getlist("directories") if str(v).isdigit()}
+        held = set(record.shared_with.values_list("pk", flat=True))
+        for directory in Directory.objects.exclude(pk=record.directory_id):
+            if (directory.pk in wanted) != (directory.pk in held):
+                share(directory, directory.pk in wanted)
+    else:
+        directory = get_object_or_404(Directory, pk=request.POST.get("directory") or 0)
+        share(directory, request.POST.get("share") == "1")
+    return refused
 
 
 def _render_attachment_list(request, kind, owner, errors=()):

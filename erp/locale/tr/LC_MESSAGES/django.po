@@ -13815,3 +13815,17 @@ msgstr "Bu tedarikçi varyanttan kaldırılsın mı? Kodu ve son fiyatı silinir
 
 msgid "This SKU is already in use."
 msgstr "Bu SKU zaten kullanılıyor."
+
+#, python-format
+msgid "Shared with %(names)s"
+msgstr "%(names)s ile paylaşılıyor"
+
+msgid "Share…"
+msgstr "Paylaş…"
+
+msgid "Share with another business"
+msgstr "Başka bir işletmeyle paylaş"
+
+#, python-format
+msgid "Kept in %(name)s. Tick the lists that may also use it."
+msgstr "%(name)s listesinde tutuluyor. Kullanabilecek diğer listeleri işaretleyin."

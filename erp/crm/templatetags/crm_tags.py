@@ -11,21 +11,22 @@ register = template.Library()
 
 @register.inclusion_tag("crm/components/_record_sharing.html", takes_context=True)
 def record_sharing(context, kind, record, separator=True):
-    """The other lists `record` could be shared with, for someone who
-    reads both its own list and theirs. `kind` is "company", "contact",
-    "supplier" — or "product", which is kept in a directory the same way
-    and shared through its own endpoint."""
+    """The other lists `record` could be shared with — for a superuser,
+    and nobody else: deciding what one business may see of another's is
+    the install owner's call. `kind` is "company", "contact", "supplier"
+    — or "product", which is kept in a directory the same way and shared
+    through its own endpoint."""
     from django.urls import reverse
-    from crm.models import Directory, visible_directory_ids
+    from crm.models import Directory
 
-    ids = visible_directory_ids()
+    request = context.get("request")
+    user = getattr(request, "user", None) or context.get("user")
+    if not getattr(user, "is_superuser", False):
+        return {"choices": []}
     others = Directory.objects.exclude(pk=record.directory_id).order_by("name")
-    if ids is not None:
-        # Sharing is for whoever sees both sides: not for somebody the
-        # record was merely shared WITH, who does not read its own list.
-        others = others.filter(pk__in=ids) if record.directory_id in ids else others.none()
     shared = set(record.shared_with.values_list("pk", flat=True))
     return {
+        "shared_names": [d.name for d in others if d.pk in shared],
         "kind": kind,
         "record": record,
         "home": record.directory,

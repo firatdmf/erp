@@ -322,10 +322,18 @@
       <div class="eq-side">
         <div class="eq-side-title">{% trans "Assets" %}</div>
         {% for l in eq_assets_lines %}
+        {% if l.parts %}
+        {% comment %} Cash and Bank opens into what the tills hold, currency by
+           currency — the same fold revenue and expenses use. {% endcomment %}
+        <details class="eq-fold">
+          <summary class="eq-line"><span><a class="eq-acct" href="{% url 'accounts:report_ledger_account' book.pk l.code %}">{{ l.label }}</a></span><span class="v">{{ l.amount|format_money }}</span></summary>
+          {% for c in l.parts %}
+          <div class="eq-line eq-sub eq-cur"><span>{{ c.native|format_money }} {{ c.currency }}</span><span class="v">{{ c.amount|format_money }}</span></div>
+          {% endfor %}
+        </details>
+        {% else %}
         <div class="eq-line"><span><a class="eq-acct" href="{% url 'accounts:report_ledger_account' book.pk l.code %}">{{ l.label }}</a></span><span class="v">{{ l.amount|format_money }}</span></div>
-        {% for c in l.parts %}
-        <div class="eq-line eq-sub eq-cur"><span>{{ c.native|format_money }} {{ c.currency }}</span><span class="v">{{ c.amount|format_money }}</span></div>
-        {% endfor %}
+        {% endif %}
         {% empty %}
         <div class="eq-line"><span>—</span><span class="v">{{ 0|format_money }}</span></div>
         {% endfor %}

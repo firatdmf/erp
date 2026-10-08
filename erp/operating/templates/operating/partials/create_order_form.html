@@ -37,6 +37,11 @@
 /* No inner scroll on the products list — let cards render at full
    height and let the outer sidebar scrollbar handle long lists. */
 .co-products-list{display:flex;flex-direction:column;gap:0}
+/* A line's note is shut behind this tick box until it is wanted. */
+.co-note-toggle{display:inline-flex;align-items:center;gap:7px;margin-top:10px;cursor:pointer;
+  font-size:12px;font-weight:600;color:var(--text-secondary);user-select:none;}
+.co-note-toggle input{width:16px;height:16px;margin:0;accent-color:#0F766E;cursor:pointer;}
+.co-note-input{display:block;width:100%;margin-top:6px;}
 /* Room between the scanner box and the first product card, which
    otherwise sit flush against each other. */
 #co-products-list{margin-top:16px}
@@ -176,6 +181,8 @@
   .co-row-counted>.form-group:last-child label{margin:0;}
   .co-row-counted .co-item-total{font-size:17px;padding-top:0;}
   .co-qty-hint{display:block;margin:2px 0 0;white-space:normal;}
+  .co-note-toggle{font-size:14px;min-height:36px;}
+  .co-note-toggle input{width:20px;height:20px;}
 }
 
 /* ── Barcode scanner popup ───────────────────────────────────────
@@ -1760,7 +1767,7 @@
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${fmtNum(item.quantity*item.price)}</div></div>
         </div>
         ${item.counted ? '' : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i)}
-        <div class="form-group" style="margin-top:8px;margin-bottom:0"><label>{% trans "Description" %}</label><input type="text" class="form-input" value="${esc(item.description)}" placeholder="Note..." onchange="coUpd(${i},'description',this.value)"></div>
+        ${coNoteHtml(item, i)}
       </div>`;
     }).join('');
     updateTotal();
@@ -1906,6 +1913,34 @@
     syncQtyFromRolls(i, true);
     renderProducts();
     return left === 0;
+  };
+
+  // A line's note. Most lines have none, so the field stays shut behind
+  // a tick box and opens when asked for — or by itself where the line
+  // already carries a note, which must never sit there unseen.
+  function coNoteHtml(item, i) {
+    var open = !!item.showNote || !!(item.description || '').trim();
+    var box = '<label class="co-note-toggle">' +
+      '<input type="checkbox"' + (open ? ' checked' : '') + ' onchange="coToggleNote(' + i + ',this.checked)">' +
+      '<span>{% trans "Add note" %}</span></label>';
+    if (!open) return box;
+    return box +
+      '<input type="text" class="form-input co-note-input" id="co-note-' + i + '" value="' + escAttr(item.description || '') + '" ' +
+        'placeholder="{% trans "Note for this line" %}" onchange="coUpd(' + i + ',\'description\',this.value)">';
+  }
+
+  // Unticking takes the note away with the field: a note left behind a
+  // closed box would still be saved, and nobody could see that it was.
+  window.coToggleNote = function (i, on) {
+    var item = orderItems[i];
+    if (!item) return;
+    item.showNote = !!on;
+    if (!on) item.description = '';
+    renderProducts();
+    if (on) {
+      var field = document.getElementById('co-note-' + i);
+      if (field) field.focus();
+    }
   };
 
   // How many of a counted product this card could take: what stands free

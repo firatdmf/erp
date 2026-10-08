@@ -13773,3 +13773,9 @@ msgstr "stokta yok"
 
 msgid "already packed"
 msgstr "zaten paketlendi"
+
+msgid "Add note"
+msgstr "Not ekle"
+
+msgid "Note for this line"
+msgstr "Bu satır için not"

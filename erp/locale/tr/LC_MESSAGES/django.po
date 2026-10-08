@@ -13744,3 +13744,7 @@ msgstr "parti"
 
 msgid "batches"
 msgstr "parti"
+
+#: erp/templates/components/_mobile_shell.html
+msgid "Switch to"
+msgstr "Şuna geç"

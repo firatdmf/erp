@@ -274,3 +274,26 @@ class TheBookTileInTheSideMenu(TestCase):
         self.assertContains(page, f'<a class="nj-book-btn" href="{here}"')
         self.assertNotContains(page, 'class="nj-book-menu"')
 
+    # ── the phone's drawer says the same thing ───────────────────
+    def test_the_drawer_names_the_book_and_links_to_its_page(self):
+        page = self._page()
+        here = reverse("accounting:book_detail", kwargs={"pk": self.book.pk})
+        self.assertContains(page, f'<a class="m-drawer-book-card" href="{here}"')
+        self.assertContains(
+            page, '<span class="m-drawer-book-name">Ergene Fabric</span>')
+
+    def test_the_drawer_offers_the_other_books_and_not_the_current_one(self):
+        html = self._page().content.decode()
+        drawer = html[html.index('class="m-drawer-book-others"'):]
+        drawer = drawer[:drawer.index("</div>")]
+        self.assertIn(reverse("accounting:set_my_working_book",
+                              kwargs={"pk": self.other.pk}), drawer)
+        self.assertNotIn(reverse("accounting:set_my_working_book",
+                                 kwargs={"pk": self.book.pk}), drawer)
+
+    def test_the_drawer_of_a_one_book_member_has_nothing_to_switch_to(self):
+        self.member.books.set([self.book])
+        page = self._page()
+        self.assertContains(page, 'class="m-drawer-book-card"')
+        self.assertNotContains(page, 'class="m-drawer-book-others"')
+

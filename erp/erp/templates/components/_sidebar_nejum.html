@@ -246,6 +246,30 @@
       return path + (query ? '?' + query : '') + loc.hash;
     }
 
+    // Any link that carries data-work-url switches books: the rail's list
+    // here and the phone drawer's (components/_mobile_shell.html), which
+    // is rendered after this script — hence one listener on the document
+    // rather than one per link.
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[data-work-url]');
+      if (!a) return;
+      e.preventDefault();
+      var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+      fetch(a.dataset.workUrl, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrf ? csrf.value : '',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+        // Navigate either way: the page the reader asked for is the
+        // point, and a working book that failed to save is a
+        // preference lost, not a page they may not see.
+        .finally(function () {
+          window.location.href = samePageIn(a.dataset.book, a.href);
+        });
+    });
+
     var root = document.querySelector('.nj-book');
     if (!root) return;
     var btn = root.querySelector('.nj-book-btn');
@@ -284,26 +308,6 @@
     });
     document.addEventListener('click', function (e) {
       if (!root.contains(e.target)) hide();
-    });
-
-    menu.querySelectorAll('.nj-book-opt').forEach(function (a) {
-      a.addEventListener('click', function (e) {
-        e.preventDefault();
-        var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
-        fetch(a.dataset.workUrl, {
-          method: 'POST',
-          headers: {
-            'X-CSRFToken': csrf ? csrf.value : '',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-        })
-          // Navigate either way: the page the reader asked for is the
-          // point, and a working book that failed to save is a
-          // preference lost, not a page they may not see.
-          .finally(function () {
-            window.location.href = samePageIn(a.dataset.book, a.href);
-          });
-      });
     });
   })();
 </script>

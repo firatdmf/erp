@@ -66,6 +66,38 @@
         <div class="m-drawer-user-role">{{ request.user.email|default:"—" }}</div>
       </div>
     </div>
+
+    {% comment %}
+      Which book the reader is in — the same answer the desktop rail gives
+      under its logo. The card opens that book's page; with several books
+      the others sit beneath it, one tap to switch. `current_book` and
+      `my_books` come from accounting.book_scope, and the switching itself
+      is the script in _sidebar_nejum.html, which answers any link that
+      carries data-work-url.
+    {% endcomment %}
+    {% if current_book %}
+    <div class="m-drawer-book">
+      <a class="m-drawer-book-card" href="{% url 'accounting:book_detail' current_book.pk %}">
+        <span class="m-drawer-book-ico"><i data-lucide="book-open"></i></span>
+        <span class="m-drawer-book-meta">
+          <span class="m-drawer-book-cap">{% trans "Book" %}</span>
+          <span class="m-drawer-book-name">{{ current_book.name }}</span>
+        </span>
+        <span class="m-drawer-book-chev"><i data-lucide="chevron-right"></i></span>
+      </a>
+      {% if my_books|length > 1 %}
+      <div class="m-drawer-book-others">
+        <span class="m-drawer-book-switch">{% trans "Switch to" %}</span>
+        {% for b in my_books %}{% if b.pk != current_book.pk %}
+        <a class="m-drawer-book-opt"
+           href="{% url 'accounting:book_detail' b.pk %}"
+           data-book="{{ b.pk }}"
+           data-work-url="{% url 'accounting:set_my_working_book' b.pk %}">{{ b.name }}</a>
+        {% endif %}{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
 
   <!-- Drawer search -->

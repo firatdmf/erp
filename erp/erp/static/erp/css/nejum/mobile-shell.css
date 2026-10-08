@@ -356,6 +356,57 @@
     text-overflow: ellipsis;
   }
 
+  /* ─── Working book ────────────────────────────────────────── */
+  .m-drawer-book { margin-top: 8px; position: relative; }
+  .m-drawer-book-card {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    color: white;
+    text-decoration: none;
+  }
+  .m-drawer-book-card:active { background: rgba(255, 255, 255, 0.20); }
+  .m-drawer-book-ico {
+    width: 36px; height: 36px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.16);
+  }
+  .m-drawer-book-ico svg { width: 17px; height: 17px; }
+  .m-drawer-book-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+  .m-drawer-book-cap {
+    font: 600 10px 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(230, 245, 245, 0.78);
+  }
+  .m-drawer-book-name {
+    font: 700 13.5px 'Plus Jakarta Sans', sans-serif;
+    color: white;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .m-drawer-book-chev { display: inline-flex; opacity: 0.7; }
+  .m-drawer-book-chev svg { width: 15px; height: 15px; }
+  .m-drawer-book-others {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    margin-top: 8px;
+  }
+  .m-drawer-book-switch {
+    font: 500 11px 'Plus Jakarta Sans', sans-serif;
+    color: rgba(230, 245, 245, 0.78);
+    margin-right: 2px;
+  }
+  .m-drawer-book-opt {
+    padding: 6px 11px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+    font: 600 12px 'Plus Jakarta Sans', sans-serif;
+    color: white;
+    text-decoration: none;
+  }
+  .m-drawer-book-opt:active { background: rgba(255, 255, 255, 0.20); }
+
   /* ─── Search bar ──────────────────────────────────────────── */
   .m-drawer-search-wrap {
     position: relative;

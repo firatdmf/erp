@@ -199,3 +199,42 @@
 .product_autocomplete_list .pa-catalog { display: none; }
 .product_autocomplete_list.pa-expanded .pa-catalog { display: flex; }
 .product_autocomplete_list.pa-expanded li.pa-group.pa-catalog { display: flex; }
+
+/* On a phone the row stops being one line. Side by side, the badges and
+ * the price never shrink (they must stay readable), so on a narrow
+ * screen they took the whole width and crushed the product's name into
+ * a column a few letters wide — worst for the long names and thirteen-
+ * digit codes of ready-made goods. Stacked instead: the name and its
+ * code get the full width, and the badges wrap underneath with the
+ * price at the end of their line. */
+@media (max-width: 560px) {
+  /* `ul li.pa-row.pa-row`: the host containers style `ul li` with two
+   * classes and two elements, centring every row; this has to outweigh
+   * that without reaching for !important. */
+  .product_autocomplete_list ul li.pa-row.pa-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .product_autocomplete_list .pa-main {
+    font-size: 14px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .product_autocomplete_list .pa-sku {
+    display: block;
+    margin: 2px 0 0;
+  }
+  .product_autocomplete_list .pa-meta {
+    display: flex;
+    flex-wrap: wrap;
+    white-space: normal;
+    gap: 5px 6px;
+  }
+  /* The price sits at the right-hand end of the badges' last line. */
+  .product_autocomplete_list .pa-meta .pa-price {
+    margin-left: auto;
+  }
+}

@@ -1895,15 +1895,25 @@
         taken[(r.barcode || '').toLowerCase()] = true;
       });
     });
-    var mine = {};
-    (item.rolls || []).concat(item.existingRolls || []).forEach(function (r) {
-      mine[(r.barcode || '').toLowerCase()] = true;
+    // Already-packed holds are spoken for; they are not free to take again.
+    (item.existingRolls || []).forEach(function (r) {
+      taken[(r.barcode || '').toLowerCase()] = true;
     });
+    var listed = {};
     var free = (item.availableRolls || []).reduce(function (s, r) {
       var key = (r.barcode || '').toLowerCase();
-      return (taken[key] || mine[key]) ? s : s + Math.floor(parseFloat(r.available) || 0);
+      listed[key] = true;
+      // The WHOLE of each batch, including one this card has taken part
+      // of: taking five out of twenty-two leaves twenty-two to choose
+      // from, not five.
+      return taken[key] ? s : s + Math.floor(parseFloat(r.available) || 0);
     }, 0);
-    return free + coPickedTotal(item);
+    // A pick the list does not carry (it only lists what is free to
+    // others) is still this card's to keep.
+    (item.rolls || []).forEach(function (r) {
+      if (!listed[(r.barcode || '').toLowerCase()]) free += parseFloat(r.quantity) || 0;
+    });
+    return free;
   }
 
   // The quantity field of a product sold by count — the first field of

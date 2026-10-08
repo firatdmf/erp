@@ -37,6 +37,9 @@
 /* No inner scroll on the products list — let cards render at full
    height and let the outer sidebar scrollbar handle long lists. */
 .co-products-list{display:flex;flex-direction:column;gap:0}
+/* Room between the scanner box and the first product card, which
+   otherwise sit flush against each other. */
+#co-products-list{margin-top:16px}
 .co-product-card{border:1.5px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:10px;background:var(--bg-primary)}
 .co-product-card.co-just-added{animation:co-slide-in .28s cubic-bezier(.22,1,.36,1)}
 @keyframes co-slide-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}

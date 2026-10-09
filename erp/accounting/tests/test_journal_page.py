@@ -58,6 +58,7 @@ class JournalPage(TestCase):
         self.assertContains(r, "Accounts Receivable (1200)")
         self.assertContains(r, "Sales (4000)")
         self.assertContains(r, "ERGTH")             # whose receivable it was
+        self.assertContains(r, "$250.00")           # in the book's currency, and saying so
 
     def test_a_transfer_between_two_accounts_is_on_it(self):
         """The row that started this: no cash moved, so the cash journal
@@ -115,3 +116,11 @@ class JournalPage(TestCase):
         self.assertEqual(rows["in lira"]["originals"], [(Decimal("5000.00"), "TRY")])
         self.assertEqual(rows["in dollars"]["originals"], [])
         self.assertContains(r, "5,000.00 TRY")
+
+    def test_it_reads_up_to_today_unless_told_otherwise(self):
+        from django.utils import timezone
+        self._move(self.samir, "100.00", when="2026-09-01", text="already happened")
+        r = self._page()
+        self.assertEqual(r.context["date_to"], timezone.localdate().isoformat())
+        self.assertContains(r, 'name="date_to" value="%s"' % timezone.localdate().isoformat())
+        self.assertEqual(r.context["count"], 1)

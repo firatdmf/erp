@@ -29,24 +29,26 @@ credited — see views_report.Journal. Reached from the reports page.
   .jr-stat .v { margin-top:4px; font:700 20px var(--sans); font-variant-numeric:tabular-nums; }
   .jr-card { background:#fff; border:1px solid #E2E8EE; border-radius:12px; overflow-x:auto; }
   .jr-tbl { width:100%; border-collapse:collapse; font:400 13px var(--sans); }
-  .jr-tbl th { background:#FAFBFD; border-bottom:1px solid #E2E8EE; padding:10px 12px; text-align:left; font:700 10.5px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--g500); white-space:nowrap; }
-  .jr-tbl td { padding:9px 12px; border-bottom:1px solid #EEF1F5; vertical-align:top; }
+  .jr-tbl th { background:#FAFBFD; border-bottom:1px solid #E2E8EE; padding:10px 12px; text-align:center; font:700 10.5px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--g500); white-space:nowrap; }
+  .jr-tbl td { padding:9px 12px; border-bottom:1px solid #EEF1F5; vertical-align:middle; text-align:center; }
   .jr-tbl tr:last-child td { border-bottom:none; }
-  .jr-tbl .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .jr-tbl th.num { text-align:right; }
+  .jr-tbl .num { font-variant-numeric:tabular-nums; white-space:nowrap; }
   .jr-date { white-space:nowrap; color:var(--g700); font-variant-numeric:tabular-nums; }
   .jr-ref { display:block; margin-top:2px; font:500 11.5px var(--mono); color:var(--g500); white-space:nowrap; }
   .jr-text { max-width:36ch; }
   .jr-text a { color:inherit; text-decoration:none; }
   .jr-text a:hover { color:var(--teal-700); text-decoration:underline; }
-  .jr-kind { display:inline-block; margin-top:3px; padding:1px 7px; border-radius:6px; background:var(--teal-50); color:var(--teal-700); font:600 11px var(--sans); }
+  .jr-kind { display:inline-block; white-space:nowrap; padding:1px 7px; border-radius:6px; background:var(--teal-50); color:var(--teal-700); font:600 11px var(--sans); }
   .jr-side { display:block; }
   .jr-side + .jr-side { margin-top:6px; }
   .jr-side a { color:var(--ink); text-decoration:none; font-weight:600; }
   .jr-side a:hover { color:var(--teal-700); text-decoration:underline; }
   .jr-side .who { display:block; font:500 11.5px var(--sans); color:var(--g500); }
   .jr-side .amt { font:500 11.5px var(--sans); color:var(--g500); font-variant-numeric:tabular-nums; }
-  .jr-orig { display:block; margin-top:2px; font:500 11.5px var(--sans); color:var(--g500); }
+  /* The book's figure is the row's amount; what was entered sits under it
+     greyed out, so the two are never read as one another. */
+  .jr-amt { display:block; font:700 14px var(--sans); color:var(--ink); }
+  .jr-orig { display:block; margin-top:2px; font:500 11.5px var(--sans); color:var(--g400); }
   .jr-pager { display:flex; align-items:center; gap:10px; margin-top:14px; font:500 12.5px var(--sans); color:var(--g600); }
   .jr-pager .spacer { flex:1; }
   .jr-empty { padding:56px 20px; text-align:center; color:var(--g500); font:500 13.5px var(--sans); }
@@ -80,7 +82,7 @@ credited — see views_report.Journal. Reached from the reports page.
 
   <div class="jr-stats">
     <div class="jr-stat"><div class="l">{% trans "Entries" %}</div><div class="v">{{ count }}</div></div>
-    <div class="jr-stat"><div class="l">{% trans "Debit" %} = {% trans "Credit" %}</div><div class="v">{{ total|format_money }}</div></div>
+    <div class="jr-stat"><div class="l">{% trans "Debit" %} = {% trans "Credit" %}</div><div class="v">{{ base_symbol }}{{ total|format_money }}</div></div>
   </div>
 
   <div class="jr-card">
@@ -89,6 +91,7 @@ credited — see views_report.Journal. Reached from the reports page.
       <thead>
         <tr>
           <th>{% trans "Date" %}</th>
+          <th>{% trans "Kind" %}</th>
           <th>{% trans "Description" %}</th>
           <th>{% trans "Debit" %}</th>
           <th>{% trans "Credit" %}</th>
@@ -99,15 +102,15 @@ credited — see views_report.Journal. Reached from the reports page.
         {% for r in rows %}
         <tr>
           <td class="jr-date">{{ r.entry.date|date:"d.m.Y" }}</td>
+          <td><span class="jr-kind">{{ r.kind }}</span></td>
           <td class="jr-text">
             {% if r.url %}<a href="{{ r.url }}">{{ r.entry.description|default:"—" }}</a>{% else %}{{ r.entry.description|default:"—" }}{% endif %}
             {% if r.entry.reference %}<span class="jr-ref">{{ r.entry.reference }}</span>{% endif %}
-            <span class="jr-kind">{{ r.kind }}</span>
           </td>
           <td>{% include "accounts/partials/journal_side.html" with side=r.debits debit=True %}</td>
           <td>{% include "accounts/partials/journal_side.html" with side=r.credits debit=False %}</td>
           <td class="num">
-            {{ r.amount|format_money }}
+            <span class="jr-amt">{{ base_symbol }}{{ r.amount|format_money }}</span>
             {% for amount, code in r.originals %}<span class="jr-orig">{{ amount|format_money }} {{ code }}</span>{% endfor %}
           </td>
         </tr>

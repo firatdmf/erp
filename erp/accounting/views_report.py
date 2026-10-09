@@ -504,7 +504,8 @@ class Journal(View):
         from .models_ledger import JournalEntry, JournalLine
 
         date_from = request.GET.get("date_from") or ""
-        date_to = request.GET.get("date_to") or ""
+        # Up to today unless told otherwise, as the trial balance reads.
+        date_to = request.GET.get("date_to") or timezone.localdate().isoformat()
         kind = request.GET.get("kind") or ""
         if kind not in self.KINDS:
             kind = ""
@@ -556,6 +557,7 @@ class Journal(View):
             "page": page,
             "count": page.paginator.count,
             "total": totals["d"] or Decimal("0"),
+            "base_symbol": request.book.effective_base_currency.symbol,
             "kinds": [(key, label) for key, (label, _models) in self.KINDS.items()],
             "kind": kind,
             "date_from": date_from,

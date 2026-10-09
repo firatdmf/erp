@@ -14073,3 +14073,27 @@ msgstr "Öne çıkarılan şu varyantlar için maliyet girin — maliyetin alın
 
 msgid "Add new"
 msgstr "Yeni ekle"
+
+msgid "This month"
+msgstr "Bu ay"
+
+msgid "Last month"
+msgstr "Geçen ay"
+
+msgid "All time"
+msgstr "Tüm zamanlar"
+
+msgid "Month"
+msgstr "Ay"
+
+#, python-format
+msgid "plus %(n)s open order from earlier"
+msgid_plural "plus %(n)s open orders from earlier"
+msgstr[0] "ve öncesinden %(n)s açık sipariş"
+msgstr[1] "ve öncesinden %(n)s açık sipariş"
+
+msgid "Search results across all time"
+msgstr "Tüm zamanlardaki arama sonuçları"
+
+msgid "No orders in this period"
+msgstr "Bu dönemde sipariş yok"

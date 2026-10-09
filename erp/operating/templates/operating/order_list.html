@@ -45,6 +45,39 @@
     color: #0F1419; margin: 0;
   }
   .ord-head-r { display: flex; gap: 8px; }
+  /* Which period the list shows, under the title */
+  .ord-period { margin-top: 6px; font: 500 13px var(--font-sans); color: var(--gray-600); }
+  .ord-period b { color: #0F1419; font-weight: 700; }
+  .ord-period i { font-size: 11px; margin-right: 5px; color: var(--nejum-teal-600); }
+  /* Period picker behind the Filter button */
+  .ord-period-pick { position: relative; display: flex; }
+  .ord-period-menu {
+    display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+    min-width: 200px; padding: 6px;
+    background: white; border: 1px solid var(--gray-200); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(15, 20, 25, 0.12);
+  }
+  .ord-period-menu.open { display: block; }
+  .ord-period-menu a {
+    display: block; padding: 8px 10px; border-radius: 8px;
+    font: 600 13px var(--font-sans); color: #0F1419; text-decoration: none;
+  }
+  .ord-period-menu a:hover { background: var(--gray-50, #F8FAFC); }
+  .ord-period-menu a.on { color: var(--nejum-teal-600); }
+  .ord-period-menu label {
+    display: block; margin: 4px 0 0; padding: 8px 10px 4px;
+    border-top: 1px solid var(--gray-200);
+    font: 600 11px var(--font-sans); color: var(--gray-500);
+  }
+  .ord-period-menu input { display: block; width: 100%; margin-top: 4px; font: 500 13px var(--font-sans); }
+  /* Open orders lead the list; this names the two halves */
+  .ord-group {
+    padding: 10px 14px 6px;
+    font: 700 10.5px var(--font-sans); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gray-500); background: var(--gray-50, #F8FAFC);
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .ord-none { padding: 28px 6px; text-align: center; font: 500 13px var(--font-sans); color: var(--gray-500); }
   .ord-btn {
     display: inline-flex; align-items: center; gap: 7px;
     padding: 8px 14px;
@@ -258,6 +291,7 @@
     border-radius: 999px;
     font: 600 11px var(--font-sans); font-variant-numeric: tabular-nums;
   }
+  .ord-gross.loss { background: #FEF2F2; color: #991B1B; border-color: #FECACA; }
   .ord-gross i { font-size: 9px; opacity: 0.7; }
   .ord-status {
     display: inline-flex; align-items: center; gap: 6px;
@@ -325,6 +359,7 @@
     .ord-head { flex-direction: column; align-items: stretch; gap: 12px; }
     .ord-head-r { display: flex; }
     .ord-head-r .ord-btn { flex: 1; justify-content: center; }
+    .ord-period-pick { flex: 1; }
 
     .ord-tabs { flex-wrap: wrap; row-gap: 8px; }
     .ord-tab { padding: 8px 11px; font-size: 12.5px; }
@@ -369,10 +404,28 @@
     <div>
       <div class="ord-eyebrow">{% trans "Order Management" %}</div>
       <h1 class="ord-title">{% trans "Orders" %}</h1>
+      {# Which orders the list is showing: the period, or — while the search box holds a query — everything. #}
+      <div class="ord-period">
+        <span id="ord-period-shown"><i class="fa fa-calendar"></i>
+          {% if period_start %}<b>{{ period_start|date:"F Y" }}</b>{% if carried_count %} · {% blocktrans count n=carried_count %}plus {{ n }} open order from earlier{% plural %}plus {{ n }} open orders from earlier{% endblocktrans %}{% endif %}{% else %}<b>{% trans "All time" %}</b>{% endif %}
+        </span>
+        <span id="ord-period-search" style="display:none"><i class="fa fa-search"></i>
+          <b>{% trans "Search results across all time" %}</b>
+        </span>
+      </div>
     </div>
     <div class="ord-head-r">
-      <button type="button" class="ord-btn ghost"><i class="fa fa-download"></i>{% trans "Export" %}</button>
-      <button type="button" class="ord-btn ghost"><i class="fa fa-filter"></i>{% trans "Filter" %}</button>
+      <div class="ord-period-pick">
+        <button type="button" class="ord-btn ghost" id="ord-filter-btn" aria-expanded="false"><i class="fa fa-filter"></i>{% trans "Filter" %}</button>
+        <div class="ord-period-menu" id="ord-filter-menu">
+          <a href="?"{% if period_is_current %} class="on"{% endif %}>{% trans "This month" %}</a>
+          <a href="?month={{ last_month }}"{% if period_month == last_month %} class="on"{% endif %}>{% trans "Last month" %}</a>
+          <a href="?month=all"{% if not period_start %} class="on"{% endif %}>{% trans "All time" %}</a>
+          <label>{% trans "Month" %}
+            <input type="month" id="ord-month-input" value="{{ period_month }}">
+          </label>
+        </div>
+      </div>
       <a href="{% url 'operating:create_order_page' current_book.pk %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "New order" %}</a>
     </div>
   </div>
@@ -411,6 +464,7 @@
       <span id="ord-visible-count"><b>{{ total_count }}</b></span> {% trans "orders" %}
     </div>
   </div>
+  <div class="ord-none" id="ord-none" style="display:none">{% trans "No orders in this period" %}</div>
 
   {# ===================== ALL ORDERS ===================== #}
   <div class="ord-list-wrap active" data-pane="all">
@@ -429,7 +483,8 @@
         <span></span>
       </div>
       {% for order in orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
+      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -497,8 +552,8 @@
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.gross_profit %}
-            <span class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
-              <i class="fa fa-arrow-trend-up"></i>
+            <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
+              <i class="fa fa-arrow-trend-{% if gp < 0 %}down{% else %}up{% endif %}"></i>
               {{ order.currency_symbol }}{{ gp|money }}
             </span>
           {% endwith %}
@@ -539,7 +594,8 @@
         <span></span>
       </div>
       {% for order in b2b_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
+      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -570,8 +626,8 @@
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.gross_profit %}
-            <span class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
-              <i class="fa fa-arrow-trend-up"></i>
+            <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
+              <i class="fa fa-arrow-trend-{% if gp < 0 %}down{% else %}up{% endif %}"></i>
               {{ order.currency_symbol }}{{ gp|money }}
             </span>
           {% endwith %}
@@ -609,7 +665,8 @@
         <span></span>
       </div>
       {% for order in b2c_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
+      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -636,8 +693,8 @@
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.gross_profit %}
-            <span class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
-              <i class="fa fa-arrow-trend-up"></i>
+            <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
+              <i class="fa fa-arrow-trend-{% if gp < 0 %}down{% else %}up{% endif %}"></i>
               {{ order.currency_symbol }}{{ gp|money }}
             </span>
           {% endwith %}
@@ -677,7 +734,8 @@
         <span></span>
       </div>
       {% for order in retail_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}">
+      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -702,8 +760,8 @@
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.gross_profit %}
-            <span class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
-              <i class="fa fa-arrow-trend-up"></i>
+            <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
+              <i class="fa fa-arrow-trend-{% if gp < 0 %}down{% else %}up{% endif %}"></i>
               {{ order.currency_symbol }}{{ gp|money }}
             </span>
           {% endwith %}
@@ -754,13 +812,50 @@
     let visible = 0;
     activePane.querySelectorAll('.ord-row').forEach(row => {
       const txt = fold(row.dataset.search || row.textContent);
-      const show = !q || txt.includes(q);
+      // No query: the period's rows. A query looks through every order
+      // there is, the ones outside the period (data-out) included.
+      const show = q ? txt.includes(q) : !row.hasAttribute('data-out');
       row.style.display = show ? '' : 'none';
       if (show) visible++;
     });
+    // A group's heading stands only over rows that are showing.
+    activePane.querySelectorAll('.ord-group').forEach(head => {
+      const any = Array.from(activePane.querySelectorAll(`.ord-row[data-group="${head.dataset.group}"]`))
+        .some(row => row.style.display !== 'none');
+      head.style.display = any ? '' : 'none';
+    });
     const counter = document.getElementById('ord-visible-count');
     if (counter) counter.innerHTML = `<b>${visible}</b>`;
+    // The line under the title says which of the two is on screen.
+    const shown = document.getElementById('ord-period-shown');
+    const searching = document.getElementById('ord-period-search');
+    if (shown) shown.style.display = q ? 'none' : '';
+    if (searching) searching.style.display = q ? '' : 'none';
+    // A pane with orders, none of them in the period, would otherwise be
+    // a header over nothing.
+    const none = document.getElementById('ord-none');
+    if (none) none.style.display = (!q && !visible && activePane.querySelector('.ord-row')) ? '' : 'none';
   }
+
+  // Period picker behind the Filter button.
+  (function () {
+    const btn = document.getElementById('ord-filter-btn');
+    const menu = document.getElementById('ord-filter-menu');
+    const month = document.getElementById('ord-month-input');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      btn.setAttribute('aria-expanded', menu.classList.toggle('open'));
+    });
+    menu.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => {
+      menu.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    });
+    if (month) month.addEventListener('change', () => {
+      if (month.value) window.location.search = '?month=' + month.value;
+    });
+  })();
 
   // Tab switching
   document.querySelectorAll('.ord-tab').forEach(btn => {
@@ -777,6 +872,7 @@
   });
 
   if (input) input.addEventListener('input', applyOrderFilter);
+  applyOrderFilter();
 
   // ─────────────────────────────────────────────────────────────────
   //  Row selection + bulk delete
@@ -793,6 +889,14 @@
     // so we sync state by data-order-id across all visible checkboxes.
     const selected = new Set();
 
+    // The checkboxes of the rows a pane is showing. "Select all" must
+    // never reach a row the period or the search has hidden: what it
+    // ticks is what Delete removes.
+    function onScreen(pane) {
+      return Array.from(pane.querySelectorAll('.ord-select-row'))
+        .filter(cb => cb.closest('.ord-row').style.display !== 'none');
+    }
+
     function refresh() {
       countEl.textContent = selected.size;
       pluralEl.style.display = selected.size === 1 ? 'none' : 'inline';
@@ -804,11 +908,14 @@
       // Sync any header "select all" boxes in panes where all visible
       // rows are checked.
       document.querySelectorAll('.ord-list-wrap').forEach(pane => {
-        const rows = pane.querySelectorAll('.ord-select-row');
-        if (!rows.length) return;
-        const allChecked = Array.from(rows).every(cb => cb.checked);
-        const someChecked = Array.from(rows).some(cb => cb.checked);
+        const rows = onScreen(pane);
         const head = pane.querySelector('.ord-select-all');
+        if (!rows.length) {
+          if (head) { head.checked = false; head.indeterminate = false; }
+          return;
+        }
+        const allChecked = rows.every(cb => cb.checked);
+        const someChecked = rows.some(cb => cb.checked);
         if (head) {
           head.checked = allChecked && rows.length > 0;
           head.indeterminate = !allChecked && someChecked;
@@ -844,7 +951,7 @@
       head.addEventListener('change', () => {
         const pane = head.closest('.ord-list-wrap');
         if (!pane) return;
-        pane.querySelectorAll('.ord-select-row').forEach(cb => {
+        onScreen(pane).forEach(cb => {
           cb.checked = head.checked;
           const id = cb.dataset.orderId;
           if (head.checked) selected.add(id);
@@ -926,7 +1033,7 @@
         document.querySelectorAll('.ord-tab').forEach(t => {
           const pane = document.querySelector(`.ord-list-wrap[data-pane="${t.dataset.tab}"]`);
           if (!pane) return;
-          const c = pane.querySelectorAll('.ord-row').length;
+          const c = pane.querySelectorAll('.ord-row:not([data-out])').length;
           const cn = t.querySelector('.ord-tab-count');
           if (cn) cn.textContent = c;
         });

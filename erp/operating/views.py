@@ -4551,6 +4551,28 @@ def _draft_purchases_prefetch():
                     to_attr="draft_purchases")
 
 
+# An order nothing has shipped on yet. The list keeps these in view past
+# the end of their month: an unfinished order that drops off the page on
+# the 1st is one that gets forgotten.
+ORDER_LIST_OPEN_STATUSES = ("pending", "confirmed", "preparing", "packaging")
+
+
+def _order_list_month(request):
+    """The first day of the month the list is asked for, or None for all
+    time. `?month=2026-09` names one, `?month=all` lifts the limit;
+    anything else — nothing at all, or a value that is not a month — is
+    this month."""
+    import datetime
+    from django.utils import timezone
+    raw = (request.GET.get("month") or "").strip()
+    if raw == "all":
+        return None
+    try:
+        return datetime.datetime.strptime(raw, "%Y-%m").date()
+    except ValueError:
+        return timezone.localdate().replace(day=1)
+
+
 class OrderList(ListView):
     model = Order
     template_name = "operating/order_list.html"
@@ -4584,7 +4606,28 @@ class OrderList(ListView):
         context = super().get_context_data(**kwargs)
         
         # Use the already-evaluated list to share prefetch cache across tabs
-        all_orders = context.get('orders', [])
+        all_orders = list(context.get('orders', []))
+
+        # Open orders lead, the longest-waiting first: they are the work
+        # still to do. Everything finished follows, newest first as the
+        # queryset has it.
+        def _day(order):
+            return order.order_date or order.created_at.date()
+        for order in all_orders:
+            order.list_group = ("open" if order.order_status in ORDER_LIST_OPEN_STATUSES
+                                else "done")
+        all_orders = (
+            sorted((o for o in all_orders if o.list_group == "open"),
+                   key=lambda o: (_day(o), o.created_at))
+            + [o for o in all_orders if o.list_group == "done"])
+        context['orders'] = all_orders
+
+        # Every line's cost in one query: the gross profit column reads a
+        # variant's cost from the stock it has on hand, which is otherwise
+        # one query per line.
+        from marketing.models import attach_live_costs
+        attach_live_costs(item.product_variant for order in all_orders
+                          for item in order.items.all() if item.product_variant_id)
 
         # What the search box actually filters on. Attached per row rather
         # than built in the template so all four panes index the same
@@ -4596,7 +4639,35 @@ class OrderList(ListView):
         # its other halves, which this list (one book's) never shows.
         from .split_orders import label_split_rows
         label_split_rows(all_orders)
-        
+
+        # The period the list opens on. Every order is still on the page —
+        # the search box reaches across all time — but a row outside the
+        # period stays hidden until a search finds it, and the tabs count
+        # only the period's.
+        import datetime
+        from django.utils import timezone
+        month = _order_list_month(self.request)
+        this_month = timezone.localdate().replace(day=1)
+        carried = 0
+        if month is not None:
+            after = (month + datetime.timedelta(days=32)).replace(day=1)
+        for order in all_orders:
+            if month is None:
+                order.in_period = True
+                continue
+            day = order.order_date or timezone.localtime(order.created_at).date()
+            # This month also carries what is still open from before it.
+            still_open = (month == this_month and day < month
+                          and order.order_status in ORDER_LIST_OPEN_STATUSES)
+            order.in_period = month <= day < after or still_open
+            carried += still_open
+        in_period = [order for order in all_orders if order.in_period]
+        context['period_start'] = month
+        context['period_month'] = month.strftime("%Y-%m") if month else ""
+        context['period_is_current'] = month == this_month
+        context['last_month'] = (this_month - datetime.timedelta(days=1)).strftime("%Y-%m")
+        context['carried_count'] = carried
+
         # B2B orders: Has contact OR company, but NO web_client
         b2b_orders = [
             order for order in all_orders 
@@ -4621,10 +4692,10 @@ class OrderList(ListView):
         context['b2b_orders'] = b2b_orders
         context['b2c_orders'] = b2c_orders
         context['retail_orders'] = retail_orders
-        context['total_count'] = len(all_orders)
-        context['b2b_count'] = len(b2b_orders)
-        context['b2c_count'] = len(b2c_orders)
-        context['retail_count'] = len(retail_orders)
+        context['total_count'] = len(in_period)
+        context['b2b_count'] = sum(o.in_period for o in b2b_orders)
+        context['b2c_count'] = sum(o.in_period for o in b2c_orders)
+        context['retail_count'] = sum(o.in_period for o in retail_orders)
         # Rows print only the symbol, so each tab's Total header names
         # the currencies its rows are in — more than one when mixed.
         context['all_currencies'] = _currency_codes(all_orders)

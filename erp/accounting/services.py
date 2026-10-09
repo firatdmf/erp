@@ -1,25 +1,45 @@
 import requests
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from .models import CurrencyExchangeRate
 
 
+def _rate_sources(fc: str, tc: str, on_date=None) -> list:
+    """Where to ask for the rate of `on_date`, best first: (url, picker)."""
+    today = date.today()
+    on_date = _as_date(on_date) or today
+    fix_day = (on_date - timedelta(days=1)).isoformat()
+    sources = [
+        (f"https://api.frankfurter.dev/v1/{fix_day}?from={fc}&to={tc}",
+         lambda j: j.get("rates", {}).get(tc)),
+    ]
+    if on_date >= today:
+        # Only publishes the latest rate, so it can stand in for today
+        # and for no other day.
+        sources.append(
+            (f"https://open.er-api.com/v6/latest/{fc}",
+             lambda j: j.get("rates", {}).get(tc)))
+    return sources
+
+
 def _fetch_rate(from_currency: str, to_currency: str, on_date=None) -> Decimal:
-    """Fetch an FX rate from reliable JSON APIs (with fallback).
+    """Fetch the rate that applies on `on_date` (today when not given).
 
     The old implementation scraped Google Finance for a `data-last-price="`
     marker; Google removed that marker, so every call raised
     "substring not found". These APIs return clean JSON and don't break on
     HTML changes.
 
-    `on_date` asks for the rate as it stood that day. A transaction entered
-    late is still worth what it was worth when it happened, so a backdated
-    row must not be converted at today's rate. Sources that only publish the
-    latest rate are skipped for a dated request rather than answering it
-    with the wrong day's number.
+    A day has one rate: the reference fix that was already published when
+    the day began, which is the one from the last trading day before it.
+    The fix for a day only comes out that afternoon, so asking for "the
+    latest" gave a morning entry yesterday's fix and an evening or
+    backdated one today's — two rates for one day, and the two directions
+    of a pair disagreeing with each other. Asking for the day before
+    answers the same at any hour, on the day or a year later.
 
-    A date with no published rate — a weekend, a holiday — resolves to the
-    most recent trading day before it, which is what the money was worth.
+    A day before with no published rate — a weekend, a holiday — resolves
+    to the most recent trading day before it.
     """
     fc, tc = (from_currency or "").upper(), (to_currency or "").upper()
     if not fc or not tc:
@@ -27,24 +47,7 @@ def _fetch_rate(from_currency: str, to_currency: str, on_date=None) -> Decimal:
     if fc == tc:
         return Decimal("1")
 
-    on_date = _as_date(on_date)
-    if on_date and on_date < date.today():
-        day = on_date.isoformat()
-        sources = (
-            (f"https://api.frankfurter.app/{day}?from={fc}&to={tc}",
-             lambda j: j.get("rates", {}).get(tc)),
-            (f"https://api.exchangerate.host/{day}?base={fc}&symbols={tc}",
-             lambda j: j.get("rates", {}).get(tc)),
-        )
-    else:
-        sources = (
-            (f"https://api.frankfurter.app/latest?from={fc}&to={tc}",
-             lambda j: j.get("rates", {}).get(tc)),
-            (f"https://open.er-api.com/v6/latest/{fc}",
-             lambda j: j.get("rates", {}).get(tc)),
-            (f"https://api.exchangerate.host/latest?base={fc}&symbols={tc}",
-             lambda j: j.get("rates", {}).get(tc)),
-        )
+    sources = _rate_sources(fc, tc, on_date)
     last_err = None
     for url, pick in sources:
         try:
@@ -88,10 +91,14 @@ def get_exchange_rate(from_currency: str, to_currency: str, on_date=None) -> Dec
 
     Defaults to today. Pass the transaction's own date to convert a
     backdated entry at what the money was worth then rather than now.
+    Every entry of one day gets the same rate, whatever hour it is asked
+    for (see `_fetch_rate`).
     Rates are cached per (pair, day), so asking for an old day repeatedly
     costs one fetch ever.
     """
-    day = _as_date(on_date) or date.today()
+    # A day that has not come yet has no rate of its own; it is worth
+    # what today is, and is not filed under a date that may still change.
+    day = min(_as_date(on_date) or date.today(), date.today())
     ck = (from_currency, to_currency, day)
     if ck in _RATE_MEMO:
         return _RATE_MEMO[ck]
@@ -120,3 +127,18 @@ def get_exchange_rate(from_currency: str, to_currency: str, on_date=None) -> Dec
         return None
 
 
+def last_known_rate(from_currency: str, to_currency: str):
+    """Today's rate, or failing that the newest one the books hold.
+
+    For a caller that has to show a price whether or not a rate source is
+    answering: a rate a few days old is close, and a made-up one is not.
+    None when the books have never held this pair.
+    """
+    rate = get_exchange_rate(from_currency, to_currency)
+    if rate:
+        return rate
+    row = (CurrencyExchangeRate.objects
+           .filter(from_currency=from_currency, to_currency=to_currency)
+           .order_by("-date")
+           .first())
+    return row.rate if row else None

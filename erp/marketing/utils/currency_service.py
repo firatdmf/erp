@@ -3,7 +3,8 @@ currency_service.py
 
 In-memory cached currency conversion service for the marketing app.
 Fetches exchange rates from open.er-api.com at most once per hour.
-Does NOT persist rates to the database.
+Does NOT persist rates to the database. When that source is down it
+answers with the rates the books hold.
 """
 
 import time
@@ -25,15 +26,6 @@ CACHE_TTL_SECONDS = 3600  # 1 hour
 API_URL = "https://open.er-api.com/v6/latest/USD"
 SUPPORTED_CURRENCIES = ["USD", "TRY", "EUR", "RUB", "PLN"]
 
-FALLBACK_RATES = {
-    "USD": 1.0,
-    "TRY": 36.0,
-    "EUR": 0.92,
-    "RUB": 90.0,
-    "PLN": 4.10,
-}
-
-
 def _is_cache_valid() -> bool:
     if _cache["rates"] is None or _cache["fetched_at"] is None:
         return False
@@ -50,11 +42,34 @@ def _fetch_live_rates() -> dict:
     return {code: float(raw[code]) for code in SUPPORTED_CURRENCIES if code in raw}
 
 
+def _rates_from_books() -> dict:
+    """The rates accounting holds, for when the live source is down.
+
+    A currency the books have never converted is left out rather than
+    guessed at.
+    """
+    from accounting.services import last_known_rate
+
+    rates = {"USD": 1.0}
+    for code in SUPPORTED_CURRENCIES:
+        if code == "USD":
+            continue
+        try:
+            rate = last_known_rate("USD", code)
+        except Exception as exc:
+            logger.warning("[currency_service] No stored rate for %s (%s).", code, exc)
+            rate = None
+        if rate:
+            rates[code] = float(rate)
+    return rates
+
+
 def get_rates() -> dict:
     """
     Return a dict of {currency_code: float} for all supported currencies.
     Uses in-memory cache; refreshes from API if cache is older than 1 hour.
-    Falls back to hardcoded rates on error.
+    Falls back to the rates the books hold on error, which may leave a
+    currency out.
     """
     global _cache
 
@@ -69,12 +84,12 @@ def get_rates() -> dict:
         return rates
     except Exception as exc:
         logger.warning("[currency_service] Failed to fetch live rates (%s). Using fallback.", exc)
-        # If we have stale cache, prefer it over hardcoded fallback
+        # If we have stale cache, prefer it over the books' daily rate
         if _cache["rates"] is not None:
             logger.info("[currency_service] Using stale cache.")
             return _cache["rates"]
-        logger.info("[currency_service] Using hardcoded fallback rates.")
-        return FALLBACK_RATES.copy()
+        logger.info("[currency_service] Using the rates the books hold.")
+        return _rates_from_books()
 
 
 def convert_price(price_usd, rates: dict) -> dict:
@@ -96,7 +111,9 @@ def convert_price(price_usd, rates: dict) -> dict:
     except (TypeError, ValueError):
         return {code: None for code in SUPPORTED_CURRENCIES}
 
+    # A currency with no rate gets no price: multiplying by a stand-in
+    # would publish the dollar figure under another currency's name.
     return {
-        code: round(usd * rates.get(code, 1.0), 2)
+        code: round(usd * rates[code], 2) if rates.get(code) else None
         for code in SUPPORTED_CURRENCIES
     }

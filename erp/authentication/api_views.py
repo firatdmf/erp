@@ -1432,77 +1432,15 @@ def get_exchange_rates(request):
     if request.method != 'GET':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
-    from datetime import datetime
-    import pytz
-    
-    # Get current time in Turkey timezone
-    turkey_tz = pytz.timezone('Europe/Istanbul')
-    current_time = datetime.now(turkey_tz)
-    
-    print(f"\n{'='*60}")
-    print(f"[EXCHANGE RATES] Request received at: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-    print(f"{'='*60}")
-    
-    rates_data = []
-    
-    try:
-        # Try to fetch live rates
-        import urllib.request
-        import json
-        
-        url = "https://open.er-api.com/v6/latest/USD"
-        print(f"[EXCHANGE RATES] Fetching live rates from: {url}")
-        
-        with urllib.request.urlopen(url) as url_response:
-            data = json.loads(url_response.read().decode())
-            
-            if data and 'rates' in data:
-                # Filter for currencies we support
-                supported_currencies = ['USD', 'EUR', 'TRY', 'RUB', 'PLN']
-                
-                print(f"[EXCHANGE RATES] OK Live rates fetched successfully!")
-                print(f"[EXCHANGE RATES] Base currency: USD")
-                print(f"[EXCHANGE RATES] Current rates:")
-                
-                for code in supported_currencies:
-                    if code in data['rates']:
-                        rate_value = data['rates'][code]
-                        rates_data.append({
-                            'currency_code': code,
-                            'rate': rate_value
-                        })
-                        print(f"  - 1 USD = {rate_value} {code}")
-    except Exception as e:
-        print(f"[EXCHANGE RATES] ERR Error fetching live rates: {e}")
-        print(f"[EXCHANGE RATES] -> Using fallback mock data")
-        # Fallback to mock rates if live fetch fails
-        rates_data = [
-            {'currency_code': 'USD', 'rate': 1.0},
-            {'currency_code': 'EUR', 'rate': 0.95},
-            {'currency_code': 'TRY', 'rate': 34.50},
-            {'currency_code': 'RUB', 'rate': 92.50},
-            {'currency_code': 'PLN', 'rate': 4.05},
-        ]
-        print(f"[EXCHANGE RATES] Fallback rates:")
-        for rate in rates_data:
-            print(f"  - 1 USD = {rate['rate']} {rate['currency_code']}")
-    
-    # If live fetch returned empty (e.g. API changed structure), use fallback
-    if not rates_data:
-        print(f"[EXCHANGE RATES] ERR Live fetch returned empty data")
-        print(f"[EXCHANGE RATES] -> Using fallback mock data")
-        rates_data = [
-            {'currency_code': 'USD', 'rate': 1.0},
-            {'currency_code': 'EUR', 'rate': 0.95},
-            {'currency_code': 'TRY', 'rate': 34.50},
-            {'currency_code': 'RUB', 'rate': 92.50},
-            {'currency_code': 'PLN', 'rate': 4.05},
-        ]
-        print(f"[EXCHANGE RATES] Fallback rates:")
-        for rate in rates_data:
-            print(f"  - 1 USD = {rate['rate']} {rate['currency_code']}")
+    # The same rates the product pages are priced with, cached there for
+    # an hour, so this endpoint and the prices beside it cannot disagree.
+    from marketing.utils.currency_service import SUPPORTED_CURRENCIES, get_rates
 
-    print(f"{'='*60}\n")
+    rates = get_rates()
+    rates_data = [
+        {'currency_code': code, 'rate': rates[code]}
+        for code in SUPPORTED_CURRENCIES if rates.get(code)
+    ]
 
     response = JsonResponse({
         'success': True,

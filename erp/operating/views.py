@@ -4622,13 +4622,6 @@ class OrderList(ListView):
             + [o for o in all_orders if o.list_group == "done"])
         context['orders'] = all_orders
 
-        # Every line's cost in one query: the gross profit column reads a
-        # variant's cost from the stock it has on hand, which is otherwise
-        # one query per line.
-        from marketing.models import attach_live_costs
-        attach_live_costs(item.product_variant for order in all_orders
-                          for item in order.items.all() if item.product_variant_id)
-
         # What the search box actually filters on. Attached per row rather
         # than built in the template so all four panes index the same
         # thing — the tabs are the SAME orders, and a query that finds an

@@ -417,7 +417,17 @@ def post_movement(movement, *, reference=""):
     edited payment keep its old figure in the ledger for ever.
 
     Returns the entry, or None when the movement belongs in no balance.
+
+    A leg of a transfer between two accounts is posted with its other leg,
+    as one entry — see post_account_transfer.
     """
+    if _is_account_transfer_leg(movement):
+        return post_account_transfer(movement, reference=reference)
+    return _post_movement_alone(movement, reference=reference)
+
+
+def _post_movement_alone(movement, *, reference=""):
+    """post_movement for a movement that is the whole of its event."""
     lines = lines_for_movement(movement)
     unpost(movement)
     if not lines:
@@ -429,6 +439,108 @@ def post_movement(movement, *, reference=""):
         lines=lines,
         source=movement,
         reference=reference or movement.reference or "",
+    )
+
+
+# ---------------------------------------------------------------------------
+# A transfer between two current accounts
+#
+# The debt moves from one account to the other and nothing else changes, so
+# the entry is Accounts Receivable against itself: a debit tagged with the
+# account that now owes, a credit tagged with the one that no longer does.
+#
+# Its two legs are `adjustment` movements, and read one at a time each
+# would park its other side in Suspense — two entries that cancel, on an
+# account whose name says somebody still has a decision to make. Nobody
+# does: each leg's other side is the other leg.
+# ---------------------------------------------------------------------------
+ACCOUNT_TRANSFER_MODEL = "currentaccounttransfer"
+
+
+def _is_account_transfer_leg(movement):
+    return bool(movement.source_id
+                and _source_model_name(movement) == ACCOUNT_TRANSFER_MODEL)
+
+
+def _account_transfer_legs(movement, *, without=None):
+    """Every movement written by the transfer that wrote `movement`."""
+    from .models_accounts import CurrentAccountMovement
+    legs = (CurrentAccountMovement.objects
+            .filter(source_type_id=movement.source_type_id,
+                    source_id=movement.source_id)
+            .select_related("current_account").order_by("pk"))
+    if without is not None:
+        legs = legs.exclude(pk=without)
+    return list(legs)
+
+
+def lines_for_account_transfer(legs):
+    """The two lines a transfer's legs imply together, or none.
+
+    None unless the legs are a pair that cancels. One leg alone (the other
+    not written yet, or deleted), a void one, or a pair somebody has since
+    edited apart is not an entry that balances inside Accounts Receivable,
+    and the caller posts each leg by itself instead.
+    """
+    live = [(leg, Decimal(leg.amount_base or 0)) for leg in legs if not leg.is_void]
+    live = [(leg, amount) for leg, amount in live if amount != ZERO]
+    if len(live) != 2 or live[0][1] + live[1][1] != ZERO:
+        return []
+    if any(leg.movement_type not in PARKED_CONTRA_BY_TYPE for leg, _ in live):
+        return []
+    live.sort(key=lambda pair: pair[1], reverse=True)       # the debit first
+    lines = []
+    for leg, amount in live:
+        memo = leg.description or leg.get_movement_type_display()
+        side = debit if amount > ZERO else credit
+        lines.append(side(CURRENT_ACCOUNT_CONTROL, abs(amount),
+                          current_account=leg.current_account, memo=memo))
+    return lines
+
+
+@transaction.atomic
+def post_account_transfer(movement, *, reference="", removed=False):
+    """Make the ledger say what the transfer behind this leg did.
+
+    One entry, sourced on the transfer, in place of an entry per leg.
+    Idempotent like post_movement, and called from the same places: each
+    leg's save, and its delete with `removed` (the row is gone by then, so
+    the legs are read without it).
+
+    While the legs are not a pair that cancels, each is posted by itself,
+    as any other adjustment would be. That keeps Accounts Receivable equal
+    to the accounts through the moment between the first leg's save and the
+    second's, and for a leg corrected by hand afterwards.
+
+    Returns the entry `movement` is in, or None.
+    """
+    from .models_accounts import CurrentAccountTransfer
+
+    legs = _account_transfer_legs(movement, without=movement.pk if removed else None)
+    transfer = CurrentAccountTransfer.objects.filter(pk=movement.source_id).first()
+    lines = lines_for_account_transfer(legs) if transfer is not None else []
+    unpost_ref(movement.source_type_id, movement.source_id)
+    if removed:
+        unpost(movement)
+
+    if not lines:
+        own = None
+        for leg in legs:
+            entry = _post_movement_alone(leg, reference=reference)
+            if leg.pk == movement.pk:
+                own = entry
+        return own
+
+    for leg in legs:
+        unpost(leg)
+    return post_entry(
+        book=transfer.book,
+        date=transfer.date,
+        description=(transfer.description or "Account transfer")[:300],
+        lines=lines,
+        source=transfer,
+        reference=reference or transfer.reference,
+        member=transfer.created_by,
     )
 
 

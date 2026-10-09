@@ -139,8 +139,15 @@ def unpost_movement_from_ledger(sender, instance, **kwargs):
     mirror by CASCADE, and the mirror's own entry goes with it on the
     partner book.
     """
-    from .services_posting import unpost
-    _safely(f"movement {instance.pk}", unpost, instance)
+    from .services_posting import (_is_account_transfer_leg,
+                                   post_account_transfer, unpost)
+    if _is_account_transfer_leg(instance):
+        # The entry is the transfer's, shared with the other leg, which is
+        # left standing by itself until it goes too.
+        _safely(f"movement {instance.pk}", post_account_transfer, instance,
+                removed=True)
+    else:
+        _safely(f"movement {instance.pk}", unpost, instance)
     _resplit_payables_on_commit(instance.book_id)
 
 

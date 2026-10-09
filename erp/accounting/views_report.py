@@ -19,7 +19,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views import View
 
 from accounting.models import Book
-from .models import CurrentAccount, CurrentAccountMovement
+from .models import CurrentAccount, CurrentAccountMovement, CurrentAccountTransfer
 from .models_ledger import ChartAccount
 
 
@@ -493,7 +493,8 @@ class Journal(View):
     # What wrote the entry, by its source model. An entry with no source is
     # one the ledger made for itself — the payables re-split, a period close.
     KINDS = {
-        "accounts": (_("Account entries"), ("currentaccountmovement",)),
+        "accounts": (_("Account entries"), ("currentaccountmovement",
+                                            "currentaccounttransfer")),
         "cash":     (_("Cash"), ("equityexpense", "equityrevenue", "equitycapital",
                                  "equitydivident", "currencyexchange", "intransfer")),
         "stock":    (_("Stock"), ("stockmovement", "stocktransfer")),
@@ -599,7 +600,12 @@ class Journal(View):
                                  .filter(pk__in=by_model.get("currentaccountmovement", ()))
                                  .values_list("pk", "amount", "currency__code")):
             add(("currentaccountmovement", pk), amount, code)
-        cash_models = [m for m in by_model if m != "currentaccountmovement"]
+        for pk, amount, code in (CurrentAccountTransfer.objects
+                                 .filter(pk__in=by_model.get("currentaccounttransfer", ()))
+                                 .values_list("pk", "amount", "currency__code")):
+            add(("currentaccounttransfer", pk), amount, code)
+        cash_models = [m for m in by_model
+                       if m not in ("currentaccountmovement", "currentaccounttransfer")]
         for model in cash_models:
             for pk, amount, code in (CashTransactionEntry.objects
                                      .filter(book=book, content_type__model=model,
@@ -630,6 +636,9 @@ class Journal(View):
                                .values_list("pk", "current_account_id")):
             urls[("currentaccountmovement", pk)] = reverse(
                 "accounts:movement_detail", args=[account_id, pk])
+        for pk in by_model.get("currentaccounttransfer", ()):
+            urls[("currentaccounttransfer", pk)] = reverse(
+                "accounts:transfer_detail", args=[pk])
         for pk in by_model.get("equityexpense", ()):
             urls[("equityexpense", pk)] = reverse(
                 "accounting:equity_expense_detail", args=[book.pk, pk])

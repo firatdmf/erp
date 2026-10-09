@@ -736,8 +736,10 @@ def suspense_report(book, limit=10):
     Items are the movements behind the parked lines, newest first, each
     with the screen that can reclassify it: the payment form for a payment
     made by offset or "other", the movement form for everything else.
-    Transfer legs are counted but not listed — a transfer's two halves park
-    equal and opposite amounts, so they are not a decision anyone owes.
+    A transfer between two accounts posts inside Accounts Receivable and
+    parks nothing. Its legs are left out here all the same: a pair caught
+    between its two saves parks equal and opposite amounts, which is not a
+    decision anyone owes.
     """
     from django.contrib.contenttypes.models import ContentType
     from django.urls import reverse

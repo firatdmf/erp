@@ -84,7 +84,8 @@ class CashAccountListingTest(CashAccountTestBase):
         response = self.client.get(self.detail_url())
         self.assertEqual(response.status_code, 200)
         listed = list(response.context["cash_accounts"])
-        self.assertEqual(listed, [self.kasa, self.usd_kasa])
+        # The book's own currency (dollars, by default) leads.
+        self.assertEqual(listed, [self.usd_kasa, self.kasa])
         self.assertNotIn(self.foreign, listed)
 
     def test_card_renders_names_and_balances(self):

@@ -69,12 +69,14 @@ class JournalPage(TestCase):
                 book=self.book, date="2026-10-06", from_current_account=self.samir,
                 to_current_account=self.demfirat, amount=Decimal("950.00"), currency=self.usd)
             transfer.post()
-        rows = [row for row in self._page().context["rows"]
+        rows = [row for row in self._page(kind="accounts").context["rows"]
                 if str(row["entry"].date) == "2026-10-06"]
-        self.assertEqual(len(rows), 2)
-        parties = {l.current_account.code for row in rows
-                   for l in row["debits"] + row["credits"] if l.current_account}
-        self.assertEqual(parties, {"ERGTH", "ACC-101"})
+        # One entry, inside Accounts Receivable: who owes now, who no longer does.
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(self._sides(rows[0]), (["1200"], ["1200"]))
+        self.assertEqual([l.current_account.code for l in rows[0]["debits"]], ["ACC-101"])
+        self.assertEqual([l.current_account.code for l in rows[0]["credits"]], ["ERGTH"])
+        self.assertEqual(rows[0]["url"], reverse("accounts:transfer_detail", args=[transfer.pk]))
 
     def test_newest_first_and_only_this_book(self):
         self._move(self.samir, "100.00", when="2026-09-01", text="older")

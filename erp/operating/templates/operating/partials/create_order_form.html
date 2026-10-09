@@ -199,7 +199,7 @@
    (.sidebar-overlay is z-index 10000) — inside it, an inline panel
    was competing for the little height the sidebar has left. */
 .co-cam-overlay{position:fixed;inset:0;z-index:10050;display:none;align-items:center;justify-content:center;
-  background:rgba(6,10,18,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:16px;}
+  background:rgba(6,10,18,.9);padding:16px;}
 .co-cam-overlay.show{display:flex;}
 .co-cam-shell{width:100%;max-width:460px;background:linear-gradient(180deg,#101826 0%,#0B1220 100%);
   border:1px solid rgba(94,234,212,.10);border-radius:20px;overflow:hidden;
@@ -211,7 +211,7 @@
 .co-cam-close{background:rgba(255,255,255,.08);border:none;color:#fff;width:34px;height:34px;
   border-radius:10px;cursor:pointer;font-size:15px;transition:background .14s;}
 .co-cam-close:hover{background:rgba(255,255,255,.16);}
-.co-cam-view{position:relative;background:#000;aspect-ratio:3/4;max-height:56vh;overflow:hidden;}
+.co-cam-view{position:relative;background:#000;width:100%;aspect-ratio:3/4;max-height:56vh;overflow:hidden;}
 .co-cam-view video{width:100%;height:100%;object-fit:cover;display:block;background:#000;}
 .co-cam-guide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
   justify-content:center;pointer-events:none;}
@@ -230,11 +230,16 @@
    a reader that never starts writes why, in the same place. */
 .co-cam-hint{margin-top:16px;display:inline-flex;align-items:center;gap:8px;color:#fff;
   font:600 12.5px var(--font-sans,sans-serif);background:rgba(4,10,18,.62);
-  border:1px solid rgba(255,255,255,.12);padding:6px 14px;border-radius:999px;
-  max-width:86%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  border:1px solid rgba(255,255,255,.12);padding:6px 14px;border-radius:14px;
+  max-width:86%;overflow:hidden;overflow-wrap:anywhere;}
 .co-cam-hint::before{content:'';width:7px;height:7px;border-radius:50%;background:#2DD4BF;
   flex-shrink:0;animation:coCamPulse 1.4s ease-in-out infinite;}
 @keyframes coCamPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+/* What the camera and the reader are doing, in small print: a phone
+   that shows a black picture can be told apart from here by a
+   screenshot, without the phone in hand. */
+.co-cam-diag{position:absolute;left:0;right:0;bottom:6px;padding:0 10px;text-align:center;pointer-events:none;
+  color:rgba(255,255,255,.55);font:500 10px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;}
 .co-cam-result{padding:18px;color:#fff;overflow-y:auto;text-align:center;}
 @media (max-width:520px){ .co-cam-shell{max-width:100%;} }
 </style>
@@ -571,6 +576,7 @@
                 </div>
                 <div class="co-cam-hint" id="co-roll-cam-hit">{% trans "Bring the barcode into the frame" %}</div>
               </div>
+              <div class="co-cam-diag" id="co-roll-cam-diag"></div>
             </div>
           </div>
           {% comment %}Where a read waits to be confirmed. The reader fires on
@@ -2497,6 +2503,15 @@
     // never loaded, the video never delivered a frame, or the decoder
     // threw on every one. These three carry that answer to the chip.
     var camFrames = 0, camDecodeErr = '', camOpenedAt = 0;
+    // The decoder is a file of its own, fetched on the first read. The
+    // library keeps a failed fetch and answers every later read with
+    // it, so one dropped download left the reader dead until the page
+    // was reloaded. Until a read has come back, a failure is taken to
+    // be that file and it is fetched again, from the next host.
+    var zxMod = null, zxReady = false, zxWasmTry = 0, camLight = -1, camDiagAt = 0;
+    var ZXW_WASM = ['https://unpkg.com/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
+      'https://esm.sh/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
+      'https://fastly.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm'];
     var ZXW_OPTS = { tryHarder: true, tryRotate: true, tryDownscale: true, maxNumberOfSymbols: 1,
       formats: ['Code128', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code39', 'Code93', 'ITF', 'Codabar', 'QRCode'] };
     var RS_BAD_LENS = /ultra|wide|tele|depth|truedepth|infrared/i;
@@ -2515,13 +2530,26 @@
     function loadZxw() {
       if (zx) return Promise.resolve(zx);
       if (zxLoading) return zxLoading;
-      var urls = ['https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/+esm', 'https://esm.sh/zxing-wasm@3.1.0/reader'];
+      // The reader-only build: the package's root entry also carries
+      // the barcode writer, and half a megabyte more to download.
+      var urls = ['https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/reader/+esm', 'https://esm.sh/zxing-wasm@3.1.0/reader'];
       function tryNext(i) {
         if (i >= urls.length) return Promise.reject(new Error('zxing load failed'));
-        return import(urls[i]).then(function (mod) { if (mod && mod.readBarcodes) return mod.readBarcodes; throw new Error('no export'); }).catch(function () { return tryNext(i + 1); });
+        return import(urls[i]).then(function (mod) { if (mod && mod.readBarcodes) return mod; throw new Error('no export'); }).catch(function () { return tryNext(i + 1); });
       }
-      zxLoading = tryNext(0).then(function (fn) { zx = fn; return fn; });
+      // A load that failed is forgotten, so the next open tries again.
+      zxLoading = tryNext(0).then(function (mod) { zxMod = mod; zx = mod.readBarcodes; return zx; })
+        .catch(function (err) { zxLoading = null; throw err; });
       return zxLoading;
+    }
+    function zxNextHost() {
+      if (!zxMod || !zxMod.prepareZXingModule || zxWasmTry >= ZXW_WASM.length * 2) return false;
+      var url = ZXW_WASM[zxWasmTry % ZXW_WASM.length];
+      zxWasmTry++;
+      try {
+        zxMod.prepareZXingModule({ overrides: { locateFile: function (path, prefix) { return /\.wasm$/.test(path) ? url : prefix + path; } } });
+      } catch (e) { return false; }
+      return true;
     }
     function getRearStream() {
       var W = { ideal: 1920 }, H = { ideal: 1080 };
@@ -2557,8 +2585,30 @@
     }
     function roi() { if (!roiCanvas) { roiCanvas = document.createElement('canvas'); roiCanvas.getContext('2d', { willReadFrequently: true }); } return roiCanvas; }
 
+    // The popup belongs to the body, not to the form. The create drawer
+    // is transformed and clips what overflows it, which makes it — not
+    // the screen — what a position:fixed child fills: on a phone the
+    // popup came out off-centre with its close button cut away. A copy
+    // left behind by a form that has since been re-rendered goes first.
+    Array.prototype.forEach.call(document.querySelectorAll('body > .co-cam-overlay'), function (el) { el.parentNode.removeChild(el); });
     var camEl = document.getElementById('co-roll-cam-overlay'), video = document.getElementById('co-roll-cam-video');
-    var hitEl = document.getElementById('co-roll-cam-hit');
+    if (camEl && camEl.parentNode !== document.body) document.body.appendChild(camEl);
+    var hitEl = document.getElementById('co-roll-cam-hit'), diagEl = document.getElementById('co-roll-cam-diag');
+    function camDiag(now) {
+      if (!diagEl || (now - camDiagAt) < 1000) return;
+      camDiagAt = now;
+      var tk = null, st = {};
+      try { tk = camStream && camStream.getVideoTracks()[0]; st = (tk && tk.getSettings && tk.getSettings()) || {}; } catch (e) {}
+      diagEl.textContent = [
+        (tk && tk.label) || 'no track',
+        (st.width || '?') + 'x' + (st.height || '?'),
+        'video ' + video.videoWidth + 'x' + video.videoHeight + (video.paused ? ' paused' : ' playing'),
+        tk ? tk.readyState + (tk.muted ? ' muted' : '') : '',
+        'frames ' + camFrames,
+        camLight < 0 ? '' : 'light ' + camLight,
+        zxReady ? 'reader ok' : (zx ? 'reader loading' : 'reader not loaded')
+      ].filter(Boolean).join(' · ');
+    }
     var stageEl = document.getElementById('co-roll-cam-stage');
     var panelEl = document.getElementById('co-roll-cam-confirm');
 
@@ -2765,6 +2815,9 @@
       camOpenedAt = (window.performance && performance.now) ? performance.now() : Date.now();
       if (camStream && video && video.srcObject) {
         camRunning = true; lastDecode = 0;
+        // The video was display:none while the read was being confirmed,
+        // and Safari may have paused it there.
+        try { var pl = video.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (e) {}
         camLoop();
       } else {
         window.coOpenRollCamera(camTargetIndex);   // stream was lost — start over
@@ -2792,7 +2845,9 @@
       camPending = '';
       camDebounce = { val: '', t: 0 };
       camStage();
-      camFrames = 0; camDecodeErr = '';
+      camFrames = 0; camDecodeErr = ''; camLight = -1; camDiagAt = 0;
+      if (!zxReady) zxWasmTry = 0;
+      if (diagEl) diagEl.textContent = '';
       camOpenedAt = (window.performance && performance.now) ? performance.now() : Date.now();
       // Back to the prompt — otherwise a reopen starts under the last
       // scan's code, or the last error, and reads as a live result.
@@ -2851,6 +2906,7 @@
     function camLoop() {
       if (!camRunning) return;
       var now = (window.performance && performance.now) ? performance.now() : Date.now();
+      camDiag(now);
       if (!zx || !video.videoWidth || video.readyState < 2 || (now - lastDecode) < 120) {
         // Five seconds of waiting with no frame is not "hold it steadier",
         // it is a camera that never started. Say so instead of leaving
@@ -2872,8 +2928,15 @@
         var cx = c.getContext('2d', { willReadFrequently: true });
         cx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
         var img = cx.getImageData(0, 0, outW, outH);
-        zx(img, ZXW_OPTS).then(function (res) { if (camRunning && res && res.length && res[0].text) onDecode(res[0].text); })
+        // How bright the frame the reader is given is, 0–255, off a
+        // sparse sample: a black picture over a bright frame is the
+        // screen's fault, over a dark one the camera's.
+        var px = img.data, sum = 0, n = 0;
+        for (var p = 0; p < px.length; p += 4000) { sum += px[p] + px[p + 1] + px[p + 2]; n += 3; }
+        camLight = n ? Math.round(sum / n) : -1;
+        zx(img, ZXW_OPTS).then(function (res) { zxReady = true; if (camRunning && res && res.length && res[0].text) onDecode(res[0].text); })
           .catch(function (err) {
+            if (!zxReady && zxNextHost()) return;
             // Once, not once per frame — this fires 8×/second.
             var msg = (err && err.message) || String(err);
             if (msg !== camDecodeErr) {

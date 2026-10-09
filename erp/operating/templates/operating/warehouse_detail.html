@@ -834,8 +834,7 @@
   /* ── Roll Scanner (camera-driven label OCR) ──────────────── */
   .rs-overlay {
     position: fixed; inset: 0;
-    background: rgba(15, 23, 31, 0.78);
-    backdrop-filter: blur(6px);
+    background: rgba(15, 23, 31, 0.9);
     z-index: 10000;
     display: none;
     align-items: center; justify-content: center;
@@ -931,6 +930,15 @@
   }
   #rsVideo {
     width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  /* What the camera and the reader are doing, in small print: a phone
+     that shows a black picture can be told apart from here by a
+     screenshot, without the phone in hand. Shared by both readers. */
+  .rs-diag {
+    position: absolute; left: 0; right: 0; bottom: 6px; padding: 0 10px;
+    text-align: center; pointer-events: none; overflow-wrap: anywhere;
+    color: rgba(255,255,255,0.55);
+    font: 500 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   .rs-guide {
     position: absolute; inset: 0;
@@ -1871,7 +1879,7 @@
 
 <!-- ─── BARCODE LOOKUP (find existing product — no add) ───────── -->
 <style>
-  .bl-overlay { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(6,10,18,0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; }
+  .bl-overlay { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(6,10,18,0.9); padding: 16px; }
   .bl-overlay.show { display: flex; }
   .bl-shell { width: 100%; max-width: 460px; background: linear-gradient(180deg, #101826 0%, #0B1220 100%); border: 1px solid rgba(94,234,212,0.10); border-radius: 20px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,0.6); display: flex; flex-direction: column; max-height: 94vh; }
   .bl-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
@@ -1879,7 +1887,7 @@
   .bl-title i { color: #2DD4BF; }
   .bl-close { background: rgba(255,255,255,0.08); border: none; color: #fff; width: 34px; height: 34px; border-radius: 10px; cursor: pointer; font-size: 15px; transition: background 140ms; }
   .bl-close:hover { background: rgba(255,255,255,0.16); }
-  .bl-cam { position: relative; background: #000; aspect-ratio: 3 / 4; max-height: 56vh; overflow: hidden; }
+  .bl-cam { position: relative; background: #000; width: 100%; aspect-ratio: 3 / 4; max-height: 56vh; overflow: hidden; }
   .bl-cam video { width: 100%; height: 100%; object-fit: cover; }
   .bl-guide { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
   .bl-guide-frame { position: relative; width: 82%; height: 30%; border-radius: 16px; box-shadow: 0 0 0 2000px rgba(4,10,18,0.42); }
@@ -1965,6 +1973,7 @@
           </div>
           <div class="bl-hint"><span class="bl-hint-dot"></span>{% trans "Point the barcode at the frame" %}</div>
         </div>
+        <div class="rs-diag" id="blDiag"></div>
       </div>
       {% get_current_language as LANGUAGE_CODE %}
       <div class="bl-manual">
@@ -2155,6 +2164,7 @@
             <div class="rs-guide-frame"></div>
             <div class="rs-guide-hint">{% trans "Center the label here" %}</div>
           </div>
+          <div class="rs-diag" id="rsDiag"></div>
           <div id="rsFlash" class="rs-flash" hidden></div>
           <div id="rsProcessing" class="rs-processing" hidden>
             <div class="rs-proc-chip">
@@ -3076,7 +3086,9 @@
     // Open the rear camera first (also grants permission so labels populate).
     return open({ facingMode: { ideal: 'environment' }, width: W, height: H }).then(function (stream) {
       if (!navigator.mediaDevices.enumerateDevices) return rsApplyFocus(stream);
-      return navigator.mediaDevices.enumerateDevices().then(function (devices) {
+      // Not being able to list the lenses is no reason to give up the
+      // stream already in hand — it is read as "one camera" instead.
+      return navigator.mediaDevices.enumerateDevices().catch(function () { return []; }).then(function (devices) {
         var cams = devices.filter(function (d) { return d.kind === 'videoinput'; });
         if (cams.length < 2) return rsApplyFocus(stream);
         var rear = cams.filter(function (d) { return /back|rear|environment|arka|tras|rück/i.test(d.label || ''); });
@@ -3092,10 +3104,15 @@
         try { curId = (stream.getVideoTracks()[0].getSettings() || {}).deviceId || ''; } catch (e) {}
         if (pick && pick.deviceId && pick.deviceId !== curId) {
           stream.getTracks().forEach(function (t) { t.stop(); });
-          return open({ deviceId: { exact: pick.deviceId }, width: W, height: H }).then(rsApplyFocus);
+          // The first stream is stopped by now, so a lens that will not
+          // open cannot fall back to it: that hands the reader a dead
+          // stream and a black picture. Ask plainly for a rear camera.
+          return open({ deviceId: { exact: pick.deviceId }, width: W, height: H })
+            .catch(function () { return open({ facingMode: { ideal: 'environment' } }); })
+            .then(rsApplyFocus);
         }
         return rsApplyFocus(stream);
-      }).catch(function () { return rsApplyFocus(stream); });
+      });
     });
   }
 
@@ -3108,6 +3125,9 @@
     getRearCameraStream().then(function (stream) {
       rsStream = stream;
       video.srcObject = stream;
+      // autoplay alone is not always enough on Safari for a <video>
+      // whose popup was display:none until this tap.
+      try { var pl = video.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (_) {}
       // Start the LIVE barcode scanner on the same stream (job #2; the
       // AI label OCR is job #1 on capture). Guarded so it never breaks
       // the camera if unavailable.
@@ -3169,19 +3189,73 @@
   function loadZxw() {
     if (rsZxw) return Promise.resolve(rsZxw);
     if (rsZxwLoading) return rsZxwLoading;
+    // The reader-only build: the package's root entry also carries the
+    // barcode writer, and half a megabyte more to download.
     var urls = [
-      'https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/+esm',
+      'https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/reader/+esm',
       'https://esm.sh/zxing-wasm@3.1.0/reader'
     ];
     function tryNext(i) {
       if (i >= urls.length) return Promise.reject(new Error('zxing-wasm load failed'));
       return import(urls[i]).then(function (mod) {
-        if (mod && mod.readBarcodes) return mod.readBarcodes;
+        if (mod && mod.readBarcodes) return mod;
         throw new Error('no readBarcodes export');
       }).catch(function () { return tryNext(i + 1); });
     }
-    rsZxwLoading = tryNext(0).then(function (fn) { rsZxw = fn; return fn; });
+    // A load that failed is forgotten, so the next open tries again.
+    rsZxwLoading = tryNext(0).then(function (mod) { rsZxw = rsZxwHealing(mod); return rsZxw; })
+      .catch(function (err) { rsZxwLoading = null; throw err; });
     return rsZxwLoading;
+  }
+  // The decoder is a file of its own, fetched on the first read. The
+  // library keeps a failed fetch and answers every later read with it,
+  // so one dropped download left every reader on the page dead until it
+  // was reloaded. Until a read has come back, a failure is taken to be
+  // that file, and it is fetched again from the next host.
+  const ZXW_WASM = ['https://unpkg.com/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
+    'https://esm.sh/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
+    'https://fastly.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm'];
+  let rsZxwReady = false;
+  function rsZxwHealing(mod) {
+    var tries = 0;
+    function read(img, opts) {
+      return mod.readBarcodes(img, opts).then(function (res) { rsZxwReady = true; return res; }, function (err) {
+        if (rsZxwReady || !mod.prepareZXingModule || tries >= ZXW_WASM.length * 2) throw err;
+        var url = ZXW_WASM[tries % ZXW_WASM.length]; tries++;
+        mod.prepareZXingModule({ overrides: { locateFile: function (path, prefix) { return /\.wasm$/.test(path) ? url : prefix + path; } } });
+        return read(img, opts);
+      });
+    }
+    return read;
+  }
+  // The small-print status line under either reader's picture. `img` is
+  // the frame just handed to the decoder, when there is one: its
+  // brightness (0–255, off a sparse sample) tells a black picture over a
+  // bright frame — the screen's fault — from one over a dark frame.
+  let rsDiagAt = 0, rsDiagFrames = 0, rsDiagLight = -1;
+  function rsDiag(id, video, img) {
+    if (img) {
+      rsDiagFrames++;
+      var px = img.data, sum = 0, n = 0;
+      for (var p = 0; p < px.length; p += 4000) { sum += px[p] + px[p + 1] + px[p + 2]; n += 3; }
+      rsDiagLight = n ? Math.round(sum / n) : -1;
+    }
+    var now = Date.now();
+    if ((now - rsDiagAt) < 1000) return;
+    rsDiagAt = now;
+    var el = document.getElementById(id);
+    if (!el) return;
+    var tk = null, st = {};
+    try { tk = video.srcObject && video.srcObject.getVideoTracks()[0]; st = (tk && tk.getSettings && tk.getSettings()) || {}; } catch (e) {}
+    el.textContent = [
+      (tk && tk.label) || 'no track',
+      (st.width || '?') + 'x' + (st.height || '?'),
+      'video ' + video.videoWidth + 'x' + video.videoHeight + (video.paused ? ' paused' : ' playing'),
+      tk ? tk.readyState + (tk.muted ? ' muted' : '') : '',
+      'frames ' + rsDiagFrames,
+      rsDiagLight < 0 ? '' : 'light ' + rsDiagLight,
+      rsZxwReady ? 'reader ok' : (rsZxw ? 'reader loading' : 'reader not loaded')
+    ].filter(Boolean).join(' · ');
   }
 
   function rsGetRoiCanvas() {
@@ -3221,6 +3295,7 @@
     // weaker phones (jittery camera). rAF still spins smoothly; only the
     // heavy getImageData + WASM decode is rate-limited.
     var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    rsDiag('rsDiag', video);
     if (!rsZxw || !video.videoWidth || video.readyState < 2 || (now - rsBcLastDecode) < 110) {
       rsBcRaf = requestAnimationFrame(function () { rsBcLoop(video); });
       return;
@@ -3239,6 +3314,7 @@
       if (roi.height !== outH) roi.height = outH;
       _rsRoiCtx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
       var img = _rsRoiCtx.getImageData(0, 0, outW, outH);
+      rsDiag('rsDiag', video, img);
       rsZxw(img, ZXW_OPTS).then(function (res) {
         if (rsBcRunning && res && res.length && res[0].text) rsOnBarcode(res[0].text);
       }).catch(function () {}).finally(function () {
@@ -3947,6 +4023,7 @@
     // Use the MAIN rear camera (shared picker — avoids ultra-wide).
     getRearCameraStream().then(function (stream) {
       blStream = stream; video.srcObject = stream;
+      try { var pl = video.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (e) {}
       try { var t = stream.getVideoTracks()[0]; if (t && t.applyConstraints) t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); } catch (e) {}
       blRunning = true; blLastCode = '';
       loadZxw().then(function () { blLoop(video); }).catch(function () {});
@@ -3955,6 +4032,7 @@
   function blLoop(video) {
     if (!blRunning) return;
     var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    rsDiag('blDiag', video);
     if (!rsZxw || !video.videoWidth || video.readyState < 2 || (now - blLastDecode) < 110) {
       blRaf = requestAnimationFrame(function () { blLoop(video); }); return;
     }
@@ -3970,6 +4048,7 @@
       var ctx = roi.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
       var img = ctx.getImageData(0, 0, outW, outH);
+      rsDiag('blDiag', video, img);
       rsZxw(img, ZXW_OPTS).then(function (res) {
         if (blRunning && res && res.length && res[0].text) onLookupBarcode(res[0].text);
       }).catch(function () {}).finally(function () {

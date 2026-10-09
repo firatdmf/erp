@@ -287,7 +287,7 @@
      what makes "scan into a package" a place you are rather than a mode
      left switched on behind you. */
   .pks-overlay{position:fixed;inset:0;z-index:95;display:none;align-items:center;justify-content:center;
-    background:rgba(6,10,18,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:16px;}
+    background:rgba(6,10,18,.9);padding:16px;}
   .pks-overlay.show{display:flex;}
   .pks-shell{width:100%;max-width:460px;background:linear-gradient(180deg,#101826 0%,#0B1220 100%);
     border:1px solid rgba(94,234,212,.10);border-radius:20px;overflow:hidden;
@@ -299,7 +299,12 @@
   .pks-close{background:rgba(255,255,255,.08);border:0;color:#fff;width:34px;height:34px;
     border-radius:10px;cursor:pointer;font-size:15px;}
   .pks-close:hover{background:rgba(255,255,255,.16);}
-  .pks-cam{position:relative;background:#000;aspect-ratio:4/3;max-height:44vh;overflow:hidden;flex-shrink:0;}
+  .pks-cam{position:relative;background:#000;width:100%;aspect-ratio:4/3;max-height:44vh;overflow:hidden;flex-shrink:0;}
+  /* What the camera and the reader are doing, in small print: a phone
+     that shows a black picture can be told apart from here by a
+     screenshot, without the phone in hand. */
+  .pks-diag{position:absolute;left:0;right:0;bottom:6px;padding:0 10px;text-align:center;pointer-events:none;
+    color:rgba(255,255,255,.55);font:500 10px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;}
   .pks-cam video{width:100%;height:100%;object-fit:cover;display:block;background:#000;}
   .pks-guide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
     justify-content:center;pointer-events:none;}
@@ -630,6 +635,7 @@
         <div class="pks-frame"><span class="c c1"></span><span class="c c2"></span><span class="c c3"></span><span class="c c4"></span><div class="pks-laser"></div></div>
         <div class="pks-hint" id="pkHit"><span class="pks-dot"></span>{% trans "Point the barcode at the frame" %}</div>
       </div>
+      <div class="pks-diag" id="pkDiag"></div>
     </div>
     <div class="pks-body">
       <div class="pks-or"><span>{% trans "or" %}</span></div>
@@ -1511,18 +1517,45 @@
   function loadZxw(){
     if (zx) return Promise.resolve(zx);
     if (zxLoading) return zxLoading;
-    var urls=['https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/+esm','https://esm.sh/zxing-wasm@3.1.0/reader'];
+    // The reader-only build: the package's root entry also carries the
+    // barcode writer, and half a megabyte more to download.
+    var urls=['https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/reader/+esm','https://esm.sh/zxing-wasm@3.1.0/reader'];
     function tryNext(i){ if(i>=urls.length) return Promise.reject(new Error('zxing load failed'));
-      return import(urls[i]).then(function(mod){ if(mod&&mod.readBarcodes) return mod.readBarcodes; throw new Error('no export'); }).catch(function(){ return tryNext(i+1); }); }
-    zxLoading = tryNext(0).then(function(fn){ zx=fn; return fn; });
+      return import(urls[i]).then(function(mod){ if(mod&&mod.readBarcodes) return mod; throw new Error('no export'); }).catch(function(){ return tryNext(i+1); }); }
+    // A load that failed is forgotten, so the next open tries again.
+    zxLoading = tryNext(0).then(function(mod){ zx=zxHealing(mod); return zx; })
+      .catch(function(err){ zxLoading=null; throw err; });
     return zxLoading;
+  }
+  // The decoder is a file of its own, fetched on the first read. The
+  // library keeps a failed fetch and answers every later read with it,
+  // so one dropped download left the reader dead until the page was
+  // reloaded. Until a read has come back, a failure is taken to be that
+  // file, and it is fetched again from the next host.
+  var ZXW_WASM = ['https://unpkg.com/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
+    'https://esm.sh/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
+    'https://fastly.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm'];
+  var zxReady = false;
+  function zxHealing(mod){
+    var tries = 0;
+    function read(img, opts){
+      return mod.readBarcodes(img, opts).then(function(res){ zxReady=true; return res; }, function(err){
+        if (zxReady || !mod.prepareZXingModule || tries >= ZXW_WASM.length*2) throw err;
+        var url = ZXW_WASM[tries % ZXW_WASM.length]; tries++;
+        mod.prepareZXingModule({overrides:{locateFile:function(path, prefix){ return /\.wasm$/.test(path) ? url : prefix+path; }}});
+        return read(img, opts);
+      });
+    }
+    return read;
   }
   function getRearStream(){
     var W={ideal:1920}, H={ideal:1080};
     function open(c){ return navigator.mediaDevices.getUserMedia({video:c,audio:false}); }
     return open({facingMode:{ideal:'environment'},width:W,height:H}).then(function(stream){
       if (!navigator.mediaDevices.enumerateDevices) return applyFocus(stream);
-      return navigator.mediaDevices.enumerateDevices().then(function(devices){
+      // Not being able to list the lenses is no reason to give up the
+      // stream already in hand — it is read as "one camera" instead.
+      return navigator.mediaDevices.enumerateDevices().catch(function(){ return []; }).then(function(devices){
         var cams=devices.filter(function(d){return d.kind==='videoinput';});
         if (cams.length<2) return applyFocus(stream);
         var rear=cams.filter(function(d){return /back|rear|environment|arka|tras|rück/i.test(d.label||'');});
@@ -1533,19 +1566,44 @@
         var pick=iosMain[0]||sorted[0], curId='';
         try{ curId=(stream.getVideoTracks()[0].getSettings()||{}).deviceId||''; }catch(e){}
         if (pick&&pick.deviceId&&pick.deviceId!==curId){ stream.getTracks().forEach(function(t){t.stop();});
-          return open({deviceId:{exact:pick.deviceId},width:W,height:H}).then(applyFocus); }
+          // The first stream is stopped by now, so a lens that will not
+          // open cannot fall back to it: that hands the popup a dead
+          // stream and a black picture. Ask plainly for a rear camera.
+          return open({deviceId:{exact:pick.deviceId},width:W,height:H})
+            .catch(function(){ return open({facingMode:{ideal:'environment'}}); })
+            .then(applyFocus); }
         return applyFocus(stream);
-      }).catch(function(){ return applyFocus(stream); });
+      });
     });
   }
   function roi(){ if(!roiCanvas){ roiCanvas=document.createElement('canvas'); roiCanvas.getContext('2d',{willReadFrequently:true}); } return roiCanvas; }
 
   var video = document.getElementById('pkVideo');
   var scanModal = document.getElementById('pkScanModal');
+  var diagEl = document.getElementById('pkDiag'), camFrames = 0, camLight = -1, camDiagAt = 0;
+  function camDiag(now){
+    if (!diagEl || (now-camDiagAt)<1000) return;
+    camDiagAt = now;
+    var tk=null, st={};
+    try{ tk=camStream&&camStream.getVideoTracks()[0]; st=(tk&&tk.getSettings&&tk.getSettings())||{}; }catch(e){}
+    diagEl.textContent = [
+      (tk&&tk.label)||'no track',
+      (st.width||'?')+'x'+(st.height||'?'),
+      'video '+video.videoWidth+'x'+video.videoHeight+(video.paused?' paused':' playing'),
+      tk ? tk.readyState+(tk.muted?' muted':'') : '',
+      'frames '+camFrames,
+      camLight<0 ? '' : 'light '+camLight,
+      zxReady ? 'reader ok' : (zx ? 'reader loading' : 'reader not loaded')
+    ].filter(Boolean).join(' · ');
+  }
   function startCam(){
     if (camRunning) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('{% filter escapejs %}{% trans "Camera not supported." %}{% endfilter %}','err'); return; }
+    camFrames=0; camLight=-1; camDiagAt=0; if(diagEl) diagEl.textContent='';
     getRearStream().then(function(stream){ camStream=stream; video.srcObject=stream; camRunning=true; lastDecode=0;
+      // autoplay alone is not always enough on Safari for a <video>
+      // whose popup was display:none until this tap.
+      try{ var pl=video.play(); if(pl&&pl.catch) pl.catch(function(){}); }catch(e){}
       loadZxw().then(function(){ camLoop(); }).catch(function(){ toast('{% filter escapejs %}{% trans "Scanner failed to load." %}{% endfilter %}','err'); });
     }).catch(function(err){ toast('Camera: '+(err&&err.message||err),'err'); });
   }
@@ -1887,8 +1945,9 @@
   function camLoop(){
     if (!camRunning) return;
     var now=(window.performance&&performance.now)?performance.now():Date.now();
+    camDiag(now);
     if (!zx || !video.videoWidth || video.readyState<2 || (now-lastDecode)<120){ camRaf=requestAnimationFrame(camLoop); return; }
-    lastDecode=now;
+    lastDecode=now; camFrames++;
     try{
       var c=roi(), vw=video.videoWidth, vh=video.videoHeight;
       var cropW=vw, cropH=Math.round(vh*0.60), sx=0, sy=Math.round((vh-cropH)/2);
@@ -1897,6 +1956,12 @@
       var cx=c.getContext('2d',{willReadFrequently:true});
       cx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
       var img=cx.getImageData(0,0,outW,outH);
+      // How bright the frame the reader is given is, 0–255, off a sparse
+      // sample: a black picture over a bright frame is the screen's
+      // fault, over a dark one the camera's.
+      var px=img.data, sum=0, n=0;
+      for (var p=0; p<px.length; p+=4000){ sum+=px[p]+px[p+1]+px[p+2]; n+=3; }
+      camLight = n ? Math.round(sum/n) : -1;
       zx(img, ZXW_OPTS).then(function(res){ if(camRunning && res && res.length && res[0].text) onDecode(res[0].text); })
         .catch(function(){}).finally(function(){ if(camRunning) camRaf=requestAnimationFrame(camLoop); });
     }catch(e){ if(camRunning) camRaf=requestAnimationFrame(camLoop); }

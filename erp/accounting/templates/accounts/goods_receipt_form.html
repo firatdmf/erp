@@ -664,6 +664,17 @@
               <span>{{ for_order.get_client }} ·
                 <a href="{% url 'operating:order_detail' for_order.pk %}">{{ for_order.order_number|default:for_order.pk }}</a></span>
             </div>
+            <div class="np-hint">{% trans "The customer is the order's. To change who this is for," %}
+              <a href="{% url 'operating:order_detail' for_order.pk %}">{% trans "change the customer on the order" %}</a>
+              {% trans "— this purchase follows it. Sale prices stay as typed." %}</div>
+          {% elif cancelled_order %}
+            <div class="np-sup-chip">
+              <i class="fa fa-box"></i>
+              <span>{% trans "None — for stock" %}</span>
+            </div>
+            <div class="np-hint">{% trans "Bought for" %} {{ cancelled_order.get_client }} ·
+              <a href="{% url 'operating:order_detail' cancelled_order.pk %}">{{ cancelled_order.order_number|default:cancelled_order.pk }}</a>,
+              {% trans "which was cancelled. The goods are stock now, so no sale price is asked for." %}</div>
           {% elif edit_invoice %}
             <div class="np-input" style="display:flex; align-items:center;">—</div>
           {% else %}

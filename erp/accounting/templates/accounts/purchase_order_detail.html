@@ -171,7 +171,12 @@
     {% if invoice.for_order %}
     <div class="po-card">
       <div class="po-card-l">{% trans "For customer order" %}</div>
-      <div class="po-card-v"><a href="{% url 'operating:order_detail' invoice.for_order.pk %}">{{ invoice.for_order.order_number|default:invoice.for_order.pk }} · {{ invoice.for_order.get_client }}</a></div>
+      <div class="po-card-v"><a href="{% url 'operating:order_detail' invoice.for_order.pk %}">{{ invoice.for_order.order_number|default:invoice.for_order.pk }} · {{ invoice.for_order.get_client }}</a>
+        {% if invoice.for_order.order_status == 'cancelled' %}
+        <span style="display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; background:#FEF2F2; border:1px solid #FECACA; color:#991B1B; font-size:11px; font-weight:700; white-space:nowrap;">{% trans "Cancelled" %}</span>
+        <div style="margin-top:3px; font-size:11.5px; font-weight:500; color:#64748B;">{% trans "The order was cancelled — these goods are stock now." %}</div>
+        {% endif %}
+      </div>
     </div>
     {% endif %}
   </div>

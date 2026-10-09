@@ -119,6 +119,20 @@ def order_is_open(order):
     return (order.order_status or "pending") not in _CLOSED_STATUSES
 
 
+def order_bought_for(invoice):
+    """The customer order `invoice` is still bought for, or None.
+
+    A cancelled order wants nothing any more: the goods bought for it are
+    plain stock, so the purchase is edited, priced and received like one
+    bought for the shelf — no sale price to ask for, no order to keep in
+    step. The link itself (invoice.for_order) stays, as the record of why
+    the goods were bought."""
+    order = invoice.for_order
+    if order is None or order.order_status == "cancelled":
+        return None
+    return order
+
+
 def parse_customer(data):
     """The CRM contact or company a purchase form names, or None."""
     from crm.models import Company, Contact

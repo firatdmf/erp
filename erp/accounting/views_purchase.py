@@ -323,6 +323,7 @@ class GoodsReceipt(View):
         # blocked everywhere else too, so they aren't offered here.
         warehouses = Warehouse.objects.exclude(kind="combined").order_by("name")
         for_order = None        # the customer order this purchase is bought for
+        cancelled_order = None  # ...or was, before that order was cancelled
         invoice = None          # a RECEIVED purchase: edited against the rolls it has
         order = None            # a DRAFT order: nothing received yet, just a plan
         selected_id = None
@@ -349,7 +350,12 @@ class GoodsReceipt(View):
             request.book = doc.book
             back_url = reverse("accounts:purchase_order_detail", args=[doc.pk])
 
-            for_order = doc.for_order
+            from operating.order_purchases import order_bought_for
+            for_order = order_bought_for(doc)
+            if for_order is None:
+                # Bought for an order since cancelled: stock now, and the
+                # form only says where it came from.
+                cancelled_order = doc.for_order
             if doc.status == "draft":
                 # Still an order — it owns a plan, not stock, so the form
                 # opens the way it was left and everything stays editable.
@@ -397,6 +403,7 @@ class GoodsReceipt(View):
             "order_invoice": order,
             "intake_plan": (order.intake_plan or {}) if order else None,
             "for_order": for_order,
+            "cancelled_order": cancelled_order,
             # What an existing customer order's prices are billed in.
             "for_order_currency": (
                 for_order.current_account.default_currency.code
@@ -596,7 +603,7 @@ class PurchaseOrderSave(View):
                 status=400)
 
         from operating.order_purchases import (
-            CustomerOrderError, parse_customer, plan_variant_skus,
+            CustomerOrderError, order_bought_for, parse_customer, plan_variant_skus,
             put_plan_in_catalog, sync_customer_order,
         )
         from operating.views_warehouse import (
@@ -667,7 +674,7 @@ class PurchaseOrderSave(View):
                 # Bought for a customer: the products go in the catalog now, so
                 # the customer's order has lines to point at. That rewrites the
                 # plan to name them, which is why it is stored only after.
-                if customer is not None or invoice.for_order_id:
+                if customer is not None or order_bought_for(invoice) is not None:
                     if (invoice.for_order_id and invoice.for_order.current_account_id
                             and invoice.for_order.current_account.book_id
                             != warehouse.accounting_book_id):

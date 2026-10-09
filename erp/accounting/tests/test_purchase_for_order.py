@@ -350,6 +350,8 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context["for_order"], Invoice.objects.get(pk=inv_id).for_order)
         self.assertContains(r, "Oleg Motuzenko")
+        # Where the customer is changed: on the order, not here.
+        self.assertContains(r, "change the customer on the order")
         self.assertEqual(r.context["intake_plan"]["products"][0]["variants"][0]["sale_price"],
                          "5.00")
 
@@ -659,6 +661,31 @@ class PurchaseForCustomerTest(TestCase):
         # The rolls it held are free stock again — still on the shelf.
         self.assertEqual(self._held(order), [])
         self.assertEqual(len(before["rolls"]), 2)
+
+    def test_a_purchase_whose_order_was_cancelled_is_edited_as_stock(self):
+        """The form drops the customer and with it the sale-price boxes:
+        there is nobody left to charge, so the purchase price can be
+        corrected without one."""
+        inv_id, _before = self._received()
+        order = Invoice.objects.get(pk=inv_id).for_order
+        url = reverse("accounts:goods_receipt_edit", args=[inv_id])
+        self.assertEqual(self.client.get(url).context["for_order"], order)
+
+        self.client.post(reverse("operating:order_detail", args=[order.pk]),
+                         {"action": "update_status", "order_status": "cancelled",
+                          "cancel_reason": "Customer changed their mind"})
+        r = self.client.get(url)
+        self.assertIsNone(r.context["for_order"])
+        self.assertEqual(r.context["cancelled_order"], order)
+        self.assertContains(r, "which was cancelled")
+        # What puts the page in for-customer mode, and so asks for prices.
+        self.assertContains(r, "const on = !!npCustomer || false;")
+        # The link stays as the record of why the goods were bought.
+        self.assertEqual(Invoice.objects.get(pk=inv_id).for_order, order)
+        # And the purchase's own page says what became of that order.
+        self.assertContains(
+            self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id])),
+            "The order was cancelled")
 
     def test_deleting_the_order_leaves_a_received_purchase_alone(self):
         inv_id, before = self._received()

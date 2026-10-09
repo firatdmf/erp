@@ -14097,3 +14097,21 @@ msgstr "Tüm zamanlardaki arama sonuçları"
 
 msgid "No orders in this period"
 msgstr "Bu dönemde sipariş yok"
+
+msgid "Bought for"
+msgstr "Şunun için alındı:"
+
+msgid "which was cancelled. The goods are stock now, so no sale price is asked for."
+msgstr "bu sipariş iptal edildi. Mallar artık stok, bu yüzden satış fiyatı istenmez."
+
+msgid "The customer is the order's. To change who this is for,"
+msgstr "Müşteri siparişe aittir. Kimin için olduğunu değiştirmek için"
+
+msgid "change the customer on the order"
+msgstr "siparişteki müşteriyi değiştirin"
+
+msgid "— this purchase follows it. Sale prices stay as typed."
+msgstr "— bu alış onu izler. Satış fiyatları yazıldığı gibi kalır."
+
+msgid "The order was cancelled — these goods are stock now."
+msgstr "Sipariş iptal edildi — bu mallar artık stok."

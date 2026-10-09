@@ -3828,7 +3828,8 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     # The customer order this stock is bought for. Only a confirmed draft
     # can have one: a purchase for a customer is always saved first, since
     # saving it is what creates the customer's order.
-    for_order = invoice.for_order if invoice is not None else None
+    from .order_purchases import order_bought_for
+    for_order = order_bought_for(invoice) if invoice is not None else None
 
     created_list = []
     warnings = []

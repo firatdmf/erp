@@ -606,6 +606,9 @@ msgstr "Şu para birimine"
 msgid "Swap currencies"
 msgstr "Para birimlerini değiştir"
 
+msgid "One rate per day: the European Central Bank reference rate published on the previous working day, at about 17:00 Istanbul time. Every entry dated today uses this rate, so it can differ slightly from a live rate such as the one Google shows. A rate typed on a payment is used instead of it."
+msgstr "Günde tek kur: Avrupa Merkez Bankası'nın bir önceki iş günü, İstanbul saatiyle yaklaşık 17:00'de yayımladığı referans kuru. Bugün tarihli her kayıt bu kuru kullanır; bu yüzden Google'da görünen gibi canlı bir kurdan biraz farklı olabilir. Ödemeye elle yazılan kur bunun yerine kullanılır."
+
 
 msgid "Notifications"
 msgstr "Bildirimler"

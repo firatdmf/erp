@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=20" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=45" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=49" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=17" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=31" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard-mobile.css' %}?v=7" />
@@ -369,7 +369,10 @@
                     title="{% trans 'Swap currencies' %}" aria-label="{% trans 'Swap currencies' %}">
               <i class="fas fa-arrow-right-arrow-left"></i>
             </button>
-            <output class="fx-mini-out" id="fxMiniResult" for="fxMiniAmount">—</output>
+            <span class="fx-mini-result">
+              <output class="fx-mini-out" id="fxMiniResult" for="fxMiniAmount" aria-describedby="fxMiniNote">—</output>
+              <span class="fx-mini-note" id="fxMiniNote" role="tooltip">{% trans 'One rate per day: the European Central Bank reference rate published on the previous working day, at about 17:00 Istanbul time. Every entry dated today uses this rate, so it can differ slightly from a live rate such as the one Google shows. A rate typed on a payment is used instead of it.' %}</span>
+            </span>
             <select class="fx-mini-ccy" id="fxMiniTo" aria-label="{% trans 'Convert to' %}">
               {% for code in fx_currencies %}<option value="{{ code }}">{{ code }}</option>{% endfor %}
             </select>

@@ -519,6 +519,43 @@ body { padding-top: 64px !important; }
   border-radius: var(--radius-pill, 999px) !important;
   max-width: 100% !important;
 }
+/* The result and its note, so the note hangs under the figure it explains
+   rather than under the left end of the pill. */
+.global-top-bar .fx-mini-result {
+  position: relative !important;
+  display: inline-flex !important;
+}
+/* Where the rate comes from, on hovering the result. Drawn here rather
+   than left to a title attribute: the pill is all form controls, and a
+   browser shows a native tooltip over those late or not at all. */
+.global-top-bar .fx-mini-note {
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  z-index: 80 !important;
+  width: 300px !important;
+  padding: 8px 10px !important;
+  font: 500 11.5px/1.45 var(--font-sans, 'Plus Jakarta Sans') !important;
+  color: #FFFFFF !important;
+  text-align: left !important;
+  white-space: normal !important;
+  background: var(--gray-800, #1B2128) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: var(--radius-sm, 6px) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  transition: opacity 0.12s ease !important;
+}
+/* Only the result asks the question the note answers. A short wait
+   before it appears, so passing over the figure does not flash it; none
+   when leaving. */
+.global-top-bar .fx-mini-out:hover + .fx-mini-note {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transition-delay: 0.35s !important;
+}
 .global-top-bar .fx-mini-amt,
 .global-top-bar .fx-mini-out {
   font: 500 11.5px var(--font-mono, 'JetBrains Mono') !important;
@@ -542,7 +579,10 @@ body { padding-top: 64px !important; }
   border-color: var(--nejum-teal-600, #006B6B) !important;
 }
 .global-top-bar .fx-mini-out {
-  min-width: 72px !important;
+  cursor: help !important;
+  /* As wide as its figure: a reserved width left a gap between the swap
+     arrow and a short result. */
+  padding: 2px 3px !important;
   color: var(--nejum-teal-700, #005354) !important;
   font-weight: 600 !important;
   white-space: nowrap !important;

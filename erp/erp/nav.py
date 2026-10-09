@@ -121,6 +121,7 @@ NAV_SECTIONS = [
             ]},
             {"title": _("TRANSACTIONS"), "items": [
                 {"label": _("All transactions"),   "icon": "list",     "url": "accounting:go_transactions"},
+                {"label": _("Journal"),            "icon": "book-open-text", "url": "accounts:legacy_report_journal"},
                 {"label": _("Expenses"),           "icon": "receipt",  "url": "accounting:go_expenses"},
                 {"label": _("Transfer"),           "icon": "shuffle",  "url": "accounting:go_transfer"},
                 {"label": _("Currency exchange"),  "icon": "refresh-cw", "url": "accounting:go_currency_exchange"},

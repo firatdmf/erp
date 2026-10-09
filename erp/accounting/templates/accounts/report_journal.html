@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load static i18n accounting_tags %}
+{% comment %}
+Every journal entry in the book, with what it debited and what it
+credited — see views_report.Journal. Reached from the reports page.
+{% endcomment %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  .jr { --teal-50:#E5F1F0; --teal-700:#005354; --g400:#A0A8B0; --g500:#6B7280; --g600:#4B5563; --g700:#374151; --ink:#0F1419;
+        --sans:'Plus Jakarta Sans',-apple-system,'Segoe UI',sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        max-width: 1280px; margin: 0 auto; padding: 24px 20px 64px; font-family: var(--sans); color: var(--ink); }
+  .jr-back { display:inline-flex; align-items:center; gap:6px; font:600 12.5px var(--sans); color:var(--g600); text-decoration:none; }
+  .jr-back:hover { color: var(--teal-700); }
+  .jr-back i, .jr-back svg { width:14px; height:14px; }
+  .jr-eyebrow { margin-top:14px; font:700 11px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--g500); }
+  .jr-title { margin:4px 0 4px; font:800 26px/1.15 var(--sans); }
+  .jr-sub { margin:0 0 16px; font:500 13.5px/1.5 var(--sans); color:var(--g600); max-width:70ch; }
+  .jr-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:14px; }
+  .jr-bar label { display:flex; flex-direction:column; gap:4px; font:700 10.5px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--g500); }
+  .jr-bar input, .jr-bar select { padding:7px 9px; border:1px solid #E0E6EE; border-radius:8px; font:500 13px var(--sans); background:#fff; }
+  .jr-btn { padding:8px 14px; border-radius:8px; border:1px solid #E0E6EE; background:#fff; font:600 12.5px var(--sans); color:var(--g700); cursor:pointer; text-decoration:none; }
+  .jr-btn.primary { background:var(--teal-700); border-color:var(--teal-700); color:#fff; }
+  .jr-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:14px; }
+  .jr-stat { background:#fff; border:1px solid #E2E8EE; border-radius:12px; padding:13px 15px; }
+  .jr-stat .l { font:700 10.5px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--g500); }
+  .jr-stat .v { margin-top:4px; font:700 20px var(--sans); font-variant-numeric:tabular-nums; }
+  .jr-card { background:#fff; border:1px solid #E2E8EE; border-radius:12px; overflow-x:auto; }
+  .jr-tbl { width:100%; border-collapse:collapse; font:400 13px var(--sans); }
+  .jr-tbl th { background:#FAFBFD; border-bottom:1px solid #E2E8EE; padding:10px 12px; text-align:left; font:700 10.5px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--g500); white-space:nowrap; }
+  .jr-tbl td { padding:9px 12px; border-bottom:1px solid #EEF1F5; vertical-align:top; }
+  .jr-tbl tr:last-child td { border-bottom:none; }
+  .jr-tbl .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .jr-tbl th.num { text-align:right; }
+  .jr-date { white-space:nowrap; color:var(--g700); font-variant-numeric:tabular-nums; }
+  .jr-ref { display:block; margin-top:2px; font:500 11.5px var(--mono); color:var(--g500); white-space:nowrap; }
+  .jr-text { max-width:36ch; }
+  .jr-text a { color:inherit; text-decoration:none; }
+  .jr-text a:hover { color:var(--teal-700); text-decoration:underline; }
+  .jr-kind { display:inline-block; margin-top:3px; padding:1px 7px; border-radius:6px; background:var(--teal-50); color:var(--teal-700); font:600 11px var(--sans); }
+  .jr-side { display:block; }
+  .jr-side + .jr-side { margin-top:6px; }
+  .jr-side a { color:var(--ink); text-decoration:none; font-weight:600; }
+  .jr-side a:hover { color:var(--teal-700); text-decoration:underline; }
+  .jr-side .who { display:block; font:500 11.5px var(--sans); color:var(--g500); }
+  .jr-side .amt { font:500 11.5px var(--sans); color:var(--g500); font-variant-numeric:tabular-nums; }
+  .jr-orig { display:block; margin-top:2px; font:500 11.5px var(--sans); color:var(--g500); }
+  .jr-pager { display:flex; align-items:center; gap:10px; margin-top:14px; font:500 12.5px var(--sans); color:var(--g600); }
+  .jr-pager .spacer { flex:1; }
+  .jr-empty { padding:56px 20px; text-align:center; color:var(--g500); font:500 13.5px var(--sans); }
+  @media print { .no-print { display:none !important; } .jr { padding:0; } .jr-card { border:none; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="jr">
+  <a class="jr-back no-print" href="{% url 'accounts:report_index' current_book.pk %}">
+    <i data-lucide="arrow-left"></i>{% trans "Reports" %}
+  </a>
+  <div class="jr-eyebrow">{{ current_book.name }} · {% trans "General ledger" %}</div>
+  <h1 class="jr-title">{% trans "Journal" %}</h1>
+  <p class="jr-sub">{% trans "Everything that changed the accounting equation, newest first: each entry with the account it debited and the account it credited." %}</p>
+
+  <form class="jr-bar no-print" method="get">
+    <label>{% trans "From" %}<input type="date" name="date_from" value="{{ date_from }}"></label>
+    <label>{% trans "To" %}<input type="date" name="date_to" value="{{ date_to }}"></label>
+    <label>{% trans "Kind" %}
+      <select name="kind">
+        <option value="">{% trans "Everything" %}</option>
+        {% for key, label in kinds %}
+        <option value="{{ key }}"{% if key == kind %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="jr-btn primary" type="submit">{% trans "Show" %}</button>
+    {% if query %}<a class="jr-btn" href="{% url 'accounts:report_journal' current_book.pk %}">{% trans "Clear" %}</a>{% endif %}
+  </form>
+
+  <div class="jr-stats">
+    <div class="jr-stat"><div class="l">{% trans "Entries" %}</div><div class="v">{{ count }}</div></div>
+    <div class="jr-stat"><div class="l">{% trans "Debit" %} = {% trans "Credit" %}</div><div class="v">{{ total|format_money }}</div></div>
+  </div>
+
+  <div class="jr-card">
+    {% if rows %}
+    <table class="jr-tbl">
+      <thead>
+        <tr>
+          <th>{% trans "Date" %}</th>
+          <th>{% trans "Description" %}</th>
+          <th>{% trans "Debit" %}</th>
+          <th>{% trans "Credit" %}</th>
+          <th class="num">{% trans "Amount" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="jr-date">{{ r.entry.date|date:"d.m.Y" }}</td>
+          <td class="jr-text">
+            {% if r.url %}<a href="{{ r.url }}">{{ r.entry.description|default:"—" }}</a>{% else %}{{ r.entry.description|default:"—" }}{% endif %}
+            {% if r.entry.reference %}<span class="jr-ref">{{ r.entry.reference }}</span>{% endif %}
+            <span class="jr-kind">{{ r.kind }}</span>
+          </td>
+          <td>{% include "accounts/partials/journal_side.html" with side=r.debits debit=True %}</td>
+          <td>{% include "accounts/partials/journal_side.html" with side=r.credits debit=False %}</td>
+          <td class="num">
+            {{ r.amount|format_money }}
+            {% for amount, code in r.originals %}<span class="jr-orig">{{ amount|format_money }} {{ code }}</span>{% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="jr-empty">{% trans "No journal entries here." %}</div>
+    {% endif %}
+  </div>
+
+  {% if page.has_other_pages %}
+  <div class="jr-pager no-print">
+    {% if page.has_previous %}<a class="jr-btn" href="?{% if query %}{{ query }}&{% endif %}page={{ page.previous_page_number }}">&larr; {% trans "Newer" %}</a>{% endif %}
+    <span class="spacer"></span>
+    <span>{% blocktrans with n=page.number total=page.paginator.num_pages %}Page {{ n }} of {{ total }}{% endblocktrans %}</span>
+    <span class="spacer"></span>
+    {% if page.has_next %}<a class="jr-btn" href="?{% if query %}{{ query }}&{% endif %}page={{ page.next_page_number }}">{% trans "Older" %} &rarr;</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+<script>if (window.lucide) lucide.createIcons();</script>
+{% endblock %}

@@ -101,6 +101,15 @@
       </div>
     </a>
 
+    <a class="rx-card" href="{% url 'accounts:report_journal' current_book.pk %}">
+      <div class="rx-ico"><i data-lucide="book-open-text"></i></div>
+      <h3>{% trans "Journal" %}</h3>
+      <p>{% trans "Every entry — what it debited and what it credited" %}</p>
+      <div class="rx-card-foot">
+        <span class="rx-badge info">{% trans "General ledger" %}</span>
+      </div>
+    </a>
+
     <a class="rx-card" href="{% url 'accounts:report_chart_of_accounts' current_book.pk %}">
       <div class="rx-ico"><i data-lucide="list-tree"></i></div>
       <h3>{% trans "Chart of Accounts" %}</h3>

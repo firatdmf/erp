@@ -689,6 +689,53 @@ def post_currency_exchange(exchange, *, reference=""):
     )
 
 
+@transaction.atomic
+def post_cash_transfer(transfer, *, reference=""):
+    """Make the ledger say what this transfer between two cash accounts did.
+
+    Idempotent. Both legs are Cash and Bank and both are the same money, so
+    the account's total does not move — which is why this used not to post
+    at all. But the journal is where everything that happened is listed,
+    and each line names its cash account, so without an entry the till that
+    gave and the bank that received disagreed with their own journal lines.
+
+    One amount on both sides: the giving row's worth in base currency. The
+    two rows are the same sum in the same currency on the same day, so a
+    transfer has no difference to send anywhere. Posted from the pair, like
+    an exchange; one row alone posts nothing. Returns the entry, or None.
+    """
+    from django.contrib.contenttypes.models import ContentType
+
+    from .models import CashTransactionEntry
+
+    rows = list(CashTransactionEntry.objects
+                .filter(content_type=ContentType.objects.get_for_model(transfer.__class__),
+                        content_pk=transfer.pk)
+                .select_related("currency", "cash_account"))
+    unpost(transfer)
+    given = [r for r in rows if not r.is_amount_positive]
+    received = [r for r in rows if r.is_amount_positive]
+    if len(given) != 1 or len(received) != 1:
+        return None
+    given, received = given[0], received[0]
+    worth = Decimal(given.amount_in_base_currency or 0)
+    if worth == ZERO:
+        return None
+
+    memo = (f"Transferred {given.amount} {given.currency.code} from "
+            f"{given.cash_account.name} to {received.cash_account.name}")
+    original = {"currency": given.currency, "amount_original": given.amount}
+    return post_entry(
+        book=given.book,
+        date=transfer.date or given.date,
+        description=transfer.description or memo,
+        lines=[debit(CASH_CONTROL, worth, cash_account=received.cash_account, memo=memo, **original),
+               credit(CASH_CONTROL, worth, cash_account=given.cash_account, memo=memo, **original)],
+        source=transfer,
+        reference=reference,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Closing the books
 #

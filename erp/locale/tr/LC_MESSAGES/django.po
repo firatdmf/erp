@@ -13683,6 +13683,47 @@ msgstr "Ana ürünü değiştir"
 msgid "New main product:"
 msgstr "Yeni ana ürün:"
 
+msgid "Journal"
+msgstr "Yevmiye defteri"
+
+msgid "Everything that changed the accounting equation, newest first: each entry with the account it debited and the account it credited."
+msgstr "Muhasebe denklemini değiştiren her şey, en yeniden eskiye: her kayıt, borçlandırdığı ve alacaklandırdığı hesapla birlikte."
+
+msgid "Every entry — what it debited and what it credited"
+msgstr "Her kayıt — neyi borçlandırdı, neyi alacaklandırdı"
+
+msgid "Kind"
+msgstr "Tür"
+
+msgid "Everything"
+msgstr "Hepsi"
+
+msgid "Account entries"
+msgstr "Cari hareketler"
+
+msgid "Ledger only"
+msgstr "Yalnızca defter"
+
+msgid "No journal entries here."
+msgstr "Burada yevmiye kaydı yok."
+
+msgid "Newer"
+msgstr "Daha yeni"
+
+msgid "Older"
+msgstr "Daha eski"
+
+#, python-format
+msgid "Page %(n)s of %(total)s"
+msgstr "Sayfa %(n)s / %(total)s"
+
+#, python-format
+msgid "cut %(took)s m out of %(total)s m"
+msgstr "%(total)s m'den %(took)s m kesildi"
+
+msgid "This order is split across books. Only someone with access to every book it is in can complete, re-open or cancel it."
+msgstr "Bu sipariş birden fazla deftere bölünmüş. Yalnızca siparişin bulunduğu tüm defterlere erişimi olan biri tamamlayabilir, yeniden açabilir veya iptal edebilir."
+
 msgid "The customer list this record is kept in"
 msgstr "Bu kaydın tutulduğu müşteri listesi"
 
@@ -13745,6 +13786,187 @@ msgstr "parti"
 msgid "batches"
 msgstr "parti"
 
+msgid "used up"
+msgstr "tükenmiş"
+
+msgid "part of it has been used"
+msgstr "bir kısmı kullanılmış"
+
+msgid "held for an order"
+msgstr "bir sipariş için ayrılmış"
+
+msgid "has no cost"
+msgstr "maliyeti yok"
+
+msgid "A combined warehouse is virtual — pick one of its member warehouses."
+msgstr "Ortak depo sanaldır — üye depolardan birini seçin."
+
+msgid "Both warehouses must belong to a book."
+msgstr "İki depo da bir deftere ait olmalı."
+
+msgid "Both warehouses belong to the same book — move the stock items between them instead."
+msgstr "İki depo da aynı deftere ait — bunun yerine stok kalemlerini aralarında taşıyın."
+
+#, python-format
+msgid "%(to)s has no inter-company account paired with %(from)s, so nothing would record what it owes for the goods."
+msgstr "%(to)s defterinde %(from)s ile eşleştirilmiş bir şirketler arası hesap yok, bu yüzden mallar için borcunu kaydedecek bir şey olmaz."
+
+#, python-format
+msgid "The inter-company account %(account)s is not kept in %(currency)s, the currency stock is costed in."
+msgstr "%(account)s şirketler arası hesabı, stoğun maliyetlendirildiği para birimi olan %(currency)s cinsinden tutulmuyor."
+
+msgid "A transfer can't be dated in the future."
+msgstr "Transfere ileri bir tarih verilemez."
+
+msgid "Pick at least one stock item."
+msgstr "En az bir stok kalemi seçin."
+
+msgid "Some of these stock items no longer exist — reload the page."
+msgstr "Bu stok kalemlerinden bazıları artık yok — sayfayı yenileyin."
+
+#, python-format
+msgid "is in %(warehouse)s now"
+msgstr "artık %(warehouse)s deposunda"
+
+msgid "Some stock items can't be transferred."
+msgstr "Bazı stok kalemleri transfer edilemez."
+
+#, python-format
+msgid "The debt did not reach %(book)s's side of the inter-company account."
+msgstr "Borç, şirketler arası hesabın %(book)s tarafına ulaşmadı."
+
+#, python-format
+msgid "transferred from %(warehouse)s (%(book)s) at cost"
+msgstr "%(warehouse)s (%(book)s) deposundan maliyetine transfer edildi"
+
+msgid "This transfer was already undone."
+msgstr "Bu transfer zaten geri alınmış."
+
+msgid "Payments are allocated to this transfer's purchase — remove them first."
+msgstr "Bu transferin alımına ödemeler bağlanmış — önce onları kaldırın."
+
+msgid "no longer exists"
+msgstr "artık yok"
+
+#, python-format
+msgid "has left %(warehouse)s"
+msgstr "%(warehouse)s deposundan çıkmış"
+
+msgid "belongs to another purchase now"
+msgstr "artık başka bir alıma ait"
+
+msgid "Some stock items are no longer as they arrived, so the transfer can't be undone."
+msgstr "Bazı stok kalemleri artık geldiği gibi değil, bu yüzden transfer geri alınamaz."
+
+#, python-format
+msgid "This purchase is stock transfer %(number)s from %(book)s — undo the transfer instead."
+msgstr "Bu alım, %(book)s defterinden gelen %(number)s numaralı stok transferidir — bunun yerine transferi geri alın."
+
+#, python-format
+msgid "This purchase is stock transfer %(number)s from %(book)s — undo the transfer instead of editing it."
+msgstr "Bu alım, %(book)s defterinden gelen %(number)s numaralı stok transferidir — düzenlemek yerine transferi geri alın."
+
+#, python-format
+msgid "This stock item is in another book's warehouse (%(source)s → %(target)s). Goods pass between books through a stock transfer, made from the warehouse they are in — a move only works between warehouses of the same book."
+msgstr "Bu stok kalemi başka bir defterin deposunda (%(source)s → %(target)s). Mallar defterler arasında, bulundukları depodan yapılan bir stok transferiyle geçer — taşıma yalnızca aynı defterin depoları arasında çalışır."
+
+msgid "Pick the warehouse the stock goes to."
+msgstr "Stoğun gideceği depoyu seçin."
+
+msgid "Scan or type a barcode or SKU."
+msgstr "Bir barkod ya da SKU okutun veya yazın."
+
+#, python-format
+msgid "This stock item is in %(warehouse)s, not here."
+msgstr "Bu stok kalemi burada değil, %(warehouse)s deposunda."
+
+msgid "Nothing in this warehouse carries that code."
+msgstr "Bu depoda o kodu taşıyan bir şey yok."
+
+msgid "Transfer stock to another book"
+msgstr "Başka bir deftere stok transfer et"
+
+msgid "This stock item belongs to another book. To bring it here, open the warehouse it is in and use “Transfer stock to another book”."
+msgstr "Bu stok kalemi başka bir deftere ait. Buraya getirmek için bulunduğu depoyu açın ve “Başka bir deftere stok transfer et” seçeneğini kullanın."
+
+msgid "Transfer to another book"
+msgstr "Başka bir deftere transfer"
+
+#, python-format
+msgid "The stock items leave %(book)s at what they cost and arrive in the other book as a purchase at that same cost. The other book owes %(book)s for them on the inter-company account; no sale and no profit is recorded."
+msgstr "Stok kalemleri %(book)s defterinden maliyetleriyle çıkar ve diğer deftere aynı maliyetle bir alım olarak girer. Diğer defter bunlar için %(book)s defterine şirketler arası hesapta borçlanır; satış da kâr da kaydedilmez."
+
+msgid "There is no warehouse to transfer to. A transfer needs a warehouse in another book you work in, and that book must keep an inter-company account paired with this one."
+msgstr "Transfer edilecek bir depo yok. Transfer için çalıştığınız başka bir defterde bir depo gerekir ve o defterin bu defterle eşleştirilmiş bir şirketler arası hesabı olmalıdır."
+
+msgid "To warehouse"
+msgstr "Hedef depo"
+
+msgid "From warehouse"
+msgstr "Kaynak depo"
+
+msgid "Scan a barcode, or type a SKU to add all of its stock items"
+msgstr "Barkod okutun ya da tüm stok kalemlerini eklemek için bir SKU yazın"
+
+msgid "Value"
+msgstr "Değer"
+
+msgid "Nothing added yet."
+msgstr "Henüz bir şey eklenmedi."
+
+msgid "stock items"
+msgstr "stok kalemi"
+
+msgid "Only whole stock items that are not held for an order can be transferred."
+msgstr "Yalnızca bütün olan ve bir sipariş için ayrılmamış stok kalemleri transfer edilebilir."
+
+msgid "Transfer at cost"
+msgstr "Maliyetine transfer et"
+
+msgid "Transfers of this warehouse"
+msgstr "Bu deponun transferleri"
+
+msgid "Number"
+msgstr "Numara"
+
+msgid "undone"
+msgstr "geri alındı"
+
+msgid "Could not reach the server. Try again."
+msgstr "Sunucuya ulaşılamadı. Tekrar deneyin."
+
+msgid "Transfer these stock items at cost to"
+msgstr "Bu stok kalemleri maliyetine şuraya transfer edilsin mi:"
+
+msgid "Stock transfer at cost"
+msgstr "Maliyetine stok transferi"
+
+#, python-format
+msgid "Undone on %(when)s. The stock items went back and neither book carries this transfer."
+msgstr "%(when)s tarihinde geri alındı. Stok kalemleri geri döndü ve iki defter de bu transferi taşımıyor."
+
+msgid "Receiving purchase"
+msgstr "Karşı defterdeki alım"
+
+msgid "Undoing sends the stock items back and cancels the purchase. It works only while every item is still as it arrived."
+msgstr "Geri almak stok kalemlerini geri gönderir ve alımı iptal eder. Yalnızca her kalem hâlâ geldiği gibiyse çalışır."
+
+msgid "Undo transfer"
+msgstr "Transferi geri al"
+
+msgid "Undo this transfer and send the stock items back?"
+msgstr "Bu transfer geri alınıp stok kalemleri geri gönderilsin mi?"
+
+msgid "Scan, type, or paste a list of barcodes — or a SKU to add all of its stock items"
+msgstr "Barkod okutun, yazın ya da bir barkod listesi yapıştırın — veya tüm stok kalemlerini eklemek için bir SKU yazın"
+
+#, python-format
+msgid "That is more than %(limit)s codes — add them in smaller lists."
+msgstr "Bu %(limit)s koddan fazla — daha küçük listeler hâlinde ekleyin."
+
+msgid "already in the list"
+msgstr "zaten listede"
+
 #: erp/templates/components/_mobile_shell.html
 msgid "Switch to"
 msgstr "Şuna geç"
@@ -13758,6 +13980,20 @@ msgstr "Stoktan alınacak miktar"
 #, python-format
 msgid "Only %(n)s are free in stock — the line takes those."
 msgstr "Stokta yalnızca %(n)s adet boşta — satır bunları alır."
+
+msgid "Also from"
+msgstr "Diğer tedarikçiler"
+
+msgid "What the supplier calls this, as printed on their invoice"
+msgstr "Tedarikçinin bu ürüne verdiği kod, faturasında yazdığı şekliyle"
+
+#, python-format
+msgid "%(account)s already uses supplier SKU '%(sku)s' for %(variant)s."
+msgstr "%(account)s, '%(sku)s' tedarikçi kodunu zaten %(variant)s için kullanıyor."
+
+#, python-format
+msgid "warehouse row %(row)s (%(warehouse)s) is linked to variant '%(variant)s', which has another SKU — left as it is"
+msgstr "%(row)s numaralı depo satırı (%(warehouse)s), SKU'su farklı olan '%(variant)s' varyantına bağlı — olduğu gibi bırakıldı"
 
 msgid "One fewer"
 msgstr "Bir azalt"
@@ -13773,26 +14009,6 @@ msgstr "stokta yok"
 
 msgid "already packed"
 msgstr "zaten paketlendi"
-
-msgid "Add note"
-msgstr "Not ekle"
-
-msgid "Note for this line"
-msgstr "Bu satır için not"
-
-msgid "Also from"
-msgstr "Diğer tedarikçiler"
-
-msgid "What the supplier calls this, as printed on their invoice"
-msgstr "Tedarikçinin bu ürüne verdiği kod, faturasında yazdığı şekliyle"
-
-#, python-format
-msgid "%(account)s already uses supplier SKU '%(sku)s' for %(variant)s."
-msgstr "%(account)s, '%(sku)s' tedarikçi kodunu zaten %(variant)s için kullanıyor."
-
-#, python-format
-msgid "warehouse row %(row)s (%(warehouse)s) is linked to variant '%(variant)s', which has another SKU — left as it is"
-msgstr "%(row)s numaralı depo satırı (%(warehouse)s), SKU'su farklı olan '%(variant)s' varyantına bağlı — olduğu gibi bırakıldı"
 
 msgid "This supplier SKU is already used for another variant"
 msgstr "Bu tedarikçi kodu zaten başka bir varyant için kullanılıyor"
@@ -13813,8 +14029,26 @@ msgstr "Son alım"
 msgid "Remove this supplier from the variant? Its code and last price are forgotten."
 msgstr "Bu tedarikçi varyanttan kaldırılsın mı? Kodu ve son fiyatı silinir."
 
+msgid "Add note"
+msgstr "Not ekle"
+
+msgid "Note for this line"
+msgstr "Bu satır için not"
+
+msgid "Average cost of the stock on hand, from the warehouse. It can be typed only while none is in stock."
+msgstr "Eldeki stokun depodan gelen ortalama maliyeti. Yalnızca stokta hiç yokken elle girilebilir."
+
+msgid "This product has variants, so cost is kept on each variant."
+msgstr "Bu ürünün varyantları var; maliyet her varyantta tutulur."
+
 msgid "This SKU is already in use."
 msgstr "Bu SKU zaten kullanılıyor."
+
+msgid "Enter the cost — a product without variants is costed here."
+msgstr "Maliyeti girin — varyantı olmayan ürünün maliyeti burada tutulur."
+
+msgid "Required when the product has no variants."
+msgstr "Ürünün varyantı yoksa zorunludur."
 
 #, python-format
 msgid "Shared with %(names)s"
@@ -13829,3 +14063,10 @@ msgstr "Başka bir işletmeyle paylaş"
 #, python-format
 msgid "Kept in %(name)s. Tick the lists that may also use it."
 msgstr "%(name)s listesinde tutuluyor. Kullanabilecek diğer listeleri işaretleyin."
+
+#, python-format
+msgid "Enter a cost for these featured variants — they have no stock to take one from: %(skus)s"
+msgstr "Öne çıkarılan şu varyantlar için maliyet girin — maliyetin alınacağı stokları yok: %(skus)s"
+
+msgid "Add new"
+msgstr "Yeni ekle"

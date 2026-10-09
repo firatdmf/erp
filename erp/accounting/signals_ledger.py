@@ -39,9 +39,10 @@ A currency exchange posts from its pair of cash rows: cash out of one
 account, cash into another, and whatever the two are worth apart to
 Foreign Exchange Gain/Loss.
 
-What still does NOT post live: cash rows whose source is a transfer
-between two cash accounts of the same book, which moves the same amount
-out and in and so leaves Cash and Bank where it was; Payment's own cash row, which is deliberately left to the
+A transfer between two cash accounts posts from its pair the same way:
+the same amount out of one and into the other, both under Cash and Bank.
+
+What still does NOT post live: Payment's own cash row, which is deliberately left to the
 current-account movement that already carries it; and stock ARRIVING,
 which is the purchase invoice's job (see services_posting).
 """
@@ -211,7 +212,7 @@ def post_cash_entry_to_ledger(sender, instance, raw=False, **kwargs):
     if raw:
         return
     from .services_posting import (CASH_CONTRA_BY_SOURCE, post_cash_entry,
-                                   post_currency_exchange)
+                                   post_cash_transfer, post_currency_exchange)
 
     model = _cash_source_model(instance)
     if model == "currencyexchange":
@@ -220,6 +221,12 @@ def post_cash_entry_to_ledger(sender, instance, raw=False, **kwargs):
         exchange = instance.content_type.get_object_for_this_type(
             pk=instance.content_pk)
         _safely(f"currency exchange {exchange.pk}", post_currency_exchange, exchange)
+        return
+    if model == "intransfer":
+        # The same shape: two cash rows, one entry, posted from the pair.
+        transfer = instance.content_type.get_object_for_this_type(
+            pk=instance.content_pk)
+        _safely(f"cash transfer {transfer.pk}", post_cash_transfer, transfer)
         return
     if model not in CASH_CONTRA_BY_SOURCE:
         return
@@ -237,7 +244,7 @@ def unpost_cash_entry_from_ledger(sender, instance, **kwargs):
     from .services_posting import CASH_CONTRA_BY_SOURCE, unpost_ref
 
     model = _cash_source_model(instance)
-    if model != "currencyexchange" and model not in CASH_CONTRA_BY_SOURCE:
+    if model not in ("currencyexchange", "intransfer") and model not in CASH_CONTRA_BY_SOURCE:
         return
     _safely(f"cash entry {instance.pk}", unpost_ref,
             instance.content_type_id, instance.content_pk)

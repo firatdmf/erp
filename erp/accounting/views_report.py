@@ -5,14 +5,17 @@ Current-account reports (Phase 4).
     /accounting/accounts/reports/trial-balance/  → TrialBalance    (current account mizan per book, period filter)
     /accounting/accounts/reports/credit-limit/   → CreditLimitReport
     /accounting/books/<id>/reports/chart-of-accounts/ → ChartOfAccounts
+    /accounting/books/<id>/reports/journal/           → Journal
 """
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from django.views import View
 
 from accounting.models import Book
@@ -466,3 +469,172 @@ class LedgerAccount(View):
             "debit_total": sum((l.debit for l in lines), Decimal("0")),
             "credit_total": sum((l.credit for l in lines), Decimal("0")),
         })
+
+
+# ---------------------------------------------------------------------------
+# Journal — every entry, with the accounts it debited and credited
+# ---------------------------------------------------------------------------
+@method_decorator(login_required, name="dispatch")
+class Journal(View):
+    """Every journal entry in the book: what was debited, what was credited.
+
+    The transactions page is the cash journal, so anything that moved no
+    cash — a sale on account, a purchase, a transfer between two accounts,
+    stock leaving the shelves — was on no list at all, only on the one
+    statement it happened to touch. Everything that changes the accounting
+    equation posts a journal entry, so this is the one list all of it is on.
+
+    Newest first, a page at a time. The ledger account page reads the same
+    lines one account at a time; this reads them one event at a time.
+    """
+    template_name = "accounts/report_journal.html"
+    PER_PAGE = 50
+
+    # What wrote the entry, by its source model. An entry with no source is
+    # one the ledger made for itself — the payables re-split, a period close.
+    KINDS = {
+        "accounts": (_("Account entries"), ("currentaccountmovement",)),
+        "cash":     (_("Cash"), ("equityexpense", "equityrevenue", "equitycapital",
+                                 "equitydivident", "currencyexchange", "intransfer")),
+        "stock":    (_("Stock"), ("stockmovement", "stocktransfer")),
+        "ledger":   (_("Ledger only"), ()),
+    }
+
+    def get(self, request):
+        from .models_ledger import JournalEntry, JournalLine
+
+        date_from = request.GET.get("date_from") or ""
+        date_to = request.GET.get("date_to") or ""
+        kind = request.GET.get("kind") or ""
+        if kind not in self.KINDS:
+            kind = ""
+
+        entries = JournalEntry.objects.filter(book=request.book)
+        if date_from:
+            entries = entries.filter(date__gte=date_from)
+        if date_to:
+            entries = entries.filter(date__lte=date_to)
+        if kind == "ledger":
+            entries = entries.filter(source_type__isnull=True)
+        elif kind:
+            entries = entries.filter(source_type__model__in=self.KINDS[kind][1])
+
+        page = Paginator(
+            entries.select_related("source_type").order_by("-date", "-pk"), self.PER_PAGE,
+        ).get_page(request.GET.get("page"))
+
+        lines = {}
+        for line in (JournalLine.objects.filter(entry__in=list(page.object_list))
+                     .select_related("account", "current_account", "cash_account")
+                     .order_by("pk")):
+            lines.setdefault(line.entry_id, []).append(line)
+
+        kind_of = {model: label for label, models in self.KINDS.values() for model in models}
+        urls = self._source_urls(request.book, page.object_list)
+        originals = self._originals(request.book, page.object_list)
+        rows = []
+        for entry in page.object_list:
+            debits = [l for l in lines.get(entry.pk, []) if l.debit]
+            credits = [l for l in lines.get(entry.pk, []) if l.credit]
+            model = entry.source_type.model if entry.source_type_id else ""
+            rows.append({
+                "entry": entry,
+                "kind": kind_of.get(model, self.KINDS["ledger"][0]),
+                "debits": debits,
+                "credits": credits,
+                "amount": sum((l.debit for l in debits), Decimal("0")),
+                "url": urls.get((model, entry.source_id), ""),
+                "originals": originals.get((model, entry.source_id), []),
+            })
+
+        totals = JournalLine.objects.filter(entry__in=entries).aggregate(d=Sum("debit"))
+        # Everything but the page number, for the pager's links.
+        params = request.GET.copy()
+        params.pop("page", None)
+        return render(request, self.template_name, {
+            "rows": rows,
+            "page": page,
+            "count": page.paginator.count,
+            "total": totals["d"] or Decimal("0"),
+            "kinds": [(key, label) for key, (label, _models) in self.KINDS.items()],
+            "kind": kind,
+            "date_from": date_from,
+            "date_to": date_to,
+            "query": params.urlencode(),
+        })
+
+    @staticmethod
+    def _originals(book, entries):
+        """{(model, id): [(amount, currency code), ...]} — what was entered.
+
+        The journal is kept in the book's currency, so a lira deposit reads
+        as dollars and the figure somebody actually typed is nowhere on the
+        row. The lines do not keep it; the document behind the entry does,
+        so it is read from there: the movement, or the cash rows a cash
+        document wrote. Only what was entered in ANOTHER currency is
+        returned — repeating a dollar amount in dollars says nothing. An
+        exchange gives one figure per foreign side, a transfer one for both.
+        """
+        from .models import CashTransactionEntry
+
+        base = book.effective_base_currency.code
+        by_model = {}
+        for entry in entries:
+            if entry.source_type_id and entry.source_id:
+                by_model.setdefault(entry.source_type.model, set()).add(entry.source_id)
+
+        originals = {}
+
+        def add(key, amount, code):
+            if code == base or amount is None:
+                return
+            figure = (abs(amount), code)
+            bucket = originals.setdefault(key, [])
+            if figure not in bucket:
+                bucket.append(figure)
+
+        for pk, amount, code in (CurrentAccountMovement.objects
+                                 .filter(pk__in=by_model.get("currentaccountmovement", ()))
+                                 .values_list("pk", "amount", "currency__code")):
+            add(("currentaccountmovement", pk), amount, code)
+        cash_models = [m for m in by_model if m != "currentaccountmovement"]
+        for model in cash_models:
+            for pk, amount, code in (CashTransactionEntry.objects
+                                     .filter(book=book, content_type__model=model,
+                                             content_pk__in=by_model[model])
+                                     .order_by("pk")
+                                     .values_list("content_pk", "amount", "currency__code")):
+                add((model, pk), amount, code)
+        return originals
+
+    @staticmethod
+    def _source_urls(book, entries):
+        """{(model, id): url} for the entries whose source has a page.
+
+        A movement's page is addressed by its account as well as its own
+        id, so those are fetched together rather than one per row. A source
+        with no page of its own — a stock movement — stays unlinked.
+        """
+        from django.urls import reverse
+
+        by_model = {}
+        for entry in entries:
+            if entry.source_type_id and entry.source_id:
+                by_model.setdefault(entry.source_type.model, set()).add(entry.source_id)
+
+        urls = {}
+        for pk, account_id in (CurrentAccountMovement.objects
+                               .filter(pk__in=by_model.get("currentaccountmovement", ()))
+                               .values_list("pk", "current_account_id")):
+            urls[("currentaccountmovement", pk)] = reverse(
+                "accounts:movement_detail", args=[account_id, pk])
+        for pk in by_model.get("equityexpense", ()):
+            urls[("equityexpense", pk)] = reverse(
+                "accounting:equity_expense_detail", args=[book.pk, pk])
+        for model, name in (("equityrevenue", "revenue"), ("equitycapital", "capital"),
+                            ("equitydivident", "dividend"), ("currencyexchange", "exchange"),
+                            ("intransfer", "transfer")):
+            for pk in by_model.get(model, ()):
+                urls[(model, pk)] = reverse(
+                    f"accounting:equity_{name}_detail", args=[book.pk, pk])
+        return urls

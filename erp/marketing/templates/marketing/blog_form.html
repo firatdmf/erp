@@ -423,6 +423,9 @@
                     <input type="file" id="coverFileInput" accept="image/*" onchange="uploadImage(this, 'cover')">
                     <input type="hidden" id="id_cover_image" name="cover_image"
                         value="{{ object.cover_image|default:'' }}">
+                    <label for="id_cover_image_alt" style="margin-top: 0.75rem;">{% trans "Alt text" %}</label>
+                    <input type="text" class="form-input" id="id_cover_image_alt" name="cover_image_alt" maxlength="255"
+                        value="{{ image_alts.cover }}">
                 </div>
 
                 <div class="form-group">
@@ -449,6 +452,9 @@
                     <input type="file" id="heroFileInput" accept="image/*" onchange="uploadImage(this, 'hero')">
                     <input type="hidden" id="id_hero_image" name="hero_image"
                         value="{{ object.hero_image|default:'' }}">
+                    <label for="id_hero_image_alt" style="margin-top: 0.75rem;">{% trans "Alt text" %}</label>
+                    <input type="text" class="form-input" id="id_hero_image_alt" name="hero_image_alt" maxlength="255"
+                        value="{{ image_alts.hero }}">
                 </div>
             </div>
 

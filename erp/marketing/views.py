@@ -3338,7 +3338,7 @@ def increment_discount_usage(request):
 # ============================================================
 from .models import BlogPost, BlogFile
 from .forms import BlogPostForm, BlogFileFormSet
-from . import blog_preview
+from . import blog_images, blog_preview
 
 
 class BlogList(generic.ListView):
@@ -3395,6 +3395,7 @@ class BlogCreate(generic.CreateView):
             self.object.hero_image = hero_image
         
         self.object.save()
+        blog_images.save_image_alts(self.object, self.request.POST)
         return redirect(self.get_success_url())
 
 
@@ -3412,6 +3413,7 @@ class BlogEdit(generic.UpdateView):
         context['page_title'] = f'Edit: {self.object.title}'
         context['is_edit'] = True
         context['site_links'] = blog_preview.site_links(self.object)
+        context['image_alts'] = blog_images.image_alts(self.object)
         return context
     
     def form_valid(self, form):
@@ -3429,6 +3431,7 @@ class BlogEdit(generic.UpdateView):
             self.object.hero_image = hero_image
         
         self.object.save()
+        blog_images.save_image_alts(self.object, self.request.POST)
         return redirect(self.get_success_url())
 
 
@@ -3598,7 +3601,7 @@ def delete_blog_image(request):
 @csrf_exempt
 def get_blog_posts(request):
     """API: Get all published blog posts for frontend"""
-    posts = BlogPost.objects.filter(is_published=True).order_by('-published_at')
+    posts = BlogPost.objects.filter(is_published=True).order_by('-published_at').prefetch_related('files')
     
     data = []
     for post in posts:
@@ -3617,6 +3620,7 @@ def get_blog_posts(request):
             'category_ru': post.category_ru or post.category_tr,
             'category_pl': post.category_pl or post.category_tr,
             'cover_image': post.cover_image,
+            'cover_image_alt': blog_images.image_alts(post)['cover'],
             'published_at': post.published_at.isoformat(),
             'author': post.author,
         })
@@ -3659,6 +3663,9 @@ def get_blog_post(request, slug):
         'footer_content': post.footer_content,
         'is_published': post.is_published,
     }
+    alts = blog_images.image_alts(post)
+    data['cover_image_alt'] = alts['cover']
+    data['hero_image_alt'] = alts['hero']
 
     response = JsonResponse(data)
     if not post.is_published:

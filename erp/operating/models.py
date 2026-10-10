@@ -2048,12 +2048,15 @@ class WarehouseProduct(models.Model):
     # parent marketing.Product groups all variants of the same base name.
     # Lets the warehouse list group by main product and keeps re-scans
     # de-duplicated. SET_NULL so deleting a catalog variant never wipes stock.
+    # What this row IS: one variant, on one warehouse's shelves. PROTECT,
+    # because a variant deleted from under its stock left the stock with
+    # no catalog entry at all.
     catalog_variant = models.ForeignKey(
         "marketing.ProductVariant",
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         null=True, blank=True,
         related_name="warehouse_products",
-        help_text="Hidden marketing ProductVariant auto-created from roll scans.",
+        help_text="The catalog variant this stock is.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -2070,10 +2073,32 @@ class WarehouseProduct(models.Model):
                 name=f"operating_warehouseproduct_{field}_not_negative",
             )
             for field in ("purchase_price", "cost_usd", "cost_try")
+        ] + [
+            # A variant stands in a warehouse once. A second row for it was
+            # the same goods under two SKUs.
+            models.UniqueConstraint(
+                fields=["warehouse", "catalog_variant"],
+                name="operating_warehouseproduct_one_row_per_variant",
+            ),
         ]
 
     def __str__(self):
         return f"{self.name} ({self.sku or '-'}) @ {self.warehouse.name}"
+
+    @classmethod
+    def in_warehouse(cls, warehouse, other):
+        """The row holding `other`'s variant in `warehouse`, or None. The
+        variant is asked first: a row whose SKU was spelled another way is
+        still that variant's row. The SKU only speaks for a row with no
+        variant yet."""
+        rows = cls.objects.filter(warehouse=warehouse)
+        if other.catalog_variant_id:
+            row = rows.filter(catalog_variant_id=other.catalog_variant_id).first()
+            if row is not None:
+                return row
+        if other.sku:
+            return rows.filter(sku__iexact=other.sku).first()
+        return None
 
     @property
     def catalog_product(self):

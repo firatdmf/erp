@@ -14,6 +14,8 @@ Run with:
     python manage.py test operating.tests.test_sku_rename_everywhere
 """
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -62,13 +64,6 @@ class RenamingASkuTest(TestCase):
         self.here.refresh_from_db()
         self.assertEqual(self.here.catalog_variant_id, self.variant.pk)
 
-    def test_a_row_spelled_another_way_is_left_alone(self):
-        odd = self._row(self.shop, "3002")
-        self._rename("SBL-ECRU")
-        odd.refresh_from_db()
-        self.assertEqual(odd.sku, "3002")
-        self.assertEqual(odd.catalog_variant_id, self.variant.pk)
-
     def test_a_sku_another_variant_holds_is_refused_and_nothing_follows(self):
         sync_roll_to_catalog(base_name="Sable", attributes=[("color", "white")],
                              variant_sku="SBL-WHITE")
@@ -88,6 +83,26 @@ class RenamingASkuTest(TestCase):
         # Sable was hidden and is now empty.
         self.assertFalse(Product.everywhere.filter(pk=self.product.pk).exists())
 
+    def _edit(self, sku):
+        user = get_user_model().objects.create_superuser("chief", "chief@example.com", "pw")
+        self.client.force_login(user)
+        return self.client.post(
+            reverse("operating:warehouse_product_edit", args=[self.shop.pk, self.here.pk]),
+            {"name": "SABLE EKRU", "sku": sku})
+
+    def test_the_edit_form_refuses_another_variants_sku_and_writes_nothing(self):
+        sync_roll_to_catalog(base_name="Sable", attributes=[("color", "white")],
+                             variant_sku="SBL-WHITE")
+        response = self._edit("SBL-WHITE")
+        self.assertEqual(response.status_code, 400)
+        self.here.refresh_from_db()
+        self.assertEqual(self.here.sku, "LZK0000120")
+
+    def test_the_edit_form_refuses_to_blank_the_sku(self):
+        self.assertEqual(self._edit("").status_code, 400)
+        self.here.refresh_from_db()
+        self.assertEqual(self.here.sku, "LZK0000120")
+
     def test_the_edit_form_renames_both_warehouses(self):
         user = get_user_model().objects.create_superuser("boss", "boss@example.com", "pw")
         self.client.force_login(user)
@@ -99,3 +114,41 @@ class RenamingASkuTest(TestCase):
         self.there.refresh_from_db()
         self.variant.refresh_from_db()
         self.assertEqual((self.there.sku, self.variant.variant_sku), ("SBL-ECRU", "SBL-ECRU"))
+
+
+class OneRowPerVariantTest(TestCase):
+    """A variant stands in a warehouse once, and cannot be deleted from
+    under its stock."""
+
+    def setUp(self):
+        book = Book.objects.get_or_create(name="Laleli Fabric")[0]
+        self.shop = Warehouse.objects.create(name="Laleli", accounting_book=book)
+        self.factory = Warehouse.objects.create(name="Laleli Fabrika", accounting_book=book)
+        self.product, self.variant, _pc, _vc = sync_roll_to_catalog(
+            base_name="Sable", attributes=[("color", "ecru")], variant_sku="sable-305-ecru")
+        self.row = WarehouseProduct.objects.create(
+            warehouse=self.shop, name="SABLE EKRU", sku="3002", quantity=0,
+            catalog_variant=self.variant)
+
+    def test_a_second_row_for_the_variant_is_refused(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            WarehouseProduct.objects.create(
+                warehouse=self.shop, name="SABLE EKRU", sku="sable-305-ecru", quantity=0,
+                catalog_variant=self.variant)
+
+    def test_another_warehouse_may_hold_it_too(self):
+        WarehouseProduct.objects.create(
+            warehouse=self.factory, name="SABLE EKRU", sku="sable-305-ecru", quantity=0,
+            catalog_variant=self.variant)
+
+    def test_a_transfer_finds_the_row_by_variant_whatever_its_sku_says(self):
+        arriving = WarehouseProduct.objects.create(
+            warehouse=self.factory, name="SABLE EKRU", sku="sable-305-ecru", quantity=0,
+            catalog_variant=self.variant)
+        self.assertEqual(WarehouseProduct.in_warehouse(self.shop, arriving), self.row)
+
+    def test_a_variant_with_stock_rows_cannot_be_deleted(self):
+        with self.assertRaises(ProtectedError):
+            self.variant.delete()
+        with self.assertRaises(ProtectedError):
+            self.product.delete()

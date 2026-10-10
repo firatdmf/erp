@@ -10,9 +10,11 @@ except Exception:
 from django.views import View, generic
 from django.views.generic.edit import ModelFormMixin
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, Http404
+from django.contrib import messages
 from django.db import transaction
 from erp.search_utils import unaccent_icontains
 from django.db import models
+from django.db.models import ProtectedError
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
@@ -233,7 +235,11 @@ def product_bulk_delete(request):
             
     if product_ids:
         # Filter by owner or permissions if needed (assuming all internal users can delete for now)
-        count, _ = Product.objects.filter(id__in=product_ids).delete()
+        try:
+            count, _ = Product.objects.filter(id__in=product_ids).delete()
+        except ProtectedError:
+            return HttpResponseBadRequest(_gettext(
+                "A product with stock in a warehouse, or on an order, cannot be deleted."))
         print(f"🗑️ Bulk deleted {count} products: IDs {product_ids}")
         
         # HTMX Response: Trigger a refresh of the product list
@@ -1772,7 +1778,15 @@ class ProductDelete(View):
     def post(self, request, pk, *args, **kwargs):
         product = get_object_or_404(Product, pk=pk)
         product_title = product.title
-        product.delete()
+        try:
+            product.delete()
+        except ProtectedError:
+            message = _gettext(
+                "A product with stock in a warehouse, or on an order, cannot be deleted.")
+            if request.headers.get('Content-Type') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': message}, status=409)
+            messages.error(request, message)
+            return redirect(reverse("marketing:product_detail", args=[product.pk]))
         
         # Return JSON for AJAX requests
         if request.headers.get('Content-Type') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -2015,7 +2029,12 @@ def instant_delete_variant(request):
             return JsonResponse({'success': False, 'error': 'variant_id or (variant_sku + product_id) required'}, status=400)
         
         # Delete variant (cascade will delete associated files)
-        variant.delete()
+        try:
+            variant.delete()
+        except ProtectedError:
+            return JsonResponse({'success': False, 'error': _gettext(
+                "A variant with stock in a warehouse, or on an order, cannot be deleted.")},
+                status=409)
         
         return JsonResponse({
             'success': True,

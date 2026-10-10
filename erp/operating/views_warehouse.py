@@ -2621,9 +2621,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     user = request.user if request.user.is_authenticated else None
 
     with transaction.atomic():
-        target_wp = (WarehouseProduct.objects
-                     .filter(warehouse=target_warehouse, sku__iexact=(source_wp.sku or ""))
-                     .first()) if source_wp.sku else None
+        target_wp = WarehouseProduct.in_warehouse(target_warehouse, source_wp)
         if target_wp is None:
             target_wp = WarehouseProduct.objects.create(
                 warehouse=target_warehouse, name=source_wp.name, sku=source_wp.sku,
@@ -7101,6 +7099,23 @@ class WarehouseProductEdit(View):
         # Optional: explicitly move this variant under a different catalog
         # main product (the base title typed/picked in the edit modal).
         catalog_base = (request.POST.get("catalog_base_name") or "").strip()
+
+        # The SKU is the catalog variant's, so one that is another
+        # variant's — or none at all — is refused before anything is
+        # written. Saved with a warning, it left the row under one SKU and
+        # its variant under another.
+        if product.catalog_variant_id and (sku or "") != (product.sku or ""):
+            if not sku:
+                return JsonResponse({"success": False, "error": _gettext(
+                    "A product in the catalog needs a SKU.")}, status=400)
+            from marketing.models import ProductVariant
+            taken = (ProductVariant.everywhere.filter(variant_sku=sku)
+                     .exclude(pk=product.catalog_variant_id)
+                     .select_related("product").first())
+            if taken is not None:
+                return JsonResponse({"success": False, "error": _gettext(
+                    "SKU '%(sku)s' is already %(product)s's.")
+                    % {"sku": sku, "product": taken.product.title}}, status=400)
 
         changes = []
         update_fields = ["updated_at"]

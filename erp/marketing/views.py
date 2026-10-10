@@ -3338,6 +3338,7 @@ def increment_discount_usage(request):
 # ============================================================
 from .models import BlogPost, BlogFile
 from .forms import BlogPostForm, BlogFileFormSet
+from . import blog_preview
 
 
 class BlogList(generic.ListView):
@@ -3357,6 +3358,12 @@ class BlogList(generic.ListView):
             )
         
         return queryset.order_by('-published_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        for post in context['blog_posts']:
+            post.site_links = blog_preview.site_links(post)
+        return context
 
 
 class BlogCreate(generic.CreateView):
@@ -3404,6 +3411,7 @@ class BlogEdit(generic.UpdateView):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'Edit: {self.object.title}'
         context['is_edit'] = True
+        context['site_links'] = blog_preview.site_links(self.object)
         return context
     
     def form_valid(self, form):
@@ -3618,10 +3626,11 @@ def get_blog_posts(request):
 
 @csrf_exempt
 def get_blog_post(request, slug):
-    """API: Get single blog post by slug for frontend"""
-    try:
-        post = BlogPost.objects.get(slug=slug, is_published=True)
-    except BlogPost.DoesNotExist:
+    """API: Get single blog post by slug for frontend. A draft is
+    answered only to a request carrying its preview token."""
+    post = BlogPost.objects.filter(slug=slug).first()
+    token = request.GET.get(blog_preview.PREVIEW_PARAM, '')
+    if post is None or not (post.is_published or blog_preview.opens_preview(post, token)):
         return JsonResponse({'error': 'Post not found'}, status=404)
     
     data = {
@@ -3648,9 +3657,13 @@ def get_blog_post(request, slug):
         'author': post.author,
         'header_content': post.header_content,
         'footer_content': post.footer_content,
+        'is_published': post.is_published,
     }
-    
-    return JsonResponse(data)
+
+    response = JsonResponse(data)
+    if not post.is_published:
+        response['Cache-Control'] = 'no-store'
+    return response
 
 
 # ============================================================

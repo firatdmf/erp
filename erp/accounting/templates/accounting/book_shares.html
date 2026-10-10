@@ -143,7 +143,7 @@
         <tr>
           <td><a href="{% url 'accounting:equity_capital_detail' pk=book.pk source_pk=c.pk %}">{{ c.date_invested|date:"d.m.Y" }}</a></td>
           <td>{{ c.member }}</td>
-          <td>{% if c.in_goods %}Goods · {{ c.warehouse.name }}{% else %}Cash · {{ c.cash_account.name }}{% endif %}</td>
+          <td>{% if c.in_goods %}Goods · {{ c.warehouse.name }}{% else %}Cash · {{ c.cash_account.label }}{% endif %}</td>
           <td class="num">{{ c.currency.symbol }}{{ c.amount|intcomma }}</td>
         </tr>
         {% endfor %}

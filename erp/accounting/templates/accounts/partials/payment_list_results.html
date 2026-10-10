@@ -63,7 +63,7 @@ place instead of reloading the whole page.
           <a class="pl-account" href="{% url 'accounts:detail' p.current_account.pk %}">{{ p.current_account.name }}</a>
           <div class="pl-account-code">{{ p.current_account.code }}</div>
         </td>
-        <td><span class="pl-cash {% if not p.cash_account %}muted{% endif %}">{% if p.cash_account %}{{ p.cash_account.name }}{% else %}—{% endif %}</span></td>
+        <td><span class="pl-cash {% if not p.cash_account %}muted{% endif %}">{% if p.cash_account %}{{ p.cash_account.label }}{% else %}—{% endif %}</span></td>
         <td>
           <span class="pl-badge {{ p.status }}">
             <span class="pl-badge-dot"></span>{{ p.get_status_display }}

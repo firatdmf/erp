@@ -257,9 +257,9 @@
                       <option value="{{ ca.pk }}"
                               data-currency="{{ ca.currency_id }}"
                               data-currency-code="{{ ca.currency.code }}"
-                              data-label="{{ ca.name }} ({{ ca.currency.code }})"
+                              data-label="{{ ca.label }} ({{ ca.currency.code }})"
                               {% if form.cash_account.value|stringformat:'s' == ca.pk|stringformat:'s' %}selected{% endif %}>
-                        {{ ca.name }} ({{ ca.currency.code }})
+                        {{ ca.label }} ({{ ca.currency.code }})
                       </option>
                     {% endfor %}
                   </select>
@@ -358,10 +358,10 @@
               </div>
               <div class="pf-f">
                 <label>{% trans "Category" %}</label>
-                <select name="category" id="id_category">
-                  <option value="">{% trans "— None —" %}</option>
+                <select name="category" id="id_category" required>
+                  <option value="">{% trans "— Select —" %}</option>
                   {% for c in categories %}
-                    <option value="{{ c.pk }}" {% if form.category.value|stringformat:'s' == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                    <option value="{{ c.pk }}" {% if form.category.value|stringformat:'s' == c.pk|stringformat:'s' %}selected{% endif %}>{{ c }}</option>
                   {% endfor %}
                 </select>
               </div>

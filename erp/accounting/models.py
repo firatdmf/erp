@@ -647,7 +647,20 @@ class CashAccount(models.Model):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
-        return f"{self.name} | {self.currency.code} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
+        return f"{self.label} | {self.currency.code} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
+
+    @property
+    def label(self):
+        """The name as the reader's language has it.
+
+        A cash account is named by whoever opens it, so most names have no
+        translation and read as typed. The till is the exception — every
+        book has one, called the same thing — and the catalogue carries it
+        under this context, apart from the "Drawer" who writes a check.
+        Shown, never stored: anything written to the ledger takes .name.
+        """
+        from django.utils.translation import pgettext
+        return pgettext("cash account name", self.name)
 
     @property
     def is_in_use(self):
@@ -810,7 +823,12 @@ class ExpenseCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
-        return self.name
+        # The stored name is English and is the msgid: the categories are a
+        # short fixed list, so the catalogue carries them by name. One the
+        # catalogue has not met reads as it was typed. Anything written to
+        # the ledger takes .name, never this.
+        from django.utils.translation import gettext
+        return gettext(self.name)
 
     class Meta:
         verbose_name_plural = "Expense Categories"

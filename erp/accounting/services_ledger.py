@@ -16,6 +16,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
+from django.utils.translation import pgettext
 
 from .models_ledger import ChartAccount, JournalEntry, JournalLine
 
@@ -595,7 +596,9 @@ def cash_by_account(book):
             .values("cash_account__name", "cash_account__currency__code")
             .annotate(native=Sum(native), base=Sum(_signed_cash()))
             .order_by("cash_account__name", "cash_account__currency__code"))
-    return [{"name": r["cash_account__name"] or "",
+    # The name as CashAccount.label gives it; "" has no translation to ask for.
+    return [{"name": pgettext("cash account name", r["cash_account__name"])
+                     if r["cash_account__name"] else "",
              "currency": r["cash_account__currency__code"] or "",
              "native": r["native"] or ZERO,
              "base": r["base"] or ZERO}

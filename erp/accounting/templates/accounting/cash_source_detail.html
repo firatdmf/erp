@@ -146,7 +146,7 @@
       {% for entry in cash_entries %}
       <div class="xd-posted"{% if not forloop.last %} style="margin-bottom:10px;"{% endif %}>
         <div class="who">
-          <a class="name" href="{% url 'accounting:cash_transaction_entry_list' pk=book.pk %}?account={{ entry.cash_account_id }}">{{ entry.cash_account.name }}</a>
+          <a class="name" href="{% url 'accounting:cash_transaction_entry_list' pk=book.pk %}?account={{ entry.cash_account_id }}">{{ entry.cash_account.label }}</a>
           <span class="code">{{ entry.cash_account.currency.code }}</span>
         </div>
         <span class="amt" style="color:{% if entry.is_amount_positive %}#1B7A4B{% else %}#B23B12{% endif %};">

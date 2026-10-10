@@ -226,7 +226,7 @@
             {% if check.cleared_cash_account %}
             <div class="row" style="grid-column: 1 / -1;">
               <div class="lbl">{% trans "Cleared Cash Account" %}</div>
-              <div class="val">{{ check.cleared_cash_account.name }} ({{ check.cleared_cash_account.currency.code }})</div>
+              <div class="val">{{ check.cleared_cash_account.label }} ({{ check.cleared_cash_account.currency.code }})</div>
             </div>
             {% endif %}
           </div>
@@ -312,7 +312,7 @@
               <label>{% trans "Cash Account" %}</label>
               <select name="cash_account" required>
                 <option value="">{% trans "— Select cash account —" %}</option>
-                {% for ca in cash_accounts %}<option value="{{ ca.id }}">{{ ca.name }} ({{ ca.currency.code }})</option>{% endfor %}
+                {% for ca in cash_accounts %}<option value="{{ ca.id }}">{{ ca.label }} ({{ ca.currency.code }})</option>{% endfor %}
               </select>
               <button type="submit" class="chk-d-btn success"><i data-lucide="check-circle"></i>{% trans "Clear" context "check" %}</button>
             </div>

@@ -79,7 +79,7 @@
           <tbody>
             {% for a in cash_accounts %}
             <tr>
-              <td>{{ a.name }} <span class="bal-code">{{ a.currency.code }}</span></td>
+              <td>{{ a.label }} <span class="bal-code">{{ a.currency.code }}</span></td>
               <td class="num">{{ a.currency.symbol }}{{ a.balance|format_money }}</td>
             </tr>
             {% endfor %}

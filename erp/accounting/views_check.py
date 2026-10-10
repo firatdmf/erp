@@ -246,7 +246,7 @@ class CheckClear(View):
             raise Http404("No such record.")
         try:
             check.clear(cash_account=cash, user=request.user)
-            messages.success(request, _g("Check cleared: %(name)s") % {"name": cash.name})
+            messages.success(request, _g("Check cleared: %(name)s") % {"name": cash.label})
         except ValidationError as ve:
             messages.error(request, _g("Could not clear: %(error)s") % {"error": ve})
         return redirect("accounts:check_detail", pk=pk)

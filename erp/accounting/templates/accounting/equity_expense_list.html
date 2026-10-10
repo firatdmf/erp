@@ -29,7 +29,7 @@
           {# Exactly one of the two is set — see EquityExpense's check constraint. #}
           <td>
             {% if expense.cash_account %}
-              {{ expense.cash_account.name }} <span class="ccy">{{ expense.cash_account.currency.code }}</span>
+              {{ expense.cash_account.label }} <span class="ccy">{{ expense.cash_account.currency.code }}</span>
             {% else %}
               {{ expense.paid_by_current_account.name }} <span class="ccy">{{ expense.currency.code }}</span>
             {% endif %}

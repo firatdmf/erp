@@ -410,6 +410,9 @@ class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
         # need not carry it — which is what lets the page lock the control
         # on the cash path (a disabled <select> submits nothing).
         self.fields["currency"].required = False
+        # Asked for here and not on the model: expenses written before this
+        # was asked have none, and still have to load.
+        self.fields["category"].required = True
         self.fields["cash_account"].empty_label = "— paid from cash —"
         self.fields["paid_by_current_account"].empty_label = "— paid by someone else —"
 

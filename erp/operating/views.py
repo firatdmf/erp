@@ -2427,7 +2427,7 @@ def _deposit_cash_boxes():
     for box in (CashAccount.objects.select_related("currency")
                 .order_by("book_id", "name")):
         boxes.setdefault(str(box.book_id), []).append(
-            {"id": box.pk, "label": f"{box.name} ({box.currency.code})"})
+            {"id": box.pk, "label": f"{box.label} ({box.currency.code})"})
     return boxes
 
 

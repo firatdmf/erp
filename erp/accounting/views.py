@@ -1204,7 +1204,7 @@ def _overdrawn_message(exc):
     return _g(
         "%(account)s does not hold enough for this — the money has already "
         "left it."
-    ) % {"account": exc.account.name}
+    ) % {"account": exc.account.label}
 
 
 def assert_not_overdrawn(*cash_account_ids):
@@ -1748,8 +1748,8 @@ class EquityTransferDetail(TransferSource, CashSourceDetail):
     def facts(self, obj):
         return [
             (_g("Date"), obj.date.strftime("%d.%m.%Y") if obj.date else "—", None),
-            (_g("From"), obj.from_cash_account.name, None),
-            (_g("To"), obj.to_cash_account.name, None),
+            (_g("From"), obj.from_cash_account.label, None),
+            (_g("To"), obj.to_cash_account.label, None),
             (_g("Amount"), f"{format_money(obj.amount)} {obj.currency.code}", None),
             (_g("Book"), obj.book.name, None),
             (_g("Recorded"), timezone.localtime(obj.created_at).strftime("%d.%m.%Y %H:%M"), None),
@@ -1813,7 +1813,13 @@ class EquityExpensePage:
                 }
                 for c in form.fields["paid_by_current_account"].queryset
             ]
-            context["categories"] = form.fields["category"].queryset
+            # By the name the reader sees, which is not the stored one in
+            # every language — and "Other" last, where a catch-all is
+            # looked for after the real ones have been ruled out.
+            context["categories"] = sorted(
+                form.fields["category"].queryset,
+                key=lambda c: (c.name == "Other", str(c).casefold()),
+            )
             context["currencies"] = CurrencyCategory.objects.all().order_by("code")
         # What the entry actually did, read back off the ledger rather than
         # recomputed from the form — the point of landing here is to see
@@ -1890,7 +1896,7 @@ class EquityExpensePage:
                 "amount": amount, "account": expense.paid_by_current_account.name,
             }
         return _g("%(amount)s expense recorded, paid from %(account)s.") % {
-            "amount": amount, "account": expense.cash_account.name,
+            "amount": amount, "account": expense.cash_account.label,
         }
 
     def get_success_url(self) -> str:
@@ -2425,8 +2431,8 @@ def describe_cash_entry_source(obj, accounts=None):
                 # Same currency both sides, so the symbols cannot say which
                 # account is which. Name them. Across currencies the symbols
                 # already do, and the names would only repeat themselves.
-                left += f" {source.name}"
-                right += f" {target.name}"
+                left += f" {source.label}"
+                right += f" {target.label}"
             return f"{left} → {right}"
 
     return ""
@@ -2718,8 +2724,8 @@ class MakeInTransfer(View):
 
         messages.success(request, _g("Moved %(amount)s from %(src)s to %(dst)s.") % {
             "amount": f"{from_cash_account.currency.symbol}{amount}",
-            "src": from_cash_account.name,
-            "dst": to_cash_account.name,
+            "src": from_cash_account.label,
+            "dst": to_cash_account.label,
         })
         # The transfer it just made, as account mode does below: its page is
         # where the two legs can be checked, and corrected or deleted.

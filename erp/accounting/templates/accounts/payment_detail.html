@@ -209,7 +209,7 @@
             {# Only for a payment that converted — into the book's currency, or into the account's when the account keeps its own. #}
             {% payment_conversion_facts payment as fx %}
             {% include "accounts/partials/fx_conversion.html" with fx=fx %}
-            <div class="row"><div class="lbl">{% trans "Cash Account" %}</div><div class="val {% if not payment.cash_account %}muted{% endif %}">{% if payment.cash_account %}{{ payment.cash_account.name }}{% else %}—{% endif %}</div></div>
+            <div class="row"><div class="lbl">{% trans "Cash Account" %}</div><div class="val {% if not payment.cash_account %}muted{% endif %}">{% if payment.cash_account %}{{ payment.cash_account.label }}{% else %}—{% endif %}</div></div>
             <div class="row"><div class="lbl">{% trans "Book" %}</div><div class="val">{{ payment.book.name }}</div></div>
             {% if payment.posted_movement %}
             <div class="row"><div class="lbl">{% trans "Account Movement" %}</div><div class="val mono">#{{ payment.posted_movement_id }}</div></div>
@@ -264,7 +264,7 @@
             <span class="ico"><i data-lucide="wallet"></i></span>
             <h3>{% trans "Cash Account" %}</h3>
           </div>
-          <div class="pd-mini-name">{{ payment.cash_account.name }}</div>
+          <div class="pd-mini-name">{{ payment.cash_account.label }}</div>
           <div class="pd-mini-sub">
             {{ payment.cash_account.currency.code }}
             <br>{% trans "Current balance:" %} <strong>{{ payment.cash_account.currency.symbol }}{{ payment.cash_account.balance|money }}</strong>

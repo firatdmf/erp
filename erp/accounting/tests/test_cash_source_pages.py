@@ -428,6 +428,21 @@ class InTransferPageTests(CashSourceFixture):
         self.assertContains(response, "to the safe")
         self.assertEqual(len(response.context["cash_entries"]), 2)
 
+    def test_the_till_reads_in_the_viewers_language(self):
+        """Stored as Drawer; named by hand, any other account reads as typed."""
+        from django.utils import translation
+
+        self.kasa.name = "Drawer"
+        self.kasa.save(update_fields=["name"])
+        with translation.override("tr"):
+            self.assertEqual(self.kasa.label, "Kasa")
+            self.assertEqual(self.vault.label, self.vault.name)
+        with translation.override("en"):
+            self.assertEqual(self.kasa.label, "Drawer")
+            # The page shows the label, not the stored name's own column.
+            response = self.client.get(self.url("equity_transfer_detail", self.transfer))
+            self.assertEqual(response.context["facts"][1][1], self.kasa.label)
+
     def test_the_detail_page_offers_another_transfer(self):
         response = self.client.get(self.url("equity_transfer_detail", self.transfer))
         self.assertContains(response, 'href="%s"' % reverse(

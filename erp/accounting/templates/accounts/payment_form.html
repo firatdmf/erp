@@ -267,7 +267,7 @@
                 <select name="cash_account" id="paymentCashAccount">
                   <option value="">{% trans "— Select —" %}</option>
                   {% for ca in cash_accounts %}
-                    <option value="{{ ca.id }}" data-currency="{{ ca.currency_id }}" {% if payment and payment.cash_account_id == ca.id %}selected{% endif %}>{{ ca.name }} ({{ ca.currency.code }}) · {{ ca.book.name }}</option>
+                    <option value="{{ ca.id }}" data-currency="{{ ca.currency_id }}" {% if payment and payment.cash_account_id == ca.id %}selected{% endif %}>{{ ca.label }} ({{ ca.currency.code }}) · {{ ca.book.name }}</option>
                   {% endfor %}
                 </select>
               </div>

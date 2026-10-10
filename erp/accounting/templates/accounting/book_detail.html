@@ -183,7 +183,7 @@
       <tbody>
         {% for account in cash_accounts %}
         <tr>
-          <td class="cash-account-name">{{ account.name }}</td>
+          <td class="cash-account-name">{{ account.label }}</td>
           <td><span class="cash-account-currency">{{ account.currency.code }}</span></td>
           <td class="num">{{ account.currency.symbol }}{{ account.balance|format_money }}</td>
         </tr>

@@ -191,7 +191,7 @@
       {% else %}
         <div class="xd-posted">
           <div class="who">
-            <a class="name" href="{% url 'accounting:cash_transaction_entry_list' pk=book.pk %}">{{ expense.cash_account.name }}</a>
+            <a class="name" href="{% url 'accounting:cash_transaction_entry_list' pk=book.pk %}">{{ expense.cash_account.label }}</a>
             <span class="code">{{ expense.cash_account.currency.code }}</span>
           </div>
           {% if cash_entry %}

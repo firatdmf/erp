@@ -14115,3 +14115,84 @@ msgstr "— bu alış onu izler. Satış fiyatları yazıldığı gibi kalır."
 
 msgid "The order was cancelled — these goods are stock now."
 msgstr "Sipariş iptal edildi — bu mallar artık stok."
+
+# Expense categories — rows of accounting.ExpenseCategory, translated by name.
+msgid "Advertising"
+msgstr "Reklam"
+
+msgid "Car and Truck Expenses"
+msgstr "Araç ve Kamyon Giderleri"
+
+msgid "COGS: Cost of Goods Sold"
+msgstr "SMM: Satılan Malın Maliyeti"
+
+msgid "Comissions and Fees"
+msgstr "Komisyonlar ve Ücretler"
+
+msgid "Contract Labor"
+msgstr "Taşeron İşçilik"
+
+msgid "Deductible Meals and Entertainment"
+msgstr "İndirilebilir Yemek ve Ağırlama Giderleri"
+
+msgid "Depletion"
+msgstr "Tükenme Payı"
+
+msgid "Depreciation"
+msgstr "Amortisman"
+
+msgid "Employee Benefit Programs"
+msgstr "Çalışan Yan Hakları"
+
+msgid "Insurance"
+msgstr "Sigorta"
+
+msgid "Interest: Mortgage"
+msgstr "Faiz: İpotek"
+
+msgid "Interest: Other"
+msgstr "Faiz: Diğer"
+
+msgid "Legal and Professional Services"
+msgstr "Hukuk ve Danışmanlık Hizmetleri"
+
+msgid "Office Expense"
+msgstr "Ofis Giderleri"
+
+msgid "Overhead"
+msgstr "Genel Giderler"
+
+msgid "Pension and Profit Sharing"
+msgstr "Emeklilik ve Kâr Payı"
+
+msgid "Rent or Lease: Other Business Property"
+msgstr "Kira: Diğer İş Yeri"
+
+msgid "Rent or Lease: Vehicle, Machinery, and Equipment"
+msgstr "Kira: Araç, Makine ve Ekipman"
+
+msgid "Repairs and Maintenance"
+msgstr "Bakım ve Onarım"
+
+msgid "Shipping and Cargo"
+msgstr "Nakliye ve Kargo"
+
+msgid "Supplies"
+msgstr "Sarf Malzemeleri"
+
+msgid "Taxes and Licenses"
+msgstr "Vergiler ve Ruhsatlar"
+
+msgid "Travel"
+msgstr "Seyahat"
+
+msgid "Utilities"
+msgstr "Elektrik, Su ve Doğalgaz"
+
+msgid "Wages"
+msgstr "Maaşlar"
+
+# Cash account names — rows of accounting.CashAccount, translated by name.
+msgctxt "cash account name"
+msgid "Drawer"
+msgstr "Kasa"

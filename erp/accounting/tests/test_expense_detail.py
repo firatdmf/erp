@@ -140,6 +140,31 @@ class ExpenseDetailPageTests(TestCase):
         self.assertContains(response, 'href="%s"' % reverse(
             "accounting:add_equity_expense", kwargs={"pk": self.book.pk}))
 
+    def test_a_category_reads_in_the_viewers_language(self):
+        from django.utils import translation
+
+        wages = ExpenseCategory.objects.create(name="Wages")
+        unknown = ExpenseCategory.objects.create(name="Something nobody translated")
+        with translation.override("tr"):
+            self.assertEqual(str(wages), "Maaşlar")
+            self.assertEqual(str(unknown), "Something nobody translated")
+        with translation.override("en"):
+            self.assertEqual(str(wages), "Wages")
+
+    def test_an_expense_without_a_category_is_refused(self):
+        response = self._add(category="")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("category", response.context["form"].errors)
+        self.assertFalse(EquityExpense.objects.exists())
+
+    def test_the_form_lists_other_after_every_real_category(self):
+        for name in ("Other", "Wages", "Advertising"):
+            ExpenseCategory.objects.create(name=name)
+        response = self.client.get(
+            reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk}))
+        names = [c.name for c in response.context["categories"]]
+        self.assertEqual(names, ["Advertising", "Taxes", "Wages", "Other"])
+
     # -- what it shows ------------------------------------------------------
     def test_a_cash_expense_shows_the_account_it_left(self):
         self._add()

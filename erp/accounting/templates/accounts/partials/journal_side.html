@@ -9,6 +9,6 @@
   <a href="{% url 'accounts:report_ledger_account' current_book.pk line.account.code %}">{{ line.account.name }} ({{ line.account.code }})</a>
   {% if side|length > 1 %}<span class="amt">{{ base_symbol }}{% if debit %}{{ line.debit|format_money }}{% else %}{{ line.credit|format_money }}{% endif %}</span>{% endif %}
   {% if line.current_account %}<span class="who">{{ line.current_account.code }} · {{ line.current_account.name }}</span>
-  {% elif line.cash_account %}<span class="who">{{ line.cash_account.name }}</span>{% endif %}
+  {% elif line.cash_account %}<span class="who">{{ line.cash_account.label }}</span>{% endif %}
 </span>
 {% endfor %}

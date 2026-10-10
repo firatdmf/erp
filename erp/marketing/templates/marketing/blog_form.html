@@ -292,6 +292,43 @@
         background: #e5e7eb;
     }
 
+    .publish-panel {
+        border: 1px solid #a7f3d0;
+        background: #ecfdf5;
+        border-radius: 8px;
+        padding: 0.875rem 1rem;
+    }
+
+    .publish-panel label {
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .publish-panel p {
+        margin: 0.375rem 0 0;
+        font-size: 0.875rem;
+        color: #4b5563;
+    }
+
+    .btn-publish {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: 0.75rem;
+        padding: 0.875rem 2rem;
+        background: #059669;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    .btn-publish:hover {
+        background: #047857;
+    }
+
     .checkbox-wrapper {
         display: flex !important;
         align-items: center !important;
@@ -387,9 +424,12 @@
             </div>
 
             <div class="form-group">
-                <div class="checkbox-wrapper">
-                    {{ form.is_published }}
-                    <label for="id_is_published">{% trans "Publish" %}</label>
+                <div class="publish-panel">
+                    <div class="checkbox-wrapper">
+                        {{ form.is_published }}
+                        <label for="id_is_published">{% trans "Published" %}</label>
+                    </div>
+                    <p>{% trans "Ticked, the post is on demfirat.com. Unticked, it stays a draft only you can preview." %}</p>
                 </div>
             </div>
         </div>
@@ -605,6 +645,11 @@
             <button type="submit" class="btn-submit" id="submitBtn">
                 <i class="fas fa-save"></i> Save
             </button>
+            {% if not object.is_published %}
+            <button type="submit" class="btn-publish" name="is_published" value="on">
+                <i class="fas fa-upload"></i> {% trans "Save and publish" %}
+            </button>
+            {% endif %}
         </div>
     </form>
 </div>

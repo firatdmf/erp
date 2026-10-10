@@ -127,6 +127,30 @@
         background: #dbeafe;
     }
 
+    .btn-publish {
+        background: #059669;
+        color: white;
+        font-weight: 600;
+    }
+
+    .btn-publish:hover {
+        background: #047857;
+    }
+
+    .btn-unpublish {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .btn-unpublish:hover {
+        background: #fde68a;
+    }
+
+    .actions form {
+        display: inline;
+        margin: 0;
+    }
+
     .btn-site {
         background: #f3f4f6;
         color: #374151;
@@ -316,6 +340,21 @@
                             {% if forloop.first %}<i class="fas fa-eye"></i> {% endif %}{{ language|upper }}
                         </a>
                         {% endfor %}
+                        <form method="post" action="{% url 'marketing:blog_set_published' post.pk %}"
+                            {% if post.is_published %}onsubmit="return confirm('{% trans 'Take this post off the website?' %}')"{% endif %}>
+                            {% csrf_token %}
+                            {% if post.is_published %}
+                            <input type="hidden" name="publish" value="0">
+                            <button type="submit" class="btn-action btn-unpublish">
+                                <i class="fas fa-eye-slash"></i> {% trans "Unpublish" %}
+                            </button>
+                            {% else %}
+                            <input type="hidden" name="publish" value="1">
+                            <button type="submit" class="btn-action btn-publish">
+                                <i class="fas fa-upload"></i> {% trans "Publish" %}
+                            </button>
+                            {% endif %}
+                        </form>
                         <button type="button" class="btn-action btn-delete"
                             onclick="showDeleteModal({{ post.pk }}, '{{ post.title|escapejs }}')">
                             <i class="fas fa-trash"></i>

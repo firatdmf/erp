@@ -3457,6 +3457,15 @@ class BlogDelete(generic.DeleteView):
         return redirect(self.get_success_url())
 
 
+@require_http_methods(["POST"])
+def blog_set_published(request, pk):
+    """Publish a post, or take it off the website, from the blog list."""
+    post = get_object_or_404(BlogPost, pk=pk)
+    post.is_published = request.POST.get('publish') == '1'
+    post.save(update_fields=['is_published', 'updated_at'])
+    return redirect('marketing:blog_list')
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_blog_image(request):

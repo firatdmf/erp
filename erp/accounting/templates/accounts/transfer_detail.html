@@ -46,6 +46,8 @@
   .md-btn i { width: 14px; height: 14px; }
   .md-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; }
   .md-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .md-btn.ghost { background: white; border:1px solid #D5DDE5; color: var(--ink); }
+  .md-btn.ghost:hover { background: #F6F8FA; color: var(--ink); }
   .md-btn.danger { background: white; border:1px solid #F0C9C2; color: #B23B12; }
   .md-btn.danger:hover { background: #FDF3F2; }
 
@@ -106,6 +108,9 @@
       </h1>
     </div>
     <div class="md-actions">
+      <a href="{% url 'accounting:make_in_transfer' pk=transfer.book_id %}?mode=current_account" class="md-btn ghost">
+        <i data-lucide="plus"></i> {% trans "Add new" %}
+      </a>
       <a href="{% url 'accounts:transfer_edit' transfer.pk %}" class="md-btn primary">
         <i data-lucide="pencil"></i> {% trans "Edit" %}
       </a>

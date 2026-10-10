@@ -43,6 +43,8 @@
   .xd-btn i { width: 14px; height: 14px; }
   .xd-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; }
   .xd-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .xd-btn.ghost { background: white; border:1px solid #D5DDE5; color: var(--ink); }
+  .xd-btn.ghost:hover { background: #F6F8FA; color: var(--ink); }
   .xd-btn.danger { background: white; border:1px solid #F0C9C2; color: #B23B12; }
   .xd-btn.danger:hover { background: #FDF3F2; }
 
@@ -92,6 +94,9 @@
       </h1>
     </div>
     <div class="xd-actions">
+      <a href="{% url 'accounting:add_equity_expense' pk=book.pk %}" class="xd-btn ghost">
+        <i data-lucide="plus"></i> {% trans "Add new" %}
+      </a>
       <a href="{% url 'accounting:edit_equity_expense' pk=book.pk expense_pk=expense.pk %}" class="xd-btn primary">
         <i data-lucide="pencil"></i> {% trans "Edit" %}
       </a>

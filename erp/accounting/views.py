@@ -1317,7 +1317,8 @@ class CashSourcePage:
     subclasses below.
 
     `kind` names the URLs: equity_<kind>_detail, edit_equity_<kind>,
-    delete_equity_<kind>.
+    delete_equity_<kind>. `add_url_name` is the form that records another
+    one, which those names are too irregular to derive.
     """
 
     pk_url_kwarg = "source_pk"
@@ -1325,6 +1326,7 @@ class CashSourcePage:
     kind = ""
     label = ""
     delete_confirm = ""
+    add_url_name = ""
 
     def get_book(self):
         return get_object_or_404(Book, pk=self.kwargs.get("pk"))
@@ -1347,6 +1349,11 @@ class CashSourcePage:
         context["edit_url"] = self.source_url(f"accounting:edit_equity_{self.kind}")
         context["delete_url"] = self.source_url(f"accounting:delete_equity_{self.kind}")
         context["delete_confirm"] = self.delete_confirm
+        # A save lands on the entry, and the next thing wanted is usually
+        # another entry of the same kind.
+        context["add_url"] = reverse(
+            self.add_url_name, kwargs={"pk": self.kwargs.get("pk")}
+        ) if self.add_url_name else ""
         return context
 
 
@@ -1507,6 +1514,7 @@ class CashInflowSource:
 class RevenueSource(CashInflowSource):
     model = EquityRevenue
     kind = "revenue"
+    add_url_name = "accounting:add_equity_revenue"
     label = _l("Revenue")
     delete_confirm = _l("Delete this revenue? The cash it added is taken back out of the account.")
 
@@ -1553,6 +1561,7 @@ class CapitalSource(CashInflowSource):
 
     model = EquityCapital
     kind = "capital"
+    add_url_name = "accounting:add_equity_capital"
     label = _l("Capital deposit")
     delete_confirm = _l("Delete this capital deposit? The cash it added is taken back out of the account.")
     goods_delete_confirm = _l(
@@ -1639,6 +1648,7 @@ class TwoLegSource:
 class ExchangeSource(TwoLegSource):
     model = CurrencyExchange
     kind = "exchange"
+    add_url_name = "accounting:make_currency_exchange"
     label = _l("Currency exchange")
     delete_confirm = _l("Delete this exchange? Both accounts go back to where they were before it.")
 
@@ -1686,6 +1696,7 @@ class DeleteEquityExchange(ExchangeSource, CashSourceDelete):
 class DividendSource:
     model = EquityDivident
     kind = "dividend"
+    add_url_name = "accounting:add_equity_divident"
     label = _l("Dividend")
     delete_confirm = _l("Delete this dividend? The cash it paid out goes back into the account.")
 
@@ -1727,6 +1738,7 @@ class DeleteEquityDividend(DividendSource, CashSourceDelete):
 class TransferSource(TwoLegSource):
     model = InTransfer
     kind = "transfer"
+    add_url_name = "accounting:make_in_transfer"
     label = _l("Transfer")
     delete_confirm = _l("Delete this transfer? Both accounts go back to where they were before it.")
 
@@ -2709,7 +2721,9 @@ class MakeInTransfer(View):
             "src": from_cash_account.name,
             "dst": to_cash_account.name,
         })
-        return redirect(self.success_url(book, "cash"))
+        # The transfer it just made, as account mode does below: its page is
+        # where the two legs can be checked, and corrected or deleted.
+        return redirect("accounting:equity_transfer_detail", pk=book.pk, source_pk=obj.pk)
 
     # -- current account → current account ------------------------------------------------------
     @transaction.atomic
@@ -2739,14 +2753,8 @@ class MakeInTransfer(View):
         # The transfer it just made, not the empty form again. A virman is a
         # document — it has two legs in two accounts and a rate they both
         # converted at — and none of that is visible from the page that
-        # entered it. Cash mode still returns here: an InTransfer writes cash
-        # ledger entries rather than a document, so there is nothing to land
-        # on and entering several in a row is the normal way it is used.
+        # entered it.
         return redirect("accounts:transfer_detail", pk=transfer.pk)
-
-    def success_url(self, book, mode):
-        base = reverse("accounting:make_in_transfer", kwargs={"pk": book.pk})
-        return f"{base}?mode={mode}"
 
 
 @method_decorator(login_required, name="dispatch")

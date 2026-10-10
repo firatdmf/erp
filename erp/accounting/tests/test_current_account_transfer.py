@@ -274,16 +274,31 @@ class TransferPageModeTest(TransferTestBase):
             fetch_redirect_response=False,
         )
 
-    def test_cash_mode_still_returns_to_the_form(self):
-        """An InTransfer writes cash ledger entries rather than a document,
-        so there is nothing to land on — and several in a row is the normal
-        way that mode is used."""
+    def test_the_transfer_page_offers_another_one_in_the_same_mode(self):
+        self.client.post(self.url(), {
+            "mode": "current_account", "book": self.book.pk, "date": "2026-02-01",
+            "from_current_account": self.a.pk, "to_current_account": self.b.pk,
+            "amount": "400.00", "currency": self.usd.pk,
+        })
+        transfer = CurrentAccountTransfer.objects.get()
+        response = self.client.get(reverse("accounts:transfer_detail", args=[transfer.pk]))
+        self.assertContains(response, 'href="%s?mode=current_account"' % self.url())
+
+    def test_cash_mode_lands_on_the_transfer_too(self):
+        """Its page is where the two legs can be checked, and corrected or
+        deleted — the same reason account mode lands on its own."""
         response = self.client.post(self.url(), {
             "mode": "cash", "book": self.book.pk, "date": "2026-02-01",
             "from_cash_account": self.kasa.pk, "to_cash_account": self.banka.pk,
             "amount": "250.00", "currency": self.usd.pk,
         })
-        self.assertIn("make_in_transfer", response["Location"])
+        transfer = InTransfer.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("accounting:equity_transfer_detail",
+                    kwargs={"pk": self.book.pk, "source_pk": transfer.pk}),
+            fetch_redirect_response=False,
+        )
 
     def test_posting_cash_mode_still_moves_cash(self):
         """The mode the page grew was added beside the one it had, not

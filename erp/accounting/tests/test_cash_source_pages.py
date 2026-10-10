@@ -428,6 +428,11 @@ class InTransferPageTests(CashSourceFixture):
         self.assertContains(response, "to the safe")
         self.assertEqual(len(response.context["cash_entries"]), 2)
 
+    def test_the_detail_page_offers_another_transfer(self):
+        response = self.client.get(self.url("equity_transfer_detail", self.transfer))
+        self.assertContains(response, 'href="%s"' % reverse(
+            "accounting:make_in_transfer", kwargs={"pk": self.book.pk}))
+
     def test_the_transactions_row_opens_the_transfer(self):
         response = self.client.get(reverse(
             "accounting:cash_transaction_entry_list", kwargs={"pk": self.book.pk}

@@ -134,6 +134,12 @@ class ExpenseDetailPageTests(TestCase):
             html,
         )
 
+    def test_the_page_offers_another_expense(self):
+        self._add()
+        response = self._detail(EquityExpense.objects.get())
+        self.assertContains(response, 'href="%s"' % reverse(
+            "accounting:add_equity_expense", kwargs={"pk": self.book.pk}))
+
     # -- what it shows ------------------------------------------------------
     def test_a_cash_expense_shows_the_account_it_left(self):
         self._add()

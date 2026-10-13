@@ -14196,3 +14196,48 @@ msgstr "Maaşlar"
 msgctxt "cash account name"
 msgid "Drawer"
 msgstr "Kasa"
+
+# Attribute wording page, and the one-row-per-variant rules.
+msgid "Attribute wording"
+msgstr "Özellik çevirileri"
+
+msgid "A term is stored once, as an English key. Write here how it reads in each language; a language left empty shows the key."
+msgstr "Bir terim bir kez, İngilizce anahtar olarak saklanır. Her dilde nasıl okunacağını buraya yazın; boş bırakılan dilde anahtar gösterilir."
+
+msgid "Find a term…"
+msgstr "Terim ara…"
+
+msgid "Stored as"
+msgstr "Kayıtlı hali"
+
+msgid "Another term…"
+msgstr "Başka bir terim…"
+
+msgid "Values of any attribute"
+msgstr "Her özellik için geçerli değerler"
+
+#, python-format
+msgid "%(count)s wordings saved."
+msgstr "%(count)s çeviri kaydedildi."
+
+msgid "A product in the catalog needs a SKU."
+msgstr "Katalogdaki bir ürünün SKU'su olmalıdır."
+
+#, python-format
+msgid "SKU '%(sku)s' is already %(product)s's."
+msgstr "'%(sku)s' SKU'su zaten %(product)s ürününe ait."
+
+msgid "A product with stock in a warehouse, or on an order, cannot be deleted."
+msgstr "Depoda stoğu olan veya bir siparişte yer alan ürün silinemez."
+
+msgid "A variant with stock in a warehouse, or on an order, cannot be deleted."
+msgstr "Depoda stoğu olan veya bir siparişte yer alan varyant silinemez."
+
+msgid "Attribute names"
+msgstr "Özellik adları"
+
+msgid "Values of"
+msgstr "Şunun değerleri"
+
+msgid "Used by"
+msgstr "Kullanan"

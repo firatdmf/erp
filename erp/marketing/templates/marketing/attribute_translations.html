@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block css %}
+<style>
+.at { padding: 22px 28px 100px; font-family: var(--font-sans, 'Plus Jakarta Sans', system-ui, sans-serif); color: var(--fg-default, #0F1419); }
+.at, .at * { box-sizing: border-box; }
+.at-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+.at-title { font: 800 26px var(--font-sans, sans-serif); letter-spacing: -0.01em; margin: 0; }
+.at-sub { font: 500 12.5px var(--font-sans, sans-serif); color: var(--fg-muted, #6B7280); margin-top: 4px; max-width: 640px; }
+.at-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.at select, .at input[type=text], .at input[type=search] {
+  padding: 8px 10px; border: 1px solid var(--border-default, #E0E6EE); border-radius: 8px;
+  font: 500 13px var(--font-sans, sans-serif); background: var(--bg-surface, #fff); color: inherit; width: 100%;
+}
+.at-tools select, .at-tools input { width: auto; min-width: 180px; }
+.at-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 10px; cursor: pointer;
+  font: 600 13px var(--font-sans, sans-serif); color: #fff; border: 1px solid var(--nejum-teal-700, #005354);
+  background: linear-gradient(180deg, var(--nejum-teal-500, #008080), var(--nejum-teal-600, #00696A));
+}
+.at-table { width: 100%; border-collapse: collapse; background: var(--bg-surface, #fff); border: 1px solid var(--border-default, #E4E9EF); border-radius: 12px; overflow: hidden; }
+.at-table th { text-align: left; font: 700 11px var(--font-sans, sans-serif); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-muted, #6B7280); padding: 10px 12px; background: var(--bg-subtle, #F8FAFC); }
+.at-table td { padding: 6px 12px; border-top: 1px solid var(--border-default, #EEF1F5); vertical-align: middle; }
+.at-key { font: 600 13px var(--font-mono, ui-monospace, monospace); }
+.at-name td { background: var(--nejum-teal-50, #F0FAF9); }
+.at-n { font: 500 12px var(--font-sans, sans-serif); color: var(--fg-muted, #6B7280); white-space: nowrap; }
+.at-foot { position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(180deg, transparent, var(--bg-page, #F6F8FA) 40%); display: flex; justify-content: flex-end; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="at">
+  <div class="at-head">
+    <div>
+      <h1 class="at-title">{% trans "Attribute wording" %}</h1>
+      <div class="at-sub">{% trans "A term is stored once, as an English key. Write here how it reads in each language; a language left empty shows the key." %}</div>
+    </div>
+    <div class="at-tools">
+      <select onchange="location.search = '?section=' + encodeURIComponent(this.value)" aria-label="{% trans 'Section' %}">
+        <option value="names" {% if section == "names" %}selected{% endif %}>{% trans "Attribute names" %}</option>
+        <option value="groups" {% if section == "groups" %}selected{% endif %}>{% trans "Product groups" %}</option>
+        <option value="any" {% if section == "any" %}selected{% endif %}>{% trans "Values of any attribute" %}</option>
+        <optgroup label="{% trans 'Values of' %}">
+          {% for one in attributes %}
+          <option value="{{ one }}" {% if one == section %}selected{% endif %}>{{ one }}</option>
+          {% endfor %}
+        </optgroup>
+      </select>
+      <input type="search" id="atSearch" placeholder="{% trans 'Find a term…' %}" oninput="atFilter(this.value)">
+    </div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="section" value="{{ section }}">
+    <input type="hidden" name="rows" value="{{ rows|length }}">
+    <table class="at-table">
+      <thead>
+        <tr>
+          <th>{% trans "Stored as" %}</th>
+          <th>{% if is_attribute or section == "groups" %}{% trans "Used by" %}{% endif %}</th>
+          {% for language in languages %}<th>{{ language|upper }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr data-key="{{ row.key }}">
+          <td>
+            <input type="hidden" name="key_{{ forloop.counter0 }}" value="{{ row.key }}">
+            <span class="at-key">{{ row.key }}</span>
+          </td>
+          <td class="at-n">{% if row.carried != None %}{{ row.carried }}{% endif %}</td>
+          {% for language, text in row.texts %}
+          <td><input type="text" name="text_{{ forloop.parentloop.counter0 }}_{{ language }}" value="{{ text }}" maxlength="255" aria-label="{{ language|upper }}"></td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        <tr class="at-name" data-key="">
+          <td><input type="text" name="new_key" maxlength="255" placeholder="{% trans 'Another term…' %}" aria-label="{% trans 'Another term…' %}"></td>
+          <td></td>
+          {% for language in languages %}
+          <td><input type="text" name="new_text_{{ language }}" maxlength="255" aria-label="{{ language|upper }}"></td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+    <div class="at-foot"><button type="submit" class="at-btn"><i data-lucide="save"></i>{% trans "Save" %}</button></div>
+  </form>
+</div>
+<script>
+function atFilter(text) {
+  const wanted = text.trim().toLowerCase();
+  document.querySelectorAll('.at-table tbody tr').forEach(row => {
+    const words = row.getAttribute('data-key') + ' ' + Array.from(row.querySelectorAll('input[type=text]')).map(i => i.value.toLowerCase()).join(' ');
+    row.style.display = (!wanted || row.classList.contains('at-name') || words.includes(wanted)) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

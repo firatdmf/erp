@@ -75,7 +75,10 @@
         {{ groups|length }} {% trans "groups" %}{% if ungrouped_count %} · {{ ungrouped_count }} {% trans "products without a group" %}{% endif %}
       </div>
     </div>
-    <a class="pg-btn primary" href="{% url 'marketing:product_group_create' %}"><i data-lucide="plus"></i>{% trans "New group" %}</a>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a class="pg-btn ghost" href="{% url 'marketing:attribute_translations' %}"><i data-lucide="languages"></i>{% trans "Attribute wording" %}</a>
+      <a class="pg-btn primary" href="{% url 'marketing:product_group_create' %}"><i data-lucide="plus"></i>{% trans "New group" %}</a>
+    </div>
   </div>
 
   <div class="pg-grid">

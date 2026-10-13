@@ -217,7 +217,7 @@
              hx-get="{% url 'marketing:product_list' %}"
              hx-trigger="keyup changed delay:300ms, search, filterChanged from:body"
              hx-target="#product-table-body"
-             hx-include="#activeCategory">
+             hx-include="#activeCategory, #activeTag">
       <span class="pl-search-loader htmx-indicator">
         <i data-lucide="loader-2"></i>
       </span>
@@ -225,6 +225,17 @@
     </div>
 
     <div class="pl-toolbar-r">
+      {% if tag_filters %}
+      <div class="pl-sort">
+        <span class="pl-sort-l">{% trans "Tag" %}</span>
+        <select id="activeTag" name="tag" onchange="htmx.trigger(document.body, 'filterChanged')">
+          <option value="">{% trans "All" %}</option>
+          {% for tag in tag_filters %}
+          <option value="{{ tag.name }}" {% if tag.name == active_tag %}selected{% endif %}>{{ tag.name }} ({{ tag.count }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="pl-sort">
         <span class="pl-sort-l">{% trans "Sort" %}</span>
         <select name="sort" onchange="this.form && this.form.submit()">

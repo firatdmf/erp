@@ -12,7 +12,9 @@ from django.core.exceptions import ValidationError
 from django.contrib.postgres.fields import ArrayField
 
 from . import units
-from .attributes import normalize_attribute_name, normalize_attribute_value
+from .attributes import (WORDING_GROUP, WORDING_NAME, WORDING_VALUE,
+                         forget_wordings, normalize_attribute_name,
+                         normalize_attribute_value, term_key)
 
 
 def _directory_manager():
@@ -1091,6 +1093,56 @@ class ProductVariantAttributeValue(models.Model):
         self.product_variant_attribute_value = normalize_attribute_value(
             self.product_variant_attribute.name, self.product_variant_attribute_value)
         super().save(*args, **kwargs)
+
+
+class CatalogWording(models.Model):
+    """How one catalog term reads in a language.
+
+    A term is stored once, as an English key ("dark_cream"); this is its
+    wording for a reader ("Koyu krem"). The term is an attribute's own
+    name, one of an attribute's values, or a product group's name — the
+    attributes on a variant and the ones on a product share the wordings.
+    It is matched by text (see attributes.term_key), not by row, so a
+    wording outlives a value nobody carries for a while.
+
+    `scope` is the attribute a value belongs to. A value with no scope
+    reads that way under any attribute ("yes").
+    """
+
+    KIND_CHOICES = [
+        (WORDING_NAME, "Attribute name"),
+        (WORDING_VALUE, "Attribute value"),
+        (WORDING_GROUP, "Product group"),
+    ]
+
+    kind = models.CharField(max_length=8, choices=KIND_CHOICES)
+    scope = models.CharField(max_length=255, blank=True, default="")
+    key = models.CharField(max_length=255)
+    language = models.CharField(max_length=8)
+    text = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ["kind", "scope", "key", "language"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["kind", "scope", "key", "language"],
+                name="marketing_catalogwording_one_per_language"),
+        ]
+
+    def __str__(self):
+        return f"{self.kind} {self.scope + ': ' if self.scope else ''}{self.key} [{self.language}] = {self.text}"
+
+    def save(self, *args, **kwargs):
+        self.scope = term_key(self.scope)
+        self.key = term_key(self.key)
+        self.text = (self.text or "").strip()
+        super().save(*args, **kwargs)
+        forget_wordings()
+
+    def delete(self, *args, **kwargs):
+        gone = super().delete(*args, **kwargs)
+        forget_wordings()
+        return gone
 
 
 class VariantAttributeValueImage(models.Model):

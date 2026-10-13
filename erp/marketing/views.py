@@ -128,11 +128,15 @@ class ProductList(generic.ListView):
         queryset = super().get_queryset()
         search_query = self.request.GET.get('search', '').strip()
         category_id = self.request.GET.get('category', '').strip()
+        tag = self.request.GET.get('tag', '').strip()
 
         if search_query:
             queryset = queryset.filter(
                 unaccent_icontains(search_query, 'title', 'sku')
             )
+
+        if tag:
+            queryset = queryset.filter(tags__contains=[tag])
 
         if category_id and category_id != 'all':
             if category_id == 'uncategorized':
@@ -177,6 +181,17 @@ class ProductList(generic.ListView):
             }
             for c in category_counts
         ]
+
+        # A product carries any number of tags, so they are counted one
+        # tag at a time rather than grouped like the product group.
+        tag_counts = {}
+        for tags in Product.objects.exclude(tags__len=0).values_list('tags', flat=True):
+            for one in set(tags or []):
+                if one:
+                    tag_counts[one] = tag_counts.get(one, 0) + 1
+        ctx['tag_filters'] = [
+            {'name': name, 'count': tag_counts[name]} for name in sorted(tag_counts)]
+        ctx['active_tag'] = self.request.GET.get('tag', '').strip()
 
         total_products = Product.objects.count()
         total_variants = ProductVariant.objects.count()

@@ -3,6 +3,7 @@ from . import views
 from . import api_stock_update
 from . import views_csv_stock
 from . import views_product_groups
+from . import views_attribute_translations
 from . import views_catalog
 from . import views_quotes
 from . import views_suppliers
@@ -25,6 +26,8 @@ urlpatterns = [
     path("product/<int:pk>/delete/",views.ProductDelete.as_view(),name="product_delete"),
     path("product/bulk-delete/", views.product_bulk_delete, name="product_bulk_delete"),
     # Product groups (ürün grupları) — group settings, margin-based pricing
+    path("attribute-wording/", views_attribute_translations.attribute_translations, name="attribute_translations"),
+    path("api/attribute_translations/", views_attribute_translations.attribute_translations_api, name="attribute_translations_api"),
     path("product-groups/", views_product_groups.ProductGroupList.as_view(), name="product_group_list"),
     path("product-groups/new/", views_product_groups.ProductGroupCreate.as_view(), name="product_group_create"),
     path("product-groups/<int:pk>/", views_product_groups.ProductGroupDetail.as_view(), name="product_group_detail"),

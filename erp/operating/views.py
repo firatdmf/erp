@@ -4868,11 +4868,15 @@ def _variant_label(variant):
     them the same way the warehouse variant picker does. A product with
     no variants prints a dash: it is not that the variant is unknown,
     it is that there is only one of it."""
-    values = [av.product_variant_attribute_value
+    from marketing.attributes import wording
+    # A value somebody has worded for the reader's language prints that
+    # way; the rest are un-slugged as before.
+    values = [wording(av.product_variant_attribute.name, av.product_variant_attribute_value)
+              or av.product_variant_attribute_value.replace("_", " ").strip().title()
               for av in _variant_attribute_values(variant)]
     if not values:
         return "-"
-    return " / ".join(v.replace("_", " ").strip().title() for v in values)
+    return " / ".join(values)
 
 
 def _packing_list_customer(order):

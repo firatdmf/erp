@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load attribute_wording %}
 <div class="variant-header">
     <div class="variant-title">{% trans "Variants" %} ({{ variants|length }})</div>
 </div>
@@ -37,8 +38,8 @@
                     {% for val in variant.product_variant_attribute_values.all %}
                     <span
                         style="background: white; border: 1px solid #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #64748b;">
-                        {{ val.product_variant_attribute.name }}: <span
-                            style="font-weight: 600; color: #334155;">{{val.product_variant_attribute_value }}</span>
+                        {{ val|worded_name }}: <span
+                            style="font-weight: 600; color: #334155;">{{ val|worded_or_stored }}</span>
                     </span>
                     {% endfor %}
                 </div>

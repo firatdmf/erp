@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% load attribute_wording %}
 {% load humanize %}
 {% load accounts_tags %}
 
@@ -213,8 +214,8 @@
       <dt>{% trans "SKU" %}</dt>
       <dd class="sku">{{ it.variant.variant_sku }}</dd>
       {% for v in it.variant.product_variant_attribute_values.all %}
-      <dt>{{ v.product_variant_attribute.name|capfirst }}</dt>
-      <dd>{{ v.product_variant_attribute_value }}</dd>
+      <dt>{{ v|worded_name }}</dt>
+      <dd>{{ v|worded_or_stored }}</dd>
       {% endfor %}
     </dl>
     {% elif it.plan %}

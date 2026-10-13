@@ -3698,7 +3698,7 @@ def newsletter_subscribe(request):
     """
     Newsletter subscription endpoint.
     - Validates email and phone are not already registered
-    - Generates a unique single-use 5% discount code
+    - Generates a unique single-use 15% discount code
     - Sends email with the discount code
     - Saves subscription to database
     """
@@ -3708,11 +3708,14 @@ def newsletter_subscribe(request):
         data = json.loads(request.body)
         email = data.get('email', '').strip().lower()
         phone = data.get('phone', '').strip()
+        # The footer form and the blog's subscribe box ask for an email only:
+        # no phone, no discount code.
+        skip_discount = data.get('skip_discount', False)
         
         # Validate inputs
         if not email:
             return JsonResponse({'success': False, 'error': _gettext("An email address is required")})
-        if not phone:
+        if not phone and not skip_discount:
             return JsonResponse({'success': False, 'error': _gettext("A phone number is required")})
         
         # Basic email validation
@@ -3722,9 +3725,16 @@ def newsletter_subscribe(request):
         
         # Normalize phone number (remove spaces, dashes, parentheses)
         phone_normalized = re.sub(r'[\s\-\(\)]+', '', phone)
-        if len(phone_normalized) < 10:
+        if len(phone_normalized) < 10 and not skip_discount:
             return JsonResponse({'success': False, 'error': _gettext("Invalid phone number")})
         
+        # Someone who unsubscribed and signs up again by email is taken back.
+        lapsed = NewsletterSubscription.objects.filter(email=email, is_active=False).first()
+        if lapsed and skip_discount:
+            lapsed.is_active = True
+            lapsed.save(update_fields=['is_active'])
+            return JsonResponse({'success': True, 'message': 'Subscribed'})
+
         # Check if email already exists
         if NewsletterSubscription.objects.filter(email=email).exists():
             return JsonResponse({
@@ -3733,7 +3743,6 @@ def newsletter_subscribe(request):
             })
         
         # Check if phone already exists (skip for footer/no-phone subscriptions)
-        skip_discount = data.get('skip_discount', False)
         if not skip_discount and NewsletterSubscription.objects.filter(phone=phone_normalized).exists():
             return JsonResponse({
                 'success': False,
@@ -3742,16 +3751,15 @@ def newsletter_subscribe(request):
 
         # Generate unique discount code (skip for footer subscriptions)
         if skip_discount:
-            # Footer subscription: no discount code
-            try:
-                subscription = NewsletterSubscription.objects.create(
-                    email=email,
-                    phone=phone_normalized,
-                    is_active=True
-                )
-            except Exception:
-                # Email might already exist
-                pass
+            # Footer subscription: no discount code. There is no phone to
+            # store and the column is unique, so each sign-up gets a
+            # placeholder of its own — one shared placeholder let the first
+            # subscriber in and silently dropped every one after.
+            NewsletterSubscription.objects.create(
+                email=email,
+                phone=f"no-phone-{uuid.uuid4().hex[:10]}",
+                is_active=True
+            )
             return JsonResponse({'success': True, 'message': 'Subscribed'})
 
         code_prefix = "HOSGELDIN"
@@ -3763,10 +3771,10 @@ def newsletter_subscribe(request):
             unique_suffix = uuid.uuid4().hex[:6].upper()
             discount_code_str = f"{code_prefix}{unique_suffix}"
         
-        # Create the discount code (5%, single-use)
+        # Create the discount code (15%, single-use)
         discount_code = DiscountCode.objects.create(
             code=discount_code_str,
-            discount_percentage=5.00,
+            discount_percentage=15.00,
             is_active=True,
             max_uses=1,  # Single use
             influencer_name=f"Newsletter: {email}"

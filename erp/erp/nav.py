@@ -179,6 +179,7 @@ NAV_SECTIONS = [
             {"title": _("MAIL"), "items": [
                 {"label": _("Email automation"), "icon": "gauge", "url": "marketing:dashboard"},
                 {"label": _("My emails"),        "icon": "inbox", "url": "marketing:my_emails"},
+                {"label": _("Subscribers"),      "icon": "users", "url": "marketing:subscriber_list"},
             ]},
         ],
     },

@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block css %}
+<style>
+    .subscriber-page {
+        padding: 2rem;
+    }
+
+    .subscriber-page h1 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 1.5rem;
+    }
+
+    .subscriber-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .subscriber-stat {
+        min-width: 150px;
+        padding: 1rem 1.25rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .subscriber-stat strong {
+        display: block;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .subscriber-stat span {
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+
+    .subscriber-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .subscriber-filters input,
+    .subscriber-filters select {
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        background: white;
+    }
+
+    .subscriber-filters input {
+        min-width: 260px;
+    }
+
+    .subscriber-filters button {
+        padding: 0.6rem 1.25rem;
+        border: none;
+        border-radius: 8px;
+        background: #1f2937;
+        color: white;
+        font-size: 0.9rem;
+        cursor: pointer;
+    }
+
+    .subscriber-table {
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .subscriber-table th {
+        background: #f9fafb;
+        padding: 0.85rem 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .subscriber-table td {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: middle;
+    }
+
+    .subscriber-table .muted {
+        color: #9ca3af;
+    }
+
+    .subscriber-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .subscriber-status.is-active {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .subscriber-status.is-gone {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .subscriber-pages {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: #6b7280;
+    }
+
+    .subscriber-pages a {
+        color: #1d4ed8;
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="subscriber-page">
+    <h1><i class="fas fa-users"></i> {% trans "Subscribers" %}</h1>
+
+    <div class="subscriber-stats">
+        <div class="subscriber-stat"><strong>{{ active_total }}</strong><span>{% trans "Active" %}</span></div>
+        <div class="subscriber-stat"><strong>{{ with_email }}</strong><span>{% trans "Active, with an email" %}</span></div>
+        <div class="subscriber-stat"><strong>{{ with_phone }}</strong><span>{% trans "Active, with a phone" %}</span></div>
+        <div class="subscriber-stat"><strong>{{ total }}</strong><span>{% trans "All time" %}</span></div>
+    </div>
+
+    <form method="get" class="subscriber-filters">
+        <input type="search" name="search" value="{{ search }}" placeholder="{% trans 'Search email or phone' %}">
+        <select name="status">
+            <option value="">{% trans "Everyone" %}</option>
+            <option value="active" {% if status == "active" %}selected{% endif %}>{% trans "Active" %}</option>
+            <option value="unsubscribed" {% if status == "unsubscribed" %}selected{% endif %}>{% trans "Unsubscribed" %}</option>
+        </select>
+        <button type="submit">{% trans "Filter" %}</button>
+    </form>
+
+    <table class="subscriber-table">
+        <thead>
+            <tr>
+                <th>{% trans "Email" %}</th>
+                <th>{% trans "Phone" %}</th>
+                <th>{% trans "Language" %}</th>
+                <th>{% trans "Discount code" %}</th>
+                <th>{% trans "Subscribed" %}</th>
+                <th>{% trans "Status" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for subscriber in subscribers %}
+            <tr>
+                <td>{% if subscriber.email %}{{ subscriber.email }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td>{% if subscriber.phone %}{{ subscriber.phone }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td>{% if subscriber.language %}{{ subscriber.language|upper }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td>{% if subscriber.discount_code %}{{ subscriber.discount_code.code }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                <td>{{ subscriber.created_at|date:"M d, Y" }}</td>
+                <td>
+                    {% if subscriber.is_active %}
+                    <span class="subscriber-status is-active">{% trans "Active" %}</span>
+                    {% else %}
+                    <span class="subscriber-status is-gone">{% trans "Unsubscribed" %}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="muted" style="text-align: center; padding: 2rem;">{% trans "No subscribers found." %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if is_paginated %}
+    <div class="subscriber-pages">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&search={{ search|urlencode }}&status={{ status }}">&larr; {% trans "Previous" %}</a>
+        {% endif %}
+        <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&search={{ search|urlencode }}&status={{ status }}">{% trans "Next" %} &rarr;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

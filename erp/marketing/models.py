@@ -1391,18 +1391,25 @@ class DiscountCode(models.Model):
 # Email + phone subscribers (newsletter / discount code signups)
 # ============================================================
 class NewsletterSubscription(models.Model):
-    """Newsletter subscribers — uniquely identified by email and phone."""
+    """Newsletter subscribers. A subscriber leaves an email, a phone
+    number, or both; whichever is missing is NULL, never a stand-in."""
     email = models.EmailField(
         unique=True,
+        null=True,
+        blank=True,
         verbose_name="Email",
         help_text="Subscriber email address"
     )
     phone = models.CharField(
         max_length=20,
         unique=True,
+        null=True,
+        blank=True,
         verbose_name="Phone",
         help_text="Subscriber phone number"
     )
+    # The website language they signed up in; what they are written to in.
+    language = models.CharField(max_length=8, blank=True, default="")
     discount_code = models.ForeignKey(
         DiscountCode,
         on_delete=models.SET_NULL,
@@ -1421,9 +1428,15 @@ class NewsletterSubscription(models.Model):
         verbose_name = "Newsletter Subscription"
         verbose_name_plural = "Newsletter Subscriptions"
         ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(email__isnull=False) | models.Q(phone__isnull=False),
+                name="marketing_newsletter_needs_a_contact",
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.email} - {self.phone}"
+        return " - ".join(part for part in (self.email, self.phone) if part)
 
 
 # ============================================================
@@ -1471,6 +1484,10 @@ class BlogPost(models.Model):
     author = models.CharField(max_length=200, default='Karven Home Collection')
     published_at = models.DateField(verbose_name=_lz("Publication date"))
     is_published = models.BooleanField(default=False, verbose_name=_lz("Published?"))
+    # When the newsletter was told about this post. Set once, the first
+    # time the post is published, so taking it down and putting it back
+    # up does not write to everyone again.
+    subscribers_notified_at = models.DateTimeField(null=True, blank=True, editable=False)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -3338,7 +3338,8 @@ def increment_discount_usage(request):
 # ============================================================
 from .models import BlogPost, BlogFile
 from .forms import BlogPostForm, BlogFileFormSet
-from . import blog_images, blog_preview
+from . import blog_images, blog_newsletter, blog_preview
+from .views_subscribers import SubscriberList  # noqa: F401  (routed from urls.py)
 
 
 class BlogList(generic.ListView):
@@ -3396,6 +3397,7 @@ class BlogCreate(generic.CreateView):
         
         self.object.save()
         blog_images.save_image_alts(self.object, self.request.POST)
+        blog_newsletter.announce(self.object)
         return redirect(self.get_success_url())
 
 
@@ -3432,6 +3434,7 @@ class BlogEdit(generic.UpdateView):
         
         self.object.save()
         blog_images.save_image_alts(self.object, self.request.POST)
+        blog_newsletter.announce(self.object)
         return redirect(self.get_success_url())
 
 
@@ -3463,6 +3466,7 @@ def blog_set_published(request, pk):
     post = get_object_or_404(BlogPost, pk=pk)
     post.is_published = request.POST.get('publish') == '1'
     post.save(update_fields=['is_published', 'updated_at'])
+    blog_newsletter.announce(post)
     return redirect('marketing:blog_list')
 
 
@@ -3697,42 +3701,71 @@ from django.conf import settings
 def newsletter_subscribe(request):
     """
     Newsletter subscription endpoint.
-    - Validates email and phone are not already registered
-    - Generates a unique single-use 15% discount code
-    - Sends email with the discount code
-    - Saves subscription to database
+    - The pop-up sends an email and a phone and is given a unique
+      single-use 15% discount code (the website emails it).
+    - The footer form and the blog's subscribe box send `skip_discount`
+      with an email or a phone, and are simply put on the list.
     """
     from marketing.models import DiscountCode, NewsletterSubscription
     
     try:
         data = json.loads(request.body)
-        email = data.get('email', '').strip().lower()
-        phone = data.get('phone', '').strip()
-        # The footer form and the blog's subscribe box ask for an email only:
-        # no phone, no discount code.
+        email = (data.get('email') or '').strip().lower()
+        # Normalize phone number (remove spaces, dashes, parentheses)
+        phone_normalized = re.sub(r'[\s\-\(\)]+', '', (data.get('phone') or '').strip())
+        language = (data.get('language') or '').strip()[:8]
+        # The footer form and the blog's subscribe box ask for one way to
+        # reach the person — an email or a phone — and give no discount code.
         skip_discount = data.get('skip_discount', False)
-        
+        if skip_discount and phone_normalized == '0000000000':
+            # The website's old stand-in for "no phone given".
+            phone_normalized = ''
+
         # Validate inputs
-        if not email:
-            return JsonResponse({'success': False, 'error': _gettext("An email address is required")})
-        if not phone and not skip_discount:
-            return JsonResponse({'success': False, 'error': _gettext("A phone number is required")})
-        
+        if skip_discount:
+            if not email and not phone_normalized:
+                return JsonResponse({'success': False, 'error': _gettext("An email address or a phone number is required")})
+        else:
+            if not email:
+                return JsonResponse({'success': False, 'error': _gettext("An email address is required")})
+            if not phone_normalized:
+                return JsonResponse({'success': False, 'error': _gettext("A phone number is required")})
+
         # Basic email validation
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_regex, email):
+        if email and not re.match(email_regex, email):
             return JsonResponse({'success': False, 'error': _gettext("Invalid email address")})
-        
-        # Normalize phone number (remove spaces, dashes, parentheses)
-        phone_normalized = re.sub(r'[\s\-\(\)]+', '', phone)
-        if len(phone_normalized) < 10 and not skip_discount:
+
+        if phone_normalized and len(phone_normalized) < 10:
             return JsonResponse({'success': False, 'error': _gettext("Invalid phone number")})
-        
-        # Someone who unsubscribed and signs up again by email is taken back.
-        lapsed = NewsletterSubscription.objects.filter(email=email, is_active=False).first()
-        if lapsed and skip_discount:
-            lapsed.is_active = True
-            lapsed.save(update_fields=['is_active'])
+        if skip_discount and phone_normalized and not re.fullmatch(r'\+?\d{10,15}', phone_normalized):
+            return JsonResponse({'success': False, 'error': _gettext("Invalid phone number")})
+
+        if skip_discount:
+            existing = None
+            if email:
+                existing = NewsletterSubscription.objects.filter(email=email).first()
+            if existing is None and phone_normalized:
+                existing = NewsletterSubscription.objects.filter(phone=phone_normalized).first()
+            if existing is not None:
+                if existing.is_active:
+                    return JsonResponse({
+                        'success': False,
+                        'error': _gettext("This email address is already registered") if email
+                        else _gettext("This phone number is already registered"),
+                    })
+                # Someone who unsubscribed and signs up again is taken back.
+                existing.is_active = True
+                existing.language = language or existing.language
+                existing.save(update_fields=['is_active', 'language'])
+                return JsonResponse({'success': True, 'message': 'Subscribed'})
+
+            NewsletterSubscription.objects.create(
+                email=email or None,
+                phone=phone_normalized or None,
+                language=language,
+                is_active=True,
+            )
             return JsonResponse({'success': True, 'message': 'Subscribed'})
 
         # Check if email already exists
@@ -3742,25 +3775,11 @@ def newsletter_subscribe(request):
                 'error': _gettext("This email address is already registered")
             })
         
-        # Check if phone already exists (skip for footer/no-phone subscriptions)
-        if not skip_discount and NewsletterSubscription.objects.filter(phone=phone_normalized).exists():
+        if NewsletterSubscription.objects.filter(phone=phone_normalized).exists():
             return JsonResponse({
                 'success': False,
                 'error': _gettext("This phone number is already registered")
             })
-
-        # Generate unique discount code (skip for footer subscriptions)
-        if skip_discount:
-            # Footer subscription: no discount code. There is no phone to
-            # store and the column is unique, so each sign-up gets a
-            # placeholder of its own — one shared placeholder let the first
-            # subscriber in and silently dropped every one after.
-            NewsletterSubscription.objects.create(
-                email=email,
-                phone=f"no-phone-{uuid.uuid4().hex[:10]}",
-                is_active=True
-            )
-            return JsonResponse({'success': True, 'message': 'Subscribed'})
 
         code_prefix = "HOSGELDIN"
         unique_suffix = uuid.uuid4().hex[:6].upper()
@@ -3785,6 +3804,7 @@ def newsletter_subscribe(request):
             email=email,
             phone=phone_normalized,
             discount_code=discount_code,
+            language=language,
             is_active=True
         )
         

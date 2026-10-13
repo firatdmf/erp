@@ -240,3 +240,34 @@ class ProductGroupPresetTest(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         group = ProductCategory.objects.get(pk=r.json()["id"])
         self.assertEqual(group.variant_attribute_names(), ["color", "size"])
+
+
+class AGuessNeverOverrulesADescriptionTest(TestCase):
+    """A roll scan reads one attribute off the label ("K24614.G47" → model
+    g47). That describes a variant nobody has described; on one somebody
+    has, it used to add itself, or replace the colour with its own guess."""
+
+    def setUp(self):
+        self.product, self.variant, _pc, _vc = sync_roll_to_catalog(
+            base_name="K24614", variant_sku="K24614.G47",
+            attributes=[("color", "dark_cream"), ("fabric", "greg_tulle"),
+                        ("yarn", "103_semi-matte_gold")])
+        self.described = _attrs(self.variant)
+
+    def test_a_scanned_guess_leaves_a_described_variant_alone(self):
+        sync_roll_to_catalog(base_name="K24614", variant_sku="K24614.G47",
+                             attribute_name="model", attribute_value="G47")
+        sync_roll_to_catalog(base_name="K24614", variant_sku="K24614.G47",
+                             attribute_name="color", attribute_value="gold")
+        self.assertEqual(_attrs(self.variant), self.described)
+
+    def test_typed_attributes_still_change_it(self):
+        sync_roll_to_catalog(base_name="K24614", variant_sku="K24614.G47",
+                             attributes=[("color", "cream")])
+        self.assertIn(("color", "cream"), _attrs(self.variant))
+
+    def test_a_guess_still_describes_a_bare_variant(self):
+        _p, bare, _pc, _vc = sync_roll_to_catalog(base_name="K24614", variant_sku="K24614.G93")
+        sync_roll_to_catalog(base_name="K24614", variant_sku="K24614.G93",
+                             attribute_name="model", attribute_value="G93")
+        self.assertEqual(_attrs(bare), [("model", "g93")])

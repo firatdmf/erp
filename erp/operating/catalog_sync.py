@@ -455,8 +455,13 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
     #    the named attributes set and keeps any others. A FEATURED parent's
     #    attribute setup belongs to the web team, so only a variant just
     #    created there is described. Other variants are never touched.
+    #    A lone `attribute_name`/`attribute_value` is a guess read off a
+    #    label ("G47" → model g47), not something typed: it describes a
+    #    variant nobody has described, and never overrules one somebody has.
+    guessed = not attributes
     if pairs and (variant_created or not product.featured):
-        set_variant_attributes(variant, pairs, replace=variant_created)
+        if variant_created or not guessed or not variant_attributes(variant):
+            set_variant_attributes(variant, pairs, replace=variant_created)
 
     # 4) No parent stock to write. A product's quantity is everything the
     #    warehouse holds across its variants, read through

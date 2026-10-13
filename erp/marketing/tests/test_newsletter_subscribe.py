@@ -5,7 +5,8 @@ the person. They used to send an email with a made-up phone, and the
 phone column is unique: the first sign-up went in, and each one after
 hit the constraint, was swallowed, and was still answered "Subscribed".
 A subscriber now has an email, a phone, or both, and the missing one is
-simply empty. The pop-up still asks for both and gives a discount code.
+simply empty. The pop-up asks for an email, takes a phone where it asks for one, and
+gives a discount code.
 
 Run with:
     python manage.py test marketing.tests.test_newsletter_subscribe
@@ -95,12 +96,23 @@ class TheListNeedsAWayToReachEveryone(TestCase):
             NewsletterSubscription.objects.create()
 
 
-class ThePopUpStillAsksForBoth(SignUp):
-    def test_a_missing_phone_is_refused(self):
-        self.assertFalse(self.subscribe(email="ada@example.com")["success"])
-
+class ThePopUpGivesADiscountCode(SignUp):
     def test_a_missing_email_is_refused(self):
         self.assertFalse(self.subscribe(phone="+905551234567")["success"])
+
+    def test_the_phone_is_optional(self):
+        """Only the Turkish pop-up asks for a phone; the others sent a
+        stand-in number, and every one after the first was refused."""
+        for name in ("ada", "bora"):
+            answer = self.subscribe(email=f"{name}@example.com", phone="0000000000")
+            self.assertTrue(answer["success"], answer)
+            self.assertTrue(answer["code"])
+        self.assertTrue(self.subscribe(email="cem@example.com")["success"])
+        self.assertEqual(NewsletterSubscription.objects.filter(phone=None).count(), 3)
+
+    def test_the_same_phone_twice_is_refused(self):
+        self.subscribe(email="ada@example.com", phone="+905551234567")
+        self.assertFalse(self.subscribe(email="bora@example.com", phone="+905551234567")["success"])
 
     def test_a_short_phone_is_refused(self):
         self.assertFalse(self.subscribe(email="ada@example.com", phone="12345")["success"])

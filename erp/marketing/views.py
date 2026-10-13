@@ -3701,8 +3701,8 @@ from django.conf import settings
 def newsletter_subscribe(request):
     """
     Newsletter subscription endpoint.
-    - The pop-up sends an email and a phone and is given a unique
-      single-use 15% discount code (the website emails it).
+    - The pop-up sends an email, and a phone where it asks for one, and
+      is given a unique single-use 15% discount code (the website emails it).
     - The footer form and the blog's subscribe box send `skip_discount`
       with an email or a phone, and are simply put on the list.
     """
@@ -3717,7 +3717,7 @@ def newsletter_subscribe(request):
         # The footer form and the blog's subscribe box ask for one way to
         # reach the person — an email or a phone — and give no discount code.
         skip_discount = data.get('skip_discount', False)
-        if skip_discount and phone_normalized == '0000000000':
+        if phone_normalized == '0000000000':
             # The website's old stand-in for "no phone given".
             phone_normalized = ''
 
@@ -3725,11 +3725,10 @@ def newsletter_subscribe(request):
         if skip_discount:
             if not email and not phone_normalized:
                 return JsonResponse({'success': False, 'error': _gettext("An email address or a phone number is required")})
-        else:
-            if not email:
-                return JsonResponse({'success': False, 'error': _gettext("An email address is required")})
-            if not phone_normalized:
-                return JsonResponse({'success': False, 'error': _gettext("A phone number is required")})
+        elif not email:
+            # The pop-up's discount code is sent by email. It asks for a
+            # phone on the Turkish site only, so the phone is optional.
+            return JsonResponse({'success': False, 'error': _gettext("An email address is required")})
 
         # Basic email validation
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -3775,7 +3774,7 @@ def newsletter_subscribe(request):
                 'error': _gettext("This email address is already registered")
             })
         
-        if NewsletterSubscription.objects.filter(phone=phone_normalized).exists():
+        if phone_normalized and NewsletterSubscription.objects.filter(phone=phone_normalized).exists():
             return JsonResponse({
                 'success': False,
                 'error': _gettext("This phone number is already registered")
@@ -3802,7 +3801,7 @@ def newsletter_subscribe(request):
         # Create the subscription
         subscription = NewsletterSubscription.objects.create(
             email=email,
-            phone=phone_normalized,
+            phone=phone_normalized or None,
             discount_code=discount_code,
             language=language,
             is_active=True

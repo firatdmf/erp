@@ -138,7 +138,7 @@ class CrossBookOrderSplit(TestCase):
     def test_one_card_holding_two_books_stock_is_cut_at_save(self):
         """A product is one card wherever it is held, so a line's stock
         items can stand in two books. The line is then two lines — the
-        metres picked off each book's shelves, each going to that book's
+        meters picked off each book's shelves, each going to that book's
         order — and the user never had to know that in advance."""
         shared = self._stock(self.ergene, LALELI_SKU, "Krep", "L-0002")
         self._post([{
@@ -163,7 +163,7 @@ class CrossBookOrderSplit(TestCase):
                 res.stock_item.product.warehouse.accounting_book_id,
                 res.order.current_account.book_id)
 
-    def test_outsourced_metres_are_billed_once(self):
+    def test_outsourced_meters_are_billed_once(self):
         """They have no shelf to read, so they sit with the book being
         worked in. Splitting them over both would invent a division
         nobody entered; repeating them would bill them twice."""

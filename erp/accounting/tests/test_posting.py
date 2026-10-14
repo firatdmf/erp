@@ -475,17 +475,17 @@ class AWarehouseOpenedAfterTheCutover(TestCase):
             name="Ergene Fabric", base_currency=self.usd)
         ensure_chart()
 
-        def shelves(name, metres, cost):
+        def shelves(name, meters, cost):
             wh = Warehouse.objects.create(name=name, accounting_book=self.book)
             wp = WarehouseProduct.objects.create(
                 warehouse=wh, name=name, sku=name[:3], quantity=Decimal("0"),
                 cost_usd=cost)
             item = WarehouseProductItem.objects.create(
-                product=wp, quantity=metres, quantity_remaining=metres,
+                product=wp, quantity=meters, quantity_remaining=meters,
                 barcode=f"BC-{name}", status="in_stock", unit_cost_base=cost)
             StockMovement.objects.create(
                 product=wp, stock_item=item, movement_type="in",
-                quantity=metres, reference=f"{name}-IMPORT")
+                quantity=meters, reference=f"{name}-IMPORT")
             return wh
 
         # The order here is the whole point, so it follows the real one.

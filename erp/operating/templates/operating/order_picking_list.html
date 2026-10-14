@@ -57,7 +57,7 @@
           {% if customer_id %}<div class="line"><b>{% trans "Customer" %}:</b> {{ customer_id }}</div>{% endif %}
           {% if carrier %}<div class="line"><b>{% trans "Carrier" %}:</b> {{ carrier }}</div>{% endif %}
           <div class="line"><b>{% trans "To pick" %}:</b>
-            {% blocktrans count counter=roll_count %}{{ counter }} roll{% plural %}{{ counter }} rolls{% endblocktrans %}{% if total_unit %} · {{ total_metres|floatformat:"2u"|intcomma:False }}&nbsp;{{ total_unit }}{% endif %}
+            {% blocktrans count counter=roll_count %}{{ counter }} roll{% plural %}{{ counter }} rolls{% endblocktrans %}{% if total_unit %} · {{ total_meters|floatformat:"2u"|intcomma:False }}&nbsp;{{ total_unit }}{% endif %}
           </div>
         </div>
       </td>

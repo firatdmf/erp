@@ -94,7 +94,7 @@ def _money_format(code):
 def _qty_format(unit):
     """A quantity that SHOWS its unit — "120.00 m" — and still holds 120,
     so it sums like the number it is. Bare when there is no one unit to
-    name (a total over metres and pieces)."""
+    name (a total over meters and pieces)."""
     unit = (unit or "").replace('"', "")
     return f'#,##0.00" {unit}"' if unit else "#,##0.00"
 
@@ -563,7 +563,7 @@ def build_combined_workbook(orders):
     # word sits in A and the cells beside it are simply dressed to
     # match, which looks the same and behaves better.
     # The foot names a unit and a pack only when every line shares it:
-    # metres and pieces added together are a number with no unit.
+    # meters and pieces added together are a number with no unit.
     line_units = {it.unit_short for _o, it in rows}
     line_packs = {it.pack_type for _o, it in rows if it.pack_count}
     total_unit = line_units.pop() if len(line_units) == 1 else ""

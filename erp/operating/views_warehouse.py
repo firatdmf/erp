@@ -154,7 +154,7 @@ def _roll_reservation_info(roll):
     retail flow — and holds nothing back physically: quantity_remaining and
     the product quantity are untouched until the order ships. So a reserved
     roll scans as ordinary free stock unless we say otherwise, and someone
-    can walk off with metres another order is counting on.
+    can walk off with meters another order is counting on.
 
     Returns None when the roll is free."""
     from django.utils.timezone import localtime
@@ -197,11 +197,11 @@ def _clamp_reservations_to_roll(roll, *, user=None):
     """Shrink live holds on a roll that no longer fit on it, and say which
     orders were touched.
 
-    A reservation stores its own snapshot of the metres held — it is not
+    A reservation stores its own snapshot of the meters held — it is not
     derived from the roll — so shortening a roll (a re-measure, a manual
-    stock-out) used to leave holds claiming metres that are no longer
+    stock-out) used to leave holds claiming meters that are no longer
     there. The order kept showing the old figure, and the warehouse
-    "Rezerv" roll-up kept those metres away from every other order,
+    "Rezerv" roll-up kept those meters away from every other order,
     until the discrepancy finally surfaced at ship time as a shortage
     adjustment. The physical roll is the truth: a hold cannot exceed it.
 
@@ -216,7 +216,7 @@ def _clamp_reservations_to_roll(roll, *, user=None):
     whole roll — see _grow_whole_roll_hold.
 
     The order LINE follows the hold down when — and only when — its
-    quantity is still exactly the metres picked for it (see
+    quantity is still exactly the meters picked for it (see
     _line_tracks_its_rolls). On the order form there is no quantity box:
     the figure is the rolls plus whatever was typed as outsourced, so a
     shortened roll leaves it stating a length nobody picked. A line whose
@@ -226,7 +226,7 @@ def _clamp_reservations_to_roll(roll, *, user=None):
     scratch. That distinction matters: billing reads the ORDERED quantity
     precisely so an order shipped without scanning still bills (see
     Order.get_billable_line_quantities, and order #145, which billed
-    nothing under the old scanned-metres rule). A line with no holds has
+    nothing under the old scanned-meters rule). A line with no holds has
     nothing to trim and so is never reached from here.
 
     Returns a list of {order, label, was, now} for the callers to report;
@@ -257,7 +257,7 @@ def _clamp_reservations_to_roll(roll, *, user=None):
             "was": float(was),
             "now": float(fits),
         }
-        # The metres did not go anywhere — the roll was never that long.
+        # The meters did not go anywhere — the roll was never that long.
         # Logged as an adjustment so the order's reserved figure changing
         # on its own has a visible cause on the roll's timeline.
         StockMovement.objects.create(
@@ -297,9 +297,9 @@ def _grow_whole_roll_hold(roll, old_remaining, *, user=None):
     The other half of _clamp_reservations_to_roll. A hold for PART of a
     roll is a quantity somebody asked for, and a longer roll changes
     nothing about it. But a single hold for everything the roll carried
-    is "this roll", not "31 metres": the roll goes out the door whole, so
+    is "this roll", not "31 meters": the roll goes out the door whole, so
     re-measuring it at 32 means 32 is shipped — and the order, left at
-    31, would bill a metre short of what the customer receives (order
+    31, would bill a meter short of what the customer receives (order
     #330, roll ADM10525600001618).
 
     So it grows only when exactly one live hold is on the roll and it
@@ -307,7 +307,7 @@ def _grow_whole_roll_hold(roll, old_remaining, *, user=None):
     roll, or one holding less than all of it, are left alone.
 
     The order LINE follows the hold up under the same rule it follows it
-    down: only while its quantity is still exactly the metres picked for
+    down: only while its quantity is still exactly the meters picked for
     it (_line_tracks_its_rolls).
 
     Returns a list of {order, label, was, now}, like the clamp; empty
@@ -363,10 +363,10 @@ def _grow_whole_roll_hold(roll, old_remaining, *, user=None):
 
 def _line_tracks_its_rolls(item):
     """Whether this order line's quantity is still simply what its rolls
-    plus its outsourced metres come to.
+    plus its outsourced meters come to.
 
     On the order form there is no quantity box at all: a line's quantity
-    IS the metres picked for it plus the "outsourced" figure typed for
+    IS the meters picked for it plus the "outsourced" figure typed for
     stock coming from elsewhere (see OrderItem.outsourced_quantity, and
     syncQtyFromRolls on the create/edit form, which the server re-derives
     on save). For such a line a shortened roll is not a decision anybody
@@ -419,7 +419,7 @@ def _note_trim_on_order(order, roll, was, now, *, line=None):
             f"({was - now:.2f} less).")
     if line is not None:
         text += (f" Line quantity followed it down to {line.quantity:.2f}, "
-                 f"since it is the metres picked for this order and nothing "
+                 f"since it is the meters picked for this order and nothing "
                  f"was picked for the difference.")
     else:
         text += (" The line quantity was entered by hand rather than picked "
@@ -456,8 +456,8 @@ class RollLengthError(ValueError):
     """A roll length that cannot be true — see _set_roll_length."""
 
 
-def _roll_metres_out(roll):
-    """Metres that have left this roll, shipped or taken off by hand."""
+def _roll_meters_out(roll):
+    """Meters that have left this roll, shipped or taken off by hand."""
     if roll.quantity_remaining is None or not roll.quantity:
         return Decimal("0")
     return max(Decimal("0"), roll.quantity - roll.quantity_remaining)
@@ -474,12 +474,12 @@ def _set_roll_length(roll, new_full):
     if new_full is None or new_full <= 0:
         raise RollLengthError(_gettext("Meters must be positive."))
     old_full = roll.quantity or Decimal("0")
-    consumed = _roll_metres_out(roll)
+    consumed = _roll_meters_out(roll)
 
     # A roll cannot have had more taken off it than it was ever
     # long. Shortening it below what has already gone out used to be
     # accepted: the remainder clamped to zero so stock stayed right,
-    # while the roll's own history claimed more metres shipped than
+    # while the roll's own history claimed more meters shipped than
     # ever existed — a contradiction no report can resolve later.
     #
     # If those two numbers disagree it is the OUTGOING record that is
@@ -488,16 +488,16 @@ def _set_roll_length(roll, new_full):
     # Equal is fine: that is a roll used up exactly.
     if new_full < consumed:
         raise RollLengthError(
-            _gettext("%(metres)s m has already gone out of this roll — its length "
+            _gettext("%(meters)s m has already gone out of this roll — its length "
                      "can't be shorter than that. Correct the shipment or the "
-                     "stock-out first.") % {"metres": f"{consumed:.2f}"})
+                     "stock-out first.") % {"meters": f"{consumed:.2f}"})
 
     if new_full == old_full:
         return False
     roll.quantity = new_full
     roll.quantity_remaining = max(Decimal("0"), new_full - consumed)
 
-    # Status follows the metres. Correcting a length can drive
+    # Status follows the meters. Correcting a length can drive
     # remaining to zero — or lift it back off zero — and leaving
     # the old status behind is what left roll #3195 flagged
     # "partial" with nothing on it: counted as live stock, listed
@@ -532,9 +532,9 @@ def _move_roll(roll, target_wp, *, user=None, reason_out, reason_in):
 
     Any live hold on the roll travels WITH it. OrderStockReservation
     denormalises the warehouse product purely so the list/detail pages
-    can roll up reserved metres, so leaving it pointed at the source
+    can roll up reserved meters, so leaving it pointed at the source
     would strand the reservation in the warehouse the stock item just left —
-    and would later cut the metres out of that warehouse's quantity
+    and would later cut the meters out of that warehouse's quantity
     when the order ships. Consumed rows stay put: they record where the
     stock actually went out from, which is history and did not move."""
     from .models import OrderStockReservation
@@ -565,19 +565,19 @@ def _roll_usage_info(roll):
     Covers a roll that is PART used as well as one used up: both answer to
     their barcode on purpose — scanning a label should say what happened to
     the roll rather than come back empty — and in both cases "found, N m"
-    alone leaves the scanner to guess whether metres are missing by mistake
+    alone leaves the scanner to guess whether meters are missing by mistake
     or because they shipped.
 
-    Returns None while nothing has been cut. Otherwise reports metres used
+    Returns None while nothing has been cut. Otherwise reports meters used
     against the roll's original length, plus one entry per withdrawal.
 
     The out-movements ARE the list: every cut writes exactly one, and each
     now records what caused it (StockMovement.reservation / .order), so the
     order, its line and its packing list are read from the row rather than
     inferred. Shipping also marks a reservation consumed for the same
-    metres, but that is the same event and is reached THROUGH the movement,
+    meters, but that is the same event and is reached THROUGH the movement,
     so it can no longer be counted twice. A cut with no order attached is
-    metres taken by hand and reads from its own reason."""
+    meters taken by hand and reads from its own reason."""
     from django.utils.timezone import localtime
 
     total = roll.quantity or Decimal("0")
@@ -643,7 +643,7 @@ def _roll_usage_info(roll):
         "total": float(total),
         "remaining": float(remaining or 0),
         "used": float(used),
-        # Metres are gone but nothing records where — the caller says so
+        # Meters are gone but nothing records where — the caller says so
         # rather than inventing a reason.
         "entries": entries,
     }
@@ -1181,7 +1181,7 @@ def _add_stock_to_variant(wp, stock_items, mint, user, *, notes_supplier=None,
         added_qty += qty
         new_roll_ids.append(roll.pk)
 
-    # Quantity = sum of remaining metres across ALL rolls (covers reusing an
+    # Quantity = sum of remaining meters across ALL rolls (covers reusing an
     # existing same-SKU product, not just the stock items just added here).
     total = Decimal("0")
     for rr in wp.stock_items.all():
@@ -1284,7 +1284,7 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
                 orphan_variant_ids.add(dup.catalog_variant_id)
             dup.delete()
             merged += 1
-        # Survivor quantity = sum of remaining metres across ALL its rolls.
+        # Survivor quantity = sum of remaining meters across ALL its rolls.
         total = Decimal("0")
         for r in survivor.stock_items.all():
             rem = r.quantity_remaining if r.quantity_remaining is not None else (r.quantity or Decimal("0"))
@@ -1835,7 +1835,7 @@ class WarehouseDetail(View):
 
         # Keep only products holding at least one ACTIVE (packed-but-not-
         # shipped) reservation. Same consumed=False definition the reserved
-        # metres column uses, so the filter and the number always agree.
+        # meters column uses, so the filter and the number always agree.
         # Applied to base_qs — the flat and grouped modes both build on it.
         if reserved_only:
             from .models import OrderStockReservation
@@ -1961,7 +1961,7 @@ class WarehouseDetail(View):
                        .annotate(rc=Count("stock_items", filter=~Q(stock_items__status='consumed'))))
                 _roll_counts = {r["base"]: r["rc"] for r in _rc}
 
-                # Active reserved metres per group — computed separately
+                # Active reserved meters per group — computed separately
                 # (product-id keyed) so it doesn't multiply the Sum()s.
                 _prod_rows = (base_qs.annotate(base=base_expr)
                               .filter(base__in=_bases).values("id", "base"))
@@ -2079,7 +2079,7 @@ class WarehouseDetail(View):
             'dup_count': 0 if warehouse.is_combined else _warehouse_dup_sku_count(warehouse),
             'total_quantity': counts['qty'],
             # The unit to print beside that total, or "" when the warehouse
-            # holds more than one. Summing metres of fabric and boxes of
+            # holds more than one. Summing meters of fabric and boxes of
             # ready-made curtains into a single figure is meaningless, so a
             # mixed warehouse gets a bare number and the per-product rows
             # carry the units instead. Fabric-only warehouses, which is all
@@ -2098,7 +2098,7 @@ def _warehouse_sole_unit(scope_ids):
 
     Reads the DISTINCT units actually present rather than assuming, so a
     warehouse that starts as fabric and later takes a pallet of curtains
-    stops calling itself metres the moment that happens.
+    stops calling itself meters the moment that happens.
     """
     # A row not yet linked to a product counts as the default unit, the
     # same answer WarehouseProduct.unit gives for it.
@@ -2589,7 +2589,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     if source_wp.warehouse_id == target_warehouse.pk:
         return JsonResponse({"success": False, "error": _gettext("This stock item is already in this warehouse.")}, status=400)
 
-    # A used-up stock item has no metres left to carry anywhere. Its row is the
+    # A used-up stock item has no meters left to carry anywhere. Its row is the
     # record of where that stock went OUT from, so moving it would relocate
     # history and credit the receiving warehouse with a transfer of nothing.
     # The scanner already withholds the offer; this is the same rule where
@@ -4164,7 +4164,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                   is what those rolls cost.
       a roll    — its length and barcode are corrected with the same rules
                   as the roll edit, holds trimmed to fit. Its line's
-                  quantity moves by the same metres, and by nothing else: a
+                  quantity moves by the same meters, and by nothing else: a
                   roll re-measured or cut on the warehouse page since
                   doesn't change what the supplier billed.
       removed   — a roll no longer listed is deleted, a line with nothing
@@ -4172,7 +4172,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
     Two things stay out of reach, because an order depends on them: a roll
     reserved for an order can't be removed, or turned into another variant.
-    A roll metres have already gone out of is further out of reach: its
+    A roll meters have already gone out of is further out of reach: its
     length, barcode and variant are that shipment's or stock-out's record,
     and it can't be removed either.
 
@@ -4232,11 +4232,11 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         # form changes about its rolls. Rebuilding it from their lengths
         # quietly billed the supplier for whatever the warehouse had since
         # re-measured or cut off — invoice 117 lost the 4 m cut for samples.
-        line_metres_before = {}
+        line_meters_before = {}
         for r in rolls.values():
             line_wps_before.setdefault(r.purchase_invoice_item_id, set()).add(r.product_id)
-            line_metres_before[r.purchase_invoice_item_id] = (
-                line_metres_before.get(r.purchase_invoice_item_id, Decimal("0"))
+            line_meters_before[r.purchase_invoice_item_id] = (
+                line_meters_before.get(r.purchase_invoice_item_id, Decimal("0"))
                 + (r.quantity or Decimal("0")))
 
         prefix = _intake_prefix(data, account.name)
@@ -4252,7 +4252,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
         # ── Every id the form names must be this purchase's own, once. ──
         named_items, named_rolls = set(), set()
-        # A roll metres have already left is part of that delivery's record:
+        # A roll meters have already left is part of that delivery's record:
         # its length, its label and its being on this purchase at all. A
         # shorter length is refused anyway (_set_roll_length), but a longer
         # one quietly put back stock nobody has.
@@ -4282,7 +4282,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                         named_rolls.add(roll_id)
                     roll = rolls[roll_id]
                     code = (t.get("barcode") or "").strip()
-                    if qty > 0 and _roll_metres_out(roll) > 0 and (
+                    if qty > 0 and _roll_meters_out(roll) > 0 and (
                             qty != roll.quantity
                             or (code and code.upper() != (roll.barcode or "").upper())):
                         history_changed.append(roll)
@@ -4292,7 +4292,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         # packer's concurrent scan can't slip a fresh hold onto a roll
         # between "check" and "delete". ──
         removed = [r for pk, r in rolls.items() if pk not in named_rolls]
-        history_changed += [r for r in removed if _roll_metres_out(r) > 0]
+        history_changed += [r for r in removed if _roll_meters_out(r) > 0]
         if history_changed:
             raise IntakeError({
                 "success": False,
@@ -4414,7 +4414,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                                                   "entry in either ledger.")),
                                  "cross_book": True},
                                 status=400)
-                        if not same_variant and _roll_metres_out(roll) > 0:
+                        if not same_variant and _roll_meters_out(roll) > 0:
                             raise IntakeError({
                                 "success": False,
                                 "error": str(_lz("Meters have already gone out of this roll as the "
@@ -4526,15 +4526,15 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                         wp.name = target["wp_name"]
                         wp.save(update_fields=["name", "updated_at"])
 
-                metres_now = sum(
+                meters_now = sum(
                     WarehouseProductItem.objects.filter(pk__in=line_roll_ids)
                     .values_list("quantity", flat=True),
                     Decimal("0"))
                 if item is None:
-                    quantity = metres_now
+                    quantity = meters_now
                 else:
-                    quantity = max(Decimal("0"), item.quantity + metres_now
-                                   - line_metres_before.get(item.pk, Decimal("0")))
+                    quantity = max(Decimal("0"), item.quantity + meters_now
+                                   - line_meters_before.get(item.pk, Decimal("0")))
                 update = {
                     "invoice_item_id": item.pk if item is not None else None,
                     "product": main_product, "variant": wp.catalog_variant,
@@ -4571,7 +4571,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             mark_as_supplier(account)
 
         # A corrected price is what the goods cost all along, including the
-        # metres that have already left. Those were taken out of stock at
+        # meters that have already left. Those were taken out of stock at
         # the old price when they shipped, and the purchase has just put the
         # whole difference into 1300 — so without this the part belonging to
         # goods already gone would sit in stock for ever, and their cost of
@@ -4629,7 +4629,7 @@ class WarehousePurchaseEdit(View):
                         OrderStockReservation.objects.filter(stock_item=OuterRef("pk"))))
                     # Oldest first, the order a shorter length trims them in
                     # (_clamp_reservations_to_roll), so the page can name who
-                    # loses metres before the save rather than after.
+                    # loses meters before the save rather than after.
                     .prefetch_related(Prefetch(
                         "reservations", to_attr="live_holds",
                         queryset=(OrderStockReservation.objects.filter(consumed=False)
@@ -4684,7 +4684,7 @@ class WarehousePurchaseEdit(View):
                 "tops": [
                     {"stock_item_id": r.pk, "qty": _plain_decimal(r.quantity),
                      "barcode": r.barcode or "", "locked": bool(r.is_locked),
-                     "out": float(_roll_metres_out(r)),
+                     "out": float(_roll_meters_out(r)),
                      "holds": [{"label": str(h.order) if h.order_id else "",
                                 "qty": float(h.quantity or 0)} for h in r.live_holds]}
                     for r in rolls
@@ -5357,7 +5357,7 @@ def _ocr_label_gemini(image_file):
         "  1. BRAND   (e.g. KARVEN, DEMFIRAT)  ← IGNORE, never extract\n"
         "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
         "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
-        "  4. METERS  (length in metres)               → goes in 'quantity'\n"
+        "  4. METERS  (length in meters)               → goes in 'quantity'\n"
         "  5. BARCODE (the code under the barcode bars) → goes in 'barcode'\n\n"
         "Field rules:\n"
         "- sku: the short product CODE on the second line (e.g. "
@@ -5372,7 +5372,7 @@ def _ocr_label_gemini(image_file):
         "numbers that are part of the name. DO NOT return the brand "
         "(KARVEN/DEMFIRAT etc.) here — the brand is the FIRST "
         "line and must be skipped. Only return null if there really "
-        "is no model line between the sku and the metres/barcode.\n"
+        "is no model line between the sku and the meters/barcode.\n"
         "- quantity: roll length as a decimal number. Turkish labels "
         "write '25,00 Metre' or '48,5 m' — interpret comma as decimal "
         "point ('25,00' → 25.0). No unit.\n"
@@ -5525,7 +5525,7 @@ def _ocr_label_xai(image_file):
         "  1. BRAND   (e.g. KARVEN, DEMFIRAT)  ← IGNORE, never extract\n"
         "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
         "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
-        "  4. METERS  (length in metres)               → goes in 'quantity'\n"
+        "  4. METERS  (length in meters)               → goes in 'quantity'\n"
         "  5. BARCODE (the code under the barcode bars) → goes in 'barcode'\n\n"
         "Field rules:\n"
         "- sku: the short product CODE printed on the second line "
@@ -5699,7 +5699,7 @@ def _ocr_label_tesseract(image_file):
 
     # ── Parsing ─────────────────────────────────────────────────
     # 1) SKU: alphanumeric, typically 5-15 chars, sometimes with hyphens or dots.
-    # 2) Meters: a number followed by 'm' or 'mt' or 'metre' etc.
+    # 2) Meters: a number followed by 'm' or 'mt' or 'meter' etc.
     # 3) Name: a line that's pure letters + spaces with no digits, longer than 3 chars.
     text = raw or ""
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
@@ -5708,7 +5708,7 @@ def _ocr_label_tesseract(image_file):
     meters = None
     name = None
 
-    # Meters: 48.5 m / 48,5m / 48 metre / LEN 48.5
+    # Meters: 48.5 m / 48,5m / 48 meter / LEN 48.5
     meter_pat = re.compile(
         r"(\d{1,3}[.,]?\d{0,2})\s*(m|mt|metre|meters)\b",
         re.IGNORECASE,
@@ -6075,7 +6075,7 @@ def reserved_meters_for_products(product_ids):
 
 
 def reserved_meters_subquery():
-    """A Coalesced Subquery summing active reserved metres per
+    """A Coalesced Subquery summing active reserved meters per
     WarehouseProduct — safe to .annotate() alongside Sum()/Count() over
     the rolls join without multiplying those aggregates."""
     from django.db.models import OuterRef, Subquery, Sum, DecimalField as _DF
@@ -6122,7 +6122,7 @@ def stock_item_count_subquery():
 
 def consume_reservations_for_order(order, user=None, reason_prefix="Order ship"):
     """Convert every ACTIVE reservation on `order` into a real
-    stock-out: cut the reserved metres from the exact scanned roll, drop
+    stock-out: cut the reserved meters from the exact scanned roll, drop
     WarehouseProduct.quantity, write StockMovement(out), and mark the
     reservation consumed. Idempotent — already-consumed reservations are
     skipped, so re-saving 'shipped' never double-cuts. Returns a list
@@ -6225,7 +6225,7 @@ def _write_stock_changes(rolls, wps, movements, reservations, reservation_fields
 
 
 def restore_reservations_for_order(order, user=None, reason_prefix="Order un-ship"):
-    """Reverse a shipped order's stock-out: add the consumed metres back
+    """Reverse a shipped order's stock-out: add the consumed meters back
     to each roll + WarehouseProduct, write StockMovement(in), and flip
     the reservation back to active (unconsumed). Used when an order
     moves OUT of 'shipped' (e.g. reverted to packing / cancelled)."""
@@ -6308,9 +6308,9 @@ def order_reservation_shortfalls(order):
     packing / ship.
 
     Rules:
-      * required metres = item.quantity, except custom-curtain lines,
-        which use their fabric-used metres when set (their quantity
-        counts curtains, not metres);
+      * required meters = item.quantity, except custom-curtain lines,
+        which use their fabric-used meters when set (their quantity
+        counts curtains, not meters);
       * items whose product has NO warehouse presence at all (nothing
         that could ever be scanned) are skipped, so catalog-only lines
         can't dead-end an order. Presence is checked at the level the
@@ -6429,7 +6429,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         the signature for caller compatibility but no longer enforced —
         the user explicitly wants cargo-less completion.);
       * entering 'packaging'/a shipped status does NOT require the
-        scanned reservations to cover the ordered metres — a mismatch
+        scanned reservations to cover the ordered meters — a mismatch
         between ordered and scanned quantity is allowed; the current account/
         invoice bill only the actually-scanned amount regardless (see
         Order.billable_value), so under/over-scanning can never
@@ -6506,12 +6506,12 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     # completion proceeds either way.
 
     # NOTE: entering 'packaging'/a shipped status used to require the
-    # scanned reservations to fully COVER every line's ordered metres
+    # scanned reservations to fully COVER every line's ordered meters
     # (order_reservation_shortfalls) — deliberately removed. Ordered vs.
     # actually-scanned quantity are allowed to disagree; the current account/invoice
     # already bill only what was really scanned (Order.billable_value),
     # so under- or over-scanning can never mis-charge the customer, and
-    # staff no longer get blocked from shipping over a metre mismatch.
+    # staff no longer get blocked from shipping over a meter mismatch.
 
     try:
         with _tx.atomic():
@@ -6526,7 +6526,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
             if entering_ship:
                 consume_reservations_for_order(order, user=user)
                 # Freeze what each line bills BEFORE anything reads it —
-                # after consumption (so it records the metres physically
+                # after consumption (so it records the meters physically
                 # cut) and before post_order_movement below. From here on
                 # this order's value is history, immune to warehouse
                 # stock arriving for its SKUs later. See
@@ -6636,7 +6636,7 @@ class WarehouseProductDetail(View):
         # This always does, by construction: in − out + corrections = stock.
         adjust_total = (product.quantity or _Dec("0")) - (in_total - out_total)
 
-        # Active (unconsumed) reservations = packed-but-not-shipped metres
+        # Active (unconsumed) reservations = packed-but-not-shipped meters
         # held against this product's rolls. Shown as a "Rezerv stok" card
         # and per-roll on the rolls list — each with the order it's held
         # for, so "Rezerv: 40 m" is traceable instead of a dead-end number.
@@ -6810,7 +6810,7 @@ def _decorate_movements(movements):
         return int(tail) if tail.isdigit() else None
 
     # Those pks resolved in one query. An order can be deleted while the
-    # ledger row recording the metres it moved stays — SET_NULL on the FK
+    # ledger row recording the meters it moved stays — SET_NULL on the FK
     # says so outright — and a link to an order that is gone is worse than
     # the plain text it replaced.
     _cand = {pk for pk in (_ref_pk(m.reference or "") for m in movements) if pk}
@@ -7200,7 +7200,7 @@ class WarehouseProductEdit(View):
         product.save(update_fields=list(set(update_fields)))
 
         # Log non-quantity edits (name/SKU/barcode/model/price) as a
-        # zero-metre adjustment so the activity feed shows every product
+        # zero-meter adjustment so the activity feed shows every product
         # change. Quantity overrides already logged their own movement.
         non_qty_changes = [c for c in changes if not c.startswith("qty ")]
         if non_qty_changes:
@@ -7542,7 +7542,7 @@ def _record_stock_out(product, roll, amount, *, purpose="", reference="", note="
         elif roll.quantity_remaining < (roll.quantity or Decimal("0")):
             roll.status = "partial"
         roll.save(update_fields=["quantity_remaining", "status"])
-        # Same rule as the roll edit: metres taken off by hand cannot
+        # Same rule as the roll edit: meters taken off by hand cannot
         # stay reserved for an order.
         trimmed = _clamp_reservations_to_roll(roll, user=user)
 
@@ -7684,10 +7684,10 @@ class WarehouseRollEdit(View):
                             "success": False,
                             "error": _gettext("This item is not on a received purchase, so there is "
                                               "no supplier to correct it with.")}, status=400)
-                    # The same line the purchase form draws: once metres
+                    # The same line the purchase form draws: once meters
                     # have gone out, the item's length is that shipment's
                     # record too.
-                    if _roll_metres_out(roll) > 0:
+                    if _roll_meters_out(roll) > 0:
                         return JsonResponse({
                             "success": False,
                             "error": _gettext("Some of this item has already gone out, so its "
@@ -7722,9 +7722,9 @@ class WarehouseRollEdit(View):
                 changes.append("quantity")
 
             if meters_changed:
-                # A shortened roll cannot keep holding the metres it no longer
+                # A shortened roll cannot keep holding the meters it no longer
                 # has. Without this the order goes on displaying the old reserved
-                # figure and the metres stay blocked for everyone else.
+                # figure and the meters stay blocked for everyone else.
                 trimmed = _clamp_reservations_to_roll(roll, user=request.user)
                 # ...and a roll sold whole takes its order with it when it turns
                 # out longer.

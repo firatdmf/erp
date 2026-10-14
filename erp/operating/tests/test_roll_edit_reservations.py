@@ -3,9 +3,9 @@
 
 """Correcting a roll's length carries the orders holding it along.
 
-A reservation keeps its OWN snapshot of the metres held, so shortening
+A reservation keeps its OWN snapshot of the meters held, so shortening
 the roll underneath it used to leave the order quoting a figure the roll
-could no longer honour — and the warehouse blocking those metres from
+could no longer honour — and the warehouse blocking those meters from
 everybody else until the discrepancy surfaced at ship time."""
 from decimal import Decimal
 from unittest.mock import patch
@@ -225,7 +225,7 @@ class RollEditTrimsReservations(TestCase):
 
     def test_a_line_built_from_rolls_follows_them_down(self):
         """There is no quantity box on the order form — the figure IS the
-        metres picked — so a shortened roll is arithmetic, not a decision."""
+        meters picked — so a shortened roll is arithmetic, not a decision."""
         order, res = self._order("DK0000309", Decimal("19.50"))
         item = order.items.first()
 
@@ -249,7 +249,7 @@ class RollEditTrimsReservations(TestCase):
         order.refresh_from_db()
         self.assertIn("entered by hand", order.internal_notes)
 
-    def test_outsourced_metres_survive_the_sync(self):
+    def test_outsourced_meters_survive_the_sync(self):
         """quantity = picked + outsourced; only the picked half moves."""
         order, res = self._order("DK0000311", Decimal("19.50"))
         item = order.items.first()
@@ -271,7 +271,7 @@ class RollEditTrimsReservations(TestCase):
         item.refresh_from_db()
         self.assertGreaterEqual(item.quantity, Decimal("0"))
 
-    def test_shipped_metres_still_refuse_the_edit(self):
+    def test_shipped_meters_still_refuse_the_edit(self):
         """Unchanged: outgoing history is a fact, not a soft hold."""
         self.roll.quantity_remaining = Decimal("7.50")   # 12.00 already gone
         self.roll.save(update_fields=["quantity_remaining"])

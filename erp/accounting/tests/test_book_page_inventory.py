@@ -36,10 +36,10 @@ class BookPageAssets(TestCase):
         user.member.save(update_fields=["default_book"])
         self.client.force_login(user)
 
-    def _item(self, metres, cost, product=None):
+    def _item(self, meters, cost, product=None):
         return WarehouseProductItem.objects.create(
-            product=product or self.wp, quantity=Decimal(metres),
-            quantity_remaining=Decimal(metres), barcode=f"BC-{metres}-{cost}",
+            product=product or self.wp, quantity=Decimal(meters),
+            quantity_remaining=Decimal(meters), barcode=f"BC-{meters}-{cost}",
             status="in_stock", unit_cost_base=cost)
 
     def _unpriced_product(self):

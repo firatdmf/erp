@@ -149,8 +149,8 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
         c.setFillColorRGB(0, 0, 0)
         c.setFont(bold, 12)
         # The unit goes on the label now that the warehouse holds more than
-        # fabric — "20.00" alone reads as metres to anyone who has only ever
-        # seen a roll tag, and a box of 20 curtain sets is not 20 metres.
+        # fabric — "20.00" alone reads as meters to anyone who has only ever
+        # seen a roll tag, and a box of 20 curtain sets is not 20 meters.
         c.drawRightString(W - 4 * mm, H - qsize - 13.5 * mm,
                           f"{float(quantity):.2f} {unit}".strip())
 

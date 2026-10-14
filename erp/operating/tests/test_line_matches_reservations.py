@@ -1,13 +1,13 @@
 # to run this test, use the command:
 # python manage.py test operating.test_line_matches_reservations
 
-"""A saved line quotes the metres actually held for it, not the metres
+"""A saved line quotes the meters actually held for it, not the meters
 the form hoped for.
 
 The browser works out a line's quantity from the rolls it believes are
 free; the server reserves each one against what the database really has
 at that instant. Between the page loading and the save landing, someone
-else can take the metres, the roll can be re-measured, or the barcode can
+else can take the meters, the roll can be re-measured, or the barcode can
 stop resolving — and every one of those used to leave the line quoting
 the browser's figure while holding less.
 """
@@ -120,7 +120,7 @@ class LineMatchesItsReservations(TestCase):
         item = Order.objects.get().items.get()
         self.assertEqual(item.quantity, Decimal("50.00"))
 
-    def test_outsourced_metres_are_kept_on_top(self):
+    def test_outsourced_meters_are_kept_on_top(self):
         """quantity = what is held + what is coming from elsewhere."""
         self.roll.quantity_remaining = Decimal("42.00")
         self.roll.save(update_fields=["quantity_remaining"])
@@ -148,7 +148,7 @@ class LineMatchesItsReservations(TestCase):
 
     def test_editing_an_order_warns_about_nothing(self):
         """The whole-order case: re-saving an edit form that changed no
-        metres must not produce a single 'reduced' line."""
+        meters must not produce a single 'reduced' line."""
         self._post([self._line(qty=50, roll_qty=50)])
         order = Order.objects.get()
 

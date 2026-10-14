@@ -861,7 +861,7 @@
                           data-purchase-price="{% if r.purchase_price is not None %}{{ r.purchase_price|stringformat:'.6f' }}{% endif %}"
                           data-purchase-currency="{{ r.purchase_currency }}"
                           {% endif %}
-                          {% comment %}Held metres and who holds them, so the edit box can
+                          {% comment %}Held meters and who holds them, so the edit box can
                           warn BEFORE saving that shortening this roll will trim
                           somebody's order down with it.{% endcomment %}
                           data-reserved="{{ r.reserved_m|default_if_none:0|stringformat:'.2f' }}"
@@ -1020,7 +1020,7 @@
             <span class="info-v">
               {% comment %}Weighted average of the stock on the floor, not the
               SKU's last-purchase price — see the view. Four decimals: a unit cost
-              of $1.9033 is not $1.90 once 27 metres are multiplied back in.{% endcomment %}
+              of $1.9033 is not $1.90 once 27 meters are multiplied back in.{% endcomment %}
               {% if product.avg_cost %}<span class="avg-cost">{{ cost_sign }}{{ product.avg_cost|money:4 }}</span>{% elif product.last_cost %}<span class="muted" title="{% trans "Last cost — none in stock" %}">{{ cost_sign }}{{ product.last_cost|money:4 }}</span>{% else %}<span class="muted">—</span>{% endif %}
             </span>
           </div>
@@ -1106,7 +1106,7 @@
     </div>
     {% comment %} The field is the roll's FULL length as received, and it arrives
        prefilled with exactly that. Without saying so, the obvious reading
-       of a bare "Meters" box on a part-used roll is "metres left" — so
+       of a bare "Meters" box on a part-used roll is "meters left" — so
        someone corrects 50 to 20 believing they are recording the remainder,
        and silently rewrites the roll's history instead. The hint states
        which number is being asked for, what has already gone out, and the
@@ -1210,7 +1210,7 @@
   // ── Bulk stock item selection ───────────────────────────────────────
   // What this product is counted in, rendered from the server so it is
   // already translated. The markup this file builds in JavaScript had "m"
-  // written into it, which read as metres over a box of curtain sets.
+  // written into it, which read as meters over a box of curtain sets.
   const PROD_UNIT = "{{ product.unit_short|escapejs }}";
   function pUnit(n) { return n + ' ' + PROD_UNIT; }
 
@@ -1330,12 +1330,12 @@
 
   // ── Roll edit ────────────────────────────────────────────────
   let _reRollId = null;
-  let _reOut = 0;            // metres already gone — fixed while editing
+  let _reOut = 0;            // meters already gone — fixed while editing
   let _reStoredTotal = 0;    // the length on record, for an empty box
-  let _reReserved = 0;       // metres held for orders that have not shipped
+  let _reReserved = 0;       // meters held for orders that have not shipped
   let _reReservedFor = '';   // which orders hold them
 
-  // Redrawn on every keystroke. Metres already out never move; what the typed
+  // Redrawn on every keystroke. Meters already out never move; what the typed
   // total changes is how much is LEFT, so the bar and the numbers follow the
   // box. Typing below the floor fills the bar red and shows 0 m left — the
   // same answer the server gives, without waiting for the round trip.
@@ -1463,7 +1463,7 @@
     document.getElementById('reNotes').value   = btn.dataset.notes || '';
     document.getElementById('reIsSecond').checked = btn.dataset.isSecond === '1';
 
-    // The floor is the metres already OUT, not the metres left: a roll cannot
+    // The floor is the meters already OUT, not the meters left: a roll cannot
     // have had more cut from it than it was ever long, so shortening it below
     // what shipped is what gets refused.
     _reStoredTotal = parseFloat(btn.dataset.quantity || '0') || 0;

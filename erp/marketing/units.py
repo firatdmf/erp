@@ -1,7 +1,7 @@
 """What a product is counted in and how its stock is packed.
 
 Both are facts about the main product: a white and a beige GREK are both
-metres of cloth on rolls, in every warehouse that holds them. So they live
+meters of cloth on rolls, in every warehouse that holds them. So they live
 once, on marketing.Product, and every warehouse row and screen reads them
 from there. They used to be stored per warehouse row as well, which let one
 product's variants disagree with no way to tell which was right.
@@ -25,13 +25,13 @@ UNIT_SHORT = {"mt": _("m"), "piece": _("pcs"),
 # no piece/pack distinction, so both are "units".
 UNIT_TO_STOREFRONT = {"mt": "mt", "kg": "kg", "piece": "units", "pack": "units"}
 
-# What the quantity COLUMN is headed. Metres of cloth are a length and kilos
+# What the quantity COLUMN is headed. Meters of cloth are a length and kilos
 # are a weight; a count of curtain sets is neither.
 QUANTITY_LABEL = {"mt": _("Length"), "kg": _("Weight")}
 
 # How a product's stock is PACKED — what one stock item physically is: a roll
 # of cloth, a box of curtain sets, a bale of waste. Separate from the unit on
-# purpose: metres can arrive on a bolt as easily as a roll, and pieces in a
+# purpose: meters can arrive on a bolt as easily as a roll, and pieces in a
 # bag as easily as a box.
 PACK_CHOICES = [
     ("roll", _("Roll")),
@@ -89,7 +89,7 @@ def pack_noun(pack_type, count):
     return one if count == 1 else many
 
 
-# Units that count interchangeable things. A metre of cloth comes off one
+# Units that count interchangeable things. A meter of cloth comes off one
 # particular roll, which has a barcode of its own; a duvet set is one of
 # many alike, and the barcode printed on it names the VARIANT — every set
 # of it carries the same one. So such a product is sold by a quantity and

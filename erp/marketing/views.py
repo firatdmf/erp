@@ -157,7 +157,7 @@ class ProductList(generic.ListView):
             variant_count=Count('variants'),
         ).order_by('title')
         # Stock is a warehouse subquery, not a join-and-Sum: summing across a
-        # second multi-valued join would multiply each variant's metres by the
+        # second multi-valued join would multiply each variant's meters by the
         # number of attributes prefetched alongside it.
         return with_product_live_quantity(queryset).annotate(
             total_stock=Coalesce(F('live_quantity'), Value(0, output_field=DecimalField())),
@@ -305,10 +305,10 @@ class ProductDetail(generic.DetailView):
             ),
             'collections',
             # The variants carry their own stock: annotated here so the
-            # table can print the metres the warehouse actually holds
+            # table can print the meters the warehouse actually holds
             # without a query per row.
             Prefetch('variants', queryset=with_live_quantity(ProductVariant.objects.all())),
-            # Where those metres are. The total spans every warehouse in
+            # Where those meters are. The total spans every warehouse in
             # every book — 75 variants stand in both Laleli's and Ergene's —
             # so the rows behind it come along to be named.
             Prefetch(

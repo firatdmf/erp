@@ -318,7 +318,7 @@
                 <span class="variant-availability">{% trans "Made to order" %}</span>
               {% elif variant.live_quantity > 0 %}
                 {% comment %}The number itself. This page is read by the people
-                who sell and cut the cloth, who need to know whether 40 metres
+                who sell and cut the cloth, who need to know whether 40 meters
                 are left — the storefront's "50+" hedge is for buyers, and it
                 called every variant under fifty "unavailable".{% endcomment %}
                 <span class="variant-availability"><b>{{ variant.live_quantity|floatformat:"-2g" }}</b> {{ product.unit_short }}</span>

@@ -39,14 +39,14 @@ def build_picking_groups(order):
     """One order's rolls, under the warehouse each stands in and the line
     it fills. Returns (warehouses, short):
 
-      warehouses — [{name, lines: [{item, rolls, metres}], roll_count, metres}]
+      warehouses — [{name, lines: [{item, rolls, meters}], roll_count, meters}]
                    by warehouse name; a line whose rolls stand in two
                    warehouses appears under each with that warehouse's rolls
       short      — [{item, needed, picked, missing}], the lines the
                    reserved rolls do not make up, in the order's line order
 
     A roll shipped already (its reservation consumed) has had the
-    reservation's metres taken off it, so they are added back: the sheet
+    reservation's meters taken off it, so they are added back: the sheet
     says what the roll held when it was picked.
     """
     from .views import build_order_print_rows
@@ -66,18 +66,18 @@ def build_picking_groups(order):
         take = r.quantity or Decimal("0")
         on_roll = (roll.quantity_remaining or Decimal("0")) + (take if r.consumed else 0)
         shelf = warehouses.setdefault(wh.pk if wh else None, SimpleNamespace(
-            name=getattr(wh, "name", "") or "", lines={}, roll_count=0, metres=Decimal("0")))
+            name=getattr(wh, "name", "") or "", lines={}, roll_count=0, meters=Decimal("0")))
         item = by_pk.get(r.order_item_id)
         line = shelf.lines.setdefault(r.order_item_id if item else ("loose", r.warehouse_product_id),
                                       SimpleNamespace(item=item, product=r.warehouse_product,
-                                                      rolls=[], metres=Decimal("0")))
+                                                      rolls=[], meters=Decimal("0")))
         line.rolls.append(SimpleNamespace(
             barcode=roll.barcode or f"#{roll.pk}", lot=roll.lot_number or "",
             on_roll=on_roll, take=take, whole=take >= on_roll))
-        line.metres += take
+        line.meters += take
         line.summary = line_summary(line)
         shelf.roll_count += 1
-        shelf.metres += take
+        shelf.meters += take
         if item:
             picked[item.pk] = picked.get(item.pk, Decimal("0")) + take
 
@@ -128,8 +128,8 @@ def line_summary(line):
     from django.utils.translation import gettext as _
     if line.item is None:
         return _("Not tied to a line")
-    return _("%(metres)s of %(needed)s %(unit)s") % {
-        "metres": f"{line.metres:,.2f}",
+    return _("%(meters)s of %(needed)s %(unit)s") % {
+        "meters": f"{line.meters:,.2f}",
         "needed": f"{line.item.quantity or 0:,.2f}",
         "unit": line.item.unit_short}
 
@@ -159,14 +159,14 @@ def order_picking_list(request, pk):
 
     order = get_object_or_404(Order, pk=pk)
     halves = split_halves(order)
-    groups, roll_count, metres, units = [], 0, Decimal("0"), set()
+    groups, roll_count, meters, units = [], 0, Decimal("0"), set()
     for half in halves:
         warehouses, short = build_picking_groups(half)
         groups.append({"order": half, "book": getattr(order_book(half), "name", ""),
                        "warehouses": warehouses, "short": short})
         for shelf in warehouses:
             roll_count += shelf.roll_count
-            metres += shelf.metres
+            meters += shelf.meters
             for line in shelf.lines:
                 units.add(line.item.unit_short if line.item else line.product.unit_short)
 
@@ -184,8 +184,8 @@ def order_picking_list(request, pk):
         "customer_id": customer_id_label(order),
         "carrier": order.get_carrier_display() if order.carrier else "",
         "roll_count": roll_count,
-        "total_metres": metres,
-        # One unit or none: "metres" across rolls and pieces is no total.
+        "total_meters": meters,
+        # One unit or none: "meters" across rolls and pieces is no total.
         "total_unit": units.pop() if len(units) == 1 else None,
         "qr": qr,
         "brand_line": brand_name_for(),

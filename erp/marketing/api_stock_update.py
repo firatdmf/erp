@@ -5,7 +5,7 @@ This endpoint used to add `quantity_change` to ProductVariant.variant_quantity
 (or Product.quantity) after an order was placed. Those columns are gone: a
 catalog product's stock is the sum of the WarehouseProduct rows behind its
 variants, read at the moment it is asked for, and the warehouse is the only
-place a metre is ever added or removed.
+place a meter is ever added or removed.
 
 So there is nothing here to write to, and the request is REFUSED rather than
 silently accepted — a caller that believed it had booked stock and had not

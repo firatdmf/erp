@@ -2,9 +2,9 @@
 column existed.
 
 Until now the create/edit order sidebar had nowhere to store the "depo
-dışı" metres, so it folded them into the line's description as
+dışı" meters, so it folded them into the line's description as
 "Depo dışı ilave: N m (not)". Billing never read that text — it bills
-SCANNED metres — which meant an outsourced line on a product that
+SCANNED meters — which meant an outsourced line on a product that
 happens to be stocked in a warehouse was indistinguishable from a line
 nobody had packed yet and silently vanished from the invoice and the
 customer's current account.
@@ -75,7 +75,7 @@ class Command(BaseCommand):
             try:
                 qty = Decimal(m.group(1).replace(",", "."))
             except (InvalidOperation, ValueError):
-                self.stderr.write(f"  ! item {it.pk}: unparsable metres {m.group(1)!r}")
+                self.stderr.write(f"  ! item {it.pk}: unparsable meters {m.group(1)!r}")
                 continue
             note = (m.group(2) or "").strip()
             new_desc = it.description
@@ -141,7 +141,7 @@ class Command(BaseCommand):
                     f"{sku:<22} qty={it.quantity} x {it.price} = {value} unbilled"
                 )
             self.stdout.write(
-                "  → set outsourced_quantity on these by hand if the metres were "
+                "  → set outsourced_quantity on these by hand if the meters were "
                 "sourced outside the warehouse, or scan/reserve the rolls if they "
                 "came out of stock."
             )

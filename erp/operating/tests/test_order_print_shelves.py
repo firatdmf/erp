@@ -51,14 +51,14 @@ class OrderPrintShelvesTest(TestCase):
         return OrderItem.objects.create(order=order, product=self.product,
                                         quantity=Decimal(qty), price=Decimal(price))
 
-    def _hold(self, line, barcode, metres, warehouse, book):
+    def _hold(self, line, barcode, meters, warehouse, book):
         wh, _ = Warehouse.objects.get_or_create(name=warehouse, accounting_book=book)
         wp, _ = WarehouseProduct.objects.get_or_create(warehouse=wh, sku="KRP", defaults={"name": "Krep"})
         roll = WarehouseProductItem.objects.create(
-            product=wp, quantity=Decimal(metres), quantity_remaining=Decimal(metres),
+            product=wp, quantity=Decimal(meters), quantity_remaining=Decimal(meters),
             barcode=barcode, status="in_stock")
         OrderStockReservation.objects.create(order=line.order, order_item=line, stock_item=roll,
-                                             warehouse_product=wp, quantity=Decimal(metres))
+                                             warehouse_product=wp, quantity=Decimal(meters))
 
     def _rows(self, response):
         body = response.content.decode()

@@ -750,7 +750,7 @@ class ProductVariant(models.Model):
         point. The column had five separate writers (intake, order
         deductions, CSV, the stock API, a reconciler) which is how 181 rows
         drifted out of step and 1,507 variants with no warehouse row behind
-        them ended up advertising 31,533 metres that did not exist.
+        them ended up advertising 31,533 meters that did not exist.
 
         One query per access — fine for a handful of variants. For lists use
         with_live_quantity() below, which resolves it in the same query and
@@ -890,7 +890,7 @@ class SupplierItem(models.Model):
 
     # ── How their unit relates to ours ────────────────────────────
     # They sell a box of 12 and we stock singles; they quote yards and we
-    # hold metres. Without this every price comparison below is a lie and
+    # hold meters. Without this every price comparison below is a lie and
     # a scanned quantity lands wrong. 1 means "same unit as ours".
     supplier_unit = models.CharField(
         max_length=20, blank=True,

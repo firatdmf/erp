@@ -7,7 +7,7 @@ cover sets, bathrobes and satin 300TC sets, the "product" titles are company
 names (GÜRSAN, DOĞRUYOL, NURPAK, PENTA, CRETON, ÇEŞTEPE, HASPEN), and most
 carry EAN-13 retail barcodes. It reads as a supplier or trade-fair price list
 loaded into the catalog. `unit_of_measurement` is "mt" on every one of them —
-metres, for bathrobes — which is the tell of a bulk load that took the default.
+meters, for bathrobes — which is the tell of a bulk load that took the default.
 
 They are inert but they are 68% of the variant table, so they distort every
 count anyone runs.

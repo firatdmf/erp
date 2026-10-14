@@ -58,7 +58,7 @@ class ConvertLinesTest(TestCase):
         self.assertEqual(out[0]["currency"], "USD")
 
     def test_the_unit_price_is_not_rounded_to_cents(self):
-        """A cent rounded off a UNIT price comes back multiplied by metres.
+        """A cent rounded off a UNIT price comes back multiplied by meters.
         TRY 100.00/m at 0.02077833 held as $2.08 bills $913.95 for a 439.40 m
         line whose true cost is $913.00."""
         from accounting.models_accounts import InvoiceItem

@@ -8,7 +8,7 @@ from the catalog's own `cost` column.
 That column is a number nobody maintains: it is set once, by hand, and
 then the same fabric is bought again at a different price and it says
 nothing true. The shelf's cost is stamped when the goods are received,
-and is what those metres actually cost. If the figure is going to be
+and is what those meters actually cost. If the figure is going to be
 typed into an order and quoted at a customer, it should be the one that
 came from a purchase.
 
@@ -106,7 +106,7 @@ class TheCostComesOffTheShelf(TestCase):
         """Shelves disagree because two businesses each bought the
         fabric — 48 variants in this catalogue do. One number in the
         corner has to pick a side and then says nothing about the other,
-        so each chip carries the cost of the metres beside it."""
+        so each chip carries the cost of the meters beside it."""
         self._shelf("Laleli depo", cost_usd=Decimal("2.40"))
         self._shelf("Laleli depo 2", cost_usd=Decimal("3.10"))
         row = row_for(self._search(), SKU)

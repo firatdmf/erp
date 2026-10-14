@@ -68,12 +68,12 @@ class DryRunPredictsTheApplyRunTest(TestCase):
         self.assertEqual(parent.title, "K12504")
         self.assertFalse(parent.featured, "auto-created parents stay off the site")
         # Stock is not copied anywhere: linking the seven warehouse rows IS
-        # the product's 7 x 10.00 metres.
+        # the product's 7 x 10.00 meters.
         self.assertEqual(parent.live_quantity, Decimal("70.00"))
         self.assertFalse(
             WarehouseProduct.objects.filter(catalog_variant=None).exists())
 
-    def test_the_new_parent_is_typed_fabric_in_metres_on_rolls(self):
+    def test_the_new_parent_is_typed_fabric_in_meters_on_rolls(self):
         """The Ergene import's 380 products came out of here with no type,
         and every invoice line for them showed a blank one."""
         from marketing.models import ProductCategory
@@ -281,7 +281,7 @@ class LinkedRowIsNotRematchedTest(TestCase):
     """Sable ecru sits on the shelf under a mill's code, "3002", linked to
     our variant LZK0000120 — and "3002" happens to be the SKU of the WHITE
     variant. Matching rows to variants by SKU text on every run wanted the
-    ecru metres on the white variant, and a second white variant minted for
+    ecru meters on the white variant, and a second white variant minted for
     the row whose code is "3002-Beyaz". A link somebody made is not
     overruled by a coincidence of codes; the run says so and moves on.
     """

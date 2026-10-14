@@ -240,7 +240,7 @@ class JournalLine(models.Model):
     # amount because that is how a ledger is read, and because "which side"
     # then cannot be lost to a sign flip somewhere upstream.
     #
-    # Six decimals, not two, because stock is valued at metres (two
+    # Six decimals, not two, because stock is valued at meters (two
     # decimals) times unit cost (four), and a roll's cost is often not a
     # whole number of cents: 20.70 m at 3.35 is 69.345. Posted to the cent,
     # each such roll left half a cent between Inventory (1300) and the

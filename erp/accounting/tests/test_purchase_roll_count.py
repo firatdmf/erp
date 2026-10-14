@@ -18,7 +18,7 @@ class PurchaseLineRollCountTest(TestCase):
     """Each purchased line says how many rolls it came in as.
 
     The receiver counts the rolls on the pallet before reading a single
-    barcode, and the metres on the line do not tell them what number to
+    barcode, and the meters on the line do not tell them what number to
     expect — the same 55 m can be two rolls or five. A line of fitted
     sheets is counted in boxes, not rolls: the page names the stock items
     by the product's own pack.
@@ -45,13 +45,13 @@ class PurchaseLineRollCountTest(TestCase):
             warehouse=self.wh, name="K24644 G07", sku="K24644.G07",
             quantity=Decimal("95.00"))
 
-    def _line(self, line_no, metres, product=None, stock=None, unit="mt"):
+    def _line(self, line_no, meters, product=None, stock=None, unit="mt"):
         item = InvoiceItem.objects.create(
             invoice=self.invoice, line_no=line_no, description=f"Line {line_no}",
-            quantity=sum(metres), unit=unit, unit_price=Decimal("3.50"),
+            quantity=sum(meters), unit=unit, unit_price=Decimal("3.50"),
             product=product,
         )
-        for i, m in enumerate(metres, 1):
+        for i, m in enumerate(meters, 1):
             WarehouseProductItem.objects.create(
                 product=stock or self.product, quantity=m,
                 barcode=f"KRV{line_no}{i:06d}", purchase_invoice_item=item)
@@ -137,7 +137,7 @@ class DraftPurchaseExpectedRollsTest(TestCase):
                 "variants": [
                     {"sku": "MRK0013", "name": "ecru", "price": "2.50",
                      "tops": [{"qty": 30, "barcode": ""}, {"qty": "27,5", "barcode": ""}]},
-                    # No metres entered: no line, so it must not shift the
+                    # No meters entered: no line, so it must not shift the
                     # next variant's rolls onto the wrong line.
                     {"sku": "MRK0014", "name": "white", "price": "2.50",
                      "tops": [{"qty": "", "barcode": ""}]},

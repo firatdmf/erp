@@ -48,7 +48,7 @@ class RollDeleteKeepsCatalogInStepTest(TestCase):
 
     def test_both_sides_come_down_together(self):
         """There are no longer two sides to keep in step: the variant reads
-        the warehouse row, so dropping the row's metres IS the catalog
+        the warehouse row, so dropping the row's meters IS the catalog
         coming down. Kept as a test because that equivalence is the point."""
         r = self._delete(self.stock_item)
         self.assertEqual(r.status_code, 200, r.content)

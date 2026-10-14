@@ -61,7 +61,7 @@ class OrderAdmin(admin.ModelAdmin):
 
 
 class StockMovementAdmin(admin.ModelAdmin):
-    """Raw view of the stock ledger — every metre in or out, with what
+    """Raw view of the stock ledger — every meter in or out, with what
     caused it. The app's own screens (product detail → Stock movements)
     show the same rows formatted; this is for searching across them."""
     list_display = ["created_at", "movement_type", "quantity", "product",

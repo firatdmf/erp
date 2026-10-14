@@ -59,7 +59,7 @@
      came in as. Split over two rows the reader had to pair the factors
      with the result themselves; the roll count sits with the figures
      because it is the first thing counted against the pallet, and the
-     metres alone do not say how many rolls there are. */
+     meters alone do not say how many rolls there are. */
   .po-item-figures { display:flex; flex-direction: column; align-items: flex-end; gap: 4px; }
   .po-item-eq { font: 500 12.5px var(--font-sans); color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .po-item-eq b { color: var(--gray-700); }
@@ -237,7 +237,7 @@
     {% endif %}
 
     {% if it.planned_rolls %}
-    {% comment %}Not received yet: the rolls the order expects, at the metres the
+    {% comment %}Not received yet: the rolls the order expects, at the meters the
        supplier quoted — the real ones replace them on confirmation.{% endcomment %}
     <div class="po-rolls-h">
       <i data-lucide="layers"></i> {% blocktrans with noun=it.pack_many %}Expected {{ noun }} — approximate{% endblocktrans %}

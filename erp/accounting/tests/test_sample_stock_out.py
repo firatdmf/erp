@@ -122,7 +122,7 @@ class SampleStockOut(TestCase):
 
 class TakeOutLivesOnTheItem(TestCase):
     """Stock-out is recorded from the item's own pop-up, which speaks the
-    product's packaging — a box of curtain sets is not a roll of metres.
+    product's packaging — a box of curtain sets is not a roll of meters.
     It is asked for when the item's quantity is changed there, not laid out
     beside it (test_roll_change_reason)."""
 

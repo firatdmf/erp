@@ -163,7 +163,7 @@ class OrderPickingListTest(TestCase):
     def test_a_shipped_roll_prints_what_it_held(self):
         order = self._order(self.laleli, "ORD-7")
         self._hold(self._line(order, "20"), "R-800", "20", "Laleli", self.laleli)
-        # Shipping takes the metres off the roll and consumes the hold.
+        # Shipping takes the meters off the roll and consumes the hold.
         r = order.stock_reservations.get()
         r.stock_item.quantity_remaining = Decimal("0")
         r.stock_item.save()

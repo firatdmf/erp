@@ -122,7 +122,7 @@ class OrderEditAuditNoise(TestCase):
 
         The figures matter: 75 and 2.5 are exact in binary, so Decimal
         and float agree on them and the bug never shows. 75.3 and 2.7 are
-        not, which is the ordinary case for metres and prices."""
+        not, which is the ordinary case for meters and prices."""
         self.client.post(reverse("operating:create_order"), self._form([
             self._line(qty=75.3, price=2.7, rolls=False) | {"outsourced": 75.3}]))
         order = Order.objects.get()

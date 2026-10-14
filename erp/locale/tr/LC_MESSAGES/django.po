@@ -11571,8 +11571,8 @@ msgstr "Kesilecek"
 
 #: operating/templates/operating/order_picking_list.html
 #, python-format
-msgid "%(metres)s of %(needed)s %(unit)s"
-msgstr "%(metres)s / %(needed)s %(unit)s"
+msgid "%(meters)s of %(needed)s %(unit)s"
+msgstr "%(meters)s / %(needed)s %(unit)s"
 
 #: operating/templates/operating/order_picking_list.html
 msgid "Not tied to a line"
@@ -11657,8 +11657,8 @@ msgstr "Sipariş güncellenemedi: %(error)s"
 
 #: hardcoded Turkish moved to the catalogue as written
 #, python-format
-msgid "This stock item is reserved — %(metres)s m is held for another order (%(ref)s)."
-msgstr "Bu stock item rezerve durumunda — %(metres)s m başka sipariş için ayrılmış (%(ref)s)."
+msgid "This stock item is reserved — %(meters)s m is held for another order (%(ref)s)."
+msgstr "Bu stock item rezerve durumunda — %(meters)s m başka sipariş için ayrılmış (%(ref)s)."
 
 #: hardcoded Turkish moved to the catalogue as written
 msgid "(existing)"
@@ -11696,8 +11696,8 @@ msgstr "%(count)s tamamlanmış sipariş silinmedi — önce sipariş detayında
 
 #: hardcoded Turkish moved to the catalogue as written
 #, python-format
-msgid "%(metres)s m has already gone out of this roll — its length can't be shorter than that. Correct the shipment or the stock-out first."
-msgstr "Bu toptan %(metres)s m çıkış yapılmış — uzunluk bundan kısa olamaz. Önce ilgili sevkiyatı veya stok çıkışını düzeltin."
+msgid "%(meters)s m has already gone out of this roll — its length can't be shorter than that. Correct the shipment or the stock-out first."
+msgstr "Bu toptan %(meters)s m çıkış yapılmış — uzunluk bundan kısa olamaz. Önce ilgili sevkiyatı veya stok çıkışını düzeltin."
 
 #: hardcoded Turkish moved to the catalogue as written
 #, python-format

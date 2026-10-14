@@ -20,7 +20,7 @@ class LiveQuantityTest(TestCase):
     """A variant's stock is what the warehouse holds, read at the moment it
     is asked for. There is no stored counterpart any more — the column had
     five writers, which is how 181 rows drifted out of step and 1,507
-    variants with nothing behind them advertised 31,533 metres that did not
+    variants with nothing behind them advertised 31,533 meters that did not
     exist.
     """
 
@@ -115,7 +115,7 @@ class ProductLiveQuantityTest(TestCase):
 
     def test_the_annotation_does_not_multiply_by_a_second_join(self):
         """Summing across variants with anything else multi-valued joined in
-        would count each variant's metres once per joined row. A subquery
+        would count each variant's meters once per joined row. A subquery
         cannot, which is why it is one."""
         from django.db.models import Count
         self._stocked("K12504.G50", "10.00")

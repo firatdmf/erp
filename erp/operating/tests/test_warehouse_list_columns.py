@@ -57,10 +57,10 @@ class UnitCostIsTheWeightedAverage(TestCase):
         user.member.save()
         self.client.force_login(user)
 
-    def _top(self, metres, cost, code):
+    def _top(self, meters, cost, code):
         return WarehouseProductItem.objects.create(
-            product=self.wp, quantity=Decimal(metres),
-            quantity_remaining=Decimal(metres), barcode=f"BC-{code}",
+            product=self.wp, quantity=Decimal(meters),
+            quantity_remaining=Decimal(meters), barcode=f"BC-{code}",
             status="in_stock",
             unit_cost_base=Decimal(cost) if cost is not None else None)
 
@@ -70,7 +70,7 @@ class UnitCostIsTheWeightedAverage(TestCase):
         self.assertEqual(resp.status_code, 200)
         return resp.content.decode()
 
-    def test_it_averages_by_metre_not_by_stock_item(self):
+    def test_it_averages_by_meter_not_by_stock_item(self):
         """A 5 m remnant must not weigh as much as a 295 m bolt."""
         self._top("295", "4.00", "a")
         self._top("5", "20.00", "b")

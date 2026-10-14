@@ -26,12 +26,12 @@ class PurchaseEditBilledQuantityTest(base.TestCase):
     _variant = base.ReceivedPurchaseEditTest._variant
     _save = base.ReceivedPurchaseEditTest._save
 
-    def _cut_on_warehouse_page(self, barcode, metres):
+    def _cut_on_warehouse_page(self, barcode, meters):
         roll = self._roll(barcode)
         r = self.client.post(
             reverse("operating:warehouse_roll_edit",
                     args=[self.wh.pk, roll.product_id, roll.pk]),
-            data={"barcode": roll.barcode, "quantity": str(metres)})
+            data={"barcode": roll.barcode, "quantity": str(meters)})
         self.assertTrue(r.json()["success"], r.json())
 
     def _line(self):

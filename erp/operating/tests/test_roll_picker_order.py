@@ -138,7 +138,7 @@ class RollPicker(TestCase):
             [r["barcode"] for r in self._list(book=str(self.laleli.pk))], [])
 
     # --- cost -------------------------------------------------------
-    def test_each_item_carries_its_cost_per_metre(self):
+    def test_each_item_carries_its_cost_per_meter(self):
         self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-PRICED")
         self._top(self._shelf(self.ergene, None), "BC-UNKNOWN")
         resp = self.client.get(reverse("operating:order_create_roll_list"), {"sku": SKU})
@@ -159,7 +159,7 @@ class RollPicker(TestCase):
         # 2.40 × 1.10 = 2.64, up to the next 0.05.
         self.assertEqual(data["rolls"][0]["unit_price"], 2.65)
 
-    def test_a_pack_product_is_not_counted_in_metres(self):
+    def test_a_pack_product_is_not_counted_in_meters(self):
         self._top(self._shelf(self.ergene, Decimal("12.00")), "BC-BOX")
         self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-ROLL")
         self.assertEqual({r["unit"] for r in self._list()}, {"m"})

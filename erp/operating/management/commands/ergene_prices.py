@@ -13,7 +13,7 @@ and the stock items' barcodes, so a human can tell which fabric is being quoted;
 the reader ignores them, and finds FIYAT by its header rather than its
 position so the extra columns cannot shift it out from under itself.
 
-Prices are per metre in USD, matching `import_ergene_stock`. A row with no
+Prices are per meter in USD, matching `import_ergene_stock`. A row with no
 FIYAT is passed over rather than treated as zero — an unquoted pattern stays
 unpriced instead of silently becoming free.
 
@@ -234,7 +234,7 @@ class Command(BaseCommand):
                                  "had one:"))
             for sku, was, cur, now, qty in sorted(s["changed"]):
                 w(f"    {sku:18} {was} {cur or '?'} -> {now} {PRICE_CURRENCY}"
-                  f"  per metre, x {qty} m")
+                  f"  per meter, x {qty} m")
         if s["unknown"]:
             w(self.style.WARNING(
                 f"\n  {len(s['unknown'])} patterns in the file are not in this "

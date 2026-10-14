@@ -68,7 +68,7 @@
     background:#F1F5F9;border-radius:6px;padding:1px 6px;display:inline-block;margin-top:3px;
     max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
-  /* Reserved metres, read-only. How much of a roll this order takes is
+  /* Reserved meters, read-only. How much of a roll this order takes is
      a commercial decision — it is the invoiced quantity (see
      Order.billable_value) — so it is set on the order form, where the
      same roll list offers the scissors. Packing only READS it: a row
@@ -254,7 +254,7 @@
     display:inline-flex;align-items:center;justify-content:center;font:800 12px var(--pk-font);flex-shrink:0;}
   .pk-pack-title{font-weight:700;font-size:13px;}
   .pk-pack-meta{margin-left:auto;font-size:11px;color:var(--pk-gray);font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums;}
-  /* The metres are the figure a packer reads off the header — the
+  /* The meters are the figure a packer reads off the header — the
      quantity that ends up on the packing list — so they carry the
      colour while the counts stay grey. */
   .pk-pack-meta [data-meters]{color:var(--pk-teal-700);font-weight:800;}
@@ -676,7 +676,7 @@
   // Every roll row, wherever it sits (a product group or a package) —
   // used for count/total refresh and for locating rows by id.
   // Excludes .pk-citem (untracked/catalog-item rows) — those aren't
-  // physical stock items, so they don't belong in the roll count/metre total
+  // physical stock items, so they don't belong in the roll count/meter total
   // or the "at least one scan" gate. They're regrouped separately below.
   function allRows(){ return document.querySelectorAll('.pk-row:not(.pk-citem)'); }
   function allCatalogRows(){ return document.querySelectorAll('.pk-citem'); }
@@ -793,8 +793,8 @@
     });
     var allPacked = document.querySelector('[data-all-packed]');
     if (allPacked) allPacked.hidden = !(loose === 0 && allRows().length > 0);
-    // Per-package header: how many stock items, how many metres they carry, and
-    // how many untracked lines sit beside them. Metres come from each
+    // Per-package header: how many stock items, how many meters they carry, and
+    // how many untracked lines sit beside them. Meters come from each
     // row's data-meters — the reserved (possibly partially cut) length,
     // which is what is really in the sack, not the roll's full length.
     document.querySelectorAll('.pk-pack').forEach(function(pack){

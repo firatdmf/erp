@@ -65,7 +65,7 @@ class ProductAutocompleteBreadthTest(TestCase):
 
 
 class AutocompleteOffersOnlyFreeStockTest(TestCase):
-    """Metres already reserved into another order are spoken for.
+    """Meters already reserved into another order are spoken for.
 
     The list showed what was on the shelf, so a roll fully reserved for one
     order still advertised its full length to the next — which is how the
@@ -102,7 +102,7 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
     def test_unreserved_stock_is_offered_in_full(self):
         self.assertIn("30", self._stock_shown())
 
-    def test_reserved_metres_are_not_offered(self):
+    def test_reserved_meters_are_not_offered(self):
         self.OrderStockReservation.objects.create(
             order=self.order, stock_item=self.stock_item, warehouse_product=self.wp,
             quantity=Decimal("30"), consumed=False)

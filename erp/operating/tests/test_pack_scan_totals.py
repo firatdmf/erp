@@ -2,7 +2,7 @@
 # python manage.py test operating.test_pack_scan_totals
 
 """The packing screen's package headers: how many stock items are in a sack and
-how many metres they carry."""
+how many meters they carry."""
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -61,7 +61,7 @@ class PackHeaderTotals(TestCase):
         self.assertEqual(resp.status_code, 200)
         return resp, {p.pack_number: p for p in resp.context["packs"]}
 
-    def test_each_package_carries_its_own_stock_and_metres(self):
+    def test_each_package_carries_its_own_stock_and_meters(self):
         _, packs = self._packs()
         self.assertEqual(packs[1].roll_count, 2)
         self.assertEqual(packs[1].total_meters, Decimal("52.50"))
@@ -80,9 +80,9 @@ class PackHeaderTotals(TestCase):
         self.assertEqual(sum(p.total_meters for p in packs.values()),
                          Decimal("77.50"))
 
-    def test_an_untracked_line_is_counted_apart_from_the_metres(self):
+    def test_an_untracked_line_is_counted_apart_from_the_meters(self):
         # A trade good with no warehouse entry: physically in the sack, but
-        # its quantity is pieces — summing it into the metres would produce
+        # its quantity is pieces — summing it into the meters would produce
         # a number that means nothing.
         trade = Product.objects.create(title="Kutu", sku="KUT-1", price=5)
         OrderItem.objects.create(order=self.order, product=trade,
@@ -100,7 +100,7 @@ class PackHeaderTotals(TestCase):
         self.assertEqual(packs[3].total_meters, Decimal("0"))
         self.assertEqual(packs[3].item_count, 0)
 
-    def test_the_header_prints_the_metres(self):
+    def test_the_header_prints_the_meters(self):
         resp, _ = self._packs()
         self.assertContains(resp, '<span data-meters>52.50</span> m', html=False)
 
@@ -159,14 +159,14 @@ class ReachingAPackageWithoutDragging(TestCase):
         self.assertNotIn("Scanned rolls", html)
 
     def test_packing_cannot_cut_a_roll(self):
-        """Reserved metres are the invoiced quantity, so they are set on the
+        """Reserved meters are the invoiced quantity, so they are set on the
         order form — packing only reads them. The figure stays: it is the
         packer's instruction to cut 13 m off a 35 m roll."""
         html = self._html()
         self.assertNotIn("pk-scissors", html)
         self.assertNotIn("pk-cut-edit", html)
         self.assertNotIn("order_pack_reserve_update", html)
-        self.assertIn("pk-cut-val", html)         # the metres are still shown
+        self.assertIn("pk-cut-val", html)         # the meters are still shown
 
     def test_no_fixed_bar_sits_across_the_bottom_of_the_page(self):
         """It ran under the fixed sidebar, which painted over its text; the

@@ -16,7 +16,7 @@ from accounting.models import Book, CurrencyCategory
 from crm.models import Contact
 from marketing.models import Product, ProductVariant, Quote
 
-PRINTED = "Prices per metre in USD."
+PRINTED = "Prices per meter in USD."
 INTERNAL = "Everything at cost: $9,973.76"
 
 

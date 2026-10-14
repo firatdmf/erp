@@ -386,7 +386,7 @@ class ReceivedPurchaseEditTest(TestCase):
         return Invoice.objects.get(pk=invoice_id)
 
     def test_an_existing_product_with_stock_keeps_its_unit(self):
-        """Its rolls are metres; a card saying pieces must not make this
+        """Its rolls are meters; a card saying pieces must not make this
         delivery's line say pieces over the same goods."""
         second = self._receive_more(self._product())
         product = self._product()

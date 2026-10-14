@@ -3,7 +3,7 @@
 `_inventory_value` counts an item at its own stamp, then the purchase line
 it arrived on, then the product's current cost. Five rolls in Ergene
 Fabrika have none of the three — each is the only item on its product, and
-that product's cost_usd is null — so 95.42 metres of real fabric is counted
+that product's cost_usd is null — so 95.42 meters of real fabric is counted
 in the unvalued column and valued at nothing:
 
     23066  K12566.T26    2000045488403  20.10m  MAMUL DEPO · 2. kalite
@@ -35,7 +35,7 @@ Equity for the same reason as the rest of the opening stock — this fabric
 was always on the shelf, nobody bought it just now; all that changed is
 that somebody finally said what it was worth.
 
-$1.00/metre is a decision about these five rolls, not a rule about seconds.
+$1.00/meter is a decision about these five rolls, not a rule about seconds.
 Pass --rate to say otherwise.
 
 Idempotent: an item that already carries a stamp is left alone, and the
@@ -74,7 +74,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--rate", default="1.00",
-                            help="Cost per metre (default 1.00).")
+                            help="Cost per meter (default 1.00).")
         parser.add_argument("--date", default="2026-09-21",
                             help="Entry date (default today's cutover).")
         parser.add_argument("--apply", action="store_true",
@@ -114,7 +114,7 @@ class Command(BaseCommand):
                     f"is not {book.name}'s.")
 
         total = Decimal("0.00")
-        w(f"{book.name} — costing at {rate}/metre\n")
+        w(f"{book.name} — costing at {rate}/meter\n")
         stamped = []
         for pk in sorted(found):
             item = found[pk]

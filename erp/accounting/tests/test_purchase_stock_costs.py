@@ -108,7 +108,7 @@ class ReceivedLiraPurchaseTest(TestCase):
         self.assertTrue(confirm["success"], confirm)
         wp = WarehouseProduct.objects.get(sku="GRK77.B")
         self.assertEqual((wp.cost_usd, wp.cost_try), (Decimal("100.0000"), Decimal("4100.0000")))
-        # The invoice booked ₺4,100 a metre — the same rate.
+        # The invoice booked ₺4,100 a meter — the same rate.
         self.assertEqual(Invoice.objects.get(pk=invoice_id).items.get().unit_price,
                          Decimal("4100.000000"))
 

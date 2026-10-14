@@ -31,13 +31,13 @@ class PrintedQuoteSectionsTest(TestCase):
             username="firat_qp", password="pw", email="a@b.c")
         self.client.force_login(admin)
 
-    def _roll(self, barcode, metres, book, warehouse):
+    def _roll(self, barcode, meters, book, warehouse):
         wh, _ = Warehouse.objects.get_or_create(name=warehouse, accounting_book=book)
         wp, _ = WarehouseProduct.objects.get_or_create(
             warehouse=wh, catalog_variant=self.variant,
             defaults={"name": "Velvet", "sku": self.variant.variant_sku})
         return WarehouseProductItem.objects.create(
-            product=wp, quantity=Decimal(metres), quantity_remaining=Decimal(metres),
+            product=wp, quantity=Decimal(meters), quantity_remaining=Decimal(meters),
             barcode=barcode, status="in_stock")
 
     def _quote(self, *lines):
@@ -82,7 +82,7 @@ class PrintedQuoteSectionsTest(TestCase):
         self.assertIn("$85.00", heads[5][1])
 
         # The Laleli line prints under each warehouse with that shelf's
-        # rolls and metres, not the whole line twice.
+        # rolls and meters, not the whole line twice.
         lines = [text for cls, text in rows if not cls]
         self.assertEqual(len(lines), 3)
         self.assertIn("5 m 1 roll", lines[1]); self.assertIn("$15.00", lines[1])

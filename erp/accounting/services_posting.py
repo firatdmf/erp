@@ -228,7 +228,7 @@ def _purchase_stock_value(movement, owed):
     """What this purchase's rolls are carried at, when that is `owed` give
     or take the rounding of its lines. None otherwise.
 
-    The supplier is owed whole cents; a roll is carried at metres times
+    The supplier is owed whole cents; a roll is carried at meters times
     unit cost, which is often not (62.37 m at 3.40 is 212.058, billed
     212.06). Posting the billed figure to Inventory (1300) leaves that
     fraction between the ledger and the shelves, the same way a shipment
@@ -1159,7 +1159,7 @@ def chart_of_accounts(book):
 # underneath it, and every sale showed its revenue against no cost at all.
 #
 # Keyed on StockMovement, the row the warehouse already writes for every
-# change in stock: it names the item, the metres and the reason, so the
+# change in stock: it names the item, the meters and the reason, so the
 # entry can be valued at what that very roll cost rather than at an average
 # nobody would recognise.
 #

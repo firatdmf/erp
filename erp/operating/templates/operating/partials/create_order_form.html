@@ -751,7 +751,7 @@
 <script>
 (function() {
   let orderItems = [], itemIndex = 0;
-  // Perakende (retail) orders capture roll barcode + cut metres right
+  // Perakende (retail) orders capture roll barcode + cut meters right
   // on the create/edit form instead of a later packing-scan visit —
   // reflects the order's persisted is_retail_order flag (edit mode) or
   // false for a brand new order until the Perakende quick-pick is used.
@@ -779,7 +779,7 @@
                    warehouse: r.warehouse || '', book_id: r.book_id || null, book: r.book || '',
                    quantity: parseFloat(r.quantity) || 0, available: parseFloat(r.available) || 0 };
         });
-        // Out-of-warehouse metres come straight off the saved line
+        // Out-of-warehouse meters come straight off the saved line
         // (OrderItem.outsourced_quantity). Legacy lines saved before that
         // column existed carry null — fall back to "quantity minus the
         // reserved rolls", which is what the number used to mean
@@ -829,7 +829,7 @@
           availableRolls: [], rollsLoading: true,
           manualMeters: manual || 0, manualNote: '',
           // Keep the section open when it holds a value, otherwise a line
-          // that also has stock items would hide its out-of-warehouse metres.
+          // that also has stock items would hide its out-of-warehouse meters.
           showManualEntry: manual > 0
         });
         if (it.sku) editHydratedItems.push({ stableIndex: stableIndex, sku: it.sku });
@@ -1663,11 +1663,11 @@
       });
   }
 
-  // `force` = the user just changed the stock items or the outsourced metres, so
+  // `force` = the user just changed the stock items or the outsourced meters, so
   // the sum IS the quantity even when it drops to zero. Without it,
-  // clearing the last stock item / the metres box left the previous quantity
+  // clearing the last stock item / the meters box left the previous quantity
   // behind. The unforced call is hydration only: a legacy item with no
-  // reservations and no metres keeps its original hand-typed quantity.
+  // reservations and no meters keeps its original hand-typed quantity.
   function syncQtyFromRolls(i, force) {
     var item = orderItems[i];
     if (!item) return;
@@ -1696,8 +1696,8 @@
     return seen;
   }
 
-  // What each book's share of the order comes to — the metres picked off
-  // its shelves at the line's own price. Outsourced metres have no shelf
+  // What each book's share of the order comes to — the meters picked off
+  // its shelves at the line's own price. Outsourced meters have no shelf
   // to read, so they sit with the book the form is working in, which is
   // where the save puts them too.
   function coBookTotals() {
@@ -1881,7 +1881,7 @@
   //    (read-only). Click a row to toggle it; scan/type a barcode
   //    (camera icon included) also adds one straight away. Each newly
   //    picked stock item defaults to being taken WHOLE; the scissors icon
-  //    reveals a metres field for a partial cut — leave it alone and
+  //    reveals a meters field for a partial cut — leave it alone and
   //    the whole stock item is used. ──
   function escAttr(s) { return esc(s).replace(/"/g, '&quot;'); }
 
@@ -2483,7 +2483,7 @@
     if (!item || !item.rolls || !item.rolls[ri]) return;
     var m = parseFloat(v) || 0;
     var cap = item.rolls[ri].available;
-    // One translatable sentence with the metres as a placeholder — the
+    // One translatable sentence with the meters as a placeholder — the
     // number sits mid-sentence in Turkish, so it can't be concatenated
     // onto a translated fragment and still read right in both.
     if (m > cap) { m = cap; showToast('{% trans "At most %(m)s m can be entered" %}'.replace('%(m)s', cap), 'warning'); }
@@ -3150,11 +3150,11 @@
       qtySum += q;
       topCount += (it.existingRolls || []).length + (it.rolls || []).length;
       // A line's unit arrives with its stock items; until then it is
-      // unknown, and unknown must not pass for metres.
+      // unknown, and unknown must not pass for meters.
       unitSet.add(it.rollUnit || '');
     });
     if (qtyEl) {
-      // Metres and pieces added together are a number with no unit.
+      // Meters and pieces added together are a number with no unit.
       const unit = (unitSet.size === 1 && !unitSet.has('')) ? [...unitSet][0] : '';
       qtyEl.textContent = fmtNum(qtySum) + (unit ? ' ' + unit : '');
     }

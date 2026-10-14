@@ -418,7 +418,7 @@ class SingleOrderPrintUnchanged(TestCase):
 
 class OrderUnitsAndPacks(TestCase):
     """A line says what its quantity is counted in and what its packs
-    are: cloth is metres on rolls, curtain sets are pieces in boxes."""
+    are: cloth is meters on rolls, curtain sets are pieces in boxes."""
 
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def setUp(self, mock_upload):
@@ -445,7 +445,7 @@ class OrderUnitsAndPacks(TestCase):
         self.assertEqual(resp.status_code, 200)
         return openpyxl.load_workbook(BytesIO(resp.content)).active
 
-    def test_fabric_prints_in_metres(self):
+    def test_fabric_prints_in_meters(self):
         resp = self._print()
         # Tied with a non-breaking space: the quantity column is narrow
         # enough that a plain space put the "m" on a line of its own.
@@ -466,7 +466,7 @@ class OrderUnitsAndPacks(TestCase):
         self.assertEqual(_packs_format("roll"), '[=1]0" roll";#,##0" rolls"')
         self.assertEqual(_packs_format(None), '[=1]0" pack";#,##0" packs"')
 
-    def test_excel_quantity_shows_metres_and_stays_a_number(self):
+    def test_excel_quantity_shows_meters_and_stays_a_number(self):
         ws = self._excel()
         row = next(r for r in ws.iter_rows() if r[0].value == "Crepe")
         self.assertEqual(row[3].value, 156)

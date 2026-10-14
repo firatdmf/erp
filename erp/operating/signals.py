@@ -29,7 +29,7 @@ def sync_order_status(sender, instance, **kwargs):
 # — a variant's stock is read from the WarehouseProduct rows behind it (see
 # marketing.models.ProductVariant.live_quantity). Physical stock is untouched
 # by this: rolls are still cut from the shelf at ship time by
-# OrderStockReservation, which is what actually moves metres.
+# OrderStockReservation, which is what actually moves meters.
 #
 # Order.stock_consumed_at was written and read only by that machinery. It is
 # now vestigial — nothing sets it and nothing reads it.

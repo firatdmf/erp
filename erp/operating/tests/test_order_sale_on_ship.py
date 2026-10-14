@@ -211,11 +211,11 @@ class ALaterUndoIsWrittenBesideTheSale(SaleOnShipBase):
 
 
 class GoodsComingBackReturnTheirCost(SaleOnShipBase):
-    """Un-shipping restocked the metres without saying which order they
+    """Un-shipping restocked the meters without saying which order they
     came back from, and the ledger only reverses cost for an order's
     stock — so 5000 kept the cost of goods that were back on the shelf."""
 
-    def test_returned_metres_go_back_into_inventory(self):
+    def test_returned_meters_go_back_into_inventory(self):
         warehouse = Warehouse.objects.create(name="Laleli Depo", accounting_book=self.book)
         wp = WarehouseProduct.objects.create(
             warehouse=warehouse, name="velvet", sku="V1",

@@ -1,5 +1,5 @@
 """The create form and the view have to agree on ONE name for the
-metres/units a picked stock item contributes.
+meters/units a picked stock item contributes.
 
 Commit 4ebbc868 renamed the warehouse's `meters` columns to `quantity`
 with a blanket search-and-replace that also swept the order form's
@@ -96,7 +96,7 @@ class RollPayloadKey(TestCase):
         self.assertNotIn("meters: d.available", form)
         self.assertIn("quantity: known.available", form)
         self.assertIn("quantity: d.available", form)
-        # The submitted roll names its metres `quantity` too. Matched on
+        # The submitted roll names its meters `quantity` too. Matched on
         # the pair rather than one exact line: the payload has since grown
         # the roll's book alongside it, and this test is about the NAME,
         # not about what else travels with it.

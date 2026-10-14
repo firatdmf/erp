@@ -353,7 +353,7 @@ def _lines_by_book(quote, items):
     """The quote's lines under the books their rolls stand in — the same
     cut acceptance makes (_quote_parts_by_book), so the page shows the
     orders the quote would become. A line with rolls on two books' shelves
-    shows under each, with that book's rolls and metres; a line with no
+    shows under each, with that book's rolls and meters; a line with no
     rolls sits under the quote's own book. The quote's book comes first.
     Every roll is listed whichever book the viewer works in: a quote
     offers the house's stock, and the barcodes are what it offers."""
@@ -427,7 +427,7 @@ def _print_sections(book_groups):
     and within each book by the warehouse whose shelf the rolls stand on —
     what each order will be and where its goods are picked from. A line
     with rolls in two warehouses prints under each, with that warehouse's
-    rolls and metres; a line with no rolls closes its book, under no
+    rolls and meters; a line with no rolls closes its book, under no
     warehouse."""
     from types import SimpleNamespace
     from marketing import units
@@ -470,7 +470,7 @@ def _quote_page_context(request, pk):
     by_line = {}
     for link in links:
         by_line.setdefault(link.quote_item_id, []).append(link)
-    # Quantities add up per unit (metres with metres). Rolls are counted
+    # Quantities add up per unit (meters with meters). Rolls are counted
     # by what the product comes packed as — "rolls" for cloth, "boxes"
     # for boxed goods — and only where a line names its rolls: a line
     # without them says nothing about how many there are.
@@ -551,7 +551,7 @@ def _quote_parts_by_book(quote):
 
     Returns [(book, [(quote item, quantity, [links])...])...], the quote's
     own book first. A line whose rolls stand in two books becomes two
-    lines, each the metres on that book's shelves, at the quoted price —
+    lines, each the meters on that book's shelves, at the quoted price —
     the same cut the order form makes (operating.views._line_parts_by_book).
     A line with no rolls has no shelf to read and stays in the quote's
     book."""

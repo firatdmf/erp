@@ -725,7 +725,7 @@ def convert_lines_to_currency(lines, target_code, rates=None, *, on_date=None):
                 f"Enter one on the form, or price the line in {target}."
             )
         # NOT to cents. This is a UNIT price and the line multiplies it by
-        # metres, so a cent rounded off here comes back multiplied — TRY
+        # meters, so a cent rounded off here comes back multiplied — TRY
         # 100.00/m at 0.02077833 held as $2.08 billed $913.95 for a line
         # whose true cost was $913.00. InvoiceItem.unit_price carries six
         # decimals for exactly this, and InvoiceItem.compute() rounds the

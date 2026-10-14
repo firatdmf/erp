@@ -4,7 +4,7 @@
 """What the purchase form may still change about a roll depends on what has
 happened to it since it arrived.
 
-Once metres have gone out of a roll — shipped on an order, or taken off by
+Once meters have gone out of a roll — shipped on an order, or taken off by
 hand — its length, barcode and variant are that record, and it can't come
 off the purchase. The price is still what was paid, so that stays open. A
 roll only reserved can still be re-measured; the page is told who holds it,
@@ -30,11 +30,11 @@ class PurchaseEditGoneOutRollsTest(base.TestCase):
     _save = base.ReceivedPurchaseEditTest._save
     _reserve = base.ReceivedPurchaseEditTest._reserve
 
-    def _stock_out(self, barcode, metres):
+    def _stock_out(self, barcode, meters):
         roll = self._roll(barcode)
         r = self.client.post(
             reverse("operating:warehouse_stock_out", args=[self.wh.pk, roll.product_id]),
-            data={"amount": str(metres), "stock_item_id": roll.pk, "reason": "Samples"})
+            data={"amount": str(meters), "stock_item_id": roll.pk, "reason": "Samples"})
         self.assertTrue(r.json()["success"], r.json())
 
     def _assert_refused(self, form, barcode):
@@ -68,7 +68,7 @@ class PurchaseEditGoneOutRollsTest(base.TestCase):
             {"label": str(second.order), "qty": 10.0},
         ])
 
-    # ── A roll metres have gone out of ──────────────────────────────
+    # ── A roll meters have gone out of ──────────────────────────────
     def test_saving_it_untouched_is_fine(self):
         self._stock_out("KRV-A", 2)
         form = self._form()

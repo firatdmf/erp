@@ -414,7 +414,7 @@ def subsidiary_equation(book):
     payable = -(current_account.filter(cached_balance__lt=0).aggregate(
         t=Sum("cached_balance"))["t"] or ZERO)
 
-    inventory, unvalued_rolls, unvalued_metres = _inventory_value(book)
+    inventory, unvalued_rolls, unvalued_meters = _inventory_value(book)
     fixed = AssetFixedAsset.objects.filter(book=book).aggregate(
         t=Sum("value"))["t"] or ZERO
 
@@ -473,7 +473,7 @@ def subsidiary_equation(book):
         "payable": payable,
         "inventory": inventory,
         "unvalued_rolls": unvalued_rolls,
-        "unvalued_metres": unvalued_metres,
+        "unvalued_meters": unvalued_meters,
         "fixed": fixed,
         "assets": assets,
         "liabilities": payable,
@@ -494,7 +494,7 @@ def subsidiary_equation(book):
 
 
 def _inventory_value(book, warehouse=None):
-    """(value, unvalued roll count, unvalued metres) for a book's stock.
+    """(value, unvalued roll count, unvalued meters) for a book's stock.
 
     `warehouse` narrows the same figure to one set of shelves. The book-wide
     answer is the sum of its warehouses, so scoping here is what lets a
@@ -509,7 +509,7 @@ def _inventory_value(book, warehouse=None):
     This used to scope by the purchase-invoice line the roll arrived on,
     which reported every book's inventory as zero: not one roll in the
     company carries a purchase_invoice_item, so the filter matched
-    nothing and 100,888 metres of real fabric read as $0.00.
+    nothing and 100,888 meters of real fabric read as $0.00.
 
     Cost is what the item itself was stamped with at intake, falling
     back to the purchase-invoice line and then to the product's current
@@ -647,7 +647,7 @@ def reconcile(book, date_to=None):
     def balance(code):
         return by_code.get(code, ZERO)
 
-    inventory, _unvalued, _metres = _inventory_value(book)
+    inventory, _unvalued, _meters = _inventory_value(book)
 
     rows = [
         {

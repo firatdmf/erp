@@ -1,10 +1,10 @@
 """What a warehouse counts its stock in, and where that unit shows up.
 
-Every quantity in the warehouse used to be metres — not by choice but by
+Every quantity in the warehouse used to be meters — not by choice but by
 default: the columns were called `meters`, and every screen printed "m"
 after the number. That was harmless while the shelves held nothing but
 fabric, and became wrong the moment a pallet of ready-made curtain sets
-arrived, because a box of 20 sets is not 20 metres of anything.
+arrived, because a box of 20 sets is not 20 meters of anything.
 
 A product's `unit` says what the numbers mean, and its `pack_type` what one
 stock item is. Both live on the main product (marketing.Product); a
@@ -81,14 +81,14 @@ class StockUnitIsShownNotAssumed(TestCase):
     def test_a_product_row_is_counted_in_its_own_unit(self):
         self.assertIn("20.00 pack", self._page())
 
-    def test_it_does_not_call_curtain_sets_metres(self):
+    def test_it_does_not_call_curtain_sets_meters(self):
         self.assertNotIn("20.00 m ", self._page())
 
     def test_the_header_total_carries_the_unit_when_there_is_only_one(self):
         self.assertRegex(self._page(), r"20\s*pack")
 
     def test_a_mixed_warehouse_claims_no_unit_for_its_total(self):
-        """Metres of fabric and boxes of curtains do not add up to anything,
+        """Meters of fabric and boxes of curtains do not add up to anything,
         so the total drops the unit rather than picking one of them. The
         per-product rows still carry their own."""
         _stock(
@@ -99,10 +99,10 @@ class StockUnitIsShownNotAssumed(TestCase):
         self.assertIn("20.00 pack", page)
         self.assertIn("300.00 m", page)
 
-    def test_the_default_is_metres_so_existing_fabric_is_untouched(self):
+    def test_the_default_is_meters_so_existing_fabric_is_untouched(self):
         """Every product that existed before the field was added is fabric.
         The default is a statement about the data, not a guess, and a
-        product created without saying otherwise still reads as metres."""
+        product created without saying otherwise still reads as meters."""
         product = Product.objects.create(title="grek tul", sku="GT", featured=False)
         self.assertEqual((product.unit, product.pack_type), ("mt", "roll"))
         # A row not linked to any product yet reads the same way.
@@ -121,7 +121,7 @@ class StockUnitIsShownNotAssumed(TestCase):
 
 class TheLabelSaysWhatItIsCounting(TestCase):
     """The sticker on the box prints a bare number under "QUANTITY". That
-    read as metres to anyone who had only ever seen a roll tag, so the unit
+    read as meters to anyone who had only ever seen a roll tag, so the unit
     now goes on it too."""
 
     def setUp(self):
@@ -155,7 +155,7 @@ class TheLabelSaysWhatItIsCounting(TestCase):
         return [s.decode("latin-1")
                 for s in re.findall(rb"\((.*?)\)\s*Tj", resp.content)]
 
-    def test_it_prints_packs_not_metres(self):
+    def test_it_prints_packs_not_meters(self):
         roll = WarehouseProductItem.objects.create(
             product=self.wp, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), barcode="BOX-12")
@@ -168,7 +168,7 @@ class MovingStockCarriesTheUnit(TestCase):
     """A move creates the destination row from scratch when the SKU is not
     already on that shelf. It used to build it without a unit, so it took
     the model default — and a box of curtain sets moved shelf to shelf came
-    out the other side measured in metres."""
+    out the other side measured in meters."""
 
     def setUp(self):
         usd = CurrencyCategory.objects.create(
@@ -294,7 +294,7 @@ class OneStockItemIsCalledWhatItIs(TestCase):
         self.assertEqual(odd.item_icon, "fa-layer-group")
 
     def test_the_pack_is_not_a_function_of_the_unit(self):
-        """The whole reason these are two fields. Metres can arrive on a
+        """The whole reason these are two fields. Meters can arrive on a
         bolt as readily as a roll, and pieces can come in a bag as readily
         as a box — so setting one must not move the other."""
         bagged = _stock(
@@ -303,11 +303,11 @@ class OneStockItemIsCalledWhatItIs(TestCase):
         self.assertEqual(bagged.unit_short, "m")
         self.assertEqual(bagged.item_noun_plural, "bags")
 
-        boxed_metres = _stock(
+        boxed_meters = _stock(
             warehouse=self.shop, name="trim", sku="TR-1",
             quantity=Decimal("80"), unit="mt", pack_type="box")
-        self.assertEqual(boxed_metres.unit_short, "m")
-        self.assertEqual(boxed_metres.item_noun_plural, "boxes")
+        self.assertEqual(boxed_meters.unit_short, "m")
+        self.assertEqual(boxed_meters.item_noun_plural, "boxes")
 
 
 class TheProductPageSpeaksTheProductsLanguage(TestCase):
@@ -358,11 +358,11 @@ class TheProductPageSpeaksTheProductsLanguage(TestCase):
         self.assertIn("20.00 pack", page)
         self.assertIn("Active boxes", page)
 
-    def test_the_curtain_page_never_prints_a_metre(self):
+    def test_the_curtain_page_never_prints_a_meter(self):
         self.assertNotRegex(self._page(self.curtains), r"\d+\.\d\d m\b")
 
     def test_the_quantity_column_is_not_headed_length_for_boxes(self):
-        """Metres of cloth are a length and kilos are a weight. A count of
+        """Meters of cloth are a length and kilos are a weight. A count of
         curtain sets is neither, so "Length: 20" over a box of them is
         simply a false statement."""
         self.assertEqual(self.curtains.quantity_label, "Quantity")

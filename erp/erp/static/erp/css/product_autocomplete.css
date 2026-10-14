@@ -99,7 +99,7 @@
   line-height: 1.15;
 }
 .product_autocomplete_list .pa-stock-cost {
-  /* What THIS shelf's stock cost, beside the metres it belongs to. Same
+  /* What THIS shelf's stock cost, beside the meters it belongs to. Same
      amber as the price note, because it is the same kind of number: a
      cost standing in a place a reader expects a price. */
   margin-left: 5px;

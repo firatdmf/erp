@@ -24,12 +24,12 @@ class RollChangeReasonTest(base.TestCase):
     _invoice = base.ReceivedPurchaseEditTest._invoice
     _roll = base.ReceivedPurchaseEditTest._roll
 
-    def _edit(self, barcode, metres, **extra):
+    def _edit(self, barcode, meters, **extra):
         roll = self._roll(barcode)
         return self.client.post(
             reverse("operating:warehouse_roll_edit",
                     args=[self.wh.pk, roll.product_id, roll.pk]),
-            data={"barcode": roll.barcode, "quantity": str(metres), **extra})
+            data={"barcode": roll.barcode, "quantity": str(meters), **extra})
 
     def _balances(self):
         return {r["code"]: r["balance"] for r in
@@ -102,7 +102,7 @@ class RollChangeReasonTest(base.TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertEqual(self._roll("LOOSE-A").quantity, Decimal("10.00"))
 
-    def test_the_supplier_cannot_be_charged_once_metres_have_gone_out(self):
+    def test_the_supplier_cannot_be_charged_once_meters_have_gone_out(self):
         self.assertTrue(self._edit("KRV-A", 25, change_reason="display").json()["success"])
 
         r = self._edit("KRV-A", 29, change_reason="supplier")
@@ -111,9 +111,9 @@ class RollChangeReasonTest(base.TestCase):
         self.assertEqual(self._invoice().total, Decimal("175.00"))
 
     # ── stock taken out ──────────────────────────────────────────
-    def _sample(self, barcode, metres, client, **extra):
+    def _sample(self, barcode, meters, client, **extra):
         kind = "contact" if isinstance(client, Contact) else "company"
-        return self._edit(barcode, metres, change_reason="sample",
+        return self._edit(barcode, meters, change_reason="sample",
                           client_type=kind, client_pk=client.pk, **extra)
 
     def test_a_sample_leaves_the_received_length_as_it_was(self):

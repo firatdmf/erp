@@ -5,10 +5,10 @@ system exports:
   FACTORY_GOODS.xlsx                     one row per physical TOP (kupon)
   Factory Stock Price <date> STOK.xlsx   one row per PATTERN (desen), priced
 
-The goods file is the physical truth — 4,641 stock_items, ~100,888 metres — and the
+The goods file is the physical truth — 4,641 stock_items, ~100,888 meters — and the
 price file is the money. They agree: 800 of the 840 patterns appear in both,
-and for 785 of those the stock item count and metre total match to the decimal. So
-metres come from the goods file only, and the price file is read for FIYAT
+and for 785 of those the stock item count and meter total match to the decimal. So
+meters come from the goods file only, and the price file is read for FIYAT
 alone; where the two disagree on quantity, the shelf wins.
 
 Two things about the goods export are worth knowing before reading the code.
@@ -56,7 +56,7 @@ C_ROLL_ID = 1      # the factory's own id for this stock item
 C_DESEN = 3        # pattern code — the SKU, and the join to the price file
 C_QUALITY = 4      # fabric type: GREK TUL, KARE SANAL, ...
 C_COLOUR = 5       # colour: 317 KREM, 1395 BEYAZ, ...
-C_METRES = 7       # metres on this stock item
+C_METRES = 7       # meters on this stock item
 C_GRADE = 11       # 1K first quality, 1A / 2K seconds
 C_DESC = 15        # composition: "630 BEYAZ POLYESTER+KROSE"
 C_LOCATION = 20    # MAMUL DEPO / RE-SEVKE HAZIR DEPO
@@ -65,7 +65,7 @@ C_BARCODE = 78     # the barcode printed on the stock item's label
 # Everything not graded 1K is a factory second. Only 44 of 4,641 stock items.
 FIRST_QUALITY = "1K"
 
-# The price file's FIYAT is dollars per metre — it runs 1.70-17.00, the same
+# The price file's FIYAT is dollars per meter — it runs 1.70-17.00, the same
 # scale the Laleli Fabrika warehouse prices in USD, and a fiftieth of what
 # the figures would have to be to read as lira.
 PRICE_CURRENCY = "USD"
@@ -155,7 +155,7 @@ def decimal(value):
 
 
 def read_prices(path):
-    """{DESEN: price per metre}. Header row DESEN/KUPON/METRE/FIYAT/TUTAR."""
+    """{DESEN: price per meter}. Header row DESEN/KUPON/METRE/FIYAT/TUTAR."""
     from openpyxl import load_workbook
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
@@ -192,8 +192,8 @@ def read_stock(path):
                 skipped.append(n)
                 continue
             desen = text(row[C_DESEN]).upper()
-            metres = decimal(row[C_METRES])
-            if not desen or metres is None or metres <= 0:
+            meters = decimal(row[C_METRES])
+            if not desen or meters is None or meters <= 0:
                 skipped.append(n)
                 continue
             entry = patterns.get(desen)
@@ -206,7 +206,7 @@ def read_stock(path):
                                            "tops": []}
             entry["tops"].append({
                 "barcode": text(row[C_BARCODE]) or None,
-                "metres": metres,
+                "meters": meters,
                 "lot": text(row[C_ROLL_ID]) or None,
                 "second": text(row[C_GRADE]).upper() != FIRST_QUALITY,
                 "location": text(row[C_LOCATION]) or None,
@@ -255,7 +255,7 @@ class Command(BaseCommand):
         self.stdout.write(f"{len(prices)} priced patterns in {price_path.name}")
         if skipped:
             self.stdout.write(self.style.WARNING(
-                f"{len(skipped)} goods rows had no pattern or no metres and were "
+                f"{len(skipped)} goods rows had no pattern or no meters and were "
                 f"skipped (rows {skipped[:10]}{'...' if len(skipped) > 10 else ''})"))
 
         usd_try = WarehouseProduct._usd_try_rate()
@@ -287,7 +287,7 @@ class Command(BaseCommand):
         nothing else.
 
         Stock items that have since been consumed or partly used are LEFT ALONE:
-        they record real metres leaving the building, and deleting them
+        they record real meters leaving the building, and deleting them
         would erase that. Same for a product still holding other stock —
         only ones the import left holding nothing at all are removed.
         """
@@ -342,13 +342,13 @@ class Command(BaseCommand):
         if s["kept"]:
             w(self.style.WARNING(
                 "  Stock items that were partly or fully used are left in place — "
-                "they record metres that really left the warehouse."))
+                "they record meters that really left the warehouse."))
 
     def _import(self, warehouse, patterns, prices, usd_try):
         stats = {"products_created": 0, "products_updated": 0,
                  "stock_created": 0, "stock_existing": 0, "unpriced": [],
                  "barcodes_minted": 0,
-                 "metres": Decimal("0"), "value_usd": Decimal("0")}
+                 "meters": Decimal("0"), "value_usd": Decimal("0")}
 
         # House codes for stock items the factory shipped without a printed label.
         # The warehouse's own minter, so an imported code can never collide
@@ -366,7 +366,7 @@ class Command(BaseCommand):
 
         # Identity of every stock item already on these shelves, so a re-run — or an
         # overlap with stock items scanned in by hand — adds nothing twice. Live
-        # metres per product come along for the ride: a merged product may
+        # meters per product come along for the ride: a merged product may
         # already hold stock items the file knows nothing about, and they still
         # count as stock.
         #
@@ -392,7 +392,7 @@ class Command(BaseCommand):
                 remaining if remaining is not None else meters)
 
         to_create, to_update, rolls, movements = [], [], [], []
-        quantities = {}   # desen -> metres, resolved once every product has a pk
+        quantities = {}   # desen -> meters, resolved once every product has a pk
 
         for desen in sorted(patterns):
             entry = patterns[desen]
@@ -436,8 +436,8 @@ class Command(BaseCommand):
                     stats["barcodes_minted"] += 1
                     notes.append(f"Fabrikadan barkodsuz geldi; {barcode} basıldı")
                 fresh.append(WarehouseProductItem(
-                    product=product, quantity=item["metres"],
-                    quantity_remaining=item["metres"], barcode=barcode,
+                    product=product, quantity=item["meters"],
+                    quantity_remaining=item["meters"], barcode=barcode,
                     lot_number=item["lot"], status="in_stock",
                     is_second=item["second"],
                     notes=" · ".join(x for x in notes if x) or None,
@@ -452,7 +452,7 @@ class Command(BaseCommand):
             total = (held.get(product.pk, Decimal("0"))
                      + sum(r.quantity for r in fresh))
             quantities[desen] = product.quantity = total
-            stats["metres"] += total
+            stats["meters"] += total
             if price is not None:
                 stats["value_usd"] += total * price
 
@@ -507,7 +507,7 @@ class Command(BaseCommand):
                     f"  {len(cat['conflicts'])} SKU(s) could not be linked "
                     f"automatically — run `manage.py reconcile_catalog` to see "
                     f"them in full."))
-        w(f"  metres in stock   {s['metres']:>12,.2f}")
+        w(f"  meters in stock   {s['meters']:>12,.2f}")
         w(f"  stock value       {s['value_usd']:>12,.2f} USD")
         if s["unpriced"]:
             w(self.style.WARNING(

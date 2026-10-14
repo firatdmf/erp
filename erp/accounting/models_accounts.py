@@ -1504,7 +1504,7 @@ class InvoiceItem(models.Model):
 
     # 6 decimals, for the reason WarehouseProduct.cost_usd already gives: a
     # price that arrives through an FX division carries genuine sub-cent
-    # value, and rounding it AT REST costs real money once metres are
+    # value, and rounding it AT REST costs real money once meters are
     # multiplied back in. TRY 100.00/m at 0.02077833 is $2.077833 — held as
     # $2.08 it billed $913.95 for a 439.40 m line whose true cost was
     # $913.00. A hand-typed price is still entered in cents; only a
@@ -1534,7 +1534,7 @@ class InvoiceItem(models.Model):
         (banker's rounding), which sends an exact half to the nearest EVEN
         cent — so 56.90 m × $2.45 = $139.405 billed as $139.40, and the
         same line at a price ending .35 would have gone up instead. Half
-        cases are common here because metre quantities carry two decimals
+        cases are common here because meter quantities carry two decimals
         against a two-decimal price, and "half goes up" is the rule people
         check invoices against. The same rounding is applied to each
         amount, discount included."""

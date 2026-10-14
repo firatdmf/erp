@@ -15,11 +15,11 @@ from operating.models import Warehouse, WarehouseProduct
 
 
 class ProductDetailStockTest(TestCase):
-    """The variants table prints the metres the warehouse holds.
+    """The variants table prints the meters the warehouse holds.
 
     It used to bucket them the way a storefront does — "50+" or nothing —
     which told the people who sell and cut the cloth that a variant with
-    forty metres on the shelf was "unavailable".
+    forty meters on the shelf was "unavailable".
     """
 
     def setUp(self):
@@ -46,7 +46,7 @@ class ProductDetailStockTest(TestCase):
         self._variant("S-BAKLAVA.ECRU-305", "40.00")
         html = self._html()
         self.assertIn("<b>40</b> m", html)
-        # Forty metres is stock, not an absence of it.
+        # Forty meters is stock, not an absence of it.
         self.assertNotIn("Unavailable", html)
 
     def test_stock_in_two_warehouses_is_added_up_and_each_one_named(self):
@@ -61,7 +61,7 @@ class ProductDetailStockTest(TestCase):
             self.assertIn(warehouse, html)
             self.assertIn(f'<span class="q">{quantity}</span>', html)
 
-    def test_a_total_spanning_two_books_says_whose_metres_they_are(self):
+    def test_a_total_spanning_two_books_says_whose_meters_they_are(self):
         """Laleli's cloth and Ergene's are not one pile to cut from."""
         variant = self._variant("K24614.G47", "143.50")
         ergene = Book.objects.create(name="Ergene Fabric")

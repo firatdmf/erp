@@ -1,7 +1,7 @@
 """The ready-made curtain stock import, end to end.
 
 The command writes 2,835 curtain sets worth ~$50,000 onto a shelf that
-counts in packs rather than metres, and the balance sheet picks that up
+counts in packs rather than meters, and the balance sheet picks that up
 the moment the rows exist. These tests build a miniature of the real
 workbooks and drive the actual command over them.
 
@@ -133,7 +133,7 @@ class ReadymadeStockImport(TestCase):
         shop = Warehouse.objects.get(name="Ready-made Shop")
         self.assertEqual(shop.accounting_book.name, "Ergene Fabric")
 
-    def test_the_shop_counts_in_packs_not_metres(self):
+    def test_the_shop_counts_in_packs_not_meters(self):
         self._apply()
         for wp in WarehouseProduct.objects.all():
             self.assertEqual(wp.unit, "pack")

@@ -17,7 +17,7 @@ class InventoryAttribution(TestCase):
 
     Not one roll in the company carries a purchase_invoice_item, so that
     filter matched nothing and both books reported $0.00 of inventory
-    while 100,888 metres of fabric stood in Ergene Fabrika.
+    while 100,888 meters of fabric stood in Ergene Fabrika.
     """
 
     def setUp(self):
@@ -30,11 +30,11 @@ class InventoryAttribution(TestCase):
         self.fabrika = Warehouse.objects.create(
             name="Ergene Fabrika", accounting_book=self.ergene)
 
-    def _roll(self, warehouse, metres, cost, status="in_stock"):
+    def _roll(self, warehouse, meters, cost, status="in_stock"):
         product = WarehouseProduct.objects.create(
             warehouse=warehouse, name="seta grey", cost_usd=cost)
         return WarehouseProductItem.objects.create(
-            product=product, quantity=metres, quantity_remaining=metres,
+            product=product, quantity=meters, quantity_remaining=meters,
             status=status)
 
     def test_uninvoiced_stock_still_counts(self):
@@ -59,7 +59,7 @@ class InventoryAttribution(TestCase):
         subs = subsidiary_equation(self.ergene)
         self.assertEqual(subs["inventory"], Decimal("0.00"))
         self.assertEqual(subs["unvalued_rolls"], 1)
-        self.assertEqual(subs["unvalued_metres"], Decimal("20.00"))
+        self.assertEqual(subs["unvalued_meters"], Decimal("20.00"))
 
     def test_unvalued_rolls_are_this_book_s_not_every_book_s(self):
         """The old count was global — it could not be filtered by book."""

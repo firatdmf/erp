@@ -35,9 +35,9 @@ class StampedAtIntake(TestCase):
             warehouse=self.wh, name="seta grey", sku="SETA-1",
             quantity=Decimal("0"), cost_usd=cost)
 
-    def _receive(self, wp, metres, unit_cost=None):
+    def _receive(self, wp, meters, unit_cost=None):
         _, ids = _add_stock_to_variant(
-            wp, [{"qty": str(metres)}], self._mint, None, unit_cost=unit_cost)
+            wp, [{"qty": str(meters)}], self._mint, None, unit_cost=unit_cost)
         return WarehouseProductItem.objects.get(pk=ids[0])
 
     def test_a_received_stock_item_carries_the_batch_price(self):
@@ -197,7 +197,7 @@ class ShownOnThePage(TestCase):
         # bare "$4.40" would pass on somebody else's figure.
         self.assertIn('class="roll-cost">$4.40', self._page())
 
-    def test_it_shows_the_metres_still_on_the_stock_item_at_that_cost(self):
+    def test_it_shows_the_meters_still_on_the_stock_item_at_that_cost(self):
         self._top(Decimal("4.4000"))
         # 19.50 m x 4.40
         self.assertIn("$85.80", self._page())
@@ -250,9 +250,9 @@ class PricingCardIsWeighted(TestCase):
         user.member.save()
         self.client.force_login(user)
 
-    def _top(self, metres, cost, barcode):
+    def _top(self, meters, cost, barcode):
         return WarehouseProductItem.objects.create(
-            product=self.wp, quantity=metres, quantity_remaining=metres,
+            product=self.wp, quantity=meters, quantity_remaining=meters,
             barcode=barcode, status="in_stock", unit_cost_base=cost)
 
     def _page(self):
@@ -269,7 +269,7 @@ class PricingCardIsWeighted(TestCase):
         self.assertIn('class="stock-value">$900.00', html)
         self.assertNotIn("1,000.00", html)
 
-    def test_unit_cost_is_the_metre_weighted_average(self):
+    def test_unit_cost_is_the_meter_weighted_average(self):
         self._top(Decimal("100"), Decimal("4.0000"), "BC-A")
         self._top(Decimal("300"), Decimal("5.0000"), "BC-B")
         # (100x4 + 300x5) / 400 = 4.75, not the plain mean of 4.50.
@@ -302,7 +302,7 @@ class PricingCardIsWeighted(TestCase):
 class DerivedNotStored(TestCase):
     """with_stock_costs / total_value_usd read the stock items every time.
 
-    More than ten code paths move metres — several by an incremental
+    More than ten code paths move meters — several by an incremental
     delta rather than a recompute — so a stored average would fall out of
     step with the shelf at the first one anybody forgot.
     """
@@ -318,23 +318,23 @@ class DerivedNotStored(TestCase):
             warehouse=self.wh, name="seta", sku="SETA-1",
             quantity=Decimal("400"), cost_usd=Decimal("5.00"))
 
-    def _top(self, metres, cost, barcode):
+    def _top(self, meters, cost, barcode):
         return WarehouseProductItem.objects.create(
-            product=self.wp, quantity=metres, quantity_remaining=metres,
+            product=self.wp, quantity=meters, quantity_remaining=meters,
             barcode=barcode, status="in_stock", unit_cost_base=cost)
 
     def _annotated(self):
         return WarehouseProduct.with_stock_costs(
             WarehouseProduct.objects.filter(pk=self.wp.pk)).first()
 
-    def test_the_average_is_weighted_by_metres(self):
+    def test_the_average_is_weighted_by_meters(self):
         self._top(Decimal("100"), Decimal("4.0000"), "A")
         self._top(Decimal("300"), Decimal("5.0000"), "B")
         # (100x4 + 300x5) / 400 = 4.75; the plain mean would say 4.50.
         self.assertEqual(round(self._annotated().avg_cost, 4),
                          Decimal("4.7500"))
 
-    def test_it_follows_metres_leaving_without_anything_recomputing(self):
+    def test_it_follows_meters_leaving_without_anything_recomputing(self):
         a = self._top(Decimal("100"), Decimal("4.0000"), "A")
         self._top(Decimal("300"), Decimal("5.0000"), "B")
         # Cut the cheap stock item down the way a stock-out would, touching

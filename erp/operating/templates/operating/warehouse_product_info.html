@@ -24,9 +24,9 @@
     .rows { margin-top: 14px; }
     .lbl { font-size: 11px; font-weight: 600; letter-spacing: .5px; color: #6B7280; text-transform: uppercase; margin-top: 12px; }
     .val { font-size: 19px; font-weight: 700; color: #111; margin-top: 2px; word-break: break-word; }
-    .metre-wrap { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
-    .metre { text-align: right; }
-    .metre .val { font-size: 24px; }
+    .meter-wrap { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+    .meter { text-align: right; }
+    .meter .val { font-size: 24px; }
     .bc { margin-top: 22px; text-align: center; border-top: 1px solid #EEF1F5; padding-top: 16px; }
     .bc img { max-width: 100%; height: 64px; object-fit: contain; }
     .wh { margin-top: 14px; text-align: center; font-size: 12px; color: #94A3B8; }
@@ -49,7 +49,7 @@
     </div>
 
     <div class="rows">
-      <div class="metre-wrap">
+      <div class="meter-wrap">
         <div>
           <div class="lbl">{% trans "Pattern" %}</div>
           <div class="val">{{ base|default:"—" }}</div>
@@ -61,12 +61,12 @@
       <div class="val">{{ variant }}</div>
       {% endif %}
 
-      <div class="metre-wrap">
+      <div class="meter-wrap">
         <div style="flex:1;">
           <div class="lbl">{% trans "SKU" %}</div>
           <div class="val">{{ product.sku|default:"—" }}</div>
         </div>
-        <div class="metre">
+        <div class="meter">
           <div class="lbl">{% trans "Meters" %}</div>
           <div class="val">{{ product.quantity|default:0|floatformat:"2g" }}</div>
         </div>

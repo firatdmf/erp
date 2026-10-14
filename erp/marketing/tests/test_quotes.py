@@ -230,7 +230,7 @@ class QuoteTest(TestCase):
 
     # ── Rolls on a line ──────────────────────────────────────────────
 
-    def _roll(self, barcode, metres, book=None, variant=None):
+    def _roll(self, barcode, meters, book=None, variant=None):
         from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
         book = book or self.book
         wh, _ = Warehouse.objects.get_or_create(name=f"{book.name} depo", accounting_book=book)
@@ -238,14 +238,14 @@ class QuoteTest(TestCase):
             warehouse=wh, catalog_variant=variant or self.variant,
             defaults={"name": "Velvet", "sku": (variant or self.variant).variant_sku})
         return WarehouseProductItem.objects.create(
-            product=wp, quantity=Decimal(metres), quantity_remaining=Decimal(metres),
+            product=wp, quantity=Decimal(meters), quantity_remaining=Decimal(meters),
             barcode=barcode, status="in_stock")
 
-    def _hold(self, roll, metres):
+    def _hold(self, roll, meters):
         from operating.models import OrderStockReservation
         other = Order.objects.create(contact=self.customer)
         return OrderStockReservation.objects.create(
-            order=other, stock_item=roll, warehouse_product=roll.product, quantity=Decimal(metres))
+            order=other, stock_item=roll, warehouse_product=roll.product, quantity=Decimal(meters))
 
     def _rolled_quote(self, *rolls):
         r = self._save(self._body(items=[
@@ -305,7 +305,7 @@ class QuoteTest(TestCase):
         quote = self._rolled_quote(own, other)                   # one line, rolls on two books' shelves
         page = self.client.get(reverse("marketing:quote_detail", args=[quote.pk]))
         # The page shows the orders the quote would become: the one line
-        # under each book, with that book's roll and metres.
+        # under each book, with that book's roll and meters.
         [own, other] = page.context["book_groups"]
         self.assertEqual((own.book, other.book), (self.book, ergene))
         self.assertEqual([(p.quantity, [r.barcode for r in p.rolls]) for p in own.parts],
@@ -320,9 +320,9 @@ class QuoteTest(TestCase):
         self.assertIsNotNone(lead.split_group)
         self.assertEqual((lead.current_account.book, sibling.current_account.book), (self.book, ergene))
         self.assertEqual((lead.currency, sibling.currency), (quote.currency, quote.currency))
-        for order, barcode, metres in ((lead, "R-600", "20.00"), (sibling, "R-601", "30.00")):
+        for order, barcode, meters in ((lead, "R-600", "20.00"), (sibling, "R-601", "30.00")):
             [line] = order.items.all()
-            self.assertEqual((line.quantity, line.price), (Decimal(metres), Decimal("2.00")))
+            self.assertEqual((line.quantity, line.price), (Decimal(meters), Decimal("2.00")))
             [held] = line.stock_reservations.all()
             self.assertEqual(held.stock_item.barcode, barcode)
 

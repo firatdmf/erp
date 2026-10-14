@@ -292,7 +292,7 @@
   /* PRODUCTS TABLE */
   .od-prods-wrap { overflow-x: auto; }
   .od-prods { width: 100%; border-collapse: collapse; }
-  /* Metre on top, small lowercase stock items count below it (stacked, saves width) */
+  /* Meter on top, small lowercase stock items count below it (stacked, saves width) */
   .od-prods .qty { font-variant-numeric: tabular-nums; }
   .tops-sub {
     font: 600 10.5px var(--font-sans); color: var(--gray-500);
@@ -4093,7 +4093,7 @@
   }
   // Rolls already picked for an order. The hold takes nothing off the roll
   // until the order ships, so without this the roll scans as free stock and
-  // someone can walk off with metres another order is counting on. Shown
+  // someone can walk off with meters another order is counting on. Shown
   // whether or not the order ever reached a packing list.
   function blHeldBanner(roll) {
     var h = roll && roll.reserved;
@@ -4120,7 +4120,7 @@
   }
 
   // A used roll is found on purpose — scanning its label should say what
-  // became of it. Metres alone read like a stocking error, so spell out how
+  // became of it. Meters alone read like a stocking error, so spell out how
   // much came off and where each cut went. Covers part-used rolls as well as
   // ones used up: both leave the scanner guessing otherwise.
   function blUsedBanner(roll) {
@@ -4242,7 +4242,7 @@
           '</div>' +
           '<div class="bl-actions">' +
             '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
-            // No move offer for a used-up stock item: there are no metres to carry,
+            // No move offer for a used-up stock item: there are no meters to carry,
             // and its row records where the stock went out from. The server
             // refuses it too, so a stale screen can't sneak one through.
             (d.cross_book

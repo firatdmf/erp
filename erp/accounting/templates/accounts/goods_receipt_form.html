@@ -971,10 +971,10 @@
 
   // What one stock item of a product physically is — roll, box, bale… Each
   // card asks, and words its rows with the answer ("Box 2", "Add box").
-  // Until someone picks, a card follows the batch's unit (metres → roll).
+  // Until someone picks, a card follows the batch's unit (meters → roll).
   const NP_PACKS = JSON.parse((document.getElementById('np-packs-data') || {}).textContent || '{"choices":[],"for_unit":{}}');
   // What a product is counted in. Per product, like its pack: one delivery
-  // can bring metres of cloth and pieces of curtain together.
+  // can bring meters of cloth and pieces of curtain together.
   const NP_UNIT_SEL = '<select class="np-select np-main-unit" onchange="npUnitPicked(this)">' +
     '<option value="mt">{% trans "Meter (m)" %}</option>' +
     '<option value="piece">{% trans "Piece (pcs)" %}</option>' +
@@ -2673,7 +2673,7 @@
       return;
     }
 
-    // A shorter roll can't keep holding metres it no longer has, so the
+    // A shorter roll can't keep holding meters it no longer has, so the
     // save trims those holds — oldest keeps its claim, the order the server
     // trims in. That changes somebody's order, so name it before the save.
     const cuts = [];
@@ -2702,7 +2702,7 @@
       .then(function (d) {
         if (d && d.success) {
           (d.warnings || []).forEach(function (w) { console.warn('catalog:', w); });
-          // A shortened roll gives back metres an order was holding. That
+          // A shortened roll gives back meters an order was holding. That
           // order changed because of this save, so say which one.
           const trimmed = d.reservations_trimmed || [];
           if (trimmed.length) {
@@ -3186,7 +3186,7 @@
 
   // A roll a customer order has reserved: its length and label can still be
   // corrected, but it can't come off the purchase, so the remove button
-  // gives way to a lock. A roll metres have already gone out of is locked
+  // gives way to a lock. A roll meters have already gone out of is locked
   // outright — that shipment or stock-out is its record now. The server
   // holds the same lines either way.
   function npLockTop(row, goneOut) {

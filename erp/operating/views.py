@@ -617,7 +617,7 @@ class OrderDetail(DetailView):
         ctx["total_scanned_meters"] = sum((r.quantity or _D("0") for r in reservations), _D("0"))
         ctx["total_scanned_count"] = len(reservations)
         ctx["total_scanned_label"] = _stock_taken_label(reservations)
-        # Nothing on the order is cloth: no metres to speak of anywhere.
+        # Nothing on the order is cloth: no meters to speak of anywhere.
         ctx["only_counted"] = bool(items_sorted) and all(
             it.sold_by_count for it in items_sorted)
         # A short line's "2 / 3 m" in the line's own unit.
@@ -1135,7 +1135,7 @@ class OrderDetail(DetailView):
 # Gönderildi). Staff open the packing page and scan the barcodes of the
 # physical rolls (stock_items) being packed. Each scanned roll must belong to
 # one of the order's products (else it's rejected) and reserves its
-# metres — editable, so a partial cut reserves less and leaves the rest
+# meters — editable, so a partial cut reserves less and leaves the rest
 # on the roll. Reservations are a SOFT hold: NO stock is physically cut
 # until the order ships. The page is re-openable — reservations can be
 # added, edited or removed any time before shipping.
@@ -1232,7 +1232,7 @@ def _match_roll_to_order(roll, items, variant_ids, product_ids, skus):
 
 
 def _roll_available_meters(roll, exclude_reservation_id=None, exclude_order_id=None):
-    """Physical metres on the roll minus what OTHER active reservations
+    """Physical meters on the roll minus what OTHER active reservations
     already hold — the ceiling so a roll can't be over-committed.
 
     `exclude_order_id` drops one order's own holds from that subtraction.
@@ -1264,7 +1264,7 @@ def _editing_order_id(request):
 
 
 def _roll_unavailable_response(roll, exclude_order_id=None):
-    """JSON error for a roll with no reservable metres — says WHY: a
+    """JSON error for a roll with no reservable meters — says WHY: a
     physically-empty roll and a roll fully held by other orders' active
     reservations are different problems for the staff scanning it, so
     the reserved case names the holding order(s)."""
@@ -1283,15 +1283,15 @@ def _roll_unavailable_response(roll, exclude_order_id=None):
         ref_txt = ", ".join(refs[:3]) + ("…" if len(refs) > 3 else "")
         return JsonResponse({
             "ok": False, "kind": "reserved",
-            "error": _gettext("This stock item is reserved — %(metres)s m is held for another order (%(ref)s).")
-                     % {"metres": f"{float(phys):g}", "ref": ref_txt},
+            "error": _gettext("This stock item is reserved — %(meters)s m is held for another order (%(ref)s).")
+                     % {"meters": f"{float(phys):g}", "ref": ref_txt},
         }, status=409)
     return JsonResponse({"ok": False, "kind": "no_stock",
                          "error": _gettext("No available meters are left on this roll.")}, status=409)
 
 
 def _outsourced_qty(item_data):
-    """The OUTSOURCED ("depo dışı") metres a create/edit order line
+    """The OUTSOURCED ("depo dışı") meters a create/edit order line
     submitted — the part of its quantity that will never have a roll
     scanned against it because it's sourced outside the warehouse.
 
@@ -1390,7 +1390,7 @@ def _batches_by_printed_barcode(code, books=None):
 
 
 def _create_roll_reservation(order, order_item, roll, req_meters, user):
-    """Lock the roll, cap the requested metres to what's actually
+    """Lock the roll, cap the requested meters to what's actually
     reservable, and create the OrderStockReservation row. Shared by the
     packing-scan endpoint and the retail order-create flow so both
     enforce the exact same no-over-commit rule. Returns
@@ -1426,14 +1426,14 @@ def _sync_line_to_reservations(order_item):
     really has at that instant. Those two numbers can disagree, and every
     way they disagree is silent:
 
-      * a competing order took metres between the form loading and saving,
+      * a competing order took meters between the form loading and saving,
         so _create_roll_reservation capped the hold to what was left;
       * the roll was re-measured shorter in the same window;
       * the barcode failed to resolve at all (moved to another book's
         shelf, wrong product) and reserved nothing.
 
     In each case the line kept the browser's figure and the order billed
-    metres no roll was holding. Reading the reservations back closes all
+    meters no roll was holding. Reading the reservations back closes all
     of them at once, because it stops trusting the submitted arithmetic
     rather than trying to detect each way it can be wrong.
 
@@ -1501,7 +1501,7 @@ def _order_edit_release_unticked(order, items_payload):
     Order matters. The per-line reconcile below releases at the end, so a
     stock item moved from line A to line B in one save would try to reserve for B
     while A still held it, see nothing available, and drop the pick. Doing
-    all the releases first makes the freed metres visible to the adds.
+    all the releases first makes the freed meters visible to the adds.
 
     Only lines actually present in the submission are considered. A hold
     is matched to the form's selection by its stock item's pick key
@@ -1538,7 +1538,7 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
     into the same list as fresh picks):
 
       * submitted barcode matching an existing unconsumed reservation →
-        kept; its metres updated in place if the user changed them via
+        kept; its meters updated in place if the user changed them via
         the scissors (capped to what's really available, same rule as
         order_pack_reserve_update);
       * submitted barcode with no reservation yet → reserved (the
@@ -1585,7 +1585,7 @@ def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcod
 
         held = existing.get(key)
         if held is not None:
-            # Kept — apply a metres change (scissors) if any.
+            # Kept — apply a meters change (scissors) if any.
             if req_m is not None and req_m > 0 and abs(held.quantity - req_m) > _PDecimal("0.004"):
                 avail = _roll_available_meters(held.stock_item, exclude_reservation_id=held.pk)
                 new_m = req_m if req_m <= avail else avail
@@ -1649,10 +1649,10 @@ def _reservation_payload(r):
 
 
 def _annotate_pack_contents(packs, reservations, untracked_items):
-    """What each package physically holds: stock_items, metres, and extra lines.
+    """What each package physically holds: stock_items, meters, and extra lines.
 
     The package header used to say only how many stock items were in it, and only
-    after the JS had run. A packer closing a sack wants the metres too —
+    after the JS had run. A packer closing a sack wants the meters too —
     that is the quantity on the packing list and on the pack label — so it
     is counted here, server-side, from the rows already loaded for the
     page (no per-pack query), and the JS keeps both figures live as stock items
@@ -1660,7 +1660,7 @@ def _annotate_pack_contents(packs, reservations, untracked_items):
 
     Untracked lines (trade goods with no roll to scan) are counted apart
     rather than folded in: they are physically in the sack, but their
-    quantity is pieces, not metres, and adding the two would produce a
+    quantity is pieces, not meters, and adding the two would produce a
     number that means nothing.
     """
     from collections import defaultdict
@@ -1854,13 +1854,13 @@ def order_pack_reserve_add(request, pk):
             "error": _gettext("This stock item doesn't belong to this order — it can't be added to the package."),
         }, status=409)
 
-    # Prefer the first matching roll that still has reservable metres.
+    # Prefer the first matching roll that still has reservable meters.
     pick = next(((roll, mi) for (roll, mi) in matched if _roll_available_meters(roll) > 0), None)
     if pick is None:
         return _roll_unavailable_response(matched[0][0])
     roll_pick, matched_item = pick
 
-    # Parse the requested metres (validation errors before we lock).
+    # Parse the requested meters (validation errors before we lock).
     raw = (request.POST.get("quantity") or "").strip()
     req_meters = None
     if raw:
@@ -1873,13 +1873,13 @@ def order_pack_reserve_add(request, pk):
 
     r, capped, err = _create_roll_reservation(order, matched_item, roll_pick, req_meters, request.user)
     if err == "no_stock":
-        # Raced: another request took the last metres between the check
+        # Raced: another request took the last meters between the check
         # above and the lock — report the (possibly reserved) state.
         return _roll_unavailable_response(roll_pick)
     if target_pack is not None:
         r.pack = target_pack
         r.save(update_fields=["pack"])
-    # The current account receivable is sourced from scanned metres (see
+    # The current account receivable is sourced from scanned meters (see
     # Order.billable_value) — a fresh scan changes it, so re-post now
     # rather than waiting for some unrelated OrderItem save.
     if order.current_account_id:
@@ -1892,7 +1892,7 @@ def order_pack_reserve_add(request, pk):
 @login_required
 @require_POST
 def order_pack_reserve_update(request, pk):
-    """Edit the reserved metres of one reservation (partial cut)."""
+    """Edit the reserved meters of one reservation (partial cut)."""
     from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
@@ -2014,7 +2014,7 @@ def order_pack_assign_item(request, pk):
 
 @login_required
 def order_create_barcode_check(request):
-    """Live validation for the retail order-create barcode+metres
+    """Live validation for the retail order-create barcode+meters
     inputs (Step 3 product cards). No Order exists yet at this point,
     so this checks a barcode against a specific product/variant SKU the
     caller already knows (the line's selected product) instead of
@@ -2047,7 +2047,7 @@ def order_create_barcode_check(request):
         "key": roll.pick_key,
         "counted": bool(roll.product and roll.product.sold_by_count),
         "available": float(avail),
-        # What `available` counts: metres of cloth, packs of curtains.
+        # What `available` counts: meters of cloth, packs of curtains.
         "unit": roll.product.unit_short if roll.product else "",
         "warehouse": (wh.name if wh else ""),
         # The shelf's book. A card that has not been tagged yet adopts
@@ -2081,7 +2081,7 @@ def _take_foreign_book_lines(order, items, member):
     allowed = {b.pk: b for b in member_books(member)}
 
     # This order's own book is the "working" one, so the part of a line
-    # that stays here keeps its item_id and its outsourced metres, and
+    # that stays here keeps its item_id and its outsourced meters, and
     # only genuinely foreign stock is carried off.
     own_book = None
     if book_id is not None:
@@ -2357,12 +2357,12 @@ def _line_parts_by_book(line, allowed, working):
     A card is one product and may hold stock off several shelves, so the
     book is a fact about each ROLL rather than about the line. A line whose
     rolls stand in two books is two lines: the quantity of each is the
-    metres picked off that book's shelves, and each goes to that book's
-    order. A line with no rolls at all — outsourced metres, a back-order,
+    meters picked off that book's shelves, and each goes to that book's
+    order. A line with no rolls at all — outsourced meters, a back-order,
     a custom curtain — has no shelf to read, so it belongs to the book
     being worked in.
 
-    The outsourced metres ride on ONE part, the working book's where it is
+    The outsourced meters ride on ONE part, the working book's where it is
     among them, else the first. Splitting them proportionally would invent
     a division nobody entered, and putting them on every part would bill
     them more than once.
@@ -2736,7 +2736,7 @@ def free_rolls_response(request, books):
             "book_id": (wh.accounting_book_id if wh else None),
             "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
             "available": float(avail),
-            # What the quantity and the cost are counted in: metres for
+            # What the quantity and the cost are counted in: meters for
             # cloth, but a box of ready-made curtains is packs.
             "unit": roll.product.unit_short if roll.product else "",
             **({"unit_cost": float(roll.unit_cost) if roll.unit_cost is not None else None}
@@ -2760,8 +2760,8 @@ def free_rolls_response(request, books):
 @require_POST
 def order_pack_complete(request, pk):
     """Confirm packing. Moves the order to 'packaging' (Paketleniyor).
-    Re-runnable; no stock cut. Scanned metres don't have to fully cover
-    every order line's ordered metres — a mismatch is allowed (the current account/
+    Re-runnable; no stock cut. Scanned meters don't have to fully cover
+    every order line's ordered meters — a mismatch is allowed (the current account/
     invoice bill only what was actually scanned, see
     Order.billable_value), only "nothing scanned at all" is rejected."""
     order = get_object_or_404(Order, pk=pk)
@@ -3223,8 +3223,8 @@ def order_print_shelves(order, items):
     warehouse headings at all.
 
     A line whose rolls stand in two warehouses prints under each with
-    that warehouse's metres and rolls, but only when those metres make up
-    the line exactly: a line typed by hand, or picked short, has metres no
+    that warehouse's meters and rolls, but only when those meters make up
+    the line exactly: a line typed by hand, or picked short, has meters no
     warehouse accounts for, so it prints whole under the warehouse holding
     most of it. Split amounts round like the whole line does, the last
     piece taking what is left, so the pieces add up to it to the cent. A
@@ -3265,12 +3265,12 @@ def order_print_shelves(order, items):
             continue
         pieces = sorted(per.items(), key=lambda kv: kv[1][0])
         spent = Decimal("0.00")
-        for n, (key, (name, rolls, metres)) in enumerate(pieces, start=1):
+        for n, (key, (name, rolls, meters)) in enumerate(pieces, start=1):
             amount = (it.line_total_calc - spent if n == len(pieces) else
-                      (metres * (it.price or Decimal("0"))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                      (meters * (it.price or Decimal("0"))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
             spent += amount
             s = shelf(key, name)
-            s.rows.append(SimpleNamespace(item=it, quantity=metres, amount=amount,
+            s.rows.append(SimpleNamespace(item=it, quantity=meters, amount=amount,
                                           pack_count=len(rolls),
                                           pack_noun=units.pack_noun(it.pack_type, len(rolls))))
             s.rolls |= rolls
@@ -3286,7 +3286,7 @@ def order_print_shelves(order, items):
 def order_print_totals_units(items, pack_count):
     """The unit and pack noun the foot of an order's lines prints.
 
-    Only when every line shares them: metres and pieces added together
+    Only when every line shares them: meters and pieces added together
     are a number with no unit, and printing "m" after it would say
     otherwise. Mixed packs fall back to the generic "packs".
     """
@@ -3809,7 +3809,7 @@ class OrderCreate(View):
                         _gettext("The order was created, but these barcodes could not be reserved — "
                                  "try again from the packing page: ") + ", ".join(failed_barcodes),
                     )
-                # Saying it is the whole point: the metres were quietly
+                # Saying it is the whole point: the meters were quietly
                 # unavailable, and a line that silently bills less than
                 # was picked is the thing this guards against.
                 if short_lines:
@@ -3986,7 +3986,7 @@ class OrderCreate(View):
 
         # Orders with rolls reserved right on the create form
         # skip the manual "Paketleniyor" scan step. The funnel's
-        # packaging gate requires FULL metre coverage; when the
+        # packaging gate requires FULL meter coverage; when the
         # picked rolls don't cover the ordered quantities the
         # order simply stays "Açık" and we tell the user below.
         order_stayed_open = False
@@ -4209,7 +4209,7 @@ class OrderEdit(UpdateView):
                 "variant": bool(it.product_variant),
                 "description": it.description or "",
                 "quantity": float(it.quantity) if it.quantity is not None else 0,
-                # Explicit "depo dışı" metres. null (not 0) for lines saved
+                # Explicit "depo dışı" meters. null (not 0) for lines saved
                 # before the column existed, so the sidebar knows to fall
                 # back to deriving it from quantity − reservations rather
                 # than showing a real 0 as an empty box.
@@ -5539,7 +5539,7 @@ def product_autocomplete(request):
                           "__product_variant_attribute")
         .order_by("name")[:60]
     )
-    # What is actually SELLABLE, not what is on the shelf: metres already
+    # What is actually SELLABLE, not what is on the shelf: meters already
     # reserved into another order are spoken for, and offering them here is
     # how a roll gets promised twice. One query for the whole result set.
     from decimal import Decimal as _D
@@ -5721,7 +5721,7 @@ def product_autocomplete(request):
                 f"{escape(_('Stock'))} {q:g}</span>")
 
     def warehouse_cells(stocks, with_cost=False):
-        """Warehouse stock — named shelves and metres. At most three; the
+        """Warehouse stock — named shelves and meters. At most three; the
         JS still receives the total.
 
         With `with_cost`, each shelf also carries what ITS stock cost.
@@ -5729,7 +5729,7 @@ def product_autocomplete(request):
         two businesses that each bought it — and 48 variants here
         disagree that way. One number in the corner has to pick a side
         and then says nothing about the other; the chips can just show
-        both, beside the metres they belong to, and the reader decides.
+        both, beside the meters they belong to, and the reader decides.
         """
         out = []
         for wh, q, wp in stocks[:3]:

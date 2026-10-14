@@ -83,7 +83,7 @@ class PackingScreenRolls(TestCase):
         self.assertNotIn('data-remaining="35,00"', html)
 
     def test_a_turkish_reader_still_reads_a_turkish_number(self):
-        """Only the machine-read attributes are unlocalized; the metres on
+        """Only the machine-read attributes are unlocalized; the meters on
         the face of the row stay in the reader's own notation."""
         self.assertIn("13,00 m", self._html("tr"))
         self.assertIn("13.00 m", self._html("en"))

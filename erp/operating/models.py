@@ -996,7 +996,7 @@ class Order(models.Model):
         nothing else — the same number the order screen prints — so the
         three can never disagree.
 
-        This deliberately replaces billing off scanned metres. That rule
+        This deliberately replaces billing off scanned meters. That rule
         (bill only what was packed) meant an order shipped without
         scanning billed nothing at all: order #145 showed a 116.80 total
         while 75.00 of it would never reach the current account, and the gap was
@@ -1060,7 +1060,7 @@ class Order(models.Model):
 
     def freeze_billable_quantities(self, save=True):
         """Capture what every line bills, right now. Called at ship time
-        AFTER reservations are consumed, so it records the metres
+        AFTER reservations are consumed, so it records the meters
         physically cut rather than whatever was reserved a moment
         earlier. Idempotent: re-freezing an already-frozen order just
         overwrites with the same figures."""
@@ -1101,16 +1101,16 @@ class Order(models.Model):
 
     def compute_billable_line_quantities(self, as_of=None):
         """Per-order-item quantity that should actually be BILLED (current account +
-        invoice) — the metres physically scanned into this order's
+        invoice) — the meters physically scanned into this order's
         packing (OrderStockReservation, whether still a pending hold or
         already consumed at ship time), NOT the ordered quantity. A line
         with nothing scanned yet contributes 0 here even though it has
         an ordered quantity — the unscanned portion of an order must
         never show up on the customer's account.
 
-        Two things are added on top of the scanned metres:
+        Two things are added on top of the scanned meters:
 
-        * outsourced_quantity — metres deliberately sourced OUTSIDE the
+        * outsourced_quantity — meters deliberately sourced OUTSIDE the
           warehouse. No roll will ever be scanned for them, but they are
           being sold, so they bill. Without this, an outsourced line on a
           product that happens to be stocked was indistinguishable from
@@ -1137,7 +1137,7 @@ class Order(models.Model):
 
         # Every reservation ever made for this line — pending
         # (consumed=False, a soft hold from packing) AND consumed=True
-        # (physically cut at ship time) — both represent metres that
+        # (physically cut at ship time) — both represent meters that
         # were actually scanned.
         scanned = {
             r["order_item_id"]: (r["s"] or Decimal("0"))
@@ -1157,7 +1157,7 @@ class Order(models.Model):
             got = scanned.get(it.pk, Decimal("0"))
             ordered = it.quantity or Decimal("0")
             # The outsourced part only fills the gap scanning hasn't
-            # covered. If staff end up packing those metres from stock
+            # covered. If staff end up packing those meters from stock
             # after all, the scan supersedes them instead of billing the
             # customer twice. A genuine scan OVERAGE (got > ordered) still
             # bills in full — that's the documented behaviour.
@@ -1443,12 +1443,12 @@ class OrderItem(models.Model):
     # outsourced, sourced elsewhere, so no roll will ever be scanned for
     # it. Entered on the create/edit order sidebar's OUTSOURCED box.
     #
-    # It exists because billing bills SCANNED metres (see
+    # It exists because billing bills SCANNED meters (see
     # get_billable_line_quantities): without an explicit column, an
     # outsourced line on a product that happens to be stocked in a
     # warehouse looked identical to a line nobody had packed yet, and was
     # silently dropped from the invoice and the customer's current account.
-    # quantity = scanned metres + outsourced_quantity.
+    # quantity = scanned meters + outsourced_quantity.
     # NULL means "never recorded" (a line saved before this column
     # existed) as opposed to an explicit 0 = "nothing outsourced". The
     # edit sidebar needs that difference: for a legacy line it falls back
@@ -1948,7 +1948,7 @@ class Warehouse(models.Model):
         Summed over the stock itself, at what each item cost. It used to
         be quantity x the SKU's cost_usd, which is a last-purchase price:
         a dearer delivery silently revalued everything already on the
-        shelf, and the headline moved without a metre going anywhere. This
+        shelf, and the headline moved without a meter going anywhere. This
         is the same expression accounting.services_ledger._inventory_value
         counts, so the warehouse page and the balance sheet cannot drift.
 
@@ -2029,7 +2029,7 @@ class WarehouseProduct(models.Model):
     # 4 decimals ON PURPOSE: these are DERIVED through an FX division, so
     # unlike purchase_price they carry genuine sub-cent value — ₺100.00 /
     # 42.4318 is $2.3567, and cost_try (price × rate) is fractional on
-    # every USD purchase. Rounding at rest costs real money once metres
+    # every USD purchase. Rounding at rest costs real money once meters
     # are multiplied back in. Screens render these with floatformat:2, so
     # they still read as plain cents next to purchase_price.
     cost_usd = models.DecimalField(
@@ -2111,7 +2111,7 @@ class WarehouseProduct(models.Model):
     @property
     def unit(self):
         """What this row is counted in — its main product's unit. A row not
-        yet linked to one is metres, what every unlinked import is."""
+        yet linked to one is meters, what every unlinked import is."""
         product = self.catalog_product
         return product.unit if product is not None else units.DEFAULT_UNIT
 
@@ -2190,8 +2190,8 @@ class WarehouseProduct(models.Model):
         """(value, quantity) over the stock standing on this product's floor.
 
         Correlated subqueries rather than a stored column. The weighted
-        average has to follow every metre that arrives, ships, is cut or
-        is deleted, and more than ten code paths move those metres —
+        average has to follow every meter that arrives, ships, is cut or
+        is deleted, and more than ten code paths move those meters —
         several of them by an incremental delta rather than a recompute.
         A stored average would fall out of step with the shelf at the
         first one anybody forgot, which is the failure this whole
@@ -2213,11 +2213,11 @@ class WarehouseProduct(models.Model):
             priced.annotate(v=Sum(F("quantity_remaining") * F("unit_cost_base"),
                                   output_field=_dec)).values("v")[:1],
             output_field=_dec)
-        metres = Subquery(
+        meters = Subquery(
             priced.annotate(m=Sum("quantity_remaining", output_field=_dec))
                   .values("m")[:1],
             output_field=_dec)
-        return value, metres
+        return value, meters
 
     @staticmethod
     def _last_cost_expr():
@@ -2251,10 +2251,10 @@ class WarehouseProduct(models.Model):
         """
         from django.db.models import Case, DecimalField, F, When
         _dec = DecimalField(max_digits=20, decimal_places=4)
-        value, metres = cls._stock_cost_exprs()
+        value, meters = cls._stock_cost_exprs()
         return (
             (cls.objects.all() if qs is None else qs)
-            .annotate(stock_value=value, stock_quantity=metres,
+            .annotate(stock_value=value, stock_quantity=meters,
                       last_cost=cls._last_cost_expr())
             .annotate(avg_cost=Case(
                 When(stock_quantity__gt=0,
@@ -2330,7 +2330,7 @@ class WarehouseProductItem(models.Model):
         on_delete=models.CASCADE,
     )
     # How much of the product this stock item is, in the parent's `unit`.
-    # Metres for a roll of fabric, sets for a box of ready-made curtains,
+    # Meters for a roll of fabric, sets for a box of ready-made curtains,
     # kilos for a bale. These were named `meters`/`quantity_remaining` back
     # when the warehouse held nothing but fabric; the arithmetic never
     # cared, but every screen said "m" and there was no way to hold
@@ -2576,7 +2576,7 @@ class StockMovement(models.Model):
     # `reason`/`reference` are free text ("Order ship Order #241"), which
     # is fine to read and useless to join on. Shipping writes BOTH a
     # consumed OrderStockReservation and this ledger row for the same
-    # metres, and with nothing linking them, code reporting where a roll
+    # meters, and with nothing linking them, code reporting where a roll
     # went had to guess which pairs were the same event — by amount, since
     # timestamps can straddle midnight. These two FKs make the pairing a
     # fact: `reservation` is set when a packing-scan hold becomes a real
@@ -2584,7 +2584,7 @@ class StockMovement(models.Model):
     # fallback path that consumes stock without a per-roll scan.
     #
     # SET_NULL on both: deleting an order or releasing a hold must never
-    # delete the record that metres physically left the warehouse.
+    # delete the record that meters physically left the warehouse.
     order = models.ForeignKey(
         "Order",
         on_delete=models.SET_NULL,
@@ -2718,7 +2718,7 @@ class OrderStockReservation(models.Model):
 
     It does NOT touch physical stock: the roll's quantity_remaining and
     the WarehouseProduct.quantity stay exactly as they are. The scanned
-    metres are only *reserved* (shown as "Rezerv" on the warehouse
+    meters are only *reserved* (shown as "Rezerv" on the warehouse
     pages). Physical deduction happens ONLY when the order is shipped
     (cargo info entered + "Complete order" pressed): each active
     reservation is then converted into a real StockMovement(out) that
@@ -2740,7 +2740,7 @@ class OrderStockReservation(models.Model):
         on_delete=models.CASCADE,
     )
     # Denormalised so the warehouse list + detail pages can roll up
-    # reserved metres per product/warehouse without walking rolls.
+    # reserved meters per product/warehouse without walking rolls.
     warehouse_product = models.ForeignKey(
         WarehouseProduct, related_name="reservations",
         on_delete=models.CASCADE,

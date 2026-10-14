@@ -175,7 +175,7 @@ class PurchaseOrderDetail(View):
             .order_by("line_no")
         )
         # Not received yet, there are no rolls to list — but the order says
-        # which it expects, each with the metres the supplier quoted. Shown
+        # which it expects, each with the meters the supplier quoted. Shown
         # in their place, marked approximate. Line order matches
         # plan_lines(), which is what built a draft's items.
         planned = []
@@ -204,8 +204,8 @@ class PurchaseOrderDetail(View):
             it.pack_one, it.pack_many = units.pack_nouns(pack_type)
             it.pack_noun = units.pack_noun(pack_type, it.pack_count)
         # What the whole delivery comes to in goods, beside what it costs:
-        # so many metres on so many rolls. Only a unit every line shares
-        # is printed — metres and pieces added together are a bare number
+        # so many meters on so many rolls. Only a unit every line shares
+        # is printed — meters and pieces added together are a bare number
         # — and mixed packs are called the generic "packs". An order still
         # to be received counts the rolls it expects.
         total_quantity = sum((it.quantity or 0) for it in items)

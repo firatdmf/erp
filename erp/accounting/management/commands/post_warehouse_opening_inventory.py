@@ -12,7 +12,7 @@ purchase invoice behind it.
 That is the whole of Ergene's remaining gap. Its cutover was 2026-09-03 and
 photographed 376,906.10 in Ergene Fabrika, which is still exactly what 1300
 says. On 2026-09-08 a second warehouse, Ready-made Shop, was loaded by the
-READYMADE-STOCK-IMPORT batch: 45 movements, 214 items, 2,796.00 metres,
+READYMADE-STOCK-IMPORT batch: 45 movements, 214 items, 2,796.00 meters,
 worth 50,168.45. No purchase invoice, no current account movement, no
 journal entry — and 50,168.45 is, to the cent, the amount by which the
 warehouse exceeds the ledger.

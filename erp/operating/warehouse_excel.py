@@ -79,8 +79,8 @@ def _filtered_products(warehouse, search, sort, search_by="text",
     # balance sheet get it: the stock on the floor, each item at cost
     # (WarehouseProduct.with_stock_costs). The export used to multiply
     # quantity by the SKU's unit cost, which is a last-purchase price, so
-    # a dearer delivery restated every metre already on the shelf and the
-    # TOPLAM moved without a metre going anywhere.
+    # a dearer delivery restated every meter already on the shelf and the
+    # TOPLAM moved without a meter going anywhere.
     qs = (WarehouseProduct.with_stock_costs(qs)
           .select_related("warehouse__accounting_book__base_currency"))
     _money = DecimalField(max_digits=20, decimal_places=4)

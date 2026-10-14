@@ -233,7 +233,7 @@ class CountedStock(TestCase):
         self.assertEqual(self.holds(order), {self.old.pk: Decimal("2")})
 
     # ── the order's page ────────────────────────────────────────
-    def test_the_order_page_counts_pieces_not_rolls_and_metres(self):
+    def test_the_order_page_counts_pieces_not_rolls_and_meters(self):
         self.post([self.line([(self.key(self.old), 3), (self.key(self.new), 1)])])
         order = Order.objects.get()
         page = self.client.get(reverse("operating:order_detail", kwargs={"pk": order.pk}))
@@ -244,7 +244,7 @@ class CountedStock(TestCase):
         self.assertNotIn(" top ·", html)
         self.assertNotRegex(html, r'class="m">[\d.,]+ m<')
 
-    def test_cloth_on_the_order_page_is_still_rolls_and_metres(self):
+    def test_cloth_on_the_order_page_is_still_rolls_and_meters(self):
         self.post([self.line([(ROLL, 12)], sku="K1.G1")])
         order = Order.objects.get()
         page = self.client.get(reverse("operating:order_detail", kwargs={"pk": order.pk}))

@@ -35,12 +35,12 @@ class StockLeavingPostsItsCost(TestCase):
         return {r["code"]: r["balance"] for r in
                 balance_sheet(self.book)["trial_balance"]["rows"]}
 
-    def _out(self, metres, **extra):
+    def _out(self, meters, **extra):
         return StockMovement.objects.create(
             product=self.product, stock_item=self.roll, movement_type="out",
-            quantity=Decimal(metres), reason="Order ship Order #298", **extra)
+            quantity=Decimal(meters), reason="Order ship Order #298", **extra)
 
-    def test_metres_leaving_become_cost_of_goods_sold(self):
+    def test_meters_leaving_become_cost_of_goods_sold(self):
         self._out("25")
         b = self._balances()
         self.assertEqual(b["5000"], Decimal("100.00"))    # 25m x 4.00
@@ -147,10 +147,10 @@ class StockLeavingPostsItsCost(TestCase):
         from accounting.services_posting import post_opening_inventory
 
         rolls = []
-        for n, metres in enumerate(("34.30", "33.50", "30.70", "33.30")):
+        for n, meters in enumerate(("34.30", "33.50", "30.70", "33.30")):
             rolls.append(WarehouseProductItem.objects.create(
-                product=self.product, quantity=Decimal(metres),
-                quantity_remaining=Decimal(metres), barcode=f"HALF-{n}",
+                product=self.product, quantity=Decimal(meters),
+                quantity_remaining=Decimal(meters), barcode=f"HALF-{n}",
                 status="in_stock", unit_cost_base=Decimal("4.35")))
         post_opening_inventory(self.book, date="2026-09-01")
 

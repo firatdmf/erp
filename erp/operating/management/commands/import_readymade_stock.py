@@ -61,7 +61,7 @@ DEFAULT_SPEC = Path.home() / "Desktop" / "KarvenReadyMadeStock.xlsx"
 WAREHOUSE_NAME = "Ready-made Shop"
 BOOK_NAME = "Ergene Fabric"
 
-# Sold as packaged sets, one EAN per set — not by the metre. The sets
+# Sold as packaged sets, one EAN per set — not by the meter. The sets
 # then travel in cartons, which is what one stock item here is: the two
 # are separate facts and the command states both rather than letting one
 # be inferred from the other.

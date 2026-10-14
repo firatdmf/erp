@@ -419,6 +419,62 @@ msgstr "Ek Bilgi"
 msgid "Alt text"
 msgstr "Alternatif metin"
 
+#: erp/nav.py:0
+msgid "Subscribers"
+msgstr "Aboneler"
+
+#: marketing/templates/marketing/subscriber_list.html:0
+msgid "Active, with an email"
+msgstr "Aktif, e-postası olan"
+
+#: marketing/templates/marketing/subscriber_list.html:0
+msgid "Active, with a phone"
+msgstr "Aktif, telefonu olan"
+
+#: marketing/templates/marketing/subscriber_list.html:0
+msgid "Search email or phone"
+msgstr "E-posta veya telefon ara"
+
+#: marketing/templates/marketing/subscriber_list.html:0
+msgid "Everyone"
+msgstr "Herkes"
+
+#: marketing/templates/marketing/subscriber_list.html:0
+msgid "Unsubscribed"
+msgstr "Abonelikten çıktı"
+
+#: marketing/templates/marketing/subscriber_list.html:0
+msgid "Discount code"
+msgstr "İndirim kodu"
+
+#: marketing/templates/marketing/subscriber_list.html:0
+msgid "Subscribed"
+msgstr "Abonelik tarihi"
+
+#: marketing/templates/marketing/subscriber_list.html:0
+msgid "No subscribers found."
+msgstr "Abone bulunamadı."
+
+#: marketing/templates/marketing/blog_list.html:0
+msgid "Take this post off the website?"
+msgstr "Bu yazı web sitesinden kaldırılsın mı?"
+
+#: marketing/templates/marketing/blog_list.html:0
+msgid "Unpublish"
+msgstr "Yayından kaldır"
+
+#: marketing/templates/marketing/blog_form.html:0
+msgid "Ticked, the post is on demfirat.com. Unticked, it stays a draft only you can preview."
+msgstr "İşaretliyse yazı demfirat.com'da yayındadır. İşaretli değilse yalnızca sizin önizleyebileceğiniz bir taslak olarak kalır."
+
+#: marketing/templates/marketing/blog_form.html:0
+msgid "Save and publish"
+msgstr "Kaydet ve yayınla"
+
+#: marketing/views.py:0
+msgid "An email address or a phone number is required"
+msgstr "E-posta adresi veya telefon numarası gerekli"
+
 msgid "Barcode (ISBN, UPC, GTIN, etc.)"
 msgstr "Barkod (ISBN, UPC, GTIN, vb.)"
 
@@ -1787,7 +1843,7 @@ msgid "Prospect"
 msgstr "Aday"
 
 msgid "Publish"
-msgstr "Publish"
+msgstr "Yayınla"
 
 msgid "Publish Date *"
 msgstr "Publish Date *"

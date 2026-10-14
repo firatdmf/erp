@@ -1527,7 +1527,8 @@
     if (res) res.innerHTML = '';
   };
 
-  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost, counted) {
+  // `startAtOne` false: the caller takes the first piece itself (a scan).
+  function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost, counted, startAtOne) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
     // Stock is informational only — out-of-stock / low-stock products
     // can still be added (back-order). Catalog stock is deducted only
@@ -1566,7 +1567,10 @@
       // Known from the pick itself where the caller says so; the stock
       // list confirms it when it arrives. Starting on the right card
       // saves the one drawn first from changing shape a moment later.
-      counted: (counted === true || counted === 'true')
+      counted: (counted === true || counted === 'true'),
+      // A product sold by count is added as one of it, not none: picked
+      // from the search, the next thing done is nearly always "one".
+      startAtOne: startAtOne !== false
     });
     renderProducts({ highlightFirst: true });
     document.getElementById('co-product-search').value = '';
@@ -1646,6 +1650,11 @@
         // One card is one SKU, so its items share a unit.
         item.rollUnit = (item.availableRolls[0] && item.availableRolls[0].unit) || item.rollUnit || 'm';
         item.rollsLoading = false;
+        var start = item.startAtOne && item.counted
+          && !(item.rolls || []).length && !(item.existingRolls || []).length
+          && coCountedFree(item) > 0;
+        item.startAtOne = false;
+        if (start) { window.coTakeQuantity(orderItems.indexOf(item), 1); return; }
         renderProducts();
       })
       .catch(function () {
@@ -2274,7 +2283,7 @@
         var skuL = (d.sku || '').toLowerCase();
         var idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         if (idx === -1) {
-          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost, d.counted);
+          coSelectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost, d.counted, false);
           idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
         }
         if (idx === -1) { showToast('{% trans "The product could not be added" %}', 'error'); return false; }

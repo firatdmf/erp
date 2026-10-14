@@ -1284,6 +1284,25 @@
             {% endfor %}
           </div>
 
+          {% if counter_gap %}
+          {% comment %}Paid at the counter, then edited or called off: the
+             person decides whether the difference changes hands. Nothing
+             settles it on its own (operating.views.settle_counter).{% endcomment %}
+          <div id="od-counter-gap" style="font-size:12.5px; color:#92400E; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:9px 11px; margin:8px 0; display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+            <i class="fa fa-cash-register"></i>
+            <span style="flex:1; min-width:200px;">
+              {% blocktrans with taken=counter_gap.0|floatformat:"2g" owed=counter_gap.1|floatformat:"2g" cur=order.currency_symbol %}{{ cur }}{{ taken }} was taken at the counter; the order bills {{ cur }}{{ owed }}.{% endblocktrans %}
+              <b>{% if counter_gap.2 > 0 %}{% blocktrans with gap=counter_gap_abs|floatformat:"2g" cur=order.currency_symbol %}{{ cur }}{{ gap }} still to collect.{% endblocktrans %}{% else %}{% blocktrans with gap=counter_gap_abs|floatformat:"2g" cur=order.currency_symbol %}{{ cur }}{{ gap }} to give back.{% endblocktrans %}{% endif %}</b>
+            </span>
+            <form method="post" action="{% url 'operating:settle_counter' order.pk %}" style="margin:0;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm" style="background:#92400E; color:#FFF; border:none; border-radius:7px; padding:5px 11px; font-weight:600; cursor:pointer;">
+                {% if counter_gap.2 > 0 %}{% trans "Collect it" %}{% else %}{% trans "Give it back" %}{% endif %}
+              </button>
+            </form>
+          </div>
+          {% endif %}
+
           <div class="od-ship{% if cargo_locked %} locked{% endif %}">
             {% if not cargo_locked %}
             <div class="od-ship-hint" style="font-size:12px;color:#64748B;margin-bottom:8px;">

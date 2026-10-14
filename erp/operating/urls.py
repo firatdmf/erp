@@ -121,6 +121,8 @@ urlpatterns = [
     path("orders/print/combined/", views.OrderPrintCombined.as_view(), name="order_print_combined"),
     path("orders/print/combined/excel/", order_excel.combined_order_excel, name="order_excel_combined"),
     path("orders/<int:pk>/changes/", of_a_customer_in_reach(views.order_changes), name="order_changes"),
+    # A retail order's counter takings brought into line with its bill.
+    path("orders/<int:pk>/settle-counter/", book_guarded(views.settle_counter, Order, "current_account.book"), name="settle_counter"),
     # The rolls to pull for an order, for the warehouse floor: no prices,
     # no customer name. Guarded the way the pack screen is — it is the
     # same people's sheet.

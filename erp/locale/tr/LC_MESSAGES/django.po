@@ -14458,3 +14458,48 @@ msgstr "Virmanı Düzenle"
 #: browser tab titles
 msgid "Sales Analytics"
 msgstr "Satış Analizi"
+
+msgid "Choose the cash account the money went into."
+msgstr "Paranın girdiği kasayı seçin."
+
+#, python-format
+msgid "%(box)s holds %(have)s, but %(book)s sells over the counter in %(want)s — choose a cash account in %(want)s."
+msgstr "%(box)s %(have)s tutuyor, ama %(book)s tezgâhta %(want)s ile satıyor — %(want)s cinsinden bir kasa seçin."
+
+msgid "Nothing to settle: what was taken matches what the order bills."
+msgstr "Kapatılacak fark yok: alınan tutar siparişin tutarıyla aynı."
+
+msgid "The cash account the sale went into is not known — settle it from the current account instead."
+msgstr "Satışın girdiği kasa bilinmiyor — farkı cari hesaptan kapatın."
+
+#, python-format
+msgid "%(amount)s collected into %(box)s."
+msgstr "%(amount)s %(box)s kasasına tahsil edildi."
+
+#, python-format
+msgid "%(amount)s given back from %(box)s."
+msgstr "%(amount)s %(box)s kasasından iade edildi."
+
+#, python-format
+msgid "%(cur)s%(taken)s was taken at the counter; the order bills %(cur)s%(owed)s."
+msgstr "Tezgâhta %(cur)s%(taken)s alındı; sipariş tutarı %(cur)s%(owed)s."
+
+#, python-format
+msgid "%(cur)s%(gap)s still to collect."
+msgstr "%(cur)s%(gap)s daha tahsil edilecek."
+
+#, python-format
+msgid "%(cur)s%(gap)s to give back."
+msgstr "%(cur)s%(gap)s iade edilecek."
+
+msgid "Collect it"
+msgstr "Tahsil et"
+
+msgid "Give it back"
+msgstr "İade et"
+
+msgid "Paid at the counter — the whole total goes into the cash account below."
+msgstr "Tezgâhta ödendi — tutarın tamamı aşağıdaki kasaya girer."
+
+msgid "No cash account in this currency"
+msgstr "Bu para biriminde kasa yok"

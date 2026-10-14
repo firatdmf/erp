@@ -1423,6 +1423,64 @@ class Order(models.Model):
             return f"{number} - {self.get_client()}"
         return f"{number} - {self.contact or self.company} "
 
+    # ── Paid at the counter ───────────────────────────────────────
+    def counter_takings(self):
+        """What has been taken for this order and not given back, in its
+        own currency: confirmed collections linked to it (OrderPayment)
+        less confirmed refunds."""
+        from decimal import Decimal
+        net = Decimal("0.00")
+        for link in self.payment_links.select_related("payment"):
+            pay = link.payment
+            if pay.status != "confirmed":
+                continue
+            if pay.type == "collection":
+                net += pay.amount
+            elif pay.type == "refund_in":
+                net -= pay.amount
+        return net
+
+    def counter_gap(self):
+        """For a retail order paid at the counter: (taken, owed, gap), where
+        gap = owed − taken — more to collect when positive, money to give
+        back when negative. None when there is nothing to say: not retail,
+        nothing taken for it through the order form (older retail orders
+        were never linked, and are left as they are), or the two agree.
+
+        Owed is what the order bills, or nothing once it is cancelled or
+        returned. The gap opens when the order is edited after the money
+        was taken, or called off; the person at the counter decides what
+        to do about it (settle_counter), nothing does it for them.
+        """
+        from decimal import Decimal
+        if not self.is_retail_order or not self.payment_links.exists():
+            return None
+        taken = self.counter_takings()
+        owed = (Decimal("0.00") if self.order_status in ("cancelled", "returned")
+                else Decimal(str(self.billable_value() or 0)))
+        gap = owed - taken
+        if gap == 0:
+            return None
+        return taken, owed, gap
+
+
+class OrderPayment(models.Model):
+    """A payment taken for one order — a deposit, or a retail sale paid at
+    the counter — tied to it by key.
+
+    The old link was the payment's notes reading "ORD-<pk>". A collection
+    entered by hand never carried it, so retail's automatic collection
+    could not see it and took order 286's money twice. A key cannot be
+    missed or mistyped."""
+    order = models.ForeignKey("operating.Order", on_delete=models.CASCADE,
+                              related_name="payment_links")
+    payment = models.OneToOneField("accounting.Payment", on_delete=models.CASCADE,
+                                   related_name="order_link")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.payment_id} for order {self.order_id}"
+
 
 class OrderItem(models.Model):
 

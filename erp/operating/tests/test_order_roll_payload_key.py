@@ -21,7 +21,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from accounting.models import Book, CurrencyCategory
+from accounting.models import Book, CashAccount, CurrencyCategory
 from marketing.models import Product
 
 from operating.models import (Order, OrderStockReservation, Warehouse, WarehouseProduct,
@@ -34,8 +34,10 @@ class RollPayloadKey(TestCase):
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def setUp(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
-        CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         book = Book.objects.create(name="Laleli Fabric")
+        # A retail sale is paid at the counter, into a cash account.
+        self.drawer = CashAccount.objects.create(book=book, name="Drawer", currency=usd)
         self.product = Product.objects.create(title="Crepe", sku=SKU, price=10)
         wh = Warehouse.objects.create(name="Laleli depo", accounting_book=book)
         wp = WarehouseProduct.objects.create(
@@ -55,6 +57,7 @@ class RollPayloadKey(TestCase):
         resp = self.client.post(reverse("operating:create_order"), {
             "customer_type": "retail",
             "retail_customer_name": "Walk-in",
+            "deposit_cash_account": self.drawer.pk,
             "product_json_input": json.dumps([{
                 "item_no": 1,
                 "product": {"sku": SKU, "variant": False},

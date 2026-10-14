@@ -626,6 +626,11 @@ class OrderDetail(DetailView):
                 if self.object.currency_code != base_code else None)
         # 1 for a foreign order means no rate was found: say nothing in base.
         ctx["order_rate_to_base"] = rate if rate and rate != 1 else None
+        # A retail order edited or called off after it was paid for: what
+        # the counter took no longer matches the bill (Order.counter_gap).
+        ctx["counter_gap"] = self.object.counter_gap()
+        if ctx["counter_gap"]:
+            ctx["counter_gap_abs"] = abs(ctx["counter_gap"][2])
         # Nothing on the order is cloth: no meters to speak of anywhere.
         ctx["only_counted"] = bool(items_sorted) and all(
             it.sold_by_count for it in items_sorted)
@@ -2472,8 +2477,36 @@ def _deposit_cash_boxes():
     for box in (CashAccount.objects.select_related("currency")
                 .order_by("book_id", "name")):
         boxes.setdefault(str(box.book_id), []).append(
-            {"id": box.pk, "label": f"{box.label} ({box.currency.code})"})
+            {"id": box.pk, "label": f"{box.label} ({box.currency.code})",
+             "currency": box.currency.code})
     return boxes
+
+
+def _retail_box_problem(request, groups):
+    """Why a retail order cannot be taken as it stands, or None.
+
+    A walk-in customer pays at the counter, so the money goes into a cash
+    account the moment the order is made — anyone who leaves owing gets an
+    account of their own instead. So every book the basket is sold from
+    needs the cash account its takings went into, in the currency its
+    counter sells in."""
+    from django.utils.translation import gettext as _
+    from accounting.models_accounts import CurrentAccount
+    from accounting.services_accounts import (
+        RETAIL_CURRENT_ACCOUNT_CODE, new_customer_currency)
+    for book, _items in groups:
+        box = _deposit_cash_box_for_book(request, book)
+        if box is None:
+            return _("Choose the cash account the money went into.")
+        counter = CurrentAccount.objects.filter(
+            book=book, code=RETAIL_CURRENT_ACCOUNT_CODE).first()
+        selling = counter.default_currency if counter else new_customer_currency(book)
+        if selling is not None and box.currency_id != selling.pk:
+            return _("%(box)s holds %(have)s, but %(book)s sells over the counter in "
+                     "%(want)s — choose a cash account in %(want)s.") % {
+                "box": box.label, "have": box.currency.code,
+                "book": book.name, "want": selling.code}
+    return None
 
 
 def _deposit_cash_box_for_book(request, book):
@@ -3768,6 +3801,12 @@ class OrderCreate(View):
                 # yet: each book's is opened in the currency picked for
                 # them — the same one across a split, as a split needs.
                 split_currency = new_currency
+            # Retail is paid at the counter: no order without the cash
+            # account the money went into.
+            if customer_type == "retail":
+                problem = _retail_box_problem(request, groups)
+                if problem:
+                    raise ValueError(problem)
         except ValueError as _e:
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 return JsonResponse({"ok": False, "error": str(_e)})
@@ -4066,6 +4105,12 @@ class OrderCreate(View):
         # ledger as a deduction.
         deposit_flag = (request.POST.get("deposit_received") or "").strip()
         deposit_amount = _deposit_amount_for_book(request, book)
+        # A retail order is paid in full at the counter, there and then:
+        # the whole of what it bills, whatever the form sent.
+        paid_at_counter = order.is_retail_order
+        if paid_at_counter:
+            deposit_flag = "1"
+            deposit_amount = float(order.billable_value() or 0)
         if deposit_flag and deposit_amount > 0 and order.current_account_id:
             try:
                 from decimal import Decimal
@@ -4097,10 +4142,13 @@ class OrderCreate(View):
                     amount=Decimal(str(deposit_amount)),
                     currency=currency,
                     cash_account=box,
-                    description=f"Deposit for Order #{order.pk}",
+                    description=(f"Paid at the counter for Order #{order.pk}"
+                                 if paid_at_counter else f"Deposit for Order #{order.pk}"),
                     notes=f"ORD-{order.pk}",
                     created_by=member,
                 )
+                from .models import OrderPayment
+                OrderPayment.objects.create(order=order, payment=pay)
                 if box is None:
                     from django.utils.translation import gettext as _g
                     messages.warning(request, _g(
@@ -7718,3 +7766,56 @@ def create_raw_material_item_partial(request):
         
     form = RawMaterialGoodItemForm(initial=initial)
     return render(request, "operating/partials/raw_material_item_form.html", {"form": form})
+
+
+@login_required
+@require_POST
+def settle_counter(request, pk):
+    """Close the gap between what a retail order took at the counter and
+    what it bills (Order.counter_gap): collect the rest, or give the
+    difference back, through the cash account the sale went into.
+
+    Only on a person's say-so. An edited or cancelled order shows the gap
+    and this button; nothing settles it on its own — taking money
+    automatically is how order 286 was collected twice.
+    """
+    from datetime import date
+    from django.utils.translation import gettext as _
+    from accounting.models import Payment
+    from accounting.views_payment import _next_payment_number
+    from .models import OrderPayment
+
+    order = get_object_or_404(Order, pk=pk)
+    gap = order.counter_gap()
+    if gap is None:
+        messages.info(request, _("Nothing to settle: what was taken matches what the order bills."))
+        return redirect("operating:order_detail", pk=order.pk)
+    _taken, _owed, difference = gap
+    last = (order.payment_links.select_related("payment__cash_account", "payment__currency")
+            .filter(payment__status="confirmed").order_by("-payment__date", "-pk").first())
+    if last is None or last.payment.cash_account_id is None:
+        messages.error(request, _("The cash account the sale went into is not known — "
+                                  "settle it from the current account instead."))
+        return redirect("operating:order_detail", pk=order.pk)
+    first = last.payment
+    kind = "collection" if difference > 0 else "refund_in"
+    member = getattr(request.user, "member", None)
+    with transaction.atomic():
+        pay = Payment.objects.create(
+            current_account=first.current_account, book=first.book,
+            number=_next_payment_number(first.book, kind),
+            type=kind, method="cash", status="draft", date=date.today(),
+            amount=abs(difference), currency=first.currency,
+            cash_account=first.cash_account,
+            description=(f"Rest collected at the counter for Order #{order.pk}" if kind == "collection"
+                         else f"Given back at the counter for Order #{order.pk}"),
+            notes=f"ORD-{order.pk}", created_by=member)
+        OrderPayment.objects.create(order=order, payment=pay)
+        pay.confirm(user=request.user)
+    if kind == "collection":
+        messages.success(request, _("%(amount)s collected into %(box)s.") % {
+            "amount": f"{order.currency_symbol}{abs(difference):,.2f}", "box": first.cash_account.label})
+    else:
+        messages.success(request, _("%(amount)s given back from %(box)s.") % {
+            "amount": f"{order.currency_symbol}{abs(difference):,.2f}", "box": first.cash_account.label})
+    return redirect("operating:order_detail", pk=order.pk)

@@ -600,7 +600,14 @@
       <i class="fas fa-chevron-down co-chev"></i>
     </div>
     <div class="co-section-body">
-      <div class="form-group">
+      {% comment %}A retail sale is paid in full at the counter: the toggle
+      gives way to this, the amount is the order's total and only the cash
+      account is asked (coRetailPayment).{% endcomment %}
+      <div id="co-counter-note" class="form-group" style="display:none; font-weight:600;">
+        <i class="fas fa-cash-register" style="color:#147F74;"></i>
+        {% trans "Paid at the counter — the whole total goes into the cash account below." %}
+      </div>
+      <div class="form-group" id="co-deposit-toggle-row">
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
           <input type="checkbox" id="co-deposit-toggle" name="deposit_received" value="1"
                  onchange="document.getElementById('co-deposit-row').style.display=this.checked?'block':'none'; if(!this.checked) document.getElementById('co-deposit-amount').value='';">
@@ -1246,6 +1253,7 @@
     var sum3 = document.getElementById('co-sum-3');
     if (sum3) sum3.textContent = label;
     renderProducts();
+    coRetailPayment(true);
     coRefreshSteps();
     // Products open, but the customer step stays open too: the optional
     // "enter customer details" has just appeared there.
@@ -1257,6 +1265,7 @@
     document.getElementById('customer-type').value = '';
     document.getElementById('customer-pk').value = '';
     coHideCustomerChip();
+    coRetailPayment(false);
     document.getElementById('co-retail-customer-toggle').style.display = 'none';
     document.getElementById('co-retail-fields').style.display = 'none';
     document.getElementById('co-delivery-fields').style.display = '';
@@ -1740,13 +1749,56 @@
   // inputs are named deposit_amount_<book id>, which is what the save
   // reads first — so the plain box can never double-post onto a split.
   // The kasas each book can take a deposit into, keyed by book id.
+  // An order being edited was paid for when it was made; the counter
+  // payment is a thing of the new-order form only.
+  const CO_EDITING = {% if order %}true{% else %}false{% endif %};
+  // What the order comes to, as the total at the foot shows it.
+  function coOrderTotal() {
+    var sum = 0;
+    orderItems.forEach(function (it) { sum += (parseFloat(it.quantity) || 0) * (parseFloat(it.price) || 0); });
+    return Math.max(0, sum + coAdjustmentsTotal());
+  }
   const CO_DEPOSIT_BOXES = (function () {
     const el = document.getElementById('co-deposit-boxes');
     return el ? JSON.parse(el.textContent) : {};
   })();
+  // At the counter only a cash account in the order's currency will do,
+  // and one is filled in: the one this person used last at this book, or
+  // the only one there is.
+  function coCounterBoxes(bookKey) {
+    var code = CO_CUR && (CO_CUR.code || CO_CUR.currency);
+    return (CO_DEPOSIT_BOXES[String(bookKey)] || []).filter(function (b) {
+      return !code || !b.currency || b.currency === code;
+    });
+  }
+  function coCounterPick(bookKey, selected) {
+    var boxes = coCounterBoxes(bookKey);
+    var ids = boxes.map(function (b) { return String(b.id); });
+    if (selected && ids.indexOf(String(selected)) !== -1) return selected;
+    var last = null;
+    try { last = localStorage.getItem('co-counter-box-' + bookKey); } catch (e) {}
+    if (last && ids.indexOf(String(last)) !== -1) return last;
+    return ids.length === 1 ? ids[0] : '';
+  }
+  function coRememberCounterBox(sel) {
+    if (!isRetailOrder || !sel || !sel.value) return;
+    var key = sel.dataset.bookKey || '';
+    try { localStorage.setItem('co-counter-box-' + key, sel.value); } catch (e) {}
+  }
+  document.addEventListener('change', function (e) {
+    if (e.target && (e.target.id === 'co-deposit-box' || e.target.classList.contains('co-deposit-book-box'))) {
+      coRememberCounterBox(e.target);
+    }
+  });
   function coBoxOptions(bookKey, selected) {
+    var counter = isRetailOrder && !CO_EDITING;
+    if (counter) selected = coCounterPick(bookKey, selected);
+    var list = counter ? coCounterBoxes(bookKey) : (CO_DEPOSIT_BOXES[String(bookKey)] || []);
+    if (counter && !list.length) {
+      return '<option value="">{% filter escapejs %}{% trans "No cash account in this currency" %}{% endfilter %}</option>';
+    }
     return '<option value="">{% trans "— Select —" %}</option>' +
-      (CO_DEPOSIT_BOXES[String(bookKey)] || []).map(function (b) {
+      list.map(function (b) {
         return '<option value="' + b.id + '"' + (String(b.id) === String(selected) ? ' selected' : '') +
           '>' + esc(b.label) + '</option>';
       }).join('');
@@ -1772,11 +1824,14 @@
       const box = document.getElementById('co-deposit-box');
       if (box) {
         const key = coSingleDepositBook();
-        if (box.dataset.bookKey !== String(key)) {
+        var mode = (isRetailOrder && !CO_EDITING ? 'counter:' + (CO_CUR && CO_CUR.code) : 'deposit');
+        if (box.dataset.bookKey !== String(key) || box.dataset.mode !== mode) {
           box.innerHTML = coBoxOptions(key, box.value);
           box.dataset.bookKey = String(key);
+          box.dataset.mode = mode;
         }
       }
+      coRetailAmounts();
       return;
     }
     single.style.display = 'none';
@@ -1814,6 +1869,44 @@
         '</select>' +
       '</div>';
     }).join('');
+    coRetailAmounts();
+  }
+
+  // A retail sale pays its whole total: the amount boxes say so and are
+  // not typed into. Called whenever the total or the basket's books move.
+  function coRetailAmounts() {
+    if (!isRetailOrder || CO_EDITING) return;
+    var single = document.getElementById('co-deposit-single');
+    if (single && single.style.display !== 'none') {
+      var amt = document.getElementById('co-deposit-amount');
+      if (amt) { amt.value = coOrderTotal().toFixed(2); amt.readOnly = true; }
+    }
+    var totals = coBookTotals();
+    document.querySelectorAll('#co-deposit-per-book input[data-book-key]').forEach(function (inp) {
+      inp.value = (totals[inp.dataset.bookKey] || 0).toFixed(2);
+      inp.readOnly = true;
+    });
+  }
+
+  // Retail on, retail off: the deposit step becomes the counter payment
+  // and back again.
+  function coRetailPayment(on) {
+    if (CO_EDITING) return;
+    var toggle = document.getElementById('co-deposit-toggle');
+    var row = document.getElementById('co-deposit-row');
+    var toggleRow = document.getElementById('co-deposit-toggle-row');
+    var note = document.getElementById('co-counter-note');
+    if (!toggle || !row) return;
+    toggle.checked = !!on;
+    if (toggleRow) toggleRow.style.display = on ? 'none' : '';
+    if (note) note.style.display = on ? '' : 'none';
+    row.style.display = on ? 'block' : 'none';
+    if (!on) {
+      document.querySelectorAll('#co-deposit-row input[type=number]').forEach(function (inp) {
+        inp.readOnly = false; inp.value = '';
+      });
+    }
+    coRenderDepositBoxes();
   }
 
   // Ticking the deposit box can come before any product is picked, so the
@@ -3175,6 +3268,7 @@
         bd.style.display = 'none';
       }
     }
+    coRetailAmounts();
   }
 
   // Deposit / Total / Remaining row was removed in favor of the
@@ -3253,7 +3347,9 @@
         });
       }
       if (missingBox) {
-        showToast('{% trans "Choose the cash box the deposit went into" %}', 'error');
+        showToast(isRetailOrder
+          ? '{% filter escapejs %}{% trans "Choose the cash account the money went into." %}{% endfilter %}'
+          : '{% trans "Choose the cash box the deposit went into" %}', 'error');
         coToggle(4);
         missingBox.focus();
         return;

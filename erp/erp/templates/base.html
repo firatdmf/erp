@@ -9,11 +9,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
+    // The theme the member picked in their settings: light, dark, or
+    // auto — dark from 19:00 to 07:00 by the browser's own clock, and what
+    // anyone who never picked gets. Auto is checked again every minute, so
+    // a page left open turns over on time.
     (function () {
-      try {
-        var t = localStorage.getItem('nejum-theme') || 'light';
-        document.documentElement.setAttribute('data-theme', t);
-      } catch (e) {}
+      function pick() {
+        var t = 'auto';
+        try { t = localStorage.getItem('nejum-theme') || 'auto'; } catch (e) {}
+        if (t !== 'auto') return t;
+        var h = new Date().getHours();
+        return (h >= 19 || h < 7) ? 'dark' : 'light';
+      }
+      window.nejumApplyTheme = function () {
+        var t = pick();
+        if (document.documentElement.getAttribute('data-theme') !== t)
+          document.documentElement.setAttribute('data-theme', t);
+      };
+      window.nejumApplyTheme();
+      setInterval(window.nejumApplyTheme, 60000);
+      // A dark page stays hidden until dark_auto.js has darkened what the
+      // page paints itself, so it doesn't flash white first. The timeout
+      // shows it anyway should that script never arrive.
+      if (pick() === 'dark') {
+        document.documentElement.classList.add('dk-pending', 'dk-init');
+        setTimeout(function () { document.documentElement.classList.remove('dk-pending', 'dk-init'); }, 800);
+      }
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
@@ -45,7 +66,8 @@
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=31" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard-mobile.css' %}?v=7" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/responsive-content.css' %}?v=4" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/dark.css' %}?v=10" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/dark.css' %}?v=11" />
+    <script src="{% static 'erp/js/nejum/dark_auto.js' %}?v=1" defer></script>
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
 
 

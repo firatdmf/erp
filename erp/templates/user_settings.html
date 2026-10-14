@@ -354,8 +354,12 @@
                 <button type="button" class="st-theme-option" data-theme-value="dark">
                   <i class="fas fa-moon"></i> {% trans "Dark Mode" %}
                 </button>
+                <button type="button" class="st-theme-option" data-theme-value="auto">
+                  <i class="fas fa-circle-half-stroke"></i> {% trans "Auto" %}
+                </button>
               </div>
               <p class="st-help">{% trans "Choose your preferred appearance. Dark mode is in beta — visual polish across modules will improve gradually." %}</p>
+              <p class="st-help">{% trans "Auto is dark from 19:00 to 07:00, by this device's clock." %}</p>
             </div>
 
             <div class="st-form-group is-full" style="margin-top: 22px;">
@@ -596,8 +600,8 @@
     const switcher = document.getElementById('themeSwitcher');
     if (switcher) {
       const stored = (function () {
-        try { return localStorage.getItem('nejum-theme') || 'light'; }
-        catch (e) { return 'light'; }
+        try { return localStorage.getItem('nejum-theme') || 'auto'; }
+        catch (e) { return 'auto'; }
       })();
       const opts = switcher.querySelectorAll('.st-theme-option');
       opts.forEach(btn => {
@@ -605,7 +609,9 @@
         btn.addEventListener('click', () => {
           const v = btn.dataset.themeValue;
           try { localStorage.setItem('nejum-theme', v); } catch (e) {}
-          document.documentElement.setAttribute('data-theme', v);
+          // base.html works out what "auto" means at this hour.
+          if (window.nejumApplyTheme) window.nejumApplyTheme();
+          else document.documentElement.setAttribute('data-theme', v === 'auto' ? 'light' : v);
           opts.forEach(b => b.classList.toggle('is-active', b === btn));
         });
       });

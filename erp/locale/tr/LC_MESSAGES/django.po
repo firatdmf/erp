@@ -14503,3 +14503,9 @@ msgstr "Tezgâhta ödendi — tutarın tamamı aşağıdaki kasaya girer."
 
 msgid "No cash account in this currency"
 msgstr "Bu para biriminde kasa yok"
+
+msgid "Auto is dark from 19:00 to 07:00, by this device's clock."
+msgstr "Otomatik, bu cihazın saatine göre 19:00 ile 07:00 arası koyudur."
+
+msgid "Auto"
+msgstr "Otomatik"

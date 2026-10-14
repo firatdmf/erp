@@ -37,15 +37,8 @@ function openVariantAttributesModal(variantIndex, variantSku) {
         window.productAttributes = currentProductAttrs;
     }
     
-    // Get existing variant-specific attributes
-    const combinations = generateCombinations();
-    const combo = combinations[variantIndex];
-    const attrKey = Object.entries(combo)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, val]) => `${key}:${val}`)
-        .join('|');
-    
-    const existingData = existingVariantData[attrKey] || {};
+    // Get existing variant-specific attributes (a row's data is kept by its index)
+    const existingData = existingVariantData[variantIndex] || {};
     const variantAttrs = variantAttributesData[variantIndex] || existingData.product_attributes || [];
     
     // Store in memory - keep existing variant-specific values if they exist
@@ -193,18 +186,11 @@ function saveVariantAttributes(variantIndex) {
     // Update memory
     variantAttributesData[variantIndex] = attrs;
     
-    // Update existingVariantData for rendering
-    const combinations = generateCombinations();
-    const combo = combinations[variantIndex];
-    const attrKey = Object.entries(combo)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, val]) => `${key}:${val}`)
-        .join('|');
-    
-    if (existingVariantData[attrKey]) {
-        existingVariantData[attrKey].product_attributes = attrs;
+    // Update existingVariantData for rendering (kept by row index)
+    if (existingVariantData[variantIndex]) {
+        existingVariantData[variantIndex].product_attributes = attrs;
     } else {
-        existingVariantData[attrKey] = { product_attributes: attrs };
+        existingVariantData[variantIndex] = { product_attributes: attrs };
     }
     
     // Update button counter

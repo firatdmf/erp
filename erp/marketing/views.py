@@ -713,13 +713,13 @@ class BaseProductView(ModelFormMixin):
         if DEBUG_PERF:
             print(f"\n⏱️  Processing {len(variants_data)} variants...")
 
-        # Delete variants the user removed.
-        #
-        # CRITICAL: we exclude variants whose `variant_id` is in the
-        # payload — that means the user kept the variant; they may just
-        # have renamed its `variant_sku`. Deleting them by stale SKU
-        # would cascade-orphan their images and trip the OrderItem FK
-        # PROTECT. The rename itself happens further down.
+        # Delete the variants the page says were removed — and only those.
+        # The page lists the variants there are, so one it leaves out was
+        # not deleted by anybody: it used to be deleted all the same, which
+        # took every variant the page failed to list (one lacking an
+        # option the others have) along with the ones removed on purpose.
+        # Rows deleted one by one go at once (instant_delete_variant); this
+        # is for those removed with an option value.
         delete_start = time.time()
         kept_variant_ids = set()
         for v in variants_data:
@@ -729,17 +729,25 @@ class BaseProductView(ModelFormMixin):
                     kept_variant_ids.add(int(vid))
             except (TypeError, ValueError):
                 pass
-        submitted_skus = {
-            v["variant_sku"] for v in variants_data if v.get("variant_sku")
-        }
-        existing_skus = set(self.object.variants.values_list("variant_sku", flat=True))
-        # Variants whose SKU isn't in the new list AND whose pk wasn't
-        # claimed by the user as "kept" → safe to delete.
-        deletable_qs = ProductVariant.objects.filter(
-            product=self.object, variant_sku__in=(existing_skus - submitted_skus),
-        ).exclude(pk__in=kept_variant_ids)
-        deleted_count = deletable_qs.delete()[0]
-        print(f"  ✓ Deleted {deleted_count} variants: {time.time() - delete_start:.3f}s")
+        removed_ids = set()
+        for vid in variants_json.get("deleted_variant_ids") or []:
+            try:
+                removed_ids.add(int(vid))
+            except (TypeError, ValueError):
+                pass
+        held_back = []
+        for variant in (ProductVariant.objects.filter(product=self.object, pk__in=removed_ids)
+                        .exclude(pk__in=kept_variant_ids)):
+            try:
+                with transaction.atomic():
+                    variant.delete()
+            except ProtectedError:
+                held_back.append(variant.variant_sku)
+        if held_back:
+            messages.warning(self.request, _gettext(
+                "Not deleted, because they have stock or are on an order: %(skus)s")
+                % {"skus": ", ".join(held_back)})
+        print(f"  ✓ Deleted {len(removed_ids) - len(held_back)} variants: {time.time() - delete_start:.3f}s")
         
         # Pre-fetch ALL data in one go to minimize queries
         prefetch_start = time.time()

@@ -14368,3 +14368,42 @@ msgstr "%(name)s, %(sells)s ile satış yapar ve defterlerini %(keeps)s ile tuta
 #: accounting/templates/accounts/goods_receipt_form.html:0
 msgid "This product is on the website, so its attributes are not changed from here. Not saved to the catalog:"
 msgstr "Bu ürün web sitesinde olduğundan özellikleri buradan değiştirilmez. Kataloğa kaydedilmeyen:"
+
+#: marketing/templates/marketing/components/variant_form.html:0
+msgid "Create every combination"
+msgstr "Tüm kombinasyonları oluştur"
+
+#: marketing/templates/marketing/components/variant_form.html:0
+msgid "Adds a variant for each combination of the values above that is not a variant yet."
+msgstr "Yukarıdaki değerlerin henüz varyant olmayan her kombinasyonu için bir varyant ekler."
+
+#: marketing/templates/marketing/components/variant_form.html:0
+msgid "No variants yet — add one, or create every combination of the values above."
+msgstr "Henüz varyant yok — bir tane ekleyin ya da yukarıdaki değerlerin tüm kombinasyonlarını oluşturun."
+
+#: marketing/templates/marketing/components/variant_form.html:0
+msgid "Every combination is already a variant."
+msgstr "Tüm kombinasyonlar zaten varyant."
+
+#: marketing/templates/marketing/components/variant_form.html:0
+#, python-format
+msgid "This adds %(count)s variants. Continue?"
+msgstr "Bu işlem %(count)s varyant ekler. Devam edilsin mi?"
+
+#: marketing/templates/marketing/components/variant_form.html:0
+msgid "A new variant has no values — pick them, or delete the row."
+msgstr "Yeni bir varyantın değerleri yok — değerleri seçin ya da satırı silin."
+
+#: marketing/templates/marketing/components/variant_form.html:0
+#, python-format
+msgid "Two variants have the same values: %(values)s — change one, or delete it."
+msgstr "İki varyantın değerleri aynı: %(values)s — birini değiştirin ya da silin."
+
+#: marketing/templates/marketing/components/variant_form.html:0
+msgid "Check the variants"
+msgstr "Varyantları kontrol edin"
+
+#: marketing/views.py:0
+#, python-format
+msgid "Not deleted, because they have stock or are on an order: %(skus)s"
+msgstr "Stokları olduğu ya da bir siparişte bulundukları için silinmedi: %(skus)s"

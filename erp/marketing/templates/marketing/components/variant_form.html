@@ -1,7 +1,7 @@
 {% load i18n %}
 {% load static %}
 {% block css %}
-<link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}?v=3" />
+<link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}?v=4" />
 {% endblock css %}
 
 <div class="loading" id="loading">{% trans "Loading…" %}</div>
@@ -45,6 +45,18 @@
     <table id="variant_table" style="width: 100%; min-width: 500px; border-collapse: collapse;"></table>
   </div>
 
+  <!-- The table lists the variants there are; new ones are added here. -->
+  <div class="variant_rows_actions" id="variant_rows_actions" style="display: none;">
+    <button type="button" class="variant_rows_btn" onclick="addVariantRow()">
+      <i class="fa fa-plus"></i> {% trans "Add variant" %}
+    </button>
+    <button type="button" class="variant_rows_btn" onclick="createEveryCombination()"
+            title="{% trans 'Adds a variant for each combination of the values above that is not a variant yet.' %}">
+      <i class="fa fa-th"></i> {% trans "Create every combination" %}
+    </button>
+    <span class="variant_rows_note" id="variant_rows_note"></span>
+  </div>
+
   <!-- Hidden input for tracking deleted variant files -->
   <input type="hidden" id="deleted_variant_files" name="deleted_variant_files" value="">
 
@@ -66,6 +78,13 @@
       delete:          '{% trans "Delete"|escapejs %}',
       // table row
       edit_hint:       '{% trans "Edit"|escapejs %}',
+      // adding variants, and rows the save can't take
+      no_rows_yet:     '{% trans "No variants yet — add one, or create every combination of the values above."|escapejs %}',
+      every_combination_exists: '{% trans "Every combination is already a variant."|escapejs %}',
+      confirm_combinations: '{% trans "This adds %(count)s variants. Continue?"|escapejs %}',
+      row_without_values: '{% trans "A new variant has no values — pick them, or delete the row."|escapejs %}',
+      rows_alike:      '{% trans "Two variants have the same values: %(values)s — change one, or delete it."|escapejs %}',
+      rows_title:      '{% trans "Check the variants"|escapejs %}',
       // variant attributes modal
       m_title:         '{% trans "Variant Attributes"|escapejs %}',
       m_help:          '{% trans "Customize attributes for this specific variant. Leave empty to use product-level defaults."|escapejs %}',
@@ -132,6 +151,6 @@
       deleteError: '{% filter escapejs %}{% trans "Delete error" %}{% endfilter %}'
     };
   </script>
-  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=5" defer></script>
-  <script src="{% static 'marketing/js/variant_attributes_modal.js' %}" defer></script>
+  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=7" defer></script>
+  <script src="{% static 'marketing/js/variant_attributes_modal.js' %}?v=2" defer></script>
 </div>

@@ -228,18 +228,17 @@ function loadExistingVariantImages() {
         const variants = JSON.parse(variantListData);
         console.log('Loading existing variant data:', variants);
 
-        // Store variant data keyed by attribute values for easy lookup
-        // Also need to find variant index for variantAttributesData
-        const combinations = generateCombinations();
+        // One row per saved variant, holding the values it has — a variant
+        // without one of the options simply has no value for it.
+        variantRows = [];
+        variants.forEach((variant, index) => {
+            const row = {};
+            Object.entries(variant.variant_attribute_values || {}).forEach(([name, value]) => {
+                if (name && value !== null && value !== undefined && String(value).trim()) row[name] = String(value);
+            });
+            variantRows.push(row);
 
-        variants.forEach(variant => {
-            // Create a key from attribute values (e.g., "color:white|size:1")
-            const attrKey = Object.entries(variant.variant_attribute_values)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([key, val]) => `${key}:${val}`)
-                .join('|');
-
-            existingVariantData[attrKey] = {
+            existingVariantData[index] = {
                 variant_id: variant.variant_id,
                 price: variant.variant_price,
                 cost: variant.variant_cost,
@@ -251,49 +250,23 @@ function loadExistingVariantImages() {
                 images: []
             };
 
-            // Populate variantAttributesData for the modal to use
-            // Find the index of this variant in combinations
-            if (variant.product_attributes && variant.product_attributes.length > 0) {
-                const variantIndex = combinations.findIndex(combo => {
-                    const comboKey = Object.entries(combo)
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([key, val]) => `${key}:${val}`)
-                        .join('|');
-                    return comboKey === attrKey;
-                });
-
-                if (variantIndex !== -1 && typeof variantAttributesData !== 'undefined') {
-                    variantAttributesData[variantIndex] = variant.product_attributes;
-                    console.log(`Loaded ${variant.product_attributes.length} attributes for variant index ${variantIndex}`);
-                }
+            if (variant.product_attributes && variant.product_attributes.length > 0
+                    && typeof variantAttributesData !== 'undefined') {
+                variantAttributesData[index] = variant.product_attributes;
             }
         });
 
         // Load variant images if available
         if (variantFilesData && variantFilesData !== '{}') {
             const filesDict = JSON.parse(variantFilesData);
-            console.log('\n═══ [PAGE LOAD] Variant files from server ═══');
-            Object.entries(filesDict).forEach(([sku, files]) => {
-                console.log(`  ${sku}: ${files.length} files | IDs=${files.map(f => f.id).join(',')}`);
-            });
-            console.log('═══════════════════════════════════════════════\n');
-
-            // Map images to variants
-            variants.forEach(variant => {
+            variants.forEach((variant, index) => {
                 const files = filesDict[variant.variant_sku];
-                if (files && files.length > 0) {
-                    const attrKey = Object.entries(variant.variant_attribute_values)
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([key, val]) => `${key}:${val}`)
-                        .join('|');
-
-                    if (existingVariantData[attrKey]) {
-                        existingVariantData[attrKey].images = files.map(f => ({
-                            id: f.id,
-                            url: f.url,
-                            name: f.name || f.url.split('/').pop()
-                        }));
-                    }
+                if (files && files.length > 0 && existingVariantData[index]) {
+                    existingVariantData[index].images = files.map(f => ({
+                        id: f.id,
+                        url: f.url,
+                        name: f.name || f.url.split('/').pop()
+                    }));
                 }
             });
         }
@@ -634,6 +607,23 @@ window.onColorValueImageRemove = onColorValueImageRemove;
 // Update option name
 function updateOptionName(optionId, name) {
     if (!variantData[optionId]) return;
+    // The rows carry the option under its name, so they follow a rename.
+    // A name cleared on the way to a new one leaves them as they are.
+    const carried = (optionId in rowOptionNames) ? rowOptionNames[optionId] : (variantData[optionId].name || '');
+    const next = (name || '').trim();
+    if (next) {
+        if (carried && carried !== next) {
+            variantRows.forEach(row => {
+                if (Object.prototype.hasOwnProperty.call(row, carried)) {
+                    row[next] = row[carried];
+                    delete row[carried];
+                }
+            });
+        }
+        rowOptionNames[optionId] = next;
+    } else {
+        rowOptionNames[optionId] = carried;
+    }
     variantData[optionId].name = name;
     refreshColorOptionState(optionId);
     updateVariantTable();
@@ -678,6 +668,23 @@ function updateOptionValue(optionId, valueIndex, value) {
         }
     }
 
+    // Rows that have this value follow a rename of it — keystroke by
+    // keystroke. A value cleared on the way to a new one leaves them be.
+    const rowNames = (rowOptionValues[optionId] = rowOptionValues[optionId] || {});
+    const carriedValue = (valueIndex in rowNames) ? rowNames[valueIndex] : (oldValue || '').trim();
+    const nextValue = (value || '').trim();
+    const optionNameNow = variantData[optionId].name;
+    if (nextValue) {
+        if (carriedValue && carriedValue !== nextValue && optionNameNow) {
+            variantRows.forEach(row => {
+                if (row[optionNameNow] === carriedValue) row[optionNameNow] = nextValue;
+            });
+        }
+        rowNames[valueIndex] = nextValue;
+    } else {
+        rowNames[valueIndex] = carriedValue;
+    }
+
     // Store the new value
     variantData[optionId].values[valueIndex] = value;
 
@@ -703,6 +710,10 @@ function updateOptionValue(optionId, valueIndex, value) {
 
 // Remove option
 function removeOption(optionId) {
+    const removedName = (optionId in rowOptionNames) ? rowOptionNames[optionId] : (variantData[optionId] || {}).name;
+    if (removedName) variantRows.forEach(row => { delete row[removedName]; });
+    delete rowOptionNames[optionId];
+    delete rowOptionValues[optionId];
     delete variantData[optionId];
     const element = document.getElementById(optionId);
     if (element) element.remove();
@@ -748,105 +759,27 @@ function removeValue(optionId, valueIndex) {
 
     console.log(`Deleting value "${deletedValue}" at index ${valueIndex} from option ${optionId}`);
 
-    // 1. BACKUP CURRENT STATE
-    // We map all current variants by their unique signature (e.g. "Color:Red|Size:L")
-    // This allows us to restore data to the correct variant even if indices change
-    const variantBackup = {};
-    const currentCombinations = generateCombinations();
-
-    currentCombinations.forEach((combo, index) => {
-        // Skip if this index is marked as deleted (user manually deleted this specific variant row)
-        if (deletedVariantIndices.has(index)) return;
-
-        // Create unique signature key
-        const signature = createVariantSignature(combo);
-
-        // Backup images
-        const images = variantImages[index];
-
-        // Backup input values from DOM
-        // We try to get values from inputs first, then fall back to existingVariantData
-        const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
-        const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
-        const costInput = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
-        const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
-        const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
-        const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
-
-        // Get ID from row data attribute
-        const row = document.querySelector(`tr[data-variant-index="${index}"]`);
-        const variantId = row ? row.getAttribute('data-variant-id') : '';
-
-        // Get product_attributes from existingVariantData or variantAttributesData
-        const existingData = existingVariantData[signature] || {};
-        const productAttrs = (typeof variantAttributesData !== 'undefined' && variantAttributesData[index])
-            ? variantAttributesData[index]
-            : (existingData.product_attributes || []);
-
-        variantBackup[signature] = {
-            images: images ? JSON.parse(JSON.stringify(images)) : null, // Deep copy images
-            price: priceInput ? priceInput.value : '',
-            cost: costInput ? costInput.value : '',
-            quantity: quantityInput ? quantityInput.value : '',
-            sku: skuInput ? skuInput.value : '',
-            barcode: barcodeInput ? barcodeInput.value : '',
-            featured: featuredInput ? featuredInput.checked : true,
-            variant_id: variantId,
-            product_attributes: productAttrs
-        };
+    // The variants that have the value go with it: their rows leave the
+    // table, and the saved ones are named for the save to delete.
+    const optionName = variantData[optionId] ? variantData[optionId].name : '';
+    const gone = deletedValue.trim();
+    variantRows.forEach((row, index) => {
+        if (deletedVariantIndices.has(index) || !optionName || row[optionName] !== gone) return;
+        deletedVariantIndices.add(index);
+        const id = (existingVariantData[index] || {}).variant_id;
+        if (id) removedVariantIds.add(String(id));
     });
 
-    console.log('Variant backup created:', Object.keys(variantBackup).length, 'items');
-
-    // 2. UPDATE DATA MODEL (Actually remove the value)
     if (variantData[optionId] && variantData[optionId].values) {
         variantData[optionId].values.splice(valueIndex, 1);
     }
+    // The values move up one place, so what each place carries is read
+    // afresh from the values themselves.
+    delete rowOptionValues[optionId];
 
-    // 3. UPDATE DOM
     if (wrapper) wrapper.remove();
     reindexDomFields(valuesList, optionId);
 
-    // 4. REGENERATE & RESTORE
-    // Clear global trackers
-    variantImages = {};
-    deletedVariantIndices.clear(); // Clear deleted indices as we are regenerating table
-
-    // Generate new combinations based on updated variantData
-    const newCombinations = generateCombinations();
-
-    // Update existingVariantData with our backup
-    // renderVariantTable uses existingVariantData to populate the table
-    existingVariantData = {}; // Clear old cache
-
-    newCombinations.forEach((combo, newIndex) => {
-        const signature = createVariantSignature(combo);
-        const backup = variantBackup[signature];
-
-        if (backup) {
-            // Restore images to global variantImages
-            if (backup.images) {
-                variantImages[newIndex] = backup.images;
-            }
-
-            // Update existingVariantData so renderVariantTable picks it up
-            existingVariantData[signature] = {
-                variant_id: backup.variant_id,
-                price: backup.price,
-                cost: backup.cost,
-                quantity: backup.quantity,
-                sku: backup.sku,
-                barcode: backup.barcode,
-                featured: backup.featured,
-                product_attributes: backup.product_attributes || [],
-                images: backup.images ? backup.images.images : []
-            };
-        }
-    });
-
-    console.log('Restored data for', Object.keys(existingVariantData).length, 'variants');
-
-    // 5. RENDER
     updateVariantTable();
     updateGroupingOptions();
 }
@@ -874,8 +807,15 @@ function reindexDomFields(valuesList, optionId) {
     });
 }
 
-// Generate variant combinations
+// The page's variants, one per row — see variantRows. Copies, so a caller
+// can't change a row by accident.
 function generateCombinations() {
+    return variantRows.map(row => ({ ...row }));
+}
+
+// Every combination of the option values: what "Create every combination"
+// adds the missing ones of, for a product that does come in all of them.
+function everyCombination() {
     const validOptions = Object.entries(variantData)
         .filter(([id, data]) => {
             // Must have a name and at least one non-empty value
@@ -921,10 +861,25 @@ function generateCombinations() {
     return combine(validOptions);
 }
 
-// Store all combinations globally for filtering
+// The rows as last drawn (generateCombinations())
 let allCombinations = [];
-// Store existing variant data from backend
+// What each row holds, by row index: the saved variant's id, SKU, price…
 let existingVariantData = {};
+// The page's variants, one entry per row: { optionName: value } for the
+// values that row has. A row is a variant, or one being added — not a
+// combination worked out from the option values. Multiplying those out
+// listed 72 rows for an embroidered design with 7 colourways, and saving
+// created the 65 nobody makes. Rows are never taken out of the list, only
+// marked in deletedVariantIndices, so a row's index — which names its
+// inputs, images and attributes — stays its own.
+let variantRows = [];
+// Saved variants removed along with an option value. The save deletes
+// these, and nothing else: a variant the page leaves out is left alone.
+let removedVariantIds = new Set();
+// The option name and values the rows carry, per option card, while one is
+// being retyped (see updateOptionName / updateOptionValue).
+let rowOptionNames = {};
+let rowOptionValues = {};
 // Track deleted variant indices
 let deletedVariantIndices = new Set();
 // Track value renames: { optionId: { oldValue: newValue } }
@@ -932,244 +887,172 @@ let pendingValueRenames = {};
 
 // Update variant table with combinations
 function updateVariantTable() {
-    console.log('updateVariantTable called');
-
-    // BACKUP: Save current variant data before regenerating combinations
-    const variantBackup = {};
-
-    if (allCombinations && allCombinations.length > 0) {
-        allCombinations.forEach((combo, index) => {
-            if (deletedVariantIndices.has(index)) return;
-
-            const signature = createVariantSignature(combo);
-
-            // Read current form values
-            const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
-            const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
-            const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
-            const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
-            const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
-
-            const attrKey = Object.entries(combo)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([key, val]) => `${key}:${val}`)
-                .join('|');
-            const existingData = existingVariantData[attrKey] || {};
-
-            // Get product_attributes from variantAttributesData (modal edits) or existingVariantData (backend)
-            const productAttrs = (typeof variantAttributesData !== 'undefined' && variantAttributesData[index])
-                ? variantAttributesData[index]
-                : (existingData.product_attributes || []);
-
-            const costInput2 = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
-            variantBackup[signature] = {
-                price: priceInput?.value || existingData.price || '',
-                cost: costInput2?.value || existingData.cost || '',
-                quantity: quantityInput?.value || existingData.quantity || '',
-                sku: skuInput?.value || existingData.sku || '',
-                barcode: barcodeInput?.value || existingData.barcode || '',
-                featured: featuredInput ? featuredInput.checked : (existingData.featured !== false),
-                variant_id: existingData.variant_id || '',
-                product_attributes: productAttrs,
-                images: variantImages[index] ? { ...variantImages[index] } : (existingData.images ? { images: existingData.images, primaryIndex: 0 } : null)
-            };
-        });
-    }
-
-    console.log('Backed up', Object.keys(variantBackup).length, 'variants');
+    // Keep what each row's inputs hold before the rows are drawn again.
+    allCombinations.forEach((combo, index) => {
+        if (deletedVariantIndices.has(index)) return;
+        const kept = existingVariantData[index] || {};
+        const input = name => document.querySelector(`input[name="variant_${name}_${index + 1}"]`);
+        const price = input('price'), cost = input('cost'), quantity = input('quantity');
+        const sku = input('sku'), barcode = input('barcode'), featured = input('featured'), active = input('active');
+        // A new row's SKU follows its values until somebody types one; a
+        // saved variant's is its own and never changes by itself.
+        let skuValue = kept.sku || '';
+        if (sku) {
+            skuValue = (kept.variant_id || sku.value !== sku.dataset.autoSku) ? sku.value : '';
+        }
+        existingVariantData[index] = {
+            ...kept,
+            price: price ? price.value : kept.price,
+            cost: cost ? cost.value : kept.cost,
+            quantity: quantity ? quantity.value : kept.quantity,
+            sku: skuValue,
+            barcode: barcode ? barcode.value : kept.barcode,
+            featured: featured ? featured.checked : kept.featured,
+            is_active: active ? active.value === 'true' : kept.is_active,
+            product_attributes: (typeof variantAttributesData !== 'undefined' && variantAttributesData[index])
+                ? variantAttributesData[index] : (kept.product_attributes || []),
+        };
+    });
 
     allCombinations = generateCombinations();
-    console.log('Generated', allCombinations.length, 'combinations');
 
     const table = document.getElementById('variant_table');
-
-    if (!table) {
-        console.error('variant_table not found!');
-        return;
-    }
-
-    // Drop the old rows and every per-index store. Rows are numbered by
-    // position, and the new combinations do not line up with the old ones —
-    // left in place, row 2 of the new table would read row 2 of the old one
-    // and take another variant's SKU, price and images (two rows then carry
-    // the same SKU and the form refuses to submit). Everything worth keeping
-    // is in variantBackup, keyed by combination, and is restored below.
+    if (!table) return;
     table.innerHTML = '';
-    variantImages = {};
-    if (typeof variantAttributesData !== 'undefined') {
-        Object.keys(variantAttributesData).forEach(k => delete variantAttributesData[k]);
-    }
 
-    if (allCombinations.length === 0) {
-        console.log('No combinations, hiding table');
+    const liveRows = allCombinations.filter((_, index) => !deletedVariantIndices.has(index)).length;
+    if (liveRows === 0) {
         table.style.display = 'none';
         const _grp = document.getElementById('grp_container');
         if (_grp) _grp.style.display = 'none';
         toggleProductImagesSection();
+        updateVariantRowsBar();
         return;
     }
 
-    // RESTORE: Map backed up data to new combinations by signature
-    // Track which backups have been used to prevent duplicates
-    const usedBackups = new Set();
-
-    // Build rename mapping from pendingValueRenames
-    // Format: { "optionName:oldValue": "optionName:newValue" }
-    const renameMap = {};
-    for (const [optionId, renames] of Object.entries(pendingValueRenames)) {
-        const optionName = variantData[optionId]?.name;
-        if (optionName) {
-            for (const [oldVal, newVal] of Object.entries(renames)) {
-                renameMap[`${optionName}:${oldVal}`] = `${optionName}:${newVal}`;
-            }
-        }
-    }
-    console.log('Rename map:', renameMap);
-
-    // Helper function to apply renames to a signature
-    function applyRenamesToSignature(signature) {
-        let parts = signature.split('|');
-        parts = parts.map(part => {
-            // part is like "size:large"
-            const newPart = renameMap[part];
-            return newPart || part;
-        });
-        return parts.sort().join('|');
-    }
-
-    allCombinations.forEach((combo, newIndex) => {
-        const newSignature = createVariantSignature(combo);
-
-        // Try exact match first
-        let backup = variantBackup[newSignature];
-        let matchedSignature = newSignature;
-
-        // If no exact match, try renamed signature match
-        if (!backup) {
-            for (const [oldSignature, oldBackup] of Object.entries(variantBackup)) {
-                if (usedBackups.has(oldSignature)) continue;
-
-                // Apply renames to old signature and check if it matches new signature
-                const renamedOldSignature = applyRenamesToSignature(oldSignature);
-                if (renamedOldSignature === newSignature) {
-                    backup = oldBackup;
-                    matchedSignature = oldSignature;
-                    console.log(`Matched via rename: ${oldSignature} -> ${newSignature}`);
-                    break;
-                }
-            }
-        }
-
-        // If still no match, try subset matching (for when new options are added)
-        // IMPORTANT: Only match if new signature is FIRST occurrence of this subset pattern
-        if (!backup) {
-            // Sort candidates by number of matching parts (descending) to get best match
-            const candidates = [];
-            for (const [oldSignature, oldBackup] of Object.entries(variantBackup)) {
-                if (usedBackups.has(oldSignature)) continue;
-
-                // Apply renames first
-                const renamedOldSignature = applyRenamesToSignature(oldSignature);
-                const oldParts = renamedOldSignature.split('|');
-                const newParts = newSignature.split('|');
-
-                // Check if old signature is a subset of new signature
-                const isSubset = oldParts.every(oldPart => newParts.includes(oldPart));
-
-                if (isSubset) {
-                    // Check if this is the FIRST new combination that matches this old signature
-                    // by checking if any earlier new combination also matches
-                    let isFirstMatch = true;
-                    for (let i = 0; i < newIndex; i++) {
-                        const earlierCombo = allCombinations[i];
-                        const earlierSignature = createVariantSignature(earlierCombo);
-                        const earlierParts = earlierSignature.split('|');
-                        const earlierIsSubset = oldParts.every(oldPart => earlierParts.includes(oldPart));
-                        if (earlierIsSubset) {
-                            isFirstMatch = false;
-                            break;
-                        }
-                    }
-
-                    if (isFirstMatch) {
-                        candidates.push({
-                            oldSignature,
-                            oldBackup,
-                            matchCount: oldParts.length
-                        });
-                    }
-                }
-            }
-
-            // Sort by match count (most specific match first)
-            candidates.sort((a, b) => b.matchCount - a.matchCount);
-
-            if (candidates.length > 0) {
-                backup = candidates[0].oldBackup;
-                matchedSignature = candidates[0].oldSignature;
-                console.log(`Matched via subset (first match): ${matchedSignature} -> ${newSignature}`);
-            }
-        }
-
-        if (backup) {
-            // Mark this backup as used
-            usedBackups.add(matchedSignature);
-
-            // Restore to existingVariantData so renderVariantTable picks it up
-            const attrKey = Object.entries(combo)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([key, val]) => `${key}:${val}`)
-                .join('|');
-
-            existingVariantData[attrKey] = {
-                variant_id: backup.variant_id,
-                price: backup.price,
-                cost: backup.cost,
-                quantity: backup.quantity,
-                sku: backup.sku,
-                barcode: backup.barcode,
-                featured: backup.featured,
-                product_attributes: backup.product_attributes || [],
-                images: backup.images?.images || []
-            };
-
-            // Also update variantAttributesData for modal to pick up
-            if (backup.product_attributes && backup.product_attributes.length > 0) {
-                if (typeof variantAttributesData !== 'undefined') {
-                    variantAttributesData[newIndex] = backup.product_attributes;
-                }
-            }
-
-            // Restore images
-            if (backup.images) {
-                variantImages[newIndex] = backup.images;
-            }
-
-            console.log(`Restored data for variant ${newIndex} (${newSignature}) from backup (${matchedSignature})`);
-        }
-    });
-
-    console.log('Showing table with', allCombinations.length, 'combinations');
     table.style.display = 'table';
     table.style.visibility = 'visible';
 
-    // Auto-select first option in grouping dropdown
     const select = document.getElementById('grouping_select');
     if (select && select.options.length > 0) {
-        select.selectedIndex = 0;
+        if (select.selectedIndex < 0) select.selectedIndex = 0;
         filterVariantTableByGroup();
+    } else {
+        renderVariantTable(allCombinations, null);
     }
 
-    // Show grouping popover
     const grpC = document.getElementById('grp_container');
     if (grpC && select && select.options.length > 0) {
         grpC.style.display = 'inline-flex';
     }
 
-    // Toggle product images section based on variants
     toggleProductImagesSection();
+    updateVariantRowsBar();
+}
 
-    console.log('Table should be visible now');
+// The values an option offers a row: the option card's, plus whatever a row
+// already has (a value can be on a variant without being typed above).
+function optionValuesFor(optionName) {
+    const values = [];
+    Object.values(variantData).forEach(d => {
+        if (d.name !== optionName) return;
+        (d.values || []).forEach(v => { if (v && v.trim() && !values.includes(v.trim())) values.push(v.trim()); });
+    });
+    variantRows.forEach(row => {
+        const v = row[optionName];
+        if (v && !values.includes(v)) values.push(v);
+    });
+    return values;
+}
+
+function vfEsc(text) {
+    return String(text === null || text === undefined ? '' : text)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// One of a row's values, picked in its cell.
+function setVariantRowValue(index, optionName, value) {
+    const row = variantRows[index];
+    if (!row || !optionName) return;
+    if (value) row[optionName] = value;
+    else delete row[optionName];
+    updateVariantTable();
+}
+
+// A row for a new variant, its values still to be picked.
+function addVariantRow() {
+    variantRows.push({});
+    updateVariantTable();
+    const rows = document.querySelectorAll('#variant_table tr.variant_row');
+    const last = rows[rows.length - 1];
+    if (last) last.scrollIntoView({ block: 'nearest' });
+}
+
+// A row for each combination of the option values that no row has yet.
+function createEveryCombination() {
+    const have = new Set(variantRows
+        .filter((_, index) => !deletedVariantIndices.has(index))
+        .map(row => createVariantSignature(row)));
+    const missing = everyCombination().filter(combo => !have.has(createVariantSignature(combo)));
+    const T = window.VARIANT_T || {};
+    if (missing.length === 0) {
+        showToast(T.every_combination_exists || 'Every combination is already a variant.', 'info');
+        return;
+    }
+    if (missing.length > 50 && !confirm(
+            (T.confirm_combinations || 'This adds %(count)s variants. Continue?').replace('%(count)s', missing.length))) {
+        return;
+    }
+    missing.forEach(combo => variantRows.push({ ...combo }));
+    updateVariantTable();
+    updateGroupingOptions();
+}
+
+// Rows the save can't take: two with the same values, or a new one with none.
+function variantRowProblems() {
+    const T = window.VARIANT_T || {};
+    const seen = {};
+    const problems = [];
+    variantRows.forEach((row, index) => {
+        if (deletedVariantIndices.has(index)) return;
+        const signature = createVariantSignature(row);
+        if (!signature) {
+            if (!(existingVariantData[index] || {}).variant_id) {
+                problems.push(T.row_without_values || 'A new variant has no values — pick them, or delete the row.');
+            }
+            return;
+        }
+        if (signature in seen) {
+            problems.push((T.rows_alike || 'Two variants have the same values: %(values)s — change one, or delete it.')
+                .replace('%(values)s', Object.values(row).join(' / ')));
+        }
+        seen[signature] = index;
+    });
+    return problems;
+}
+
+// The buttons under the table, and what is wrong with its rows.
+function updateVariantRowsBar() {
+    const bar = document.getElementById('variant_rows_actions');
+    if (!bar) return;
+    const hasValues = Object.values(variantData).some(d => d.name && (d.values || []).some(v => v && v.trim()));
+    bar.style.display = hasValues ? 'flex' : 'none';
+    const note = document.getElementById('variant_rows_note');
+    if (!note) return;
+    const T = window.VARIANT_T || {};
+    const live = variantRows.filter((_, index) => !deletedVariantIndices.has(index)).length;
+    const problems = variantRowProblems();
+    if (problems.length) {
+        note.textContent = problems[0];
+        note.className = 'variant_rows_note bad';
+    } else if (!live) {
+        note.textContent = T.no_rows_yet || 'No variants yet — add one, or create every combination of the values above.';
+        note.className = 'variant_rows_note';
+    } else {
+        note.textContent = '';
+        note.className = 'variant_rows_note';
+    }
 }
 
 // Render variant table with given combinations
@@ -1200,13 +1083,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         // Skip deleted variants
         if (deletedVariantIndices.has(originalIndex)) return '';
 
-        // Create key for looking up existing data
-        const attrKey = Object.entries(combo)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, val]) => `${key}:${val}`)
-            .join('|');
-
-        const existingData = existingVariantData[attrKey] || {};
+        const existingData = existingVariantData[originalIndex] || {};
         const variantId = existingData.variant_id || '';
         const variantProductAttrs = existingData.product_attributes || [];
 
@@ -1299,13 +1176,20 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                 </div>
             </td>`;
 
-        // Option Values (Non-editable text)
+        // Option values: each picked from its option's values. A variant
+        // may have no value for an option, shown as "—".
         displayOptions.forEach((optionName, optIdx) => {
             const value = combo[optionName] || '';
+            const choices = optionValuesFor(optionName).map(v =>
+                `<option value="${vfEsc(v)}"${v === value ? ' selected' : ''}>${vfEsc(v)}</option>`).join('');
+            const picker = `<select class="variant_row_value${value ? '' : ' blank'}" data-option="${vfEsc(optionName)}"
+                onclick="event.stopPropagation()"
+                onchange="setVariantRowValue(${originalIndex}, this.dataset.option, this.value)">
+                <option value="">—</option>${choices}</select>`;
             if (optIdx === 0) {
-                rowHTML += `<td><span style="font-weight: 500;">${value}</span><br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> ${(window.VARIANT_T && window.VARIANT_T.edit_hint) || 'Edit'}</span></td>`;
+                rowHTML += `<td>${picker}<br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> ${(window.VARIANT_T && window.VARIANT_T.edit_hint) || 'Edit'}</span></td>`;
             } else {
-                rowHTML += `<td><span style="font-weight: 500;">${value}</span></td>`;
+                rowHTML += `<td>${picker}</td>`;
             }
         });
 
@@ -1341,7 +1225,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         // HIDDEN INPUTS for Modal Fields (wrapped in td to avoid browser foster-parenting)
         rowHTML += `<td style="display:none;">`;
         rowHTML += `<input type="hidden" name="variant_cost_${originalIndex + 1}" value="${cost}">`;
-        rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}">`;
+        rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}" data-auto-sku="${vfEsc(_autoSku)}">`;
         rowHTML += `<input type="hidden" name="variant_barcode_${originalIndex + 1}" value="${barcode}">`;
         rowHTML += `<input type="hidden" name="variant_active_${originalIndex + 1}" value="${active}">`;
         rowHTML += `</td>`;
@@ -1355,7 +1239,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         // Group all combinations by the selected option
         const grouped = {};
         allCombinations.forEach((combo, index) => {
-            const groupValue = combo[selectedGrouping];
+            const groupValue = combo[selectedGrouping] || '—';
             if (!grouped[groupValue]) {
                 grouped[groupValue] = [];
             }
@@ -2777,7 +2661,19 @@ let unlinkedVariantFiles = new Set();
 // Prepare variants data for form submission
 function prepareVariantsForSubmission() {
     const combinations = generateCombinations();
-    if (combinations.length === 0) {
+    // Saved variants the page never drew (a product whose variants have no
+    // option values at all) are not ones anybody deleted: "delete all"
+    // would take them.
+    let savedVariants = 0;
+    try { savedVariants = JSON.parse(window.product_variant_list_data || '[]').length; } catch (e) { savedVariants = 0; }
+    if (combinations.length < savedVariants) {
+        return {
+            product_variant_list: [],
+            deleted_variant_ids: Array.from(removedVariantIds),
+            deleted_files: Array.from(unlinkedVariantFiles)
+        };
+    }
+    if (combinations.every((_, index) => deletedVariantIndices.has(index))) {
         return { delete_all_variants: true, deleted_files: Array.from(unlinkedVariantFiles) };
     }
 
@@ -2825,11 +2721,7 @@ function prepareVariantsForSubmission() {
         // user can rename variant_sku without orphaning the row + losing
         // its images. Lookup key is the attribute combo, which is stable
         // across SKU renames.
-        const _attrKey = Object.entries(combo)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, val]) => `${key}:${val}`)
-            .join('|');
-        const _existingForId = existingVariantData[_attrKey] || {};
+        const _existingForId = existingVariantData[index] || {};
         const _variantId = _existingForId.variant_id || '';
 
         const variantData = {
@@ -2850,11 +2742,7 @@ function prepareVariantsForSubmission() {
             console.log(`  ✅ Added ${variantAttributesData[index].length} product attributes to variant ${index}`);
         } else {
             // Also check existingVariantData for attributes that were loaded from backend
-            const attrKey = Object.entries(combo)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([key, val]) => `${key}:${val}`)
-                .join('|');
-            const existingData = existingVariantData[attrKey] || {};
+            const existingData = existingVariantData[index] || {};
             if (existingData.product_attributes && existingData.product_attributes.length > 0) {
                 variantData.product_attributes = existingData.product_attributes;
                 console.log(`  ✅ Added ${existingData.product_attributes.length} existing product attributes to variant ${index}`);
@@ -2881,6 +2769,7 @@ function prepareVariantsForSubmission() {
 
     return {
         product_variant_list,
+        deleted_variant_ids: Array.from(removedVariantIds),
         deleted_files: Array.from(unlinkedVariantFiles)
     };
 }
@@ -2909,6 +2798,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
+
+            const rowProblems = variantRowProblems();
+            if (rowProblems.length > 0) {
+                e.preventDefault();
+                showErrorModal((window.VARIANT_T && window.VARIANT_T.rows_title) || 'Check the variants', rowProblems[0]);
+                return false;
+            }
 
             const dupCheckTime = performance.now() - dupCheckStart;
             console.log(`✓ Duplicate check: ${dupCheckTime.toFixed(2)}ms`);

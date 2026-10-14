@@ -3687,8 +3687,6 @@ def get_blog_post(request, slug):
         'hero_image': post.hero_image,
         'published_at': post.published_at.isoformat(),
         'author': post.author,
-        'header_content': post.header_content,
-        'footer_content': post.footer_content,
         'is_published': post.is_published,
     }
     alts = blog_images.image_alts(post)

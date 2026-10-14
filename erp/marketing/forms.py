@@ -204,7 +204,6 @@ class BlogPostForm(forms.ModelForm):
             'title_ru', 'excerpt_ru', 'content_ru', 'category_ru',
             # Polish
             'title_pl', 'excerpt_pl', 'content_pl', 'category_pl',
-            'header_content', 'footer_content',
             # cover_image and hero_image handled manually in template via hidden inputs
         ]
         widgets = {
@@ -231,9 +230,6 @@ class BlogPostForm(forms.ModelForm):
             'excerpt_pl': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
             'content_pl': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
             'category_pl': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Kategoria'}),
-            # Code blocks
-            'header_content': forms.Textarea(attrs={'class': 'form-textarea code-editor', 'rows': 5, 'placeholder': '<style>...</style>'}),
-            'footer_content': forms.Textarea(attrs={'class': 'form-textarea code-editor', 'rows': 5, 'placeholder': '<script>...</script>'}),
         }
 
 

@@ -1696,6 +1696,14 @@
           badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "exists" %} — ' +
             '{% trans "will add stock to this variant" %} (' +
             (Math.round((d.variant_quantity || 0) * 100) / 100) + ')';
+          if ((d.ignored_attributes || []).length) {
+            // A product on the website keeps the attributes it has there,
+            // so the row says which of its values the save will leave out.
+            badge.classList.add('new');
+            badge.innerHTML += ' · <i class="fa fa-exclamation-triangle"></i> ' +
+              '{% trans "This product is on the website, so its attributes are not changed from here. Not saved to the catalog:" %} ' +
+              npEsc(d.ignored_attributes.map(npAttrLabel).join(', '));
+          }
           skuI.value = d.variant_sku || skuI.value;
           skuI.dataset.matchLocked = '1';
         } else if (d.conflict) {

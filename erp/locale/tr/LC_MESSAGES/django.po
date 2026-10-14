@@ -14364,3 +14364,7 @@ msgstr "Para birimlerini kaydet"
 #, python-format
 msgid "%(name)s sells in %(sells)s and keeps its books in %(keeps)s: every sale and every payment is converted into %(keeps_code)s at the rate of its day."
 msgstr "%(name)s, %(sells)s ile satış yapar ve defterlerini %(keeps)s ile tutar: her satış ve her ödeme kendi gününün kuruyla %(keeps_code)s'a çevrilir."
+
+#: accounting/templates/accounts/goods_receipt_form.html:0
+msgid "This product is on the website, so its attributes are not changed from here. Not saved to the catalog:"
+msgstr "Bu ürün web sitesinde olduğundan özellikleri buradan değiştirilmez. Kataloğa kaydedilmeyen:"

@@ -2928,7 +2928,7 @@ def catalog_variant_match(request, pk, product_id):
     than attribute fields, `name`."""
     import json as _json
     from marketing.models import ProductVariant
-    from .catalog_sync import find_lookalike
+    from .catalog_sync import find_lookalike, variant_attributes
 
     sku = (request.GET.get("sku") or "").strip()
     try:
@@ -2946,10 +2946,18 @@ def catalog_variant_match(request, pk, product_id):
              if product is not None and sku else None)
 
     if match is not None:
+        # A featured product's variant keeps the attributes the web team
+        # gave it (sync_roll_to_catalog), so what the row says beyond them
+        # is not saved. Named here so the row can say so before the save.
+        ignored = []
+        if product.featured:
+            held = set(variant_attributes(match))
+            ignored = [n for n, v in pairs if (n, v) not in held]
         return JsonResponse({
             "exists": True, "attributes": described,
             "variant_sku": match.variant_sku,
             "variant_quantity": float(match.live_quantity or 0),
+            "ignored_attributes": ignored,
         })
 
     # A SKU already spoken for by ANOTHER product is not "new" either:

@@ -198,6 +198,23 @@ class GoodsReceiptAttributesTest(TestCase):
         self.assertFalse(d["exists"])
         self.assertNotIn("lookalike", d)
 
+    def test_the_match_endpoint_names_what_a_website_product_will_not_take(self, _up):
+        self._receive([self._row("K24644.S11", ("color", "white"))])
+        product = Product.objects.get(sku="K24644")
+        url = reverse("operating:catalog_variant_match", args=[self.warehouse.pk, product.pk])
+        typed = {"sku": "K24644.S11",
+                 "attrs": json.dumps([{"name": "color", "value": "BEYAZ"},
+                                      {"name": "width", "value": "300"}])}
+        # Hidden from the website: the save adds the width, so nothing is left out.
+        self.assertEqual(self.client.get(url, typed).json()["ignored_attributes"], [])
+        Product.objects.filter(pk=product.pk).update(featured=True)
+        self.assertEqual(self.client.get(url, typed).json()["ignored_attributes"], ["width"])
+        # And the save does leave it out.
+        self._receive([self._row("K24644.S11", ("color", "white"), ("width", "300"))],
+                      main={"mode": "existing", "id": product.pk})
+        self.assertEqual(_attrs(ProductVariant.objects.get(variant_sku="K24644.S11")),
+                         [("color", "white")])
+
     def test_a_product_lists_its_groups_attributes_then_its_own(self, _up):
         from operating.views_warehouse import product_attribute_names
         for i, name in enumerate(["color", "model"]):

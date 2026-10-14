@@ -70,6 +70,34 @@ class OneRatePerDayTests(TestCase):
             list(CurrencyExchangeRate.objects.values_list("date", flat=True)), [today])
 
 
+class AFailedFetchIsRetried(TestCase):
+    """No source answering is remembered for a few minutes, not until the
+    worker restarts: one short outage used to leave the day without a
+    rate for hours after the sources were back."""
+
+    def setUp(self):
+        services._RATE_MEMO.clear()
+        self.addCleanup(services._RATE_MEMO.clear)
+
+    def test_the_sources_are_left_alone_for_a_while_then_asked_again(self):
+        day = date.today() - timedelta(days=3)
+        with mock.patch("accounting.services._fetch_rate", side_effect=RuntimeError) as fetch, \
+                mock.patch("time.monotonic", return_value=1000.0):
+            self.assertIsNone(services.get_exchange_rate("KZT", "USD", on_date=day))
+            self.assertIsNone(services.get_exchange_rate("KZT", "USD", on_date=day))
+        self.assertEqual(fetch.call_count, 1)
+
+        later = 1000.0 + services.RATE_RETRY_AFTER + 1
+        with mock.patch("accounting.services._fetch_rate", return_value=Decimal("0.00222")) as fetch, \
+                mock.patch("time.monotonic", return_value=later):
+            self.assertEqual(services.get_exchange_rate("KZT", "USD", on_date=day),
+                             Decimal("0.00222"))
+        self.assertEqual(fetch.call_count, 1)
+        # Answered now, so stored for good like any other day's rate.
+        self.assertTrue(CurrencyExchangeRate.objects.filter(
+            from_currency="KZT", to_currency="USD", date=day).exists())
+
+
 class LastKnownRateTests(TestCase):
     def setUp(self):
         services._RATE_MEMO.clear()

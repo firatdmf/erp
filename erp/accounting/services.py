@@ -75,6 +75,23 @@ def _fetch_rate(from_currency: str, to_currency: str, on_date=None) -> Decimal:
 # product. Keyed by (from, to, day); cleared naturally when the worker restarts.
 _RATE_MEMO = {}
 
+# How long a pair and day that no source could answer is left alone
+# before the sources are asked again. Long enough not to hammer them
+# through an outage, short enough that the day gets its rate once they
+# are back — rather than, as before, not until the worker restarted.
+RATE_RETRY_AFTER = 300
+
+
+class _NoRate:
+    """What the memo holds for a pair and day nobody could answer: when
+    the last attempt failed. Kept in the same memo, so whatever clears
+    the memo clears this too."""
+
+    __slots__ = ("at",)
+
+    def __init__(self, at):
+        self.at = at
+
 
 def _as_date(value):
     """Coerce to a date, because callers hand over both kinds.
@@ -108,8 +125,14 @@ def get_exchange_rate(from_currency: str, to_currency: str, on_date=None) -> Dec
     # what today is, and is not filed under a date that may still change.
     day = min(_as_date(on_date) or date.today(), date.today())
     ck = (from_currency, to_currency, day)
-    if ck in _RATE_MEMO:
-        return _RATE_MEMO[ck]
+    import time
+    held = _RATE_MEMO.get(ck)
+    if isinstance(held, _NoRate):
+        if time.monotonic() - held.at < RATE_RETRY_AFTER:
+            return None
+        del _RATE_MEMO[ck]          # long enough: ask the sources again
+    elif ck in _RATE_MEMO:
+        return held
 
     # Per-day DB cache (filter().first() tolerates accidental duplicate rows).
     rate_obj = (CurrencyExchangeRate.objects
@@ -131,7 +154,9 @@ def get_exchange_rate(from_currency: str, to_currency: str, on_date=None) -> Dec
         import logging
         logging.getLogger(__name__).warning(
             "FX rate %s->%s failed: %s", from_currency, to_currency, e)
-        _RATE_MEMO[ck] = None   # don't re-hammer the API for this process
+        # Not None: a None here used to stand until the worker restarted,
+        # so one short outage left the day with no rate for hours.
+        _RATE_MEMO[ck] = _NoRate(time.monotonic())
         return None
 
 

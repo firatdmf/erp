@@ -3714,6 +3714,23 @@ from django.conf import settings
 @csrf_exempt
 @require_http_methods(["POST"])
 def newsletter_subscribe(request):
+    """Sign someone up, answering in the language of the page they are on.
+
+    The website sends that language with the sign-up. Without one the
+    answer stays in the storefront's own language; a language this ERP
+    has no wording for (Russian, say) is answered in English."""
+    from django.utils import translation
+    try:
+        language = (json.loads(request.body).get('language') or '').strip().lower()[:2]
+    except (ValueError, AttributeError):
+        language = ''
+    if not language:
+        return _newsletter_subscribe(request)
+    with translation.override(language if language == 'tr' else 'en'):
+        return _newsletter_subscribe(request)
+
+
+def _newsletter_subscribe(request):
     """
     Newsletter subscription endpoint.
     - The pop-up sends an email, and a phone where it asks for one, and

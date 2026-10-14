@@ -126,3 +126,22 @@ class ThePopUpGivesADiscountCode(SignUp):
         self.assertEqual(subscriber.discount_code.discount_percentage, 15)
         self.assertEqual(subscriber.discount_code.max_uses, 1)
         self.assertEqual(subscriber.language, "tr")
+
+
+class TheAnswerIsInTheVisitorsLanguage(SignUp):
+    """The same refusal, asked for from three pages of the website."""
+
+    def refusal(self, **body):
+        return self.quick(email="not-an-email", **body)["error"]
+
+    def test_an_english_page_is_answered_in_english(self):
+        self.assertEqual(self.refusal(language="en"), "Invalid email address")
+
+    def test_a_turkish_page_is_answered_in_turkish(self):
+        self.assertNotEqual(self.refusal(language="tr"), "Invalid email address")
+
+    def test_a_language_with_no_wording_here_is_answered_in_english(self):
+        self.assertEqual(self.refusal(language="ru"), "Invalid email address")
+
+    def test_no_language_keeps_the_storefronts_own(self):
+        self.assertEqual(self.refusal(), self.refusal(language="tr"))

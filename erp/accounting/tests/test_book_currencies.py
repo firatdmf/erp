@@ -16,7 +16,7 @@ from accounting.models_accounts import CurrentAccountSettings
 from accounting.services_accounts import new_customer_currency
 
 
-class TwoCurrencies(TestCase):
+class ABranchBook:
     @classmethod
     def setUpTestData(cls):
         cls.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
@@ -36,6 +36,8 @@ class TwoCurrencies(TestCase):
         return self.client.post(
             reverse("accounting:set_book_currencies", kwargs={"pk": self.book.pk}), data)
 
+
+class TwoCurrencies(ABranchBook, TestCase):
     def test_a_book_trades_in_what_it_reports_in_until_told_otherwise(self):
         self.assertEqual(self.book.effective_trading_currency, self.usd)
         self.assertEqual(new_customer_currency(self.book), self.usd)
@@ -92,3 +94,36 @@ class TwoCurrencies(TestCase):
         book = form.save()
         self.assertEqual(book.effective_trading_currency, self.kzt)
         self.assertIn("trading_currency", BookForm().fields)
+
+
+class TheOrderFormStartsInTheTradingCurrency(ABranchBook, TestCase):
+    """A branch that charges in tenge opens its order form in tenge —
+    before any customer is picked, and for a walk-in sale."""
+
+    def setUp(self):
+        self.save(self.owner, reporting_currency=self.usd.pk, trading_currency=self.kzt.pk)
+        self.client.force_login(self.owner)
+
+    def test_the_form_opens_in_tenge_and_converts_from_dollars(self):
+        page = self.client.get(reverse("operating:create_order_page",
+                                       kwargs={"book_id": self.book.pk}))
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.context["base_currency_code"], "KZT")
+        self.assertFalse(page.context["base_is_reporting"])
+        self.assertEqual(page.context["catalog_currency_code"], "USD")
+        html = page.content.decode()
+        self.assertIn('<span data-cur-symbol>₸</span>', html)
+        self.assertIn("is_base: false", html)
+
+    def test_a_book_that_trades_in_dollars_opens_in_dollars(self):
+        other = Book.objects.create(name="Ergene Fabric", base_currency=self.usd)
+        self.owner.member.books.add(other)
+        page = self.client.get(reverse("operating:create_order_page",
+                                       kwargs={"book_id": other.pk}))
+        self.assertEqual(page.context["base_currency_code"], "USD")
+        self.assertTrue(page.context["base_is_reporting"])
+
+    def test_the_walk_in_counter_takes_tenge(self):
+        from accounting.services_accounts import get_or_create_retail_current_account
+        counter = get_or_create_retail_current_account(book=Book.objects.get(pk=self.book.pk))
+        self.assertEqual(counter.default_currency, self.kzt)

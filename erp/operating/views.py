@@ -3031,8 +3031,19 @@ def base_currency_facts(book=None):
 
     code = getattr(_s, "BASE_CURRENCY_CODE", "USD")
     cur = CurrencyCategory.objects.filter(code=code).first()
-    return {"base_currency_code": code,
-            "base_currency_symbol": (cur.symbol if (cur and cur.symbol) else "$"),
+    catalog_symbol = cur.symbol if (cur and cur.symbol) else "$"
+    # The form STARTS in the currency the book trades in — a branch that
+    # charges in tenge opens its order form in tenge, before any customer
+    # is picked — while catalogue prices stay in the deployment's currency
+    # and are converted from it (catalog_currency_*).
+    start = new_customer_currency(book) if book is not None else cur
+    start_code = start.code if start is not None else code
+    return {"base_currency_code": start_code,
+            "base_currency_symbol": ((start.symbol or start.code) if start is not None
+                                     else catalog_symbol),
+            "base_is_reporting": start_code == code,
+            "catalog_currency_code": code,
+            "catalog_currency_symbol": catalog_symbol,
             # What a customer made on the form can be billed in, and what
             # one starts on: the currency this book opens customers in.
             "currencies": CurrencyCategory.objects.order_by("code"),
@@ -4120,6 +4131,8 @@ class OrderEdit(UpdateView):
         # form states that rather than the book's own currency.
         context["base_currency_symbol"] = self.object.currency_symbol
         context["base_currency_code"] = self.object.currency_code
+        context["base_is_reporting"] = (
+            self.object.currency_code == context["catalog_currency_code"])
         items = (self.object.items.all()
                  .select_related("product", "product_variant")
                  .prefetch_related(

@@ -710,7 +710,7 @@
       <div id="co-total-amount"
            style="font:800 22px 'Inter',sans-serif; color:#0F1419;
                   font-variant-numeric: tabular-nums; letter-spacing:-.3px;">
-        <span data-cur-symbol>$</span>0.00
+        <span data-cur-symbol>{{ base_currency_symbol|default:"$" }}</span>0.00
       </div>
       {# How much is being sold, beside what it comes to. The unit is #}
       {# printed only when every line shares one — see order_print_totals_units. #}
@@ -1095,8 +1095,15 @@
   // The currency this customer is billed in, from the account their order
   // will be raised against in this book — one answer, shared with the
   // purchase form (operating:customer_currency).
+  // CO_BASE: what the form starts in, and returns to with no customer —
+  // the book's trading currency on a new order, the order's own on an
+  // edit. CO_CATALOG: what catalogue prices and the books are in, which
+  // a price in any other currency is converted from.
   var CO_BASE = { symbol: '{{ base_currency_symbol|default:"$"|escapejs }}',
-                  code: '{{ base_currency_code|default:"USD"|escapejs }}', is_base: true };
+                  code: '{{ base_currency_code|default:"USD"|escapejs }}',
+                  is_base: {% if base_is_reporting is False %}false{% else %}true{% endif %} };
+  var CO_CATALOG = { symbol: '{{ catalog_currency_symbol|default:"$"|escapejs }}',
+                     code: '{{ catalog_currency_code|default:"USD"|escapejs }}' };
   var CO_CUR = CO_BASE;
   var CO_CURRENCY_URL = "{% url 'operating:customer_currency' %}";
   // Units of each currency per one of the book's own, today. The catalogue
@@ -1109,8 +1116,9 @@
   // rate to convert with — the label then says nothing was converted.
   function coFromBase(basePrice) {
     var p = parseFloat(basePrice) || 0;
-    if (!CO_CUR || CO_CUR.is_base) return p;
-    var rate = CO_RATES[CO_CUR.code || CO_CUR.currency];
+    var code = CO_CUR && (CO_CUR.code || CO_CUR.currency);
+    if (!code || code === CO_CATALOG.code) return p;
+    var rate = CO_RATES[code];
     return rate ? Math.round(p * rate * 100) / 100 : p;
   }
 
@@ -1118,9 +1126,10 @@
   // it was converted from, so the figure can be rounded to a price of
   // their own knowing where it came from.
   function coPriceFromHtml(item) {
-    if (!item.priceFromBase || !CO_CUR || CO_CUR.is_base) return '';
-    if (!CO_RATES[CO_CUR.code || CO_CUR.currency]) return '';
-    return ' <span class="co-price-from">{% trans "from" %} ' + esc(CO_BASE.symbol) +
+    var code = CO_CUR && (CO_CUR.code || CO_CUR.currency);
+    if (!item.priceFromBase || !code || code === CO_CATALOG.code) return '';
+    if (!CO_RATES[code]) return '';
+    return ' <span class="co-price-from">{% trans "from" %} ' + esc(CO_CATALOG.symbol) +
            fmtNum(item.basePrice) + '</span>';
   }
 
@@ -1271,7 +1280,7 @@
     var opt = sel && sel.options[sel.selectedIndex];
     if (!opt) return null;
     return { code: opt.value, symbol: opt.dataset.symbol || opt.value,
-             is_base: opt.value === CO_BASE.code };
+             is_base: opt.value === CO_CATALOG.code };
   }
   function coApplyNewCustomerCurrency(cur, name) {
     if (!cur) return;
@@ -1284,7 +1293,7 @@
       coCurrencyNote('<i class="fas fa-triangle-exclamation"></i> ' +
         '<b>' + esc(name) + '</b> {% trans "is billed in" %} <b>' + esc(cur.code) + '</b> — ' +
         '{% trans "type the prices below in" %} ' + esc(cur.code) + ' (' + esc(cur.symbol) + '). ' +
-        '{% trans "The order is recorded to the book in" %} ' + CO_BASE.code + ' ' +
+        '{% trans "The order is recorded to the book in" %} ' + CO_CATALOG.code + ' ' +
         '{% trans "at the rate of the day, fixed when the order completes." %}', true);
     }
   }

@@ -1015,7 +1015,9 @@ def get_or_create_retail_current_account(member=None, book=None) -> CurrentAccou
         # to. "other" is the ledger's word for an account that stands
         # alone by design; ACC-061, the inter-company position on Ergene,
         # is the same kind of thing.
-        type="other", default_currency=_resolve_currency(),
+        # The counter takes what the business is paid in: tenge at a
+        # branch that trades in tenge (Book.effective_trading_currency).
+        type="other", default_currency=new_customer_currency(book),
         # English, like every other row this code writes: the database
         # records what happened, the interface translates it. See
         # migration 0096, which renamed the row already out there.

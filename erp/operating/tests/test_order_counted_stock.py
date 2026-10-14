@@ -232,6 +232,34 @@ class CountedStock(TestCase):
         self.assertLess(response.status_code, 400)
         self.assertEqual(self.holds(order), {self.old.pk: Decimal("2")})
 
+    # ── the order's page ────────────────────────────────────────
+    def test_the_order_page_counts_pieces_not_rolls_and_metres(self):
+        self.post([self.line([(self.key(self.old), 3), (self.key(self.new), 1)])])
+        order = Order.objects.get()
+        page = self.client.get(reverse("operating:order_detail", kwargs={"pk": order.pk}))
+        self.assertEqual(page.context["total_scanned_label"], "4 pcs")
+        self.assertEqual(page.context["order_items_sorted"][0].scanned_label, "4 pcs")
+        self.assertTrue(page.context["only_counted"])
+        html = page.content.decode()
+        self.assertNotIn(" top ·", html)
+        self.assertNotRegex(html, r'class="m">[\d.,]+ m<')
+
+    def test_cloth_on_the_order_page_is_still_rolls_and_metres(self):
+        self.post([self.line([(ROLL, 12)], sku="K1.G1")])
+        order = Order.objects.get()
+        page = self.client.get(reverse("operating:order_detail", kwargs={"pk": order.pk}))
+        self.assertEqual(page.context["total_scanned_label"], "1 roll · 12 m")
+        self.assertFalse(page.context["only_counted"])
+
+    def test_both_kinds_on_one_order_are_each_said_in_their_own_terms(self):
+        self.post([self.line([(self.key(self.old), 2)]),
+                   self.line([(ROLL, 12)], sku="K1.G1", item_no=2)])
+        order = Order.objects.get()
+        page = self.client.get(reverse("operating:order_detail", kwargs={"pk": order.pk}))
+        label = page.context["total_scanned_label"]
+        self.assertIn("2 pcs", label)
+        self.assertIn("1 roll · 12 m", label)
+
     def test_the_edit_form_is_handed_its_holds_by_key(self):
         self.post([self.line([(self.key(self.old), 3)])])
         order = Order.objects.get()

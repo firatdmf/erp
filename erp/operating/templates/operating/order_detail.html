@@ -1529,9 +1529,9 @@
                     {% endif %}
                     {% if item.is_tracked %}
                       {% if item.scanned_count %}
-                      <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2g" }} m</span>
+                      <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
                       {% else %}
-                      <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% trans "no tops" %}</span>
+                      <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% if item.sold_by_count %}{% trans "none taken from stock" %}{% else %}{% trans "no tops" %}{% endif %}</span>
                       {% endif %}
                     {% else %}
                       <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% trans "not tracked" %}{% if item.pack_id %} · {% trans "Pack" %} #{{ item.pack.pack_number }}{% endif %}</span>
@@ -1711,9 +1711,9 @@
               <span style="display:block; font-weight:500; font-size:10.5px; opacity:.85;">
                 {% trans "Billed in full regardless" %}
               </span>
-              {% for it, ordered, got in scan_shortfall_rows %}
+              {% for it, ordered, got, unit in scan_shortfall_rows %}
               <span style="display:block; font-weight:500; font-size:10.5px; opacity:.75;">
-                {{ it.product.title|default:"—"|truncatechars:26 }}: {{ got|floatformat:"-2g" }} / {{ ordered|floatformat:"-2g" }} m
+                {{ it.product.title|default:"—"|truncatechars:26 }}: {{ got|floatformat:"-2g" }} / {{ ordered|floatformat:"-2g" }} {{ unit }}
               </span>
               {% endfor %}
             </span>
@@ -1722,7 +1722,7 @@
           {% if total_scanned_count %}
           <div class="od-tot-row" style="color:#005354;">
             <span><i class="fa fa-layer-group" style="font-size:10px; opacity:.7;"></i> {% trans "Total scanned" %}</span>
-            <span style="font-weight:700;">{{ total_scanned_count }} {% trans "tops" %} · {{ total_scanned_meters|floatformat:"-2g" }} m</span>
+            <span style="font-weight:700;">{{ total_scanned_label }}</span>
           </div>
           {% endif %}
           {% if may_see_profit %}
@@ -1792,7 +1792,7 @@
                 <td>
                   <div class="od-prod"><span>{% if item.product %}{{ item.product.title }}{% else %}<span class="od-empty-mute">{% trans "(deleted product)" %}</span>{% endif %}</span></div>
                   {% if item.scanned_count %}
-                  <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2g" }} m</span>
+                  <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
                   {% endif %}
                 </td>
                 <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
@@ -3066,7 +3066,7 @@
       revertBtn.addEventListener('click', function (e) {
         e.preventDefault();
         const msg = '{% trans "The order will be re-opened:" %}\n\n'
-          + '\u2022 {% trans "Cut meters return to their rolls" %}\n'
+          + '\u2022 {% if only_counted %}{% trans "The pieces taken go back into stock" %}{% else %}{% trans "Cut meters return to their rolls" %}{% endif %}\n'
           + '\u2022 {% trans "The auto collection is cancelled (manual deposits stay)" %}\n'
           + '\u2022 {% trans "The retail ledger entry is removed" %}\n'
           + '\u2022 {% trans "The order becomes editable again" %}\n\n'

@@ -97,7 +97,7 @@ def other_halves_for_page(order, member):
     order the page lists its own, with the rolls scanned for each, the
     half's totals, and whether the viewer may open it."""
     from decimal import Decimal
-    from .views import _order_item_variant_lines
+    from .views import _order_item_variant_lines, _stock_taken_label
 
     halves = []
     for half in split_halves(order):
@@ -108,13 +108,15 @@ def other_halves_for_page(order, member):
             key=lambda i: ((getattr(i.product, "title", "") or "").casefold(),
                            (getattr(i.product_variant, "variant_sku", "") or ""), i.pk))
         held = {}
-        for r in half.stock_reservations.all():
+        for r in half.stock_reservations.select_related(
+                "warehouse_product__catalog_variant__product"):
             if r.order_item_id:
                 held.setdefault(r.order_item_id, []).append(r)
         for it in items:
             rs = held.get(it.pk, [])
             it.scanned_count = len(rs)
             it.scanned_meters = sum((r.quantity or Decimal("0") for r in rs), Decimal("0"))
+            it.scanned_label = _stock_taken_label(rs)
             it.variant_lines = _order_item_variant_lines(it)
         half.page_items = items
         half.book_name = getattr(order_book(half), "name", "")

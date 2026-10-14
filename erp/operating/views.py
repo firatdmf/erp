@@ -312,6 +312,30 @@ def _variant_attribute_values(variant):
     return values
 
 
+def _stock_taken_label(reservations):
+    """What was taken off the shelf for an order, in each product's own
+    terms: "3 rolls · 40 m" for cloth, "2 pcs" for goods sold by count —
+    whose stock entries are batches of alike pieces, not worth counting —
+    and both, joined, where an order holds both kinds."""
+    from decimal import Decimal
+    from django.template.defaultfilters import floatformat
+    groups = {}
+    for r in reservations:
+        wp = r.warehouse_product
+        unit = wp.unit if wp is not None else units.DEFAULT_UNIT
+        pack = wp.pack_type if wp is not None else units.DEFAULT_PACK
+        groups.setdefault((unit, pack), []).append(r)
+    parts = []
+    for (unit, pack), rs in groups.items():
+        amount = sum((r.quantity or Decimal("0") for r in rs), Decimal("0"))
+        said = f"{floatformat(amount, '-2g')} {units.unit_short(unit)}"
+        if units.sold_by_count(unit) or not units.counts_packs(pack):
+            parts.append(said)
+        else:
+            parts.append(f"{len(rs)} {units.pack_noun(pack, len(rs))} · {said}")
+    return " · ".join(parts)
+
+
 def _order_item_variant_lines(it):
     """The variant of an order line, as the pieces it is made of — one
     warehouse product name, or one entry per attribute value. The order
@@ -567,7 +591,8 @@ class OrderDetail(DetailView):
         reservations = list(
             self.object.stock_reservations
             .select_related("stock_item", "warehouse_product",
-                            "warehouse_product__warehouse", "pack")
+                            "warehouse_product__warehouse", "pack",
+                            "warehouse_product__catalog_variant__product")
             .order_by("-created_at")
         )
         by_item = {}
@@ -582,6 +607,8 @@ class OrderDetail(DetailView):
             it.item_reservations = by_item.get(it.pk, [])
             it.scanned_meters = sum((r.quantity or _D("0") for r in it.item_reservations), _D("0"))
             it.scanned_count = len(it.item_reservations)
+            it.scanned_label = _stock_taken_label(it.item_reservations)
+            it.sold_by_count = units.sold_by_count(getattr(it.product, "unit", None))
             it.variant_lines = _order_item_variant_lines(it)
         # Every item-less reservation, pack or no pack — in this layout
         # nothing else renders them, so filtering pack'd ones out (as the
@@ -589,6 +616,15 @@ class OrderDetail(DetailView):
         ctx["unassigned_reservations"] = [r for r in reservations if not r.order_item_id]
         ctx["total_scanned_meters"] = sum((r.quantity or _D("0") for r in reservations), _D("0"))
         ctx["total_scanned_count"] = len(reservations)
+        ctx["total_scanned_label"] = _stock_taken_label(reservations)
+        # Nothing on the order is cloth: no metres to speak of anywhere.
+        ctx["only_counted"] = bool(items_sorted) and all(
+            it.sold_by_count for it in items_sorted)
+        # A short line's "2 / 3 m" in the line's own unit.
+        ctx["scan_shortfall_rows"] = [
+            (it, ordered, got, units.unit_short(getattr(it.product, "unit", None)
+                                                or units.DEFAULT_UNIT))
+            for it, ordered, got in ctx["scan_shortfall_rows"]]
         ctx["reservation_count"] = sum(1 for r in reservations if not r.consumed)
         ctx["has_cargo_info"] = bool((self.object.carrier or "").strip() and (self.object.tracking_number or "").strip())
         # Change history preview (full page at order_changes).

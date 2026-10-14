@@ -14404,3 +14404,9 @@ msgstr "Varyantları kontrol edin"
 #, python-format
 msgid "Not deleted, because they have stock or are on an order: %(skus)s"
 msgstr "Stokları olduğu ya da bir siparişte bulundukları için silinmedi: %(skus)s"
+
+msgid "none taken from stock"
+msgstr "stoktan alınmadı"
+
+msgid "The pieces taken go back into stock"
+msgstr "Alınan parçalar stoğa geri döner"

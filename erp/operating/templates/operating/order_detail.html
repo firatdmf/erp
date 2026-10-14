@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load l10n %}
 {% load static %}
+{% load operating_tags %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -673,6 +674,8 @@
   .od-tops-chev.open { transform: rotate(90deg); }
   /* Compact per-line badge under the product name — scanned recap (or
      "not tracked") visible without expanding anything. */
+  /* The order's own currency after a cost said in base: "$10.00 (₸5,200.00)". */
+  .od-in-cur { font-weight: 500; opacity: .7; font-size: .9em; white-space: nowrap; }
   .od-scan-chip { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;
     font: 700 10.5px var(--font-sans); color: #005354; background: #E5F1F0;
     border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
@@ -1568,7 +1571,7 @@
               <td class="num od-cost-col" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}">
                 {% with uc=item.unit_cost %}
                   {% if uc and uc > 0 %}
-                    <span style="color:var(--gray-700);">{{ order.currency_symbol }}{{ uc|floatformat:"2g" }}</span>
+                    <span style="color:var(--gray-700);">{{ uc|cost_in_base:order }}</span>
                   {% else %}
                     <span class="od-empty-mute" title="{% trans 'No cost set on this product' %}">—</span>
                   {% endif %}
@@ -1732,7 +1735,7 @@
               <i class="fa fa-lock" style="font-size:10px; opacity:0.6;" title="{% trans 'Internal only — not on invoice' %}"></i>
               {% trans "Total cost (COGS)" %}
             </span>
-            <span data-order-cost style="font-weight:700;">{{ order.currency_symbol }}{{ tc|floatformat:"2g" }}</span>
+            <span data-order-cost style="font-weight:700;">{{ tc|cost_in_base:order }}</span>
           </div>
           <div id="od-profit-row" class="od-tot-row od-gross"
                style="margin-top:4px; padding:8px 10px; border-radius:8px;
@@ -1743,7 +1746,7 @@
               {% trans "Gross profit" %}
               <small data-order-margin style="opacity:0.75; font-weight:600;">{% if gm is not None and tc and tc > 0 %}· {{ gm }}%{% endif %}</small>
             </span>
-            <span data-order-profit style="font-weight:700;">{{ order.currency_symbol }}{{ gp|floatformat:"2g" }}</span>
+            <span data-order-profit style="font-weight:700;">{{ gp|cost_in_base:order }}</span>
           </div>
           {% if not tc or tc == 0 %}
           <div class="od-tot-row" style="margin-top:4px; padding:6px 10px; font-size:11px; color:#92400E; background:#FEF3C7; border:1px dashed #FCD34D; border-radius:8px;">
@@ -2284,6 +2287,14 @@
   const NUM_LOCALE = /^tr\b/i.test(document.documentElement.lang || '') ? 'tr-TR' : 'en-US';
   const fmtNum = (n, decimals = 2) => (Number(n) || 0).toLocaleString(
     NUM_LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  // Cost and profit are said in base first, the order's own currency in
+  // brackets — the cost_in_base filter, for the figures written here.
+  const BASE_CUR = "{{ base_currency_symbol|escapejs }}";
+  const ORDER_RATE = {% localize off %}{{ order_rate_to_base|default:"null" }}{% endlocalize %};
+  const costMoney = (v) => ORDER_RATE
+    ? BASE_CUR + fmtNum(Math.round((Number(v) || 0) * ORDER_RATE * 100) / 100) +
+      ' <span class="od-in-cur">(' + ORDER_CUR + fmtNum(v) + ')</span>'
+    : ORDER_CUR + fmtNum(v);
   // Delivery, a discount — they are in the grand total but not in any
   // line, so the scripts that rebuild the total from the rows have to
   // add them back. Localisation is turned off around the number below:
@@ -3150,11 +3161,11 @@
       
       // Update cost, profit, margin
       document.querySelectorAll('[data-order-cost]').forEach(el => {
-        el.textContent = ORDER_CUR + fmtNum(totalCost);
+        el.innerHTML = costMoney(totalCost);
       });
       const grossProfit = orderTotal - totalCost;
       document.querySelectorAll('[data-order-profit]').forEach(el => {
-        el.textContent = ORDER_CUR + fmtNum(grossProfit);
+        el.innerHTML = costMoney(grossProfit);
       });
       document.querySelectorAll('[data-order-margin]').forEach(el => {
         if (totalCost > 0) {
@@ -3273,10 +3284,10 @@
     function applyProfitSnapshot(p) {
       if (!p) return;
       document.querySelectorAll('[data-order-cost]').forEach(el => {
-        el.textContent = ORDER_CUR + fmtNum(p.total_cost || 0);
+        el.innerHTML = costMoney(p.total_cost || 0);
       });
       document.querySelectorAll('[data-order-profit]').forEach(el => {
-        el.textContent = ORDER_CUR + fmtNum(p.gross_profit || 0);
+        el.innerHTML = costMoney(p.gross_profit || 0);
       });
       document.querySelectorAll('[data-order-margin]').forEach(el => {
         el.textContent = (p.margin === null || p.margin === undefined) ? '' : ('· ' + p.margin + '%');
@@ -3813,7 +3824,7 @@
             ' data-original="" onwheel="this.blur()"></td>' +
           '<td class="num od-cost-col" data-item-cost="' + tempId + '" data-unit-cost="' + (it.unit_cost || 0) + '">' +
             ((it.unit_cost && Number(it.unit_cost) > 0)
-              ? '<span style="color:var(--gray-700);">' + ORDER_CUR + fmtNum(it.unit_cost) + '</span>'
+              ? '<span style="color:var(--gray-700);">' + costMoney(it.unit_cost) + '</span>'
               : '<span class="od-empty-mute" title="No cost set">—</span>') +
           '</td>' +
           '<td class="num" data-item-subtotal="' + tempId + '"><b>' + ORDER_CUR + fmtNum(it.subtotal) + '</b></td>' +

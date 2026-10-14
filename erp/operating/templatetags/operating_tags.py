@@ -46,3 +46,29 @@ def book_sign(warehouse):
     book = getattr(warehouse, "accounting_book", None)
     currency = getattr(book, "base_currency", None)
     return currency_sign(getattr(currency, "code", "") or "")
+
+
+@register.filter
+def cost_in_base(value, order):
+    """A cost or profit on an order, said in base first: "$10.00 (₸5,200.00)".
+
+    Costs are kept in base and the book reports in it, so that is the
+    figure that means something; the order's own currency follows in
+    brackets, to set against its prices. An order in base reads as before.
+    The rate is the order's (Order.rate_to_base): today's while it is
+    open, the one fixed when it completed after that.
+    """
+    from decimal import Decimal
+    from django.template.defaultfilters import floatformat
+    from django.utils.html import format_html
+    from operating.models import _dollar_labels
+
+    amount = Decimal(str(value or 0))
+    base_code, base_symbol = _dollar_labels()
+    own = f"{order.currency_symbol}{floatformat(amount, '2g')}"
+    rate = order.rate_to_base() if order.currency_code != base_code else None
+    if not rate or rate == Decimal("1"):
+        return own                  # in base already, or no rate to say it with
+    in_base = (amount * Decimal(str(rate))).quantize(Decimal("0.01"))
+    return format_html('{}{} <span class="od-in-cur">({})</span>',
+                       base_symbol, floatformat(in_base, "2g"), own)

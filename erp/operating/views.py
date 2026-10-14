@@ -617,6 +617,15 @@ class OrderDetail(DetailView):
         ctx["total_scanned_meters"] = sum((r.quantity or _D("0") for r in reservations), _D("0"))
         ctx["total_scanned_count"] = len(reservations)
         ctx["total_scanned_label"] = _stock_taken_label(reservations)
+        # Cost and profit are said in base, the order's currency after
+        # them in brackets (operating_tags.cost_in_base); the scripts that
+        # rewrite them need the same two facts.
+        from .models import _dollar_labels
+        base_code, ctx["base_currency_symbol"] = _dollar_labels()
+        rate = (self.object.rate_to_base()
+                if self.object.currency_code != base_code else None)
+        # 1 for a foreign order means no rate was found: say nothing in base.
+        ctx["order_rate_to_base"] = rate if rate and rate != 1 else None
         # Nothing on the order is cloth: no meters to speak of anywhere.
         ctx["only_counted"] = bool(items_sorted) and all(
             it.sold_by_count for it in items_sorted)

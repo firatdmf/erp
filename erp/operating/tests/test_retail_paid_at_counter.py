@@ -91,6 +91,23 @@ class PaidAtTheCounter(TestCase):
         self.assertEqual(pay.amount, Decimal("20000.00"))
         self.assertIsNone(order.counter_gap())
 
+    def test_the_sale_is_over_when_it_is_made(self):
+        # Paid and handed over: completed at once, the stock gone, and the
+        # Retail Sales account square — the payment never runs ahead.
+        self.post(self.tenge)
+        order = Order.objects.get()
+        self.assertEqual(order.order_status, "shipped")
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.quantity_remaining, Decimal("3"))
+        counter = order.current_account
+        counter.refresh_from_db()
+        self.assertEqual(Decimal(str(counter.own_currency_balance() or 0)), Decimal("0"))
+
+    def test_a_customer_s_order_is_not_completed_for_them(self):
+        dana = Contact.objects.create(name="Dana Akhmet")
+        self.post(self.tenge, customer_type="contact", customer_pk=dana.pk)
+        self.assertNotEqual(Order.objects.get().order_status, "shipped")
+
     def test_a_deposit_on_a_customer_s_order_is_linked_too(self):
         dana = Contact.objects.create(name="Dana Akhmet")
         self.post(self.tenge, customer_type="contact", customer_pk=dana.pk,

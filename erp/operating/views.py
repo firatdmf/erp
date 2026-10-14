@@ -4164,11 +4164,36 @@ class OrderCreate(View):
         # when notify_customer is True (staff opt-in) AND the
         # order has a usable customer email.
         try:
+            # A split order is confirmed once, for every half (the mail
+            # lists them all): the caller asks for it on the last one.
             if order.notify_customer:
                 from .order_notifications import send_order_event_email
                 send_order_event_email(order, "created", attach_pdf=True)
         except Exception as _e:
             messages.warning(request, f"Order saved but confirmation email failed: {_e}")
+
+        # ── A retail sale is over when it is made ─────────────────
+        # Paid at the counter and handed over: completed at once, so the
+        # money, the sale and the stock leaving are one moment and the
+        # Retail Sales account never shows the payment ahead of the sale.
+        # Through the one status funnel, as Complete order goes — a split
+        # moves all its halves, so the last half asks for it, after every
+        # half has taken its payment. A refusal (a sales rep, goods still
+        # on their way in) leaves the order where it is and says why.
+        last_half = (order.split_group is None or not Order.objects.filter(
+            split_group=order.split_group, pk__gt=order.pk).exists())
+        if order.is_retail_order and last_half:
+            from django.utils.translation import gettext as _g
+            from .views_warehouse import apply_order_status_change
+            try:
+                done, code = apply_order_status_change(
+                    order, "shipped", user=request.user, require_cargo_for_ship=False)
+            except Exception as _e:
+                done, code = False, str(_e)
+            if not done:
+                messages.warning(request, _g(
+                    "The retail sale was saved and paid for but not completed (%(reason)s) — "
+                    "complete it from the order page.") % {"reason": code})
 
 
 class OrderEdit(UpdateView):

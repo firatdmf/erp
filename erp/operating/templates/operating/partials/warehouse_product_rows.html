@@ -75,14 +75,14 @@ links so that keeps working.{% endcomment %}
   warehouse_detail.html drops the same column.{% endcomment %}
   <td class="num" data-label="{% trans 'Price' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
-      {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|sales_rep_price|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+      {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|sales_rep_price|floatformat:"2g" }}</span>{% elif p.last_cost %}<span class="mono" style="color:#9AA5B1;" title="{% trans "Last cost — none in stock" %}">{{ p.warehouse|book_sign }}{{ p.last_cost|sales_rep_price|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
   {% else %}
   <td class="num" data-label="{% trans 'Unit cost' %}">
     <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;"
-       {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"4g" }}"{% endif %}>
-      {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+       {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"4g" }}"{% elif p.last_cost %}title="{% trans "Last cost — none in stock" %}: {{ p.warehouse|book_sign }}{{ p.last_cost|floatformat:"4g" }}"{% endif %}>
+      {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"2g" }}</span>{% elif p.last_cost %}<span class="mono" style="color:#9AA5B1;">{{ p.warehouse|book_sign }}{{ p.last_cost|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
   <td class="num" data-label="{% trans 'Total' %}">
@@ -137,11 +137,11 @@ links so that keeps working.{% endcomment %}
   {% if is_sales_rep %}
   {# Price derived from the average cost, and no Total — as the flat rows. #}
   <td class="num" data-label="{% trans 'Price' %}">
-    {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|sales_rep_price|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|sales_rep_price|floatformat:"2g" }}</span>{% elif g.last_cost_usd %}<span class="mono" style="color:#9AA5B1;" title="{% trans "Last cost — none in stock" %}">~{{ cost_sign }}{{ g.last_cost_usd|sales_rep_price|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   {% else %}
   <td class="num" data-label="{% trans 'Unit cost' %}" title="{% trans 'Weighted-average unit cost across the variants of this product' %}">
-    {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% if g.avg_cost_usd %}<span class="mono">~{{ cost_sign }}{{ g.avg_cost_usd|floatformat:"2g" }}</span>{% elif g.last_cost_usd %}<span class="mono" style="color:#9AA5B1;" title="{% trans "Last cost — none in stock" %}">~{{ cost_sign }}{{ g.last_cost_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Total' %}">{% if g.total_usd %}<span class="cost-usd">{{ cost_sign }}{{ g.total_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
   {% endif %}

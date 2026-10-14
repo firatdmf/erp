@@ -2648,7 +2648,10 @@
     const search = (document.getElementById('whSearchInput') || {}).value || '';
     const sort = (document.getElementById('whSortInput') || {}).value || 'name_asc';
     const searchBy = (document.getElementById('whSearchByInput') || {}).value || 'text';
-    const params = new URLSearchParams({ search: search, sort: sort, search_by: searchBy });
+    const showEmpty = (document.getElementById('whShowEmptyInput') || {}).value || '';
+    const reservedOnly = (document.getElementById('whReservedOnlyInput') || {}).value || '';
+    const params = new URLSearchParams({ search: search, sort: sort, search_by: searchBy,
+                                         show_empty: showEmpty, reserved_only: reservedOnly });
     window.location.href = whExcelUrl + '?' + params.toString();
   }
 

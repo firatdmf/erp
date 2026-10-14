@@ -12628,10 +12628,12 @@ msgstr "Sipariş Onayı"
 msgid "Warehouse product list"
 msgstr "Depo Ürün Listesi"
 
-#: hardcoded Turkish moved to the catalogue as written
+#: operating/warehouse_excel.py
 #, python-format
-msgid "%(count)s products"
-msgstr "%(count)s ürün"
+msgid "%(count)s product"
+msgid_plural "%(count)s products"
+msgstr[0] "%(count)s ürün"
+msgstr[1] "%(count)s ürün"
 
 #: hardcoded Turkish moved to the catalogue as written
 #, python-format
@@ -14306,3 +14308,24 @@ msgstr "şuradan"
 
 msgid "Separate collections with a comma. A name not in use yet makes a new collection."
 msgstr "Koleksiyonları virgülle ayırın. Henüz kullanılmayan bir ad yeni bir koleksiyon oluşturur."
+
+#: operating/templates/operating/partials/warehouse_product_rows.html
+#: operating/templates/operating/partials/warehouse_group_variant_rows.html
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Last cost — none in stock"
+msgstr "Son maliyet — stokta yok"
+
+#: operating/warehouse_excel.py
+msgctxt "warehouse sheet"
+msgid "last cost"
+msgstr "son maliyet"
+
+#: operating/warehouse_excel.py
+msgctxt "warehouse sheet"
+msgid "reserved only"
+msgstr "yalnızca rezerve"
+
+#: operating/warehouse_excel.py
+msgctxt "warehouse sheet"
+msgid "including empty"
+msgstr "boşlar dahil"

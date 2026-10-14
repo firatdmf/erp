@@ -15,9 +15,10 @@ from io import BytesIO
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.utils.translation import gettext as _gettext, pgettext
+from django.utils.translation import gettext as _gettext, ngettext, pgettext
 
 from erp.roles import is_sales_rep, sales_rep_price
 from erp.xlsx_utils import (
@@ -56,14 +57,23 @@ def _dt(v):
         return "—"
 
 
-def _filtered_products(warehouse, search, sort, search_by="text"):
+def _filtered_products(warehouse, search, sort, search_by="text",
+                       show_empty=False, reserved_only=False):
     # Combined (ortak) warehouses export their MEMBERS' stock.
     scope_ids = warehouse.scope_ids()
     qs = WarehouseProduct.objects.filter(warehouse_id__in=scope_ids)
+    # The page's filters, applied the way WarehouseDetail applies them, so
+    # the export holds exactly the rows that were on screen: no empty rows
+    # unless "show empty" was ticked.
+    if not show_empty:
+        qs = qs.exclude(quantity=0)
     if search:
-        # Same filter the page's search box builds, so the export holds
-        # exactly the rows that were on screen.
         qs = qs.filter(warehouse_search_q(search, scope_ids, search_by))
+    if reserved_only:
+        from .models import OrderStockReservation
+        qs = qs.filter(id__in=(OrderStockReservation.objects
+                               .filter(consumed=False)
+                               .values("warehouse_product_id")))
 
     # Line value comes from the SAME place the warehouse page and the
     # balance sheet get it: the stock on the floor, each item at cost
@@ -88,22 +98,27 @@ def _filtered_products(warehouse, search, sort, search_by="text"):
         "qty_desc": "-quantity", "qty_asc": "quantity",
         "recent": "-updated_at",
     }
+    # A sold-out SKU sorts by its last cost, as on the page.
+    if sort in ("price_desc", "price_asc"):
+        qs = qs.annotate(_price=Coalesce("avg_cost", "last_cost"))
     if sort == "price_desc":
-        qs = qs.order_by(F("avg_cost").desc(nulls_last=True), "name", "id")
+        qs = qs.order_by(F("_price").desc(nulls_last=True), "name", "id")
     elif sort == "price_asc":
-        qs = qs.order_by(F("avg_cost").asc(nulls_last=True), "name", "id")
+        qs = qs.order_by(F("_price").asc(nulls_last=True), "name", "id")
     else:
         qs = qs.order_by(_sort_map.get(sort, "name"), "sku", "id")
     return qs
 
 
 def build_warehouse_workbook(warehouse, search="", sort="name_asc",
-                             search_by="text", for_sales_rep=False):
+                             search_by="text", for_sales_rep=False,
+                             show_empty=False, reserved_only=False):
     from openpyxl import Workbook
 
     from erp.branding import brand as brand_value
     brand = brand_value("BRAND_NAME") or "Nejum"
-    products = list(_filtered_products(warehouse, search, sort, search_by))
+    products = list(_filtered_products(warehouse, search, sort, search_by,
+                                       show_empty, reserved_only))
 
     # A combined (ortak) warehouse pools several members' shelves, so a row
     # is ambiguous without saying which one it came off.
@@ -133,9 +148,16 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
     r += 1
     cell(ws, r, 1, _gettext("Warehouse product list"), font=F_SUB)
     merge(ws, r, 1, 4)
-    subtitle = _gettext("%(count)s products") % {"count": len(products)}
+    subtitle = ngettext("%(count)s product", "%(count)s products",
+                        len(products)) % {"count": len(products)}
     if search:
         subtitle += " · " + _gettext('filtered for "%(search)s"') % {"search": search}
+    # The page's other filters, so a sheet opened later says it is not the
+    # whole warehouse.
+    if reserved_only:
+        subtitle += " · " + pgettext("warehouse sheet", "reserved only")
+    if show_empty:
+        subtitle += " · " + pgettext("warehouse sheet", "including empty")
     cell(ws, r, 5, subtitle, font=F_SUB, align=RIGHT)
     merge(ws, r, 5, ncols)
     for c in range(1, ncols + 1):
@@ -165,14 +187,20 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
         # number the screen shows, and the one the total is built from. This
         # column used to print purchase_price, a last-purchase price, so
         # unit cost x stock never came to the total.
+        # With nothing on the floor there is no average; the page then
+        # shows the last cost received, and so does the sheet, marked so it
+        # is not read as the cost of stock on hand.
+        cost = p.avg_cost if p.avg_cost is not None else p.last_cost
         unit_cost = ""
-        if p.avg_cost is not None and for_sales_rep:
+        if cost is not None and for_sales_rep:
             # The price derived from the cost, which moves in 0.05 steps —
             # two decimals say all of it.
-            unit_cost = (f"{_dec(sales_rep_price(p.avg_cost)):,.2f} "
+            unit_cost = (f"{_dec(sales_rep_price(cost)):,.2f} "
                          f"{_cost_currency(p.warehouse)}").strip()
-        elif p.avg_cost is not None:
-            unit_cost = f"{_dec(p.avg_cost):,.4f} {_cost_currency(p.warehouse)}".strip()
+        elif cost is not None:
+            unit_cost = f"{_dec(cost):,.4f} {_cost_currency(p.warehouse)}".strip()
+        if unit_cost and p.avg_cost is None:
+            unit_cost += " (" + pgettext("warehouse sheet", "last cost") + ")"
         c = 1
         cell(ws, r, c, p.sku or "—", font=F_VAL, border=GRID, fmt=TEXT); c += 1
         cell(ws, r, c, p.name, font=F_VAL, border=GRID); c += 1
@@ -204,14 +232,18 @@ def build_warehouse_workbook(warehouse, search="", sort="name_asc",
 @login_required
 def warehouse_excel(request, pk):
     """Download this warehouse's product list as an .xlsx file, honoring the
-    same ?search= / ?search_by= / ?sort= the on-screen list is currently
-    filtered by."""
+    same ?search= / ?search_by= / ?sort= / ?show_empty= / ?reserved_only=
+    the on-screen list is currently filtered by."""
     warehouse = get_object_or_404(Warehouse, pk=pk)
     search = (request.GET.get('search') or '').strip()
     sort = (request.GET.get('sort') or 'name_asc').strip()
-    wb = build_warehouse_workbook(warehouse, search=search, sort=sort,
-                                  search_by=warehouse_search_mode(request),
-                                  for_sales_rep=is_sales_rep(request.user))
+    on = ('1', 'true', 'on')
+    wb = build_warehouse_workbook(
+        warehouse, search=search, sort=sort,
+        search_by=warehouse_search_mode(request),
+        for_sales_rep=is_sales_rep(request.user),
+        show_empty=(request.GET.get('show_empty') or '').strip() in on,
+        reserved_only=(request.GET.get('reserved_only') or '').strip() in on)
     buf = BytesIO()
     wb.save(buf)
     label = f"depo-{warehouse.pk}-{warehouse.name}".replace("/", "-")

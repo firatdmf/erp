@@ -2219,22 +2219,43 @@ class WarehouseProduct(models.Model):
             output_field=_dec)
         return value, metres
 
+    @staticmethod
+    def _last_cost_expr():
+        """What the most recently received priced item cost, whatever its
+        status — sold and consumed items keep their unit_cost_base.
+
+        Shown in place of the average once nothing is left on the floor,
+        so a sold-out SKU still says what it cost. Never part of a value:
+        stock that is gone is worth nothing on the balance sheet.
+        """
+        from django.db.models import DecimalField, OuterRef, Subquery
+        return Subquery(
+            WarehouseProductItem.objects
+            .filter(product=OuterRef("pk"), unit_cost_base__isnull=False)
+            .order_by("-scanned_at", "-id")
+            .values("unit_cost_base")[:1],
+            output_field=DecimalField(max_digits=20, decimal_places=4))
+
     @classmethod
     def with_stock_costs(cls, qs=None):
-        """Annotate `stock_value`, `stock_quantity` and `avg_cost`.
+        """Annotate `stock_value`, `stock_quantity`, `avg_cost` and
+        `last_cost`.
 
         `avg_cost` is what one unit of this SKU actually cost, weighted
         by quantity — NOT the plain mean of the items, which would let a
         5 m remnant count for as much as a 400 m bolt. `stock_value` is the
         exact figure the balance sheet counts, so a list total and the
         books agree by construction rather than by coincidence.
+        `last_cost` is the fallback for a SKU with nothing on the floor
+        (see _last_cost_expr).
         """
         from django.db.models import Case, DecimalField, F, When
         _dec = DecimalField(max_digits=20, decimal_places=4)
         value, metres = cls._stock_cost_exprs()
         return (
             (cls.objects.all() if qs is None else qs)
-            .annotate(stock_value=value, stock_quantity=metres)
+            .annotate(stock_value=value, stock_quantity=metres,
+                      last_cost=cls._last_cost_expr())
             .annotate(avg_cost=Case(
                 When(stock_quantity__gt=0,
                      then=F("stock_value") / F("stock_quantity")),

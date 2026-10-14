@@ -1870,10 +1870,13 @@ class WarehouseDetail(View):
             }
             # Price sorts use the normalized USD unit cost with NULLs last
             # so uncosted products never stock item the "most expensive" list.
+            # A sold-out SKU sorts by its last cost, the figure its row shows.
+            if sort in ("price_desc", "price_asc"):
+                flat = flat.annotate(_price=Coalesce("avg_cost", "last_cost"))
             if sort == "price_desc":
-                flat = flat.order_by(F("avg_cost").desc(nulls_last=True), "name", "id")
+                flat = flat.order_by(F("_price").desc(nulls_last=True), "name", "id")
             elif sort == "price_asc":
-                flat = flat.order_by(F("avg_cost").asc(nulls_last=True), "name", "id")
+                flat = flat.order_by(F("_price").asc(nulls_last=True), "name", "id")
             else:
                 flat = flat.order_by(_flat_sort.get(sort, "name"), "sku", "id")
             paginator = Paginator(flat, PAGE_SIZE)
@@ -1888,10 +1891,11 @@ class WarehouseDetail(View):
             # ── Group in SQL by main product (base name). One row per group →
             #    cheap to paginate even with thousands of variants. Each group
             #    expands to its variants (stock / SKU / stock_items=stock items/coupons). ──
-            from django.db.models import Case, Max, When
+            from django.db.models import Avg, Case, Max, When
             _tv, _tm = WarehouseProduct._stock_cost_exprs()
             grouped = (base_qs.annotate(base=base_expr,
-                                        stock_value=_tv, stock_quantity=_tm)
+                                        stock_value=_tv, stock_quantity=_tm,
+                                        last_cost=WarehouseProduct._last_cost_expr())
                        .values("base").annotate(
                 variant_count=Count("id"),
                 linked=Count("catalog_variant"),
@@ -1911,13 +1915,17 @@ class WarehouseDetail(View):
                 # for as much as a 400 m bolt, and averaged a
                 # last-purchase price at that.
                 total_quantity=Sum("stock_quantity"),
+                # A group with nothing on the floor shows its variants'
+                # last costs instead. A plain mean — there is no quantity
+                # left to weight them by.
+                group_last_cost=Avg("last_cost"),
             ).annotate(
                 avg_cost=Case(
                     When(total_quantity__gt=0,
                          then=F("total_usd") / F("total_quantity")),
                     default=None,
                     output_field=DecimalField(max_digits=20, decimal_places=4)),
-            ))
+            ).annotate(_price=Coalesce("avg_cost", "group_last_cost")))
             _sort_map = {
                 "name_asc": "base", "name_desc": "-base",
                 "qty_desc": "-total_qty", "qty_asc": "total_qty",
@@ -1925,9 +1933,9 @@ class WarehouseDetail(View):
             }
             # Price sorts by the group's average USD unit cost, NULLs last.
             if sort == "price_desc":
-                grouped = grouped.order_by(F("avg_cost").desc(nulls_last=True), "base")
+                grouped = grouped.order_by(F("_price").desc(nulls_last=True), "base")
             elif sort == "price_asc":
-                grouped = grouped.order_by(F("avg_cost").asc(nulls_last=True), "base")
+                grouped = grouped.order_by(F("_price").asc(nulls_last=True), "base")
             else:
                 grouped = grouped.order_by(_sort_map.get(sort, "base"), "base")
 
@@ -1992,6 +2000,7 @@ class WarehouseDetail(View):
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "avg_cost_usd": g["avg_cost"],
+                "last_cost_usd": g["group_last_cost"],
                 "locations": _locations_by_base.get(g["base"], []),
                 "is_catalog": (g.get("linked") or 0) > 0,
             } for g in page.object_list]

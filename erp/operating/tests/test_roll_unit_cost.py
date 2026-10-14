@@ -368,3 +368,94 @@ class DerivedNotStored(TestCase):
         self.assertEqual(
             self.wh.total_value_usd().quantize(Decimal("0.01")),
             subsidiary_equation(self.book)["inventory"])
+
+
+class SoldOutShowsLastCost(TestCase):
+    """Once every item is gone there is no average to take, but the SKU
+    still has a known cost: the last one received. It is shown, greyed,
+    and never counted as value."""
+
+    def setUp(self):
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(
+            name="Laleli", base_currency=usd)
+        self.wh = Warehouse.objects.create(
+            name="Laleli Fabrika", accounting_book=self.book)
+        self.wp = WarehouseProduct.objects.create(
+            warehouse=self.wh, name="kzl", sku="KZL-1",
+            quantity=Decimal("0"), cost_usd=Decimal("2.80"))
+        self.old = self._item(Decimal("2.5000"), "A")
+        self.new = self._item(Decimal("2.8000"), "B")
+        self._item(None, "C")  # unpriced, received last: skipped
+
+        user = get_user_model().objects.create_user("wh3", password="pw")
+        user.member.books.add(self.book)
+        user.member.default_book = self.book
+        user.member.save()
+        self.client.force_login(user)
+
+    def _item(self, cost, barcode):
+        return WarehouseProductItem.objects.create(
+            product=self.wp, quantity=Decimal("100"),
+            quantity_remaining=Decimal("0"), barcode=barcode,
+            status="consumed", unit_cost_base=cost)
+
+    def _annotated(self):
+        return WarehouseProduct.with_stock_costs(
+            WarehouseProduct.objects.filter(pk=self.wp.pk)).first()
+
+    def test_the_last_priced_item_received_gives_the_cost(self):
+        p = self._annotated()
+        self.assertIsNone(p.avg_cost)
+        self.assertEqual(p.last_cost, Decimal("2.8000"))
+
+    def test_it_is_worth_nothing(self):
+        self.assertIsNone(self._annotated().stock_value)
+        self.assertEqual(self.wh.total_value_usd(), Decimal("0"))
+
+    def test_the_product_page_shows_it_greyed(self):
+        resp = self.client.get(reverse(
+            "operating:warehouse_product_detail", args=[self.wh.pk, self.wp.pk]))
+        html = resp.content.decode()
+        self.assertIn('class="muted" title="Last cost — none in stock">$2.8000', html)
+        self.assertNotIn('class="avg-cost"', html)
+        self.assertNotIn('class="stock-value"', html)
+
+    def test_the_lists_show_it(self):
+        for view in ("variants", "grouped"):
+            with self.subTest(view=view):
+                resp = self.client.get(
+                    reverse("operating:warehouse_detail", args=[self.wh.pk]),
+                    {"view": view, "sort": "price_desc", "show_empty": "1"})
+                self.assertEqual(resp.status_code, 200)
+                self.assertIn("2.80</span>", resp.content.decode())
+
+    def test_stock_on_the_floor_still_wins(self):
+        WarehouseProductItem.objects.create(
+            product=self.wp, quantity=Decimal("50"),
+            quantity_remaining=Decimal("50"), barcode="D",
+            status="in_stock", unit_cost_base=Decimal("3.0000"))
+        self.assertEqual(round(self._annotated().avg_cost, 4), Decimal("3.0000"))
+
+    def _sheet_values(self, **params):
+        from io import BytesIO
+        from openpyxl import load_workbook
+        resp = self.client.get(
+            reverse("operating:warehouse_excel", args=[self.wh.pk]), params)
+        self.assertEqual(resp.status_code, 200)
+        ws = load_workbook(BytesIO(resp.content)).active
+        return [c.value for row in ws.iter_rows() for c in row]
+
+    def test_the_export_leaves_it_out_like_the_page(self):
+        self.assertNotIn("KZL-1", self._sheet_values())
+
+    def test_the_export_with_show_empty_gives_the_last_cost(self):
+        values = self._sheet_values(show_empty="1")
+        self.assertIn("KZL-1", values)
+        self.assertIn("2.8000 USD (last cost)", values)
+        self.assertIn("1 product · including empty", values)
+
+    def test_the_export_says_it_is_reserved_only(self):
+        values = self._sheet_values(reserved_only="1")
+        self.assertIn("0 products · reserved only", values)

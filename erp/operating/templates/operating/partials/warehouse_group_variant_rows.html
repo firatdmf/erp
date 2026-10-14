@@ -52,13 +52,17 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
   <td class="num" data-label="{% trans 'Price' %}">
     {% if p.avg_cost %}
       <span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|sales_rep_price|floatformat:"2g" }}</span>
+    {% elif p.last_cost %}
+      <span class="mono" style="color:#9AA5B1;" title="{% trans "Last cost — none in stock" %}">{{ p.warehouse|book_sign }}{{ p.last_cost|sales_rep_price|floatformat:"2g" }}</span>
     {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   {% else %}
   <td class="num" data-label="{% trans 'Unit cost' %}"
-      {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"4g" }}"{% endif %}>
+      {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"4g" }}"{% elif p.last_cost %}title="{% trans "Last cost — none in stock" %}: {{ p.warehouse|book_sign }}{{ p.last_cost|floatformat:"4g" }}"{% endif %}>
     {% if p.avg_cost %}
       <span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"2g" }}</span>
+    {% elif p.last_cost %}
+      <span class="mono" style="color:#9AA5B1;">{{ p.warehouse|book_sign }}{{ p.last_cost|floatformat:"2g" }}</span>
     {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
   <td class="num" data-label="{% trans 'Total' %}">{% if p.line_usd %}<span class="cost-usd">{{ p.warehouse|book_sign }}{{ p.line_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>

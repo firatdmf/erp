@@ -1003,7 +1003,7 @@
           <div class="info-row" style="grid-column: 1 / -1;">
             <span class="info-k">{% trans "Price" %}</span>
             <span class="info-v">
-              {% if product.avg_cost %}<span class="avg-cost">{{ cost_sign }}{{ product.avg_cost|sales_rep_price|money }}</span>{% else %}<span class="muted">—</span>{% endif %}
+              {% if product.avg_cost %}<span class="avg-cost">{{ cost_sign }}{{ product.avg_cost|sales_rep_price|money }}</span>{% elif product.last_cost %}<span class="muted" title="{% trans "Last cost — none in stock" %}">{{ cost_sign }}{{ product.last_cost|sales_rep_price|money }}</span>{% else %}<span class="muted">—</span>{% endif %}
             </span>
           </div>
           {% else %}
@@ -1021,7 +1021,7 @@
               {% comment %}Weighted average of the stock on the floor, not the
               SKU's last-purchase price — see the view. Four decimals: a unit cost
               of $1.9033 is not $1.90 once 27 metres are multiplied back in.{% endcomment %}
-              {% if product.avg_cost %}<span class="avg-cost">{{ cost_sign }}{{ product.avg_cost|money:4 }}</span>{% else %}<span class="muted">—</span>{% endif %}
+              {% if product.avg_cost %}<span class="avg-cost">{{ cost_sign }}{{ product.avg_cost|money:4 }}</span>{% elif product.last_cost %}<span class="muted" title="{% trans "Last cost — none in stock" %}">{{ cost_sign }}{{ product.last_cost|money:4 }}</span>{% else %}<span class="muted">—</span>{% endif %}
             </span>
           </div>
           <div class="info-row" style="grid-column: 1 / -1;">

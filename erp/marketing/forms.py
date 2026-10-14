@@ -33,7 +33,9 @@ class ProductForm(forms.ModelForm):
         model = Product
         # fields = ['title', 'description', 'sku', 'barcode', 'price', 'cost', 'featured', 'selling_while_out_of_stock', 'weight', 'unit_of_weight', 'vendor', 'has_variants']
         fields = "__all__"
-        exclude = ['datasheet_url', 'primary_image']
+        # Collections are typed by name below (collection_names), not picked
+        # from the model's multiple-choice list, which the page never drew.
+        exclude = ['datasheet_url', 'primary_image', 'collections']
         widgets = {
             'featured': forms.CheckboxInput(attrs={'class': 'switch-input'}),
             'selling_while_out_of_stock': forms.CheckboxInput(attrs={'class': 'switch-input'}),
@@ -43,6 +45,37 @@ class ProductForm(forms.ModelForm):
     has_variants = forms.BooleanField(
         required=False, label="Does this product have variants?"
     )
+
+    collection_names = forms.CharField(
+        required=False,
+        label=gettext_lazy("Collections"),
+        widget=forms.TextInput(attrs={
+            'class': 'form-input', 'list': 'collectionChoices',
+            'placeholder': 'Bridal, Summer 2026', 'autocomplete': 'off'}),
+    )
+
+    def clean_collection_names(self):
+        """The collections typed, comma between them, each once whatever its
+        capitals."""
+        names, seen = [], set()
+        for name in (self.cleaned_data.get('collection_names') or '').split(','):
+            name = " ".join(name.split())
+            if name and name.lower() not in seen:
+                seen.add(name.lower())
+                names.append(name)
+        return names
+
+    def _save_m2m(self):
+        """Put the product in the collections typed: one already there by
+        that name (any capitals), or a new one."""
+        super()._save_m2m()
+        if 'collection_names' not in self.cleaned_data:
+            return
+        chosen = []
+        for name in self.cleaned_data['collection_names']:
+            collection = ProductCollection.objects.filter(title__iexact=name).order_by('id').first()
+            chosen.append(collection or ProductCollection.objects.create(title=name))
+        self.instance.collections.set(chosen)
 
     def clean_tags(self):
         """Each tag once, lower case, as the storefront reads them
@@ -73,6 +106,15 @@ class ProductForm(forms.ModelForm):
                 .order_by('name')
             )
         
+        # The collections the product is in, as typed names, and every
+        # collection there is, offered as the box is typed into.
+        self.collection_titles = list(
+            ProductCollection.objects.exclude(title__isnull=True).exclude(title='')
+            .order_by('title').values_list('title', flat=True))
+        if self.instance and self.instance.pk:
+            self.fields['collection_names'].initial = ", ".join(
+                c.title for c in self.instance.collections.order_by('title') if c.title)
+
         # Tags are typed as one line, comma between them ("embroidery, sheer").
         if 'tags' in self.fields:
             self.fields['tags'].widget.attrs.update({

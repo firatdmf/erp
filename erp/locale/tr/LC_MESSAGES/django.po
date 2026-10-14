@@ -14303,3 +14303,6 @@ msgstr "Etiketleri virgülle ayırın."
 
 msgid "from"
 msgstr "şuradan"
+
+msgid "Separate collections with a comma. A name not in use yet makes a new collection."
+msgstr "Koleksiyonları virgülle ayırın. Henüz kullanılmayan bir ad yeni bir koleksiyon oluşturur."

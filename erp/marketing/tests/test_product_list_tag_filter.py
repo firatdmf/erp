@@ -63,3 +63,41 @@ class TagsOnTheEditFormTest(TestCase):
         form = ProductForm(data={**data, "tags": "Embroidery, sheer,  sheer , "}, instance=self.product)
         form.is_valid()
         self.assertEqual(form.cleaned_data.get("tags"), ["embroidery", "sheer"])
+
+
+class CollectionsOnTheEditFormTest(TestCase):
+    """The edit form shows the collections a product is in and puts it in the
+    ones typed. Its Collections box was a placeholder: nothing showed, and
+    nothing typed was kept."""
+
+    def setUp(self):
+        from marketing.models import ProductCollection
+        self.client.force_login(
+            get_user_model().objects.create_superuser("boss", "boss@example.com", "pw"))
+        self.product = Product.objects.create(title="Florenza", sku="K12767", cost=1)
+        self.bridal = ProductCollection.objects.create(title="Bridal")
+        self.product.collections.add(self.bridal)
+
+    def _save(self, typed):
+        from marketing.forms import ProductForm
+        form = ProductForm(instance=self.product)
+        data = {k: v for k, v in form.initial.items()
+                if v is not None and not isinstance(v, (list, tuple))}
+        form = ProductForm(data={**data, "collection_names": typed}, instance=self.product)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        return sorted(self.product.collections.values_list("title", flat=True))
+
+    def test_the_form_shows_the_collections(self):
+        response = self.client.get(reverse("marketing:product_edit", args=[self.product.pk]))
+        self.assertContains(response, 'name="collection_names"')
+        self.assertContains(response, 'value="Bridal"')
+        self.assertContains(response, '<option value="Bridal">')
+
+    def test_a_typed_name_joins_or_makes_a_collection(self):
+        from marketing.models import ProductCollection
+        self.assertEqual(self._save("bridal, Summer 2026, summer 2026"), ["Bridal", "Summer 2026"])
+        self.assertEqual(ProductCollection.objects.filter(title__iexact="bridal").count(), 1)
+
+    def test_emptying_the_box_takes_the_product_out(self):
+        self.assertEqual(self._save(""), [])

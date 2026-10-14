@@ -182,7 +182,7 @@ body > main {
   position: fixed;
   left: 102px;     /* JS recomputes this when an item opens */
   top: 80px;
-  width: 308px;
+  width: 310px;    /* 308px of content inside the 1px border */
   background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFC 100%);
   border: 1px solid #E2E8EB;
   border-radius: 14px;
@@ -203,6 +203,13 @@ body > main {
     visibility 0s linear 220ms;
   text-align: left;
   cursor: default;
+  /* Held between the topbar (it opens no higher than 76px) and a 12px
+     margin at the bottom. The head keeps its height and the body below
+     scrolls in what is left, so the last entries are never off-screen. */
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;   /* so the cap counts the padding and border too */
+  max-height: calc(100vh - 88px);
 }
 /* ------------------------------------------------------------------------
    Compact mode for the Accounting flyout. It absorbed the old top-level
@@ -211,48 +218,59 @@ body > main {
    it fits before the body has to scroll. The compact rules were written for
    the old Current Account flyout; that section no longer exists, so they
    moved here
-   with it.
+   with it. Marketing shares them since it took in Mail and the blog.
    ------------------------------------------------------------------------ */
-[data-flyout="accounting"] > .nj-flyout {
+[data-flyout="accounting"] > .nj-flyout,
+[data-flyout="marketing"] > .nj-flyout {
   padding: 8px 0 6px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fly-head {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-head,
+[data-flyout="marketing"] > .nj-flyout .nj-fly-head {
   padding: 2px 16px 8px;
   margin-bottom: 4px;
   gap: 10px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fly-icon {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-icon,
+[data-flyout="marketing"] > .nj-flyout .nj-fly-icon {
   width: 32px;
   height: 32px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fly-title {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-title,
+[data-flyout="marketing"] > .nj-flyout .nj-fly-title {
   font-size: 15px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fly-body {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-body,
+[data-flyout="marketing"] > .nj-flyout .nj-fly-body {
   padding: 0 6px 4px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fly-group + .nj-fly-group {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-group + .nj-fly-group,
+[data-flyout="marketing"] > .nj-flyout .nj-fly-group + .nj-fly-group {
   margin-top: 2px;
   padding-top: 2px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fly-group-title {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-group-title,
+[data-flyout="marketing"] > .nj-flyout .nj-fly-group-title {
   padding: 6px 10px 2px;
   font-size: 9.5px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fly-item {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-item,
+[data-flyout="marketing"] > .nj-flyout .nj-fly-item {
   padding: 5px 8px;
   gap: 10px;
   font-size: 13px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fi-icon {
+[data-flyout="accounting"] > .nj-flyout .nj-fi-icon,
+[data-flyout="marketing"] > .nj-flyout .nj-fi-icon {
   width: 22px;
   height: 22px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fi-icon svg {
+[data-flyout="accounting"] > .nj-flyout .nj-fi-icon svg,
+[data-flyout="marketing"] > .nj-flyout .nj-fi-icon svg {
   width: 12px;
   height: 12px;
 }
-[data-flyout="accounting"] > .nj-flyout .nj-fi-label {
+[data-flyout="accounting"] > .nj-flyout .nj-fi-label,
+[data-flyout="marketing"] > .nj-flyout .nj-fi-label {
   font-size: 13px;
 }
 .nj-nav-item.nj-open > .nj-flyout,
@@ -327,12 +345,15 @@ body > main {
    absorbing each other — Accounting took in Current Account, Operations took in
    Procurement, Marketing took in Mail — and a menu that runs off the bottom
    of the screen hides its own last entries with no way to reach them.
-   140px leaves room for the 64px topbar, the flyout header and a bottom
-   margin. overscroll-behavior stops the page scrolling underneath once the
-   list hits its end. */
+   The flyout itself is capped to the viewport (see .nj-flyout); the body
+   scrolls inside it. A cap on the body alone left the head and padding
+   uncounted, and a full menu ran some 30px past the bottom of the screen.
+   overscroll-behavior stops the page scrolling underneath once the list
+   hits its end. */
 .nj-fly-body {
   padding: 0 8px 6px;
-  max-height: calc(100vh - 140px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }

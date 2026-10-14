@@ -166,6 +166,7 @@
 .co-stockline.short{color:#B45309;}
 .co-stockline .sep{color:#CBD5E1;margin:0 5px;}
 .co-stockline .cost{font-weight:500;}
+.co-price-from{font-weight:500;font-size:10.5px;color:#64748B;margin-left:4px;white-space:nowrap;}
 /* The price field while it still holds the purchase cost nobody has
    confirmed as a price. */
 .form-input.co-price-is-cost{border-color:#F59E0B;background:#FFFBEB;}
@@ -388,7 +389,7 @@
               <select id="co-nc-currency" class="form-input">
                 {% for c in currencies %}
                   <option value="{{ c.code }}" data-symbol="{{ c.symbol|default:c.code }}"
-                          {% if c.code == base_currency_code %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
+                          {% if c.code == new_customer_currency_code|default:base_currency_code %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -1098,6 +1099,38 @@
                   code: '{{ base_currency_code|default:"USD"|escapejs }}', is_base: true };
   var CO_CUR = CO_BASE;
   var CO_CURRENCY_URL = "{% url 'operating:customer_currency' %}";
+  // Units of each currency per one of the book's own, today. The catalogue
+  // prices in the book's currency; a customer billed in another is offered
+  // that price converted, never the same bare number in the wrong unit.
+  var CO_RATES = JSON.parse('{{ currency_rates_json|default:"{}"|escapejs }}');
+
+  // `basePrice` (a catalogue price, in the book's currency) in the
+  // currency the order is priced in now. Unconverted where there is no
+  // rate to convert with — the label then says nothing was converted.
+  function coFromBase(basePrice) {
+    var p = parseFloat(basePrice) || 0;
+    if (!CO_CUR || CO_CUR.is_base) return p;
+    var rate = CO_RATES[CO_CUR.code || CO_CUR.currency];
+    return rate ? Math.round(p * rate * 100) / 100 : p;
+  }
+
+  // Under the price, while it is still a converted catalogue price: what
+  // it was converted from, so the figure can be rounded to a price of
+  // their own knowing where it came from.
+  function coPriceFromHtml(item) {
+    if (!item.priceFromBase || !CO_CUR || CO_CUR.is_base) return '';
+    if (!CO_RATES[CO_CUR.code || CO_CUR.currency]) return '';
+    return ' <span class="co-price-from">{% trans "from" %} ' + esc(CO_BASE.symbol) +
+           fmtNum(item.basePrice) + '</span>';
+  }
+
+  // Re-price every line still holding a converted catalogue price, after
+  // the order's currency changed. A price somebody typed is theirs.
+  function coRepriceFromBase() {
+    orderItems.forEach(function (it) {
+      if (it.priceFromBase) it.price = coFromBase(it.basePrice);
+    });
+  }
 
   function coCurrencyNote(html, warn) {
     var el = document.getElementById('co-currency-note');
@@ -1144,6 +1177,7 @@
 
   // Every figure the form prints follows the customer's currency.
   function coRepriceLabels() {
+    coRepriceFromBase();
     document.querySelectorAll('[data-cur-symbol]').forEach(function (el) {
       el.textContent = CO_CUR.symbol;
     });
@@ -1486,7 +1520,12 @@
     // Newest item on top so the user immediately sees what they
     // just added — important once the list grows past a few rows.
     orderItems.unshift({
-      index: stableIndex, sku, variant, title: title||sku, price: parseFloat(price)||0,
+      index: stableIndex, sku, variant, title: title||sku,
+      // The search answers in the book's currency; the line is priced in
+      // the order's. Kept apart so a change of customer re-converts it,
+      // until somebody types a price of their own (coUpd).
+      basePrice: parseFloat(price)||0, priceFromBase: true,
+      price: coFromBase(price),
       // Quantity is derived from the stock items picked below (not typed) —
       // starts at 0 until a roll is selected.
       quantity: 0, description: '', categoryName: categoryName||'',
@@ -1784,7 +1823,7 @@
         </div>
         <div class="co-row${item.counted ? ' co-row-counted' : ''}">
           ${item.counted ? coCountedQtyHtml(item, i) : ''}
-          <div class="form-group"><label>{% trans "Unit Price" %}${(item.is_cost_price && !item.counted) ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input${(item.is_cost_price && item.counted) ? ' co-price-is-cost' : ''}" id="co-pricefield-${i}" value="${item.price}" min="0" step="0.01"${(item.is_cost_price && item.counted) ? ` title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}"` : ''} onchange="coUpd(${i},'price',this.value)"></div>
+          <div class="form-group"><label>{% trans "Unit Price" %}${coPriceFromHtml(item)}${(item.is_cost_price && !item.counted) ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input${(item.is_cost_price && item.counted) ? ' co-price-is-cost' : ''}" id="co-pricefield-${i}" value="${item.price}" min="0" step="0.01"${(item.is_cost_price && item.counted) ? ` title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}"` : ''} onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${fmtNum(item.quantity*item.price)}</div></div>
         </div>
         ${item.counted ? '' : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i)}
@@ -2992,6 +3031,8 @@
     if (!orderItems[i]) return;
     if (['quantity','price','custom_width','custom_height','custom_fabric_used_meters'].includes(f)) orderItems[i][f] = parseFloat(v)||0;
     else orderItems[i][f] = v;
+    // A price typed by hand is not a converted catalogue price any more.
+    if (f === 'price') orderItems[i].priceFromBase = false;
     if (f === 'price' && orderItems[i].is_cost_price) {
       // Staff has looked at / edited the pre-filled cost — it's now a
       // deliberate value, so drop the "purchase price" warning badge.

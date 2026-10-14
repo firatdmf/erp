@@ -212,6 +212,25 @@ def _resolve_currency(order=None) -> CurrencyCategory:
     return cur or CurrencyCategory.objects.first()
 
 
+def new_customer_currency(book=None) -> CurrencyCategory:
+    """The currency a book opens a new CUSTOMER account in.
+
+    A customer owes in their account's currency, and every order raised
+    against it is priced in that currency, so this decides what a branch
+    charges in. Almaty keeps its books in dollars and charges in tenge:
+    the two are separate settings. The book's own choice
+    (CurrentAccountSettings.default_currency) when it has made one, else
+    the currency it reports in.
+    """
+    if book is None:
+        return _resolve_currency()
+    settings_row = (CurrentAccountSettings.objects.filter(book=book)
+                    .select_related("default_currency").first())
+    if settings_row is not None and settings_row.default_currency_id:
+        return settings_row.default_currency
+    return book.effective_base_currency or _resolve_currency()
+
+
 # ---------------------------------------------------------------------------
 # Current account resolution
 # ---------------------------------------------------------------------------
@@ -391,7 +410,7 @@ def get_or_create_current_account_for_contact(contact, *, member=None, book=None
         name=getattr(contact, "name", "") or f"Contact #{contact.pk}",
         type="customer",
         billing_country=_crm_country(contact, getattr(contact, "company", None)),
-        default_currency=_resolve_currency(),
+        default_currency=new_customer_currency(book),
         created_by=member,
     )
 
@@ -411,7 +430,7 @@ def get_or_create_current_account_for_company(company, *, member=None, book=None
         name=getattr(company, "name", "") or f"Company #{company.pk}",
         type="customer",
         billing_country=_crm_country(company),
-        default_currency=_resolve_currency(),
+        default_currency=new_customer_currency(book),
         created_by=member,
     )
 

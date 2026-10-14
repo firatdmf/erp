@@ -382,13 +382,15 @@ class CurrentAccountCreate(View):
     ENTITY_TYPES = ("company", "contact", "supplier")
 
     def get(self, request):
+        from .services_accounts import new_customer_currency as _new_customer_currency
         return render(request, self.template_name, {
             "current_account": None,
             "books": _member_books(request),
             "currencies": _currencies(),
-            # A new account starts in the book's own currency, not whichever
-            # currency sorts first.
-            "default_currency_id": request.book.effective_base_currency.pk,
+            # A new account starts in the currency this book opens
+            # customers in (its own setting, else what it reports in), not
+            # whichever currency sorts first.
+            "default_currency_id": _new_customer_currency(request.book).pk,
             "type_choices": CurrentAccount.TYPE_CHOICES,
             "entity_types": self.ENTITY_TYPES,
         })

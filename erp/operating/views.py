@@ -3022,18 +3022,44 @@ def order_customer_card_view(request, pk):
     })
 
 
-def base_currency_facts():
+def base_currency_facts(book=None):
     """The book's own currency, for a form that prices before it knows the
     customer's. Replaced the moment one is picked (customer_currency)."""
     from django.conf import settings as _s
     from accounting.models import CurrencyCategory
+    from accounting.services_accounts import new_customer_currency
 
     code = getattr(_s, "BASE_CURRENCY_CODE", "USD")
     cur = CurrencyCategory.objects.filter(code=code).first()
     return {"base_currency_code": code,
             "base_currency_symbol": (cur.symbol if (cur and cur.symbol) else "$"),
-            # What a customer made on the form can be billed in.
-            "currencies": CurrencyCategory.objects.order_by("code")}
+            # What a customer made on the form can be billed in, and what
+            # one starts on: the currency this book opens customers in.
+            "currencies": CurrencyCategory.objects.order_by("code"),
+            "new_customer_currency_code": (new_customer_currency(book).code
+                                           if book is not None else code),
+            # What one unit of the book's currency is worth in each other
+            # one today, so a catalogue price in dollars can be offered in
+            # the customer's currency instead of as the same bare number.
+            "currency_rates_json": json.dumps(_rates_from_base(code))}
+
+
+def _rates_from_base(code):
+    """{currency code: units of it per one unit of `code`, today} — the
+    rates the order form converts a dollar price with. A currency nobody
+    can rate today is left out, and its prices are not converted."""
+    from accounting.models import CurrencyCategory
+    from accounting.services import get_exchange_rate
+
+    rates = {}
+    for other in CurrencyCategory.objects.values_list("code", flat=True):
+        if other == code:
+            rates[other] = 1.0
+            continue
+        rate = get_exchange_rate(code, other)
+        if rate:
+            rates[other] = float(rate)
+    return rates
 
 
 def _base_currency_symbol():
@@ -3570,7 +3596,7 @@ class OrderCreate(View):
         return render(request, template, {
             "form": form,
             "deposit_cash_boxes": _deposit_cash_boxes(),
-            **base_currency_facts(),
+            **base_currency_facts(getattr(request, "book", None)),
         })
 
     def _settle_book(self, request):

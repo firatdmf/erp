@@ -2827,7 +2827,8 @@ def customer_currency_facts(book_id, customer_type, customer_pk):
     """
     from django.conf import settings as _s
     from accounting.models_accounts import CurrentAccount
-    from accounting.services_accounts import _resolve_currency
+    from accounting.models import Book
+    from accounting.services_accounts import new_customer_currency
     from crm.models import Company, Contact
 
     if not str(customer_pk or "").isdigit():
@@ -2844,8 +2845,10 @@ def customer_currency_facts(book_id, customer_type, customer_pk):
                 .select_related("default_currency"))
     account = (accounts.filter(company=company) if company else
                accounts.filter(contact=contact)).first()
+    # No account in this book yet: it will be opened in the currency the
+    # book opens customers in, so that is what the prices are in.
     currency = (account.default_currency if account and account.default_currency_id
-                else _resolve_currency())
+                else new_customer_currency(Book.objects.filter(pk=book_id).first()))
     base = getattr(_s, "BASE_CURRENCY_CODE", "USD")
     return {
         "currency": currency.code,

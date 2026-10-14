@@ -195,13 +195,13 @@ class PackingListColumns(TestCase):
         self.assertEqual(
             [c.value for c in ws[7]],
             ["Pack", "No", "Product", "Variant", "Product Group", "SKU",
-             "Barcode", "Metres"])
+             "Barcode", "Meters"])
         # One merged block per package, down its own items.
         self.assertIn("A8:A9", [str(m) for m in ws.merged_cells.ranges])
         tail = [[c for c in row if c is not None]
                 for row in ws.iter_rows(min_row=ws.max_row - 2, values_only=True)]
         self.assertEqual(tail, [["Total Packages", 2], ["Total Items", 4],
-                                ["Total Metres", 129.8]])
+                                ["Total Meters", 129.8]])
 
     def test_totals_say_items_not_rolls(self):
         """"Rolls" only makes sense for fabric; the same list also

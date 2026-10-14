@@ -1251,7 +1251,7 @@ def _roll_unavailable_response(roll, exclude_order_id=None):
                      % {"metres": f"{float(phys):g}", "ref": ref_txt},
         }, status=409)
     return JsonResponse({"ok": False, "kind": "no_stock",
-                         "error": _gettext("No available metres are left on this roll.")}, status=409)
+                         "error": _gettext("No available meters are left on this roll.")}, status=409)
 
 
 def _outsourced_qty(item_data):
@@ -1831,9 +1831,9 @@ def order_pack_reserve_add(request, pk):
         try:
             req_meters = _PDecimal(raw)
         except Exception:
-            return JsonResponse({"ok": False, "error": _gettext("Invalid metres.")}, status=400)
+            return JsonResponse({"ok": False, "error": _gettext("Invalid meters.")}, status=400)
         if req_meters <= 0:
-            return JsonResponse({"ok": False, "error": _gettext("Metres must be greater than zero.")}, status=400)
+            return JsonResponse({"ok": False, "error": _gettext("Meters must be greater than zero.")}, status=400)
 
     r, capped, err = _create_roll_reservation(order, matched_item, roll_pick, req_meters, request.user)
     if err == "no_stock":
@@ -1873,9 +1873,9 @@ def order_pack_reserve_update(request, pk):
     try:
         meters = _PDecimal(raw)
     except Exception:
-        return JsonResponse({"ok": False, "error": _gettext("Invalid metres.")}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("Invalid meters.")}, status=400)
     if meters <= 0:
-        return JsonResponse({"ok": False, "error": _gettext("Metres must be greater than zero.")}, status=400)
+        return JsonResponse({"ok": False, "error": _gettext("Meters must be greater than zero.")}, status=400)
     avail = _roll_available_meters(r.stock_item, exclude_reservation_id=r.pk)
     capped = meters > avail
     if capped:
@@ -5173,7 +5173,7 @@ def export_packing_list_excel(request, pk):
     ws.title = f"Packing List {pk}"
 
     headers = ["Pack", "No", "Product", "Variant", "Product Group", "SKU",
-               "Barcode", "Metres"]
+               "Barcode", "Meters"]
     last_col = len(headers)
     last_letter = get_column_letter(last_col)
 
@@ -5260,7 +5260,7 @@ def export_packing_list_excel(request, pk):
     for offset, (label, value) in enumerate((
         ("Total Packages", len(packs)),
         ("Total Items", item_no),
-        ("Total Metres", float(total_meters)),
+        ("Total Meters", float(total_meters)),
     )):
         r = totals_row + offset
         lbl = ws.cell(row=r, column=last_col - 1, value=label)
@@ -5268,7 +5268,7 @@ def export_packing_list_excel(request, pk):
         val = ws.cell(row=r, column=last_col, value=value)
         val.font = Font(bold=True)
         val.alignment = Alignment(horizontal="right")
-        if label == "Total Metres":
+        if label == "Total Meters":
             val.number_format = '0.00" m"'
             lbl.fill = header_fill
             val.fill = header_fill
@@ -6148,10 +6148,10 @@ def order_packing_list_pdf(request, pk):
         'variant': _gettext("Variant"),
         'product_group': _gettext("Product Group"),
         'barcode': _gettext("Barcode"),
-        'quantity': _gettext("Metres"),
+        'quantity': _gettext("Meters"),
         'total_packages': _gettext("Total Packages"),
         'total_items': _gettext("Total Items"),
-        'total_meters': _gettext("Total Metres"),
+        'total_meters': _gettext("Total Meters"),
         'empty_pack': _gettext("(empty)"),
         'no_items': _gettext("Nothing has been packed for this order yet."),
     }
@@ -6407,7 +6407,7 @@ def pack_pdf(request, pack_pk):
         'order': _gettext("Order"),
         'contents': _gettext("CONTENTS"),
         'product': _gettext("Product"),
-        'quantity': _gettext("Metres"),
+        'quantity': _gettext("Meters"),
     }
     
     font = _ensure_pdf_fonts() or "Helvetica"

@@ -87,7 +87,7 @@ def update_product_stock(request):
         'success': False,
         'error': ('Catalog stock is no longer writable. A variant\'s quantity is '
                   'the sum of the warehouse rows behind it, so stock is added or '
-                  'removed in the warehouse, not through this endpoint. Metres '
+                  'removed in the warehouse, not through this endpoint. Meters '
                   'leave the shelf when an order\'s reserved rolls are consumed '
                   'at ship time.'),
         'product_sku': product_sku,

@@ -472,7 +472,7 @@ def _set_roll_length(roll, new_full):
     Shared by the roll edit on the warehouse page and the purchase edit, so a
     length corrected from either place obeys the same two rules."""
     if new_full is None or new_full <= 0:
-        raise RollLengthError(_gettext("Metres must be positive."))
+        raise RollLengthError(_gettext("Meters must be positive."))
     old_full = roll.quantity or Decimal("0")
     consumed = _roll_metres_out(roll)
 
@@ -2597,7 +2597,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     if roll.status == "consumed":
         return JsonResponse(
             {"success": False,
-             "error": _gettext("This stock item is used up — there are no metres to move.")}, status=400)
+             "error": _gettext("This stock item is used up — there are no meters to move.")}, status=400)
 
     # Stock may not cross between BOOKS on a warehouse move. A book is a
     # business: a stocked Warehouse.accounting_book is required and PROTECTed because
@@ -4296,7 +4296,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         if history_changed:
             raise IntakeError({
                 "success": False,
-                "error": str(_lz("Metres have already gone out of these rolls, so their length and "
+                "error": str(_lz("Meters have already gone out of these rolls, so their length and "
                                  "barcode can't change and they can't be removed. Correct the "
                                  "shipment or stock-out first.")),
                 "blocked": [{"barcode": r.barcode} for r in history_changed],
@@ -4417,7 +4417,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                         if not same_variant and _roll_metres_out(roll) > 0:
                             raise IntakeError({
                                 "success": False,
-                                "error": str(_lz("Metres have already gone out of this roll as the "
+                                "error": str(_lz("Meters have already gone out of this roll as the "
                                                  "variant it is, so it can't become a different one.")),
                                 "blocked": [{"barcode": roll.barcode}],
                             }, status=422)
@@ -6404,7 +6404,7 @@ def reservation_shortfall_message(order):
     more = (" " + _gettext("(+%(count)s lines)") % {"count": len(rows) - 4}
             if len(rows) > 4 else "")
     return (_gettext("The scanned rolls don't cover the order — %(details)s. "
-                     "Scan the remaining metres from the packing page.")
+                     "Scan the remaining meters from the packing page.")
             % {"details": det + more})
 
 
@@ -7656,7 +7656,7 @@ class WarehouseRollEdit(View):
             try:
                 new_full = Decimal(meters_raw)
             except (InvalidOperation, TypeError):
-                return JsonResponse({"success": False, "error": _gettext("Invalid metre value.")}, status=400)
+                return JsonResponse({"success": False, "error": _gettext("Invalid meter value.")}, status=400)
             if new_full != old_full and change_reason in _ROLL_TAKE_OUT_PURPOSE:
                 # Stock taken out: the item was received at the length it
                 # has, and the difference is what left it.

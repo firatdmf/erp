@@ -2207,7 +2207,7 @@
     var rowsHtml = '';
     if (noStockAtAll) {
       rowsHtml = '<div style="font-size:11.5px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;padding:7px 9px;border-radius:7px;">' +
-        '<i class="fas fa-triangle-exclamation"></i> {% trans "No rolls in the warehouse for this product — enter the metres below." %}' +
+        '<i class="fas fa-triangle-exclamation"></i> {% trans "No rolls in the warehouse for this product — enter the meters below." %}' +
       '</div>';
     } else {
       existing.forEach(function (r) { rowsHtml += rollRowHtml(i, r, 'existing', null); });

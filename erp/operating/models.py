@@ -1537,7 +1537,7 @@ class OrderItem(models.Model):
         decimal_places=2,
         blank=True,
         null=True,
-        help_text=_("Fabric used (metres)")
+        help_text=_("Fabric used (meters)")
     )
     
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")

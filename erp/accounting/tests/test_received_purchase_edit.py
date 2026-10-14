@@ -417,7 +417,7 @@ class ReceivedPurchaseEditTest(TestCase):
         card = self._form()["products"][0]
         self.assertEqual((card["unit"], card["pack_type"], card["unit_locked"]),
                          ("mt", "roll", False))
-        self.assertEqual(card["unit_label"], "Metre")
+        self.assertEqual(card["unit_label"], "Meter")
         self.assertEqual(card["pack_label"], "Roll")
 
     def test_the_variants_endpoint_states_the_product(self):

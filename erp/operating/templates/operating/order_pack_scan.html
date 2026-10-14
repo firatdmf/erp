@@ -446,7 +446,7 @@
   <div class="pk-banner">
     <i class="fa fa-circle-info"></i>
     <div>
-      {% trans "Put this order's rolls into packages: open a package's <b>Scan here</b> to scan barcodes, or type or paste one or several; <b>drag</b> rolls onto a package; or use a roll's <b>To package</b> button. Drag a roll out of its package to take it out, and drag a package by its grip to change its number. Which rolls and how many metres are settled on the order screen; stock is deducted only when the order ships." %}
+      {% trans "Put this order's rolls into packages: open a package's <b>Scan here</b> to scan barcodes, or type or paste one or several; <b>drag</b> rolls onto a package; or use a roll's <b>To package</b> button. Drag a roll out of its package to take it out, and drag a package by its grip to change its number. Which rolls and how many meters are settled on the order screen; stock is deducted only when the order ships." %}
     </div>
   </div>
   {% endif %}
@@ -908,7 +908,7 @@
       }
       var el = addRow(d.reservation, true);
       if (el) el.scrollIntoView({block:'center', behavior:'smooth'});
-      if (d.capped) say('{% filter escapejs %}{% trans "Metres capped to what remains on the roll." %}{% endfilter %}', 'warn');
+      if (d.capped) say('{% filter escapejs %}{% trans "Meters capped to what remains on the roll." %}{% endfilter %}', 'warn');
       else if (d.reservation.pack_id) say('{% filter escapejs %}{% trans "Roll added to the package." %}{% endfilter %}');
       else say('{% filter escapejs %}{% trans "Roll added." %}{% endfilter %}');
       scanLogAdd('', code, d.reservation.product_name, d.reservation.quantity);

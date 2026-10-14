@@ -12,7 +12,7 @@ from django.utils.translation import pgettext_lazy
 # What a product is COUNTED IN. Codes and labels are English; Turkish belongs
 # in the .po catalogue, not in the data.
 UNIT_CHOICES = [
-    ("mt", pgettext_lazy("unit", "Metre")),
+    ("mt", pgettext_lazy("unit", "Meter")),
     ("piece", pgettext_lazy("unit", "Piece")),
     ("pack", pgettext_lazy("unit", "Pack")),
     ("kg", pgettext_lazy("unit", "Kilogram")),

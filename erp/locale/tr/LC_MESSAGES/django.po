@@ -1606,7 +1606,7 @@ msgid "Meeting Type"
 msgstr "Toplantı Türü"
 
 msgid "Meter"
-msgstr "Meter"
+msgstr "Metre"
 
 msgid "Monthly"
 msgstr "Aylık"
@@ -8630,7 +8630,7 @@ msgstr "Depo dışı ilave miktar ekle"
 msgid "Note (optional) — e.g. to be sourced from another warehouse"
 msgstr "Not (opsiyonel) — örn. başka depodan temin edilecek"
 
-msgid "No rolls in the warehouse for this product — enter the metres below."
+msgid "No rolls in the warehouse for this product — enter the meters below."
 msgstr "Bu ürün için depoda top bulunamadı — aşağıdan metre girin."
 
 msgid "Add roll by barcode"
@@ -9480,7 +9480,7 @@ msgstr "Onaylıyor musunuz?"
 msgid "The order will be re-opened:"
 msgstr "Sipariş geri açılacak:"
 
-msgid "Cut metres return to their rolls"
+msgid "Cut meters return to their rolls"
 msgstr "Kesilen metreler aynı toplara iade edilir"
 
 msgid "The auto collection is cancelled (manual deposits stay)"
@@ -9584,13 +9584,13 @@ msgstr "Bir alım başka bir deftere ait bir depoya taşınamaz — toplar iki d
 msgid "This roll is reserved for an order, so it can't become a different variant. Fix that order first."
 msgstr "Bu top bir siparişe ayrılmış, bu yüzden başka bir varyanta dönüştürülemez. Önce o siparişi düzeltin."
 
-msgid "Metres have already gone out of these rolls, so their length and barcode can't change and they can't be removed. Correct the shipment or stock-out first."
+msgid "Meters have already gone out of these rolls, so their length and barcode can't change and they can't be removed. Correct the shipment or stock-out first."
 msgstr "Bu toplardan metre çıkışı yapılmış, bu yüzden uzunlukları ve barkodları değiştirilemez, silinemezler. Önce ilgili sevkiyatı veya stok çıkışını düzeltin."
 
-msgid "Metres have already gone out of this roll as the variant it is, so it can't become a different one."
+msgid "Meters have already gone out of this roll as the variant it is, so it can't become a different one."
 msgstr "Bu toptan bu varyant olarak metre çıkışı yapılmış, bu yüzden başka bir varyanta dönüştürülemez."
 
-msgid "Metres have already gone out of this roll — its length and barcode can't change, and it can't be removed."
+msgid "Meters have already gone out of this roll — its length and barcode can't change, and it can't be removed."
 msgstr "Bu toptan metre çıkışı yapılmış — uzunluğu ve barkodu değiştirilemez, silinemez."
 
 msgid "Saving will reduce what these orders have reserved:"
@@ -10033,7 +10033,7 @@ msgid "This product already has stock, so its unit and pack are set on the produ
 msgstr "Bu ürünün zaten stoğu var; birimi ve ambalajı ürün sayfasında belirlenir."
 
 msgctxt "unit"
-msgid "Metre"
+msgid "Meter"
 msgstr "Metre"
 
 msgctxt "unit"
@@ -11056,7 +11056,7 @@ msgid "All rolls are in packages."
 msgstr "Tüm toplar paketlerde."
 
 #: operating/templates/operating/order_pack_scan.html
-msgid "Put this order's rolls into packages: open a package's <b>Scan here</b> to scan barcodes, or type or paste one or several; <b>drag</b> rolls onto a package; or use a roll's <b>To package</b> button. Drag a roll out of its package to take it out, and drag a package by its grip to change its number. Which rolls and how many metres are settled on the order screen; stock is deducted only when the order ships."
+msgid "Put this order's rolls into packages: open a package's <b>Scan here</b> to scan barcodes, or type or paste one or several; <b>drag</b> rolls onto a package; or use a roll's <b>To package</b> button. Drag a roll out of its package to take it out, and drag a package by its grip to change its number. Which rolls and how many meters are settled on the order screen; stock is deducted only when the order ships."
 msgstr "Bu siparişin toplarını paketlere koyun: bir paketin <b>Buraya okut</b> düğmesiyle barkod okutun ya da bir veya birkaç barkodu yazın veya yapıştırın; topları bir pakete <b>sürükleyin</b>; ya da topun <b>Pakete at</b> düğmesini kullanın. Bir topu paketten çıkarmak için paketin dışına sürükleyin; paketin numarasını değiştirmek için paketi tutamağından sürükleyin. Toplar ve metreleri sipariş ekranında belirlenir; stok ancak sipariş gönderildiğinde düşer."
 
 #: operating/templates/operating/order_pack_scan.html
@@ -11754,7 +11754,7 @@ msgstr "(+%(count)s kalem)"
 
 #: hardcoded Turkish moved to the catalogue as written
 #, python-format
-msgid "The scanned rolls don't cover the order — %(details)s. Scan the remaining metres from the packing page."
+msgid "The scanned rolls don't cover the order — %(details)s. Scan the remaining meters from the packing page."
 msgstr "Okutulan toplar siparişi karşılamıyor — %(details)s. Kalan metreleri paketleme sayfasından okutun."
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -11797,7 +11797,7 @@ msgid "A cancelled order can't be re-opened. Create a new order if needed."
 msgstr "İptal edilmiş bir sipariş tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun."
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "No available metres are left on this roll."
+msgid "No available meters are left on this roll."
 msgstr "Bu topta uygun metre kalmadı."
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -11833,11 +11833,11 @@ msgid "This stock item doesn't belong to this order — it can't be added to the
 msgstr "Bu stock item bu siparişe ait değil — pakete eklenemez."
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Invalid metres."
+msgid "Invalid meters."
 msgstr "Geçersiz metre."
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Metres must be greater than zero."
+msgid "Meters must be greater than zero."
 msgstr "Metre sıfırdan büyük olmalı."
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -11897,7 +11897,7 @@ msgid "The package list is out of date — refresh the page."
 msgstr "Paket listesi güncel değil — sayfayı yenileyin."
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Metres must be positive."
+msgid "Meters must be positive."
 msgstr "Metre pozitif olmalı."
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -11925,7 +11925,7 @@ msgid "A combined warehouse is virtual — a stock item can only be moved to one
 msgstr "Ortak depo sanaldır — stock item ancak üye depolardan birine taşınabilir."
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "This stock item is used up — there are no metres to move."
+msgid "This stock item is used up — there are no meters to move."
 msgstr "Bu stock item tükenmiş — taşınacak metre yok."
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -11973,7 +11973,7 @@ msgid "This barcode is already used on another roll."
 msgstr "Bu barkod zaten başka bir topta kullanılıyor."
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Invalid metre value."
+msgid "Invalid meter value."
 msgstr "Geçersiz metre değeri."
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -12307,7 +12307,7 @@ msgid "already in this package"
 msgstr "zaten bu pakette"
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Metres capped to what remains on the roll."
+msgid "Meters capped to what remains on the roll."
 msgstr "Girilen metre topta kalanla sınırlandı."
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -12592,16 +12592,13 @@ msgstr "Vazgeç"
 msgid "Order No"
 msgstr "Sipariş No"
 
-#: hardcoded Turkish moved to the catalogue as written
-msgid "Metres"
-msgstr "Metre"
 
 #: hardcoded Turkish moved to the catalogue as written
 msgid "Total Packages"
 msgstr "Toplam Paket"
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Total Metres"
+msgid "Total Meters"
 msgstr "Toplam Metre"
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -13035,7 +13032,7 @@ msgid "Panel type"
 msgstr "Kanat tipi"
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Fabric used (metres)"
+msgid "Fabric used (meters)"
 msgstr "Kullanılan kumaş miktarı (metre)"
 
 #: hardcoded Turkish moved to the catalogue as written

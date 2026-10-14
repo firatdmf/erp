@@ -3044,6 +3044,12 @@ def base_currency_facts(book=None):
             "base_is_reporting": start_code == code,
             "catalog_currency_code": code,
             "catalog_currency_symbol": catalog_symbol,
+            # What the book sells in, kept apart from base_currency_* (an
+            # edit restates those as the order's): a cost read in the
+            # catalogue's currency is shown in it too, in brackets.
+            "trading_currency_code": start_code,
+            "trading_currency_symbol": ((start.symbol or start.code) if start is not None
+                                        else catalog_symbol),
             # What a customer made on the form can be billed in, and what
             # one starts on: the currency this book opens customers in.
             "currencies": CurrencyCategory.objects.order_by("code"),
@@ -4126,7 +4132,8 @@ class OrderEdit(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(base_currency_facts())
+        account = getattr(self.object, "current_account", None)
+        context.update(base_currency_facts(getattr(account, "book", None)))
         # An order being edited already knows what it is priced in, so the
         # form states that rather than the book's own currency.
         context["base_currency_symbol"] = self.object.currency_symbol

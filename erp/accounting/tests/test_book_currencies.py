@@ -114,6 +114,9 @@ class TheOrderFormStartsInTheTradingCurrency(ABranchBook, TestCase):
         html = page.content.decode()
         self.assertIn('<span data-cur-symbol>₸</span>', html)
         self.assertIn("is_base: false", html)
+        # A dollar cost is shown in tenge beside it, so the form knows both.
+        self.assertEqual(page.context["trading_currency_code"], "KZT")
+        self.assertIn("code: 'KZT' };", html)
 
     def test_a_book_that_trades_in_dollars_opens_in_dollars(self):
         other = Book.objects.create(name="Ergene Fabric", base_currency=self.usd)
@@ -122,6 +125,7 @@ class TheOrderFormStartsInTheTradingCurrency(ABranchBook, TestCase):
                                        kwargs={"book_id": other.pk}))
         self.assertEqual(page.context["base_currency_code"], "USD")
         self.assertTrue(page.context["base_is_reporting"])
+        self.assertEqual(page.context["trading_currency_code"], "USD")
 
     def test_the_walk_in_counter_takes_tenge(self):
         from accounting.services_accounts import get_or_create_retail_current_account

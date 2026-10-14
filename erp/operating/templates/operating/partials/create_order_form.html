@@ -1104,6 +1104,10 @@
                   is_base: {% if base_is_reporting is False %}false{% else %}true{% endif %} };
   var CO_CATALOG = { symbol: '{{ catalog_currency_symbol|default:"$"|escapejs }}',
                      code: '{{ catalog_currency_code|default:"USD"|escapejs }}' };
+  // What the book sells in. Where it is not the catalogue's currency,
+  // a cost is also shown in it, in brackets (coCostInTrading).
+  var CO_TRADING = { symbol: '{{ trading_currency_symbol|default:"$"|escapejs }}',
+                     code: '{{ trading_currency_code|default:"USD"|escapejs }}' };
   var CO_CUR = CO_BASE;
   var CO_CURRENCY_URL = "{% url 'operating:customer_currency' %}";
   // Units of each currency per one of the book's own, today. The catalogue
@@ -1125,6 +1129,18 @@
   // Under the price, while it is still a converted catalogue price: what
   // it was converted from, so the figure can be rounded to a price of
   // their own knowing where it came from.
+  // " (₸460,000)" after a cost read in the catalogue's currency, at a
+  // book that sells in another one; nothing when they are the same or
+  // there is no rate today.
+  function coCostInTrading(lo, hi) {
+    if (CO_TRADING.code === CO_CATALOG.code) return '';
+    var rate = CO_RATES[CO_TRADING.code];
+    if (!rate) return '';
+    var sym = esc(CO_TRADING.symbol);
+    var at = function (v) { return sym + fmtNum(Math.round(+v * rate * 100) / 100); };
+    return ' (' + at(lo) + (hi != null && hi - lo > 0.005 ? '–' + at(hi) : '') + ')';
+  }
+
   function coPriceFromHtml(item) {
     var code = CO_CUR && (CO_CUR.code || CO_CUR.currency);
     if (!item.priceFromBase || !code || code === CO_CATALOG.code) return '';
@@ -1892,7 +1908,7 @@
     var cost = (costItem.rollCosts || {})[(r.barcode || '').toLowerCase()];
     if (cost != null) {
       meterHtml += '<span title="' + (costItem.rollCostIsPrice ? '{% trans "Price" %}' : '{% trans "Unit cost" %}') + '" style="color:#94A3B8;font-weight:500;white-space:nowrap;">· ' +
-        esc(costItem.costSymbol || '') + fmtNum(+cost) + '/' + unit + '</span>';
+        esc(costItem.costSymbol || '') + fmtNum(+cost) + '/' + unit + coCostInTrading(cost) + '</span>';
     }
     var scissorsBtn = picked
       ? '<button type="button" onclick="event.stopPropagation(); coToggleRollCut(' + i + ',' + ri + ')" title="{% trans "Cut part of it" %}" style="background:none;border:0;color:#B45309;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"><i class="fas fa-scissors"></i></button>'
@@ -2067,7 +2083,8 @@
       var sym = esc(item.costSymbol || '');
       costHtml = '<span class="sep">·</span><span class="cost">' +
         (item.rollCostIsPrice ? '{% trans "Price" %}' : '{% trans "Purchase cost" %}') + ' ' +
-        sym + fmtNum(lo) + (hi - lo > 0.005 ? '–' + sym + fmtNum(hi) : '') + '</span>';
+        sym + fmtNum(lo) + (hi - lo > 0.005 ? '–' + sym + fmtNum(hi) : '') +
+        coCostInTrading(lo, hi) + '</span>';
     }
     var taken = coPickedTotal(item);
     return '<span class="co-stockline' + ((free <= 0 || taken >= free) ? ' short' : '') + '">' + text + costHtml + '</span>';

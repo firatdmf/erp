@@ -39,3 +39,27 @@ class TagFilterTest(TestCase):
         self.assertEqual(response.context["tag_filters"], [
             {"name": "embroidery", "count": 2}, {"name": "sheer", "count": 1}])
         self.assertContains(response, "embroidery (2)")
+
+
+class TagsOnTheEditFormTest(TestCase):
+    """The edit form shows a product's tags and saves what is typed. Its
+    Tags box used to be a placeholder with no name, so a tag set elsewhere
+    was invisible there and nothing typed was kept."""
+
+    def setUp(self):
+        self.client.force_login(
+            get_user_model().objects.create_superuser("boss", "boss@example.com", "pw"))
+        self.product = Product.objects.create(title="Florenza", sku="K12767", tags=["embroidery"])
+
+    def test_the_form_shows_the_tags(self):
+        response = self.client.get(reverse("marketing:product_edit", args=[self.product.pk]))
+        self.assertContains(response, 'name="tags"')
+        self.assertContains(response, 'value="embroidery"')
+
+    def test_typed_tags_are_kept_once_and_lower_case(self):
+        from marketing.forms import ProductForm
+        form = ProductForm(instance=self.product)
+        data = {k: v for k, v in form.initial.items() if v is not None and not isinstance(v, (list, tuple))}
+        form = ProductForm(data={**data, "tags": "Embroidery, sheer,  sheer , "}, instance=self.product)
+        form.is_valid()
+        self.assertEqual(form.cleaned_data.get("tags"), ["embroidery", "sheer"])

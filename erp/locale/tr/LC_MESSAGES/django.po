@@ -14297,3 +14297,6 @@ msgstr "Şunun değerleri"
 
 msgid "Used by"
 msgstr "Kullanan"
+
+msgid "Separate tags with a comma."
+msgstr "Etiketleri virgülle ayırın."

@@ -44,6 +44,16 @@ class ProductForm(forms.ModelForm):
         required=False, label="Does this product have variants?"
     )
 
+    def clean_tags(self):
+        """Each tag once, lower case, as the storefront reads them
+        ("Embroidery" would not be found by its "embroidery")."""
+        tags = []
+        for tag in self.cleaned_data.get('tags') or []:
+            tag = " ".join(str(tag or "").lower().split())
+            if tag and tag not in tags:
+                tags.append(tag)
+        return tags
+
     # If it has variants, this field will be set to True, otherwise False.
     def __init__(self, *args, **kwargs):
         # default is false, passed through the views.
@@ -63,6 +73,13 @@ class ProductForm(forms.ModelForm):
                 .order_by('name')
             )
         
+        # Tags are typed as one line, comma between them ("embroidery, sheer").
+        if 'tags' in self.fields:
+            self.fields['tags'].widget.attrs.update({
+                'class': 'form-input',
+                'placeholder': 'embroidery, sheer',
+            })
+
         # If the instance has variants, set the has_variants field to True
         if self.instance and self.instance.pk:
             # Use count() instead of exists() for better compatibility with some cursor types

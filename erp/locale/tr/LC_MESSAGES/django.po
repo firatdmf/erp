@@ -14329,3 +14329,38 @@ msgstr "yalnızca rezerve"
 msgctxt "warehouse sheet"
 msgid "including empty"
 msgstr "boşlar dahil"
+
+msgid "Reporting currency"
+msgstr "Raporlama para birimi"
+
+msgid "Trading currency"
+msgstr "Ticaret para birimi"
+
+msgid "What this book keeps its accounts in. Every figure in its ledger, its balance sheet and the value of its stock is in this currency; anything paid or charged in another is converted into it at the rate of its day. It can only be changed while the book has no entries."
+msgstr "Bu defterin hesaplarını tuttuğu para birimi. Defterindeki, bilançosundaki ve stok değerindeki her rakam bu para birimindedir; başka bir para birimiyle ödenen ya da kesilen her şey kendi gününün kuruyla buna çevrilir. Yalnızca defterde hiç kayıt yokken değiştirilebilir."
+
+msgid "What this business sells in and gets paid in. A new customer account opens in it, so the orders raised for that customer are priced in it; the order form converts catalogue prices into it; a new cash account starts in it. Customers who already have an account keep their own currency. Blank: the same as the reporting currency."
+msgstr "Bu işletmenin sattığı ve ödeme aldığı para birimi. Yeni bir müşteri hesabı bu para biriminde açılır, böylece o müşteri için açılan siparişler bu para biriminde fiyatlanır; sipariş formu katalog fiyatlarını buna çevirir; yeni bir kasa hesabı bu para biriminde başlar. Zaten hesabı olan müşteriler kendi para birimlerini korur. Boş: raporlama para birimiyle aynı."
+
+msgid "Fixed: this book already has entries, and every one of them is recorded in this currency."
+msgstr "Sabit: bu defterde zaten kayıtlar var ve hepsi bu para biriminde tutuluyor."
+
+msgid "Only someone who manages this book can change its currencies."
+msgstr "Bu defterin para birimlerini yalnızca defteri yöneten biri değiştirebilir."
+
+msgid "Currencies saved."
+msgstr "Para birimleri kaydedildi."
+
+#, python-format
+msgid "The currencies could not be saved: %(error)s"
+msgstr "Para birimleri kaydedilemedi: %(error)s"
+
+msgid "Currencies"
+msgstr "Para birimleri"
+
+msgid "Save currencies"
+msgstr "Para birimlerini kaydet"
+
+#, python-format
+msgid "%(name)s sells in %(sells)s and keeps its books in %(keeps)s: every sale and every payment is converted into %(keeps_code)s at the rate of its day."
+msgstr "%(name)s, %(sells)s ile satış yapar ve defterlerini %(keeps)s ile tutar: her satış ve her ödeme kendi gününün kuruyla %(keeps_code)s'a çevrilir."

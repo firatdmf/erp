@@ -218,17 +218,13 @@ def new_customer_currency(book=None) -> CurrencyCategory:
     A customer owes in their account's currency, and every order raised
     against it is priced in that currency, so this decides what a branch
     charges in. Almaty keeps its books in dollars and charges in tenge:
-    the two are separate settings. The book's own choice
-    (CurrentAccountSettings.default_currency) when it has made one, else
-    the currency it reports in.
+    the two are separate settings. The book's trading currency
+    (Book.effective_trading_currency), which is its reporting currency
+    where it has not chosen another.
     """
     if book is None:
         return _resolve_currency()
-    settings_row = (CurrentAccountSettings.objects.filter(book=book)
-                    .select_related("default_currency").first())
-    if settings_row is not None and settings_row.default_currency_id:
-        return settings_row.default_currency
-    return book.effective_base_currency or _resolve_currency()
+    return book.effective_trading_currency or _resolve_currency()
 
 
 # ---------------------------------------------------------------------------

@@ -402,6 +402,33 @@ class SetBookBrandName(generic.edit.UpdateView):
 
 
 @method_decorator(login_required, name="dispatch")
+class SetBookCurrencies(generic.View):
+    """Save a book's two currencies from its page (BookCurrenciesForm).
+
+    For whoever manages the book — erp.ownership.is_admin, which a
+    branch's Middle manager is — and nobody else: which currency a
+    business charges in decides what every new customer owes in.
+    """
+
+    def post(self, request, pk):
+        from erp.ownership import is_admin
+        from .forms import BookCurrenciesForm
+
+        book = get_object_or_404(Book, pk=pk)
+        if not is_admin(request.user):
+            messages.error(request, _g("Only someone who manages this book can change its currencies."))
+            return redirect("accounting:book_detail", pk=book.pk)
+        form = BookCurrenciesForm(request.POST, book=book)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _g("Currencies saved."))
+        else:
+            messages.error(request, _g("The currencies could not be saved: %(error)s")
+                           % {"error": "; ".join(e for errs in form.errors.values() for e in errs)})
+        return redirect("accounting:book_detail", pk=book.pk)
+
+
+@method_decorator(login_required, name="dispatch")
 class SetMyWorkingBook(generic.detail.SingleObjectMixin, generic.View):
     """Make this the book the logged-in member's work is booked into.
 
@@ -529,6 +556,17 @@ class BookDetail(generic.DetailView):
         context["is_my_working_book"] = bool(
             member and member.default_book_id == book.pk)
         context["my_working_book"] = getattr(member, "default_book", None)
+        # The book's two currencies, explained where they are set.
+        from erp.ownership import is_admin
+        from .forms import BookCurrenciesForm
+        currencies_form = BookCurrenciesForm(book=self.object)
+        context["may_set_currencies"] = is_admin(self.request.user)
+        if not context["may_set_currencies"]:
+            # Shown to everyone, so nobody has to guess what the book
+            # charges in; changed only by whoever manages it.
+            for field in currencies_form.fields.values():
+                field.disabled = True
+        context["currencies_form"] = currencies_form
         context["cash_accounts"] = (
             CashAccount.objects.filter(book=book)
             .select_related("currency")

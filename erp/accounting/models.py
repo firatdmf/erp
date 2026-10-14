@@ -215,6 +215,41 @@ class Book(models.Model):
         """The currency this book reports in, falling back to the default."""
         return self.base_currency or get_base_currency()
 
+    @property
+    def effective_trading_currency(self):
+        """The currency this business sells in and is paid in.
+
+        One of a book's two currencies, and separate from the one above on
+        purpose: a branch can keep its books in dollars and charge its
+        customers in tenge. A new customer account opens in this one (so
+        every order raised for that customer is priced in it), the order
+        form converts catalogue prices into it, and a new cash account
+        starts in it. Kept in the book's current-account settings
+        (CurrentAccountSettings.default_currency); where none is chosen it
+        is the reporting currency, so a book that never thought about it
+        charges in what it reports in.
+        """
+        if self.pk:
+            from .models_accounts import CurrentAccountSettings
+            row = (CurrentAccountSettings.objects.filter(book_id=self.pk)
+                   .select_related("default_currency").first())
+            if row is not None and row.default_currency_id:
+                return row.default_currency
+        return self.effective_base_currency
+
+    @property
+    def has_entries(self):
+        """Whether anything has been recorded in this book's currency yet —
+        once it has, the reporting currency is fixed: changing it would
+        restate every figure without touching a single entry."""
+        if not self.pk:
+            return False
+        from .models_accounts import CurrentAccountMovement
+        from .models_ledger import JournalEntry
+        return (JournalEntry.objects.filter(book_id=self.pk).exists()
+                or CurrentAccountMovement.objects.filter(book_id=self.pk).exists()
+                or CashTransactionEntry.objects.filter(book_id=self.pk).exists())
+
     # This is how a data entry gets displayed in the admin panel and forms
     def __str__(self):
         return self.name

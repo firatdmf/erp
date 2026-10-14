@@ -24,6 +24,77 @@ class BookForm(forms.ModelForm):
         if ids is not None and "directory" in self.fields:
             field = self.fields["directory"]
             field.queryset = field.queryset.filter(pk__in=ids)
+        # A book has two currencies, and the form says what each does —
+        # see BookCurrenciesForm, which edits both on the book's page.
+        if "base_currency" in self.fields:
+            self.fields["base_currency"].label = _("Reporting currency")
+            self.fields["base_currency"].help_text = REPORTING_CURRENCY_HELP
+        self.fields["trading_currency"] = forms.ModelChoiceField(
+            queryset=CurrencyCategory.objects.order_by("code"), required=False,
+            label=_("Trading currency"), help_text=TRADING_CURRENCY_HELP)
+
+    def save(self, commit=True):
+        book = super().save(commit=commit)
+        trading = self.cleaned_data.get("trading_currency")
+        if commit and trading is not None:
+            from .models_accounts import CurrentAccountSettings
+            settings_row = CurrentAccountSettings.for_book(book)
+            settings_row.default_currency = trading
+            settings_row.save(update_fields=["default_currency"])
+        return book
+
+
+REPORTING_CURRENCY_HELP = _("What this book keeps its accounts in. Every figure in its ledger, its balance sheet and the value of its stock is in this currency; anything paid or charged in another is converted into it at the rate of its day. It can only be changed while the book has no entries.")
+TRADING_CURRENCY_HELP = _("What this business sells in and gets paid in. A new customer account opens in it, so the orders raised for that customer are priced in it; the order form converts catalogue prices into it; a new cash account starts in it. Customers who already have an account keep their own currency. Blank: the same as the reporting currency.")
+
+
+class BookCurrenciesForm(forms.Form):
+    """A book's two currencies, as its page edits them.
+
+    Reporting: what the book keeps its accounts in. Trading: what the
+    business sells in and is paid in. They are the same for most books and
+    differ for a branch that, say, keeps dollar books and charges in tenge.
+    The reporting currency is fixed once anything has been recorded —
+    changing it then would restate every figure without touching an entry
+    — so the form disables it for a book with entries.
+    """
+
+    reporting_currency = forms.ModelChoiceField(
+        queryset=CurrencyCategory.objects.order_by("code"),
+        label=_("Reporting currency"), help_text=REPORTING_CURRENCY_HELP)
+    trading_currency = forms.ModelChoiceField(
+        queryset=CurrencyCategory.objects.order_by("code"),
+        label=_("Trading currency"), help_text=TRADING_CURRENCY_HELP)
+
+    def __init__(self, *args, book, **kwargs):
+        self.book = book
+        kwargs.setdefault("initial", {
+            "reporting_currency": book.effective_base_currency,
+            "trading_currency": book.effective_trading_currency,
+        })
+        super().__init__(*args, **kwargs)
+        if book.has_entries:
+            field = self.fields["reporting_currency"]
+            field.disabled = True
+            field.help_text = _(
+                "Fixed: this book already has entries, and every one of them "
+                "is recorded in this currency.")
+
+    def save(self):
+        from .models_accounts import CurrentAccountSettings
+        book = self.book
+        reporting = self.cleaned_data["reporting_currency"]
+        if not self.fields["reporting_currency"].disabled and reporting != book.base_currency:
+            book.base_currency = reporting
+            book.save(update_fields=["base_currency"])
+        settings_row = CurrentAccountSettings.for_book(book)
+        trading = self.cleaned_data["trading_currency"]
+        # Stored only where it differs: a book that charges in what it
+        # reports in follows its reporting currency if that ever changes.
+        settings_row.default_currency = (None if trading == book.effective_base_currency
+                                         else trading)
+        settings_row.save(update_fields=["default_currency"])
+        return book
 
 
 class BookNameForm(forms.ModelForm):
@@ -81,6 +152,9 @@ class CashAccountForm(forms.ModelForm):
         # column.
         if book is not None:
             self.instance.book = book
+            if not self.instance.pk:
+                # A new till starts in the currency the business is paid in.
+                self.fields["currency"].initial = book.effective_trading_currency
         if self.instance.pk and self.instance.is_in_use:
             # Balances are summed per currency across the book, so
             # re-denominating an account that already holds movements

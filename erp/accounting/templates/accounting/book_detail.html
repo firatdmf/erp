@@ -142,6 +142,55 @@
     {% endif %}
   </div>
 
+  {% comment %}
+    The book's two currencies, each said in words where it is set. Most
+    books report and trade in one currency; a branch can keep dollar books
+    and charge in tenge, and this card is where that is decided — and
+    where anyone can read that it was.
+  {% endcomment %}
+  <div class="financial-overview-card book-currencies">
+    <style>
+      .book-currencies form { display: grid; gap: 14px; margin-top: 4px; }
+      .book-currencies .cur-row { display: grid; grid-template-columns: 220px 1fr; gap: 6px 18px; align-items: start; }
+      .book-currencies .cur-row label { font-weight: 700; font-size: 13.5px; padding-top: 7px; }
+      .book-currencies select { min-width: 200px; max-width: 320px; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; background: #fff; }
+      .book-currencies select:disabled { background: #F1F5F9; color: #475569; }
+      .book-currencies .cur-help { grid-column: 2; margin: 0; font-size: 12.5px; line-height: 1.5; color: #64748B; max-width: 680px; }
+      .book-currencies .cur-summary { margin: 0; padding: 9px 12px; border-radius: 8px; background: #F0FDFA; border: 1px solid #99F6E4; color: #115E59; font-size: 13px; }
+      .book-currencies .cur-actions { display: flex; justify-content: flex-end; }
+      .book-currencies .cur-actions button { padding: 8px 16px; border-radius: 8px; border: 0; background: #0F766E; color: #fff; font-weight: 600; cursor: pointer; }
+      @media (max-width: 640px) {
+        .book-currencies .cur-row { grid-template-columns: 1fr; }
+        .book-currencies .cur-row label { padding-top: 0; }
+        .book-currencies .cur-help { grid-column: 1; }
+        .book-currencies select { width: 100%; max-width: none; font-size: 16px; }
+      }
+    </style>
+    <div class="card-header-title">
+      <i class="fas fa-coins green-icon"></i> {% trans "Currencies" %}
+    </div>
+    {% with reporting=book.effective_base_currency trading=book.effective_trading_currency %}
+    {% if reporting != trading %}
+    <p class="cur-summary">
+      {% blocktrans with name=book.name sells=trading.name keeps=reporting.name keeps_code=reporting.code %}{{ name }} sells in {{ sells }} and keeps its books in {{ keeps }}: every sale and every payment is converted into {{ keeps_code }} at the rate of its day.{% endblocktrans %}
+    </p>
+    {% endif %}
+    {% endwith %}
+    <form method="post" action="{% url 'accounting:set_book_currencies' book.pk %}">
+      {% csrf_token %}
+      {% for field in currencies_form %}
+      <div class="cur-row">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        <div>{{ field }}</div>
+        <p class="cur-help">{{ field.help_text }}</p>
+      </div>
+      {% endfor %}
+      {% if may_set_currencies %}
+      <div class="cur-actions"><button type="submit">{% trans "Save currencies" %}</button></div>
+      {% endif %}
+    </form>
+  </div>
+
   <!-- Financial Overview Card -->
   <div class="financial-overview-card">
     <div class="card-header-title">

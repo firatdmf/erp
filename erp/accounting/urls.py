@@ -43,6 +43,7 @@ urlpatterns = [
     path('books/<int:pk>/',book_page(BookDetail.as_view()),name="book_detail"),
     path('books/<int:pk>/rename/', book_page(RenameBook.as_view()), name="rename_book"),
     path('books/<int:pk>/brand_name/', book_page(SetBookBrandName.as_view()), name="set_book_brand_name"),
+    path('books/<int:pk>/currencies/', book_page(SetBookCurrencies.as_view()), name="set_book_currencies"),
     path('books/<int:pk>/work_here/', SetMyWorkingBook.as_view(), name="set_my_working_book"),
     path('books/<int:pk>/shares/', book_page(BookShares.as_view()), name="book_shares"),
     path('books/<int:pk>/cash_accounts/new/', book_page(AddCashAccount.as_view()), name="add_cash_account"),

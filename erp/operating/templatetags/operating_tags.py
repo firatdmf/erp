@@ -11,6 +11,7 @@ _CURRENCY_SIGNS = {
     "USD": "$",
     "EUR": "€",
     "TRY": "₺",
+    "KZT": "₸",
 }
 
 

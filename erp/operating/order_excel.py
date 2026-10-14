@@ -79,7 +79,7 @@ def _currency_symbol(code):
             return sym
     except Exception:
         pass
-    return {"USD": "$", "EUR": "€", "GBP": "£", "TRY": "₺"}.get(code, code)
+    return {"USD": "$", "EUR": "€", "GBP": "£", "TRY": "₺", "KZT": "₸"}.get(code, code)
 
 
 def _money_format(code):

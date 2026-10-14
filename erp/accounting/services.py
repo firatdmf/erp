@@ -9,9 +9,17 @@ def _rate_sources(fc: str, tc: str, on_date=None) -> list:
     today = date.today()
     on_date = _as_date(on_date) or today
     fix_day = (on_date - timedelta(days=1)).isoformat()
+    fl, tl = fc.lower(), tc.lower()
     sources = [
         (f"https://api.frankfurter.dev/v1/{fix_day}?from={fc}&to={tc}",
          lambda j: j.get("rates", {}).get(tc)),
+        # The ECB, behind Frankfurter, fixes about thirty currencies and
+        # the tenge is not one of them, so a book paid in KZT got no rate
+        # for any day. This one publishes every currency, for any past day
+        # by date, from public sources — asked for the same day before.
+        (f"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{fix_day}"
+         f"/v1/currencies/{fl}.json",
+         lambda j: (j.get(fl) or {}).get(tl)),
     ]
     if on_date >= today:
         # Only publishes the latest rate, so it can stand in for today

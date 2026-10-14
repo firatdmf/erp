@@ -27,8 +27,10 @@ class OneRatePerDayTests(TestCase):
     def test_a_past_day_asks_for_the_fix_of_the_day_before(self):
         sources = services._rate_sources("USD", "EUR", date(2026, 10, 7))
 
-        self.assertEqual(len(sources), 1)
+        self.assertEqual(len(sources), 2)
         self.assertIn("/2026-10-06?from=USD&to=EUR", sources[0][0])
+        # The second source is asked for the same day.
+        self.assertIn("@2026-10-06/", sources[1][0])
 
     def test_today_asks_for_the_same_fix_morning_or_evening(self):
         today = date.today()
@@ -40,9 +42,20 @@ class OneRatePerDayTests(TestCase):
     def test_only_today_may_fall_back_on_a_latest_only_source(self):
         today = date.today()
 
-        self.assertEqual(len(services._rate_sources("USD", "EUR", today)), 2)
+        self.assertEqual(len(services._rate_sources("USD", "EUR", today)), 3)
         self.assertEqual(
-            len(services._rate_sources("USD", "EUR", today - timedelta(days=1))), 1)
+            len(services._rate_sources("USD", "EUR", today - timedelta(days=1))), 2)
+        self.assertFalse(any("latest" in url for url, _pick in
+                             services._rate_sources("USD", "EUR", today - timedelta(days=1))))
+
+    def test_a_currency_the_ecb_does_not_fix_still_has_a_source_for_a_past_day(self):
+        """The tenge: Almaty is paid in it. Frankfurter answers nothing for
+        it, so the dated source has to — read here off its own answer."""
+        url, pick = services._rate_sources("KZT", "USD", date(2026, 10, 7))[1]
+        self.assertIn("@2026-10-06/v1/currencies/kzt.json", url)
+        answer = {"date": "2026-10-06", "kzt": {"usd": 0.0022232437, "try": 0.1097}}
+        self.assertEqual(pick(answer), 0.0022232437)
+        self.assertIsNone(pick({"date": "2026-10-06"}))
 
     def test_a_day_that_has_not_come_is_worth_what_today_is(self):
         today = date.today()

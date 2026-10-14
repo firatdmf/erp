@@ -1528,10 +1528,6 @@ class BlogPost(models.Model):
     cover_image = models.URLField(blank=True, verbose_name=_lz("Cover image (list)"))
     hero_image = models.URLField(blank=True, verbose_name=_lz("Hero image (detail)"))
     
-    # Custom Code Injection
-    header_content = models.TextField(blank=True, verbose_name="Extra Header Content (CSS/Meta)", help_text="e.g. &lt;style&gt;...&lt;/style&gt; or &lt;link&gt;")
-    footer_content = models.TextField(blank=True, verbose_name="Extra Footer Content (JS)", help_text="e.g. &lt;script&gt;...&lt;/script&gt;")
-    
     # Meta
     author = models.CharField(max_length=200, default='Karven Home Collection')
     published_at = models.DateField(verbose_name=_lz("Publication date"))

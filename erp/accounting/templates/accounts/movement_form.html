@@ -3,6 +3,7 @@
 {% load humanize %}
 {% load accounts_tags %}
 {% load l10n %}
+{% block title %}{% if movement %}{% trans "Edit Movement" %}{% else %}{% trans "New Movement" %}{% endif %} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">

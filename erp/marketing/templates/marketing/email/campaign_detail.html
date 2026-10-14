@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load i18n %}
+{% block title %}{% trans "Email Campaigns" %} · {{ campaign.company.name }} | Nejum ERP{% endblock %}
 
 {% block css %}
 <style>

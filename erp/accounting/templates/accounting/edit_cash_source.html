@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% block title %}{% trans "Edit" %} · {{ label }} #{{ source.pk }} | Nejum ERP{% endblock %}
 
 {% comment %}
   Correcting a revenue, a capital deposit or a currency exchange. Saving

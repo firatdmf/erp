@@ -2,7 +2,7 @@
 {% load i18n %}
 {% load static %}
 
-<title>Messages - {{ active_room.display_name|default:team.name }} | Nejum ERP</title>
+{% block title %}{% trans "Messages" %} · {{ active_room.display_name|default:team.name }} | Nejum ERP{% endblock %}
 
 {% block css %}
 {{ block.super }}

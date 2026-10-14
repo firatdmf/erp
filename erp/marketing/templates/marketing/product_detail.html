@@ -4,6 +4,7 @@
 {% load l10n %}
 {% load static %}
 {% load crm_tags %}
+{% block title %}{% trans "Product" %} · {{ product.title|default:product.sku }} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'erp/css/product_detail.css' %}?v=2.0" />

@@ -4,6 +4,7 @@
 {% load static %}
 {% load operating_tags %}
 
+{% block title %}{% trans "Order" %} {% if combined_number %}{{ combined_number }}{% elif order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} | Nejum ERP{% endblock %}
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load l10n %}
 {% load static %}
+{% block title %}{% if object.pk %}{% trans "Edit expense" %} · #{{ object.pk }}{% else %}{% trans "Record an expense" %}{% endif %} | Nejum ERP{% endblock %}
 
 {% comment %}
   Add expense — the book's expense entry page.

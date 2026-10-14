@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load humanize %}
 {% load accounting_tags accounts_tags %}
+{% block title %}{{ mv.get_movement_type_display }} #{{ mv.pk }} | Nejum ERP{% endblock %}
 
 {% comment %}
   One ledger row, in full.

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load accounting_tags %}
+{% block title %}{% trans "Expense" %} #{{ expense.pk }} | Nejum ERP{% endblock %}
 
 {% comment %}
   One expense, in full, with nothing on it to submit.

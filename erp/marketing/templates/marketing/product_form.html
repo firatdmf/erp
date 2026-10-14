@@ -2,6 +2,7 @@
 {% load i18n %}
 {% load static %}
 {% load marketing_tags %}
+{% block title %}{% if is_update %}{% trans "Edit product" %} · {{ product.title|default:product.sku }}{% else %}{% trans "New product" %}{% endif %} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}">

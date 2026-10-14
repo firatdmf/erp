@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load static %}
+{% block title %}{% trans "Product Group" %} · {{ group.name }} | Nejum ERP{% endblock %}
 
 {% block css %}
 {% include "marketing/partials/_product_group_styles.html" %}

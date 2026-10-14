@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% block title %}{% trans "Edit Note" %} | Nejum ERP{% endblock %}
 {% block content %}
 {% comment %} <p>{{ request.GET.next_url }}</p> {% endcomment %}
 <form method="post" action="{% url 'crm:update_note' note.id %}">

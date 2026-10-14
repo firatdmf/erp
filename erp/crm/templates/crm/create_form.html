@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% block title %}{% if model_type == "company" %}{% trans "New company" %}{% else %}{% trans "New contact" %}{% endif %} | Nejum ERP{% endblock %}
 {% block content %}
   {% load static %}
   {% block css %}

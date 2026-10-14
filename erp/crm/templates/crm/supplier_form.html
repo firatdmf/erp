@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load i18n %}
 {% load static %}
+{% block title %}{% if form.instance.pk %}{% trans "Edit supplier" %} · {{ form.instance.company_name|default:form.instance.contact_name }}{% else %}{% trans "New supplier" %}{% endif %} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">

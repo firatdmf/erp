@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load accounting_tags %}
+{% load i18n %}
+{% block title %}{% trans "Transactions" %} · {{ book.name }} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'accounting/css/book_detail.css' %}">

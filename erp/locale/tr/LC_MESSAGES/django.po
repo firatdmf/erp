@@ -1384,7 +1384,7 @@ msgid "Edit Company"
 msgstr "Company'yi Düzenle"
 
 msgid "Edit Contact"
-msgstr "Contact'yi Düzenle"
+msgstr "Kişiyi Düzenle"
 
 msgid "Edit Raw Material"
 msgstr "Raw Material'yi Düzenle"
@@ -1618,7 +1618,7 @@ msgid "Multi-Team Management"
 msgstr "Multi-Team Management"
 
 msgid "My Notes"
-msgstr "Benim Notes"
+msgstr "Notlarım"
 
 msgid "My Teams"
 msgstr "Benim Teams"
@@ -1714,7 +1714,7 @@ msgid "Operating"
 msgstr "Operasyon"
 
 msgid "Operating Index"
-msgstr "Operating Index"
+msgstr "Operasyon"
 
 msgid "Option Name"
 msgstr "Option Name"
@@ -1753,7 +1753,7 @@ msgid "Order Quantity"
 msgstr "Order Quantity"
 
 msgid "Order Shipping Status"
-msgstr "Order Shipping Status"
+msgstr "Sipariş Kargo Durumu"
 
 msgid "Order Status"
 msgstr "Sipariş Durumu"
@@ -14410,3 +14410,51 @@ msgstr "stoktan alınmadı"
 
 msgid "The pieces taken go back into stock"
 msgstr "Alınan parçalar stoğa geri döner"
+
+#: browser tab titles
+msgid "Email Templates"
+msgstr "E-posta Şablonları"
+
+#: browser tab titles
+msgid "Edit Note"
+msgstr "Notu Düzenle"
+
+#: browser tab titles
+msgid "Edit supplier"
+msgstr "Tedarikçiyi düzenle"
+
+#: browser tab titles
+msgid "Delete supplier"
+msgstr "Tedarikçiyi sil"
+
+#: browser tab titles
+msgid "Purchase request"
+msgstr "Satın alma talebi"
+
+#: browser tab titles
+msgid "Shares"
+msgstr "Hisseler"
+
+#: browser tab titles
+msgid "Add stakeholder"
+msgstr "Hissedar ekle"
+
+#: browser tab titles
+msgid "New Cash Account"
+msgstr "Yeni Kasa Hesabı"
+
+#: browser tab titles
+msgid "Move money"
+msgstr "Para aktar"
+
+#: browser tab titles
+msgid "Balance Sheet"
+msgstr "Bilanço"
+
+#: browser tab titles
+msgid "Edit Transfer"
+msgstr "Virmanı Düzenle"
+
+#: browser tab titles
+msgid "Sales Analytics"
+msgstr "Satış Analizi"

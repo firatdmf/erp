@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n todo_filters todo_tags crm_tags static accounts_tags %}
+{% block title %}{% trans "Supplier" %} · {{ supplier.company_name|default:supplier.contact_name }} | Nejum ERP{% endblock %}
 {% comment %}
 Supplier detail. Built on contact_detail.html so the two read the same:
 the same Attached items card (tasks and files), the same always-open

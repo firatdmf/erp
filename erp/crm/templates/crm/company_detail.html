@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n todo_filters todo_tags crm_tags static accounts_tags %}
+{% block title %}{% trans "Company" %} · {{ company.name }} | Nejum ERP{% endblock %}
 {% comment %}
 Company detail. The same page as contact_detail.html — one stylesheet
 (crm/css/record_detail.css), one script (crm/js/record_detail.js), the

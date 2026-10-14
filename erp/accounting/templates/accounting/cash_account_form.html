@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load i18n %}
+{% block title %}{% if cash_account %}{% trans "Cash Account" %} · {{ cash_account.name }}{% else %}{% trans "New Cash Account" %}{% endif %} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'accounting/css/book_detail.css' %}">

@@ -3,6 +3,7 @@
 {% load humanize %}
 {% load l10n %}
 {% load accounts_tags %}
+{% block title %}{% if payment %}{% blocktrans with number=payment.number %}Edit {{ number }}{% endblocktrans %}{% else %}{% trans "New Collection / Payment" %}{% endif %} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">

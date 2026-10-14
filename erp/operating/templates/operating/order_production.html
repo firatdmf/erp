@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 
 {% load i18n %}
+{% block title %}{% trans "Production" %} · {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} | Nejum ERP{% endblock %}
 {% block content %}
   {% load static %}
   {% block css %}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load accounting_tags %}
+{% block title %}{{ label }} #{{ source.pk }} | Nejum ERP{% endblock %}
 
 {% comment %}
   One cash entry — a revenue, a capital deposit or a currency exchange — in

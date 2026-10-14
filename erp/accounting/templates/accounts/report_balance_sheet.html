@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% block title %}{% trans "Balance Sheet" %} | Nejum ERP{% endblock %}
 {% comment %}
 The balance sheet, from the general ledger, where A = L + E is true by
 construction — an unbalanced entry cannot be stored.

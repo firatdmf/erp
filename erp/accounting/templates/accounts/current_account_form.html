@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% block title %}{% if current_account %}{% trans "Edit" %} · {{ current_account.name }}{% else %}{% trans "New Account" %}{% endif %} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">

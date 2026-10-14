@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static i18n accounting_tags %}
+{% block title %}{% trans "Ledger account" %} · {{ account_label }} | Nejum ERP{% endblock %}
 {% comment %}
 One ledger account and every entry behind its balance — see
 views_report.LedgerAccount. Reached from the account names on the balance

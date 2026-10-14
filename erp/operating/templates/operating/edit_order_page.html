@@ -17,6 +17,7 @@
   back to `document` when there is no .sidebar-content around it).
 {% endcomment %}
 
+{% block title %}{% trans "Edit Order" %} · {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} | Nejum ERP{% endblock %}
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

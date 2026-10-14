@@ -3,6 +3,7 @@
 {% load humanize %}
 
 {% load accounts_tags %}
+{% block title %}{{ check.get_instrument_display }} · {{ check.serial_no }} | Nejum ERP{% endblock %}
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

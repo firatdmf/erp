@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n static %}
 
+{% block title %}{% trans "Order changes" %} · {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} | Nejum ERP{% endblock %}
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

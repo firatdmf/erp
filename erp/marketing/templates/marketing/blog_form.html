@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load i18n %}
 {% load static %}
+{% block title %}{% if object %}{% trans "Blog post" %} · {{ object.title }}{% else %}{% trans "Create blog post" %}{% endif %} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v={{ request.timestamp|default:'3' }}" />

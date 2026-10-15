@@ -3294,6 +3294,15 @@ class OrderPrint(DetailView):
         from accounting.services_accounts import brand_name_for
         ctx = super().get_context_data(**kwargs)
         order = self.object
+        # A split order prints whole from either half, for whoever may
+        # open that half — the order page shows them every half's lines
+        # and the one total, and the sheet must not quote them less.
+        from .split_orders import split_halves
+        halves = split_halves(order)
+        if len(halves) > 1:
+            ctx.update(combined_print_context(halves))
+            ctx["is_pdf"] = True
+            return ctx
         # Who the document signs as: the order's own print header, else
         # the ledger book's brand name. Resolved here rather than in the
         # template so the printed order, its Excel and the invoice
@@ -3399,74 +3408,84 @@ class OrderPrintCombined(LoginRequiredMixin, View):
     """
 
     def get(self, request):
-        from decimal import Decimal
-        from accounting.services_accounts import brand_name_for
         from erp.pdf_render import document_response
 
         orders, refusal = select_combined_orders(request)
         if refusal is not None:
             return refusal
+        ctx = combined_print_context(orders)
+        return document_response(request, "operating/order_print.html", ctx,
+                                 f"orders_{ctx['order'].order_number or ctx['order'].pk}.pdf")
 
-        groups, items = [], []
-        total, total_qty, pack_ids = Decimal("0.00"), Decimal("0"), set()
-        # One sheet, one total — so it has to be in ONE currency. Orders
-        # for the same customer usually share theirs; where they don't
-        # (an order raised before orders carried one is dollars, a newer
-        # one may be euros) the sheet totals in base, which is what the
-        # book records anyway, and says so rather than adding the two.
-        base_total = Decimal("0.00")
-        codes = {o.currency_code for o in orders}
-        for o in orders:
-            rows, o_total, o_qty, o_packs = build_order_print_rows(o)
-            shelves, has_rolls = order_print_shelves(o, rows)
-            groups.append({"order": o, "items": rows, "shelves": shelves, "has_rolls": has_rolls})
-            items.extend(rows)
-            total += o_total
-            base_total += o.to_base(o_total)
-            total_qty += o_qty
-            # Union, not a sum: an order's pack set may overlap another's
-            # only if the same roll went out twice, which it cannot — but
-            # unioning is what makes the total a count of PACKS rather
-            # than a count of scans, the same way it does within an order.
-            pack_ids |= o_packs
 
-        # The customer block is one block for the whole sheet. Which
-        # order fills it matters only for the address: the customer is
-        # the same on all of them (checked above), but an older order's
-        # address is where a past delivery went, not where these goods
-        # are going. So: the most recent order carrying an address, and
-        # the most recent order at all when none of them do.
-        primary = next((o for o in reversed(orders) if order_has_delivery_info(o)),
-                       orders[-1])
+def combined_print_context(orders):
+    """What the combined sheet prints for `orders`: their lines under a
+    heading each and one grand total. OrderPrintCombined's, and also a
+    split order's own print — the halves are one order, so either half
+    prints all of it (see split_orders)."""
+    from decimal import Decimal
+    from accounting.services_accounts import brand_name_for
 
-        # The span the header prints. Undated orders are left out of it
-        # rather than emptying it: Postgres sorts NULLs last, so one
-        # order saved without a date would otherwise become the range's
-        # end and print nothing at all.
-        dates = [o.order_date for o in orders if o.order_date]
+    groups, items = [], []
+    total, total_qty, pack_ids = Decimal("0.00"), Decimal("0"), set()
+    # One sheet, one total — so it has to be in ONE currency. Orders
+    # for the same customer usually share theirs; where they don't
+    # (an order raised before orders carried one is dollars, a newer
+    # one may be euros) the sheet totals in base, which is what the
+    # book records anyway, and says so rather than adding the two.
+    base_total = Decimal("0.00")
+    codes = {o.currency_code for o in orders}
+    for o in orders:
+        rows, o_total, o_qty, o_packs = build_order_print_rows(o)
+        shelves, has_rolls = order_print_shelves(o, rows)
+        groups.append({"order": o, "items": rows, "shelves": shelves, "has_rolls": has_rolls})
+        items.extend(rows)
+        total += o_total
+        base_total += o.to_base(o_total)
+        total_qty += o_qty
+        # Union, not a sum: an order's pack set may overlap another's
+        # only if the same roll went out twice, which it cannot — but
+        # unioning is what makes the total a count of PACKS rather
+        # than a count of scans, the same way it does within an order.
+        pack_ids |= o_packs
 
-        from .split_orders import combined_number
-        return document_response(request, "operating/order_print.html", {
-            "order": primary,
-            "combined": True,
-            "combined_orders": orders,
-            "combined_label": combined_number(orders),
-            "combined_from": dates[0] if dates else None,
-            "combined_to": dates[-1] if dates else None,
-            "order_groups": groups,
-            "order_items": items,
-            "order_total": total if len(codes) == 1 else base_total,
-            "order_currency_symbol": (primary.currency_symbol if len(codes) == 1
-                                      else _base_currency_symbol()),
-            "combined_mixed_currency": sorted(codes) if len(codes) > 1 else None,
-            "order_total_quantity": total_qty,
-            "order_total_packs": len(pack_ids),
-            **order_print_totals_units(items, len(pack_ids)),
-            "brand_line": brand_name_for(),
-            "has_customer_info": bool(primary.contact_id or primary.company_id
-                                      or primary.web_client_id),
-            "has_delivery_info": order_has_delivery_info(primary),
-        }, f"orders_{primary.order_number or primary.pk}.pdf")
+    # The customer block is one block for the whole sheet. Which
+    # order fills it matters only for the address: the customer is
+    # the same on all of them (checked above), but an older order's
+    # address is where a past delivery went, not where these goods
+    # are going. So: the most recent order carrying an address, and
+    # the most recent order at all when none of them do.
+    primary = next((o for o in reversed(orders) if order_has_delivery_info(o)),
+                   orders[-1])
+
+    # The span the header prints. Undated orders are left out of it
+    # rather than emptying it: Postgres sorts NULLs last, so one
+    # order saved without a date would otherwise become the range's
+    # end and print nothing at all.
+    dates = [o.order_date for o in orders if o.order_date]
+
+    from .split_orders import combined_number
+    return {
+        "order": primary,
+        "combined": True,
+        "combined_orders": orders,
+        "combined_label": combined_number(orders),
+        "combined_from": dates[0] if dates else None,
+        "combined_to": dates[-1] if dates else None,
+        "order_groups": groups,
+        "order_items": items,
+        "order_total": total if len(codes) == 1 else base_total,
+        "order_currency_symbol": (primary.currency_symbol if len(codes) == 1
+                                  else _base_currency_symbol()),
+        "combined_mixed_currency": sorted(codes) if len(codes) > 1 else None,
+        "order_total_quantity": total_qty,
+        "order_total_packs": len(pack_ids),
+        **order_print_totals_units(items, len(pack_ids)),
+        "brand_line": brand_name_for(),
+        "has_customer_info": bool(primary.contact_id or primary.company_id
+                                  or primary.web_client_id),
+        "has_delivery_info": order_has_delivery_info(primary),
+    }
 
 
 def save_order_adjustments(order, raw):

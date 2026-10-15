@@ -96,3 +96,16 @@ class SplitOrderPage(TestCase):
         resp = self.client.get(reverse("operating:order_list_scoped", kwargs={"book_id": self.laleli.pk}))
         self.assertContains(resp, "Split with")
         self.assertContains(resp, "Ergene Fabric")
+
+    def test_the_order_list_shows_the_whole_order_s_total(self):
+        resp = self.client.get(reverse("operating:order_list_scoped", kwargs={"book_id": self.laleli.pk}))
+        html = resp.content.decode()
+        self.assertRegex(html, r'(?s)class="num ord-total">\s*\$97\.50\s*<span[^>]*>This book: \$25\.00</span>')
+
+    def test_the_rep_prints_the_whole_order(self):
+        resp = self.client.get(reverse("operating:order_print", kwargs={"pk": self.laleli_half.pk}) + "?html=1")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Krep")
+        self.assertContains(resp, "Tul Ergene")
+        self.assertContains(resp, "$97.50")
+        self.assertNotContains(resp, "Anna (Ergene Fabric)")

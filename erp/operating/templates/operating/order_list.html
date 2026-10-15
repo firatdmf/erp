@@ -548,7 +548,12 @@
           {% endif %}
         </div>
         <div class="num ord-total">
-          {{ order.currency_symbol }}{{ order.total_value|money }}
+          {% if order.combined_number and order.combined_total is not None %}{# a split order: the whole order's total, this book's half under it #}
+            {{ order.currency_symbol }}{{ order.combined_total|money }}
+            <span style="display:block;">{% trans "This book" %}: {{ order.currency_symbol }}{{ order.total_value|money }}</span>
+          {% else %}
+            {{ order.currency_symbol }}{{ order.total_value|money }}
+          {% endif %}
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
@@ -622,7 +627,12 @@
           {% endif %}
         </div>
         <div class="num ord-total">
-          {{ order.currency_symbol }}{{ order.total_value|money }}
+          {% if order.combined_number and order.combined_total is not None %}{# a split order: the whole order's total, this book's half under it #}
+            {{ order.currency_symbol }}{{ order.combined_total|money }}
+            <span style="display:block;">{% trans "This book" %}: {{ order.currency_symbol }}{{ order.total_value|money }}</span>
+          {% else %}
+            {{ order.currency_symbol }}{{ order.total_value|money }}
+          {% endif %}
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
@@ -689,7 +699,12 @@
           </div>
         </div>
         <div class="num ord-total">
-          {{ order.currency_symbol }}{{ order.total_value|money }}
+          {% if order.combined_number and order.combined_total is not None %}{# a split order: the whole order's total, this book's half under it #}
+            {{ order.currency_symbol }}{{ order.combined_total|money }}
+            <span style="display:block;">{% trans "This book" %}: {{ order.currency_symbol }}{{ order.total_value|money }}</span>
+          {% else %}
+            {{ order.currency_symbol }}{{ order.total_value|money }}
+          {% endif %}
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
@@ -756,7 +771,12 @@
           </div>
         </div>
         <div class="num ord-total">
-          {{ order.currency_symbol }}{{ order.total_value|money }}
+          {% if order.combined_number and order.combined_total is not None %}{# a split order: the whole order's total, this book's half under it #}
+            {{ order.currency_symbol }}{{ order.combined_total|money }}
+            <span style="display:block;">{% trans "This book" %}: {{ order.currency_symbol }}{{ order.total_value|money }}</span>
+          {% else %}
+            {{ order.currency_symbol }}{{ order.total_value|money }}
+          {% endif %}
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">

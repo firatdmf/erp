@@ -74,14 +74,17 @@ def split_order_guarded(view):
 
 
 def label_split_rows(orders):
-    """Put the combined name and the other halves' books on every split
-    order in a list, in one query for the whole page."""
+    """Put the combined name, the other halves' books and the combined
+    total on every split order in a list, in a few queries for the whole
+    page. The total is the whole order's, as its page shows it — None
+    for an older split in two currencies, which has no one sum."""
     groups = {o.split_group for o in orders if o.split_group}
     if not groups:
         return
     by_group = {}
     for half in (Order.objects.filter(split_group__in=groups)
-                 .select_related("current_account__book").order_by("pk")):
+                 .select_related("current_account__book", "currency")
+                 .prefetch_related("items", "adjustments").order_by("pk")):
         by_group.setdefault(half.split_group, []).append(half)
     for order in orders:
         halves = by_group.get(order.split_group) if order.split_group else None
@@ -90,6 +93,8 @@ def label_split_rows(orders):
         order.combined_number = combined_number(halves)
         order.split_other_books = [
             getattr(order_book(h), "name", "") for h in halves if h.pk != order.pk]
+        totals = combined_totals(halves)
+        order.combined_total = totals[0][1] if len(totals) == 1 else None
 
 
 def other_halves_for_page(order, member):

@@ -651,7 +651,10 @@ def combined_order_excel(request):
 def order_excel(request, pk):
     """Download the order as an .xlsx file."""
     order = get_object_or_404(Order, pk=pk)
-    wb = build_order_workbook(order)
+    # A split order downloads whole from either half, as it prints.
+    from .split_orders import split_halves
+    halves = split_halves(order)
+    wb = build_combined_workbook(halves) if len(halves) > 1 else build_order_workbook(order)
     buf = BytesIO()
     wb.save(buf)
     label = order.order_number or f"order-{order.pk}"

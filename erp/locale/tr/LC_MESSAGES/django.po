@@ -11114,6 +11114,9 @@ msgstr "Birleşik toplam"
 msgid "Split with"
 msgstr "Bölündüğü defter:"
 
+msgid "This book"
+msgstr "Bu defter"
+
 #: operating/templates/operating/warehouse_product_detail.html
 msgid "Purpose"
 msgstr "Amaç"

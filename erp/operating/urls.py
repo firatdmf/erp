@@ -11,7 +11,7 @@ from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book
 from crm.directories import customer_guarded
 from .models import Order, Pack, Warehouse
 from .split_orders import split_order_guarded
-from django.views.generic import TemplateView, RedirectView
+from django.views.generic import RedirectView
 
 
 app_name = "operating"
@@ -216,27 +216,6 @@ urlpatterns = [
         views.MachineStatusUpdate.as_view(),
         name="machine-status-update",
     ),
-    # path(
-    #     "scan/",
-    #     TemplateView.as_view(template_name="operating/scan.html"),
-    #     name="qr_scan",
-    # ),
-    path(
-        "scan_order_item_unit/",
-        views.OrderItemUnitScan.as_view(),
-        name="scan_order_item_unit",
-    ),
-    path(
-        "scan_order_item_unit_pack/",
-        views.OrderItemUnitScanPack.as_view(),
-        name="scan_order_item_unit_pack",
-    ),
-    path(
-        "prcocess_qr_payload_pack/",
-        views.process_qr_payload_pack,
-        name="process_qr_payload_pack",
-    ),
-    path("process-qr/", views.process_qr_payload, name="process_qr_payload"),
     path(
         "generate_pdf_qr_for_order_item_units/<int:pk>/",
         views.generate_pdf_qr_for_order_item_units,

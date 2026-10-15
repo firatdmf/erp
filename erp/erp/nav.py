@@ -188,10 +188,6 @@ NAV_SECTIONS = [
         "label": _("Operating"),
         "icon": "settings-2",
         "groups": [
-            {"title": _("QR ACTIONS"), "items": [
-                {"label": _("QR scan"),         "icon": "qr-code",   "url": "operating:scan_order_item_unit"},
-                {"label": _("QR scan package"), "icon": "package-2", "url": "operating:scan_order_item_unit_pack"},
-            ]},
             {"title": _("RAW MATERIAL"), "items": [
                 {"label": _("Raw material list"),    "icon": "list",        "url": "operating:raw_material_good_list"},
                 {"label": _("Create raw material"),  "icon": "box",         "action": "openRawMaterialSidebar"},

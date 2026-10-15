@@ -37,8 +37,6 @@ const MENU_ITEMS = [
     // Operating
     { name: 'Order List', url: '/operating/orders/', icon: 'fa-shopping-cart', category: 'Operating' },
     { name: 'Create Order', url: '/operating/orders/create', icon: 'fa-cart-plus', category: 'Operating' },
-    { name: 'QR Scan', url: '/operating/scan_order_item_unit/', icon: 'fa-qrcode', category: 'Operating' },
-    { name: 'QR Scan Pack', url: '/operating/scan_order_item_unit_pack/', icon: 'fa-box', category: 'Operating' },
     { name: 'Raw Material List', url: '/operating/raw_material_goods/', icon: 'fa-cube', category: 'Operating' },
     { name: 'Order Analytics', url: '/operating/order-analytics/', icon: 'fa-chart-line', category: 'Operating' },
 

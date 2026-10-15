@@ -26,8 +26,6 @@ from django.db import transaction
 from django.forms import ValidationError, formset_factory
 from django.views.decorators.http import require_POST
 
-from .models import STATUS_CHOICES
-
 # from accounting.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
 
 
@@ -194,87 +192,6 @@ def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
             url = upload_to_bunny(f, path)
 
     return url
-
-
-# This is for reading the QR code on mobile for order_item_unit status updates.
-@require_POST
-def process_qr_payload(request):
-    try:
-        data = json.loads(request.body)
-        order_id = data.get("order_id")
-        order_item_id = data.get("order_item_id")
-        order_item_unit_pk = data.get("order_item_unit_id")
-        # new_status = data.get("status")
-        new_status = data.get(
-            "status", "pending"
-        )  # Default to 'pending' if not provided
-
-        # item = OrderItem.objects.get(pk=order_item_id)
-        # item.status = new_status
-        # item.save()
-        order_item_unit = OrderItemUnit.objects.get(pk=order_item_unit_pk)
-        order_item_unit.status = new_status
-        order_item_unit.save(update_fields=["status"])
-
-        return JsonResponse(
-            {
-                "success": True,
-                "message": f"Item {order_item_unit.pk} updated to {new_status}",
-            }
-        )
-
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
-
-
-@require_POST
-def process_qr_payload_pack(request):
-    try:
-        with transaction.atomic():
-            data = json.loads(request.body)
-            order_id = data.get("order_id")
-            order_item_id = data.get("order_item_id")
-            order_item_unit_pk = data.get("order_item_unit_id")
-            pack_number = data.get("pack_number")
-
-            order = get_object_or_404(Order, pk=order_id)
-            order_item_unit = OrderItemUnit.objects.get(pk=order_item_unit_pk)
-            pack, created = Pack.objects.get_or_create(
-                order=order, pack_number=pack_number
-            )
-
-            try:
-                packed_item = PackedItem.objects.get(order_item_unit=order_item_unit)
-                # Already packed: move to new pack
-                packed_item.pack = pack
-                packed_item.save()
-                message = f"Unit {order_item_unit_pk} moved to pack {pack_number}."
-
-            except PackedItem.DoesNotExist:
-                # Not packed: create new PackedItem
-                PackedItem.objects.create(pack=pack, order_item_unit=order_item_unit)
-                message = f"Unit {order_item_unit_pk} packed in pack {pack_number}."
-
-            return JsonResponse({"success": True, "message": message})
-
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
-
-
-def process_qr_payload_goods_received(request):
-    try:
-        with transaction.atomic():
-            data = json.loads(request.body)
-            receipt_number = data.get(
-                "receipt_number"
-            )  # this would be the ideal case to have.
-            item_name = data.get("name")
-            item_sku = data.get("sku")
-            item_serial = data.get("serial")
-            item_batch = data.get("batch")
-
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
 
 
 # Create your views here.
@@ -4993,24 +4910,6 @@ class MachineStatusUpdate(View):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
 
-class OrderItemUnitScan(View):
-    choices = STATUS_CHOICES
-    template_name = "operating/scan_order_item_unit.html"
-
-    def get(self, request):
-        # return render(request,"")
-        return render(request, self.template_name, {"choices": STATUS_CHOICES})
-
-
-class OrderItemUnitScanPack(View):
-
-    template_name = "operating/scan_order_item_unit_pack.html"
-
-    def get(self, request):
-        context = {"max_pack_range": range(1, 51)}  # loops from 1 to 50
-        return render(request, self.template_name, context)
-
-
 def _product_group_label(product):
     """Which product group a packed roll belongs to — "Fabric", "Curtain",
     … The invoice print shows the same group, so a customer reading both
@@ -5216,8 +5115,7 @@ def _renumber_packs(order, ordered_ids=None):
     counted on from.
 
     A package whose number changes gets its code rewritten and its QR
-    cleared — the old QR carries the old number, which
-    process_qr_payload_pack looks packages up by — and the label PDF
+    cleared — the old QR carries the old number — and the label PDF
     draws a fresh one the next time it is printed.
 
     Returns {pack_id: pack_number} for every package, for the screen to

@@ -128,8 +128,8 @@
       </div>
       {% conversion_facts mv as fx %}
       <div class="md-facts">
-        <div class="md-fact"><span class="k">{% trans "Date" %}</span><span class="v">{{ mv.date|date:"d.m.Y" }}</span></div>
-        <div class="md-fact"><span class="k">{% trans "Due Date" %}</span><span class="v">{% if mv.due_date %}{{ mv.due_date|date:"d.m.Y" }}{% else %}—{% endif %}</span></div>
+        <div class="md-fact"><span class="k">{% trans "Date" %}</span><span class="v">{{ mv.date|date:"d M Y" }}</span></div>
+        <div class="md-fact"><span class="k">{% trans "Due Date" %}</span><span class="v">{% if mv.due_date %}{{ mv.due_date|date:"d M Y" }}{% else %}—{% endif %}</span></div>
         <div class="md-fact">
           <span class="k">{% trans "Amount" %}</span>
           <span class="v {% if mv.amount > 0 %}pos{% elif mv.amount < 0 %}neg{% endif %}">

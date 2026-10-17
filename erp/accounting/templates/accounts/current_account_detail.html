@@ -433,7 +433,7 @@
                   {% if o.order_number %}{{ o.order_number }}{% else %}#{{ o.pk }}{% endif %}
                 </a>
               </td>
-              <td style="color: var(--gray-600); font-size: 12.5px;">{{ o.created_at|date:"d.m.Y" }}</td>
+              <td style="color: var(--gray-600); font-size: 12.5px; white-space: nowrap;">{{ o.created_at|date:"d M Y" }}</td>
               <td>
                 {% if o.order_status == "cancelled" or o.order_status == "returned" %}
                   <span class="ord-st ord-st-cancelled"><i data-lucide="x-circle"></i>{{ o.get_order_status_display }}</span>
@@ -484,7 +484,7 @@
                 <a href="{% url 'accounts:movement_detail' current_account.pk m.mv.pk %}"
                    onclick="event.stopPropagation();">{{ m.mv.pk }}</a>
               </td>
-              <td style="color: var(--gray-600); font-size: 12.5px;">{{ m.mv.date|date:"d.m.Y" }}</td>
+              <td style="color: var(--gray-600); font-size: 12.5px; white-space: nowrap;">{{ m.mv.date|date:"d M Y" }}</td>
               <td>
                 {% if link_url %}
                   <a class="mv-type mv-type-link" href="{{ link_url }}" onclick="event.stopPropagation();">

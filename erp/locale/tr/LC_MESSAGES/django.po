@@ -1777,7 +1777,7 @@ msgid "Participants"
 msgstr "Katılımcılar"
 
 msgid "Pay Dividend"
-msgstr "Pay Dividend"
+msgstr "Kâr Payı Öde"
 
 msgid "Payment"
 msgstr "Tahsilat / Ödeme"
@@ -14512,3 +14512,33 @@ msgstr "Otomatik, bu cihazın saatine göre 19:00 ile 07:00 arası koyudur."
 
 msgid "Auto"
 msgstr "Otomatik"
+
+msgid "ENTRIES"
+msgstr "KAYITLAR"
+
+msgid "Add capital"
+msgstr "Sermaye ekle"
+
+msgid "Add revenue"
+msgstr "Gelir ekle"
+
+msgid "Pay dividend"
+msgstr "Kâr payı öde"
+
+msgid "Add asset"
+msgstr "Varlık ekle"
+
+msgid "Add cash account"
+msgstr "Kasa hesabı ekle"
+
+msgid "TRANSACTIONS"
+msgstr "İŞLEMLER"
+
+msgid "CURRENT ACCOUNTS"
+msgstr "CARİ HESAPLAR"
+
+msgid "SHARES"
+msgstr "HİSSELER"
+
+msgid "Cap table"
+msgstr "Hisse dağılımı"

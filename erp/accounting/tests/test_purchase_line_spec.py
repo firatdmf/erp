@@ -56,7 +56,7 @@ class PurchaseLineSpecTest(TestCase):
         )
         InvoiceItem.objects.create(
             invoice=self.invoice, line_no=1, description="Baklava ecru 305",
-            quantity=Decimal("55.000"), unit="mt", unit_price=Decimal("3.50"),
+            quantity=Decimal("55.000"), unit="m", unit_price=Decimal("3.50"),
             product=product, variant=self.variant,
         )
 
@@ -105,7 +105,7 @@ class PurchaseLineSpecTest(TestCase):
             )
         InvoiceItem.objects.create(
             invoice=self.invoice, line_no=2, description="Baklava gray 300",
-            quantity=Decimal("40.000"), unit="mt", unit_price=Decimal("3.50"),
+            quantity=Decimal("40.000"), unit="m", unit_price=Decimal("3.50"),
             product=self.variant.product, variant=second,
         )
 

@@ -485,7 +485,7 @@ def plan_lines(plan):
         # Plans saved before products had their own unit carry a single
         # batch-wide one instead.
         ex_unit, ex_title, ex_sku = existing.get(existing_id(p_in), (None, None, None))
-        unit = (ex_unit or p_in.get("unit") or plan.get("unit") or "mt")[:20]
+        unit = (ex_unit or p_in.get("unit") or plan.get("unit") or "m")[:20]
         # A picked existing product arrives with its title, not a name (the
         # form sends "name" only for a new one), so the line used to read
         # just "ecru". The catalog's own title wins over either.

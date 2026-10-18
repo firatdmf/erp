@@ -87,7 +87,7 @@ class PurchaseInvoicePromotesTheAccountTest(TestCase):
         from accounting.services_accounts import create_purchase_invoice_for_intake
         create_purchase_invoice_for_intake(
             self.current_account,
-            [{"description": "GREK Beyaz", "quantity": Decimal("50"), "unit": "mt",
+            [{"description": "GREK Beyaz", "quantity": Decimal("50"), "unit": "m",
               "unit_price": Decimal("2.00"), "currency": "USD"}],
         )
         self.current_account.refresh_from_db()

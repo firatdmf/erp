@@ -81,7 +81,7 @@ class DryRunPredictsTheApplyRunTest(TestCase):
         reconcile_all_warehouse_links(apply=True)
         parent = Product.objects.get()
         self.assertEqual((parent.category, parent.unit, parent.pack_type),
-                         (fabric, "mt", "roll"))
+                         (fabric, "m", "roll"))
         self.assertEqual(
             {wp.unit_short for wp in WarehouseProduct.objects.all()}, {"m"})
 

@@ -45,7 +45,7 @@ class PurchaseLineRollCountTest(TestCase):
             warehouse=self.wh, name="K24644 G07", sku="K24644.G07",
             quantity=Decimal("95.00"))
 
-    def _line(self, line_no, meters, product=None, stock=None, unit="mt"):
+    def _line(self, line_no, meters, product=None, stock=None, unit="m"):
         item = InvoiceItem.objects.create(
             invoice=self.invoice, line_no=line_no, description=f"Line {line_no}",
             quantity=sum(meters), unit=unit, unit_price=Decimal("3.50"),
@@ -77,7 +77,7 @@ class PurchaseLineRollCountTest(TestCase):
     def test_a_line_without_rolls_shows_no_count(self):
         InvoiceItem.objects.create(
             invoice=self.invoice, line_no=1, description="Ordered, not here",
-            quantity=Decimal("55.000"), unit="mt", unit_price=Decimal("3.50"),
+            quantity=Decimal("55.000"), unit="m", unit_price=Decimal("3.50"),
         )
         html = self._html()
         self.assertNotIn("po-rolls-n", html.split("</style>", 1)[1])
@@ -132,7 +132,7 @@ class DraftPurchaseExpectedRollsTest(TestCase):
             date=date(2026, 9, 29), due_date=date(2026, 10, 29),
             intake_warehouse=self.wh,
             intake_plan={"products": [{
-                "unit": "mt", "pack_type": "roll",
+                "unit": "m", "pack_type": "roll",
                 "main_product": {"mode": "new", "name": "MT-5019"},
                 "variants": [
                     {"sku": "MRK0013", "name": "ecru", "price": "2.50",
@@ -149,7 +149,7 @@ class DraftPurchaseExpectedRollsTest(TestCase):
         for n, (desc, qty) in enumerate([("MT-5019 ecru", "57.5"), ("MT-5019 grey", "40")], 1):
             InvoiceItem.objects.create(
                 invoice=self.invoice, line_no=n, description=desc,
-                quantity=Decimal(qty), unit="mt", unit_price=Decimal("2.50"))
+                quantity=Decimal(qty), unit="m", unit_price=Decimal("2.50"))
 
     def _html(self):
         resp = self.client.get(
@@ -175,7 +175,7 @@ class DraftPurchaseExpectedRollsTest(TestCase):
         self.assertNotIn("No rolls linked", html)
 
     def test_the_total_counts_the_expected_rolls(self):
-        self.assertRegex(self._html(), r'97\.50 mt\s*<span class="dot">·</span>\s*3 rolls')
+        self.assertRegex(self._html(), r'97\.50 m\s*<span class="dot">·</span>\s*3 rolls')
 
     def test_the_card_names_the_product_and_its_skus(self):
         """Picked from the catalog, the form sends the product's title and

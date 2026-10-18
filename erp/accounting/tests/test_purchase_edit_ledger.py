@@ -173,7 +173,7 @@ class ReceivedAtAFractionalPriceTest(base.TestCase):
                 reverse("accounts:purchase_order_save", kwargs={"book_id": book.pk}),
                 data=json.dumps({
                     "warehouse_id": wh.pk, "current_account_id": karven.pk,
-                    "unit": "mt", "date": "2026-08-21", "delivery_date": "2026-09-01",
+                    "unit": "m", "date": "2026-08-21", "delivery_date": "2026-09-01",
                     "products": [{
                         "main_product": {"mode": "new", "name": "K24644", "sku": "K24644"},
                         "has_variants": True,

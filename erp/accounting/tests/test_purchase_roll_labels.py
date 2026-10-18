@@ -41,7 +41,7 @@ class PurchaseLineLabelsTest(TestCase):
         )
         self.item = InvoiceItem.objects.create(
             invoice=self.invoice, line_no=1, description="K24644 G07",
-            quantity=Decimal("55.000"), unit="mt", unit_price=Decimal("3.50"),
+            quantity=Decimal("55.000"), unit="m", unit_price=Decimal("3.50"),
         )
         self.product = WarehouseProduct.objects.create(
             warehouse=self.wh, name="K24644 G07", sku="K24644.G07",
@@ -84,7 +84,7 @@ class PurchaseLineLabelsTest(TestCase):
     def test_rolls_of_other_lines_stay_out(self):
         other_item = InvoiceItem.objects.create(
             invoice=self.invoice, line_no=2, description="K24644 G09",
-            quantity=Decimal("12.000"), unit="mt", unit_price=Decimal("3.50"))
+            quantity=Decimal("12.000"), unit="m", unit_price=Decimal("3.50"))
         WarehouseProductItem.objects.create(
             product=self.product, quantity=Decimal("12.00"),
             barcode="KRV0000003", purchase_invoice_item=other_item)

@@ -48,7 +48,7 @@ class QuoteTest(TestCase):
             "valid_until": "2026-10-08",
             "notes": "Delivery in 3 weeks.",
             "items": [
-                {"sku": "V320.ECRU", "quantity": "50", "unit": "mt", "price": "2.30"},
+                {"sku": "V320.ECRU", "quantity": "50", "unit": "m", "price": "2.30"},
                 {"sku": "", "description": "Cutting service", "quantity": "1", "unit": "", "price": "15"},
             ],
         }
@@ -171,7 +171,7 @@ class QuoteTest(TestCase):
 
     def test_accepting_makes_the_order(self):
         quote = Quote.objects.get(pk=self._save(self._body(
-            currency="EUR", items=[{"sku": "V320.ECRU", "quantity": "50", "unit": "mt", "price": "2.30"}],
+            currency="EUR", items=[{"sku": "V320.ECRU", "quantity": "50", "unit": "m", "price": "2.30"}],
         )).json()["quote_id"])
         r = self.client.post(reverse("marketing:quote_convert", args=[quote.pk]))
         order = Order.objects.get()
@@ -212,10 +212,10 @@ class QuoteTest(TestCase):
 
     def test_detail_and_print_total_the_quantities_per_unit(self):
         """A product's line counts in the product's own unit, whatever was
-        typed on it — the order sheet's "m", not "mt"; a line naming no
+        typed on it — the order sheet's "m", not "m"; a line naming no
         product keeps the unit typed on it."""
         quote = Quote.objects.get(pk=self._save(self._body(items=[
-            {"sku": "V320.ECRU", "quantity": "60.5", "unit": "mt", "price": "2"},
+            {"sku": "V320.ECRU", "quantity": "60.5", "unit": "m", "price": "2"},
             {"sku": "V320.ECRU", "quantity": "41.25", "unit": "yd", "price": "2"},
             {"sku": "", "description": "Cutting service", "quantity": "3", "unit": "pcs", "price": "2"},
         ])).json()["quote_id"])
@@ -249,7 +249,7 @@ class QuoteTest(TestCase):
 
     def _rolled_quote(self, *rolls):
         r = self._save(self._body(items=[
-            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+            {"sku": "V320.ECRU", "quantity": "", "unit": "m", "price": "2",
              "rolls": [{"id": roll.pk, "quantity": ""} for roll in rolls]}]))
         self.assertEqual(r.status_code, 200, r.content)
         return Quote.objects.get(pk=r.json()["quote_id"])
@@ -278,7 +278,7 @@ class QuoteTest(TestCase):
         roll = self._roll("R-200", "30")
         self._hold(roll, "30")
         r = self._save(self._body(items=[
-            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+            {"sku": "V320.ECRU", "quantity": "", "unit": "m", "price": "2",
              "rolls": [{"id": roll.pk, "quantity": ""}]}]))
         self.assertEqual(r.status_code, 400)
         self.assertIn("R-200", r.json()["error"])
@@ -287,7 +287,7 @@ class QuoteTest(TestCase):
         other_variant = ProductVariant.objects.create(product=self.product, variant_sku="V320.GREY")
         roll = self._roll("R-300", "10", variant=other_variant)
         r = self._save(self._body(items=[
-            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+            {"sku": "V320.ECRU", "quantity": "", "unit": "m", "price": "2",
              "rolls": [{"id": roll.pk, "quantity": ""}]}]))
         self.assertEqual(r.status_code, 400)
 
@@ -351,7 +351,7 @@ class QuoteTest(TestCase):
         self.assertEqual(Order.objects.count(), orders)
         # A save of some other change keeps the roll rather than failing on it.
         r = self._save(self._body(notes="Updated", items=[
-            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+            {"sku": "V320.ECRU", "quantity": "", "unit": "m", "price": "2",
              "rolls": [{"id": roll.pk, "quantity": "25"}]}]), pk=quote.pk)
         self.assertEqual(r.status_code, 200, r.content)
 
@@ -394,9 +394,9 @@ class QuoteTest(TestCase):
     def test_lines_without_rolls_get_their_own_section_beside_lines_with_them(self):
         roll = self._roll("R-800", "20")
         quote = Quote.objects.get(pk=self._save(self._body(items=[
-            {"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": "2",
+            {"sku": "V320.ECRU", "quantity": "", "unit": "m", "price": "2",
              "rolls": [{"id": roll.pk, "quantity": ""}]},
-            {"sku": "V320.ECRU", "quantity": "15", "unit": "mt", "price": "2"},
+            {"sku": "V320.ECRU", "quantity": "15", "unit": "m", "price": "2"},
         ])).json()["quote_id"])
         page = self.client.get(reverse("marketing:quote_detail", args=[quote.pk]))
         [picked, loose] = page.context["page_groups"]

@@ -231,7 +231,7 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                             # new product says so — type, unit and pack.
                             parent = Product.objects.create(
                                 title=base, sku=(None if taken else (base[:SKU_MAX_LENGTH] or None)),
-                                featured=False, unit="mt", pack_type="roll",
+                                featured=False, unit="m", pack_type="roll",
                                 category=ProductCategory.objects.filter(name="fabric").first(),
                             )
                             if parent.sku:

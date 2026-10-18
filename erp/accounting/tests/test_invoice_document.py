@@ -53,7 +53,7 @@ class InvoiceDocBase(TestCase):
             date=date(2026, 9, 1), due_date=date(2026, 10, 1), currency=self.usd)
         InvoiceItem.objects.create(invoice=self.purchase, line_no=1, product=self.product,
                                    description="Velvet Moss greige", quantity=Decimal("120.00"),
-                                   unit="mt", unit_price=Decimal("1.10"), tax_rate=0)
+                                   unit="m", unit_price=Decimal("1.10"), tax_rate=0)
 
         self.user = User.objects.create_user("staff_invoice", password="pw")
         self.user.member.books.add(self.book)
@@ -210,9 +210,9 @@ class PurchasePageTotals(InvoiceDocBase):
     def test_one_unit_prints_with_the_quantity(self):
         InvoiceItem.objects.create(invoice=self.purchase, line_no=2, product=self.product,
                                    description="Velvet Moss dyed", quantity=Decimal("30.50"),
-                                   unit="mt", unit_price=Decimal("2.00"), tax_rate=0)
+                                   unit="m", unit_price=Decimal("2.00"), tax_rate=0)
         resp = self.client.get(reverse("accounts:purchase_order_detail", args=[self.purchase.pk]))
-        self.assertContains(resp, "150.50 mt")
+        self.assertContains(resp, "150.50 m")
         self.assertContains(resp, "0 rolls")
 
     def test_mixed_units_print_a_bare_number(self):
@@ -221,4 +221,4 @@ class PurchasePageTotals(InvoiceDocBase):
                                    unit="pcs", unit_price=Decimal("2.00"), tax_rate=0)
         resp = self.client.get(reverse("accounts:purchase_order_detail", args=[self.purchase.pk]))
         self.assertContains(resp, "126.00\n")
-        self.assertNotContains(resp, "126.00 mt")
+        self.assertNotContains(resp, "126.00 m")

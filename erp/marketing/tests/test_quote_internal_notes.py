@@ -38,7 +38,7 @@ class QuoteInternalNotesTest(TestCase):
             "customer": {"type": "contact", "pk": self.customer.pk},
             "currency": "", "date": "2026-09-29", "valid_until": "",
             "notes": PRINTED, "internal_notes": INTERNAL,
-            "items": [{"sku": "V320.ECRU", "quantity": "50", "unit": "mt", "price": "2.30"}],
+            "items": [{"sku": "V320.ECRU", "quantity": "50", "unit": "m", "price": "2.30"}],
         }
         r = self.client.post(reverse("marketing:quote_create"), data=json.dumps(body),
                              content_type="application/json")

@@ -52,7 +52,7 @@ class GoodsReceiptPageTest(TestCase):
         )
         item = InvoiceItem.objects.create(
             invoice=inv, line_no=1, description="GREK Beyaz",
-            quantity=Decimal("50.000"), unit="mt", unit_price=Decimal("2.00"),
+            quantity=Decimal("50.000"), unit="m", unit_price=Decimal("2.00"),
         )
         if warehouse is not None:
             wp = WarehouseProduct.objects.create(

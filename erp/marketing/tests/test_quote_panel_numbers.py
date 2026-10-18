@@ -20,7 +20,7 @@ from marketing.models import Product, ProductCampaign, ProductCampaignTier, Prod
 
 class QuotePanelNumbers(TestCase):
     def setUp(self):
-        self.product = Product.objects.create(title="Baklava", sku="BKL-1", unit="mt",
+        self.product = Product.objects.create(title="Baklava", sku="BKL-1", unit="m",
                                               category=ProductCategory.objects.get_or_create(name="fabric", defaults={"price_multiplier": "4/3"})[0])
         # The panel quotes from the variants' price, worked out from cost:
         # 10.11 + a third = 13.48, rounded up to 13.50.

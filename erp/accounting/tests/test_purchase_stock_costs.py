@@ -83,7 +83,7 @@ class ReceivedLiraPurchaseTest(TestCase):
                 "date": "2026-09-17", "rates": rates or {},
                 "products": [{
                     "main_product": {"mode": "new", "name": "GREK", "sku": "GRK77"},
-                    "unit": "mt", "has_variants": True,
+                    "unit": "m", "has_variants": True,
                     "variants": [{"name": "Beyaz", "sku": "GRK77.B", "price": "100",
                                   "currency": currency, "tops": [{"qty": 20, "barcode": "KZL-1"}]}],
                 }],

@@ -124,7 +124,7 @@ class GoodsReceiptAttributesTest(TestCase):
                 "products": [{
                     "main_product": main or {"mode": "new", "name": "K24644", "sku": "K24644"},
                     "category_id": (category or self.fabric).pk,
-                    "unit": "mt", "has_variants": True,
+                    "unit": "m", "has_variants": True,
                     "variants": variants,
                 }],
             }), content_type="application/json")

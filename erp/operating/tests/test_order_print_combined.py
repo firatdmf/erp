@@ -427,7 +427,7 @@ class OrderUnitsAndPacks(TestCase):
         self.order = Order.objects.create(order_number="DK-296",
                                           contact=Contact.objects.create(name="OLEG"))
         self.crepe = Product.objects.create(title="Crepe", sku="KZL000315", price=10,
-                                            unit="mt", pack_type="roll")
+                                            unit="m", pack_type="roll")
         OrderItem.objects.create(order=self.order, product=self.crepe,
                                  quantity=Decimal("156.00"), price=Decimal("2.50"))
         self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))

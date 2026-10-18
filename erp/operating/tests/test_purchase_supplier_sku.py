@@ -45,7 +45,7 @@ class PurchaseRecordsTheSupplierSkuTest(TestCase):
             row["supplier_sku"] = supplier_sku
         r = self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
-            data=json.dumps({"current_account_id": account.pk, "unit": "mt",
+            data=json.dumps({"current_account_id": account.pk, "unit": "m",
                              "products": [{"main_product": main, "has_variants": True,
                                            "variants": [row]}]}),
             content_type="application/json")
@@ -108,7 +108,7 @@ class PurchaseRecordsTheSupplierSkuTest(TestCase):
         row = {"name": "Ecru", "price": "1.60", "currency": "USD", "tops": [{"qty": 30}], **row}
         return self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
-            data=json.dumps({"current_account_id": account.pk, "unit": "mt",
+            data=json.dumps({"current_account_id": account.pk, "unit": "m",
                              "products": [{"main_product": main, "has_variants": True,
                                            "variants": [row]}]}),
             content_type="application/json")
@@ -136,7 +136,7 @@ class PurchaseRecordsTheSupplierSkuTest(TestCase):
     def test_one_purchase_cannot_put_a_code_on_two_variants(self):
         r = self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
-            data=json.dumps({"current_account_id": self.karven.pk, "unit": "mt", "products": [{
+            data=json.dumps({"current_account_id": self.karven.pk, "unit": "m", "products": [{
                 "main_product": {"mode": "new", "name": "Sable", "sku": "SABLE"},
                 "has_variants": True,
                 "variants": [

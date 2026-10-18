@@ -25,7 +25,7 @@ class ProductDetailStockTest(TestCase):
     def setUp(self):
         self.book = Book.objects.create(name="Demfirat")
         self.warehouse = Warehouse.objects.create(name="Fabrika", accounting_book=self.book)
-        self.product = Product.objects.create(title="Baklava", unit="mt")
+        self.product = Product.objects.create(title="Baklava", unit="m")
         self.user = get_user_model().objects.create_superuser(
             username="stock_reader", password="pw", email="s@a.c")
         self.client.force_login(self.user)

@@ -43,7 +43,7 @@ class ReceivedPurchaseEditTest(TestCase):
             reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
             data=json.dumps({
                 "warehouse_id": self.wh.pk, "current_account_id": self.karven.pk,
-                "unit": "mt", "date": "2026-08-21", "delivery_date": "2026-09-01",
+                "unit": "m", "date": "2026-08-21", "delivery_date": "2026-09-01",
                 "notes": "first note",
                 "products": [{
                     "main_product": {"mode": "new", "name": "K24644", "sku": "K24644"},
@@ -260,7 +260,7 @@ class ReceivedPurchaseEditTest(TestCase):
 
     def test_the_unit(self):
         form = self._form()
-        self.assertEqual(form["products"][0]["unit"], "mt")
+        self.assertEqual(form["products"][0]["unit"], "m")
         form["products"][0]["unit"] = "piece"
         self.assertEqual(self._save(form).status_code, 200)
         self.assertEqual(self._invoice().items.get().unit, "piece")
@@ -291,10 +291,10 @@ class ReceivedPurchaseEditTest(TestCase):
         })
         self.assertEqual(self._save(form).status_code, 200)
         units = dict(self._invoice().items.values_list("description", "unit"))
-        self.assertEqual(sorted(units.values()), ["mt", "piece"])
+        self.assertEqual(sorted(units.values()), ["m", "piece"])
         self.assertEqual(WarehouseProduct.objects.get(sku="PRD02.KREM").unit, "piece")
         self.assertEqual(WarehouseProduct.objects.get(sku="PRD02.KREM").pack_type, "box")
-        self.assertEqual(WarehouseProduct.objects.get(sku="K24644.G07").unit, "mt")
+        self.assertEqual(WarehouseProduct.objects.get(sku="K24644.G07").unit, "m")
 
     # ── Pack type ───────────────────────────────────────────────────
     def test_the_pack_it_was_received_as_comes_back(self):
@@ -306,7 +306,7 @@ class ReceivedPurchaseEditTest(TestCase):
         form["products"][0]["pack_type"] = "bale"
         self.assertEqual(self._save(form).status_code, 200)
         self.assertEqual(WarehouseProduct.objects.get().pack_type, "bale")
-        self.assertEqual(WarehouseProduct.objects.get().unit, "mt")
+        self.assertEqual(WarehouseProduct.objects.get().unit, "m")
 
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def _receive_order(self, pack_type, mock_upload, unit=None):
@@ -315,7 +315,7 @@ class ReceivedPurchaseEditTest(TestCase):
             reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
             data=json.dumps({
                 "warehouse_id": self.wh.pk, "current_account_id": self.karven.pk,
-                "unit": "mt", "date": "2026-08-22",
+                "unit": "m", "date": "2026-08-22",
                 "products": [{
                     "main_product": {"mode": "new", "name": "PERDE", "sku": "PRD01"},
                     "has_variants": True, "pack_type": pack_type, "unit": unit,
@@ -341,7 +341,7 @@ class ReceivedPurchaseEditTest(TestCase):
             reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
             data=json.dumps({
                 "warehouse_id": self.wh.pk, "current_account_id": self.karven.pk,
-                "unit": "mt", "date": "2026-08-23",
+                "unit": "m", "date": "2026-08-23",
                 "products": [
                     {"main_product": {"mode": "new", "name": "GREK", "sku": "GRK01"},
                      "has_variants": True,
@@ -354,7 +354,7 @@ class ReceivedPurchaseEditTest(TestCase):
                 ],
             }), content_type="application/json")
         draft = Invoice.objects.get(pk=order.json()["invoice_id"])
-        self.assertEqual(sorted(draft.items.values_list("unit", flat=True)), ["mt", "piece"])
+        self.assertEqual(sorted(draft.items.values_list("unit", flat=True)), ["m", "piece"])
 
     def test_an_unknown_pack_falls_back_to_the_units(self):
         self.assertEqual(self._receive_order("crate").pack_type, "roll")
@@ -390,9 +390,9 @@ class ReceivedPurchaseEditTest(TestCase):
         delivery's line say pieces over the same goods."""
         second = self._receive_more(self._product())
         product = self._product()
-        self.assertEqual((product.unit, product.pack_type), ("mt", "roll"))
-        self.assertEqual(second.items.get().unit, "mt")
-        self.assertEqual(self._roll("KRV-C").product.unit, "mt")
+        self.assertEqual((product.unit, product.pack_type), ("m", "roll"))
+        self.assertEqual(second.items.get().unit, "m")
+        self.assertEqual(self._roll("KRV-C").product.unit, "m")
 
     def test_an_existing_product_with_no_stock_takes_the_cards_unit(self):
         empty = Product.objects.create(title="PERDE", sku="PRD09", featured=False)
@@ -403,20 +403,20 @@ class ReceivedPurchaseEditTest(TestCase):
         self.assertEqual(second.items.get().unit, "piece")
 
     def test_an_edit_cannot_relabel_stock_another_purchase_brought(self):
-        self._receive_more(self._product(), unit="mt", pack_type="roll")
+        self._receive_more(self._product(), unit="m", pack_type="roll")
         form = self._form()
         self.assertTrue(form["products"][0]["unit_locked"])
         form["products"][0]["unit"] = "piece"
         form["products"][0]["pack_type"] = "box"
         self.assertEqual(self._save(form).status_code, 200)
         product = self._product()
-        self.assertEqual((product.unit, product.pack_type), ("mt", "roll"))
-        self.assertEqual(self._invoice().items.get().unit, "mt")
+        self.assertEqual((product.unit, product.pack_type), ("m", "roll"))
+        self.assertEqual(self._invoice().items.get().unit, "m")
 
     def test_the_reopened_purchase_states_the_product(self):
         card = self._form()["products"][0]
         self.assertEqual((card["unit"], card["pack_type"], card["unit_locked"]),
-                         ("mt", "roll", False))
+                         ("m", "roll", False))
         self.assertEqual(card["unit_label"], "Meter")
         self.assertEqual(card["pack_label"], "Roll")
 
@@ -424,7 +424,7 @@ class ReceivedPurchaseEditTest(TestCase):
         url = reverse("operating:catalog_product_variants",
                       args=[self.wh.pk, self._product().pk])
         facts = self.client.get(url).json()["product"]
-        self.assertEqual((facts["unit"], facts["pack_type"]), ("mt", "roll"))
+        self.assertEqual((facts["unit"], facts["pack_type"]), ("m", "roll"))
         # Its only stock came in on this purchase: locked for any other
         # purchase, open while editing this one.
         self.assertTrue(facts["unit_locked"])
@@ -571,7 +571,7 @@ class ReceivedPurchaseEditTest(TestCase):
         draft = self.client.post(
             reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
             data=json.dumps({
-                "warehouse_id": self.wh.pk, "current_account_id": self.karven.pk, "unit": "mt",
+                "warehouse_id": self.wh.pk, "current_account_id": self.karven.pk, "unit": "m",
                 "products": [{"main_product": {"mode": "new", "name": "X1"},
                               "variants": [{"name": "A", "price": "1", "tops": [{"qty": 1}]}]}],
             }), content_type="application/json").json()["invoice_id"]

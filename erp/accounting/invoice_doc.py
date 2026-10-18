@@ -184,7 +184,7 @@ def build_order_doc(order):
             group=(product.category.name if product and product.category_id else ""),
             description=_invoice_line_desc(it),
             quantity=qty,
-            unit="mt",
+            unit="m",
             unit_price=price,
             total=_money(price * qty),
             rolls=[{"barcode": r.stock_item.barcode, "quantity": r.quantity}

@@ -14,7 +14,7 @@ from accounting.services_accounts import (
 
 
 def _line(price, currency, desc="GREK Beyaz"):
-    return {"description": desc, "quantity": Decimal("10"), "unit": "mt",
+    return {"description": desc, "quantity": Decimal("10"), "unit": "m",
             "unit_price": Decimal(price), "currency": currency}
 
 

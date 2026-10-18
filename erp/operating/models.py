@@ -71,7 +71,7 @@ class RawMaterialGood(models.Model):
     unit_of_measurement = models.CharField(
         choices=[
             ("units", "Unit"),
-            ("mt", "Meter"),
+            ("m", "Meter"),
             ("kg", "Kilogram"),
             ("l", "Liter"),
             ("bx", "Box"),

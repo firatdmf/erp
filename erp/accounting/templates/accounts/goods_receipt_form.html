@@ -976,15 +976,15 @@
   // What a product is counted in. Per product, like its pack: one delivery
   // can bring meters of cloth and pieces of curtain together.
   const NP_UNIT_SEL = '<select class="np-select np-main-unit" onchange="npUnitPicked(this)">' +
-    '<option value="mt">{% trans "Meter (m)" %}</option>' +
+    '<option value="m">{% trans "Meter (m)" %}</option>' +
     '<option value="piece">{% trans "Piece (pcs)" %}</option>' +
     '<option value="kg">kg</option>' +
     '<option value="pack">{% trans "Package" %}</option>' +
     '</select>';
-  const NP_UNIT_SHORT = { mt: 'm', piece: '{% trans "pcs" %}', kg: 'kg', pack: '{% trans "pack" %}' };
+  const NP_UNIT_SHORT = { m: 'm', piece: '{% trans "pcs" %}', kg: 'kg', pack: '{% trans "pack" %}' };
   function npUnitOf(card) {
     const sel = card && card.querySelector('.np-main-unit');
-    return (sel && sel.value) || 'mt';
+    return (sel && sel.value) || 'm';
   }
   const NP_PACK_SEL = '<select class="np-select np-main-pack" onchange="npPackPicked(this)">' +
     NP_PACKS.choices.map(function (c) { return '<option value="' + c.value + '">' + c.label + '</option>'; }).join('') +
@@ -2073,7 +2073,7 @@
   window.npSummaryUpdate = function () {
     let pcount = 0, vcount = 0, tcount = 0;
     const totals = {};   // unit → quantity; units can't be added together
-    let unit = 'mt';
+    let unit = 'm';
     function addQ(q) {
       const val = parseFloat((q.value || '').replace(',', '.'));
       if (!isNaN(val) && val > 0) { tcount++; totals[unit] = (totals[unit] || 0) + val; }
@@ -2908,7 +2908,7 @@
       barcode_prefix: (opt && opt.getAttribute('data-prefix')) || '',
       // Batch-wide unit, from before each product had its own — the server
       // only falls back on it for a product that names none.
-      unit: products.length ? products[0].unit : 'mt',
+      unit: products.length ? products[0].unit : 'm',
       // What the rate boxes above say, so the purchase is cut at the rate the
       // page showed. Without these the server falls back to the published
       // rate and the total that posts is not the total that was agreed to.

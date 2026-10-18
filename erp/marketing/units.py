@@ -12,22 +12,22 @@ from django.utils.translation import pgettext_lazy
 # What a product is COUNTED IN. Codes and labels are English; Turkish belongs
 # in the .po catalogue, not in the data.
 UNIT_CHOICES = [
-    ("mt", pgettext_lazy("unit", "Meter")),
+    ("m", pgettext_lazy("unit", "Meter")),
     ("piece", pgettext_lazy("unit", "Piece")),
     ("pack", pgettext_lazy("unit", "Pack")),
     ("kg", pgettext_lazy("unit", "Kilogram")),
 ]
-DEFAULT_UNIT = "mt"
-UNIT_SHORT = {"mt": _("m"), "piece": _("pcs"),
+DEFAULT_UNIT = "m"
+UNIT_SHORT = {"m": _("m"), "piece": _("pcs"),
               "pack": _("pack"), "kg": _("kg")}
 
 # The storefront's older, coarser unit (Product.unit_of_measurement): it has
 # no piece/pack distinction, so both are "units".
-UNIT_TO_STOREFRONT = {"mt": "mt", "kg": "kg", "piece": "units", "pack": "units"}
+UNIT_TO_STOREFRONT = {"m": "m", "kg": "kg", "piece": "units", "pack": "units"}
 
 # What the quantity COLUMN is headed. Meters of cloth are a length and kilos
 # are a weight; a count of curtain sets is neither.
-QUANTITY_LABEL = {"mt": _("Length"), "kg": _("Weight")}
+QUANTITY_LABEL = {"m": _("Length"), "kg": _("Weight")}
 
 # How a product's stock is PACKED — what one stock item physically is: a roll
 # of cloth, a box of curtain sets, a bale of waste. Separate from the unit on
@@ -68,7 +68,7 @@ PACK_ICON = {"roll": "fa-scroll", "box": "fa-box", "bale": "fa-cubes-stacked",
 
 # The pack a unit starts on when nobody has said otherwise. A starting point,
 # not a rule: the two can be set independently.
-PACK_FOR_UNIT = {"mt": "roll", "kg": "bale", "piece": "box", "pack": "box"}
+PACK_FOR_UNIT = {"m": "roll", "kg": "bale", "piece": "box", "pack": "box"}
 
 
 def unit_short(unit):

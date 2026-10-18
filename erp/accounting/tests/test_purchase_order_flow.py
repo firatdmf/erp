@@ -46,7 +46,7 @@ class PurchaseOrderFlowTest(TestCase):
         return {
             "warehouse_id": self.wh.pk,
             "current_account_id": self.current_account.pk,
-            "unit": "mt",
+            "unit": "m",
             "date": "2026-08-21",
             "delivery_date": "2026-09-01",
             "notes": "Kamyon sabah gelecek",

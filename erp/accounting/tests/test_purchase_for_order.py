@@ -57,7 +57,7 @@ class PurchaseForCustomerTest(TestCase):
             "warehouse_id": (warehouse or self.wh).pk,
             "current_account_id": self.supplier.pk,
             "customer": ({"type": "contact", "pk": self.customer.pk} if customer else None),
-            "unit": "mt",
+            "unit": "m",
             "date": "2026-09-17",
             "products": [{
                 "main_product": main,

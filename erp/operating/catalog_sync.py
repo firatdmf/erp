@@ -371,7 +371,7 @@ def _base_product(base_name, existing_base_product=None):
         fabric = ProductCategory.objects.filter(name="fabric").first()
         product = Product.objects.create(
             title=base_name, sku=_safe_sku(base_name), featured=False,
-            unit="mt", pack_type="roll",
+            unit="m", pack_type="roll",
             category=fabric,
         )
         product_created = True

@@ -4079,13 +4079,13 @@ class WarehouseManualAdd(View):
       {
         "current_account_id": 163,                   # REQUIRED → barcode prefix + alım
         "barcode_prefix": "KZL",          # optional explicit override
-        "unit": "mt",                     # legacy batch-wide unit, used by a
+        "unit": "m",                     # legacy batch-wide unit, used by a
                                           # product that names none
         "products": [
           {
             "main_product": {"mode": "new"|"existing", "id": 12,
                               "name": "GREK", "sku": "GREK"},
-            "unit": "mt",                 # mt | piece | kg | pack
+            "unit": "m",                 # m | piece | kg | pack
             "pack_type": "roll",          # roll | box | bale | bag | bundle | pallet
             "has_variants": true,
             "variants": [
@@ -4733,7 +4733,7 @@ class WarehousePurchaseEdit(View):
             "current_account_name": invoice.current_account.name,
             "current_account_prefix": _consonant_prefix(invoice.current_account.name),
             "currency": invoice.currency.code,
-            "unit": items[0].unit if items else "mt",
+            "unit": items[0].unit if items else "m",
             "products": [groups[k] for k in order],
         })
 

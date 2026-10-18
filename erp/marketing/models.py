@@ -275,7 +275,7 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now=True, blank=False, null=False)
     QUANTITY_UNIT_TYPE_CHOICES = [
         ("units", "Unit"),
-        ("mt", "Meter"),
+        ("m", "Meter"),
         ("kg", "Kilogram"),
     ]
     WEIGHT_UNIT_TYPE_CHOICES = [("lb", "lb"), ("oz", "oz"), ("kg", "kg"), ("g", "g")]

@@ -109,7 +109,7 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
         return self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "current_account_id": self.current_account.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "m",
                 "products": [{
                     "main_product": main or {"mode": "new", "name": "K24644", "sku": "K24644"},
                     "has_variants": True,

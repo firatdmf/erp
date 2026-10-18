@@ -43,7 +43,7 @@ class ManualAddMainProductSkuTest(TestCase):
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
                 "current_account_id": self.current_account.pk,
-                "unit": "mt",
+                "unit": "m",
                 "products": [{
                     "main_product": {"mode": "new", "name": name, "sku": main_sku},
                     "has_variants": True,
@@ -97,7 +97,7 @@ class ManualAddMainProductSkuTest(TestCase):
         r = self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "current_account_id": self.current_account.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "m",
                 "products": [
                     {"main_product": {"mode": "new", "name": "GREK", "sku": "GREK"},
                      "has_variants": True,
@@ -124,7 +124,7 @@ class ManualAddMainProductSkuTest(TestCase):
         r = self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "current_account_id": self.current_account.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "m",
                 "barcode_prefix": "KRV",
                 "products": [
                     {"main_product": {"mode": "new", "name": "GREK", "sku": "KRV001"},
@@ -152,7 +152,7 @@ class ManualAddMainProductSkuTest(TestCase):
         r = self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "current_account_id": self.current_account.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "m",
                 "products": [{
                     "main_product": {"mode": "existing", "id": existing.pk,
                                      "title": "K24644", "sku": "K24644"},
@@ -190,7 +190,7 @@ class ManualAddPermissionTest(TestCase):
         return self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "current_account_id": self.current_account.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "m",
                 "products": [{
                     "main_product": {"mode": "new", "name": "GREK", "sku": ""},
                     "has_variants": True,
@@ -508,7 +508,7 @@ class LongVariantSkuTest(TestCase):
         return self.client.post(
             reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
             data=json.dumps({
-                "current_account_id": self.current_account.pk, "unit": "mt",
+                "current_account_id": self.current_account.pk, "unit": "m",
                 "products": [{
                     "main_product": {"mode": "new", "name": "PETEK FONLUK KUMAŞ",
                                      "sku": "PETEK FONLUK KUMAŞ"},

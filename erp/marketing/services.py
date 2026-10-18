@@ -93,7 +93,7 @@ def import_stock_from_excel(file_path=None):
                     # "quantity": row["quantity"],
                     # The sheet uses the storefront's codes; the product
                     # stores its own and derives the storefront one.
-                    "unit": {"units": "piece", "kg": "kg"}.get(row.get("unit"), "mt"),
+                    "unit": {"units": "piece", "kg": "kg"}.get(row.get("unit"), "m"),
                     "category": category,
                 },
             )

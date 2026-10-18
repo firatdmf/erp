@@ -44,7 +44,7 @@ class GoodsReceiptEditPayload(TestCase):
             data=json.dumps({
                 "warehouse_id": self.wh.pk,
                 "current_account_id": self.supplier.pk,
-                "unit": "mt", "date": "2026-08-21", "notes": "first note",
+                "unit": "m", "date": "2026-08-21", "notes": "first note",
                 "products": [{
                     "main_product": {"mode": "new", "name": "K24644",
                                      "sku": "K24644"},

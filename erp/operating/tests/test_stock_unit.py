@@ -38,7 +38,7 @@ def _text(html):
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
 
 
-def _stock(warehouse, name, sku, quantity, unit="mt", pack_type="roll"):
+def _stock(warehouse, name, sku, quantity, unit="m", pack_type="roll"):
     """A warehouse row of a variant of its own main product, which holds
     the unit and the pack."""
     product = Product.objects.create(
@@ -93,7 +93,7 @@ class StockUnitIsShownNotAssumed(TestCase):
         per-product rows still carry their own."""
         _stock(
             warehouse=self.shop, name="seta grey", sku="SETA-1",
-            quantity=Decimal("300"), unit="mt", pack_type="roll")
+            quantity=Decimal("300"), unit="m", pack_type="roll")
         page = self._page()
         self.assertNotRegex(page, r"320\s*(pack|m)\b")
         self.assertIn("20.00 pack", page)
@@ -104,12 +104,12 @@ class StockUnitIsShownNotAssumed(TestCase):
         The default is a statement about the data, not a guess, and a
         product created without saying otherwise still reads as meters."""
         product = Product.objects.create(title="grek tul", sku="GT", featured=False)
-        self.assertEqual((product.unit, product.pack_type), ("mt", "roll"))
+        self.assertEqual((product.unit, product.pack_type), ("m", "roll"))
         # A row not linked to any product yet reads the same way.
         unlinked = WarehouseProduct.objects.create(
             warehouse=self.shop, name="grek tul", sku="GT-1",
             quantity=Decimal("48.5"))
-        self.assertEqual(unlinked.unit, "mt")
+        self.assertEqual(unlinked.unit, "m")
         self.assertEqual(unlinked.unit_short, "m")
 
     def test_an_unrecognised_unit_shows_itself_rather_than_vanishing(self):
@@ -280,7 +280,7 @@ class OneStockItemIsCalledWhatItIs(TestCase):
         hardcoded label did."""
         _stock(
             warehouse=self.shop, name="grek tul", sku="GT-1",
-            quantity=Decimal("50"), unit="mt", pack_type="roll")
+            quantity=Decimal("50"), unit="m", pack_type="roll")
         page = _text(self._page(self.shop))
         self.assertRegex(page, r"\d+ items\b")
         self.assertNotRegex(page, r"\d+ rolls?\b")
@@ -299,13 +299,13 @@ class OneStockItemIsCalledWhatItIs(TestCase):
         as a box — so setting one must not move the other."""
         bagged = _stock(
             warehouse=self.shop, name="tape", sku="TP-1",
-            quantity=Decimal("500"), unit="mt", pack_type="bag")
+            quantity=Decimal("500"), unit="m", pack_type="bag")
         self.assertEqual(bagged.unit_short, "m")
         self.assertEqual(bagged.item_noun_plural, "bags")
 
         boxed_meters = _stock(
             warehouse=self.shop, name="trim", sku="TR-1",
-            quantity=Decimal("80"), unit="mt", pack_type="box")
+            quantity=Decimal("80"), unit="m", pack_type="box")
         self.assertEqual(boxed_meters.unit_short, "m")
         self.assertEqual(boxed_meters.item_noun_plural, "boxes")
 
@@ -393,7 +393,7 @@ class TheMainProductOwnsUnitAndPack(TestCase):
         self.mill = Warehouse.objects.create(name="Mill", accounting_book=book)
         self.shop = Warehouse.objects.create(name="Shop", accounting_book=book)
         self.product = Product.objects.create(
-            title="GREK", sku="GREK", featured=False, unit="mt", pack_type="roll")
+            title="GREK", sku="GREK", featured=False, unit="m", pack_type="roll")
         white = ProductVariant.objects.create(product=self.product, variant_sku="GREK.W")
         beige = ProductVariant.objects.create(product=self.product, variant_sku="GREK.B")
         self.rows = [
@@ -412,7 +412,7 @@ class TheMainProductOwnsUnitAndPack(TestCase):
     def test_the_storefront_unit_follows(self):
         """The storefront's coarser unit is derived on every save, so it
         cannot drift from the stock again."""
-        self.assertEqual(self.product.unit_of_measurement, "mt")
+        self.assertEqual(self.product.unit_of_measurement, "m")
         self.product.set_unit("piece")
         self.product.refresh_from_db()
         self.assertEqual(self.product.unit_of_measurement, "units")

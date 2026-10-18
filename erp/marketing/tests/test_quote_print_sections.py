@@ -45,7 +45,7 @@ class PrintedQuoteSectionsTest(TestCase):
             "book_id": self.ergene.pk,
             "customer": {"type": "contact", "pk": self.customer.pk},
             "currency": "", "date": "2026-09-29", "valid_until": "", "notes": "",
-            "items": [{"sku": "V320.ECRU", "quantity": "", "unit": "mt", "price": price,
+            "items": [{"sku": "V320.ECRU", "quantity": "", "unit": "m", "price": price,
                        "rolls": [{"id": r.pk, "quantity": ""} for r in rolls]}
                       for price, rolls in lines],
         }

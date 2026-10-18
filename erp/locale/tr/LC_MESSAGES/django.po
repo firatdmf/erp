@@ -14647,3 +14647,13 @@ msgstr "Tam ekran"
 
 msgid "Exit full screen"
 msgstr "Tam ekrandan çık"
+
+msgid "Previous month"
+msgstr "Önceki ay"
+
+msgid "Next month"
+msgstr "Sonraki ay"
+
+#, python-format
+msgid "Show %(month)s"
+msgstr "%(month)s göster"

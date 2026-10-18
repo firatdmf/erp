@@ -50,6 +50,17 @@
   .ord-period { margin-top: 6px; font: 500 13px var(--font-sans); color: var(--gray-600); }
   .ord-period b { color: #0F1419; font-weight: 700; }
   .ord-period i { font-size: 11px; margin-right: 5px; color: var(--nejum-teal-600); }
+  /* ‹ › one month back or forward, either side of the month's name */
+  .ord-period-step {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; margin: 0 4px; border-radius: 6px;
+    vertical-align: middle; text-decoration: none;
+  }
+  .ord-period-step i { margin: 0; font-size: 10px; }
+  a.ord-period-step:hover { background: var(--gray-100, #F1F5F9); }
+  .ord-period-step.off i { color: var(--gray-300, #CBD5E1); }
+  /* Footer under the list: on to the month before */
+  .ord-more { display: flex; justify-content: center; gap: 8px; padding: 18px 0 4px; }
   /* Period picker behind the Filter button */
   .ord-period-pick { position: relative; display: flex; }
   .ord-period-menu {
@@ -408,7 +419,7 @@
       {# Which orders the list is showing: the period, or — while the search box holds a query — everything. #}
       <div class="ord-period">
         <span id="ord-period-shown"><i class="fa fa-calendar"></i>
-          {% if period_start %}<b>{{ period_start|date:"F Y" }}</b>{% if carried_count %} · {% blocktrans count n=carried_count %}plus {{ n }} open order from earlier{% plural %}plus {{ n }} open orders from earlier{% endblocktrans %}{% endif %}{% else %}<b>{% trans "All time" %}</b>{% endif %}
+          {% if period_start %}{% if prev_month %}<a href="?month={{ prev_month|date:'Y-m' }}" class="ord-period-step" data-keep-tab title="{{ prev_month|date:'F Y' }}" aria-label="{% trans 'Previous month' %}"><i class="fa fa-chevron-left"></i></a>{% else %}<span class="ord-period-step off"><i class="fa fa-chevron-left"></i></span>{% endif %}<b>{{ period_start|date:"F Y" }}</b>{% if next_month %}<a href="?month={{ next_month|date:'Y-m' }}" class="ord-period-step" data-keep-tab title="{{ next_month|date:'F Y' }}" aria-label="{% trans 'Next month' %}"><i class="fa fa-chevron-right"></i></a>{% else %}<span class="ord-period-step off"><i class="fa fa-chevron-right"></i></span>{% endif %}{% if carried_count %} · {% blocktrans count n=carried_count %}plus {{ n }} open order from earlier{% plural %}plus {{ n }} open orders from earlier{% endblocktrans %}{% endif %}{% else %}<b>{% trans "All time" %}</b>{% endif %}
         </span>
         <span id="ord-period-search" style="display:none"><i class="fa fa-search"></i>
           <b>{% trans "Search results across all time" %}</b>
@@ -804,6 +815,14 @@
     </div>
     {% endif %}
   </div>
+
+  {# The way on to older orders, where the reader runs out of this month's. #}
+  {% if prev_month %}
+  <div class="ord-more" id="ord-more">
+    <a href="?month={{ prev_month|date:'Y-m' }}" class="ord-btn ghost" data-keep-tab><i class="fa fa-arrow-down"></i>{% blocktrans with month=prev_month|date:"F Y" %}Show {{ month }}{% endblocktrans %}</a>
+    <a href="?month=all" class="ord-btn ghost" data-keep-tab>{% trans "All time" %}</a>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Floating bulk action bar -->
@@ -852,6 +871,10 @@
     const searching = document.getElementById('ord-period-search');
     if (shown) shown.style.display = q ? 'none' : '';
     if (searching) searching.style.display = q ? '' : 'none';
+    // A search already reaches every month; the way to the one before
+    // only stands under the period's own rows.
+    const more = document.getElementById('ord-more');
+    if (more) more.style.display = q ? 'none' : '';
     // A pane with orders, none of them in the period, would otherwise be
     // a header over nothing.
     const none = document.getElementById('ord-none');
@@ -891,6 +914,20 @@
       applyOrderFilter();
     });
   });
+
+  // Stepping to another month keeps the tab the reader is on: the
+  // month links carry it as #tab, and the page opens on it.
+  (function () {
+    const tab = location.hash.slice(1);
+    const btn = tab && document.querySelector(`.ord-tab[data-tab="${CSS.escape(tab)}"]`);
+    if (btn) btn.click();
+    document.querySelectorAll('a[data-keep-tab]').forEach(a => {
+      a.addEventListener('click', () => {
+        const active = document.querySelector('.ord-tab.active');
+        a.hash = active && active.dataset.tab !== 'all' ? active.dataset.tab : '';
+      });
+    });
+  })();
 
   if (input) input.addEventListener('input', applyOrderFilter);
   applyOrderFilter();

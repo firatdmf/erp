@@ -4800,6 +4800,15 @@ class OrderList(ListView):
         context['period_is_current'] = month == this_month
         context['last_month'] = (this_month - datetime.timedelta(days=1)).strftime("%Y-%m")
         context['carried_count'] = carried
+        # The arrows beside the month and the footer under the list step
+        # one month at a time: back no further than the book's first
+        # order, forward no further than this month.
+        if month is not None:
+            first = min((order.order_date or timezone.localtime(order.created_at).date()
+                         for order in all_orders), default=month).replace(day=1)
+            prev_month = (month - datetime.timedelta(days=1)).replace(day=1)
+            context['prev_month'] = prev_month if prev_month >= first else None
+            context['next_month'] = after if after <= this_month else None
 
         # B2B orders: Has contact OR company, but NO web_client
         b2b_orders = [

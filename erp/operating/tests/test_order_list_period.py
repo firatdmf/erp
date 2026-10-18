@@ -81,6 +81,28 @@ class OrderListPeriodTest(TestCase):
         response = self.client.get(self.url, {"month": "soon"})
         self.assertEqual(response.context["period_start"], self.this_month)
 
+    def test_this_month_steps_back_but_not_forward(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context["prev_month"], self.last_month)
+        self.assertIsNone(response.context["next_month"])
+        self.assertContains(response, 'id="ord-more"')
+        self.assertContains(
+            response, f'href="?month={self.last_month:%Y-%m}" class="ord-btn ghost"')
+
+    def test_the_first_month_steps_forward_but_not_back(self):
+        """No orders before last month, so there is no month to go back to."""
+        response = self.client.get(
+            self.url, {"month": self.last_month.strftime("%Y-%m")})
+        self.assertIsNone(response.context["prev_month"])
+        self.assertEqual(response.context["next_month"], self.this_month)
+        self.assertNotContains(response, 'id="ord-more"')
+
+    def test_all_time_has_no_steps(self):
+        response = self.client.get(self.url, {"month": "all"})
+        self.assertNotIn("prev_month", response.context)
+        self.assertNotContains(response, 'class="ord-period-step')
+        self.assertNotContains(response, 'id="ord-more"')
+
     def test_open_orders_lead_the_list_longest_waiting_first(self):
         newer_open = self._order("DK-OPEN-2", self.this_month, "packaging")
         response = self.client.get(self.url, {"month": "all"})

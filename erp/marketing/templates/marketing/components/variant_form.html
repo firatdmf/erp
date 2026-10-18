@@ -1,7 +1,7 @@
 {% load i18n %}
 {% load static %}
 {% block css %}
-<link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}?v=4" />
+<link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}?v=8" />
 {% endblock css %}
 
 <div class="loading" id="loading">{% trans "Loading…" %}</div>
@@ -39,10 +39,17 @@
     </div>
   </div>
 
+  <!-- Full screen: the whole table at once, on the same inputs. -->
+  <div class="variant_fullscreen_bar">
+    <button type="button" class="variant_fullscreen_btn" id="variant_fullscreen_btn" onclick="toggleVariantFullscreen()">
+      <i class="fa fa-expand"></i> <span>{% trans "Full screen" %}</span>
+    </button>
+  </div>
+
   <!-- Scrollable Table Wrapper for Mobile -->
   <div id="variant_table_wrapper"
     style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;">
-    <table id="variant_table" style="width: 100%; min-width: 500px; border-collapse: collapse;"></table>
+    <table id="variant_table" style="width: max-content; min-width: 100%; border-collapse: collapse;"></table>
   </div>
 
   <!-- The table lists the variants there are; new ones are added here. -->
@@ -78,6 +85,8 @@
       delete:          '{% trans "Delete"|escapejs %}',
       // table row
       edit_hint:       '{% trans "Edit"|escapejs %}',
+      fullscreen:      '{% trans "Full screen"|escapejs %}',
+      exit_fullscreen: '{% trans "Exit full screen"|escapejs %}',
       // adding variants, and rows the save can't take
       no_rows_yet:     '{% trans "No variants yet — add one, or create every combination of the values above."|escapejs %}',
       every_combination_exists: '{% trans "Every combination is already a variant."|escapejs %}',
@@ -154,6 +163,6 @@
       deleteError: '{% filter escapejs %}{% trans "Delete error" %}{% endfilter %}'
     };
   </script>
-  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=10" defer></script>
+  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=13" defer></script>
   <script src="{% static 'marketing/js/variant_attributes_modal.js' %}?v=2" defer></script>
 </div>

@@ -14641,3 +14641,9 @@ msgstr "Hisse dağılımı"
 
 msgid "from"
 msgstr "şuradan"
+
+msgid "Full screen"
+msgstr "Tam ekran"
+
+msgid "Exit full screen"
+msgstr "Tam ekrandan çık"

@@ -1289,18 +1289,18 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
         if (!displayOptions.length) {
             rowHTML += `<td>
-            <input type="text" name="variant_sku_${originalIndex + 1}" value="${vfEsc(sku)}" data-auto-sku="" placeholder="SKU" style="min-width: 120px;" onclick="event.stopPropagation()" oninput="updateVariantRowsBar()">
+            <input type="text" name="variant_sku_${originalIndex + 1}" value="${vfEsc(sku)}" data-auto-sku="" placeholder="SKU" style="min-width: 180px;" onclick="event.stopPropagation()" oninput="updateVariantRowsBar()">
         </td>`;
         }
 
         // Price Input
         rowHTML += `<td>
-            <input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="—" value="${price}" readonly tabindex="-1" title="${vfEsc((window.VARIANT_T && window.VARIANT_T.price_from_cost) || 'Worked out from the cost')}" style="min-width: 100px; background:#F3F4F6; cursor:not-allowed;" onclick="event.stopPropagation()">
+            <input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="—" value="${price}" readonly tabindex="-1" title="${vfEsc((window.VARIANT_T && window.VARIANT_T.price_from_cost) || 'Worked out from the cost')}" style="min-width: 120px; background:#F3F4F6; cursor:not-allowed;" onclick="event.stopPropagation()">
         </td>`;
 
         // Stock Input
         rowHTML += `<td>
-            <input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;" onclick="event.stopPropagation()">
+            <input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 120px;" onclick="event.stopPropagation()">
         </td>`;
 
         // Featured Checkbox - using toggle switch
@@ -3952,3 +3952,28 @@ function removeImageFromMainGallery(deletedUrl) {
         }
     });
 }
+
+// Full screen: the same section, fixed over the page, so the inputs stay in
+// the form and keep their handlers.
+function toggleVariantFullscreen(force) {
+    const section = document.getElementById('variant_component');
+    const btn = document.getElementById('variant_fullscreen_btn');
+    if (!section || !btn) return;
+    const on = force === undefined ? !section.classList.contains('is_fullscreen') : force;
+    section.classList.toggle('is_fullscreen', on);
+    document.body.classList.toggle('variant_fullscreen_open', on);
+    const VT = window.VARIANT_T || {};
+    btn.innerHTML = on
+        ? `<i class="fa fa-compress"></i> <span>${vfEsc(VT.exit_fullscreen || 'Exit full screen')}</span>`
+        : `<i class="fa fa-expand"></i> <span>${vfEsc(VT.fullscreen || 'Full screen')}</span>`;
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const section = document.getElementById('variant_component');
+    if (!section || !section.classList.contains('is_fullscreen')) return;
+    // A popup open on top closes first.
+    const detail = document.getElementById('variant_detail_modal');
+    if ((detail && detail.style.display !== 'none') || document.querySelector('[id^="variant_attr_modal_"]')) return;
+    toggleVariantFullscreen(false);
+});

@@ -181,3 +181,60 @@ class StockLeavingPostsItsCost(TestCase):
         b = self._balances()
         self.assertEqual(b["5000"], Decimal("0"))
         self.assertEqual(b["3200"], Decimal("-69.345"))
+
+
+class ShipUnshipShipAgain(TestCase):
+    """An order shipped, re-opened and shipped again takes its cost out of
+    stock once. Before be87d469 the un-ship wrote its movements without
+    the order, the ledger read them as stock arriving and posted nothing,
+    and orders 314 and 318 carried their cost twice (LL18/LL19)."""
+
+    def setUp(self):
+        from operating.models import Order, OrderStockReservation
+
+        usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Laleli Fabric", base_currency=usd)
+        ensure_chart()
+        warehouse = Warehouse.objects.create(name="Laleli", accounting_book=self.book)
+        self.product = WarehouseProduct.objects.create(
+            warehouse=warehouse, name="seta", sku="S1",
+            quantity=Decimal("35"), cost_usd=Decimal("2.30"))
+        self.roll = WarehouseProductItem.objects.create(
+            product=self.product, quantity=Decimal("35"),
+            quantity_remaining=Decimal("35"), barcode="BC-1",
+            status="in_stock", unit_cost_base=Decimal("2.30"))
+        self.order = Order.objects.create(order_number="ORD-TEST-1")
+        OrderStockReservation.objects.create(
+            order=self.order, stock_item=self.roll,
+            warehouse_product=self.product, quantity=Decimal("35"))
+
+    def _inventory_gap(self):
+        row = next(r for r in reconcile(self.book)["rows"] if r["control"] == "1300")
+        return row["ledger"] - row["subsidiary"]
+
+    def test_the_cost_leaves_stock_once(self):
+        from operating.views_warehouse import (consume_reservations_for_order,
+                                               restore_reservations_for_order)
+        gap = self._inventory_gap()
+        consume_reservations_for_order(self.order)
+        restore_reservations_for_order(self.order)
+        consume_reservations_for_order(self.order)
+
+        self.roll.refresh_from_db()
+        self.assertEqual(self.roll.quantity_remaining, Decimal("0"))
+        b = {r["code"]: r["balance"] for r in
+             balance_sheet(self.book)["trial_balance"]["rows"]}
+        self.assertEqual(b["5000"], Decimal("80.50"))   # 35 m x 2.30, once
+        # The ledger moved exactly as far as the shelves did.
+        self.assertEqual(self._inventory_gap(), gap)
+
+    def test_the_un_ship_is_linked_to_its_order(self):
+        from operating.views_warehouse import (consume_reservations_for_order,
+                                               restore_reservations_for_order)
+        consume_reservations_for_order(self.order)
+        restore_reservations_for_order(self.order)
+        back = StockMovement.objects.get(movement_type="in", order=self.order)
+        self.assertIsNotNone(back.reservation_id)
+        self.assertEqual(JournalEntry.objects.filter(
+            source_id=back.pk, lines__account__code="5000",
+            lines__credit=Decimal("80.50")).count(), 1)

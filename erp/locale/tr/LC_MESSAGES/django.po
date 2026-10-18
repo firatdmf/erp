@@ -9820,6 +9820,9 @@ msgstr "%(number)s alımı iptal edildi"
 msgid "Order %(number)s had nothing else on it and was cancelled too."
 msgstr "%(number)s siparişinde başka bir şey kalmadığından o da iptal edildi."
 
+msgid "Order %(number)s had nothing else on it and was cancelled too. The rest of the split order stays open."
+msgstr "%(number)s siparişinde başka bir şey kalmadığından o da iptal edildi. Bölünmüş siparişin geri kalanı açık kalıyor."
+
 msgid "Purchase changes"
 msgstr "Alım değişiklikleri"
 

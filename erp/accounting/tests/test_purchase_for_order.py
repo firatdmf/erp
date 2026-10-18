@@ -792,6 +792,50 @@ class PurchaseForCustomerTest(TestCase):
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
         self.assertContains(page, "was cancelled too")
 
+    def _other_half(self, order, with_goods=True):
+        """Split `order` across books: a sibling half in the other book."""
+        import uuid
+        order.split_group = uuid.uuid4()
+        order.save(update_fields=["split_group"])
+        account = CurrentAccount.objects.create(
+            book=self.other_book, code="C-ERG", name="Oleg (Ergene)", type="customer",
+            contact=self.customer, default_currency=self.usd)
+        half = Order.objects.create(current_account=account, contact=self.customer,
+                                    currency=order.currency, split_group=order.split_group)
+        if with_goods:
+            OrderItem.objects.create(order=half, quantity=Decimal("10"), price=Decimal("2"),
+                                     product=Product.objects.create(title="Tul", sku="TUL01", price=1))
+        return half
+
+    @patch("operating.order_notifications.send_order_event_email")
+    def test_a_half_left_empty_is_cancelled_alone_and_the_rest_goes_ahead(self, send):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        order.notify_customer = True
+        order.save(update_fields=["notify_customer"])
+        half = self._other_half(order)
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.assertTrue(r.json()["success"], r.json())
+        order.refresh_from_db()
+        half.refresh_from_db()
+        self.assertEqual(order.order_status, "cancelled")
+        self.assertEqual(half.order_status, "pending")
+        self.assertTrue(half.items.exists())
+        # The customer's order is still on: nobody is told it was cancelled.
+        send.assert_not_called()
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, "The rest of the split order stays open.")
+
+    def test_a_half_left_empty_beside_an_empty_half_cancels_the_whole_order(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        half = self._other_half(order, with_goods=False)
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.assertTrue(r.json()["success"], r.json())
+        order.refresh_from_db()
+        half.refresh_from_db()
+        self.assertEqual((order.order_status, half.order_status), ("cancelled", "cancelled"))
+
     def test_editing_the_purchase_is_logged_on_both_sides(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order

@@ -572,7 +572,7 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
     Returns the sentence the purchase page shows about the order, or None
     when there is nothing to say."""
     from .audit import log_change
-    from .models import OrderChange
+    from .models import Order, OrderChange
     from .views_warehouse import apply_order_status_change
 
     order = invoice.for_order
@@ -598,7 +598,19 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
             return (_("Its %(count)s line(s) were removed from order %(number)s, which "
                       "stays open with what else is on it.")
                     % {"count": removed, "number": number})
-        ok, _code = apply_order_status_change(order, "cancelled", user=user)
+        # A half of a split order emptied while another half still has goods
+        # on it: only this half is called off. The status funnel moves every
+        # half together, so it would cancel the goods the customer still
+        # wants. Nobody is told — the order itself goes ahead.
+        rest_goes_ahead = bool(order.split_group) and (
+            Order.objects.filter(split_group=order.split_group, items__isnull=False)
+            .exclude(pk=order.pk).exclude(order_status="cancelled").exists())
+        if rest_goes_ahead:
+            from .views_warehouse import _apply_status_to_one
+            order._one_notice_for_split = True
+            ok, _code = _apply_status_to_one(order, "cancelled", user=user)
+        else:
+            ok, _code = apply_order_status_change(order, "cancelled", user=user)
     if not ok:
         return (_("Order %(number)s has nothing left on it but could not be cancelled "
                   "— cancel it on the order page.") % {"number": number})
@@ -607,5 +619,8 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
         new_value=_("Purchase %(number)s cancelled") % {"number": invoice.number},
         created_by=user if getattr(user, "is_authenticated", False) else None,
     )
+    if rest_goes_ahead:
+        return (_("Order %(number)s had nothing else on it and was cancelled too. "
+                  "The rest of the split order stays open.") % {"number": number})
     return (_("Order %(number)s had nothing else on it and was cancelled too.")
             % {"number": number})

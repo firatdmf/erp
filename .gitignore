@@ -172,3 +172,6 @@ erp/accounting/data/
 # Railway deploy key — private, never commit
 ssh-railway
 ssh-railway.pub
+
+# Claude Code permissions approved on this machine — personal, never commit
+.claude/settings.local.json

@@ -8,7 +8,7 @@ hard-coded "suggested price" formula — pricing now flows from cost through
 the group's margin, applied in bulk from the group page.
 """
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -16,12 +16,12 @@ from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext as _, gettext as _gettext
+from django.utils.translation import gettext as _gettext
 from django.views import View
 
 from .attributes import normalize_attribute_name
 from .models import (CategoryVariantAttribute, Product, ProductCategory,
-                     ProductVariant, ProductVariantAttribute,
+                     ProductVariantAttribute, attach_live_costs,
                      with_product_live_quantity)
 
 
@@ -62,19 +62,22 @@ def _safe_decimal(value):
         return None
 
 
-def _apply_margin_price(cost, margin_pct):
-    """price = cost x (1 + margin/100), rounded to 2 decimals."""
-    return (cost * (Decimal("1") + margin_pct / Decimal("100"))).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-
-
 def _fill_group_settings(group, request):
     """Copy every group setting out of the request onto the (possibly unsaved)
-    group — the create page and the settings page submit the same form."""
+    group — the create page and the settings page submit the same form.
+    Returns what is wrong with them, or None.
+
+    The price multiplier is required: every price in the group comes from
+    it (marketing/pricing.py), and there is no default behind it."""
+    from .pricing import parse_multiplier
+    multiplier = (request.POST.get("price_multiplier") or "").strip()
+    try:
+        parse_multiplier(multiplier)
+    except ValueError:
+        return _gettext("Type what the cost is multiplied by, e.g. 4/3 or 3.")
+    group.price_multiplier = multiplier
     group.description = (request.POST.get("description") or "").strip() or None
     group.is_active = request.POST.get("is_active") in ("1", "true", "on")
-    group.profit_margin = _safe_decimal(request.POST.get("profit_margin"))
     group.minimum_order_quantity = _safe_decimal(request.POST.get("minimum_order_quantity"))
     lead = (request.POST.get("lead_time_days") or "").strip()
     group.lead_time_days = int(lead) if lead.isdigit() else None
@@ -134,7 +137,9 @@ class ProductGroupCreate(View):
                 status=400,
             )
         group = ProductCategory(name=name)
-        _fill_group_settings(group, request)
+        problem = _fill_group_settings(group, request)
+        if problem:
+            return JsonResponse({"success": False, "error": problem}, status=400)
         group.save()
         _save_variant_attributes(group, request)
         return JsonResponse({"success": True, "existed": False, "id": group.pk})
@@ -143,7 +148,7 @@ class ProductGroupCreate(View):
 @method_decorator(login_required, name="dispatch")
 class ProductGroupDetail(View):
     """One group's settings + its products. POST actions:
-    save_settings / apply_margin / delete_group."""
+    save_settings / delete_group."""
 
     def get(self, request, pk):
         group = get_object_or_404(ProductCategory, pk=pk)
@@ -153,6 +158,9 @@ class ProductGroupDetail(View):
             .prefetch_related("variants")
             .order_by("title")
         )
+        # A variant's cost is read off its stock: all of them in one query.
+        products = list(products)
+        attach_live_costs(v for p in products for v in p.variants.all())
         rows = []
         total_stock = Decimal("0")
         costed = 0
@@ -162,7 +170,8 @@ class ProductGroupDetail(View):
             # Stock is the warehouse's answer, annotated in one query above.
             stock = p.live_quantity or Decimal("0")
             total_stock += stock
-            has_cost = bool(p.cost) or any(v.variant_cost for v in variants)
+            # Costed on its variants: a product has no cost of its own.
+            has_cost = any(v.live_cost for v in variants)
             if has_cost:
                 costed += 1
             rows.append({
@@ -170,7 +179,7 @@ class ProductGroupDetail(View):
                 "variant_count": v_count,
                 "stock": stock,
                 "has_cost": has_cost,
-                "margin_override": p.profit_margin,
+                "multiplier_override": p.price_multiplier,
             })
         stats = {
             "product_count": len(rows),
@@ -191,8 +200,6 @@ class ProductGroupDetail(View):
 
         if action == "save_settings":
             return self._save_settings(request, group)
-        if action == "apply_margin":
-            return self._apply_margin(request, group)
         if action == "delete_group":
             return self._delete_group(request, group)
         return JsonResponse({"success": False, "error": _gettext("Unknown action.")}, status=400)
@@ -209,80 +216,20 @@ class ProductGroupDetail(View):
                 )
             group.name = name
 
-        _fill_group_settings(group, request)
+        problem = _fill_group_settings(group, request)
+        if problem:
+            return JsonResponse({"success": False, "error": problem}, status=400)
         group.save()
         _save_variant_attributes(group, request)
         return JsonResponse({"success": True, "name": group.name})
 
-    def _apply_margin(self, request, group):
-        """Reprice the whole group from cost: price = cost x (1 + margin/100).
-        A product's own profit_margin override wins over the group's. Rows
-        without a cost are left untouched and reported back."""
-        if group.profit_margin is None:
-            return JsonResponse(
-                {"success": False, "error": _gettext("Save the group's margin first.")},
-                status=400,
-            )
-
-        products = list(group.product_set.prefetch_related("variants"))
-
-        # A margin under -100% prices every costed row below zero. Refuse the
-        # whole run up front instead of letting the database reject it
-        # halfway through: name the products so the margin can be fixed.
-        def has_cost(p):
-            return (p.cost and p.cost > 0) or any(
-                v.variant_cost and v.variant_cost > 0 for v in p.variants.all())
-
-        below_zero = sorted(
-            p.sku or p.title for p in products
-            if has_cost(p)
-            and (p.profit_margin if p.profit_margin is not None
-                 else group.profit_margin) < -100
-        )
-        if below_zero:
-            return JsonResponse({
-                "success": False,
-                "error": _("A margin below -100%% would price these products "
-                           "below zero: %(products)s") % {"products": ", ".join(below_zero)},
-            }, status=400)
-
-        products_updated = 0
-        variants_updated = 0
-        skipped_no_cost = 0
-
-        products_to_save = []
-        variants_to_save = []
-        for p in products:
-            margin = p.profit_margin if p.profit_margin is not None else group.profit_margin
-            touched = False
-            if p.cost and p.cost > 0:
-                p.price = _apply_margin_price(p.cost, margin)
-                products_to_save.append(p)
-                touched = True
-            for v in p.variants.all():
-                if v.variant_cost and v.variant_cost > 0:
-                    v.variant_price = _apply_margin_price(v.variant_cost, margin)
-                    variants_to_save.append(v)
-                    touched = True
-            if not touched:
-                skipped_no_cost += 1
-
-        with transaction.atomic():
-            if products_to_save:
-                Product.objects.bulk_update(products_to_save, ["price"], batch_size=500)
-                products_updated = len(products_to_save)
-            if variants_to_save:
-                ProductVariant.objects.bulk_update(variants_to_save, ["variant_price"], batch_size=500)
-                variants_updated = len(variants_to_save)
-
-        return JsonResponse({
-            "success": True,
-            "products_updated": products_updated,
-            "variants_updated": variants_updated,
-            "skipped_no_cost": skipped_no_cost,
-        })
-
     def _delete_group(self, request, group):
+        # Every product is in a group — its prices come from there — so a
+        # group that still has products is not deleted out from under them.
         count = group.product_set.count()
-        group.delete()   # Product.category is SET_NULL — products survive
-        return JsonResponse({"success": True, "orphaned_products": count})
+        if count:
+            return JsonResponse({"success": False, "error": _gettext(
+                "Move this group's %(count)s products to another group first: "
+                "every product needs a group.") % {"count": count}}, status=400)
+        group.delete()
+        return JsonResponse({"success": True, "orphaned_products": 0})

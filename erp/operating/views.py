@@ -303,11 +303,12 @@ def _order_profit_snapshot(order, user):
     if not may_see_profit(user):
         return None
     try:
-        tc = float(order.total_cost() or 0)
-        gp = float(order.gross_profit() or 0)
-        ov = float(order.total_value() or 0)
-        margin = round(gp / ov * 100, 1) if ov > 0 else None
-        return {"total_cost": tc, "gross_profit": gp, "margin": margin}
+        # A split order's page shows every half's cost and profit together.
+        from .split_orders import profit_figures
+        f = profit_figures(order, getattr(user, "member", None),
+                           admin=getattr(user, "is_superuser", False))
+        return {"total_cost": float(f["cost"]), "gross_profit": float(f["profit"]),
+                "margin": float(f["margin"]) if f["margin"] is not None else None}
     except Exception:
         return None
 
@@ -385,13 +386,17 @@ class OrderDetail(DetailView):
             # Delivery, discounts: read by the totals block and by every
             # money method on the page.
             "adjustments",
-            # Listed twice on the cargo card: its summary and its edit grid.
-            "cargo_receipts",
         )
 
     def get_context_data(self, **kwargs):
         from accounting.services_accounts import brand_name_for
+        from .split_orders import split_halves, lend_cargo_info
+        # A split order has one status section: cargo info saved before
+        # its halves moved together may sit on one half only.
+        halves = split_halves(self.object)
+        lend_cargo_info(self.object, halves)
         ctx = super().get_context_data(**kwargs)
+        ctx["cargo_receipts"] = self.object.shipment_receipts()
         # What the print-header box hints at when it is left blank — the
         # book's brand name, i.e. what the documents will actually say.
         ctx["brand_line"] = brand_name_for()
@@ -533,29 +538,7 @@ class OrderDetail(DetailView):
         ctx["unassigned_reservations"] = [r for r in reservations if not r.order_item_id]
         ctx["total_scanned_meters"] = sum((r.quantity or _D("0") for r in reservations), _D("0"))
         ctx["total_scanned_count"] = len(reservations)
-        ctx["total_scanned_label"] = _stock_taken_label(reservations)
-        # Cost and profit are said in base, the order's currency after
-        # them in brackets (operating_tags.cost_in_base); the scripts that
-        # rewrite them need the same two facts.
-        from .models import _dollar_labels
-        base_code, ctx["base_currency_symbol"] = _dollar_labels()
-        rate = (self.object.rate_to_base()
-                if self.object.currency_code != base_code else None)
-        # 1 for a foreign order means no rate was found: say nothing in base.
-        ctx["order_rate_to_base"] = rate if rate and rate != 1 else None
-        # A retail order edited or called off after it was paid for: what
-        # the counter took no longer matches the bill (Order.counter_gap).
-        ctx["counter_gap"] = self.object.counter_gap()
-        if ctx["counter_gap"]:
-            ctx["counter_gap_abs"] = abs(ctx["counter_gap"][2])
-        # Nothing on the order is cloth: no meters to speak of anywhere.
-        ctx["only_counted"] = bool(items_sorted) and all(
-            it.sold_by_count for it in items_sorted)
-        # A short line's "2 / 3 m" in the line's own unit.
-        ctx["scan_shortfall_rows"] = [
-            (it, ordered, got, units.unit_short(getattr(it.product, "unit", None)
-                                                or units.DEFAULT_UNIT))
-            for it, ordered, got in ctx["scan_shortfall_rows"]]
+        all_taken = list(reservations)
         ctx["reservation_count"] = sum(1 for r in reservations if not r.consumed)
         ctx["has_cargo_info"] = bool((self.object.carrier or "").strip() and (self.object.tracking_number or "").strip())
         # Change history preview (full page at order_changes).
@@ -569,21 +552,72 @@ class OrderDetail(DetailView):
         # under this one's — to anyone who may open this half, whatever
         # book the others are in. Their accounts stay behind their books.
         from .split_orders import (
-            split_halves, combined_number, other_halves_for_page, combined_totals,
+            combined_number, other_halves_for_page, combined_totals,
         )
-        halves = split_halves(self.object)
+        from erp.roles import may_see_profit
+        if may_see_profit(self.request.user):
+            from .split_orders import profit_figures
+            ctx["profit"] = profit_figures(
+                self.object, getattr(self.request.user, "member", None),
+                admin=self.request.user.is_superuser)
         if len(halves) > 1:
             ctx["combined_number"] = combined_number(halves)
             ctx["this_book_name"] = getattr(
                 getattr(self.object.current_account, "book", None), "name", "")
             ctx["other_halves"] = other_halves_for_page(
-                self.object, getattr(self.request.user, "member", None))
+                self.object, getattr(self.request.user, "member", None),
+                admin=self.request.user.is_superuser)
             ctx["combined_totals"] = combined_totals(halves)
+            # The halves complete together, so goods still on their way in
+            # for any of them hold the whole order back.
+            for half in ctx["other_halves"]:
+                if half.billing_waits_for_goods():
+                    ctx["billing_waits_for"] = (list(ctx["billing_waits_for"])
+                                                + list(half.unreceived_purchases()))
+            # ...and it takes someone who holds every half's book.
+            # The message itself, for the page to show before anyone tries.
+            if not all(h.may_open for h in ctx["other_halves"]):
+                from .views_warehouse import SPLIT_NEEDS_ALL_BOOKS_MSG
+                ctx["needs_all_books"] = SPLIT_NEEDS_ALL_BOOKS_MSG
+            # One shipment: the rolls scanned for every half count together.
+            ctx["total_scanned_count"] += sum(h.scanned_count for h in ctx["other_halves"])
+            ctx["total_scanned_meters"] += sum(h.scanned_meters for h in ctx["other_halves"])
+            for h in ctx["other_halves"]:
+                all_taken += h.taken_reservations
+            # What the other halves add to the one total at the foot, for
+            # the scripts that rewrite it as this half's lines are edited.
+            # Not for an older split in two currencies: that has no one sum.
+            if len(ctx["combined_totals"]) == 1:
+                ctx["other_halves_total"] = sum(
+                    (h.total_value() or 0) for h in ctx["other_halves"])
             # Print prints the whole order, each half under its book — for
             # a viewer who may open every half, which the combined sheet
             # asks. Anyone else prints the half they are on.
             if all(h.may_open for h in ctx["other_halves"]):
                 ctx["print_ids"] = ",".join(str(h.pk) for h in halves)
+        ctx["total_scanned_label"] = _stock_taken_label(all_taken)
+        # A retail order edited or called off after it was paid for: what
+        # the counter took no longer matches the bill (Order.counter_gap).
+        ctx["counter_gap"] = self.object.counter_gap()
+        if ctx["counter_gap"]:
+            ctx["counter_gap_abs"] = abs(ctx["counter_gap"][2])
+        # Cost and profit are said in base, the order's currency after
+        # them in brackets (operating_tags.cost_in_base); the scripts that
+        # rewrite them need the same two facts.
+        from .models import _dollar_labels
+        base_code, ctx["base_currency_symbol"] = _dollar_labels()
+        rate = (self.object.rate_to_base()
+                if self.object.currency_code != base_code else None)
+        # 1 for a foreign order means no rate was found: say nothing in base.
+        ctx["order_rate_to_base"] = rate if rate and rate != 1 else None
+        # Nothing on the order is cloth: no meters to speak of anywhere.
+        ctx["only_counted"] = bool(items_sorted) and all(
+            it.sold_by_count for it in items_sorted)
+        # A short line's "2 / 3 m" in the line's own unit.
+        ctx["scan_shortfall_rows"] = [
+            (it, ordered, got, units.unit_short(getattr(it.product, "unit", None)
+                                                or units.DEFAULT_UNIT))
+            for it, ordered, got in ctx["scan_shortfall_rows"]]
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -753,7 +787,8 @@ class OrderDetail(DetailView):
             if stock is not None and not allow_oversell:
                 max_qty = float(qty) + float(stock)
                 
-            unit_cost = variant.variant_cost if is_variant else product.cost
+            # Cost lives on the variant; a product has none of its own.
+            unit_cost = variant.live_cost if is_variant else None
 
             return JsonResponse({
                 "ok": True,
@@ -923,8 +958,10 @@ class OrderDetail(DetailView):
                     return JsonResponse({"ok": False, "error": _g("You can't change this order's cargo receipts.")}, status=403)
                 messages.error(request, _g("You can't change this order's cargo receipts."))
                 return redirect("operating:order_detail", pk=order.pk)
-            receipt = OrderCargoReceipt.objects.filter(
-                order=order, pk=request.POST.get("receipt_id") or 0).first()
+            # One receipt for the shipment: on a split order it may hang
+            # on the other half, and comes off from either page.
+            receipt = next((r for r in order.shipment_receipts()
+                            if str(r.pk) == str(request.POST.get("receipt_id") or 0)), None)
             if receipt:
                 try:
                     from marketing.utils.bunny_storage import delete_from_bunny
@@ -998,6 +1035,9 @@ class OrderDetail(DetailView):
             elif code == "goods_not_received":
                 from .views_warehouse import GOODS_NOT_RECEIVED_MSG
                 error = GOODS_NOT_RECEIVED_MSG
+            elif code == "needs_all_books":
+                from .views_warehouse import SPLIT_NEEDS_ALL_BOOKS_MSG
+                error = SPLIT_NEEDS_ALL_BOOKS_MSG
             else:
                 error = _gettext("The order could not be updated: %(error)s") % {"error": (code or '').replace('error:', '')}
             if wants_json:
@@ -1080,16 +1120,15 @@ def _cargo_json(request, order, message, warning=None):
     """The order page's cargo card, redrawn after a background save or a
     receipt's removal: the saved carrier and tracking number, and the two
     parts of the card that list receipts."""
-    from django.db.models import prefetch_related_objects
     from django.template.loader import render_to_string
     from erp.roles import is_sales_rep
 
     # Both parts list the receipts and the summary names the carrier:
     # each is read once here, not once per part.
-    prefetch_related_objects([order], "cargo_receipts")
     carrier_label = order.get_carrier_display() if order.carrier else ""
     ctx = {"order": order, "is_sales_rep": is_sales_rep(request.user),
-           "carrier_label": carrier_label}
+           "carrier_label": carrier_label,
+           "cargo_receipts": order.shipment_receipts()}
     return JsonResponse({
         "ok": True,
         "message": message,
@@ -2544,20 +2583,12 @@ def order_create_barcode_resolve(request):
     title = (f"{base_title} — {label}" if (base_title and label)
              else (disp or base_title or sku))
 
-    price, is_cost = 0, False
-    sale = (cv.variant_price if cv else None) or (parent.price if parent else None)
-    if sale:
-        price = sale
-    else:
-        cost = (cv.variant_cost if cv else None) or (parent.cost if parent else None)
-        if cost:
-            # A sales rep is never handed the cost: they get the price
-            # derived from it, and it is a price, so no "Purchase cost" flag.
-            from erp.roles import is_sales_rep, sales_rep_price
-            if is_sales_rep(request.user):
-                price = sales_rep_price(cost)
-            else:
-                price, is_cost = cost, True
+    # The price is worked out from what the scanned stock's book paid for
+    # it, marked up (marketing/pricing.py) — a price, never a cost.
+    from marketing.pricing import book_costs, book_price
+    book_id = wp.warehouse.accounting_book_id if wp.warehouse_id else None
+    price = (book_price(cv, book_id, book_costs([cv.pk])) if cv else None) or 0
+    is_cost = False
 
     return JsonResponse({
         "ok": True,
@@ -3815,7 +3846,8 @@ class OrderCreate(View):
 
                 for order, book, _stayed in created:
                     self._finalise_order(request, order, book=book, member=member,
-                                         split_currency=split_currency)
+                                         split_currency=split_currency,
+                                         confirm_to_customer=order is created[-1][0])
 
                 if len(created) > 1:
                     messages.success(
@@ -3981,7 +4013,8 @@ class OrderCreate(View):
 
         return order, order_stayed_open
 
-    def _finalise_order(self, request, order, *, book, member, split_currency=None):
+    def _finalise_order(self, request, order, *, book, member, split_currency=None,
+                        confirm_to_customer=True):
         """Snapshot, current-account link and deposit for one saved order.
 
         Runs OUTSIDE the creating transaction, exactly as it always has:
@@ -4102,7 +4135,7 @@ class OrderCreate(View):
         try:
             # A split order is confirmed once, for every half (the mail
             # lists them all): the caller asks for it on the last one.
-            if order.notify_customer:
+            if order.notify_customer and confirm_to_customer:
                 from .order_notifications import send_order_event_email
                 send_order_event_email(order, "created", attach_pdf=True)
         except Exception as _e:
@@ -4721,6 +4754,13 @@ class OrderList(ListView):
                    key=lambda o: (_day(o), o.created_at))
             + [o for o in all_orders if o.list_group == "done"])
         context['orders'] = all_orders
+
+        # Every line's cost in one query: the gross profit column reads a
+        # variant's cost from the stock it has on hand, which is otherwise
+        # one query per line.
+        from marketing.models import attach_live_costs
+        attach_live_costs(item.product_variant for order in all_orders
+                          for item in order.items.all() if item.product_variant_id)
 
         # What the search box actually filters on. Attached per row rather
         # than built in the template so all four panes index the same
@@ -5585,6 +5625,15 @@ def product_autocomplete(request):
         .prefetch_related("variants__product_variant_attribute_values"
                           "__product_variant_attribute")[:12]
     )
+    # A row's price is worked out from its variant's cost (marketing/
+    # pricing.py): every row's cost in one query, not one each.
+    from marketing.models import attach_live_costs
+    from marketing.pricing import book_costs, book_price
+    attach_live_costs([wp.catalog_variant for wp in wh_rows]
+                      + [v for p in products for v in p.variants.all()])
+    # A stock row is priced from what the WORKING book's stock of it cost —
+    # an order is billed to one book and ships off its shelves.
+    costs_by_book = book_costs({wp.catalog_variant_id for wp in wh_rows})
 
     def js_str(s):
         """Escape string for safe use inside JS onclick single quotes"""
@@ -5616,12 +5665,11 @@ def product_autocomplete(request):
         return ", ".join(parts)
 
     def sale_price(product, variant=None):
-        """The SELLING price, or None. The variant's own if it has one,
-        else the parent's, which is where a fabric whose colours all sell
-        alike keeps the single number."""
+        """The SELLING price, or None: the variant's cost marked up
+        (marketing/pricing.py). A product has no price of its own."""
         if variant:
-            return variant.variant_price or product.price or None
-        return product.price or None
+            return variant.live_price or None
+        return None
 
     # The USD/TRY rate, fetched at most once for the whole search rather
     # than per row. unit_cost_usd() would look it up again for every
@@ -5634,7 +5682,7 @@ def product_autocomplete(request):
             _rate["v"] = WarehouseProduct._usd_try_rate()
         return _rate["v"]
 
-    from erp.roles import is_sales_rep, sales_rep_price
+    from erp.roles import is_sales_rep
     rep = is_sales_rep(request.user)
 
     def shelf_cost_usd(wp):
@@ -5827,24 +5875,12 @@ def product_autocomplete(request):
 
         sku = variant.variant_sku or ""
         allow_oversell = bool(getattr(parent, "selling_while_out_of_stock", False))
-        # Sale price if the catalog has one; otherwise what this stock
-        # actually cost on the shelf. The catalog's own `cost` column is
-        # deliberately not consulted: it is a number nobody maintains,
-        # while the shelf's is stamped when the goods are received.
-        sale = sale_price(parent, variant)
-        if sale:
-            price, is_cost = sale, False
-        else:
-            shelf = warehouse_cost(group)
-            if shelf is None:
-                price, is_cost = 0, False
-            elif rep:
-                # A sales rep is quoted the price derived from the cost,
-                # never the cost — and it is a price, so no Cost label and
-                # no per-shelf cost chips below.
-                price, is_cost = sales_rep_price(shelf), False
-            else:
-                price, is_cost = shelf, True
+        # The working book's stock cost, marked up (marketing/pricing.py);
+        # with no valued stock, the shelf's own figure marked up the same.
+        # Always a price — staff still see each shelf's cost on its chip.
+        sale = book_price(variant, working_book_id, costs_by_book,
+                          shelf_cost=warehouse_cost(group))
+        price, is_cost = (sale or 0), False
         total = sum((q or 0) for _wh, q, _wp in group["stocks"])
         title_js = js_str(f"{base_title} — {qualifier}" if qualifier else base_title)
         cat_js = js_str(parent.category.name if parent.category else "")
@@ -5858,7 +5894,7 @@ def product_autocomplete(request):
                    f"{'true' if wp.sold_by_count else 'false'}")
         return row(sku, base_title, qualifier, price, is_cost,
                    book_cell(group["books"])
-                   + warehouse_cells(group["stocks"], with_cost=is_cost),
+                   + warehouse_cells(group["stocks"], with_cost=not rep),
                    js_args)
 
     def note(text, cls):
@@ -7005,6 +7041,9 @@ def update_order_status(request, order_id):
             if code == "goods_not_received":
                 from .views_warehouse import GOODS_NOT_RECEIVED_MSG
                 return JsonResponse({'error': str(GOODS_NOT_RECEIVED_MSG)}, status=400)
+            if code == "needs_all_books":
+                from .views_warehouse import SPLIT_NEEDS_ALL_BOOKS_MSG
+                return JsonResponse({'error': str(SPLIT_NEEDS_ALL_BOOKS_MSG)}, status=403)
             return JsonResponse({'error': _gettext("Status update error"), 'details': (code or '').replace('error:', '')}, status=500)
 
         return JsonResponse({
@@ -7143,9 +7182,11 @@ class OrderAnalytics(LoginRequiredMixin, View):
         # ── Money — computed from OrderItem lines so it's correct for
         #    BOTH web orders (carry original_price) and manual/B2B orders
         #    (which don't). unit_cost mirrors OrderItem.unit_cost():
-        #    variant_cost preferred, else product.cost, else 0. ──
+        #    the variant's live cost (its stock's average, else its
+        #    stored cost), else 0. ──
+        from marketing.models import live_cost_expr
         unit_cost_expr = Coalesce(
-            F("product_variant__variant_cost"), F("product__cost"),
+            live_cost_expr("product_variant__"),
             Value(Decimal("0")), output_field=DEC,
         )
         #    Each line is rounded to cents BEFORE it is summed, exactly as
@@ -7424,6 +7465,9 @@ class WebOrderStatusEdit(View):
             elif code == "goods_not_received":
                 from .views_warehouse import GOODS_NOT_RECEIVED_MSG
                 messages.error(request, GOODS_NOT_RECEIVED_MSG)
+            elif code == "needs_all_books":
+                from .views_warehouse import SPLIT_NEEDS_ALL_BOOKS_MSG
+                messages.error(request, SPLIT_NEEDS_ALL_BOOKS_MSG)
             else:
                 messages.error(request, _gettext("The order could not be updated: %(error)s") % {"error": (code or '').replace('error:', '')})
             next_url = request.POST.get('next') or request.GET.get('next')

@@ -229,6 +229,7 @@ def send_order_shipped_whatsapp(order):
         if not (cfg["enabled"] and cfg["ready"]):
             return False
 
+        from .order_notifications import order_ref
         phone = _resolve_customer_phone(order, cfg["default_country_code"])
         if not phone:
             print(f"[order_whatsapp] order #{order.pk}: no usable customer phone — skipped")
@@ -236,7 +237,7 @@ def send_order_shipped_whatsapp(order):
 
         ok, reason = _send_shipped_template(cfg, phone, [
             _resolve_customer_name(order),
-            order.order_number or f"#{order.pk}",
+            order_ref(order),
             order.get_carrier_display() if order.carrier else "",
             order.tracking_number,
         ])

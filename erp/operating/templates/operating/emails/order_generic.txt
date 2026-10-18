@@ -1,5 +1,5 @@
 {% load i18n %}{% autoescape off %}{{ BRAND_NAME|default:"Nejum" }}
-{% if order.order_number %}{% trans "Order" %} {{ order.order_number }}{% else %}{% trans "Order" %} #{{ order.pk }}{% endif %} — {{ event_label }}
+{% trans "Order" %} {{ order_ref|safe }} — {{ event_label }}
 {% if customer_name %}
 {% blocktrans %}Hi {{ customer_name }},{% endblocktrans %}{% endif %}
 {% if event == 'created' %}

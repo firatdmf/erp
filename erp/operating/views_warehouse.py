@@ -1316,6 +1316,14 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
     return survivor, merged
 
 
+def _can_transfer_out(request, warehouse):
+    """Whether to offer "transfer to another book" on this warehouse's page."""
+    from .views_transfer import _may_transfer, _targets
+    if warehouse.is_combined or not _may_transfer(request, warehouse.accounting_book):
+        return False
+    return bool(_targets(request, warehouse))
+
+
 def warehouse_guarded(view):
     """404 a warehouse route for a member who may not read its shelves.
 
@@ -2087,6 +2095,7 @@ class WarehouseDetail(View):
             'total_unit_short': _warehouse_unit_short(scope_ids),
             **_warehouse_item_words(scope_ids),
             'owning_book': warehouse.owning_book,
+            'can_transfer_out': _can_transfer_out(request, warehouse),
             'combined_members': (list(warehouse.combined_sources.order_by('name'))
                                  if warehouse.is_combined else []),
         })
@@ -2610,18 +2619,18 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     # Between depots of the SAME book it is what it looks like: goods
     # changing shelves, no change of owner, and it stays allowed.
     #
-    # Selling between the two businesses is a real transaction and belongs in
-    # a purchase invoice, where it gets a price, a currency, a counterparty
-    # and an entry on both sides.
+    # Handing goods between the two businesses is a real transaction and
+    # belongs in a stock transfer (accounting.services_stock_transfer),
+    # where it gets a price, a counterparty and an entry on both sides.
     source_book_id = source_wp.warehouse.accounting_book_id
     if source_book_id != target_warehouse.accounting_book_id:
         return JsonResponse({
             "success": False,
             "error": (
                 _gettext("This stock item is in another book's warehouse (%(source)s → "
-                         "%(target)s). Goods pass between books through a purchase "
-                         "invoice — a move only works between warehouses of the "
-                         "same book.")
+                         "%(target)s). Goods pass between books through a stock "
+                         "transfer, made from the warehouse they are in — a move only "
+                         "works between warehouses of the same book.")
                 % {"source": source_wp.warehouse.name, "target": target_warehouse.name}
             ),
             "cross_book": True,
@@ -3737,6 +3746,9 @@ def _intake_catalog_link(wp, target, main_product, base_name, first_barcode, war
         return None
     wp.catalog_variant = cat_variant
     wp.save(update_fields=["catalog_variant"])
+    # Linked now, so the rolls just received count towards its cost.
+    from .catalog_sync import remember_stock_cost
+    remember_stock_cost(cat_variant)
     return cat_variant
 
 
@@ -4203,6 +4215,18 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             raise IntakeError(
                 {"success": False,
                  "error": str(_lz("This purchase is still an order — save it as an order instead."))},
+                status=400)
+        # Its lines are what another book gave up, at that book's cost; a
+        # new price or a removed roll here would leave the two books
+        # disagreeing about one event.
+        from accounting.services_stock_transfer import live_transfer_of
+        transfer = live_transfer_of(invoice)
+        if transfer is not None:
+            raise IntakeError(
+                {"success": False,
+                 "error": _gettext("This purchase is stock transfer %(number)s from %(book)s — "
+                                   "undo the transfer instead of editing it.")
+                 % {"number": transfer.number, "book": transfer.from_book.name}},
                 status=400)
 
         old_account = invoice.current_account
@@ -6300,6 +6324,12 @@ GOODS_NOT_RECEIVED_MSG = gettext_lazy(
     "This order can't be completed yet — goods bought for it from a supplier "
     "haven't been received. Receive the purchase first, or cancel it.")
 
+# Shown by every caller of apply_order_status_change that gets
+# 'needs_all_books' back, and on the order page before anyone tries.
+SPLIT_NEEDS_ALL_BOOKS_MSG = gettext_lazy(
+    "This order is split across books. Only someone with access to every "
+    "book it is in can complete, re-open or cancel it.")
+
 
 def order_reservation_shortfalls(order):
     """Items whose ACTIVE (unconsumed) roll reservations do NOT cover
@@ -6456,9 +6486,119 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         transaction, so a roll-cut failure rolls the whole thing back
         (no half-shipped, catalog-cut-but-warehouse-not state).
 
+      * an order split across books is one order with one status: its
+        halves move together, in one transaction, and take the same cargo
+        info — whichever half the change was asked on, and the customer
+        is told once, for the whole order. Completing,
+        re-opening or cancelling posts to every half's book, so it takes
+        someone who holds all of them ('needs_all_books'); a half already
+        cancelled stays where it is. Every half is checked before any is
+        touched, so a refusal leaves them all as they were.
+
     Returns (ok: bool, code: str|None). code is a machine-readable
     reason on failure: 'forbidden_sales_rep' | 'order_cancelled_terminal' |
-    'cancel_requires_reopen' | 'goods_not_received' | 'error:<detail>'."""
+    'cancel_requires_reopen' | 'goods_not_received' | 'needs_all_books' |
+    'error:<detail>'."""
+    from erp.roles import is_sales_rep, _member_and_user
+
+    if is_sales_rep(user):
+        return False, "forbidden_sales_rep"
+    if not order.split_group:
+        return _apply_status_to_one(order, new_status, carrier=carrier, tracking=tracking,
+                                    user=user, require_cargo_for_ship=require_cargo_for_ship)
+
+    from django.db import transaction as _tx
+    from accounting.services_accounts import member_can_use_book
+    from .models import Order
+    from .split_orders import order_book
+
+    halves = [order] + list(
+        Order.objects.filter(split_group=order.split_group)
+        .exclude(pk=order.pk).exclude(order_status="cancelled")
+        .select_related("current_account__book").order_by("pk"))
+    # One status for the whole order: every half is brought to where this
+    # one stands once the change is made — so even a save that leaves this
+    # half's status alone (cargo info only) pulls along a half that stands
+    # elsewhere. Not from a cancelled half, though: it is the one left
+    # behind, and saving on it must not cancel the rest.
+    moving = _is_status_change(order, new_status)
+    was = order.order_status
+    target = new_status if moving else (None if was == "cancelled" else was)
+
+    def touches_the_books(half):
+        if not _is_status_change(half, target):
+            return False
+        return (target == "cancelled"
+                or (target in SHIPPED_CLASS) != (half.order_status in SHIPPED_CLASS))
+
+    # `user` is None for the system's own changes, which answer to no book.
+    if user is not None and any(touches_the_books(h) for h in halves):
+        member, _user = _member_and_user(user)
+        for half in halves:
+            book = order_book(half)
+            if book is not None and not member_can_use_book(member, book):
+                return False, "needs_all_books"
+    for half in halves:
+        code = _status_change_refusal(half, new_status if half is order else target)
+        if code:
+            return False, code
+
+    class _HalfRefused(Exception):
+        pass
+
+    try:
+        with _tx.atomic():
+            for half in halves:
+                # The customer hears once, below — not as each half is saved.
+                half._one_notice_for_split = True
+                ok, code = _apply_status_to_one(
+                    half, new_status if half is order else target,
+                    carrier=carrier, tracking=tracking, user=user,
+                    require_cargo_for_ship=require_cargo_for_ship)
+                if not ok:
+                    raise _HalfRefused(code)
+    except _HalfRefused as refused:
+        # The halves saved before this one went back with it; so does
+        # what the caller still holds in memory.
+        order.refresh_from_db()
+        return False, refused.args[0]
+    if moving:
+        # One notice for the whole order, from a half that asks for one,
+        # and only once the change is really in the database.
+        teller = next((h for h in halves if h.notify_customer), None)
+        if teller is not None:
+            from .signals import notify_customer_of_status
+            _tx.on_commit(lambda: notify_customer_of_status(teller, new_status))
+    return True, None
+
+
+def _is_status_change(order, new_status):
+    from .models import ORDER_STATUS_CHOICES
+    return (bool(new_status) and new_status in {k for k, _ in ORDER_STATUS_CHOICES}
+            and new_status != order.order_status)
+
+
+def _status_change_refusal(order, new_status):
+    """Why this order may not take `new_status`, as apply_order_status_change's
+    code — or None. Reads only: asked of every half of a split order
+    before any of them is written."""
+    if not _is_status_change(order, new_status):
+        return None
+    old_status = order.order_status
+    if old_status == "cancelled":
+        return "order_cancelled_terminal"
+    if new_status == "cancelled" and old_status in SHIPPED_CLASS:
+        return "cancel_requires_reopen"
+    if (new_status in SHIPPED_CLASS and old_status not in SHIPPED_CLASS
+            and order.unreceived_purchases().exists()):
+        return "goods_not_received"
+    return None
+
+
+def _apply_status_to_one(order, new_status, carrier=None, tracking=None,
+                         user=None, require_cargo_for_ship=True):
+    """One order through apply_order_status_change's rules — the whole of
+    it for an ordinary order, each half in turn for a split one."""
     from erp.roles import is_sales_rep
 
     # Read the role before anything else: a refusal must leave the order
@@ -6474,10 +6614,9 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     old_status = order.order_status
 
     changing = bool(new_status) and new_status in valid_statuses and new_status != old_status
-    if changing and old_status == "cancelled":
-        return False, "order_cancelled_terminal"
-    if changing and new_status == "cancelled" and old_status in SHIPPED_CLASS:
-        return False, "cancel_requires_reopen"
+    refusal = _status_change_refusal(order, new_status)
+    if refusal:
+        return False, refusal
 
     # Stash any cargo info the caller carried.
     if carrier is not None:
@@ -6496,9 +6635,6 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     leaving_ship = (old_status in SHIPPED_CLASS and new_status in valid_statuses
                     and new_status not in SHIPPED_CLASS and new_status != old_status)
     entering_cancelled = changing and new_status == "cancelled" and old_status != "cancelled"
-
-    if entering_ship and order.unreceived_purchases().exists():
-        return False, "goods_not_received"
 
     # NOTE: the "shipping needs cargo info" gate used to live here —
     # deliberately removed. Cargo is optional for every order; whatever

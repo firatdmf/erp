@@ -70,10 +70,10 @@
                   </td>
                   <td class="num">{{ r.variant_count }}</td>
                   <td class="num">{{ r.stock|floatformat:"-2g" }}</td>
-                  <td class="num">{% if r.product.price %}${{ r.product.price|floatformat:"2g" }}{% else %}—{% endif %}</td>
+                  <td class="num">{% if r.product.from_price is not None %}${{ r.product.from_price|floatformat:"2g" }}{% else %}—{% endif %}</td>
                   <td>
-                    {% if r.margin_override is not None %}
-                      <span class="pgd-mini-chip teal">%{{ r.margin_override|floatformat:"-2g" }} {% trans "own" %}</span>
+                    {% if r.multiplier_override %}
+                      <span class="pgd-mini-chip teal">× {{ r.multiplier_override }} {% trans "own" %}</span>
                     {% elif not r.has_cost %}
                       <span class="pgd-mini-chip warn">{% trans "no cost" %}</span>
                     {% else %}
@@ -113,16 +113,6 @@ function pgdFlash(ok, msg) {
   f._t = setTimeout(function () { f.className = 'pgd-flash'; }, 6000);
 }
 
-function pgdMarginExample() {
-  const box = document.getElementById('pgdMarginExample');
-  const m = parseFloat((document.getElementById('pgdMargin').value || '').replace(',', '.'));
-  if (isNaN(m)) { box.style.display = 'none'; return; }
-  const price = fmtNum(100 * (1 + m / 100));
-  box.style.display = '';
-  box.textContent = '{% trans "Example" %}: {% trans "cost" %} $100 → {% trans "price" %} $' + price;
-}
-pgdMarginExample();
-
 function pgdSave() {
   const btn = document.getElementById('pgdSaveBtn');
   btn.disabled = true;
@@ -138,32 +128,6 @@ function pgdSave() {
       if (d && d.success) {
         pgdFlash(true, '{% trans "Settings saved." %}');
         setTimeout(function () { window.location.reload(); }, 700);
-      } else {
-        pgdFlash(false, (d && d.error) || '{% trans "Could not save." %}');
-      }
-    }).catch(function () { btn.disabled = false; pgdFlash(false, '{% trans "Network error." %}'); });
-}
-
-function pgdApplyMargin() {
-  const m = (document.getElementById('pgdMargin').value || '').trim();
-  if (!m) { pgdFlash(false, '{% trans "Enter and save a margin first." %}'); return; }
-  if (!confirm('{% trans "Recalculate ALL prices in this group from cost using the saved margin? This overwrites current prices." %}')) return;
-  const btn = document.getElementById('pgdApplyBtn');
-  btn.disabled = true;
-  const fd = new FormData();
-  fd.append('action', 'apply_margin');
-  fetch(PGD_URL, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': PGD_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
-    body: fd
-  }).then(function (r) { return r.json(); })
-    .then(function (d) {
-      btn.disabled = false;
-      if (d && d.success) {
-        pgdFlash(true, '{% trans "Prices updated" %} — ' + d.products_updated + ' {% trans "products" %}, ' +
-          d.variants_updated + ' {% trans "variants" %}' +
-          (d.skipped_no_cost ? ' · ' + d.skipped_no_cost + ' {% trans "skipped (no cost)" %}' : ''));
-        setTimeout(function () { window.location.reload(); }, 1200);
       } else {
         pgdFlash(false, (d && d.error) || '{% trans "Could not save." %}');
       }

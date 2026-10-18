@@ -2,10 +2,11 @@
 {% comment %}
 The product-group settings cards, shared by the create page (group = None →
 blank fields, visibility defaults on) and the detail/settings page (group
-set → current values, plus the bulk apply-margin box).
+set → current values).
 Expects: group (ProductCategory or None), variant_attribute_names (every
 attribute a preset can pick from).
 {% endcomment %}
+{% include "marketing/partials/_price_multiplier_assets.html" %}
 
 <div class="pgd-card">
   <div class="pgd-card-title"><i data-lucide="settings-2"></i>{% trans "General" %}</div>
@@ -38,23 +39,14 @@ attribute a preset can pick from).
 <div class="pgd-card">
   <div class="pgd-card-title"><i data-lucide="percent"></i>{% trans "Pricing" %}</div>
   <div class="pgd-field">
-    <label>{% trans "Profit margin" %} (%)</label>
-    <input class="pgd-input" name="profit_margin" id="pgdMargin" type="number" step="0.01" min="0"
-           value="{{ group.profit_margin|default_if_none:''|stringformat:'s' }}" placeholder="{% trans 'e.g. 40' %}"
-           oninput="pgdMarginExample()">
-    <div class="pgd-hint">{% trans "Selling price = cost × (1 + margin/100). A product can override this with its own margin on the product edit page." %}</div>
-    <div class="pgd-margin-example" id="pgdMarginExample" style="display:none;"></div>
+    <label for="pgdMultiplier">{% trans "Price = cost ×" %}</label>
+    {# Required: the group's multiplier is where every price in it comes from. #}
+    <input class="pgd-input" name="price_multiplier" id="pgdMultiplier" type="text" maxlength="40"
+           value="{{ group.price_multiplier|default:'' }}" placeholder="4/3" autocomplete="off" required
+           data-multiplier-preview="pgdMultiplierPreview">
+    <p class="pm-preview" id="pgdMultiplierPreview"></p>
+    <div class="pgd-hint">{% trans "Every price in the group is its cost times this, rounded up to 0.05 — worked out from the stock's cost whenever it is shown, so it follows the cost. A formula is fine: 4/3 is a third on top, 3 is three times cost. A product can set its own on its edit page." %}</div>
   </div>
-  {% if group %}
-    <div class="pgd-apply-box">
-      <div class="pgd-apply-note">
-        {% trans "Recalculates the price of every costed product and variant in this group from its cost. Products without a cost are skipped." %}
-      </div>
-      <button type="button" class="pgd-btn ghost" id="pgdApplyBtn" onclick="pgdApplyMargin()">
-        <i data-lucide="calculator"></i>{% trans "Apply margin to all prices" %}
-      </button>
-    </div>
-  {% endif %}
 </div>
 
 <div class="pgd-card">

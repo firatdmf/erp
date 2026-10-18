@@ -38,9 +38,11 @@ def _D(val, default="0"):
 
 
 def _filter_checks(request):
+    # One book's checks, as with payments: the route names the book and
+    # book_scoped has put it on request.book.
     qs = (CheckOrPromissoryNote.objects
           .select_related("current_account", "book", "currency", "endorsed_to")
-          .all())
+          .filter(book=request.book))
 
     q = (request.GET.get("q") or "").strip()
     if q:
@@ -113,10 +115,12 @@ class CheckCreate(View):
         prefilled_current_account = None
         current_account_id = request.GET.get("account")
         if current_account_id and current_account_id.isdigit():
-            prefilled_current_account = CurrentAccount.objects.filter(pk=int(current_account_id)).first()
+            prefilled_current_account = CurrentAccount.objects.filter(
+                pk=int(current_account_id), book=request.book).first()
 
+        # This book's accounts only, as on the payment form.
         current_account_options = (
-            CurrentAccount.objects.filter(is_active=True).order_by("name")
+            CurrentAccount.objects.filter(book=request.book, is_active=True).order_by("name")
             if not prefilled_current_account else CurrentAccount.objects.none()
         )
 
@@ -134,7 +138,8 @@ class CheckCreate(View):
         if not current_account_id:
             messages.error(request, _g("An account must be selected."))
             return redirect("accounts:check_create", book_id=request.book.pk)
-        current_account = get_object_or_404(CurrentAccount, pk=int(current_account_id))
+        current_account = get_object_or_404(
+            CurrentAccount, pk=int(current_account_id), book=request.book)
 
         amount = _D(request.POST.get("amount"))
         if amount <= 0:

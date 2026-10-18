@@ -1306,3 +1306,7 @@ from .models_accounts import *  # noqa: E402,F401,F403
 # The general ledger, same arrangement and for the same reason. It sits
 # after models_accounts because a JournalLine points at a CurrentAccount.
 from .models_ledger import *  # noqa: E402,F401,F403
+
+# Goods handed between two books. After both: it points at an Invoice and
+# is the source of a JournalEntry.
+from .models_transfer import *  # noqa: E402,F401,F403

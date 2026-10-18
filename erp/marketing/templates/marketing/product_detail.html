@@ -115,11 +115,14 @@
             <span class="value">{{ product.barcode }}</span>
           </div>
           {% endif %}
-          {% if not product.variants.all %}
+          {% if product.variants.all|length == 1 %}
+          {# A single item: its one variant's price. Several are listed below. #}
           <div class="info-item">
             <span class="label">{% trans "Price" %}</span>
-            <span class="value price">${{ product.price|default:"0.00" }}</span>
+            <span class="value price">${{ product.from_price|default:"0.00" }}</span>
           </div>
+          {% endif %}
+          {% if not product.variants.all %}
           {# B2B stock display: hide exact qty. Below 50 = hidden entirely, 50+ shown as "50+". #}
           {% if product.live_quantity and product.live_quantity >= 50 %}
           <div class="info-item">
@@ -158,7 +161,7 @@
       parseFloat stops at the comma and quietly quotes 13. What the
       shopper READS is localized as usual, further down.{% endcomment %}
       <div class="b2b-quote" id="b2bQuote"
-           data-base-price="{{ product.price|default:0|unlocalize }}"
+           data-base-price="{{ product.from_price|default:0|unlocalize }}"
            data-campaign-type="{{ camp.campaign_type|default:'' }}"
            data-campaign-percent="{{ camp.discount_percent|default:0|unlocalize }}"
            data-campaign-end="{{ camp.end_date|date:'Y-m-d'|default:'' }}">
@@ -211,12 +214,12 @@
           <div class="b2b-prices">
             <div class="b2b-unit">
               <span class="b2b-unit-l">{% trans "Unit price" %}</span>
-              <span class="b2b-unit-v" id="b2bUnit">${{ product.price|default:"0.00" }}</span>
-              <span class="b2b-unit-orig" id="b2bUnitOrig" hidden>${{ product.price|default:"0.00" }}</span>
+              <span class="b2b-unit-v" id="b2bUnit">${{ product.from_price|default:"0.00" }}</span>
+              <span class="b2b-unit-orig" id="b2bUnitOrig" hidden>${{ product.from_price|default:"0.00" }}</span>
             </div>
             <div class="b2b-total">
               <span class="b2b-total-l">{% trans "Total" %}</span>
-              <span class="b2b-total-v" id="b2bTotal">${{ product.price|default:"0.00" }}</span>
+              <span class="b2b-total-v" id="b2bTotal">${{ product.from_price|default:"0.00" }}</span>
             </div>
           </div>
         </div>
@@ -312,7 +315,7 @@
                 {% endfor %}
               </div>
             </td>
-            <td><span class="variant-price">${{ variant.variant_price|default:"0.00" }}</span></td>
+            <td><span class="variant-price">{% if variant.live_price is not None %}${{ variant.live_price }}{% else %}—{% endif %}</span></td>
             <td>
               {% if not variant.stock_tracked %}
                 {# No warehouse carries it: made to order, NOT out of stock. #}

@@ -49,7 +49,7 @@
             </td>
             <td style="text-align: right;">
                 <span
-                    style="font-weight: 600; color: #0f172a;">${{variant.variant_price|default:product.price|default:"0.00"}}</span>
+                    style="font-weight: 600; color: #0f172a;">{% if variant.live_price is not None %}${{ variant.live_price }}{% else %}<span style="color:#94A3B8;font-weight:400;">—</span>{% endif %}</span>
             </td>
         </tr>
         {% endfor %}

@@ -30,6 +30,7 @@ from .models import (
     ProductCategory,
     with_live_quantity,
     with_product_live_quantity,
+    attach_live_costs,
 )
 from .forms import ProductForm, ProductFileFormSet
 from .attributes import normalize_attribute_name, normalize_attribute_value
@@ -166,7 +167,13 @@ class ProductList(generic.ListView):
     def get_context_data(self, **kwargs):
         from django.db.models import Count, Sum, F, DecimalField, Value
         from django.db.models.functions import Coalesce
+        from .pricing import attach_live_prices
         ctx = super().get_context_data(**kwargs)
+        # Each row's price is worked out from its variants' cost: the page's
+        # rows only, in a fixed number of queries.
+        ctx['products'] = ctx['object_list'] = attach_live_prices(ctx['object_list'])
+        if ctx.get('page_obj') is not None:
+            ctx['page_obj'].object_list = ctx['products']
 
         category_counts = (
             Product.objects.values('category_id', 'category__name')
@@ -224,6 +231,8 @@ def product_variants(request, pk):
         Prefetch('files', queryset=ProductFile.objects.order_by('-is_primary', 'sequence')),
         'product_variant_attribute_values__product_variant_attribute'
     ).all()
+    # Prices are worked out from cost: every variant's in one query.
+    variants = attach_live_costs(variants)
     
     return render(request, 'marketing/partials/product_variants.html', {
         'product': product,
@@ -373,6 +382,9 @@ class ProductDetail(generic.DetailView):
             # never read as one pile of 622.60 to cut from.
             held = [row for row in variant.warehouse_products.all() if row.quantity]
             variant.stock_locations = held if len(held) > 1 else []
+            variant.product = self.object   # its markup, without a query each
+        # Prices are worked out from cost: every variant's in one query.
+        attach_live_costs(variants)
         context['product_variants'] = variants  # Cache variants
         # Who sells each variant, and what they call it.
         from .views_suppliers import supplier_rows
@@ -642,7 +654,10 @@ class BaseProductView(ModelFormMixin):
         # ---------------------------- this runs when we have no variants. --------------------------------------------
         delete_all_variants = variants_json.get("delete_all_variants", False)
         if delete_all_variants:
-            product.variants.all().delete()
+            # A single item's one variant is kept: the page has no table
+            # for it, and save_single_item writes it after this.
+            if self.request.POST.get("single_item") != "1":
+                product.variants.all().delete()
             # delete the files that marked as deleted by user and were not linked to any variant
             deleted_files_pks = variants_json.get("deleted_files", [])
             if len(deleted_files_pks) > 0:
@@ -931,6 +946,8 @@ class BaseProductView(ModelFormMixin):
         # browser tab running old JS can still POST removed keys (e.g. the
         # dropped variant_b2b_price) and would otherwise crash bulk_update.
         valid_model_fields = {f.name for f in ProductVariant._meta.concrete_fields}
+        from .models import stock_costs
+        computed_cost_ids = set(stock_costs(v.pk for v in existing_variants_dict.values()))
 
         for variant_data in variants_data:
             variant_sku = variant_data.get("variant_sku")
@@ -944,6 +961,10 @@ class BaseProductView(ModelFormMixin):
             has_changes = False
             # Update variant fields and track changes
             for key, value in variant_data.items():
+                # Read off its stock, shown locked on the form — whatever a
+                # stale page posts for it is not a cost anyone typed.
+                if key == "variant_cost" and variant.pk in computed_cost_ids:
+                    continue
                 if key not in non_model_fields and key in valid_model_fields:
                     old_value = getattr(variant, key, None)
                     # Boolean fields: never let a missing/None value
@@ -1507,6 +1528,7 @@ class ProductCreate(BaseProductView, generic.CreateView):
                 variants_json = self.request.POST.get("variants_json", "[]")
                 if variants_json and variants_json != "[]":
                     self.handle_variants(self.object, variants_json)
+                form.save_single_item(self.object)
                 
                 return JsonResponse({
                     'success': True,
@@ -1524,6 +1546,8 @@ class ProductCreate(BaseProductView, generic.CreateView):
             if not variants_json_str:
                 variants_json_str = self.request.POST.get("variants_json", "[]")
             self.handle_variants(self.object, variants_json_str)
+            # A single item's one variant, from its boxes on the Pricing card.
+            form.save_single_item(self.object)
 
             # Save color/attribute swatch images per attribute value
             self.handle_attribute_value_images(self.object)
@@ -1707,6 +1731,8 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             # Always process variants (needed for image changes)
             if has_variants:
                 self.handle_variants(self.object, variants_json)
+            # A single item's one variant, from its boxes on the Pricing card.
+            form.save_single_item(self.object)
 
             # Save color/attribute swatch images per attribute value
             self.handle_attribute_value_images(self.object)
@@ -2889,6 +2915,17 @@ def get_products(request):
             "alt_text": f.get("alt_text", ""),
         })
 
+    # Prices are worked out from cost (marketing/pricing.py), not stored. A
+    # product's is its variants' lowest — the "from" price.
+    from .pricing import live_prices
+    variant_prices = live_prices(
+        ProductVariant.objects.filter(product_id__in=product_ids).values_list("pk", flat=True))
+    from_prices = {}
+    for vid, pid in ProductVariant.objects.filter(product_id__in=product_ids).values_list("pk", "product_id"):
+        price = variant_prices.get(vid)
+        if price is not None and (from_prices.get(pid) is None or price < from_prices[pid]):
+            from_prices[pid] = price
+
     # Build products data
     products_data = [
         {
@@ -2896,8 +2933,8 @@ def get_products(request):
             "title": p.title,
             "sku": p.sku,
             "description": p.description,
-            "price": p.price,
-            "prices": _convert_price(p.price, rates),
+            "price": from_prices.get(p.id),
+            "prices": _convert_price(from_prices.get(p.id), rates),
             "minimum_order_quantity": float(p.effective_minimum_order_quantity) if p.effective_minimum_order_quantity is not None else None,
             "care_instructions": {"en": p.get_care_instructions("en"), "tr": p.get_care_instructions("tr")},
             "primary_image": p.primary_image.file_url if p.primary_image else None,
@@ -2932,8 +2969,8 @@ def get_products(request):
             "id": v["id"],
             "product_id": v["product_id"],
             "variant_sku": v["variant_sku"],
-            "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
-            "variant_prices": _convert_price(v["variant_price"], rates),
+            "variant_price": float(variant_prices[v["id"]]) if variant_prices.get(v["id"]) is not None else None,
+            "variant_prices": _convert_price(variant_prices.get(v["id"]), rates),
             "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
             "variant_featured": v.get("variant_featured", True),
             "stock_tracked": bool(v.get("stock_tracked")),
@@ -3027,7 +3064,8 @@ def get_product(request):
                    FROM operating_warehouseproduct wp
                    JOIN marketing_productvariant pv ON pv.id = wp.catalog_variant_id
                   WHERE pv.product_id = p.id) AS quantity,
-                p.price,
+                -- Worked out from cost below (marketing/pricing.py).
+                NULL AS price,
                 p.featured, p.selling_while_out_of_stock, p.weight, p.unit_of_weight,
                 p.category_id, p.supplier_account_id, p.datasheet_url, p.minimum_inventory_level,
                 pi.file_url as primary_image_url,
@@ -3052,6 +3090,13 @@ def get_product(request):
      p_category_id, p_supplier_account_id, p_datasheet_url, p_min_inv,
      p_primary_image_url, p_category_name,
      p_min_order_qty, p_group_care_en, p_group_care_tr) = row
+
+    # Prices are worked out from cost (marketing/pricing.py), not stored;
+    # the product's is its variants' lowest.
+    from .pricing import live_prices
+    variant_prices = live_prices(
+        ProductVariant.objects.filter(product_id=p_id).values_list("pk", flat=True))
+    p_price = min((v for v in variant_prices.values() if v is not None), default=None)
 
     # Care texts per language: the product's OWN text (from its description
     # translations JSON) wins; otherwise the product group's default.
@@ -3246,8 +3291,8 @@ def get_product(request):
             "variant_sku": v["variant_sku"],
             "variant_barcode": v["variant_barcode"],
             "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
-            "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
-            "variant_prices": _convert_price(v["variant_price"], rates),
+            "variant_price": float(variant_prices[v["id"]]) if variant_prices.get(v["id"]) is not None else None,
+            "variant_prices": _convert_price(variant_prices.get(v["id"]), rates),
             "variant_featured": v["variant_featured"],
             "stock_tracked": bool(v.get("stock_tracked")),
             "product_id": v["product_id"],

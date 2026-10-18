@@ -44,7 +44,8 @@ class ProductAdminForm(forms.ModelForm):
 
     class Meta:
         model = Product
-        fields = "__all__"
+        # Price and cost live on the variants (the inline below).
+        exclude = ["price", "cost"]
 
     # def clean(self):
     #     cleaned_data = super().clean()
@@ -69,7 +70,7 @@ class ProductVariantInLine(admin.TabularInline):
 
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductFileInline, ProductVariantInLine]
-    list_display = ("title", "sku", "price", "featured", "selling_while_out_of_stock")
+    list_display = ("title", "sku", "featured", "selling_while_out_of_stock")
     search_fields = ("title", "sku", "barcode")
     list_filter = ("featured", "selling_while_out_of_stock", "collections")
     # I added below to show the primary image in the admin interface.

@@ -874,6 +874,15 @@ def cancel_purchase_invoice(invoice_pk, user, *, origin="purchase", mirror_order
                    .select_related("current_account").get(pk=invoice_pk, type="purchase"))
         if invoice.status == "cancelled":
             raise ValueError(_gettext("This purchase is already cancelled."))
+        # Cancelling deletes the rolls, and these are another book's goods:
+        # they go back to its shelves, not out of existence.
+        from .services_stock_transfer import live_transfer_of
+        transfer = live_transfer_of(invoice)
+        if transfer is not None:
+            raise ValueError(
+                _gettext("This purchase is stock transfer %(number)s from %(book)s — undo the "
+                         "transfer instead.")
+                % {"number": transfer.number, "book": transfer.from_book.name})
 
         rolls = list(
             WarehouseProductItem.objects

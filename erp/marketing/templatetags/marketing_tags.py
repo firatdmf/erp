@@ -67,6 +67,8 @@ def variant_form(variants, product, current_url):
             pass
 
     if variants:
+        from marketing.models import attach_live_costs
+        variants = attach_live_costs(variants)
         for variant in variants:
             # Use prefetched data - files are already ordered in prefetch
             files = variant.files.all()
@@ -98,8 +100,14 @@ def variant_form(variants, product, current_url):
                     "variant_id": variant.id,
                     "variant_sku": variant.variant_sku,
                     "variant_attribute_values": variant_attribute_values,
-                    "variant_price": variant.variant_price,
+                    # Worked out from cost (marketing/pricing.py); shown, not typed.
+                    "variant_price": (float(variant.live_price)
+                                      if variant.live_price is not None else None),
                     "variant_cost": variant.variant_cost,
+                    # Set while the cost is read off the stock on hand: the
+                    # form shows this figure and does not let it be typed.
+                    "stock_cost": (float(variant.stock_cost)
+                                   if variant.stock_cost is not None else None),
                     "variant_quantity": variant.live_quantity,
                     "stock_tracked": variant.stock_tracked,
                     "variant_barcode": variant.variant_barcode,

@@ -41,6 +41,8 @@ sheet, the chart of accounts and the book page's equation card.
   .la-text { max-width:44ch; }
   .la-against, .la-party { display:block; margin-top:2px; font:500 11.5px var(--sans); color:var(--g500); }
   .la-party a { color:var(--teal-700); text-decoration:none; }
+  .la-open { color:inherit; text-decoration:none; }
+  .la-open:hover { color:var(--teal-700); text-decoration:underline; }
   .la-tbl tr.carry td { background:#FAFBFD; font-style:italic; color:var(--g600); }
   .la-tbl tfoot td { background:#FAFBFD; border-top:1px solid #E2E8EE; font-weight:700; }
   .la-muted { color:var(--g400); }
@@ -99,7 +101,7 @@ sheet, the chart of accounts and the book page's equation card.
           <td class="la-date">{{ r.entry.date|date:"d.m.Y" }}</td>
           <td><span class="la-ref">{{ r.entry.reference|default:"—" }}</span></td>
           <td class="la-text">
-            {{ r.text|default:"—" }}
+            {% if r.url %}<a class="la-open" href="{{ r.url }}">{{ r.text|default:"—" }}</a>{% else %}{{ r.text|default:"—" }}{% endif %}
             {% if r.against %}<span class="la-against">{% trans "against" %} {{ r.against|join:", " }}</span>{% endif %}
             {% if r.party %}<span class="la-party"><a href="{{ r.party_url }}">{{ r.party.code }} · {{ r.party.name }}</a></span>{% endif %}
           </td>

@@ -98,8 +98,8 @@
           <div class="pg-card-desc">{{ g.description|default:""|truncatechars:90 }}</div>
           <div class="pg-chips">
             <span class="pg-chip teal"><i data-lucide="package"></i>{{ g.product_count }} {% trans "products" %}</span>
-            {% if g.profit_margin is not None %}
-              <span class="pg-chip"><i data-lucide="percent"></i>{% trans "margin" %} %{{ g.profit_margin|floatformat:"-2g" }}</span>
+            {% if g.price_multiplier %}
+              <span class="pg-chip"><i data-lucide="percent"></i>{% trans "price" %} = {% trans "cost" %} × {{ g.price_multiplier }}</span>
             {% endif %}
             {% if g.minimum_order_quantity is not None %}
               <span class="pg-chip"><i data-lucide="scale"></i>{% trans "min" %} {{ g.minimum_order_quantity|floatformat:"-2g" }}</span>

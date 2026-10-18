@@ -14300,14 +14300,9 @@ msgstr "Şunun değerleri"
 msgid "Used by"
 msgstr "Kullanan"
 
-msgid "Separate tags with a comma."
-msgstr "Etiketleri virgülle ayırın."
-
-msgid "from"
-msgstr "şuradan"
-
-msgid "Separate collections with a comma. A name not in use yet makes a new collection."
-msgstr "Koleksiyonları virgülle ayırın. Henüz kullanılmayan bir ad yeni bir koleksiyon oluşturur."
+#: accounting/templates/accounts/goods_receipt_form.html:0
+msgid "This product is on the website, so its attributes are not changed from here. Not saved to the catalog:"
+msgstr "Bu ürün web sitesinde olduğundan özellikleri buradan değiştirilmez. Kataloğa kaydedilmeyen:"
 
 #: operating/templates/operating/partials/warehouse_product_rows.html
 #: operating/templates/operating/partials/warehouse_group_variant_rows.html
@@ -14315,10 +14310,16 @@ msgstr "Koleksiyonları virgülle ayırın. Henüz kullanılmayan bir ad yeni bi
 msgid "Last cost — none in stock"
 msgstr "Son maliyet — stokta yok"
 
+msgid "Separate tags with a comma."
+msgstr "Etiketleri virgülle ayırın."
+
 #: operating/warehouse_excel.py
 msgctxt "warehouse sheet"
 msgid "last cost"
 msgstr "son maliyet"
+
+msgid "Separate collections with a comma. A name not in use yet makes a new collection."
+msgstr "Koleksiyonları virgülle ayırın. Henüz kullanılmayan bir ad yeni bir koleksiyon oluşturur."
 
 #: operating/warehouse_excel.py
 msgctxt "warehouse sheet"
@@ -14329,45 +14330,6 @@ msgstr "yalnızca rezerve"
 msgctxt "warehouse sheet"
 msgid "including empty"
 msgstr "boşlar dahil"
-
-msgid "Reporting currency"
-msgstr "Raporlama para birimi"
-
-msgid "Trading currency"
-msgstr "Ticaret para birimi"
-
-msgid "What this book keeps its accounts in. Every figure in its ledger, its balance sheet and the value of its stock is in this currency; anything paid or charged in another is converted into it at the rate of its day. It can only be changed while the book has no entries."
-msgstr "Bu defterin hesaplarını tuttuğu para birimi. Defterindeki, bilançosundaki ve stok değerindeki her rakam bu para birimindedir; başka bir para birimiyle ödenen ya da kesilen her şey kendi gününün kuruyla buna çevrilir. Yalnızca defterde hiç kayıt yokken değiştirilebilir."
-
-msgid "What this business sells in and gets paid in. A new customer account opens in it, so the orders raised for that customer are priced in it; the order form converts catalogue prices into it; a new cash account starts in it. Customers who already have an account keep their own currency. Blank: the same as the reporting currency."
-msgstr "Bu işletmenin sattığı ve ödeme aldığı para birimi. Yeni bir müşteri hesabı bu para biriminde açılır, böylece o müşteri için açılan siparişler bu para biriminde fiyatlanır; sipariş formu katalog fiyatlarını buna çevirir; yeni bir kasa hesabı bu para biriminde başlar. Zaten hesabı olan müşteriler kendi para birimlerini korur. Boş: raporlama para birimiyle aynı."
-
-msgid "Fixed: this book already has entries, and every one of them is recorded in this currency."
-msgstr "Sabit: bu defterde zaten kayıtlar var ve hepsi bu para biriminde tutuluyor."
-
-msgid "Only someone who manages this book can change its currencies."
-msgstr "Bu defterin para birimlerini yalnızca defteri yöneten biri değiştirebilir."
-
-msgid "Currencies saved."
-msgstr "Para birimleri kaydedildi."
-
-#, python-format
-msgid "The currencies could not be saved: %(error)s"
-msgstr "Para birimleri kaydedilemedi: %(error)s"
-
-msgid "Currencies"
-msgstr "Para birimleri"
-
-msgid "Save currencies"
-msgstr "Para birimlerini kaydet"
-
-#, python-format
-msgid "%(name)s sells in %(sells)s and keeps its books in %(keeps)s: every sale and every payment is converted into %(keeps_code)s at the rate of its day."
-msgstr "%(name)s, %(sells)s ile satış yapar ve defterlerini %(keeps)s ile tutar: her satış ve her ödeme kendi gününün kuruyla %(keeps_code)s'a çevrilir."
-
-#: accounting/templates/accounts/goods_receipt_form.html:0
-msgid "This product is on the website, so its attributes are not changed from here. Not saved to the catalog:"
-msgstr "Bu ürün web sitesinde olduğundan özellikleri buradan değiştirilmez. Kataloğa kaydedilmeyen:"
 
 #: marketing/templates/marketing/components/variant_form.html:0
 msgid "Create every combination"
@@ -14408,11 +14370,40 @@ msgstr "Varyantları kontrol edin"
 msgid "Not deleted, because they have stock or are on an order: %(skus)s"
 msgstr "Stokları olduğu ya da bir siparişte bulundukları için silinmedi: %(skus)s"
 
-msgid "none taken from stock"
-msgstr "stoktan alınmadı"
+msgid "Reporting currency"
+msgstr "Raporlama para birimi"
 
-msgid "The pieces taken go back into stock"
-msgstr "Alınan parçalar stoğa geri döner"
+msgid "Trading currency"
+msgstr "Ticaret para birimi"
+
+msgid "What this book keeps its accounts in. Every figure in its ledger, its balance sheet and the value of its stock is in this currency; anything paid or charged in another is converted into it at the rate of its day. It can only be changed while the book has no entries."
+msgstr "Bu defterin hesaplarını tuttuğu para birimi. Defterindeki, bilançosundaki ve stok değerindeki her rakam bu para birimindedir; başka bir para birimiyle ödenen ya da kesilen her şey kendi gününün kuruyla buna çevrilir. Yalnızca defterde hiç kayıt yokken değiştirilebilir."
+
+msgid "What this business sells in and gets paid in. A new customer account opens in it, so the orders raised for that customer are priced in it; the order form converts catalogue prices into it; a new cash account starts in it. Customers who already have an account keep their own currency. Blank: the same as the reporting currency."
+msgstr "Bu işletmenin sattığı ve ödeme aldığı para birimi. Yeni bir müşteri hesabı bu para biriminde açılır, böylece o müşteri için açılan siparişler bu para biriminde fiyatlanır; sipariş formu katalog fiyatlarını buna çevirir; yeni bir kasa hesabı bu para biriminde başlar. Zaten hesabı olan müşteriler kendi para birimlerini korur. Boş: raporlama para birimiyle aynı."
+
+msgid "Fixed: this book already has entries, and every one of them is recorded in this currency."
+msgstr "Sabit: bu defterde zaten kayıtlar var ve hepsi bu para biriminde tutuluyor."
+
+msgid "Only someone who manages this book can change its currencies."
+msgstr "Bu defterin para birimlerini yalnızca defteri yöneten biri değiştirebilir."
+
+msgid "Currencies saved."
+msgstr "Para birimleri kaydedildi."
+
+#, python-format
+msgid "The currencies could not be saved: %(error)s"
+msgstr "Para birimleri kaydedilemedi: %(error)s"
+
+msgid "Currencies"
+msgstr "Para birimleri"
+
+msgid "Save currencies"
+msgstr "Para birimlerini kaydet"
+
+#, python-format
+msgid "%(name)s sells in %(sells)s and keeps its books in %(keeps)s: every sale and every payment is converted into %(keeps_code)s at the rate of its day."
+msgstr "%(name)s, %(sells)s ile satış yapar ve defterlerini %(keeps)s ile tutar: her satış ve her ödeme kendi gününün kuruyla %(keeps_code)s'a çevrilir."
 
 #: browser tab titles
 msgid "Email Templates"
@@ -14462,6 +14453,39 @@ msgstr "Virmanı Düzenle"
 msgid "Sales Analytics"
 msgstr "Satış Analizi"
 
+msgid "none taken from stock"
+msgstr "stoktan alınmadı"
+
+msgid "The pieces taken go back into stock"
+msgstr "Alınan parçalar stoğa geri döner"
+
+msgid "Nothing in stock: shown is the average of the variants' stored costs."
+msgstr "Stokta ürün yok: gösterilen, varyantların kayıtlı maliyetlerinin ortalamasıdır."
+
+msgid "Shown is their stock's weighted-average cost, as the balance sheet values it."
+msgstr "Gösterilen, stoklarının bilançodaki değerlemeyle ağırlıklı ortalama maliyetidir."
+
+msgid "Auto is dark from 19:00 to 07:00, by this device's clock."
+msgstr "Otomatik, bu cihazın saatine göre 19:00 ile 07:00 arası koyudur."
+
+msgid "Auto"
+msgstr "Otomatik"
+
+msgid "Add at least one variant. A single item has one, with no options."
+msgstr "En az bir varyant ekleyin. Tekil bir ürünün seçeneksiz tek bir varyantı olur."
+
+msgid "Price and cost are set on each variant."
+msgstr "Fiyat ve maliyet her varyantta ayrı girilir."
+
+msgid "Every product has at least one variant. Add one for a single item, or add an option above."
+msgstr "Her ürünün en az bir varyantı vardır. Tekil bir ürün için bir varyant ekleyin ya da yukarıdan bir seçenek ekleyin."
+
+msgid "Without options a product has one variant. Add an option to tell more of them apart."
+msgstr "Seçeneği olmayan bir ürünün tek varyantı olur. Birden fazlasını ayırt etmek için bir seçenek ekleyin."
+
+msgid "Type a SKU for the variant."
+msgstr "Varyant için bir SKU yazın."
+
 msgid "Choose the cash account the money went into."
 msgstr "Paranın girdiği kasayı seçin."
 
@@ -14507,11 +14531,80 @@ msgstr "Tezgâhta ödendi — tutarın tamamı aşağıdaki kasaya girer."
 msgid "No cash account in this currency"
 msgstr "Bu para biriminde kasa yok"
 
-msgid "Auto is dark from 19:00 to 07:00, by this device's clock."
-msgstr "Otomatik, bu cihazın saatine göre 19:00 ile 07:00 arası koyudur."
+msgid "Item SKU"
+msgstr "Ürün SKU"
 
-msgid "Auto"
-msgstr "Otomatik"
+msgid "Enter the item's SKU — stock, barcodes and orders use it."
+msgstr "Ürünün SKU'sunu girin — stok, barkodlar ve siparişler onu kullanır."
+
+msgid "Another variant already has this SKU."
+msgstr "Bu SKU başka bir varyantta zaten var."
+
+msgid "Enter the cost — nothing is in stock to take one from."
+msgstr "Maliyeti girin — maliyetin alınacağı stok yok."
+
+msgid "Stock, barcodes and orders use the item SKU."
+msgstr "Stok, barkodlar ve siparişler ürün SKU'sunu kullanır."
+
+msgid "Cost is the average of the stock on hand."
+msgstr "Maliyet, eldeki stoğun ortalamasıdır."
+
+msgid "Price is the cost plus the profit margin below (a third when none is set), rounded up to 0.05."
+msgstr "Fiyat, maliyete aşağıdaki kâr marjının eklenmesiyle bulunur (marj girilmemişse üçte bir) ve 0,05'e yukarı yuvarlanır."
+
+msgid "Cost is kept on each variant; price is the cost plus the profit margin below (a third when none is set), rounded up to 0.05."
+msgstr "Maliyet her varyantta tutulur; fiyat, maliyete aşağıdaki kâr marjının eklenmesiyle bulunur (marj girilmemişse üçte bir) ve 0,05'e yukarı yuvarlanır."
+
+msgid "Worked out from the cost: cost plus the profit margin, rounded up to 0.05."
+msgstr "Maliyetten hesaplanır: maliyet artı kâr marjı, 0,05'e yukarı yuvarlanır."
+
+msgid "Every price is the cost plus this margin, rounded up to 0.05 — worked out from the stock's cost whenever it is shown, so it follows the cost. Left blank, the margin is a third. A product can set its own on its edit page."
+msgstr "Her fiyat, maliyete bu marjın eklenmesiyle bulunur ve 0,05'e yukarı yuvarlanır — gösterildiği her an stoğun maliyetinden hesaplanır, yani maliyeti izler. Boş bırakılırsa marj üçte birdir. Bir ürün kendi marjını düzenleme sayfasında belirleyebilir."
+
+msgid "Price = cost ×"
+msgstr "Fiyat = maliyet ×"
+
+msgid "on cost"
+msgstr "maliyetin üstüne"
+
+msgid "below cost"
+msgstr "maliyetin altında"
+
+msgid "A formula is fine: 4/3, 1.5, 3. Leave blank to use the product group's."
+msgstr "Formül yazılabilir: 4/3, 1.5, 3. Ürün grubununkini kullanmak için boş bırakın."
+
+msgid "Price is the cost times the multiplier below, rounded up to 0.05."
+msgstr "Fiyat, maliyetin aşağıdaki çarpanla çarpımıdır ve 0,05'e yukarı yuvarlanır."
+
+msgid "Cost is kept on each variant; price is the cost times the multiplier below, rounded up to 0.05."
+msgstr "Maliyet her varyantta tutulur; fiyat, maliyetin aşağıdaki çarpanla çarpımıdır ve 0,05'e yukarı yuvarlanır."
+
+msgid "Type what the cost is multiplied by, e.g. 4/3 or 1.5."
+msgstr "Maliyetin neyle çarpılacağını yazın, ör. 4/3 ya da 1.5."
+
+msgid "Type what the cost is multiplied by, e.g. 4/3 or 3."
+msgstr "Maliyetin neyle çarpılacağını yazın, ör. 4/3 ya da 3."
+
+msgid "Type what the cost is multiplied by, e.g. 4/3."
+msgstr "Maliyetin neyle çarpılacağını yazın, ör. 4/3."
+
+msgid "Not a formula — use numbers, + − × ÷ and brackets, e.g. 4/3."
+msgstr "Geçerli bir formül değil — sayılar, + − × ÷ ve parantez kullanın, ör. 4/3."
+
+msgid "Every price in the group is its cost times this, rounded up to 0.05 — worked out from the stock's cost whenever it is shown, so it follows the cost. A formula is fine: 4/3 is a third on top, 3 is three times cost. A product can set its own on its edit page."
+msgstr "Gruptaki her fiyat, maliyetin bununla çarpımıdır ve 0,05'e yukarı yuvarlanır — gösterildiği her an stoğun maliyetinden hesaplanır, yani maliyeti izler. Formül yazılabilir: 4/3 üçte bir fazlası, 3 maliyetin üç katıdır. Bir ürün kendi çarpanını düzenleme sayfasında belirleyebilir."
+
+msgid "Move this group's %(count)s products to another group first: every product needs a group."
+msgstr "Önce bu grubun %(count)s ürününü başka bir gruba taşıyın: her ürünün bir grubu olmalı."
+
+msgid "Worked out from the cost: cost times the price multiplier, rounded up to 0.05."
+msgstr "Maliyetten hesaplanır: maliyet çarpı fiyat çarpanı, 0,05'e yukarı yuvarlanır."
+
+msgid "Price = cost × this, e.g. 4/3"
+msgstr "Fiyat = maliyet × bu, ör. 4/3"
+
+msgid "Price = cost × this — left blank, the product group's applies"
+msgstr "Fiyat = maliyet × bu — boş bırakılırsa ürün grubununki geçerlidir"
 
 msgid "ENTRIES"
 msgstr "KAYITLAR"
@@ -14542,3 +14635,6 @@ msgstr "HİSSELER"
 
 msgid "Cap table"
 msgstr "Hisse dağılımı"
+
+msgid "from"
+msgstr "şuradan"

@@ -80,6 +80,9 @@ document.addEventListener('DOMContentLoaded', () => {
         loadProductAttributes();
         // Load existing variants if in edit mode
         loadExistingVariants();
+        // A new product starts as a single item.
+        refreshSingleItem();
+        updateVariantRowsBar();
     }
 });
 
@@ -111,7 +114,13 @@ function loadExistingVariants() {
     console.log('Variant options:', variantOptionsData);
 
     if (!variantOptionsData || variantOptionsData === '[]' || variantOptionsData === '') {
-        console.log('No existing variants to load');
+        // A product sold as one item has one variant and no options. Draw
+        // it all the same: its price, cost and SKU live on it, and nowhere
+        // else on the page.
+        if (variantListData && variantListData !== '[]' && variantListData !== '') {
+            loadExistingVariantImages();
+            updateVariantTable();
+        }
         return;
     }
 
@@ -237,6 +246,12 @@ function loadExistingVariantImages() {
                 if (name && value !== null && value !== undefined && String(value).trim()) row[name] = String(value);
             });
             variantRows.push(row);
+
+            // A variant with priced stock on hand costs what that stock
+            // cost on average — computed, so the modal shows it locked.
+            if (variant.stock_cost !== null && variant.stock_cost !== undefined) {
+                (window.computedVariantCosts = window.computedVariantCosts || {})[variant.variant_sku] = variant.stock_cost;
+            }
 
             existingVariantData[index] = {
                 variant_id: variant.variant_id,
@@ -861,6 +876,51 @@ function everyCombination() {
     return combine(validOptions);
 }
 
+// Whether any option has a name and a value. Without one, the product is a
+// single item: one variant, told apart by nothing but its SKU.
+function hasOptionValues() {
+    return Object.values(variantData).some(d => d.name && (d.values || []).some(v => v && v.trim()));
+}
+
+// A single item: no option has a value, and there is at most one variant —
+// the saved one. It has no table: its SKU, price and cost are boxes on the
+// Pricing card (#single_item_fields), saved to that variant on the server
+// (ProductForm.save_single_item). Adding an option turns them into a table
+// row, carrying what was typed.
+function liveRowIndices() {
+    return variantRows.map((_, index) => index).filter(index => !deletedVariantIndices.has(index));
+}
+function singleItemMode() {
+    if (!document.getElementById('single_item') || hasOptionValues()) return false;
+    const live = liveRowIndices();
+    return live.length <= 1 && live.every(index => (existingVariantData[index] || {}).variant_id);
+}
+let wasSingleItem = null;
+function refreshSingleItem() {
+    const flag = document.getElementById('single_item');
+    if (!flag) return;
+    const single = singleItemMode();
+    if (wasSingleItem === true && !single) carrySingleItemIntoRow();
+    flag.value = single ? '1' : '';
+    const fields = document.getElementById('single_item_fields');
+    const summary = document.getElementById('variants_summary');
+    if (fields) fields.hidden = !single;
+    if (summary) summary.hidden = single;
+    wasSingleItem = single;
+}
+function carrySingleItemIntoRow() {
+    const live = liveRowIndices();
+    if (live.length !== 1) return;
+    const kept = existingVariantData[live[0]] || {};
+    const typed = id => (document.getElementById(id)?.value || '').trim();
+    existingVariantData[live[0]] = {
+        ...kept,
+        sku: typed('id_item_sku') || kept.sku,
+        price: typed('id_item_price') || kept.price,
+        cost: typed('id_item_cost') || kept.cost,
+    };
+}
+
 // The rows as last drawn (generateCombinations())
 let allCombinations = [];
 // What each row holds, by row index: the saved variant's id, SKU, price…
@@ -887,6 +947,17 @@ let pendingValueRenames = {};
 
 // Update variant table with combinations
 function updateVariantTable() {
+    refreshSingleItem();
+    if (singleItemMode()) {
+        const table = document.getElementById('variant_table');
+        if (table) { table.innerHTML = ''; table.style.display = 'none'; }
+        const _grp = document.getElementById('grp_container');
+        if (_grp) _grp.style.display = 'none';
+        allCombinations = [];
+        toggleProductImagesSection();
+        updateVariantRowsBar();
+        return;
+    }
     // Keep what each row's inputs hold before the rows are drawn again.
     allCombinations.forEach((combo, index) => {
         if (deletedVariantIndices.has(index)) return;
@@ -1014,6 +1085,22 @@ function variantRowProblems() {
     const T = window.VARIANT_T || {};
     const seen = {};
     const problems = [];
+    if (singleItemMode()) return problems;   // the server checks its boxes
+    if (!hasOptionValues()) {
+        const live = variantRows.map((_, index) => index).filter(index => !deletedVariantIndices.has(index));
+        // Saved ones are left as they are (some products already have
+        // several); a new one beside another is what can't be told apart.
+        const isNew = index => !(existingVariantData[index] || {}).variant_id;
+        if (live.length > 1 && live.some(isNew)) {
+            problems.push(T.rows_need_option || 'Without options a product has one variant. Add an option to tell more of them apart.');
+        }
+        live.forEach(index => {
+            const sku = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
+            const typed = sku ? sku.value : (existingVariantData[index] || {}).sku;
+            if (!(typed || '').trim()) problems.push(T.row_without_sku || 'Type a SKU for the variant.');
+        });
+        return problems;
+    }
     variantRows.forEach((row, index) => {
         if (deletedVariantIndices.has(index)) return;
         const signature = createVariantSignature(row);
@@ -1036,18 +1123,24 @@ function variantRowProblems() {
 function updateVariantRowsBar() {
     const bar = document.getElementById('variant_rows_actions');
     if (!bar) return;
-    const hasValues = Object.values(variantData).some(d => d.name && (d.values || []).some(v => v && v.trim()));
-    bar.style.display = hasValues ? 'flex' : 'none';
+    if (singleItemMode()) { bar.style.display = 'none'; return; }
+    const hasValues = hasOptionValues();
+    const live = variantRows.filter((_, index) => !deletedVariantIndices.has(index)).length;
+    // Without options: "Add variant" until the one variant is there.
+    bar.style.display = (hasValues || !live) ? 'flex' : 'none';
+    const every = document.getElementById('variant_rows_every');
+    if (every) every.style.display = hasValues ? '' : 'none';
     const note = document.getElementById('variant_rows_note');
     if (!note) return;
     const T = window.VARIANT_T || {};
-    const live = variantRows.filter((_, index) => !deletedVariantIndices.has(index)).length;
     const problems = variantRowProblems();
     if (problems.length) {
         note.textContent = problems[0];
         note.className = 'variant_rows_note bad';
     } else if (!live) {
-        note.textContent = T.no_rows_yet || 'No variants yet — add one, or create every combination of the values above.';
+        note.textContent = hasValues
+            ? (T.no_rows_yet || 'No variants yet — add one, or create every combination of the values above.')
+            : (T.no_rows_single || 'Every product has at least one variant. Add one for a single item, or add an option above.');
         note.className = 'variant_rows_note';
     } else {
         note.textContent = '';
@@ -1076,6 +1169,8 @@ function renderVariantTable(combinations, selectedGrouping = null) {
     displayOptions.forEach(name => {
         tableHTML += `<th>${labelOf(name)}</th>`;
     });
+    // With no options there is nothing else to tell the row by.
+    if (!displayOptions.length) tableHTML += `<th>SKU</th>`;
     tableHTML += `<th>${VT.price}</th><th>${VT.stock}</th><th>${VT.featured}</th><th style="text-align: center;">${VT.attributes}</th></tr></thead><tbody>`;
 
     // Helper to generate row HTML (avoids duplication between grouped/ungrouped)
@@ -1118,23 +1213,22 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
         const activeInput = document.querySelector(`input[name="variant_active_${originalIndex + 1}"]`);
 
-        // Parent product defaults — used when a brand-new variant row
-        // has no price / cost / SKU of its own. User explicitly asked
-        // for new variants to inherit the main product's pricing and
-        // for empty SKUs to fall back to "parent_sku_<value>".
+        // A new row's SKU falls back to "parent_sku_<value>". Price and
+        // cost have no parent to inherit from: the product has none.
         const _parentSku   = (document.getElementById('id_sku')?.value || '').trim();
-        const _parentPrice = (document.getElementById('id_price')?.value || '').trim();
-        const _parentCost  = (document.getElementById('id_cost')?.value || '').trim();
         const _slugBits = displayOptions
             .map(opt => (combo[opt] || '').toString().trim().toLowerCase().replace(/\s+/g, '_'))
             .filter(Boolean);
-        const _autoSku = skuRuleOn()
+        // A variant with no options has no values to build a SKU from: its
+        // SKU is typed by hand, and the PARENT.SUFFIX rule does not apply.
+        const _autoSku = !displayOptions.length ? ''
+            : skuRuleOn()
             ? skuJoin(skuParent(), skuSuffixFromValues(displayOptions.map(opt => combo[opt])))
             : (_parentSku
                 ? `${_parentSku}_${_slugBits.join('_')}`
                 : _slugBits.join('_'));
 
-        const price = priceInput?.value || existingData.price || _parentPrice || '';
+        const price = priceInput?.value || existingData.price || '';
         const quantity = quantityInput?.value || existingData.quantity || '';
         // Featured: prefer the live DOM checkbox if rendered already;
         // else respect server-loaded existingData; else default to true
@@ -1148,7 +1242,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         } else {
             featured = true;
         }
-        const cost = costInput?.value || existingData.cost || _parentCost || '';
+        const cost = costInput?.value || existingData.cost || '';
         const sku = skuInput?.value || existingData.sku || existingData.item_code || _autoSku || '';
         const barcode = barcodeInput?.value || existingData.barcode || '';
         const active = activeInput ? (activeInput.value === 'true') : (existingData.is_active !== false);
@@ -1193,9 +1287,15 @@ function renderVariantTable(combinations, selectedGrouping = null) {
             }
         });
 
+        if (!displayOptions.length) {
+            rowHTML += `<td>
+            <input type="text" name="variant_sku_${originalIndex + 1}" value="${vfEsc(sku)}" data-auto-sku="" placeholder="SKU" style="min-width: 120px;" onclick="event.stopPropagation()" oninput="updateVariantRowsBar()">
+        </td>`;
+        }
+
         // Price Input
         rowHTML += `<td>
-            <input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" onclick="event.stopPropagation()" oninput="updateGroupPriceRange('${groupId}')">
+            <input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="—" value="${price}" readonly tabindex="-1" title="${vfEsc((window.VARIANT_T && window.VARIANT_T.price_from_cost) || 'Worked out from the cost')}" style="min-width: 100px; background:#F3F4F6; cursor:not-allowed;" onclick="event.stopPropagation()">
         </td>`;
 
         // Stock Input
@@ -1225,7 +1325,9 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         // HIDDEN INPUTS for Modal Fields (wrapped in td to avoid browser foster-parenting)
         rowHTML += `<td style="display:none;">`;
         rowHTML += `<input type="hidden" name="variant_cost_${originalIndex + 1}" value="${cost}">`;
-        rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}" data-auto-sku="${vfEsc(_autoSku)}">`;
+        if (displayOptions.length) {
+            rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}" data-auto-sku="${vfEsc(_autoSku)}">`;
+        }
         rowHTML += `<input type="hidden" name="variant_barcode_${originalIndex + 1}" value="${barcode}">`;
         rowHTML += `<input type="hidden" name="variant_active_${originalIndex + 1}" value="${active}">`;
         rowHTML += `</td>`;
@@ -2660,6 +2762,15 @@ let unlinkedVariantFiles = new Set();
 
 // Prepare variants data for form submission
 function prepareVariantsForSubmission() {
+    if (singleItemMode()) {
+        // Its variant is written from the Pricing card's boxes. A saved one
+        // is left to that; a new product still takes the "no variants" pass
+        // for its images, which the server keeps from deleting anything.
+        const saved = liveRowIndices().length > 0;
+        return saved
+            ? { product_variant_list: [], deleted_variant_ids: [], deleted_files: Array.from(unlinkedVariantFiles) }
+            : { delete_all_variants: true, deleted_files: Array.from(unlinkedVariantFiles) };
+    }
     const combinations = generateCombinations();
     // Saved variants the page never drew (a product whose variants have no
     // option values at all) are not ones anybody deleted: "delete all"
@@ -2835,7 +2946,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // New product: variants need the product SKU to hang off, and
             // each needs a part of its own after the dot.
-            if (skuRuleOn()) {
+            if (skuRuleOn() && hasOptionValues()) {
                 const variantSkus = document.querySelectorAll('input[name^="variant_sku_"]');
                 if (variantSkus.length) {
                     const parent = skuParent();
@@ -3586,7 +3697,16 @@ function openVariantDetailModal(variantIndex) {
     const activeEl = document.getElementById('modal_variant_active');
 
     if (priceEl) priceEl.value = price;
-    if (costEl) costEl.value = cost;
+    if (costEl) {
+        const computed = (window.computedVariantCosts || {})[sku];
+        const locked = computed !== undefined;
+        costEl.value = locked ? computed : cost;
+        costEl.readOnly = locked;
+        costEl.style.background = locked ? '#F3F4F6' : '';
+        costEl.style.cursor = locked ? 'not-allowed' : '';
+        const hint = document.getElementById('modal_variant_cost_hint');
+        if (hint) hint.hidden = !locked;
+    }
     if (skuEl) skuEl.value = sku;
     if (barcodeEl) barcodeEl.value = barcode;
     if (activeEl) activeEl.checked = isActive;
@@ -3643,7 +3763,8 @@ function saveVariantDetailModal() {
     const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
 
     if (priceInput) priceInput.value = price;
-    if (costInput) costInput.value = cost;
+    // A computed cost was only shown, never typed: the stored one stays.
+    if (costInput && !document.getElementById('modal_variant_cost').readOnly) costInput.value = cost;
     if (skuInput) skuInput.value = sku;
     if (barcodeInput) barcodeInput.value = barcode;
     if (activeInput) activeInput.value = isActive;

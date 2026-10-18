@@ -378,18 +378,14 @@ class GlobalSearch(View):
     def _product_url(self, product, restricted):
         """Where a product result goes.
 
-        The edit form for anyone who may open it; the read-only detail
-        page for anyone who may not. A search result is a way to LOOK
-        something up, so the detail page is a fair answer — an empty
-        result list is not.
+        The read-only detail page, for everyone. A search result is a way
+        to LOOK something up; the detail page links on to the edit form
+        for anyone who may change the product.
         """
-        for name in (("marketing:product_detail",) if restricted
-                     else ("marketing:product_edit", "marketing:product_detail")):
-            try:
-                return reverse(name, args=[product.id])
-            except Exception:
-                continue
-        return '#'
+        try:
+            return reverse("marketing:product_detail", args=[product.id])
+        except Exception:
+            return '#'
 
     def _visible(self, results, restricted):
         if not restricted:

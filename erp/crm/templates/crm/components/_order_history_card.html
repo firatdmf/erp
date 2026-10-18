@@ -3,7 +3,8 @@
   A client's orders, newest first, each one a link to its order page.
   Ticked rows print onto one sheet or download as one spreadsheet.
 
-  Expects: orders (through Order.with_pre_order_flag), empty_text.
+  Expects: orders (through Order.with_pre_order_flag, then
+  operating.split_orders.order_rows: a split order is one row), empty_text.
 {% endcomment %}
 <section class="od-card">
   <div class="od-card-h">
@@ -34,12 +35,12 @@
   <div class="od-order-list">
     {% for o in orders %}
       <div class="od-order-pick">
-        <input type="checkbox" class="od-order-check" value="{{ o.pk }}"
+        <input type="checkbox" class="od-order-check" value="{{ o.row_pks|join:',' }}"
                onchange="syncPrintSelection()"
-               aria-label="{% trans 'Print this order' %} {{ o.order_number|default:o.pk }}">
+               aria-label="{% trans 'Print this order' %} {{ o.row_numbers|join:' & ' }}">
         <a class="od-order-row" href="{% url 'operating:order_detail' o.pk %}">
         <div class="od-order-id">
-          <div class="od-order-num">{{ o.order_number|default:o.pk }}</div>
+          {% for number in o.row_numbers %}<div class="od-order-num">{{ number }}</div>{% endfor %}
           <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
         </div>
         {% with disp_status=o.order_status %}
@@ -56,14 +57,9 @@
           {% if disp_status == 'shipped' %}{% trans "Completed" %}{% else %}{{ o.status_label }}{% endif %}
         </span>
         {% endwith %}
+        {% comment %}The order's grand total, as its page says it — a split order's every half together.{% endcomment %}
         <div class="od-order-total">
-          {% if o.paid_amount %}
-            {{ o.paid_amount }} <span>{{ o.paid_currency|default:"" }}</span>
-          {% elif o.original_price %}
-            {{ o.original_price }} <span>{{ o.original_currency|default:"" }}</span>
-          {% else %}
-            <span class="od-empty-mute">—</span>
-          {% endif %}
+          {% for symbol, total in o.row_totals %}{{ symbol }}{{ total|floatformat:"2g" }}{% if not forloop.last %} + {% endif %}{% endfor %}
         </div>
         <i class="fa fa-chevron-right od-order-chev"></i>
         </a>

@@ -753,13 +753,15 @@ def mark_as_supplier(current_account):
     Staff is left alone deliberately. A staff account settles expenses on
     the book's behalf, and turning a colleague into a vendor because one
     receipt was posted through them is a classification nobody asked for.
+    So is one of our own books: goods transferred in from it arrive on a
+    purchase, and it is still not a supplier.
 
     Returns True when the type actually moved.
     """
     if current_account is None or not current_account.pk:
         return False
     current = (current_account.type or "").strip()
-    if current in ("supplier", "both", "staff"):
+    if current in ("supplier", "both", "staff", "intercompany"):
         return False
     new_type = "both" if current == "customer" else "supplier"
     current_account.type = new_type

@@ -99,3 +99,61 @@ class LedgerAccountPage(TestCase):
         self.assertContains(self.client.get(reverse("accounts:report_balance_sheet", args=[self.book.pk])), url)
         self.assertContains(self.client.get(reverse("accounts:report_chart_of_accounts", args=[self.book.pk])), url)
         self.assertContains(self.client.get(reverse("accounting:book_detail", args=[self.book.pk])), url)
+
+
+class LedgerAccountRowsOpenTheirSource(LedgerAccountPage):
+    """A row is a line of an entry; what a reader wants next is the page of
+    whatever wrote it."""
+
+    def test_a_movements_row_opens_the_movement(self):
+        mv = self._move(self.tatyana, "250.00", kind="invoice_sale", text="a sale")
+        r = self._page("1200")
+        url = reverse("accounts:movement_detail", args=[self.tatyana.pk, mv.pk])
+        self.assertEqual(r.context["rows"][0]["url"], url)
+        self.assertContains(r, 'href="%s"' % url)
+
+    def test_a_transfers_row_opens_the_transfer(self):
+        from accounting.models_accounts import CurrentAccountTransfer
+        zamira = CurrentAccount.objects.create(
+            book=self.book, code="ACC-057", name="ZAMIRA", type="customer", default_currency=self.usd)
+        self._move(self.tatyana, "1000.00")
+        with self.captureOnCommitCallbacks(execute=True):
+            transfer = CurrentAccountTransfer.objects.create(
+                book=self.book, date="2026-10-06", from_current_account=self.tatyana,
+                to_current_account=zamira, amount=Decimal("300.00"), currency=self.usd)
+            transfer.post()
+        rows = [row for row in self._page("1200").context["rows"]
+                if str(row["entry"].date) == "2026-10-06"]
+        self.assertEqual({row["url"] for row in rows},
+                         {reverse("accounts:transfer_detail", args=[transfer.pk])})
+
+    def test_stock_leaving_opens_its_order_or_else_its_shelf(self):
+        from operating.models import (Order, StockMovement, Warehouse,
+                                      WarehouseProduct, WarehouseProductItem)
+        warehouse = Warehouse.objects.create(name="Ergene Fabrika", accounting_book=self.book)
+        product = WarehouseProduct.objects.create(
+            warehouse=warehouse, name="seta", sku="S1",
+            quantity=Decimal("100"), cost_usd=Decimal("3.00"))
+        roll = WarehouseProductItem.objects.create(
+            product=product, quantity=Decimal("100"), quantity_remaining=Decimal("100"),
+            barcode="BC-1", status="in_stock", unit_cost_base=Decimal("4.00"))
+        order = Order.objects.create()
+        shipped = StockMovement.objects.create(
+            product=product, stock_item=roll, movement_type="out",
+            quantity=Decimal("25"), reason="Order ship", order=order)
+        loose = StockMovement.objects.create(
+            product=product, stock_item=roll, movement_type="out",
+            quantity=Decimal("5"), reason="Order ship Order #298")
+        by_source = {row["entry"].source_id: row["url"]
+                     for row in self._page("1300").context["rows"]}
+        self.assertEqual(by_source[shipped.pk],
+                         reverse("operating:order_detail", args=[order.pk]))
+        self.assertEqual(by_source[loose.pk],
+                         reverse("operating:warehouse_product_detail",
+                                 args=[warehouse.pk, product.pk]))
+
+    def test_an_entry_the_ledger_made_for_itself_is_not_a_link(self):
+        self._move(self.tatyana, "-529.66")
+        rows = self._page("2000").context["rows"]
+        self.assertTrue(rows)
+        self.assertTrue(all(row["url"] == "" for row in rows))

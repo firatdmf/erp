@@ -1,1 +1,1 @@
-{{ event_label }} — Order {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}
+{{ event_label }} — Order {{ order_ref|safe }}

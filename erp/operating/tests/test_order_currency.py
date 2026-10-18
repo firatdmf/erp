@@ -159,10 +159,10 @@ class OrderCurrencyTest(TestCase):
         self.assertEqual(order.total_value_base(), order.total_value())
 
     def test_cost_is_stated_in_the_orders_currency_so_margin_is_not_mixed(self):
-        # The catalog keeps cost in base: $1.08 a unit.
-        self.product.cost = Decimal("1.08")
-        self.product.save(update_fields=["cost"])
+        # The catalog keeps cost in base, on the variant: $1.08 a unit.
+        variant = self.product.variants.create(variant_sku="KRP", variant_cost=Decimal("1.08"))
         order = self._order(price="2.00", qty="100")
+        order.items.update(product_variant=variant)
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
             order.freeze_billable_quantities()

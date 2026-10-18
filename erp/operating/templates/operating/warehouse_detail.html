@@ -1710,6 +1710,12 @@
               <span class="k">{% trans "Accounting book" %}</span>
               <div class="od-dt-stack">
                 <span class="v-line"><i class="fa fa-book" style="color:var(--nejum-teal-600);margin-right:6px;"></i>{{ owning_book.name }}</span>
+                {% if can_transfer_out %}
+                <a href="{% url 'operating:stock_transfer_create' warehouse.pk %}"
+                   style="display:inline-flex; align-items:center; gap:6px; margin-top:6px; font:600 12px var(--font-sans, sans-serif); color:#00696A; text-decoration:none;">
+                  <i class="fa fa-right-left"></i>{% trans "Transfer stock to another book" %}
+                </a>
+                {% endif %}
               </div>
             </div>
           {% endif %}
@@ -4248,7 +4254,7 @@
             (d.cross_book
               ? '<div class="bl-note" style="margin-top:6px; font-size:11px; color:var(--gray-600); line-height:1.5;">' +
                   '<i class="fa fa-circle-info"></i> ' +
-                  '{% trans "This top belongs to another book. Stock moves between books through a purchase invoice, not a warehouse transfer." %}' +
+                  '{% trans "This stock item belongs to another book. To bring it here, open the warehouse it is in and use “Transfer stock to another book”." %}' +
                 '</div>'
               : '') +
             (d.move_url

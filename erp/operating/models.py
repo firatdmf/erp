@@ -878,6 +878,16 @@ class Order(models.Model):
                 .select_related("current_account__book")
                 .order_by("current_account__book__name", "pk"))
 
+    def shipment_receipts(self):
+        """The carrier's receipts for the shipment this order went out in:
+        its own, and for an order split across books every half's — one
+        parcel has one receipt, whichever half it was attached on."""
+        if not self.split_group:
+            return list(self.cargo_receipts.all())
+        return list(OrderCargoReceipt.objects
+                    .filter(order__split_group=self.split_group)
+                    .order_by("created_at", "pk"))
+
     def lines_total(self):
         """Sum of the line amounts, BEFORE any discount. subtotal() has
         already rounded each line to cents, so this equals what you get
@@ -1300,7 +1310,11 @@ class Order(models.Model):
         """Sum of every item's unit_cost × quantity. Counterpart to
         total_value(); revenue − total_cost == gross_profit."""
         from decimal import Decimal
-        return sum((it.line_cost() for it in self.items.all()), Decimal("0.00"))
+        from marketing.models import attach_live_costs
+        items = list(self.items.all())
+        # One query for every line's cost, not one per line.
+        attach_live_costs(it.product_variant for it in items if it.product_variant_id)
+        return sum((it.line_cost() for it in items), Decimal("0.00"))
 
     def gross_margin_pct(self):
         """Gross profit as a percentage of revenue. Returns None when
@@ -1634,14 +1648,14 @@ class OrderItem(models.Model):
     def unit_cost_base(self):
         """Cost per unit as the catalog keeps it: base currency.
 
-        Prefer the variant's own cost; fall back to the parent product's.
-        Returns 0 if nothing is set so callers don't crash on None * Decimal.
+        The variant's own cost — what its stock on hand cost on average, or
+        its stored cost when none is held (see ProductVariant.live_cost). A
+        product has no cost of its own. Returns 0 if nothing is set so
+        callers don't crash on None * Decimal.
         """
         from decimal import Decimal
-        if self.product_variant and self.product_variant.variant_cost is not None:
-            return self.product_variant.variant_cost
-        if self.product and self.product.cost is not None:
-            return self.product.cost
+        if self.product_variant and self.product_variant.live_cost is not None:
+            return self.product_variant.live_cost
         return Decimal("0")
 
     def unit_cost(self):
@@ -2836,6 +2850,22 @@ class OrderStockReservation(models.Model):
     def __str__(self):
         return (f"Reserve {self.quantity} {self.warehouse_product.unit_short}"
                 f" · item #{self.stock_item_id} · order #{self.order_id}")
+
+    @property
+    def roll_meters(self):
+        """What the roll held when this was taken from it: what is on it
+        now, plus this take once it has been deducted. The picking list
+        reads a roll the same way (picking_list.build_picking_groups)."""
+        from decimal import Decimal
+        roll = self.stock_item
+        left = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
+        return (left or Decimal("0")) + ((self.quantity or Decimal("0")) if self.consumed else 0)
+
+    @property
+    def was_cut(self):
+        """Deducted, and less than the roll held: the roll was really cut.
+        A whole roll that shipped was not."""
+        return self.consumed and (self.quantity or 0) < self.roll_meters
 
 
 class OrderChange(models.Model):

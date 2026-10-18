@@ -198,9 +198,10 @@ class Pricing:
 def build_block(product, photo_side: str, pricing: "Pricing | None" = None) -> dict:
     """One product → one catalog block."""
     pricing = pricing or Pricing()
-    variants = [v for v in product.variants.all() if v.variant_featured]
+    from .models import attach_live_costs
+    variants = attach_live_costs(v for v in product.variants.all() if v.variant_featured)
     for variant in variants:
-        variant.catalog_price = pricing.of(variant.variant_cost, variant.variant_price)
+        variant.catalog_price = pricing.of(variant.live_cost, variant.live_price)
     priced = [v for v in variants if v.catalog_price is not None]
     distinct_prices = {v.catalog_price for v in priced}
 
@@ -235,7 +236,7 @@ def build_block(product, photo_side: str, pricing: "Pricing | None" = None) -> d
 
     # One price for the whole product: state it once, then describe each axis
     # of choice on its own line.
-    price = distinct_prices.pop() if distinct_prices else pricing.of(product.cost, product.price)
+    price = distinct_prices.pop() if distinct_prices else None
     if price is not None:
         block["rows"] = [{"label": "Price:", "amount": _money(price, pricing.currency)}]
         # A lone price is a statement, not a list — the reference prints it

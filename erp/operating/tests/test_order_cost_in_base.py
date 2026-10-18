@@ -61,12 +61,13 @@ class TheOrderPage(TestCase):
         account = CurrentAccount.objects.create(
             book=book, code="ACC-KZ", name="Dana Akhmet", type="customer",
             company=company, default_currency=kzt)
-        product = Product.objects.create(title="Sheet", featured=False, unit="piece",
-                                         cost=Decimal("10"))
+        product = Product.objects.create(title="Sheet", featured=False, unit="piece")
         # Fixed as a completed order's would be: ₸1 = $0.002.
         self.order = Order.objects.create(company=company, current_account=account,
                                           currency=kzt, currency_rate=Decimal("0.002"))
         OrderItem.objects.create(order=self.order, product=product,
+                                 product_variant=product.variants.create(
+                                     variant_sku="SHEET", variant_cost=Decimal("10")),
                                  quantity=Decimal("2"), price=Decimal("10000"))
         user = get_user_model().objects.create_superuser("cib", "c@i.b", "pw")
         user.member.books.add(book)

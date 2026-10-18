@@ -1,5 +1,5 @@
 {% load i18n %}{% comment %}The order's saved cargo receipts, each with its × (not for sales reps). Drawn inside #od-rcpt-saved on the order page, and again after a background save or removal.{% endcomment %}
-{% with receipts=order.cargo_receipts.all %}
+{% with receipts=cargo_receipts %}
 {% if receipts %}
 <div class="od-rcpt-list">
   {% for r in receipts %}

@@ -2,6 +2,7 @@ from django.urls import path, include
 from . import views
 from . import views_warehouse
 from . import views_samples
+from . import views_transfer
 from . import order_excel
 from . import picking_list
 from . import warehouse_label
@@ -65,6 +66,12 @@ urlpatterns = [
     path("warehouses/<int:pk>/barcode-lookup/", in_reach(views_warehouse.warehouse_barcode_lookup), name="warehouse_barcode_lookup"),
     path("warehouses/<int:pk>/product-search/", in_reach(views_warehouse.warehouse_product_search), name="warehouse_product_search"),
     path("warehouses/<int:pk>/rolls/<int:roll_pk>/move-here/", in_reach(views_warehouse.warehouse_roll_move_here), name="warehouse_roll_move_here"),
+    # Stock handed to another book's warehouse. Each view checks the books
+    # itself: a transfer needs both, which no one warehouse's reach says.
+    path("warehouses/<int:pk>/transfer/", views_transfer.StockTransferCreate.as_view(), name="stock_transfer_create"),
+    path("warehouses/<int:pk>/transfer/find/", views_transfer.stock_transfer_find, name="stock_transfer_find"),
+    path("stock-transfers/<int:pk>/", views_transfer.stock_transfer_detail, name="stock_transfer_detail"),
+    path("stock-transfers/<int:pk>/undo/", views_transfer.stock_transfer_undo, name="stock_transfer_undo"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/", in_reach(views_warehouse.warehouse_product_rolls), name="warehouse_product_rolls"),
     path("warehouses/<int:warehouse_pk>/rolls/<int:roll_pk>/photo/", in_reach(views_warehouse.warehouse_roll_photo), name="warehouse_roll_photo"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/", in_reach(warehouse_label.warehouse_product_label), name="warehouse_product_label"),

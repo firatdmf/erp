@@ -74,7 +74,12 @@ class CollectionsOnTheEditFormTest(TestCase):
         from marketing.models import ProductCollection
         self.client.force_login(
             get_user_model().objects.create_superuser("boss", "boss@example.com", "pw"))
-        self.product = Product.objects.create(title="Florenza", sku="K12767", cost=1)
+        from marketing.models import ProductCategory
+        self.product = Product.objects.create(
+            title="Florenza", sku="K12767",
+            category=ProductCategory.objects.create(name="fabric", price_multiplier="4/3"))
+        # Every product has a variant; the form refuses one without.
+        self.product.variants.create(variant_sku="K12767.G01", variant_cost=1)
         self.bridal = ProductCollection.objects.create(title="Bridal")
         self.product.collections.add(self.bridal)
 

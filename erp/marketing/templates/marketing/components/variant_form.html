@@ -50,7 +50,7 @@
     <button type="button" class="variant_rows_btn" onclick="addVariantRow()">
       <i class="fa fa-plus"></i> {% trans "Add variant" %}
     </button>
-    <button type="button" class="variant_rows_btn" onclick="createEveryCombination()"
+    <button type="button" class="variant_rows_btn" id="variant_rows_every" onclick="createEveryCombination()"
             title="{% trans 'Adds a variant for each combination of the values above that is not a variant yet.' %}">
       <i class="fa fa-th"></i> {% trans "Create every combination" %}
     </button>
@@ -83,6 +83,10 @@
       every_combination_exists: '{% trans "Every combination is already a variant."|escapejs %}',
       confirm_combinations: '{% trans "This adds %(count)s variants. Continue?"|escapejs %}',
       row_without_values: '{% trans "A new variant has no values — pick them, or delete the row."|escapejs %}',
+      no_rows_single:  '{% trans "Every product has at least one variant. Add one for a single item, or add an option above."|escapejs %}',
+      rows_need_option: '{% trans "Without options a product has one variant. Add an option to tell more of them apart."|escapejs %}',
+      row_without_sku: '{% trans "Type a SKU for the variant."|escapejs %}',
+      price_from_cost: '{% trans "Worked out from the cost: cost times the price multiplier, rounded up to 0.05."|escapejs %}',
       rows_alike:      '{% trans "Two variants have the same values: %(values)s — change one, or delete it."|escapejs %}',
       rows_title:      '{% trans "Check the variants"|escapejs %}',
       // variant attributes modal
@@ -131,11 +135,10 @@
     console.log('product_variant_options_data:', window.product_variant_options_data);
     console.log('product_attributes_data:', window.product_attributes_data);
 
-    // If editing and variants exist, show variant section automatically
-    if (window.product_variant_list_data && window.product_variant_list_data !== '[]' && window.product_variant_list_data !== '') {
-      console.log('Showing variant section because variants exist');
-      showVariantSection();
-    }
+    // Every product has at least one variant, so the section is always
+    // open: a new product starts at "Add variant" (a single item) or
+    // "Add another option" (one that comes in several).
+    showVariantSection();
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -151,6 +154,6 @@
       deleteError: '{% filter escapejs %}{% trans "Delete error" %}{% endfilter %}'
     };
   </script>
-  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=7" defer></script>
+  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=10" defer></script>
   <script src="{% static 'marketing/js/variant_attributes_modal.js' %}?v=2" defer></script>
 </div>

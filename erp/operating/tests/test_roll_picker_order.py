@@ -156,8 +156,8 @@ class RollPicker(TestCase):
         data = json.loads(resp.content)
         self.assertEqual([r["barcode"] for r in data["rolls"]], ["BC-PRICED"])
         self.assertNotIn("unit_cost", data["rolls"][0])
-        # 2.40 × 1.10 = 2.64, up to the next 0.05.
-        self.assertEqual(data["rolls"][0]["unit_price"], 2.65)
+        # 2.40 × 1.05 = 2.52, up to the next 0.05.
+        self.assertEqual(data["rolls"][0]["unit_price"], 2.55)
 
     def test_a_pack_product_is_not_counted_in_meters(self):
         self._top(self._shelf(self.ergene, Decimal("12.00")), "BC-BOX")

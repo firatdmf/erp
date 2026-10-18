@@ -11,8 +11,8 @@ disagrees with what the warehouse paid.
 
 Cost model, as decided:
 
-  * marketing ProductVariant.variant_cost (or Product.cost for a product with
-    no variants) is the AUTHORITATIVE pricing input. It is the only field that
+  * marketing ProductVariant.variant_cost (every product has at least one
+    variant) is the AUTHORITATIVE pricing input. It is the only field that
     covers outsourced products, which have no warehouse row at all — 28 of the
     55 featured products.
   * The warehouse figure is a REFERENCE for comparison, never an automatic
@@ -67,18 +67,13 @@ class Command(BaseCommand):
             variants = list(product.variants.all())
             lines = []
 
-            if not variants:
-                # A product with no variants prices off Product.cost.
-                cost = product.cost
-                lines.append((product.sku or "—", cost, None))
-            else:
-                for variant in variants:
-                    reference = warehouse_cost.get(variant.id)
-                    lines.append((
-                        variant.variant_sku,
-                        variant.variant_cost,
-                        reference[0] if reference else None,
-                    ))
+            for variant in variants:
+                reference = warehouse_cost.get(variant.id)
+                lines.append((
+                    variant.variant_sku,
+                    variant.variant_cost,
+                    reference[0] if reference else None,
+                ))
 
             shown = []
             for sku, cost, reference in lines:

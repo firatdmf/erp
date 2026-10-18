@@ -15,13 +15,16 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import translation
 
-from marketing.models import Product, ProductCampaign, ProductCampaignTier
+from marketing.models import Product, ProductCampaign, ProductCampaignTier, ProductCategory
 
 
 class QuotePanelNumbers(TestCase):
     def setUp(self):
-        self.product = Product.objects.create(
-            title="Baklava", sku="BKL-1", unit="mt", price=Decimal("13.50"))
+        self.product = Product.objects.create(title="Baklava", sku="BKL-1", unit="mt",
+                                              category=ProductCategory.objects.get_or_create(name="fabric", defaults={"price_multiplier": "4/3"})[0])
+        # The panel quotes from the variants' price, worked out from cost:
+        # 10.11 + a third = 13.48, rounded up to 13.50.
+        self.product.variants.create(variant_sku="BKL-1", variant_cost=Decimal("10.11"))
         self.client.force_login(get_user_model().objects.create_superuser(
             username="shopper", password="pw", email="s@a.c"))
 

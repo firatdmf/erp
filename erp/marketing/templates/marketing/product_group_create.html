@@ -54,15 +54,6 @@ function pgdFlash(ok, msg) {
   f._t = setTimeout(function () { f.className = 'pgd-flash'; }, 6000);
 }
 
-function pgdMarginExample() {
-  const box = document.getElementById('pgdMarginExample');
-  const m = parseFloat((document.getElementById('pgdMargin').value || '').replace(',', '.'));
-  if (isNaN(m)) { box.style.display = 'none'; return; }
-  const price = fmtNum(100 * (1 + m / 100));
-  box.style.display = '';
-  box.textContent = '{% trans "Example" %}: {% trans "cost" %} $100 → {% trans "price" %} $' + price;
-}
-
 function pgcCreate() {
   const form = document.getElementById('pgcForm');
   const name = (form.querySelector('input[name="name"]').value || '').trim();

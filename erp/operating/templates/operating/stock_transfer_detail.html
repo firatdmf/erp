@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% load i18n static %}
+
+{% block title %}{{ transfer.number }} | Nejum ERP{% endblock %}
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .ord { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 1100px; }
+  .od-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-back {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: white;
+    border: 1px solid #E0E6EE; border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: var(--gray-700); text-decoration: none;
+  }
+  .od-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-sep { color: var(--gray-400); }
+  .od-crumb-here { font: 600 12.5px var(--font-sans); color: var(--gray-700); }
+  .ord-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .ord-title { font: 800 28px var(--font-sans); letter-spacing: -0.01em; margin: 0 0 18px; }
+
+  .tr-card { background: white; border: 1px solid #E2E8EE; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .tr-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .tr-fact .k { font: 700 10.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 4px; }
+  .tr-fact .v { font: 700 14px var(--font-sans); }
+  .tr-fact .s { color: var(--gray-500); font-size: 12px; }
+  .tr-note { margin-top: 12px; color: var(--gray-600); }
+  .tr-undone { padding: 10px 12px; border-radius: 8px; background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; font-weight: 600; margin-bottom: 14px; }
+  .tr-table { width: 100%; border-collapse: collapse; }
+  .tr-table th { text-align: left; font: 700 10.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-500); padding: 8px 10px; border-bottom: 1px solid #E2E8EE; }
+  .tr-table td { padding: 9px 10px; border-bottom: 1px solid #F1F4F7; }
+  .tr-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tr-table .mono { font-family: var(--font-mono); font-size: 12.5px; }
+  .tr-table tfoot td { font-weight: 800; border-bottom: none; border-top: 2px solid #E2E8EE; }
+  .tr-btn {
+    display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px;
+    border-radius: 8px; border: 1px solid #FECACA; background: white; cursor: pointer;
+    font: 700 13px var(--font-sans); color: #B91C1C;
+  }
+  .tr-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+  .tr-foot .hint { color: var(--gray-600); font-size: 12.5px; }
+  .tr-msg { margin-top: 10px; padding: 9px 12px; border-radius: 8px; font: 500 12.5px var(--font-sans); display: none; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+  .tr-msg ul { margin: 6px 0 0; padding-left: 18px; }
+  @media (max-width: 760px) { .tr-facts { grid-template-columns: 1fr 1fr; } .ord { padding: 16px 14px 80px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ord">
+  <div class="od-crumbs">
+    <a href="{{ back_url }}" class="od-back">
+      <i class="fa fa-arrow-left"></i>{% trans "Back" %}
+    </a>
+    <span class="od-sep">/</span>
+    <span class="od-crumb-here">{{ transfer.number }}</span>
+  </div>
+
+  <div class="ord-eyebrow">{% trans "Stock transfer at cost" %}</div>
+  <h1 class="ord-title">{{ transfer.number }}</h1>
+
+  {% if transfer.is_undone %}
+  <div class="tr-undone">
+    <i class="fa fa-rotate-left"></i>
+    {% blocktrans with when=transfer.undone_at|date:"d.m.Y H:i" %}Undone on {{ when }}. The stock items went back and neither book carries this transfer.{% endblocktrans %}
+  </div>
+  {% endif %}
+
+  <div class="tr-card">
+    <div class="tr-facts">
+      <div class="tr-fact">
+        <div class="k">{% trans "From warehouse" %}</div>
+        <div class="v">{{ transfer.from_warehouse.name }}</div>
+        <div class="s">{{ transfer.from_book.name }}</div>
+      </div>
+      <div class="tr-fact">
+        <div class="k">{% trans "To warehouse" %}</div>
+        <div class="v">{{ transfer.to_warehouse.name }}</div>
+        <div class="s">{{ transfer.to_book.name }}</div>
+      </div>
+      <div class="tr-fact">
+        <div class="k">{% trans "Date" %}</div>
+        <div class="v">{{ transfer.date|date:"d.m.Y" }}</div>
+        <div class="s">{% if transfer.created_by %}{{ transfer.created_by }}{% endif %}</div>
+      </div>
+      <div class="tr-fact">
+        <div class="k">{% trans "Receiving purchase" %}</div>
+        <div class="v">
+          {% if sees_purchase %}
+          <a href="{% url 'accounts:purchase_order_detail' transfer.purchase.pk %}">{{ transfer.purchase.display_number }}</a>
+          {% else %}{{ transfer.purchase.display_number }}{% endif %}
+        </div>
+        <div class="s">{{ transfer.purchase.total|floatformat:"2g" }} {{ transfer.purchase.currency.code }}</div>
+      </div>
+    </div>
+    {% if transfer.note %}<div class="tr-note">{{ transfer.note }}</div>{% endif %}
+  </div>
+
+  <div class="tr-card">
+    <table class="tr-table">
+      <thead>
+        <tr>
+          <th>{% trans "Barcode" %}</th>
+          <th>{% trans "SKU" %}</th>
+          <th>{% trans "Product" %}</th>
+          <th class="num">{% trans "Quantity" %}</th>
+          <th class="num">{% trans "Unit cost" %}</th>
+          <th class="num">{% trans "Value" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in lines %}
+        <tr>
+          <td class="mono">{{ line.barcode }}</td>
+          <td class="mono">{{ line.sku }}</td>
+          <td>{{ line.name }}</td>
+          <td class="num">{{ line.quantity|floatformat:"-2g" }}</td>
+          <td class="num">{{ line.unit_cost|floatformat:"-4g" }}</td>
+          <td class="num">{{ line.value|floatformat:"2g" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">{{ lines|length }} {% trans "stock items" %}</td>
+          <td class="num">{{ meters|floatformat:"-2g" }}</td>
+          <td></td>
+          <td class="num">{{ transfer.value|floatformat:"2g" }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    {% if can_undo %}
+    <div class="tr-foot">
+      <div class="hint">{% trans "Undoing sends the stock items back and cancels the purchase. It works only while every item is still as it arrived." %}</div>
+      <button type="button" class="tr-btn" id="trUndo"><i class="fa fa-rotate-left"></i>{% trans "Undo transfer" %}</button>
+    </div>
+    <div class="tr-msg" id="trMsg"></div>
+    {% endif %}
+  </div>
+</div>
+
+{% if can_undo %}
+<script>
+(function () {
+  var btn = document.getElementById('trUndo');
+  var msg = document.getElementById('trMsg');
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+    });
+  }
+  btn.addEventListener('click', function () {
+    if (!confirm('{% trans "Undo this transfer and send the stock items back?" %}')) return;
+    btn.disabled = true;
+    fetch("{% url 'operating:stock_transfer_undo' transfer.pk %}", {
+      method: 'POST',
+      headers: {'X-CSRFToken': "{{ csrf_token }}", 'X-Requested-With': 'XMLHttpRequest'}
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.success) { window.location.reload(); return; }
+        var html = esc(d.error);
+        if (d.blocked && d.blocked.length) {
+          html += '<ul>' + d.blocked.map(function (b) {
+            return '<li><b>' + esc(b.barcode) + '</b> — ' + esc(b.reason) + '</li>';
+          }).join('') + '</ul>';
+        }
+        msg.innerHTML = html;
+        msg.style.display = 'block';
+        btn.disabled = false;
+      })
+      .catch(function () { btn.disabled = false; });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -224,6 +224,22 @@ def derive_catalog(sku, name, color=None):
     return parsed
 
 
+def _stock_cost(variant):
+    """The variant's stock average, to the cent the cost column keeps."""
+    from marketing.models import stock_costs
+    held = stock_costs([variant.pk]).get(variant.pk)
+    return held.quantize(Decimal("0.01")) if held is not None else None
+
+
+def remember_stock_cost(variant):
+    """Leave the stock's average in the stored cost, for the day the stock
+    runs out. Called once a receipt's rows are linked to the variant."""
+    held = _stock_cost(variant)
+    if held is not None and held != variant.variant_cost:
+        variant.variant_cost = held
+        variant.save(update_fields=["variant_cost"])
+
+
 def _to_decimal(v):
     if v in (None, ""):
         return None
@@ -434,7 +450,15 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
             variant.variant_featured = False
         if variant_barcode and not variant.variant_barcode:
             variant.variant_barcode = variant_barcode[:14]
-        if cost_dec is not None:
+        # The stored cost is only the answer while nothing priced is in
+        # stock (ProductVariant.live_cost), so it keeps the last thing
+        # known: the stock's average while there is stock to average, and
+        # this purchase's price only when there is none — a last-purchase
+        # price written over it every receipt was neither.
+        held = _stock_cost(variant)
+        if held is not None:
+            variant.variant_cost = held
+        elif cost_dec is not None:
             variant.variant_cost = cost_dec
         variant.save(update_fields=[
             "variant_featured", "variant_barcode", "variant_cost",

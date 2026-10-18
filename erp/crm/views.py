@@ -480,9 +480,14 @@ class ContactDetail(generic.DetailView):
         # the row template links to operating:order_detail for the
         # full picture.
         from operating.models import Order
-        context["orders"] = Order.with_pre_order_flag(
-            of_books_in_reach(Order.objects.filter(contact=contact), "current_account__book").order_by("-created_at")
-        )[:25]
+        # One row per order — a split order's halves on one — each with
+        # what it comes to.
+        from operating.split_orders import order_rows
+        context["orders"] = order_rows(Order.with_pre_order_flag(
+            of_books_in_reach(Order.objects.filter(contact=contact), "current_account__book")
+            .select_related("currency").prefetch_related("items", "adjustments")
+            .order_by("-created_at")
+        )[:25])
 
         # ── Samples this contact has been given ───────────────
         from operating.samples import sample_card_context
@@ -638,9 +643,14 @@ class CompanyDetail(generic.DetailView):
 
         # ── Order history for this company ────────────────────
         from operating.models import Order
-        context["orders"] = Order.with_pre_order_flag(
-            of_books_in_reach(Order.objects.filter(company=company), "current_account__book").order_by("-created_at")
-        )[:25]
+        # One row per order — a split order's halves on one — each with
+        # what it comes to.
+        from operating.split_orders import order_rows
+        context["orders"] = order_rows(Order.with_pre_order_flag(
+            of_books_in_reach(Order.objects.filter(company=company), "current_account__book")
+            .select_related("currency").prefetch_related("items", "adjustments")
+            .order_by("-created_at")
+        )[:25])
 
         # ── Samples this company has been given ───────────────
         # Its own and its people's: a sample handed to the buyer is a

@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+{% load i18n static %}
+
+{% block title %}{% trans "Transfer stock to another book" %} | Nejum ERP{% endblock %}
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .ord { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 1100px; }
+  .od-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-back {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: white;
+    border: 1px solid #E0E6EE; border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: var(--gray-700); text-decoration: none;
+  }
+  .od-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-sep { color: var(--gray-400); }
+  .od-crumb-here { font: 600 12.5px var(--font-sans); color: var(--gray-700); }
+  .ord-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .ord-title { font: 800 28px var(--font-sans); letter-spacing: -0.01em; margin: 0 0 6px; }
+  .ord-lead { color: var(--gray-600); margin: 0 0 18px; max-width: 760px; line-height: 1.55; }
+
+  .tr-card { background: white; border: 1px solid #E2E8EE; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .tr-card h3 { margin: 0 0 12px; font: 700 14px var(--font-sans); }
+  .tr-grid { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 12px; }
+  .tr-field label { display: block; font: 700 10.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 5px; }
+  .tr-field select, .tr-field input {
+    width: 100%; height: 38px; padding: 0 10px; border: 1px solid #D5DCE4; border-radius: 8px;
+    font: 500 13.5px var(--font-sans); background: white; box-sizing: border-box;
+  }
+  .tr-scan { display: flex; gap: 8px; }
+  .tr-scan { align-items: flex-start; }
+  .tr-scan textarea {
+    flex: 1; min-width: 0; min-height: 42px; max-height: 190px; resize: vertical; box-sizing: border-box;
+    padding: 10px 12px; border: 1px solid #D5DCE4; border-radius: 8px;
+    font: 600 14px/1.4 var(--font-mono);
+  }
+  .tr-result { display: none; margin-top: 8px; padding: 8px 10px; border-radius: 7px; font: 600 11.5px var(--font-sans); }
+  .tr-result code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 4px; }
+  .tr-btn {
+    display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 16px;
+    border-radius: 8px; border: 1px solid #D5DCE4; background: white; cursor: pointer;
+    font: 700 13px var(--font-sans); color: var(--gray-700);
+  }
+  .tr-btn.primary { background: var(--nejum-teal-600); border-color: var(--nejum-teal-600); color: white; }
+  .tr-btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .tr-msg { margin-top: 10px; padding: 9px 12px; border-radius: 8px; font: 500 12.5px var(--font-sans); display: none; }
+  .tr-msg.err { display: block; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+  .tr-msg ul { margin: 6px 0 0; padding-left: 18px; }
+
+  .tr-table { width: 100%; border-collapse: collapse; }
+  .tr-table th { text-align: left; font: 700 10.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-500); padding: 8px 10px; border-bottom: 1px solid #E2E8EE; }
+  .tr-table td { padding: 9px 10px; border-bottom: 1px solid #F1F4F7; vertical-align: middle; }
+  .tr-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tr-table .mono { font-family: var(--font-mono); font-size: 12.5px; }
+  .tr-table tr.bad td { background: #FFFBEB; }
+  .tr-bad { color: #B45309; font: 600 11.5px var(--font-sans); }
+  .tr-table tfoot td { font-weight: 800; border-bottom: none; border-top: 2px solid #E2E8EE; }
+  .tr-x { padding: 0; width: 26px; height: 26px; border: none; background: none; color: var(--gray-400); cursor: pointer; border-radius: 6px; }
+  .tr-x:hover { background: #F1F4F7; color: #B91C1C; }
+  .tr-empty { padding: 26px 10px; text-align: center; color: var(--gray-500); }
+  .tr-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+  .tr-foot .hint { color: var(--gray-600); font-size: 12.5px; line-height: 1.5; }
+  .tr-undone { color: var(--gray-500); text-decoration: line-through; }
+  @media (max-width: 760px) { .tr-grid { grid-template-columns: 1fr; } .ord { padding: 16px 14px 80px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ord">
+  <div class="od-crumbs">
+    <a href="{% url 'operating:warehouse_detail' warehouse.pk %}" class="od-back">
+      <i class="fa fa-arrow-left"></i>{{ warehouse.name }}
+    </a>
+    <span class="od-sep">/</span>
+    <span class="od-crumb-here">{% trans "Transfer to another book" %}</span>
+  </div>
+
+  <div class="ord-eyebrow">{{ warehouse.accounting_book.name }}</div>
+  <h1 class="ord-title">{% trans "Transfer stock to another book" %}</h1>
+  <p class="ord-lead">
+    {% blocktrans with book=warehouse.accounting_book.name %}The stock items leave {{ book }} at what they cost and arrive in the other book as a purchase at that same cost. The other book owes {{ book }} for them on the inter-company account; no sale and no profit is recorded.{% endblocktrans %}
+  </p>
+
+  {% if not targets %}
+  <div class="tr-card">
+    {% trans "There is no warehouse to transfer to. A transfer needs a warehouse in another book you work in, and that book must keep an inter-company account paired with this one." %}
+  </div>
+  {% else %}
+  <div class="tr-card">
+    <div class="tr-grid">
+      <div class="tr-field">
+        <label for="trTarget">{% trans "To warehouse" %}</label>
+        <select id="trTarget">
+          {% for t in targets %}
+          <option value="{{ t.pk }}">{{ t.name }} — {{ t.accounting_book.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="tr-field">
+        <label for="trDate">{% trans "Date" %}</label>
+        <input type="date" id="trDate" value="{{ today|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
+      </div>
+      <div class="tr-field">
+        <label for="trNote">{% trans "Note" %}</label>
+        <input type="text" id="trNote" maxlength="300">
+      </div>
+    </div>
+  </div>
+
+  <div class="tr-card">
+    <h3>{% trans "Stock items" %}</h3>
+    <form class="tr-scan" id="trScanForm">
+      {% comment %}A textarea, as on the order form: a column copied out of
+      Excel is one barcode per line, and an <input> strips the newlines
+      into one unfindable code. Enter still adds, so a scanner behaves as
+      before; Shift+Enter adds a line by hand.{% endcomment %}
+      <textarea id="trCode" rows="1" autocomplete="off" autofocus
+                placeholder="{% trans 'Scan, type, or paste a list of barcodes — or a SKU to add all of its stock items' %}"></textarea>
+      <button type="submit" class="tr-btn"><i class="fa fa-plus"></i>{% trans "Add" %}</button>
+    </form>
+    <div class="tr-result" id="trResult"></div>
+    <div class="tr-msg" id="trMsg"></div>
+
+    <table class="tr-table" style="margin-top:12px;">
+      <thead>
+        <tr>
+          <th>{% trans "Barcode" %}</th>
+          <th>{% trans "Product" %}</th>
+          <th class="num">{% trans "Quantity" %}</th>
+          <th class="num">{% trans "Unit cost" %}</th>
+          <th class="num">{% trans "Value" %}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="trRows">
+        <tr id="trEmpty"><td colspan="6" class="tr-empty">{% trans "Nothing added yet." %}</td></tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2"><span id="trCount">0</span> {% trans "stock items" %}</td>
+          <td class="num" id="trQty">0</td>
+          <td></td>
+          <td class="num" id="trValue">0.00</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="tr-foot">
+      <div class="hint">{% trans "Only whole stock items that are not held for an order can be transferred." %}</div>
+      <button type="button" class="tr-btn primary" id="trSend" disabled>
+        <i class="fa fa-right-left"></i>{% trans "Transfer at cost" %}
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if transfers %}
+  <div class="tr-card">
+    <h3>{% trans "Transfers of this warehouse" %}</h3>
+    <table class="tr-table">
+      <thead>
+        <tr>
+          <th>{% trans "Number" %}</th>
+          <th>{% trans "Date" %}</th>
+          <th>{% trans "From warehouse" %}</th>
+          <th>{% trans "To warehouse" %}</th>
+          <th class="num">{% trans "Value" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transfers %}
+        <tr>
+          <td class="mono"><a href="{% url 'operating:stock_transfer_detail' t.pk %}"{% if t.is_undone %} class="tr-undone"{% endif %}>{{ t.number }}</a>{% if t.is_undone %} <span class="tr-bad">{% trans "undone" %}</span>{% endif %}</td>
+          <td>{{ t.date|date:"d.m.Y" }}</td>
+          <td>{{ t.from_warehouse.name }}</td>
+          <td>{{ t.to_warehouse.name }}</td>
+          <td class="num">{{ t.purchase.total|floatformat:"2g" }} {{ t.purchase.currency.code }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% if targets %}
+<script>
+(function () {
+  var FIND_URL = "{% url 'operating:stock_transfer_find' warehouse.pk %}";
+  var SEND_URL = "{% url 'operating:stock_transfer_create' warehouse.pk %}";
+  var CSRF = "{{ csrf_token }}";
+  var rolls = {};          // id → roll, in the order added
+  var order = [];
+
+  var rowsEl = document.getElementById('trRows');
+  var msgEl = document.getElementById('trMsg');
+  var codeEl = document.getElementById('trCode');
+  var sendEl = document.getElementById('trSend');
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+    });
+  }
+  function money(n) { return (n == null) ? '—' : Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+  function qty(n) { return Number(n).toLocaleString(undefined, {maximumFractionDigits: 2}); }
+
+  function say(text, blocked) {
+    if (!text) { msgEl.className = 'tr-msg'; msgEl.innerHTML = ''; return; }
+    var html = esc(text);
+    if (blocked && blocked.length) {
+      html += '<ul>' + blocked.map(function (b) {
+        return '<li><b>' + esc(b.barcode) + '</b> — ' + esc(b.reason) + '</li>';
+      }).join('') + '</ul>';
+    }
+    msgEl.className = 'tr-msg err';
+    msgEl.innerHTML = html;
+  }
+
+  function render() {
+    var good = 0, totalQty = 0, totalValue = 0, bad = 0;
+    if (!order.length) {
+      rowsEl.innerHTML = '<tr id="trEmpty"><td colspan="6" class="tr-empty">{% trans "Nothing added yet." %}</td></tr>';
+    } else {
+      rowsEl.innerHTML = order.map(function (id) {
+        var r = rolls[id];
+        if (r.problem) { bad++; } else { good++; totalQty += r.quantity; totalValue += (r.value || 0); }
+        return '<tr class="' + (r.problem ? 'bad' : '') + '">' +
+          '<td class="mono">' + esc(r.barcode) + '</td>' +
+          '<td>' + esc(r.name) + (r.sku ? ' <span class="mono" style="color:#6B7280;">' + esc(r.sku) + '</span>' : '') +
+            (r.problem ? '<div class="tr-bad"><i class="fa fa-triangle-exclamation"></i> ' + esc(r.problem) + '</div>' : '') + '</td>' +
+          '<td class="num">' + qty(r.quantity) + ' ' + esc(r.unit) + '</td>' +
+          '<td class="num">' + (r.unit_cost == null ? '—' : Number(r.unit_cost).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})) + '</td>' +
+          '<td class="num">' + money(r.value) + '</td>' +
+          '<td class="num"><button type="button" class="tr-x" data-id="' + id + '" title="{% trans "Remove" %}"><i class="fa fa-xmark"></i></button></td>' +
+        '</tr>';
+      }).join('');
+    }
+    document.getElementById('trCount').textContent = good;
+    document.getElementById('trQty').textContent = qty(totalQty);
+    document.getElementById('trValue').textContent = money(totalValue);
+    sendEl.disabled = !good || bad > 0;
+  }
+
+  rowsEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('.tr-x');
+    if (!btn) return;
+    var id = Number(btn.dataset.id);
+    delete rolls[id];
+    order = order.filter(function (x) { return x !== id; });
+    render();
+  });
+
+  // A pasted column, one code per line. Excel gives newlines; a scanner
+  // gives one code and an Enter; someone typing might use spaces or
+  // commas. All of it splits the same way.
+  function codesIn(raw) {
+    return (raw || '').split(/[\s,;]+/)
+      .map(function (c) { return c.trim(); })
+      .filter(function (c) { return c.length > 0; });
+  }
+  // Grow the box to what has been pasted into it, up to the CSS cap.
+  function grow() {
+    codeEl.style.height = 'auto';
+    codeEl.style.height = Math.min(codeEl.scrollHeight + 2, 190) + 'px';
+  }
+  var resultEl = document.getElementById('trResult');
+  function result(html, tone) {
+    if (!html) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; return; }
+    var c = tone === 'bad'  ? ['#FEF2F2', '#FECACA', '#991B1B']
+          : tone === 'warn' ? ['#FFFBEB', '#FDE68A', '#92400E']
+          :                   ['#F0FDF4', '#BBF7D0', '#166534'];
+    resultEl.style.background = c[0];
+    resultEl.style.border = '1px solid ' + c[1];
+    resultEl.style.color = c[2];
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = html;
+  }
+
+  function addCodes() {
+    var codes = codesIn(codeEl.value);
+    if (!codes.length) return;
+    say('');
+    result('<i class="fa fa-spinner fa-spin"></i> {% trans "Adding" %}…', 'ok');
+    fetch(FIND_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'},
+      body: JSON.stringify({codes: codes})
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.success) { result(''); say(d.error); return; }
+        var added = 0, already = 0;
+        d.rolls.forEach(function (r) {
+          if (r.id in rolls) { already++; } else { order.push(r.id); added++; }
+          rolls[r.id] = r;
+        });
+        codeEl.value = '';
+        grow();
+        render();
+        var skipped = d.skipped || [];
+        // One code that went on needs no report; the row is the report.
+        if (codes.length === 1 && !skipped.length && !already) { result(''); return; }
+        var head = '<b>' + added + '</b> {% trans "added" %}';
+        if (already) head += ' · <b>' + already + '</b> {% trans "already in the list" %}';
+        if (!skipped.length) { result(head, 'ok'); return; }
+        result(
+          head + ' · <b>' + skipped.length + '</b> {% trans "skipped" %}' +
+          '<div style="margin-top:5px;font-weight:500;line-height:1.5;">' +
+          skipped.map(function (f) {
+            return '<code>' + esc(f.code) + '</code> — ' + esc(f.why);
+          }).join('<br>') + '</div>',
+          added ? 'warn' : 'bad');
+      })
+      .catch(function () { result(''); say('{% trans "Could not reach the server. Try again." %}'); })
+      .finally(function () { codeEl.focus(); });
+  }
+
+  codeEl.addEventListener('input', grow);
+  codeEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addCodes(); }
+  });
+  document.getElementById('trScanForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    addCodes();
+  });
+
+  sendEl.addEventListener('click', function () {
+    var target = document.getElementById('trTarget');
+    var label = target.options[target.selectedIndex].text;
+    if (!confirm('{% trans "Transfer these stock items at cost to" %} ' + label + '?')) return;
+    sendEl.disabled = true;
+    say('');
+    fetch(SEND_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'},
+      body: JSON.stringify({
+        to_warehouse: target.value,
+        roll_ids: order,
+        date: document.getElementById('trDate').value,
+        note: document.getElementById('trNote').value
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.success) { window.location.href = d.url; return; }
+        say(d.error, d.blocked);
+        sendEl.disabled = false;
+      })
+      .catch(function () {
+        say('{% trans "Could not reach the server. Try again." %}');
+        sendEl.disabled = false;
+      });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

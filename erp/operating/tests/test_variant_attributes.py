@@ -235,7 +235,7 @@ class ProductGroupPresetTest(TestCase):
 
     def test_the_group_page_saves_the_preset_in_order(self):
         url = reverse("marketing:product_group_detail", args=[self.group.pk])
-        r = self.client.post(url, {"action": "save_settings", "name": self.group.name,
+        r = self.client.post(url, {"action": "save_settings", "name": self.group.name, "price_multiplier": "4/3",
                                    "variant_attributes_sent": "1",
                                    "variant_attributes": ["Color", "Size Per Panel", "header", "color"]})
         self.assertEqual(r.status_code, 200, r.content)
@@ -247,12 +247,12 @@ class ProductGroupPresetTest(TestCase):
         CategoryVariantAttribute.objects.create(
             category=self.group, attribute=ProductVariantAttribute.objects.create(name="color"))
         url = reverse("marketing:product_group_detail", args=[self.group.pk])
-        self.client.post(url, {"action": "save_settings", "name": self.group.name})
+        self.client.post(url, {"action": "save_settings", "name": self.group.name, "price_multiplier": "4/3"})
         self.assertEqual(self.group.variant_attribute_names(), ["color"])
 
     def test_a_new_group_can_start_with_a_preset(self):
         r = self.client.post(reverse("marketing:product_group_create"),
-                             {"name": "Towels", "variant_attributes_sent": "1",
+                             {"name": "Towels", "variant_attributes_sent": "1", "price_multiplier": "4/3",
                               "variant_attributes": ["color", "size"]})
         self.assertEqual(r.status_code, 200, r.content)
         group = ProductCategory.objects.get(pk=r.json()["id"])

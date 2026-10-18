@@ -101,9 +101,14 @@ def _next_payment_number(book, ptype):
 
 
 def _filter_payments(request):
+    # One book's payments, not every book's. The route is
+    # books/<id>/payments/, so book_scoped has already resolved
+    # request.book; without this filter the page listed every book's
+    # payments under whichever book you opened it in and summed them
+    # into that book's collected and paid totals.
     qs = (Payment.objects
           .select_related("current_account", "book", "currency", "cash_account")
-          .all())
+          .filter(book=request.book))
 
     # Both free-text filters fold each side to plain uppercase ASCII —
     # current account names are stored in uppercase Turkish, ILIKE folds only ASCII
@@ -290,20 +295,23 @@ class PaymentCreate(View):
     template_name = "accounts/payment_form.html"
 
     def get(self, request):
+        # Everything the form offers comes from the book in the path —
+        # the accounts, the cash accounts, and the ?account= it opens on.
+        # It used to offer every book's, so a member assigned one book
+        # could read the others' customer names off the dropdown.
         prefilled_current_account = None
         current_account_id = request.GET.get("account")
         if current_account_id and current_account_id.isdigit():
-            prefilled_current_account = CurrentAccount.objects.filter(pk=int(current_account_id)).first()
+            prefilled_current_account = CurrentAccount.objects.filter(
+                pk=int(current_account_id), book=request.book).first()
 
         current_account_options = (
-            CurrentAccount.objects.filter(is_active=True).order_by("name")
+            CurrentAccount.objects.filter(book=request.book, is_active=True).order_by("name")
             if not prefilled_current_account else CurrentAccount.objects.none()
         )
 
-        # Cash accounts scoped to prefilled current account's book if known
-        cash_qs = CashAccount.objects.select_related("currency", "book").all().order_by("book", "name")
-        if prefilled_current_account:
-            cash_qs = cash_qs.filter(book=prefilled_current_account.book)
+        cash_qs = (CashAccount.objects.select_related("currency", "book")
+                   .filter(book=request.book).order_by("name"))
 
         # "Take Payment" / "Make Payment" land here with ?type= so the
         # form opens on the right side without the user re-picking it.
@@ -329,7 +337,10 @@ class PaymentCreate(View):
         if not current_account_id:
             messages.error(request, _g("An account must be selected."))
             return redirect("accounts:payment_create", book_id=request.book.pk)
-        current_account = get_object_or_404(CurrentAccount, pk=int(current_account_id))
+        # The form only offers this book's accounts; a posted id is held
+        # to the same rule, or the dropdown would be the only lock.
+        current_account = get_object_or_404(
+            CurrentAccount, pk=int(current_account_id), book=request.book)
 
         amount = _D(request.POST.get("amount"))
         if amount <= 0:
@@ -340,6 +351,8 @@ class PaymentCreate(View):
         method = request.POST.get("method") or "bank_transfer"
         currency_id = int(request.POST.get("currency") or current_account.default_currency_id)
         cash_account_id = request.POST.get("cash_account") or None
+        if cash_account_id:
+            get_object_or_404(CashAccount, pk=int(cash_account_id), book=request.book)
 
         with transaction.atomic():
             payment = Payment(
@@ -476,6 +489,11 @@ class PaymentEdit(View):
             if currency_id:
                 payment.currency_id = int(currency_id)
             cash_account_id = request.POST.get("cash_account") or None
+            # This book's cash accounts, or the one it already had — the
+            # same set the form offers.
+            if cash_account_id and int(cash_account_id) != old_cash_id:
+                get_object_or_404(CashAccount, pk=int(cash_account_id),
+                                  book=payment.current_account.book)
             payment.cash_account_id = int(cash_account_id) if cash_account_id else None
             payment.set_stated_rate(_entered_rate(request))
             payment.description = request.POST.get("description", "")

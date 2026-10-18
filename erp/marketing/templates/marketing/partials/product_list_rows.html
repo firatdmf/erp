@@ -48,7 +48,7 @@
     </div>
 
     <div class="pr-price">
-      ${{ product.price|default:"0.00" }}
+      ${{ product.from_price|default:"0.00" }}
     </div>
 
     <span class="pr-status pc-status {% if stock <= 0 %}out{% elif stock < 10 %}low{% else %}on{% endif %}">

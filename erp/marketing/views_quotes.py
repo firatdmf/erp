@@ -751,14 +751,7 @@ def quote_product_search(request):
             "sku": v.variant_sku, "variant": True,
             "label": f"{v.product.title} {attrs}".strip(),
             "unit": getattr(v.product, "unit", "") or "",
-            "price": str(getattr(v.product, "price", "") or ""),
+            # Worked out from the variant's cost (marketing/pricing.py).
+            "price": str(v.live_price if v.live_price is not None else ""),
         })
-    seen = {r["sku"] for r in rows}
-    for p in (Product.objects.filter(fq("title") | fq("sku"))
-              .order_by("title")[:15]):
-        if p.sku in seen or p.variants.exists():
-            continue
-        rows.append({"sku": p.sku or "", "variant": False, "label": p.title,
-                     "unit": getattr(p, "unit", "") or "",
-                     "price": str(getattr(p, "price", "") or "")})
     return JsonResponse({"results": rows[:20]})

@@ -418,7 +418,8 @@ class LedgerAccount(View):
             in_range = in_range.filter(entry__date__lte=date_to)
 
         count = in_range.count()
-        ordered = (in_range.select_related("entry", "current_account", "cash_account")
+        ordered = (in_range.select_related("entry__source_type", "current_account",
+                                           "cash_account")
                    .order_by("entry__date", "entry_id", "pk"))
         hidden = max(0, count - self.LIMIT)
         lines = list(ordered[hidden:])
@@ -439,14 +440,20 @@ class LedgerAccount(View):
             if label not in bucket:
                 bucket.append(label)
 
+        # The page of whatever wrote each entry, as the journal links it.
+        urls = Journal._source_urls(request.book, [l.entry for l in lines])
+
         running = opening
         rows = []
         for line in lines:
             running += signed(line.debit, line.credit)
             party = line.current_account
+            entry = line.entry
+            model = entry.source_type.model if entry.source_type_id else ""
             rows.append({
                 "line": line,
-                "entry": line.entry,
+                "entry": entry,
+                "url": urls.get((model, entry.source_id), ""),
                 "text": line.memo or line.entry.description,
                 "against": others.get(line.entry_id, []),
                 "party": party,
@@ -620,8 +627,10 @@ class Journal(View):
         """{(model, id): url} for the entries whose source has a page.
 
         A movement's page is addressed by its account as well as its own
-        id, so those are fetched together rather than one per row. A source
-        with no page of its own — a stock movement — stays unlinked.
+        id, so those are fetched together rather than one per row. A stock
+        movement has no page of its own: it opens the order it was for, or
+        the product on its shelf when there was none. An entry the ledger
+        made for itself has nothing behind it and stays unlinked.
         """
         from django.urls import reverse
 
@@ -648,4 +657,17 @@ class Journal(View):
             for pk in by_model.get(model, ()):
                 urls[(model, pk)] = reverse(
                     f"accounting:equity_{name}_detail", args=[book.pk, pk])
+        for pk in by_model.get("stocktransfer", ()):
+            urls[("stocktransfer", pk)] = reverse(
+                "operating:stock_transfer_detail", args=[pk])
+        stock = by_model.get("stockmovement", ())
+        if stock:
+            from operating.models import StockMovement
+            for pk, order_id, warehouse_id, product_id in (
+                    StockMovement.objects.filter(pk__in=stock)
+                    .values_list("pk", "order_id", "product__warehouse_id", "product_id")):
+                urls[("stockmovement", pk)] = (
+                    reverse("operating:order_detail", args=[order_id]) if order_id else
+                    reverse("operating:warehouse_product_detail",
+                            args=[warehouse_id, product_id]))
         return urls

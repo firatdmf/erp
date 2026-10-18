@@ -130,68 +130,6 @@ class TheProductFormChecksItsVariantsFirst(TestCase):
             self.assertEqual(_skus_with_negative_money(payload), set(), payload)
 
 
-class GroupRepricingRefusesAMarginThatGoesBelowZero(TestCase):
-    def setUp(self):
-        user = get_user_model().objects.create_user(username="pricer", password="x")
-        # Of a book, so its products are theirs to reprice.
-        works_in_a_book(user)
-        self.client.force_login(user)
-        self.group = ProductCategory.objects.create(name="Curtains", profit_margin=Decimal("40"))
-        self.product = Product.objects.create(
-            title="Drape", sku="DRP1", category=self.group,
-            cost=Decimal("10"), price=Decimal("14"))
-        self.variant = ProductVariant.objects.create(
-            product=self.product, variant_sku="DRP1-A",
-            variant_cost=Decimal("20"), variant_price=Decimal("28"))
-
-    def apply(self):
-        return self.client.post(
-            reverse("marketing:product_group_detail", args=[self.group.pk]),
-            {"action": "apply_margin"})
-
-    def test_a_normal_margin_still_reprices(self):
-        self.group.profit_margin = Decimal("50")
-        self.group.save()
-
-        response = self.apply()
-
-        self.assertEqual(response.status_code, 200)
-        self.product.refresh_from_db()
-        self.variant.refresh_from_db()
-        self.assertEqual(self.product.price, Decimal("15.00"))
-        self.assertEqual(self.variant.variant_price, Decimal("30.00"))
-
-    def test_minus_one_hundred_prices_at_zero_which_is_allowed(self):
-        self.group.profit_margin = Decimal("-100")
-        self.group.save()
-
-        self.assertEqual(self.apply().status_code, 200)
-        self.product.refresh_from_db()
-        self.assertEqual(self.product.price, Decimal("0.00"))
-
-    def test_below_minus_one_hundred_is_refused_and_nothing_is_written(self):
-        self.product.profit_margin = Decimal("-150")   # the product's own override
-        self.product.save()
-
-        response = self.apply()
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("DRP1", response.json()["error"])
-        self.product.refresh_from_db()
-        self.variant.refresh_from_db()
-        self.assertEqual(self.product.price, Decimal("14"))
-        self.assertEqual(self.variant.variant_price, Decimal("28"))
-
-    def test_a_bad_margin_on_a_product_with_no_cost_blocks_nothing(self):
-        """It would never be repriced, so it is not a reason to stop."""
-        Product.objects.create(title="Uncosted", sku="NOCOST", category=self.group,
-                               profit_margin=Decimal("-500"))
-
-        self.assertEqual(self.apply().status_code, 200)
-        self.product.refresh_from_db()
-        self.assertEqual(self.product.price, Decimal("14.00"))
-
-
 class TheWarehouseSyncDoesNotMirrorANegativeCost(TestCase):
     def test_the_variant_is_still_created_just_without_the_cost(self):
         from operating.catalog_sync import sync_roll_to_catalog

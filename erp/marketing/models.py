@@ -185,12 +185,19 @@ class ProductCategory(models.Model):
     # without touching each product's featured flag.
     is_active = models.BooleanField(default=True)
 
-    # Pricing: % profit margin applied on top of cost when pricing the
-    # group's products (price = cost * (1 + margin/100)). The group page
-    # can bulk-apply this to every costed product/variant in the group.
+    # Superseded by price_multiplier (migration 0110 carried it over);
+    # read by nothing, dropped in a later release.
     profit_margin = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
         help_text=_lz("Margin % — added on top of cost (price = cost × (1 + margin/100))"),
+    )
+    # What the cost of the group's products is multiplied by to price them,
+    # as typed: "4/3", "3", "1.3" — worked out exactly by
+    # marketing.pricing.parse_multiplier. Every group has one: it is the
+    # only place a price comes from (a product may override it).
+    price_multiplier = models.CharField(
+        max_length=40, blank=True, default="",
+        help_text=_lz("Price = cost × this, e.g. 4/3"),
     )
 
     # Order rules — defaults for the B2B storefront.
@@ -389,9 +396,16 @@ class Product(models.Model):
     # ── Per-product OVERRIDES of the product group's defaults ──
     # Null = inherit from category; the effective_* properties below resolve
     # the fallback chain (product → category → None).
+    # Superseded by price_multiplier; read by nothing, dropped later.
     profit_margin = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
         help_text=_lz("Margin % — left blank, the product group's applies"),
+    )
+    # This product's own price multiplier ("4/3"), over its group's; blank
+    # takes the group's. See ProductCategory.price_multiplier.
+    price_multiplier = models.CharField(
+        max_length=40, blank=True, default="",
+        help_text=_lz("Price = cost × this — left blank, the product group's applies"),
     )
     minimum_order_quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
@@ -567,10 +581,12 @@ class Product(models.Model):
 
     # Fallback chain: product override → product group default → None.
     @property
-    def effective_profit_margin(self):
-        if self.profit_margin is not None:
-            return self.profit_margin
-        return self.category.profit_margin if self.category_id else None
+    def effective_price_multiplier(self):
+        """The multiplier text that prices this product: its own, else its
+        group's; "" when neither has one."""
+        if self.price_multiplier:
+            return self.price_multiplier
+        return self.category.price_multiplier if self.category_id else ""
 
     @property
     def effective_minimum_order_quantity(self):
@@ -599,6 +615,27 @@ class Product(models.Model):
     @live_quantity.setter
     def live_quantity(self, value):
         self.__dict__["_live_quantity"] = value
+
+    @property
+    def from_price(self):
+        """The lowest of the variants' prices, or None when none is priced.
+
+        A product has no price of its own: what is sold is a variant, and a
+        single item is a product with one. For lists use
+        pricing.attach_live_prices(), which sets this without a query per row.
+        """
+        if "_from_price" not in self.__dict__:
+            variants = attach_live_costs(self.variants.all())
+            for v in variants:
+                v.product = self
+            prices = [v.live_price for v in variants
+                      if v.live_price is not None]
+            self.__dict__["_from_price"] = min(prices) if prices else None
+        return self.__dict__["_from_price"]
+
+    @from_price.setter
+    def from_price(self, value):
+        self.__dict__["_from_price"] = value
 
     def _own_translation_text(self, lang, key):
         """A product's own per-language rich text, stored by the product form
@@ -780,6 +817,102 @@ class ProductVariant(models.Model):
         # Django assigns annotations onto the instance; without a setter the
         # annotated queryset would raise rather than fill the property.
         self.__dict__["_live_quantity"] = value
+
+    # NO authoritative cost column either, for anything the warehouse
+    # holds. What a variant costs is what the rolls standing on the floor
+    # cost — every warehouse's, weighted by the meters left on each — and
+    # that is read when it is asked for, like the quantity. `variant_cost`
+    # is only the answer while there is nothing priced in stock: typed by
+    # hand for a made-to-order product, the last known cost for one that
+    # has sold out or is still on its way.
+    @property
+    def stock_cost(self):
+        """Weighted average cost of this variant's priced stock on hand, or
+        None when there is none. For lists use attach_live_costs() or
+        with_live_cost() so it costs one query, not one per row."""
+        if "_stock_cost" not in self.__dict__:
+            self.__dict__["_stock_cost"] = stock_costs([self.pk]).get(self.pk)
+        return self.__dict__["_stock_cost"]
+
+    @stock_cost.setter
+    def stock_cost(self, value):
+        self.__dict__["_stock_cost"] = value
+
+    @property
+    def cost_is_computed(self):
+        """True while the cost comes from the warehouse, and so is not
+        something anyone can type."""
+        return self.stock_cost is not None
+
+    @property
+    def live_price(self):
+        """What this variant sells for: its live cost marked up and rounded
+        up to 0.05 — see marketing/pricing.py. None without a cost."""
+        from .pricing import multiplier_for, selling_price
+        return selling_price(self.live_cost, multiplier_for(self.product))
+
+    @property
+    def live_cost(self):
+        """What this variant costs now: the stock's average while there is
+        priced stock, the stored cost otherwise. None if neither."""
+        stock = self.stock_cost
+        return stock if stock is not None else self.variant_cost
+
+
+def _priced_stock():
+    """The stock items a cost can be read from: on the floor, with a cost.
+    The same rule as WarehouseProduct._stock_cost_exprs — quantity with no
+    cost in the divisor would report stock cheaper than anything held."""
+    from django.apps import apps
+    return (apps.get_model("operating", "WarehouseProductItem").objects
+            .filter(status__in=("in_stock", "partial"),
+                    unit_cost_base__isnull=False,
+                    quantity_remaining__gt=0))
+
+
+def stock_costs(variant_ids):
+    """{variant_id: weighted average cost of its priced stock on hand},
+    across every warehouse that holds it. Variants with none are absent.
+
+    In base currency, as each item's unit_cost_base is — every book is USD
+    today, which is what lets two books' rolls be averaged at all."""
+    from django.db.models import DecimalField, F, Sum
+    _dec = DecimalField(max_digits=20, decimal_places=6)
+    rows = (_priced_stock()
+            .filter(product__catalog_variant_id__in=list(variant_ids))
+            .values("product__catalog_variant_id")
+            .annotate(value=Sum(F("quantity_remaining") * F("unit_cost_base"), output_field=_dec),
+                      quantity=Sum("quantity_remaining", output_field=_dec)))
+    return {r["product__catalog_variant_id"]: (r["value"] / r["quantity"]).quantize(Decimal("0.0001"))
+            for r in rows if r["quantity"]}
+
+
+def attach_live_costs(variants):
+    """Give each of `variants` its stock_cost in ONE query, so reading
+    live_cost in a loop costs nothing more. Returns the list."""
+    variants = list(variants)
+    costs = stock_costs(v.pk for v in variants)
+    for v in variants:
+        v.stock_cost = costs.get(v.pk)
+    return variants
+
+
+def live_cost_expr(path=""):
+    """SQL for a variant's live cost, for an aggregate that can't loop:
+    the stock's weighted average, else the stored cost. `path` is the
+    lookup to the variant from the queryset's model ("product_variant__"),
+    empty for a ProductVariant queryset."""
+    from django.db.models import DecimalField, F, OuterRef, Subquery, Sum
+    from django.db.models.functions import Coalesce
+    _dec = DecimalField(max_digits=20, decimal_places=6)
+    key = f"{path}pk" if path else "pk"
+    held = (_priced_stock().filter(product__catalog_variant=OuterRef(key))
+            .values("product__catalog_variant")
+            .annotate(c=Sum(F("quantity_remaining") * F("unit_cost_base"), output_field=_dec)
+                      / Sum("quantity_remaining", output_field=_dec))
+            .values("c")[:1])
+    return Coalesce(Subquery(held, output_field=_dec), F(f"{path}variant_cost"),
+                    output_field=_dec)
 
 
 def with_live_quantity(queryset):

@@ -493,6 +493,50 @@ def subsidiary_equation(book):
     }
 
 
+def _inventory_unit_cost():
+    """What one unit of a WarehouseProductItem is carried at on the
+    balance sheet: its own stamp, else its purchase-invoice line, else the
+    product's current cost. NULL when none says — uncosted, not zero.
+    stock_unit_cost in services_posting is the same rule for one item."""
+    from django.db.models import DecimalField, F
+    from django.db.models.functions import Coalesce
+    return Coalesce(F("unit_cost_base"),
+                    F("purchase_invoice_item__unit_price"),
+                    F("product__cost_usd"),
+                    output_field=DecimalField(max_digits=18, decimal_places=6))
+
+
+def _inventory_line_value():
+    """quantity_remaining × _inventory_unit_cost, per item."""
+    from django.db.models import DecimalField, ExpressionWrapper, F
+    return ExpressionWrapper(F("quantity_remaining") * _inventory_unit_cost(),
+                             output_field=DecimalField(max_digits=18, decimal_places=6))
+
+
+def inventory_average_cost(items):
+    """Weighted average unit cost of `items` (WarehouseProductItems), at
+    exactly the cost the balance sheet carries them at.
+
+    Live items in a warehouse that belongs to a book only, so the value
+    here is a slice of some book's Inventory line. Items with no cost
+    basis stay out of both halves — counted in the divisor they would
+    pass for free stock. None when nothing costed is on the floor.
+    """
+    from django.db.models import DecimalField
+    valued = (items.filter(status__in=("in_stock", "partial"),
+                           product__warehouse__accounting_book__isnull=False)
+              .exclude(quantity_remaining=None)
+              .annotate(_unit_cost=_inventory_unit_cost())
+              .exclude(_unit_cost=None))
+    totals = valued.aggregate(
+        value=Sum(_inventory_line_value()),
+        quantity=Sum("quantity_remaining",
+                     output_field=DecimalField(max_digits=20, decimal_places=6)))
+    if not totals["quantity"]:
+        return None
+    return (totals["value"] / totals["quantity"]).quantize(Decimal("0.0001"))
+
+
 def _inventory_value(book, warehouse=None):
     """(value, unvalued roll count, unvalued meters) for a book's stock.
 
@@ -526,15 +570,11 @@ def _inventory_value(book, warehouse=None):
     same precision (JournalLine.debit), and the two are compared exactly;
     rounding this side alone is a difference of its own making.
     """
-    from django.db.models import DecimalField, ExpressionWrapper, F
-    from django.db.models.functions import Coalesce
-
     try:
         from operating.models import WarehouseProductItem
     except ImportError:          # operating not installed — inventory is 0
         return ZERO, 0, ZERO
 
-    money = DecimalField(max_digits=18, decimal_places=6)
     live = (WarehouseProductItem.objects
             .filter(product__warehouse__accounting_book=book,
                     status__in=("in_stock", "partial"))
@@ -542,13 +582,7 @@ def _inventory_value(book, warehouse=None):
     if warehouse is not None:
         live = live.filter(product__warehouse=warehouse)
 
-    unit_cost = Coalesce(F("unit_cost_base"),
-                         F("purchase_invoice_item__unit_price"),
-                         F("product__cost_usd"),
-                         output_field=money)
-    value = ExpressionWrapper(F("quantity_remaining") * unit_cost,
-                              output_field=money)
-    total = live.aggregate(v=Sum(value))["v"] or ZERO
+    total = live.aggregate(v=Sum(_inventory_line_value()))["v"] or ZERO
 
     unvalued = live.filter(unit_cost_base=None, purchase_invoice_item=None,
                            product__cost_usd=None)

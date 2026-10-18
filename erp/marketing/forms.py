@@ -35,7 +35,11 @@ class ProductForm(forms.ModelForm):
         fields = "__all__"
         # Collections are typed by name below (collection_names), not picked
         # from the model's multiple-choice list, which the page never drew.
-        exclude = ['datasheet_url', 'primary_image', 'collections']
+        # Price and cost live on the variants: every product has at least
+        # one, so the product's own two columns are read by nothing and
+        # are on their way out.
+        exclude = ['datasheet_url', 'primary_image', 'collections', 'price', 'cost',
+                   'profit_margin']
         widgets = {
             'featured': forms.CheckboxInput(attrs={'class': 'switch-input'}),
             'selling_while_out_of_stock': forms.CheckboxInput(attrs={'class': 'switch-input'}),
@@ -45,6 +49,31 @@ class ProductForm(forms.ModelForm):
     has_variants = forms.BooleanField(
         required=False, label="Does this product have variants?"
     )
+
+    # What the variants are priced and cost at, for the Pricing card; set
+    # in __init__ for a saved product — see there.
+    variants_price_low = None
+    variants_price_high = None
+    variants_cost = None
+    variants_cost_is_stored = False
+
+    # A single item: a product with no options. On screen it has no variant
+    # table, just these boxes; underneath it is one variant, which they are
+    # saved to (save_single_item). Its price is not typed: it is worked out
+    # from the cost (marketing/pricing.py) and shown as item_price_live. The page posts single_item=1
+    # while it is in that mode — adding an option leaves it.
+    item_sku = forms.CharField(
+        required=False, max_length=ProductVariant._meta.get_field("variant_sku").max_length,
+        label=gettext_lazy("Item SKU"),
+        widget=forms.TextInput(attrs={"class": "form-input", "autocomplete": "off"}))
+    item_cost = forms.DecimalField(
+        required=False, min_value=0, max_digits=10, decimal_places=2,
+        label=gettext_lazy("Cost per item"),
+        widget=forms.NumberInput(attrs={"class": "form-input", "step": "0.01", "placeholder": "0.00"}))
+    single_item = False
+    single_variant = None
+    item_cost_computed = None
+    item_price_live = None
 
     collection_names = forms.CharField(
         required=False,
@@ -122,11 +151,72 @@ class ProductForm(forms.ModelForm):
                 'placeholder': 'embroidery, sheer',
             })
 
+        # Every product is in a group: its price multiplier comes from there.
+        if 'category' in self.fields:
+            self.fields['category'].required = True
+
+        # No options and at most one variant: shown as a single item.
+        variants = list(self.instance.variants.prefetch_related(
+            "product_variant_attribute_values")) if self.instance.pk else []
+        if len(variants) <= 1 and not any(
+                v.product_variant_attribute_values.all() for v in variants):
+            self.single_item = True
+            if variants:
+                self.single_variant = variants[0]
+                self.fields["item_sku"].initial = variants[0].variant_sku
+                self.item_price_live = variants[0].live_price
+                self.fields["item_cost"].initial = variants[0].variant_cost
+                # Priced stock on hand says what it cost; nobody types that.
+                self.item_cost_computed = variants[0].stock_cost
+
         # If the instance has variants, set the has_variants field to True
         if self.instance and self.instance.pk:
             # Use count() instead of exists() for better compatibility with some cursor types
             if is_update and self.instance.variants.count() > 0:
                 self.fields["has_variants"].initial = True
+                # Price and cost are typed on each variant. The card shows
+                # what they come to: the lowest and highest variant price,
+                # and the cost of the variants' stock, weighted by what is
+                # on the floor and valued exactly as the balance sheet
+                # carries it — with nothing in stock, the plain mean of the
+                # variants' stored costs, shown as such.
+                prices = [v.live_price for v in attach_live_costs(self.instance.variants.all())
+                          if v.live_price is not None]
+                if prices:
+                    self.variants_price_low, self.variants_price_high = min(prices), max(prices)
+                from accounting.services_ledger import inventory_average_cost
+                from operating.models import WarehouseProductItem
+                self.variants_cost = inventory_average_cost(
+                    WarehouseProductItem.objects.filter(
+                        product__catalog_variant__product=self.instance))
+                if self.variants_cost is None:
+                    stored = [v.variant_cost for v in self.instance.variants.all()
+                              if v.variant_cost is not None]
+                    if stored:
+                        self.variants_cost = (sum(stored) / len(stored)).quantize(Decimal("0.0001"))
+                        self.variants_cost_is_stored = True
+
+    @property
+    def example_cost(self):
+        """The cost the multiplier box's preview works an example price
+        from: this product's own, where there is one."""
+        cost = self.item_cost_computed or self.variants_cost
+        if cost is None and self.single_variant is not None:
+            cost = self.single_variant.variant_cost
+        return "" if cost is None else format(Decimal(cost).quantize(Decimal("0.01")), "f")
+
+    def clean_price_multiplier(self):
+        """A formula the price can be worked out with, or blank for the
+        group's (marketing/pricing.py)."""
+        from .pricing import parse_multiplier
+        text = (self.cleaned_data.get("price_multiplier") or "").strip()
+        if text:
+            try:
+                parse_multiplier(text)
+            except ValueError:
+                raise forms.ValidationError(
+                    _("Type what the cost is multiplied by, e.g. 4/3 or 1.5."))
+        return text
 
     def clean_sku(self):
         """A NEW product's SKU is stored in capitals and carries no dot.
@@ -169,7 +259,102 @@ class ProductForm(forms.ModelForm):
                       "variant's own part in capitals (%(example)s): %(skus)s")
                     % {"example": f"{parent}.{_('WHITE-140')}", "skus": ", ".join(off)}
                 )
+        # A featured variant is on sale, so it has to cost something: its
+        # stock says what, and where it has none on hand (made to order,
+        # sold out) somebody must. One nobody sells can wait for its cost.
+        uncosted = sorted(self._featured_variants_without_a_cost())
+        if uncosted:
+            raise forms.ValidationError(
+                _("Enter a cost for these featured variants — they have no stock to "
+                  "take one from: %(skus)s") % {"skus": ", ".join(uncosted)}
+            )
+        if self._posted_single_item():
+            self._clean_single_item(cleaned_data)
+        # What is sold is always a variant — a single item is a product with
+        # one — so its SKU, price and cost have somewhere to live.
+        elif not self._has_variants(cleaned_data):
+            raise forms.ValidationError(
+                _("Add at least one variant. A single item has one, with no options."))
         return cleaned_data
+
+    def _featured_variants_without_a_cost(self):
+        """SKUs of the posted variants that are featured, carry no cost,
+        and have no priced stock to read one from."""
+        from .models import stock_costs
+        known = ({v.pk: v.variant_sku for v in self.instance.variants.all()}
+                 if self.instance.pk else {})
+        computed = set(stock_costs(known))
+        computed_skus = {known[pk] for pk in computed}
+        found = set()
+        for variant in _variant_dicts(self.data.get("variants_json")):
+            if not variant.get("variant_featured"):
+                continue
+            if variant.get("variant_cost") not in (None, ""):
+                continue
+            sku = str(variant.get("variant_sku") or "")
+            if variant.get("variant_id") in computed or sku in computed_skus:
+                continue
+            found.add(sku or "?")
+        return found
+
+    def _posted_single_item(self):
+        return self.data.get("single_item") == "1"
+
+    def _clean_single_item(self, cleaned_data):
+        """The single item's SKU is needed, and is its own; a featured one
+        with nothing in stock needs a cost, as any featured variant does."""
+        sku = (cleaned_data.get("item_sku") or "").strip()
+        if not sku:
+            self.add_error("item_sku", _("Enter the item's SKU — stock, barcodes and orders use it."))
+            return
+        taken = ProductVariant.objects.filter(variant_sku=sku)
+        if self.single_variant is not None:
+            taken = taken.exclude(pk=self.single_variant.pk)
+        if taken.exists():
+            self.add_error("item_sku", _("Another variant already has this SKU."))
+        cleaned_data["item_sku"] = sku
+        if (self.item_cost_computed is None and cleaned_data.get("item_cost") is None
+                and "item_cost" not in self.errors
+                and (self.single_variant is None or self.single_variant.variant_featured)):
+            self.add_error("item_cost", _("Enter the cost — nothing is in stock to take one from."))
+
+    def save_single_item(self, product):
+        """Write the single item's boxes to its one variant, creating it
+        for a new product. Called by the views after the variants are
+        handled, so a new product's "no variants" pass cannot remove it."""
+        if not self._posted_single_item():
+            return None
+        variant = self.single_variant
+        if variant is None:
+            variant = product.variants.first() if product.variants.count() == 1 else None
+        if variant is None:
+            variant = ProductVariant(product=product)
+        variant.variant_sku = self.cleaned_data["item_sku"]
+        if self.item_cost_computed is None:
+            variant.variant_cost = self.cleaned_data.get("item_cost")
+        variant.save()
+        return variant
+
+    def _has_variants(self, cleaned_data):
+        """Whether the product will have variants once this form is saved.
+        The page posts them as variants_json; a form built without it (an
+        import, a test) is judged by the switch and by what the product
+        already has."""
+        if "variants_json" in self.data:
+            if _variant_dicts(self.data.get("variants_json")):
+                return True
+            # An empty list leaves the saved variants alone (handle_variants
+            # deletes only what it is told to); "delete all" does not.
+            try:
+                payload = json.loads(self.data.get("variants_json") or "[]")
+            except (TypeError, ValueError):
+                payload = []
+            if isinstance(payload, dict) and payload.get("delete_all_variants"):
+                return False
+            return bool(self.instance.pk and self.instance.variants.exists())
+        if cleaned_data.get("has_variants"):
+            return True
+        return bool(self.instance.pk and self.instance.variants.exists())
 
 
 def _variant_dicts(variants_json):
@@ -189,11 +374,21 @@ def _variant_dicts(variants_json):
 def _skus_off_the_parent(variants_json, parent):
     """The variant SKUs that do not read PARENT.SUFFIX — the parent SKU, a
     dot, and a non-empty suffix already in capitals. Enforced on new
-    products only; see ProductForm.clean_sku."""
+    products only; see ProductForm.clean_sku.
+
+    A variant with no option values (a single item's one variant) has no
+    suffix to build: its SKU is typed by hand, and only has to be there."""
     prefix = f"{parent}."
     found = set()
     for variant in _variant_dicts(variants_json):
         sku = str(variant.get("variant_sku") or "")
+        # The page always sends the variant's option values; an empty set
+        # is a variant with no options.
+        values = variant.get("variant_attribute_values")
+        if isinstance(values, dict) and not any(str(v or "").strip() for v in values.values()):
+            if not sku.strip():
+                found.add("?")
+            continue
         suffix = sku[len(prefix):] if sku.startswith(prefix) else ""
         if not suffix.strip() or suffix != suffix.upper():
             found.add(sku or "?")

@@ -31,10 +31,11 @@ class OrderCostIsHiddenFromSalesRep(TestCase):
                 code="USD", name="US Dollar", symbol="$"))
         self.order = Order.objects.create(
             order_number="DK0000301", current_account=account, order_status="pending")
-        product = Product.objects.create(title="Crepe", sku="KZL000315",
-                                         price=10, cost=Decimal("1.37"))
+        product = Product.objects.create(title="Crepe", sku="KZL000315")
         self.item = OrderItem.objects.create(
             order=self.order, product=product,
+            product_variant=product.variants.create(
+                variant_sku="KZL000315", variant_price=10, variant_cost=Decimal("1.37")),
             quantity=Decimal("100.00"), price=Decimal("2.50"))
 
         self.user = User.objects.create_user("rep_test", password="pw")

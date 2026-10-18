@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book
-from marketing.models import (Product, ProductVariant,
+from marketing.models import (Product, ProductCategory, ProductVariant,
                              ProductVariantAttribute,
                              ProductVariantAttributeValue)
 from operating.models import Warehouse, WarehouseProduct
@@ -136,7 +136,8 @@ class WarehouseFirstCatalogOnDemandTest(TestCase):
 
         # On a shelf.
         self.stocked = Product.objects.create(
-            title="ARDEN", sku="ARDEN", featured=False, price=Decimal("9.00"))
+            title="ARDEN", sku="ARDEN", featured=False, price=Decimal("9.00"),
+            category=ProductCategory.objects.get_or_create(name="fabric", defaults={"price_multiplier": "4/3"})[0])
         v = ProductVariant.objects.create(
             product=self.stocked, variant_sku="ARDEN.G10")
         WarehouseProduct.objects.create(
@@ -178,23 +179,17 @@ class WarehouseFirstCatalogOnDemandTest(TestCase):
         self.assertEqual(html.count("pa-main"), html.count("pa-row"))
         self.assertEqual(html.count("pa-meta"), html.count("pa-row"))
 
-    def test_a_cost_fallback_says_so_in_words(self):
-        """Amber alone is invisible to anyone not hovering, and a rep
-        reading this list was quoting purchase cost as a sale price.
-
-        The fallback now comes off the SHELF rather than the catalog, so
-        this asks a warehouse row for it — but the thing being defended
-        is unchanged: a cost shown where a price belongs has to say which
-        it is, in a word and not only in a colour.
-        """
-        self.stocked.price = None
-        self.stocked.save(update_fields=["price"])
+    def test_the_price_slot_holds_a_price_worked_out_from_the_shelf(self):
+        """A rep reading this list once quoted purchase cost as a sale price.
+        The slot now always holds a price — the cost plus a third, rounded
+        up to 0.05 (marketing/pricing.py) — and staff read the cost itself
+        on the shelf's chip."""
         WarehouseProduct.objects.filter(sku="ARDEN.G10").update(
             cost_usd=Decimal("4.25"))
         html = self._search()
-        self.assertIn("pa-price--cost", html)
-        self.assertIn("Cost", html)
-        self.assertIn("$4.25", html)
+        self.assertNotIn("pa-price--cost", html)
+        self.assertIn("$5.70", html)          # 4.25 → 5.6667
+        self.assertIn("$4.25", html)          # on the chip
 
     def test_a_product_on_no_shelf_offers_no_cost_at_all(self):
         """Deliberate, and a change of behaviour: the catalog's own cost

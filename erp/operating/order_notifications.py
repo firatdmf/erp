@@ -83,22 +83,34 @@ def _order_lines_and_total(order):
     The adjustments come back beside the figures because the mail has to
     show them: a total that the lines above it don't add up to is the
     customer's first question, and the invoice they get later quotes the
-    same net figure (Order.total_value)."""
-    items = []
+    same net figure (Order.total_value).
+
+    An order split across books is one order to its customer: every
+    half's lines and adjustments, and one total (split_orders)."""
+    from .split_orders import halves_in_step
+    items, adjustments = [], []
     subtotal = Decimal("0.00")
-    for it in order.items.all().select_related("product", "product_variant"):
-        qty = it.quantity or Decimal("0")
-        price = it.price or Decimal("0")
-        it.line_total_calc = (qty * price).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP)
-        items.append(it)
-        subtotal += it.line_total_calc
-    adjustments = list(order.adjustments.all())
+    for half in halves_in_step(order):
+        for it in half.items.all().select_related("product", "product_variant"):
+            qty = it.quantity or Decimal("0")
+            price = it.price or Decimal("0")
+            it.line_total_calc = (qty * price).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP)
+            items.append(it)
+            subtotal += it.line_total_calc
+        adjustments += list(half.adjustments.all())
     total = subtotal + sum((a.amount or Decimal("0.00") for a in adjustments),
                            Decimal("0.00"))
     if total < 0:
         total = Decimal("0.00")
     return items, adjustments, subtotal, total
+
+
+def order_ref(order):
+    """What the customer knows the order by: its number, or both halves'
+    ("ORD-2026-000011 & ORD-2026-000012") for one split across books."""
+    from .split_orders import combined_number, halves_in_step
+    return combined_number(halves_in_step(order))
 
 
 def _html_to_text(html):
@@ -251,7 +263,7 @@ def _render_order_pdf(order):
         story = []
 
         # ---- Header (brand left, order # right, bottom rule) ----
-        num = order.order_number or f"#{order.pk}"
+        num = order_ref(order)
         header = Table([[
             [par(brand.upper(), 18, bold=True),
              par(subtitle, 8, color=MUT, upper=True)],
@@ -426,7 +438,8 @@ def _cargo_receipt_attachments(order):
     import requests
 
     out, total = [], 0
-    for n, r in enumerate(order.cargo_receipts.all(), start=1):
+    receipts = order.shipment_receipts()
+    for n, r in enumerate(receipts, start=1):
         try:
             resp = requests.get(r.file_url, timeout=20)
             resp.raise_for_status()
@@ -442,7 +455,7 @@ def _cargo_receipt_attachments(order):
         # A phone camera names every shot "image.jpg"; number them so the
         # customer's mail client doesn't show three of the same name.
         name = r.file_name or f"cargo-receipt{ext}"
-        if sum(1 for o in order.cargo_receipts.all() if o.file_name == r.file_name) > 1:
+        if sum(1 for o in receipts if o.file_name == r.file_name) > 1:
             stem, e = os.path.splitext(name)
             name = f"{stem}-{n}{e}"
         out.append((name, data, r.content_type or "application/octet-stream"))
@@ -490,6 +503,7 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
         ctx = {
             "cargo_receipts_attached": len(receipts),
             "order": order,
+            "order_ref": order_ref(order),
             "customer_name": _resolve_customer_name(order),
             "event": event,
             "event_label": EVENT_LABELS.get(event, event.replace("_", " ").title()),

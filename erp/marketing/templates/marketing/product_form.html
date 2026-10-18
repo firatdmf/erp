@@ -522,27 +522,81 @@
       <!-- Pricing (Moved to Sidebar) -->
       <div class="form-card sidebar-card">
         <div class="form-card-title"><span class="form-card-ico"><i data-lucide="tag"></i></span>{% trans "Pricing" %}</div>
+        {% comment %}A single item (no options) is typed here, and saved to its
+        one variant (ProductForm.save_single_item). Once it has options, price
+        and cost are typed on each variant and this shows what they come to.
+        variant_form_modern.js switches between the two and sets single_item.{% endcomment %}
+        <input type="hidden" name="single_item" id="single_item" value="{% if form.single_item %}1{% endif %}">
+        <div id="single_item_fields"{% if not form.single_item %} hidden{% endif %}>
+          <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+              <label for="id_item_sku">{% trans "Item SKU" %}</label>
+              {{ form.item_sku }}
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>{% trans "Price" %}</label>
+              {# Cost times the multiplier, rounded up to 0.05 (marketing/pricing.py). #}
+              <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">{% if form.item_price_live is not None %}${{ form.item_price_live|floatformat:"2g" }}{% else %}<span style="color:#9AA5B1;">—</span>{% endif %}</div>
+            </div>
+            <div class="form-group">
+              <label for="id_item_cost">{% trans "Cost per item" %}</label>
+              {% if form.item_cost_computed is not None %}
+              {# Priced stock on hand says what it cost; nobody types that. #}
+              <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">~${{ form.item_cost_computed|floatformat:"2g" }}</div>
+              {% else %}
+              {{ form.item_cost }}
+              {% endif %}
+            </div>
+          </div>
+          <div style="margin:-4px 0 10px; font-size:12px; color:#5B6470;">
+            {% trans "Stock, barcodes and orders use the item SKU." %}
+            {% trans "Price is the cost times the multiplier below, rounded up to 0.05." %}
+            {% if form.item_cost_computed is not None %}{% trans "Cost is the average of the stock on hand." %}{% endif %}
+          </div>
+        </div>
+        <div id="variants_summary"{% if form.single_item %} hidden{% endif %}>
         <div class="form-row">
           <div class="form-group">
-            <label for="id_price">{% trans "Price" %}</label>
-            {{ form.price }}
+            <label>{% trans "Price" %}</label>
+            <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">
+              {% if form.variants_price_low is None %}<span style="color:#9AA5B1;">—</span>
+              {% elif form.variants_price_low == form.variants_price_high %}${{ form.variants_price_low|floatformat:"2g" }}
+              {% else %}${{ form.variants_price_low|floatformat:"2g" }} – ${{ form.variants_price_high|floatformat:"2g" }}{% endif %}
+            </div>
           </div>
           <div class="form-group">
-            <label for="id_cost">{% trans "Cost per item" %}</label>
-            {{ form.cost }}
+            <label>{% trans "Cost per item" %}</label>
+            <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;{% if form.variants_cost_is_stored or form.variants_cost is None %} color:#9AA5B1;{% endif %}">
+              {% if form.variants_cost is None %}—{% else %}~${{ form.variants_cost|floatformat:"2g" }}{% endif %}
+            </div>
           </div>
+        </div>
+        <div style="margin:-4px 0 10px; font-size:12px; color:#5B6470;">
+          {% trans "Cost is kept on each variant; price is the cost times the multiplier below, rounded up to 0.05." %}
+          {% if form.variants_cost_is_stored %}{% trans "Nothing in stock: shown is the average of the variants' stored costs." %}{% elif form.variants_cost is not None %}{% trans "Shown is their stock's weighted-average cost, as the balance sheet values it." %}{% endif %}
+        </div>
         </div>
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
-            <label for="id_profit_margin">
-              {% trans "Profit margin" %} (%)
-              {% if product.category and product.category.profit_margin is not None %}
-                <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "group default" %}: %{{ product.category.profit_margin|floatformat:"-2g" }}</span>
+            <label for="id_price_multiplier">
+              {% trans "Price = cost ×" %}
+              {% if product.category.price_multiplier %}
+                <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "group" %}: × {{ product.category.price_multiplier }}</span>
               {% endif %}
             </label>
-            {{ form.profit_margin }}
+            {# data-* read by price_multiplier.js, which previews the formula as it is typed. #}
+            <input type="text" name="price_multiplier" id="id_price_multiplier" class="form-input"
+                   value="{{ form.price_multiplier.value|default_if_none:'' }}" maxlength="40" autocomplete="off"
+                   placeholder="{{ product.category.price_multiplier|default:'' }}"
+                   data-multiplier-preview="id_price_multiplier_preview"
+                   data-fallback="{{ product.category.price_multiplier|default:'' }}"
+                   data-fallback-label="{% trans 'group' %}"
+                   {% if form.example_cost %}data-example-cost="{{ form.example_cost }}"{% endif %}>
+            <p id="id_price_multiplier_preview" class="pm-preview" style="margin:4px 0 0;font-size:12px;color:#5B6470;"></p>
             <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">
-              {% trans "Leave blank to use the product group's margin." %}
+              {% trans "A formula is fine: 4/3, 1.5, 3. Leave blank to use the product group's." %}
             </p>
           </div>
         </div>
@@ -1844,6 +1898,7 @@
 </script>
 
 <!-- File Manager Modal -->
+{% include "marketing/partials/_price_multiplier_assets.html" %}
 <script src="{% static 'marketing/js/file_manager_modal.js' %}"></script>
 <script src="{% static 'marketing/js/instant_file_manager.js' %}"></script>
 
@@ -1966,13 +2021,18 @@
             <span class="currency-symbol">$</span>
             <input type="number" id="modal_variant_cost" class="form-input" step="0.01" placeholder="0.00">
           </div>
+          <div id="modal_variant_cost_hint" hidden style="margin-top:4px; font-size:12px; color:#5B6470;">
+            {% trans "Average cost of the stock on hand, from the warehouse. It can be typed only while none is in stock." %}
+          </div>
         </div>
 
         <div class="form-group">
           <label for="modal_variant_price">{% trans "Price" %}</label>
           <div class="input-with-icon">
             <span class="currency-symbol">$</span>
-            <input type="number" id="modal_variant_price" class="form-input" step="0.01" placeholder="0.00">
+            {# Worked out from the cost (marketing/pricing.py): shown, not typed. #}
+            <input type="number" id="modal_variant_price" class="form-input" step="0.01" placeholder="—" readonly disabled
+                   style="background:#F3F4F6; cursor:not-allowed;">
           </div>
         </div>
       </div>

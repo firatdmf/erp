@@ -52,36 +52,29 @@ def _capture_order_old_status(sender, instance, **kwargs):
         instance._old_status = None
 
 
-@receiver(post_save, sender=Order)
-def email_customer_on_status_change(sender, instance, created, **kwargs):
-    """Fire a transactional email when the order's order_status
-    transitions into a notable state. Gated on Order.notify_customer.
+# Statuses a customer is told about. "pending" is the initial state, not
+# a notification trigger; the first email goes out at create time.
+NOTIFY_EVENTS = frozenset({
+    "confirmed", "preparing", "packaging",
+    "shipped", "in_transit", "out_for_delivery", "delivered",
+    "cancelled", "returned",
+})
 
-    Skips the 'created' event here — that's handled at create-time in
-    the view so we can guarantee the customer email is resolved off
-    the freshly-saved order (signals fire before some downstream
-    customer-linking steps in certain code paths)."""
-    if not instance.notify_customer:
-        return
-    new_status = instance.order_status
-    old_status = getattr(instance, "_old_status", None) if not created else None
-    if not created and old_status == new_status:
-        return
-    # Events worth emailing about. "pending" is the initial state, not
-    # a notification trigger; first email goes out at create time.
-    notify_events = {
-        "confirmed", "preparing", "packaging",
-        "shipped", "in_transit", "out_for_delivery", "delivered",
-        "cancelled", "returned",
-    }
-    if new_status not in notify_events:
+
+def notify_customer_of_status(order, new_status):
+    """Tell the order's customer it now stands at `new_status`: an email,
+    and for "shipped" a WhatsApp message. Gated on Order.notify_customer
+    by the senders themselves. For an order split across books this is
+    the whole order's one notice — the senders write it for every half
+    (order_notifications, order_whatsapp)."""
+    if new_status not in NOTIFY_EVENTS:
         return
     try:
         from .order_notifications import send_order_event_email
         # Attach PDF only for the big lifecycle events. For tiny
         # status nudges the customer doesn't need the file again.
         attach_pdf = new_status in {"shipped", "delivered", "cancelled"}
-        send_order_event_email(instance, new_status, attach_pdf=attach_pdf)
+        send_order_event_email(order, new_status, attach_pdf=attach_pdf)
     except Exception as _exc:
         import traceback as _tb
         _tb.print_exc()
@@ -90,10 +83,34 @@ def email_customer_on_status_change(sender, instance, created, **kwargs):
     if new_status == "shipped":
         try:
             from .order_whatsapp import send_order_shipped_whatsapp
-            send_order_shipped_whatsapp(instance)
+            send_order_shipped_whatsapp(order)
         except Exception as _exc:
             import traceback as _tb
             _tb.print_exc()
+
+
+@receiver(post_save, sender=Order)
+def email_customer_on_status_change(sender, instance, created, **kwargs):
+    """Fire a transactional email when the order's order_status
+    transitions into a notable state. Gated on Order.notify_customer.
+
+    Skips the 'created' event here — that's handled at create-time in
+    the view so we can guarantee the customer email is resolved off
+    the freshly-saved order (signals fire before some downstream
+    customer-linking steps in certain code paths).
+
+    Skips a split order's halves as they move together too: the customer
+    gets one notice for the order, sent once every half has moved
+    (apply_order_status_change), not one per half as each is saved."""
+    if getattr(instance, "_one_notice_for_split", False):
+        return
+    if not instance.notify_customer:
+        return
+    new_status = instance.order_status
+    old_status = getattr(instance, "_old_status", None) if not created else None
+    if not created and old_status == new_status:
+        return
+    notify_customer_of_status(instance, new_status)
 
 
 @receiver([post_save, post_delete], sender=OrderItem)

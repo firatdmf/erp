@@ -1318,6 +1318,64 @@ def post_stock_movement(movement, *, reference=""):
     )
 
 
+INTERCOMPANY_CLEARING = "1950"
+
+
+def lines_for_stock_transfer(transfer):
+    """The sending book's half of a transfer between books, balanced.
+
+    The inter-company mirror has already said the other book owes this one
+    for the goods, and parked it in Inter-company Clearing because a mirror
+    carries a value and not a reason. This is the reason: the goods left
+    the shelves, at what they were carried at. Nothing is sold, so nothing
+    reaches revenue or cost of goods sold.
+
+    What is owed is whole cents and what the rolls cost often is not; the
+    fraction between them is a closing difference, as it is on the purchase
+    that received them (_lines_with_purchase_fraction).
+    """
+    if transfer.is_undone:
+        return []
+    movement = transfer.purchase.posted_movement
+    if movement is None or movement.is_void:
+        return []
+    owed = abs(Decimal(movement.amount_base or 0))
+    stock = Decimal(transfer.value or 0)
+    if owed == ZERO and stock == ZERO:
+        return []
+    memo = f"Stock transfer {transfer.number} to {transfer.to_book.name}"
+    lines = [debit(INTERCOMPANY_CLEARING, owed, memo=memo),
+             credit(INVENTORY, stock, memo=memo, exact=True)]
+    gap = owed - stock
+    if gap > ZERO:
+        lines.append(credit(CLOSING_DIFFERENCE_INCOME, gap, memo=memo, exact=True))
+    elif gap < ZERO:
+        lines.append(debit(CLOSING_DIFFERENCE_EXPENSE, -gap, memo=memo, exact=True))
+    return lines
+
+
+@transaction.atomic
+def post_stock_transfer(transfer):
+    """Make the sending book's ledger say what this transfer did. Idempotent.
+
+    Returns the entry, or None for a transfer that has been undone.
+    """
+    lines = lines_for_stock_transfer(transfer)
+    unpost(transfer)
+    if not lines:
+        return None
+    return post_entry(
+        book=transfer.from_book,
+        date=transfer.date,
+        description=(f"Stock transferred to {transfer.to_warehouse.name} "
+                     f"({transfer.to_book.name}) at cost")[:300],
+        lines=lines,
+        source=transfer,
+        reference=transfer.number,
+        member=transfer.created_by,
+    )
+
+
 @transaction.atomic
 def post_stock_movements(movements):
     """post_stock_movement for many movements, in a handful of queries.

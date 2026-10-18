@@ -1,0 +1,16 @@
+{% load i18n static %}
+{# The "Price = cost ×" box's live preview — product form and group page. #}
+<style>
+  .pm-preview { margin: 4px 0 0; font-size: 12px; color: #5B6470; font-variant-numeric: tabular-nums; }
+  .pm-preview.bad { color: #B42318; }
+</style>
+<script>
+  window.PRICE_MULTIPLIER_T = {
+    group: '{% trans "group"|escapejs %}',
+    on_cost: '{% trans "on cost"|escapejs %}',
+    below_cost: '{% trans "below cost"|escapejs %}',
+    empty: '{% trans "Type what the cost is multiplied by, e.g. 4/3."|escapejs %}',
+    invalid: '{% trans "Not a formula — use numbers, + − × ÷ and brackets, e.g. 4/3."|escapejs %}'
+  };
+</script>
+<script src="{% static 'marketing/js/price_multiplier.js' %}?v=1" defer></script>

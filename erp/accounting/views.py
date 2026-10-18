@@ -3177,6 +3177,13 @@ class SalesDashboardView(View):
         total_cost = Decimal('0')
         order_list = []
         
+        # Every line's cost in one query: a variant's cost is read from the
+        # stock it has on hand, not from a column.
+        from marketing.models import attach_live_costs
+        orders = list(orders)
+        attach_live_costs(item.product_variant for order in orders
+                          for item in order.items.all() if item.product_variant_id)
+
         for order in orders:
             # Get customer name
             if order.web_client:
@@ -3207,11 +3214,8 @@ class SalesDashboardView(View):
                 variant_price = Decimal('0')
                 
                 if item.product_variant:
-                    variant_cost = item.product_variant.variant_cost or Decimal('0')
-                    variant_price = item.product_variant.variant_price or Decimal('0')
-                elif item.product:
-                    variant_cost = item.product.cost or Decimal('0')
-                    variant_price = item.product.price or Decimal('0')
+                    variant_cost = item.product_variant.live_cost or Decimal('0')
+                    variant_price = item.product_variant.live_price or Decimal('0')
                 
                 if item.is_custom_curtain:
                     # Custom Curtain Formula:

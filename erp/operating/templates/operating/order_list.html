@@ -183,6 +183,7 @@
   }
   .ord-result { font: 500 12.5px var(--font-sans); color: var(--gray-600); }
   .ord-result b { color: #0F1419; font-weight: 700; }
+  .ord-gp-total b { color: var(--nejum-teal-600); }
 
   /* ─── LIST ──────────────────────────────────────────── */
   .ord-list-wrap { display: none; }
@@ -474,6 +475,11 @@
   <div class="ord-meta">
     <div class="ord-result">
       <span id="ord-visible-count"><b>{{ total_count }}</b></span> {% trans "orders" %}
+      {% if is_admin %}{# the rows on screen added up, per currency — filled in by applyOrderFilter #}
+      <span class="ord-gp-total" id="ord-gp-total" title="{% trans 'Gross profit (internal)' %}">
+        · {% trans "Gross profit" %} <b id="ord-gp-done"></b><span id="ord-gp-open-wrap"> · <b id="ord-gp-open"></b> {% trans "still open" %}</span>
+      </span>
+      {% endif %}
     </div>
   </div>
   <div class="ord-none" id="ord-none" style="display:none">{% trans "No orders in this period" %}</div>
@@ -496,7 +502,7 @@
       </div>
       {% for order in orders %}
       {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -568,7 +574,7 @@
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
-          {% with gp=order.gross_profit %}
+          {% with gp=order.list_gross_profit %}
             <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-{% if gp < 0 %}down{% else %}up{% endif %}"></i>
               {{ order.currency_symbol }}{{ gp|money }}
@@ -612,7 +618,7 @@
       </div>
       {% for order in b2b_orders %}
       {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -647,7 +653,7 @@
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
-          {% with gp=order.gross_profit %}
+          {% with gp=order.list_gross_profit %}
             <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-{% if gp < 0 %}down{% else %}up{% endif %}"></i>
               {{ order.currency_symbol }}{{ gp|money }}
@@ -688,7 +694,7 @@
       </div>
       {% for order in b2c_orders %}
       {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -719,7 +725,7 @@
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
-          {% with gp=order.gross_profit %}
+          {% with gp=order.list_gross_profit %}
             <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-{% if gp < 0 %}down{% else %}up{% endif %}"></i>
               {{ order.currency_symbol }}{{ gp|money }}
@@ -762,7 +768,7 @@
       </div>
       {% for order in retail_orders %}
       {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -791,7 +797,7 @@
         </div>
         {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
-          {% with gp=order.gross_profit %}
+          {% with gp=order.list_gross_profit %}
             <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
               <i class="fa fa-arrow-trend-{% if gp < 0 %}down{% else %}up{% endif %}"></i>
               {{ order.currency_symbol }}{{ gp|money }}
@@ -866,6 +872,7 @@
     });
     const counter = document.getElementById('ord-visible-count');
     if (counter) counter.innerHTML = `<b>${visible}</b>`;
+    showProfitTotal(activePane);
     // The line under the title says which of the two is on screen.
     const shown = document.getElementById('ord-period-shown');
     const searching = document.getElementById('ord-period-search');
@@ -879,6 +886,30 @@
     // a header over nothing.
     const none = document.getElementById('ord-none');
     if (none) none.style.display = (!q && !visible && activePane.querySelector('.ord-row')) ? '' : 'none';
+  }
+
+  // The gross profit of the rows on screen, completed and still open
+  // apart, one sum per currency: rows in euros and in dollars are not
+  // added together. Cancelled and returned rows carry no data-gp.
+  const moneyFormat = new Intl.NumberFormat(document.documentElement.lang || undefined,
+    { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function showProfitTotal(pane) {
+    const box = document.getElementById('ord-gp-total');
+    if (!box) return;
+    const sums = { done: new Map(), open: new Map() };
+    pane.querySelectorAll('.ord-row[data-gp]').forEach(row => {
+      if (row.style.display === 'none') return;
+      const half = sums[row.dataset.group === 'open' ? 'open' : 'done'];
+      const sum = half.get(row.dataset.ccy) || { sym: row.dataset.sym, cents: 0 };
+      sum.cents += Math.round(parseFloat(row.dataset.gp) * 100);
+      half.set(row.dataset.ccy, sum);
+    });
+    const text = (half) => Array.from(half.values())
+      .map(s => (s.cents < 0 ? '−' : '') + s.sym + moneyFormat.format(Math.abs(s.cents) / 100))
+      .join(' · ');
+    document.getElementById('ord-gp-done').textContent = text(sums.done) || moneyFormat.format(0);
+    document.getElementById('ord-gp-open').textContent = text(sums.open);
+    document.getElementById('ord-gp-open-wrap').style.display = sums.open.size ? '' : 'none';
   }
 
   // Period picker behind the Filter button.

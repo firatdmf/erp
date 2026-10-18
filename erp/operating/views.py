@@ -4761,6 +4761,7 @@ class OrderList(ListView):
         from marketing.models import attach_live_costs
         attach_live_costs(item.product_variant for order in all_orders
                           for item in order.items.all() if item.product_variant_id)
+        _attach_list_gross_profit(all_orders)
 
         # What the search box actually filters on. Attached per row rather
         # than built in the template so all four panes index the same
@@ -4850,6 +4851,56 @@ class OrderList(ListView):
         context['is_admin'] = _is_admin(self.request.user)
 
         return context
+
+
+# Orders whose goods have left: their cost is what the ledger took out of
+# stock for them, not what the same goods would cost today.
+ORDER_LIST_SHIPPED_STATUSES = ("shipped", "in_transit", "out_for_delivery", "delivered")
+# Orders that made no sale, so they add nothing to the list's profit total.
+ORDER_LIST_UNSOLD_STATUSES = ("cancelled", "returned")
+
+
+def _attach_list_gross_profit(orders):
+    """Set `list_gross_profit` on each order: its gross profit in its own
+    currency, at the cost the goods actually went out at.
+
+    A shipped order's cost is the cost of goods sold its stock movements
+    posted — each roll at what it was carried at — net of anything put
+    back. That is the figure the books hold, and it does not move when
+    the same product costs something else next month. An open order has
+    posted nothing, so it, and a shipped order with no movements behind
+    it, keep the live cost gross_profit() reads.
+
+    Two queries for the whole list, however many orders.
+    """
+    from collections import defaultdict
+    from decimal import Decimal, ROUND_HALF_UP
+    from django.contrib.contenttypes.models import ContentType
+    from accounting.models_ledger import JournalLine
+    from accounting.services_posting import COST_OF_GOODS_SOLD
+    from .models import StockMovement
+
+    shipped = {o.pk: o for o in orders if o.order_status in ORDER_LIST_SHIPPED_STATUSES}
+    movement_order = dict(
+        StockMovement.objects.filter(order_id__in=shipped).values_list("pk", "order_id"))
+    recorded = defaultdict(Decimal)
+    for source_id, debit, credit in (
+            JournalLine.objects
+            .filter(account__code=COST_OF_GOODS_SOLD,
+                    entry__source_type=ContentType.objects.get_for_model(StockMovement),
+                    entry__source_id__in=list(movement_order))
+            .values_list("entry__source_id", "debit", "credit")):
+        recorded[movement_order[source_id]] += debit - credit
+
+    for order in orders:
+        profit = order.gross_profit()
+        if order.pk in recorded:
+            live = sum((item.line_cost() for item in order.items.all()), Decimal("0"))
+            rate = order.rate_to_base() or Decimal("1")
+            cost = (recorded[order.pk] / rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            profit += live - cost
+        order.list_gross_profit = profit
+        order.counts_in_profit = order.order_status not in ORDER_LIST_UNSOLD_STATUSES
 
 
 def _currency_codes(orders):

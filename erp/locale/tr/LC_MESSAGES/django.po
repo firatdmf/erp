@@ -14258,9 +14258,9 @@ msgctxt "cash account name"
 msgid "Drawer"
 msgstr "Kasa"
 
-# Attribute wording page, and the one-row-per-variant rules.
-msgid "Attribute wording"
-msgstr "Özellik çevirileri"
+# Catalog wording page, and the one-row-per-variant rules.
+msgid "Catalog wording"
+msgstr "Katalog çevirileri"
 
 msgid "A term is stored once, as an English key. Write here how it reads in each language; a language left empty shows the key."
 msgstr "Bir terim bir kez, İngilizce anahtar olarak saklanır. Her dilde nasıl okunacağını buraya yazın; boş bırakılan dilde anahtar gösterilir."

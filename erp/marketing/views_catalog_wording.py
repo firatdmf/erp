@@ -118,7 +118,7 @@ def _save(kind, scope, key, texts):
 
 
 @login_required
-def attribute_translations(request):
+def catalog_wording(request):
     attributes = _attribute_names()
     section = term_key(request.POST.get("section") or request.GET.get("section") or NAMES)
     if section not in (NAMES, GROUPS, ANY) and section not in attributes:
@@ -137,9 +137,9 @@ def attribute_translations(request):
                 language: request.POST.get(f"new_text_{language}")
                 for language in CATALOG_LANGUAGES})
         messages.success(request, _gettext("%(count)s wordings saved.") % {"count": changed})
-        return redirect(f"{reverse('marketing:attribute_translations')}?section={section}")
+        return redirect(f"{reverse('marketing:catalog_wording')}?section={section}")
 
-    return render(request, "marketing/attribute_translations.html", {
+    return render(request, "marketing/catalog_wording.html", {
         "attributes": attributes,
         "section": section,
         "is_attribute": section not in (NAMES, GROUPS, ANY),
@@ -150,7 +150,7 @@ def attribute_translations(request):
 
 @require_GET
 @cache_control(public=True, max_age=300)
-def attribute_translations_api(request):
+def catalog_wording_api(request):
     """Every wording, for the storefront:
     {"names":  {"color": {"tr": "Renk"}},
      "values": {"color": {"white": {"tr": "Beyaz"}}, "": {"yes": {"tr": "Evet"}}},

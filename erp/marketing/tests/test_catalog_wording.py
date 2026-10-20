@@ -9,7 +9,7 @@ attribute's name, one of its values, or a product group's name; the
 attributes on a variant and the ones on a product share them.
 
 Run with:
-    python manage.py test marketing.tests.test_attribute_wording
+    python manage.py test marketing.tests.test_catalog_wording
 """
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -96,12 +96,17 @@ class WordingPageTest(TestCase):
         variant.product_variant_attribute_values.add(white)
         ProductAttribute.objects.create(product=product, name="Sheet Type", value="Fitted")
         ProductAttribute.objects.create(product=product, name="Color", value="white")
-        self.url = reverse("marketing:attribute_translations")
+        self.url = reverse("marketing:catalog_wording")
 
     def _keys(self, section):
         response = self.client.get(self.url, {"section": section})
         self.assertEqual(response.status_code, 200)
         return [(r["key"], r["carried"]) for r in response.context["rows"]]
+
+    def test_the_old_address_still_leads_to_the_page(self):
+        response = self.client.get("/marketing/attribute-wording/", {"section": "groups"})
+        self.assertRedirects(response, "/marketing/catalog-wording/?section=groups",
+                             status_code=302, fetch_redirect_response=False)
 
     def test_names_come_from_variants_and_products_alike(self):
         self.assertEqual(self._keys("names"), [("color", None), ("sheet type", None)])
@@ -142,19 +147,21 @@ class WordingPageTest(TestCase):
         self.client.post(self.url, {"section": "groups", "rows": "1",
                                     "key_0": "ready-made curtain", "text_0_tr": "Hazır Perde"})
         self.client.logout()
-        answer = self.client.get(reverse("marketing:attribute_translations_api")).json()
+        answer = self.client.get(reverse("marketing:catalog_wording_api")).json()
         self.assertEqual(answer, {
             "names": {"color": {"tr": "Renk"}},
             "values": {"color": {"white": {"tr": "Beyaz", "pl": "Biały"}},
                        "": {"yes": {"tr": "Evet"}}},
             "groups": {"ready-made curtain": {"tr": "Hazır Perde"}},
         })
+        # A storefront still on the old address gets the same answer.
+        self.assertEqual(self.client.get("/marketing/api/attribute_translations/").json(), answer)
 
     def test_the_variant_list_prints_the_wording(self):
         self._post("color", text_0_tr="Beyaz")
         self.client.post(self.url, {"section": "names", "rows": "1", "key_0": "color",
                                     "text_0_tr": "Renk"})
         with translation.override("tr"):
-            from marketing.templatetags.attribute_wording import worded_name, worded_value
+            from marketing.templatetags.catalog_wording import worded_name, worded_value
             row = ProductVariantAttributeValue.objects.get()
             self.assertEqual((worded_name(row), worded_value(row)), ("Renk", "Beyaz"))

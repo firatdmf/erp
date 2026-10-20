@@ -569,7 +569,12 @@ tbody td {
   right: 0;
   width: 500px;
   max-width: 90vw;
+  /* 100vh on a phone is the screen with the browser's toolbars hidden,
+     so the drawer ran on under them and its last stretch — the submit
+     button — could not be scrolled into view. dvh is the screen that is
+     actually showing; vh stays as the fallback for older browsers. */
   height: 100vh;
+  height: 100dvh;
   background-color: var(--bg-primary);
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
   transform: translateX(100%);
@@ -642,6 +647,8 @@ tbody td {
   flex: 1;
   overflow-y: auto;
   padding: 1.5rem;
+  /* Clear the iPhone home indicator at the end of the scroll. */
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 .form-group {

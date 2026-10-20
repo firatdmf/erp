@@ -327,6 +327,15 @@
         width: 100% !important;
       }
 
+      /* iPhone Safari zooms in on any field whose text is under 16px and
+         does not zoom back out. !important because many fields set a
+         smaller size inline or in their page's own stylesheet. */
+      input,
+      select,
+      textarea {
+        font-size: 16px !important;
+      }
+
       /* Mobile: Stats bar vertical */
       .stats-bar {
         flex-direction: column !important;

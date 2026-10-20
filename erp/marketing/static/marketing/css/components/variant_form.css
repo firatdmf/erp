@@ -951,6 +951,9 @@ input[type=file]::-webkit-file-upload-button {
 }
 .imp_upload_btn:hover { background: #5568d3; }
 .imp_drop_hint { font-size: 13px; color: #aaa; }
+.imp_upload_note {
+  margin: 0; padding: 0 24px 10px; font-size: 12px; line-height: 1.5; color: #6b7280;
+}
 
 /* Body */
 .imp_body { padding: 20px 24px; overflow-y: auto; flex: 1; }

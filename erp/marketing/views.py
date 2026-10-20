@@ -41,11 +41,14 @@ from .signals import cdn_url_in_use
 
 # AVIF Image Optimizer
 from .utils.image_optimizer import optimize_image_to_avif
+import os
+from . import product_images
+from .product_images import new_file_name
 from django.utils.translation import gettext as _gettext
 from erp.storefront import answers_in_storefront_language
 
 
-def smart_upload(file, folder, resource_type="image"):
+def smart_upload(file, folder, resource_type="image", product=None):
     """
     Upload file to Bunny CDN. Automatically converts images to AVIF before uploading.
 
@@ -53,6 +56,9 @@ def smart_upload(file, folder, resource_type="image"):
         file: File object to upload
         folder: Target folder path
         resource_type: 'image' or 'video'
+        product: a product's photo is stored under a fresh name of its own
+            (product_images.new_file_name); anything else keeps the name
+            it came with
 
     Returns: URL of the uploaded file
     """
@@ -72,6 +78,10 @@ def smart_upload(file, folder, resource_type="image"):
     # ─────────────────────────────────────────────────────────────────────
 
     filename = getattr(file, 'name', 'image.jpg')
+    if product is not None:
+        # A fresh path: no edge node can hold an older copy to purge.
+        extension = os.path.splitext(filename)[1] or '.jpg'
+        return upload_to_bunny(file, f"{folder}/{new_file_name(product, extension)}", purge=False)
     path = f"{folder}/{filename}"
     return upload_to_bunny(file, path)
 
@@ -670,8 +680,8 @@ class BaseProductView(ModelFormMixin):
             uploaded_files = []
             for index, file_obj in enumerate(self.request.FILES.getlist("no_variant_file")):
                 try:
-                    folder = f"media/product_images/product_{product.sku}"
-                    url = smart_upload(file_obj, folder)
+                    folder = product_images.product_folder(product)
+                    url = smart_upload(file_obj, folder, product=product)
                     if url:
                         product_file = ProductFile.objects.create(
                             product=product,
@@ -1338,8 +1348,8 @@ class BaseProductView(ModelFormMixin):
         uploaded_main_files = []
         for index, file_obj in enumerate(self.request.FILES.getlist("no_variant_file")):
             try:
-                folder = f"media/product_images/product_{self.object.sku}"
-                url = smart_upload(file_obj, folder)
+                folder = product_images.product_folder(self.object)
+                url = smart_upload(file_obj, folder, product=self.object)
                 if url:
                     product_file = ProductFile.objects.create(
                         product=self.object,
@@ -1466,7 +1476,15 @@ class ProductCreate(BaseProductView, generic.CreateView):
                 del self.request.session['temp_product_files']
                 self.request.session.modified = True
                 print("✓ Temporary files linked and session cleared")
-            
+
+            # Photos uploaded before the product had a SKU or a title move
+            # into its folders under its name once it is saved; the rest go
+            # to the folder of the variant that uses them.
+            temp_urls = [d['url'] for d in temp_files.get('main_images', [])]
+            for file_list in temp_files.get('variant_images', {}).values():
+                temp_urls.extend(d['url'] for d in file_list)
+            product_images.relocate_after_commit(self.object.pk, adopt=temp_urls)
+
             # Update variants_json to replace temp IDs with real DB IDs
             variants_json_str = self.request.POST.get("variants_json", "[]")
             print(f"\n🔍 DEBUG: variants_json_str = {variants_json_str[:200] if variants_json_str else 'None'}...")
@@ -1511,8 +1529,8 @@ class ProductCreate(BaseProductView, generic.CreateView):
                 primary_image_file = self.request.FILES.get('primary_image')
                 if primary_image_file:
                     try:
-                        folder = f"media/product_images/product_{self.object.sku}"
-                        url = smart_upload(primary_image_file, folder)
+                        folder = product_images.product_folder(self.object)
+                        url = smart_upload(primary_image_file, folder, product=self.object)
                         if url:
                             product_file = ProductFile.objects.create(
                                 product=self.object,
@@ -1775,7 +1793,11 @@ class ProductEdit(BaseProductView, generic.UpdateView):
                 chosen_file.save(update_fields=['is_primary'])
 
             print(f"⏱️  Primary image update: {time.time() - primary_update_start:.3f}s")
-        
+
+            # Photos whose folder no longer fits who uses them, or the SKU,
+            # move once this save is committed.
+            product_images.relocate_after_commit(self.object.pk)
+
         # Persist campaign / discount selection for this product (Update path)
         self._save_campaign()
 
@@ -1854,7 +1876,11 @@ def instant_upload_file(request):
     """
     Instant file upload - Upload to Bunny CDN and save to DB immediately.
     Used for Shopify-style instant upload during product edit.
-    Expects: multipart/form-data with 'file', 'product_id', and optional 'variant_id'
+    Expects: multipart/form-data with 'file', 'product_id', and optional
+    'variant_id' (links the photo to the variant) or 'for_variant_id' (a
+    variant's editor uploading into the product's pool: the photo is stored
+    in that variant's folder but joins the pool unlinked, and the editor's
+    save links it — see marketing.product_images)
     """
     try:
         # Get file from request
@@ -1885,14 +1911,17 @@ def instant_upload_file(request):
         file_type = get_file_type_from_name(file.name)
         resource_type = file_type  # 'image' or 'video'
         
+        folder_variant = variant
+        if folder_variant is None and request.POST.get('for_variant_id', '').isdigit():
+            folder_variant = ProductVariant.objects.filter(
+                pk=request.POST['for_variant_id'], product=product).first()
+
         # Upload to Bunny CDN
         try:
-            folder = f"media/product_images/product_{product.sku}"
-            if variant:
-                folder = f"{folder}/variant_{variant.variant_sku}"
-            
+            folder = product_images.folder_for(product, folder_variant)
+
             # Pass resource_type for video uploads (audio will be removed automatically)
-            file_url = smart_upload(file, folder, resource_type=resource_type)
+            file_url = smart_upload(file, folder, resource_type=resource_type, product=product)
             
             if not file_url:
                 return JsonResponse({'success': False, 'error': 'CDN upload failed'}, status=500)
@@ -2742,6 +2771,7 @@ def get_products(request):
     
     start = time.time()
     product_category = request.GET.get("product_category", None)
+    product_images.housekeep_now_and_then()
 
     if product_category:
         try:
@@ -2898,6 +2928,20 @@ def get_products(request):
     except Exception:
         pass
 
+    # Each photo's alt text is built from the variants using it.
+    variant_pairs = {}
+    for m in m2m_rows:
+        variant_pairs.setdefault(m["productvariant_id"], []).append(
+            (m["attr_name"], m["product_variant_attribute_value"]))
+    rows_by_product = {}
+    for f in file_rows:
+        rows_by_product.setdefault(f["product_id"], []).append(f)
+    alt_by_row = {}
+    for p in products_list:
+        alt_by_row.update(product_images.alt_texts_by_row(
+            rows_by_product.get(p.id, []), p.title, p.description,
+            p.category.name if p.category else "", variant_pairs))
+
     # Build product files map: product_id -> [files]
     prod_files_map = {}
     for f in file_rows:
@@ -2913,6 +2957,7 @@ def get_products(request):
             "sequence": f["sequence"],
             "is_primary": f["is_primary"],
             "alt_text": f.get("alt_text", ""),
+            "alt_texts": alt_by_row[f["id"]],
         })
 
     # Prices are worked out from cost (marketing/pricing.py), not stored. A
@@ -3044,6 +3089,7 @@ def get_products(request):
 # ------------------------------------------------------------------------------------------------
 def get_product(request):
     product_sku = request.GET.get("product_sku", None)
+    product_images.housekeep_now_and_then()
 
     import time as _time
     _t0 = _time.time()
@@ -3248,13 +3294,21 @@ def get_product(request):
     except Exception:
         product_fields['attribute_value_images'] = {}
 
-    # Files (already JSON dicts from Postgres)
+    # Files (already JSON dicts from Postgres). Each photo's alt text is
+    # built from the variants using it.
+    variant_pairs = {}
+    for m in m2m_rows_json:
+        variant_pairs.setdefault(m["productvariant_id"], []).append(
+            (m["attr_name"], m["product_variant_attribute_value"]))
+    alt_by_row = product_images.alt_texts_by_row(
+        file_rows_json, p_title, p_description, p_category_name or "", variant_pairs)
     product_files = [
         {
             "id": f["id"], "file": f["file_url"], "file_type": f["file_type"],
             "product_id": f["product_id"], "product_variant_id": f["product_variant_id"],
             "sequence": f["sequence"], "is_primary": f["is_primary"],
             "alt_text": f.get("alt_text", ""),
+            "alt_texts": alt_by_row[f["id"]],
         }
         for f in file_rows_json
     ]

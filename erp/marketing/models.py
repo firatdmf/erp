@@ -1415,6 +1415,21 @@ class ProductFile(models.Model):
         return f"{self.product} | {self.file_url}"
 
 
+class RetiredCdnFile(models.Model):
+    """A CDN file a photo moved away from (see marketing.product_images).
+
+    Cached storefront pages, the Meta feed and search engines still ask for
+    the old URL for a while, so the file is deleted only after
+    `delete_after`, and not at all if something uses it again by then.
+    """
+
+    url = models.URLField(max_length=500, unique=True)
+    delete_after = models.DateTimeField(db_index=True)
+
+    def __str__(self):
+        return self.url
+
+
 # ============================================================
 # PRODUCT REVIEWS
 # User ratings and comments for products

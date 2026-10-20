@@ -171,6 +171,28 @@ def delete_from_bunny(path_or_url):
     return storage_deleted
 
 
+def delete_empty_bunny_folder(path):
+    """Remove the folder at `path` only if it holds nothing.
+
+    Bunny deletes a folder WITH everything in it, so this lists it first and
+    leaves it alone unless the listing comes back empty — a file nobody here
+    knows about must never go with it. True when the folder was removed.
+    """
+    config = get_bunny_config()
+    url = f"{get_storage_url(config)}/{config['storage_zone']}/{path.strip('/')}/"
+    headers = {"AccessKey": config['api_key']}
+
+    listing = requests.get(url, headers=headers, timeout=30)
+    if listing.status_code != 200:
+        return False
+    try:
+        if listing.json():
+            return False
+    except ValueError:
+        return False
+    return requests.delete(url, headers=headers, timeout=30).status_code in (200, 404)
+
+
 def purge_bunny_cache(cdn_file_url):
     """Purge a specific file from Bunny CDN edge cache using Storage API key"""
     import json

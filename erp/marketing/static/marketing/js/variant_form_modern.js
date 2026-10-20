@@ -1990,6 +1990,7 @@ async function openImagePicker(variantIndex) {
                     <span>Select All</span>
                 </label>
             </div>
+            <p class="imp_upload_note">${VF_TEXT.uploadNote || ''}</p>
             <div class="imp_body image_modal_body">
                 <div class="image_grid" id="image_grid">
                     ${generateImageGrid()}
@@ -2300,6 +2301,10 @@ async function handleImageUpload(event) {
 
     if (validFiles.length === 0) { event.target.value = ''; return; }
 
+    // In the order a file window sorted by name shows them (numbers counted
+    // as numbers, so "-2" before "-10"): that order becomes the variant's.
+    validFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
     // Create floating upload tracker
     if (typeof window.createUploadTracker === 'function') {
         window.createUploadTracker(validFiles.length);
@@ -2324,7 +2329,7 @@ async function handleImageUpload(event) {
             </div>
             <p>Uploading...</p>
         `;
-        if (grid) grid.prepend(placeholder);
+        if (grid) grid.append(placeholder);
 
         try {
             const formData = new FormData();
@@ -2346,6 +2351,9 @@ async function handleImageUpload(event) {
                 try { data = JSON.parse(text); } catch(e) { throw new Error(`Server error (${response.status}): ${text.substring(0, 200)}`); }
             } else {
                 formData.append('product_id', productEditMatch);
+                // Stored in this variant's folder; it joins the pool unlinked
+                // and is linked when the product is saved.
+                if (variantId) formData.append('for_variant_id', variantId);
                 const response = await fetch('/marketing/api/instant_upload_file/', {
                     method: 'POST',
                     headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
@@ -2377,8 +2385,10 @@ async function handleImageUpload(event) {
                 temp_file: isCreateMode
             };
 
-            // Insert at beginning so new uploads appear at top
-            uploadedImages.unshift(newImage);
+            // Uploaded from this variant's editor, so picked for it, in
+            // upload order — the files' name order.
+            uploadedImages.push(newImage);
+            if (!selectionOrder.includes(fileUrl)) selectionOrder.push(fileUrl);
 
             // Remove placeholder and refresh grid
             if (placeholder) placeholder.remove();

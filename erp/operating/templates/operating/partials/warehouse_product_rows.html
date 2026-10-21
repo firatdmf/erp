@@ -13,7 +13,7 @@ the SKU pill still navigates to the product, and ctrl/cmd/middle/right-click
 anywhere on the row opens it in a tab — the cell anchors below stay real
 links so that keeps working.{% endcomment %}
 <tr class="wh-vrow" style="cursor:pointer;" data-roll-count="{{ p.roll_count|default:0 }}"
-    onclick="toggleWhRolls(event, this, '{% url 'operating:warehouse_product_rolls' warehouse.pk p.pk %}')">
+    onclick="toggleWhRolls(event, this, '{% if p.is_merged %}{% url 'operating:warehouse_merged_rolls' warehouse.pk %}?ids={{ p.member_ids }}{% else %}{% url 'operating:warehouse_product_rolls' warehouse.pk p.pk %}{% endif %}')">
   {% comment %}Every cell wraps its content in an anchor to the product
   detail page, so right-click / middle-click / Cmd+click work anywhere
   on the row (not just SKU or Name). Nested anchors are invalid HTML —
@@ -22,7 +22,7 @@ links so that keeps working.{% endcomment %}
   <td class="wh-chev-cell" data-label="SKU">
     <i class="fa fa-chevron-right wh-vrow-chev{% if not p.roll_count %} is-empty{% endif %}"
        title="{% blocktrans with n=p.item_noun_plural %}Show the {{ n }} in this product{% endblocktrans %}"></i>
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link wh-cell-nav" style="text-decoration:none; color:inherit;">
+    <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link{% if not p.is_merged %} wh-cell-nav{% endif %}" style="text-decoration:none; color:inherit;">
       {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
@@ -35,29 +35,44 @@ links so that keeps working.{% endcomment %}
         <i class="fa fa-up-right-from-square"></i> {{ p.catalog_variant.product.sku|default:p.catalog_variant.product.title }}
       </a>
     {% else %}
-      <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="color:#C5CCD3;">—</a>
+      <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="color:#C5CCD3;">—</a>
     {% endif %}
   </td>
   <td data-label="{% trans 'Name' %}">
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+    <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
       <div class="pname" style="font-weight:600;">{{ p.name }}</div>
       {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
+      {% comment %}A merged line shows the name of the member holding the most;
+      a member that calls the SKU something else is named here, so the
+      difference stays in sight instead of being folded away.{% endcomment %}
+      {% for other in p.other_names %}<div class="psub wh-other-name" title="{% trans 'Another warehouse names this SKU differently' %}">{{ other }}</div>{% endfor %}
     </a>
   </td>
   {% if warehouse.is_combined %}
   {% comment %}Which member warehouse this row's stock actually stands in.
   The warehouse NAME is what a picker needs; its address goes in the title so
-  the column stays one line.{% endcomment %}
+  the column stays one line. A merged line lists every member with its share,
+  each opening that member's product page.{% endcomment %}
   <td data-label="{% trans 'Location' %}">
+    {% if p.is_merged %}
+    {% for m in p.members %}
+    <a href="{% url 'operating:warehouse_product_detail' m.warehouse_id m.pk %}" class="wh-cell-link wh-loc-link wh-loc-member"
+       onclick="event.stopPropagation();"
+       title="{{ m.warehouse.location|default:m.warehouse.name }}">
+      <i class="fa fa-warehouse"></i> {{ m.warehouse.name }} <span class="wh-loc-qty">{{ m.quantity|floatformat:"2g" }} {{ m.unit_short }}</span>
+    </a>
+    {% endfor %}
+    {% else %}
     <a href="{% url 'operating:warehouse_detail' p.warehouse_id %}" class="wh-cell-link wh-loc-link"
        onclick="event.stopPropagation();"
        title="{{ p.warehouse.location|default:p.warehouse.name }}">
       <i class="fa fa-warehouse"></i> {{ p.warehouse.name }}
     </a>
+    {% endif %}
   </td>
   {% endif %}
   <td class="num" data-label="{% trans 'Stock' %}">
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+    <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
       <div class="qty">{{ p.quantity|floatformat:"2g" }} {{ p.unit_short }}</div>
       {% if p.roll_count and p.counts_packs %}<div class="tops-sub" title="{% blocktrans with n=p.item_noun_plural %}The {{ n }} this product is stored in{% endblocktrans %}">{{ p.roll_count }} {% if p.roll_count == 1 %}{{ p.item_noun }}{% else %}{{ p.item_noun_plural }}{% endif %}</div>{% endif %}
       {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} {{ p.unit_short }}</div>{% endif %}
@@ -74,19 +89,19 @@ links so that keeps working.{% endcomment %}
   from it — and no Total, which is cost times quantity. The header in
   warehouse_detail.html drops the same column.{% endcomment %}
   <td class="num" data-label="{% trans 'Price' %}">
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+    <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
       {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|sales_rep_price|floatformat:"2g" }}</span>{% elif p.last_cost %}<span class="mono" style="color:#9AA5B1;" title="{% trans "Last cost — none in stock" %}">{{ p.warehouse|book_sign }}{{ p.last_cost|sales_rep_price|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
   {% else %}
   <td class="num" data-label="{% trans 'Unit cost' %}">
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;"
+    <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;"
        {% if p.avg_cost %}title="{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"4g" }}"{% elif p.last_cost %}title="{% trans "Last cost — none in stock" %}: {{ p.warehouse|book_sign }}{{ p.last_cost|floatformat:"4g" }}"{% endif %}>
       {% if p.avg_cost %}<span class="mono">{{ p.warehouse|book_sign }}{{ p.avg_cost|floatformat:"2g" }}</span>{% elif p.last_cost %}<span class="mono" style="color:#9AA5B1;">{{ p.warehouse|book_sign }}{{ p.last_cost|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>
   <td class="num" data-label="{% trans 'Total' %}">
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+    <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
       {% if p.line_usd %}<span class="cost-usd">{{ p.warehouse|book_sign }}{{ p.line_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
   </td>

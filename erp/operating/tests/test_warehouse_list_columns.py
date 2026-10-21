@@ -296,3 +296,137 @@ class TheListDoesNotJoinTheStockItems(TestCase):
             "operating:warehouse_detail", args=[self.wh.pk]))
         self.assertEqual(resp.status_code, 200)
         return resp.content.decode()
+
+
+class CombinedWarehouseMergesTheSameSku(TestCase):
+    """A combined (ortak) page shows one SKU once, however many members
+    hold it — the Location column saying where, and how much, and the
+    expanded rolls saying which member each one stands in."""
+
+    def setUp(self):
+        self.usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        self.laleli_book = Book.objects.create(name="Laleli", base_currency=self.usd)
+        self.ergene_book = Book.objects.create(name="Ergene", base_currency=self.usd)
+        self.store = Warehouse.objects.create(name="Laleli", accounting_book=self.laleli_book)
+        self.factory = Warehouse.objects.create(name="Ergene Fabrika",
+                                                accounting_book=self.ergene_book)
+        self.combined = Warehouse.objects.create(name="Ortak Perde Depo", kind="combined")
+        self.combined.combined_sources.set([self.store, self.factory])
+
+        user = get_user_model().objects.create_user("wh3", password="pw")
+        user.member.books.add(self.laleli_book, self.ergene_book)
+        user.member.default_book = self.laleli_book
+        user.member.save()
+        self.client.force_login(user)
+
+    def _stock(self, warehouse, sku, meters, cost, name="GRİ SİMLİ"):
+        wp = WarehouseProduct.objects.create(
+            warehouse=warehouse, name=name, sku=sku, quantity=Decimal(meters))
+        WarehouseProductItem.objects.create(
+            product=wp, quantity=Decimal(meters), quantity_remaining=Decimal(meters),
+            barcode=f"BC-{warehouse.pk}-{sku}", status="in_stock",
+            unit_cost_base=Decimal(cost))
+        return wp
+
+    def _list(self, **params):
+        resp = self.client.get(
+            reverse("operating:warehouse_detail", args=[self.combined.pk]), params)
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode()
+
+    def _rows(self, html):
+        return re.findall(r'<tr class="wh-vrow[^"]*".*?</tr>', html, re.S)
+
+    def test_the_same_sku_in_two_members_is_one_row(self):
+        self._stock(self.store, "K24614.G47", "100", "4.00")
+        self._stock(self.factory, "K24614.G47", "300", "2.00")
+        rows = self._rows(self._list())
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(_cell(rows[0], "Stock").split(" m")[0], "400.00")
+        # (100 x 4 + 300 x 2) / 400 = 2.50, over both members' rolls.
+        self.assertEqual(_cell(rows[0], "Unit cost"), "$2.50")
+        self.assertEqual(_cell(rows[0], "Total"), "$1,000.00")
+
+    def test_the_location_names_each_member_with_its_share(self):
+        self._stock(self.store, "K24614.G47", "100", "4.00")
+        self._stock(self.factory, "K24614.G47", "300", "2.00")
+        loc = _cell(self._rows(self._list())[0], "Location")
+        # Most stock first.
+        self.assertEqual(loc, "Ergene Fabrika 300.00 m Laleli 100.00 m")
+
+    def test_each_member_links_to_its_own_product_page(self):
+        a = self._stock(self.store, "K24614.G47", "100", "4.00")
+        b = self._stock(self.factory, "K24614.G47", "300", "2.00")
+        row = self._rows(self._list())[0]
+        for wp in (a, b):
+            self.assertIn(reverse("operating:warehouse_product_detail",
+                                  args=[wp.warehouse_id, wp.pk]), row)
+
+    def test_a_name_another_member_uses_is_shown_under_it(self):
+        self._stock(self.store, "2052ABEYAZ", "100", "4.00", name="2052-GÜMÜŞ A.BEYAZ")
+        self._stock(self.factory, "2052ABEYAZ", "300", "2.00", name="2052-ALTIN A.BEYAZ")
+        name = _cell(self._rows(self._list())[0], "Name")
+        self.assertEqual(name, "2052-ALTIN A.BEYAZ 2052-GÜMÜŞ A.BEYAZ")
+
+    def test_rows_with_no_sku_are_not_merged(self):
+        self._stock(self.store, "", "10", "1.00")
+        self._stock(self.factory, "", "20", "1.00")
+        self.assertEqual(len(self._rows(self._list())), 2)
+
+    def test_stock_in_another_currency_is_not_added_in(self):
+        try_ = CurrencyCategory.objects.create(code="TRY", name="Lira", symbol="₺")
+        self.ergene_book.base_currency = try_
+        self.ergene_book.save()
+        self._stock(self.store, "K24614.G47", "100", "4.00")
+        self._stock(self.factory, "K24614.G47", "300", "80.00")
+        self.assertEqual(len(self._rows(self._list())), 2)
+
+    def test_every_sort_still_pages_by_sku(self):
+        self._stock(self.store, "A", "100", "4.00")
+        self._stock(self.factory, "A", "300", "2.00")
+        self._stock(self.factory, "B", "50", "9.00")
+        for sort in ("name_asc", "name_desc", "qty_desc", "qty_asc",
+                     "price_desc", "price_asc", "recent"):
+            with self.subTest(sort=sort):
+                self.assertEqual(len(self._rows(self._list(sort=sort))), 2)
+        rows = self._rows(self._list(sort="price_desc"))
+        self.assertIn("$9.00", _cell(rows[0], "Unit cost"))
+
+    def test_the_rolls_come_per_member(self):
+        a = self._stock(self.store, "K24614.G47", "100", "4.00")
+        b = self._stock(self.factory, "K24614.G47", "300", "2.00")
+        resp = self.client.get(
+            reverse("operating:warehouse_merged_rolls", args=[self.combined.pk]),
+            {"ids": f"{a.pk},{b.pk}"})
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode()
+        self.assertEqual(html.count('class="wh-rolls-section"'), 2)
+        # Most stock first, each section under its member's name.
+        self.assertLess(html.index("Ergene Fabrika"), html.index("Laleli"))
+        self.assertLess(html.index(f"BC-{self.factory.pk}-"), html.index(f"BC-{self.store.pk}-"))
+
+    def test_the_merged_rolls_stay_inside_the_combined_warehouse(self):
+        outsider = Warehouse.objects.create(name="Almaty", accounting_book=self.laleli_book)
+        wp = self._stock(outsider, "K24614.G47", "10", "4.00")
+        resp = self.client.get(
+            reverse("operating:warehouse_merged_rolls", args=[self.combined.pk]),
+            {"ids": str(wp.pk)})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_an_opened_group_merges_the_same_way(self):
+        self._stock(self.store, "K24614.G47", "100", "4.00")
+        self._stock(self.factory, "K24614.G47", "300", "2.00")
+        from operating.views_warehouse import _warehouse_base_expr
+        base = (WarehouseProduct.objects.annotate(base=_warehouse_base_expr())
+                .values_list("base", flat=True).first())
+        resp = self.client.get(
+            reverse("operating:warehouse_group_variants", args=[self.combined.pk]),
+            {"base": base})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(self._rows(resp.content.decode())), 1)
+
+    def test_a_plain_warehouse_still_lists_its_own_rows(self):
+        self._stock(self.store, "A", "100", "4.00")
+        resp = self.client.get(reverse("operating:warehouse_detail", args=[self.store.pk]))
+        self.assertEqual(len(self._rows(resp.content.decode())), 1)

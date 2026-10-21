@@ -1887,14 +1887,25 @@ class WarehouseDetail(View):
                 flat = flat.order_by(F("_price").asc(nulls_last=True), "name", "id")
             else:
                 flat = flat.order_by(_flat_sort.get(sort, "name"), "sku", "id")
-            paginator = Paginator(flat, PAGE_SIZE)
+            # A combined (ortak) page lists one row per SKU, not one per
+            # member holding it, so it paginates the SKUs and fetches the
+            # members' rows for the page it shows.
+            paginator = Paginator(
+                _same_sku_keys(base_qs, sort) if warehouse.is_combined else flat,
+                PAGE_SIZE)
             try:
                 page = paginator.page(int(page_num))
             except (PageNotAnInteger, ValueError):
                 page = paginator.page(1)
             except EmptyPage:
                 page = paginator.page(paginator.num_pages or 1)
-            variants_render = list(page.object_list)
+            if warehouse.is_combined:
+                keys = [k["mkey"] for k in page.object_list]
+                variants_render = _merge_same_sku(
+                    flat.annotate(mkey=_same_sku_key()).filter(mkey__in=keys),
+                    order=keys)
+            else:
+                variants_render = list(page.object_list)
         else:
             # ── Group in SQL by main product (base name). One row per group →
             #    cheap to paginate even with thousands of variants. Each group
@@ -2102,6 +2113,100 @@ class WarehouseDetail(View):
         return render(request, self.template_name, ctx)
 
 
+def _same_sku_key():
+    """What a combined (ortak) page merges rows on: the SKU, within one
+    currency. Two members holding the same SKU show as one row; a row with
+    no SKU stays its own, since a blank SKU says nothing about what it is.
+    The currency is in the key because the row adds up its members' cost,
+    and dollars and lira do not add.
+    """
+    from django.db.models import Case, CharField, Value, When
+    from django.db.models.functions import Cast, Concat
+    return Case(
+        When(Q(sku__isnull=True) | Q(sku=""),
+             then=Concat(Value("#"), Cast("id", CharField()))),
+        default=Concat(
+            "sku", Value("|"),
+            Cast("warehouse__accounting_book__base_currency_id", CharField())),
+        output_field=CharField())
+
+
+def _same_sku_keys(base_qs, sort):
+    """One row per merge key, ordered the way the flat list is sorted —
+    what the combined page paginates. The cost sums are only worked out
+    for a price sort: over every product of every member they are the
+    expensive part, and no other sort reads them."""
+    from django.db.models import Case, Max, Min, When
+    keys = base_qs.annotate(mkey=_same_sku_key()).values("mkey")
+    if sort in ("price_desc", "price_asc"):
+        _dec = DecimalField(max_digits=20, decimal_places=4)
+        value, meters = WarehouseProduct._stock_cost_exprs()
+        keys = (base_qs.annotate(mkey=_same_sku_key(), _v=value, _m=meters,
+                                 _l=WarehouseProduct._last_cost_expr())
+                .values("mkey")
+                .annotate(_value=Sum("_v"), _meters=Sum("_m"), _last=Max("_l"))
+                .annotate(_price=Coalesce(
+                    Case(When(_meters__gt=0, then=F("_value") / F("_meters")),
+                         default=None, output_field=_dec),
+                    "_last")))
+        price = F("_price").desc(nulls_last=True) if sort == "price_desc" \
+            else F("_price").asc(nulls_last=True)
+        return keys.order_by(price, "mkey")
+    keys = keys.annotate(_name=Min("name"), _qty=Sum("quantity"),
+                         _updated=Max("updated_at"))
+    order = {"name_asc": "_name", "name_desc": "-_name", "qty_desc": "-_qty",
+             "qty_asc": "_qty", "recent": "-_updated"}.get(sort, "_name")
+    return keys.order_by(order, "mkey")
+
+
+class _SameSku:
+    """One SKU on a combined (ortak) page, however many members hold it.
+
+    Reads like a WarehouseProduct to the row templates — anything it does
+    not total is the lead row's, the member holding the most — so the
+    templates only need to know `is_merged` for what differs: no single
+    product page to link to, a location per member, and the other names
+    the members give it.
+    """
+
+    def __init__(self, rows):
+        self.members = sorted(rows, key=lambda r: (-(r.quantity or 0), r.warehouse.name))
+        self._lead = self.members[0]
+        zero = Decimal("0")
+        self.quantity = sum((r.quantity or zero for r in self.members), zero)
+        self.roll_count = sum(r.roll_count or 0 for r in self.members)
+        self.reserved = sum((r.reserved or zero for r in self.members), zero)
+        value = sum((r.stock_value or zero for r in self.members), zero)
+        meters = sum((r.stock_quantity or zero for r in self.members), zero)
+        self.stock_value = self.line_usd = value or None
+        self.stock_quantity = meters
+        self.avg_cost = value / meters if meters else None
+        lasts = [r.last_cost for r in self.members if r.last_cost is not None]
+        self.last_cost = max(lasts) if lasts else None
+        self.other_names = list(dict.fromkeys(
+            r.name for r in self.members if r.name != self._lead.name))
+        self.member_ids = ",".join(str(r.pk) for r in self.members)
+
+    @property
+    def is_merged(self):
+        return len(self.members) > 1
+
+    def __getattr__(self, name):
+        if name.startswith("__") or name == "_lead":
+            raise AttributeError(name)
+        return getattr(self._lead, name)
+
+
+def _merge_same_sku(rows, order=None):
+    """Fold rows annotated with `mkey` into one _SameSku per key — in
+    `order` when given (the page's keys), else in the order rows came."""
+    by_key = {}
+    for r in rows:
+        by_key.setdefault(r.mkey, []).append(r)
+    return [_SameSku(by_key[k]) for k in (order if order is not None else by_key)
+            if k in by_key]
+
+
 def _warehouse_sole_unit(scope_ids):
     """The one unit a warehouse counts in, or None when it holds several.
 
@@ -2182,7 +2287,11 @@ def warehouse_group_variants(request, pk):
                     reserved=reserved_meters_subquery())
           .filter(base=base).order_by("name", "id"))
     total = qs.count()
-    variants = list(qs[:CAP])
+    if warehouse.is_combined:
+        # Same SKU in two members → one row, as on the flat list.
+        variants = _merge_same_sku(qs.annotate(mkey=_same_sku_key())[:CAP])
+    else:
+        variants = list(qs[:CAP])
     return render(request, "operating/partials/warehouse_group_variant_rows.html", {
         "warehouse": warehouse,
         "variants": variants,
@@ -2268,13 +2377,46 @@ def warehouse_product_rolls(request, warehouse_pk, product_pk):
     hundreds of rolls and a page lists dozens of products, so rendering them
     all up front would make the list crawl.
     """
-    from decimal import Decimal as _Dec
-    from .models import OrderStockReservation
-
     warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
     # A combined (ortak) warehouse expands rows belonging to its MEMBERS.
     product = get_object_or_404(WarehouseProduct, pk=product_pk,
                                 warehouse_id__in=warehouse.scope_ids())
+    return _render_roll_rows(request, warehouse, [product])
+
+
+@login_required
+def warehouse_merged_rolls(request, warehouse_pk):
+    """The rolls of one SKU that several members of a combined (ortak)
+    warehouse hold, as the same injected row — split per member, each with
+    its own way to that member's product page. `?ids=` names the rows the
+    merged line stands for (_SameSku.member_ids)."""
+    warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+    ids = [int(x) for x in (request.GET.get("ids") or "").split(",")
+           if x.strip().isdigit()]
+    products = sorted(
+        WarehouseProduct.objects.filter(pk__in=ids, warehouse_id__in=warehouse.scope_ids())
+        .select_related("warehouse__accounting_book__base_currency"),
+        key=lambda p: (-(p.quantity or 0), p.warehouse.name))
+    if not products:
+        raise Http404("No such stock in this warehouse.")
+    return _render_roll_rows(request, warehouse, products)
+
+
+def _render_roll_rows(request, warehouse, products):
+    return render(request, "operating/partials/warehouse_product_roll_rows.html", {
+        "warehouse": warehouse,
+        "sections": [_roll_section(p) for p in products],
+        # A heading per member only when there is more than one to tell apart.
+        "per_member": len(products) > 1,
+        "col_count": _warehouse_col_count(warehouse, request.user),
+    })
+
+
+def _roll_section(product):
+    """One product's rolls for the injected row: the newest CAP of them,
+    each carrying the orders it is reserved for."""
+    from decimal import Decimal as _Dec
+    from .models import OrderStockReservation
 
     CAP = 200
     # Consumed rolls are gone from the floor — the row's roll count and the
@@ -2309,16 +2451,14 @@ def warehouse_product_rolls(request, warehouse_pk, product_pk):
         r.reserved_m = reserved_by_roll.get(r.id, _Dec("0"))
         r.reservation_list = reservations_by_roll.get(r.id, [])
 
-    return render(request, "operating/partials/warehouse_product_roll_rows.html", {
-        "warehouse": warehouse,
+    return {
         "product": product,
         "cost_sign": _cost_sign(product.warehouse),
         "rolls": rolls,
         "shown": len(rolls),
         "total": total,
         "truncated": truncated,
-        "col_count": _warehouse_col_count(warehouse, request.user),
-    })
+    }
 
 
 @login_required

@@ -73,6 +73,7 @@ urlpatterns = [
     path("stock-transfers/<int:pk>/", views_transfer.stock_transfer_detail, name="stock_transfer_detail"),
     path("stock-transfers/<int:pk>/undo/", views_transfer.stock_transfer_undo, name="stock_transfer_undo"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/", in_reach(views_warehouse.warehouse_product_rolls), name="warehouse_product_rolls"),
+    path("warehouses/<int:warehouse_pk>/same-sku-rolls/", in_reach(views_warehouse.warehouse_merged_rolls), name="warehouse_merged_rolls"),
     path("warehouses/<int:warehouse_pk>/rolls/<int:roll_pk>/photo/", in_reach(views_warehouse.warehouse_roll_photo), name="warehouse_roll_photo"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/", in_reach(warehouse_label.warehouse_product_label), name="warehouse_product_label"),
     # Not in_reach: what a roll's QR opens, for anyone holding the label.

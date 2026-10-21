@@ -352,6 +352,13 @@
     text-decoration: none;
   }
   .od-prods .wh-loc-name + .wh-loc-name { margin-top: 3px; }
+  /* A merged same-SKU line: one pill per member, stacked, with its share. */
+  .od-prods .wh-loc-member { display: table; }
+  .od-prods .wh-loc-member + .wh-loc-member { margin-top: 3px; }
+  .od-prods .wh-loc-qty { font-weight: 500; opacity: 0.8; margin-left: 4px; }
+  .od-prods .wh-other-name { color: #94A3B8; }
+  .od-prods .wh-rolls-section + .wh-rolls-section { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #E2E8F0; }
+  .od-prods .wh-rolls-count .wh-loc-name { margin-right: 6px; }
   .od-prods .wh-loc-link:hover { background: #EDE9FE; border-color: #C9BCF6; }
   .od-prods .wh-loc-link i { font-size: 10px; opacity: 0.75; margin-right: 3px; }
   .od-prods .rolls-pill {

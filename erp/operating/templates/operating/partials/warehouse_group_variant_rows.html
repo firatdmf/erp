@@ -6,14 +6,14 @@ warehouse page lists member warehouses' rows.{% endcomment %}
 {% comment %}Same behaviour as the flat rows: a plain click expands this
 variant's rolls, the SKU pill opens the product.{% endcomment %}
 <tr class="wh-vrow wh-vrow-nested" style="cursor:pointer;" data-roll-count="{{ p.roll_count|default:0 }}"
-    onclick="toggleWhRolls(event, this, '{% url 'operating:warehouse_product_rolls' warehouse.pk p.pk %}')">
+    onclick="toggleWhRolls(event, this, '{% if p.is_merged %}{% url 'operating:warehouse_merged_rolls' warehouse.pk %}?ids={{ p.member_ids }}{% else %}{% url 'operating:warehouse_product_rolls' warehouse.pk p.pk %}{% endif %}')">
   {% comment %}Spans SKU + Catalog: this cell carries both (the catalog link
   sits inline here rather than in its own column), and without the span every
   nested row sat one column left of the headings it belongs under.{% endcomment %}
   <td class="wh-vrow-sku wh-chev-cell" colspan="2" data-label="SKU">
     <i class="fa fa-chevron-right wh-vrow-chev{% if not p.roll_count %} is-empty{% endif %}"
        title="{% trans 'Show the rolls in this product' %}"></i>
-    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link wh-cell-nav" style="text-decoration:none; color:inherit;">
+    <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link{% if not p.is_merged %} wh-cell-nav{% endif %}" style="text-decoration:none; color:inherit;">
       {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
     {% if p.catalog_variant_id and p.catalog_variant.product_id %}
@@ -28,16 +28,27 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
   <td data-label="{% trans 'Name' %}">
     <div class="pname" style="font-weight:600;">{{ p.name }}</div>
     {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
+    {% for other in p.other_names %}<div class="psub wh-other-name" title="{% trans 'Another warehouse names this SKU differently' %}">{{ other }}</div>{% endfor %}
   </td>
   {% if warehouse.is_combined %}
   {% comment %}Which member warehouse holds this variant — the same Location
   column the flat list has, so an expanded group reads the same way.{% endcomment %}
   <td data-label="{% trans 'Location' %}">
+    {% if p.is_merged %}
+    {% for m in p.members %}
+    <a href="{% url 'operating:warehouse_product_detail' m.warehouse_id m.pk %}" class="wh-cell-link wh-loc-link wh-loc-member"
+       onclick="event.stopPropagation();"
+       title="{{ m.warehouse.location|default:m.warehouse.name }}">
+      <i class="fa fa-warehouse"></i> {{ m.warehouse.name }} <span class="wh-loc-qty">{{ m.quantity|floatformat:"2g" }} {{ m.unit_short }}</span>
+    </a>
+    {% endfor %}
+    {% else %}
     <a href="{% url 'operating:warehouse_detail' p.warehouse_id %}" class="wh-cell-link wh-loc-link"
        onclick="event.stopPropagation();"
        title="{{ p.warehouse.location|default:p.warehouse.name }}">
       <i class="fa fa-warehouse"></i> {{ p.warehouse.name }}
     </a>
+    {% endif %}
   </td>
   {% endif %}
   <td class="num" data-label="{% trans 'Stock' %}">

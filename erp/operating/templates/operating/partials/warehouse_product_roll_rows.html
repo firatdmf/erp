@@ -4,12 +4,21 @@
 that product's line when it is expanded. A single full-width cell rather
 than cells aligned to the parent columns: a roll's fields (barcode, length
 left, status, who scanned it) don't line up with a product's, and forcing
-them into the same grid squeezed both.{% endcomment %}
+them into the same grid squeezed both.
+
+One section per product. A combined (ortak) page's merged line stands for
+the same SKU in several members, so it gets a section per member, each
+headed with where the rolls are and its own way to that member's product
+page — the line itself has no single page to open.{% endcomment %}
 <tr class="wh-rollrow">
   <td colspan="{{ col_count|default:6 }}" class="wh-rolls-cell">
+    {% for s in sections %}
+    {% with product=s.product rolls=s.rolls shown=s.shown total=s.total truncated=s.truncated cost_sign=s.cost_sign %}
+    <div class="wh-rolls-section">
     {% if rolls %}
     <div class="wh-rolls-head">
       <span class="wh-rolls-count">
+        {% if per_member %}<span class="wh-loc-name"><i class="fa fa-warehouse"></i> {{ product.warehouse.name }}</span>{% endif %}
         <i class="fa fa-layer-group"></i>
         {{ shown }}{% if truncated %} / {{ total }}{% endif %}
         {% if shown == 1 %}{{ product.item_noun }}{% else %}{{ product.item_noun_plural }}{% endif %}
@@ -96,9 +105,13 @@ them into the same grid squeezed both.{% endcomment %}
     {% else %}
     <div class="wh-rolls-empty">
       <i class="fa fa-barcode"></i>
+      {% if per_member %}<span class="wh-loc-name"><i class="fa fa-warehouse"></i> {{ product.warehouse.name }}</span>{% endif %}
       {% blocktrans with n=product.item_noun_plural %}No {{ n }} recorded for this product.{% endblocktrans %}
       <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}">{% trans "Open product" %}</a>
     </div>
     {% endif %}
+    </div>
+    {% endwith %}
+    {% endfor %}
   </td>
 </tr>

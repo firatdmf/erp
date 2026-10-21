@@ -114,8 +114,8 @@ class ReceivedPurchaseEditTest(TestCase):
         self.assertEqual(card["main_product"]["sku"], "K24644")
         v = card["variants"][0]
         self.assertEqual((v["name"], v["sku"], v["price"]), ("G07", "K24644.G07", "3.5"))
-        # The row's fields, as stored: a code, not a colour, so a model.
-        self.assertEqual(v["attributes"], [{"name": "model", "value": "g07"}])
+        # The row's fields, as stored: a colourway code is the colour.
+        self.assertEqual(v["attributes"], [{"name": "color", "value": "g07"}])
         self.assertEqual([t["qty"] for t in v["tops"]], ["30", "20"])
         self.assertTrue(all(t["stock_item_id"] for t in v["tops"]))
 

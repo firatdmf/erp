@@ -148,7 +148,7 @@ class GoodsReceiptAttributesTest(TestCase):
                             "currency": "USD", "tops": [{"qty": 5}]}])
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(_attrs(ProductVariant.objects.get(variant_sku="K24644.V107")),
-                         [("model", "v-107")])
+                         [("color", "v-107")])
 
     def test_an_auto_sku_is_built_from_the_values(self, _up):
         r = self._receive([self._row("", ("model", "S11"), ("color", "white"))])

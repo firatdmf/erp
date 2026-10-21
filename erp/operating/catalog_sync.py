@@ -144,12 +144,10 @@ def parse_label_name(name: str) -> dict:
          the FIRST one (the separator itself is dropped).
          "1072/V-356"   -> base="1072", token="V-356"
 
-    The token decides the attribute:
-      - token folds to a key in TR_EN_COLORS -> attribute "color",
-        value = the English colour (upper-case for display).
-      - otherwise                            -> attribute "model",
-        value = the token as printed.
-    No space and no special char -> base only, no variant.
+    The token is the variant's colour (see _color_token): the English
+    colour when it folds to a key in TR_EN_COLORS, else the colourway code
+    as printed ("V-356"). No space and no special char -> base only, no
+    variant.
 
     Returns: {base_name, attribute_name, attribute_value, original_token, is_color}
     """
@@ -175,12 +173,22 @@ def parse_label_name(name: str) -> dict:
         return {"base_name": base, "attribute_name": None, "attribute_value": None,
                 "original_token": None, "is_color": False}
 
+    return _color_token(base, token)
+
+
+def _color_token(base, token):
+    """The variant part of a label, as the variant's colour.
+
+    A colour word is stored by its English key; anything else is the mill's
+    colourway code ("V-356", "G93"), which is what tells the variants of one
+    design apart, and is kept as printed. There is no separate "model"
+    attribute: it only ever held these same codes and colour words, under a
+    name the storefront could not filter on. `is_color` says the token was
+    translated, for the scan screen's "translated from" hint."""
     english = translate_color(token)
-    if english:
-        return {"base_name": base, "attribute_name": "color",
-                "attribute_value": english, "original_token": token, "is_color": True}
-    return {"base_name": base, "attribute_name": "model",
-            "attribute_value": token, "original_token": token, "is_color": False}
+    return {"base_name": base, "attribute_name": "color",
+            "attribute_value": english or token, "original_token": token,
+            "is_color": bool(english)}
 
 
 def derive_catalog(sku, name, color=None):
@@ -199,28 +207,18 @@ def derive_catalog(sku, name, color=None):
     sku = (sku or "").strip()
     color = (color or "").strip()
 
-    def _from_color(base, col):
-        eng = translate_color(col)
-        if eng:
-            return {"base_name": base, "attribute_name": "color",
-                    "attribute_value": eng, "original_token": col, "is_color": True}
-        return {"base_name": base, "attribute_name": "model",
-                "attribute_value": col, "original_token": col, "is_color": False}
-
     if "." in sku:
         base, _, suffix = sku.partition(".")
         base = base.strip()
         suffix = suffix.strip()
-        if color:
-            return _from_color(base, color)
-        return {"base_name": base,
-                "attribute_name": "model" if suffix else None,
-                "attribute_value": suffix or None,
-                "original_token": suffix or None, "is_color": False}
+        if color or suffix:
+            return _color_token(base, color or suffix)
+        return {"base_name": base, "attribute_name": None, "attribute_value": None,
+                "original_token": None, "is_color": False}
 
     parsed = parse_label_name(name)
     if color and not parsed["attribute_value"]:
-        parsed = _from_color(parsed["base_name"], color)
+        parsed = _color_token(parsed["base_name"], color)
     return parsed
 
 

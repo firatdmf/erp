@@ -3699,8 +3699,8 @@ def _row_attributes(v):
     """[(name, value)] one variant row describes its variant with, in the
     stored spelling: the row's own attribute fields, a colour typed in
     Turkish (KREM) stored by its English key (cream). A row saved before
-    rows had fields carries one free-text `name`, read the old way: a
-    colour if it is one, a model otherwise."""
+    rows had fields carries one free-text `name`, read as its colour: the
+    English key for a colour word, the colourway code otherwise."""
     from marketing.attributes import normalize_attribute_name, normalize_attribute_value
     from .catalog_sync import translate_color
 
@@ -3722,7 +3722,7 @@ def _row_attributes(v):
                     pairs.append(found)
     legacy = (v.get("name") or "").strip()
     if not pairs and legacy:
-        found = pair("color", legacy) if translate_color(legacy) else pair("model", legacy)
+        found = pair("color", legacy)
         pairs = [found] if found else []
     return pairs
 

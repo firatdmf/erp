@@ -499,13 +499,22 @@ class ContactDetail(generic.DetailView):
         # this is the only place their whole position is visible.
         # Not for a sales rep: customer balances are not theirs to read,
         # and the account pages behind these rows are closed to the role.
+        # A person who buys for their company is charged to the company's
+        # account, so those are listed too — else their orders show here
+        # with no account behind them.
+        from django.db.models import Q
         from accounting.models_accounts import CurrentAccount
         from erp.roles import is_sales_rep
+        held = Q(contact=contact)
+        if contact.company_id:
+            held |= Q(company_id=contact.company_id)
         context["current_account_accounts"] = accounts = [] if is_sales_rep(self.request.user) else list(
-            of_books_in_reach(CurrentAccount.objects.filter(contact=contact))
-            .select_related("book", "default_currency")
-            .order_by("book__name")
+            of_books_in_reach(CurrentAccount.objects.filter(held))
+            .select_related("book", "default_currency", "company")
+            .order_by("book__name", "company_id")
         )
+        for a in accounts:
+            a.held_by_company = a.company_id is not None
         context.update(_accounts_total(accounts))
         return context
 

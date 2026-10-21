@@ -27,5 +27,5 @@ class TheFormPrintsOneCurrency(SimpleTestCase):
         self.assertNotIn("coUpdateTotals", self.src)
 
     def test_a_retail_sale_goes_back_to_the_books_currency(self):
-        body = self.src.split("function coCurrencyFor(type, pk, name) {", 1)[1].split("\n  }\n", 1)[0]
+        body = self.src.split("function coCurrencyFor(type, pk, name, keepChargeTo) {", 1)[1].split("\n  }\n", 1)[0]
         self.assertIn("CO_CUR = CO_BASE;", body)

@@ -14712,3 +14712,10 @@ msgstr "Bu paketin etiketini yazdır"
 
 msgid "Warehouse name"
 msgstr "Depodaki adı"
+
+msgid "Charge to"
+msgstr "Kime borçlandırılsın"
+
+#, python-format
+msgid "%(name)s personally"
+msgstr "%(name)s (şahsen)"

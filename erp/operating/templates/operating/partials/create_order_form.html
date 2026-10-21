@@ -115,6 +115,17 @@
 .co-sup-clear::before{transform:translate(-50%,-50%) rotate(45deg)}
 .co-sup-clear::after{transform:translate(-50%,-50%) rotate(-45deg)}
 .co-sup-clear:hover{background:#DCEBE9}
+/* Charge to: the contact's company, or the contact personally. */
+.co-charge-to{margin-top:10px}
+.co-charge-to[hidden]{display:none}
+.co-charge-to>label{display:block;font:600 12px var(--font-sans,sans-serif);color:#475569;margin-bottom:6px}
+.co-charge-opts{display:flex;gap:6px;flex-wrap:wrap}
+.co-charge-opt{flex:1 1 140px;display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 12px;border:1px solid #E2E8EE;border-radius:9px;cursor:pointer;font:600 13px var(--font-sans,sans-serif);color:#334155;background:#fff}
+.co-charge-opt input{display:none}
+.co-charge-opt i{color:#64748B}
+.co-charge-opt span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.co-charge-opt:has(input:checked){border-color:#147F74;background:#EFF6F5;color:#0B5F60}
+.co-charge-opt:has(input:checked) i{color:#147F74}
 .co-toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:6px;font-size:13px;font-weight:500;z-index:100000;opacity:0;transform:translateY(8px);transition:all .3s}
 .co-toast.show{opacity:1;transform:translateY(0)}
 .co-toast-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
@@ -340,6 +351,27 @@
               <button type="button" class="co-sup-clear" title="{% trans 'Change customer' %}">&times;</button>
             </div>
           </div>
+
+          {# Shown for a contact filed under a company: whose account the #}
+          {# order goes on, the company picked unless someone says otherwise. #}
+          {# Not on an edit — there the order page's customer card has it. #}
+          {% if not order %}
+          <div id="co-charge-to" class="co-charge-to" hidden>
+            <label>{% trans "Charge to" %}</label>
+            <div class="co-charge-opts">
+              <label class="co-charge-opt">
+                <input type="radio" name="charge_to" value="company" checked
+                       onchange="coChargeToChanged()">
+                <i class="fa fa-building"></i><span id="co-charge-company"></span>
+              </label>
+              <label class="co-charge-opt">
+                <input type="radio" name="charge_to" value="contact"
+                       onchange="coChargeToChanged()">
+                <i class="fa fa-user"></i><span id="co-charge-contact"></span>
+              </label>
+            </div>
+          </div>
+          {% endif %}
 
           <!-- Inline "+ create new" — shown when the search has no match.
                Takes a plain contact or company (name/phone/email/address
@@ -1175,7 +1207,52 @@
     el.innerHTML = html;
   }
 
-  function coCurrencyFor(type, pk, name) {
+  // "Charge to" — offered when the picked contact is filed under a
+  // company. The company is picked to begin with; a new customer always
+  // starts there again, so one person's choice never carries to the next.
+  function coChargePersonally() {
+    var box = document.getElementById('co-charge-to');
+    var picked = box && !box.hidden && box.querySelector('input[name="charge_to"]:checked');
+    return !!picked && picked.value === 'contact';
+  }
+  function coResetChargeTo() {
+    var box = document.getElementById('co-charge-to');
+    if (!box) return;
+    box.hidden = true;
+    box.querySelector('input[value="company"]').checked = true;
+  }
+  function coOfferChargeTo(company, contactName) {
+    var box = document.getElementById('co-charge-to');
+    if (!box) return;
+    document.getElementById('co-charge-company').textContent = company;
+    document.getElementById('co-charge-contact').textContent =
+      '{% trans "%(name)s personally" %}'.replace('%(name)s', contactName);
+    box.hidden = false;
+    // Picking the customer folded this step away before the answer came
+    // back; open it again, or the choice is drawn where nobody sees it.
+    // The products stay open too, as they do for a retail sale.
+    var step = document.getElementById('co-step-3');
+    if (step) step.classList.add('active');
+    var sum3 = document.getElementById('co-sum-3');
+    if (sum3) sum3.textContent = contactName + ' · ' + company;
+  }
+  // The account changes with the choice, and with it what the prices
+  // are in, so the currency is asked again.
+  window.coChargeToChanged = function () {
+    var type = (document.getElementById('customer-type') || {}).value || '';
+    var pk = (document.getElementById('customer-pk') || {}).value || '';
+    var name = (document.getElementById('co-customer-search') || {}).value || '';
+    // The folded step's header says who is charged, so the choice is
+    // still in sight once the step is closed.
+    var sum3 = document.getElementById('co-sum-3');
+    if (sum3) sum3.textContent = coChargePersonally()
+      ? document.getElementById('co-charge-contact').textContent
+      : name + ' · ' + document.getElementById('co-charge-company').textContent;
+    coCurrencyFor(type, pk, name, true);
+  };
+
+  function coCurrencyFor(type, pk, name, keepChargeTo) {
+    if (!keepChargeTo) coResetChargeTo();
     if (type === 'retail' || !pk) {
       // Nobody's account to follow: back to the book's own currency,
       // otherwise a retail sale after a euro customer stayed in euros.
@@ -1186,11 +1263,13 @@
     }
     var book = (document.querySelector('[name="book"]') || {}).value || '';
     fetch(CO_CURRENCY_URL + '?book=' + encodeURIComponent(book) +
-          '&type=' + encodeURIComponent(type) + '&pk=' + encodeURIComponent(pk),
+          '&type=' + encodeURIComponent(type) + '&pk=' + encodeURIComponent(pk) +
+          (coChargePersonally() ? '&personally=1' : ''),
           { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || d.error) { coCurrencyNote(''); return; }
+        if (type === 'contact' && d.company && !keepChargeTo) coOfferChargeTo(d.company, name);
         CO_CUR = d;
         coRepriceLabels();
         if (d.is_base) {

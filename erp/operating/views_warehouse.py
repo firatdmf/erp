@@ -2970,14 +2970,17 @@ def catalog_product_variants(request, pk, product_id):
     return JsonResponse({"results": results, "product": _product_facts(product, invoice)})
 
 
-def customer_currency_facts(book_id, customer_type, customer_pk):
+def customer_currency_facts(book_id, customer_type, customer_pk, personally=False):
     """What a customer's order in this book is priced in.
 
     The order is raised against the account get_or_create_current_account_
-    for_order picks in that book — the company's, else the contact's — and
-    an order is priced in its customer's own currency. A customer with no
-    account there yet gets one in the default currency, which is what this
-    answers for them.
+    for_order picks in that book — the company's, else the contact's (the
+    contact's own when `personally`) — and an order is priced in its
+    customer's own currency. A customer with no account there yet gets one
+    in the default currency, which is what this answers for them.
+
+    `company` names the company a contact is filed under, so the order
+    form can offer to charge the person instead.
 
     Shared by both screens that price goods for a customer: the order form
     and a purchase bought for one. Neither should have its own idea of what
@@ -2991,11 +2994,13 @@ def customer_currency_facts(book_id, customer_type, customer_pk):
 
     if not str(customer_pk or "").isdigit():
         return None
+    contacts_company = None
     if customer_type == "company":
         contact, company = None, Company.objects.filter(pk=int(customer_pk)).first()
     else:
         contact = Contact.objects.filter(pk=int(customer_pk)).first()
-        company = getattr(contact, "company", None) if contact else None
+        contacts_company = getattr(contact, "company", None) if contact else None
+        company = None if personally else contacts_company
     if contact is None and company is None:
         return None
 
@@ -3012,6 +3017,7 @@ def customer_currency_facts(book_id, customer_type, customer_pk):
         "currency": currency.code,
         "symbol": currency.symbol or currency.code,
         "account": account.name if account else None,
+        "company": contacts_company.name if contacts_company else None,
         # Said plainly, because a price typed in one currency and read as
         # another is the whole class of mistake this exists to stop.
         "is_base": currency.code.upper() == base.upper(),
@@ -3021,10 +3027,12 @@ def customer_currency_facts(book_id, customer_type, customer_pk):
 
 @login_required
 def customer_currency(request):
-    """`customer_currency_facts` for the order form: ?book=&type=&pk=."""
+    """`customer_currency_facts` for the order form: ?book=&type=&pk=, and
+    &personally=1 when the form says to charge the contact personally."""
     facts = customer_currency_facts(request.GET.get("book"),
                                     request.GET.get("type"),
-                                    request.GET.get("pk"))
+                                    request.GET.get("pk"),
+                                    personally=request.GET.get("personally") == "1")
     if facts is None:
         return JsonResponse({"error": "not found"}, status=404)
     return JsonResponse(facts)

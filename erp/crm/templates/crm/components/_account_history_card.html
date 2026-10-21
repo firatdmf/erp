@@ -49,7 +49,7 @@
         <a class="od-order-row" href="{% url 'accounts:detail' a.pk %}">
           <div class="od-order-id">
             <div class="od-order-num">{{ a.book.name }}</div>
-            <div class="od-order-date">{{ a.code }}</div>
+            <div class="od-order-date">{{ a.code }}{% if a.held_by_company %} · {{ a.company.name }}{% endif %}</div>
           </div>
           <span class="ord-status {% if a.cached_balance > 0 %}pending{% elif a.cached_balance < 0 %}cancelled{% else %}completed{% endif %}">
             <span class="ord-status-dot"></span>{{ a.balance_label }}

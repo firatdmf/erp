@@ -270,14 +270,16 @@ class SplitCurrencyClash(ValueError):
     """An order split across books would end up in two currencies."""
 
 
-def existing_customer_account(*, book, company=None, contact=None, retail=False):
+def existing_customer_account(*, book, company=None, contact=None, retail=False,
+                              personally=False):
     """The account a customer already has in `book`, or None — found, never
     made. Same precedence as get_or_create_current_account_for_order: the
-    company (the contact's own company included), then the contact; a
-    retail order's is the book's shared retail account."""
+    company (the contact's own company included, unless `personally`), then
+    the contact; a retail order's is the book's shared retail account."""
     if retail:
         return CurrentAccount.objects.filter(book=book, code=RETAIL_CURRENT_ACCOUNT_CODE).first()
-    company = company or (getattr(contact, "company", None) if contact else None)
+    company = company or (getattr(contact, "company", None)
+                          if contact and not personally else None)
     if company:
         return CurrentAccount.objects.filter(book=book, company=company).first()
     if contact:
@@ -350,7 +352,9 @@ def get_or_create_current_account_for_order(order, *, member=None, book=None) ->
     """Find (or create) the current account for an order's customer.
 
     Resolution priority (per user spec):
-      1. If the order's contact is tied to a company → use COMPANY's current account.
+      1. If the order's contact is tied to a company → use COMPANY's current
+         account, unless the order says to charge the contact personally
+         (order.charge_contact_personally, picked on the order form).
       2. Else if order.company → use that.
       3. Else if order.contact → use contact's current account.
       4. Else → return None (web_client / no customer = skip).
@@ -365,8 +369,9 @@ def get_or_create_current_account_for_order(order, *, member=None, book=None) ->
     is right for the ordinary single-book order and wrong for a split.
     """
     contact = getattr(order, "contact", None)
+    personally = getattr(order, "charge_contact_personally", False)
     company = getattr(order, "company", None) or (
-        getattr(contact, "company", None) if contact else None
+        getattr(contact, "company", None) if contact and not personally else None
     )
 
     if company:

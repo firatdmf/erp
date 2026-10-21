@@ -354,6 +354,37 @@ class TheCardOnTheCrmPage(CombinedStatementBase):
         self.assertContains(r, "Account history")
         self.assertContains(r, f'value="{account.pk}"')
 
+    def test_the_contact_page_lists_the_account_of_the_company_she_buys_for(self):
+        """Fadime Akdas orders for Akdas Gardinen, charged to the company's
+        account; her page listed the orders and no account behind them."""
+        company = Company.objects.create(name="Akdas Gardinen")
+        fadime = Contact.objects.create(name="Fadime Akdas", company=company)
+        account = CurrentAccount.objects.create(
+            book=self.laleli, code="C-2", name="Akdas Gardinen",
+            company=company, default_currency=self.usd)
+        self._move(account, "40.00", 1)
+        r = self.client.get(reverse("crm:contact_detail", args=[fadime.pk]))
+        self.assertEqual(r.context["current_account_accounts"], [account])
+        self.assertContains(r, f'value="{account.pk}"')
+        self.assertContains(r, "C-2 · Akdas Gardinen")
+
+    def test_a_colleagues_own_account_stays_off_the_contact_page(self):
+        company = Company.objects.create(name="Akdas Gardinen")
+        fadime = Contact.objects.create(name="Fadime Akdas", company=company)
+        colleague = Contact.objects.create(name="Ali Akdas", company=company)
+        CurrentAccount.objects.create(
+            book=self.laleli, code="P-1", name="Ali Akdas",
+            contact=colleague, default_currency=self.usd)
+        r = self.client.get(reverse("crm:contact_detail", args=[fadime.pk]))
+        self.assertEqual(r.context["current_account_accounts"], [])
+
+    def test_the_contacts_own_account_is_not_labelled_as_the_company(self):
+        company = Company.objects.create(name="Varsova Ltd")
+        self.contact.company = company
+        self.contact.save()
+        r = self.client.get(reverse("crm:contact_detail", args=[self.contact.pk]))
+        self.assertNotContains(r, "· Varsova Ltd")
+
     def test_the_two_cards_do_not_share_a_checkbox_class(self):
         """Order history and Account history both sit on this page. One
         `.od-order-check` query for both would have Print selected on one

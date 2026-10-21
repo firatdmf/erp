@@ -36,6 +36,33 @@
           <div class="od-dt"><span>{% trans "Address" %}</span><b>{{ order.contact.address|default:"—"|truncatechars:60 }}</b></div>
           {% if order.contact.country %}<div class="od-dt"><span>{% trans "Country" %}</span><b>{{ order.contact.country }}</b></div>{% endif %}
         </div>
+        {% if order.contact.company %}
+          {# Whose account the order goes on. The company unless someone #}
+          {# picks the person here — never decided out of sight. #}
+          <div class="od-charge-to" style="margin:10px 0 4px;">
+            <div style="font:600 11px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px;">
+              {% trans "Charge to" %}
+            </div>
+            <div class="od-cust-srcs">
+              <label class="od-cust-src">
+                <input type="radio" name="charge_to" value="company"
+                       {% if not order.charge_contact_personally %}checked{% endif %}
+                       hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                       hx-vals='{"action":"charge_to"}' hx-trigger="change"
+                       hx-target="#od-customer-section" hx-swap="outerHTML">
+                <i class="fa fa-building"></i> {{ order.contact.company.name }}
+              </label>
+              <label class="od-cust-src">
+                <input type="radio" name="charge_to" value="contact"
+                       {% if order.charge_contact_personally %}checked{% endif %}
+                       hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                       hx-vals='{"action":"charge_to"}' hx-trigger="change"
+                       hx-target="#od-customer-section" hx-swap="outerHTML">
+                <i class="fa fa-user"></i> {% blocktrans with name=order.contact.name %}{{ name }} personally{% endblocktrans %}
+              </label>
+            </div>
+          </div>
+        {% endif %}
         <a class="od-link" href="{% url 'crm:contact_detail' order.contact.pk %}">{% trans "Open profile" %} <i class="fa fa-external-link-alt"></i></a>
 
       {% elif order.company %}

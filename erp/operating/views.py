@@ -914,7 +914,10 @@ class OrderDetail(DetailView):
                 order.company = None
             else:
                 return JsonResponse({"ok": False, "error": "Bad customer"}, status=400)
-            order.save(update_fields=["contact", "company", "updated_at"])
+            order.charge_contact_personally = _charge_contact_personally(
+                request, order.contact)
+            order.save(update_fields=["contact", "company",
+                                      "charge_contact_personally", "updated_at"])
 
             # Customer changed → re-resolve the current account; posting
             # moves the order's rows onto it with their dates kept
@@ -2101,6 +2104,7 @@ def _sibling_order_for_book(order, book, member):
     sibling = Order.objects.create(
         contact=order.contact,
         company=order.company,
+        charge_contact_personally=order.charge_contact_personally,
         is_retail_order=order.is_retail_order,
         is_guest_order=order.is_guest_order,
         guest_first_name=order.guest_first_name,
@@ -2167,7 +2171,8 @@ def _split_currency_at_edit(order, foreign_groups):
     for book, _lines in foreign_groups:
         check_split_currency(existing_customer_account(
             book=book, company=order.company, contact=order.contact,
-            retail=order.is_retail_order), currency)
+            retail=order.is_retail_order,
+            personally=order.charge_contact_personally), currency)
     return currency
 
 
@@ -2262,6 +2267,15 @@ def _working_book(request, member, allowed=None):
     return working or get_default_book(member)
 
 
+def _charge_contact_personally(request, contact):
+    """Whether the form's "Charge to" choice says the contact personally.
+
+    Only a contact filed under a company is offered the choice; for anyone
+    else it means nothing and is False, so a stale field can't mark them."""
+    return bool(contact and contact.company_id
+                and (request.POST.get("charge_to") or "").strip() == "contact")
+
+
 def _split_currency_at_create(request, member, groups, customer_type, customer_pk):
     """The one currency a new split order will be in, after checking every
     book's account can take it. None for an order that is not split, or a
@@ -2282,8 +2296,10 @@ def _split_currency_at_create(request, member, groups, customer_type, customer_p
     if not (company or contact or retail):
         return None
     working = _working_book(request, member)
+    personally = _charge_contact_personally(request, contact)
     accounts = {book.pk: existing_customer_account(
-                    book=book, company=company, contact=contact, retail=retail)
+                    book=book, company=company, contact=contact, retail=retail,
+                    personally=personally)
                 for book, _lines in groups}
     currency = split_lead_currency(accounts.values(), accounts.get(working.pk))
     for account in accounts.values():
@@ -2918,12 +2934,16 @@ def order_customer_card_view(request, pk):
                 cpk = 0
             prev_current_account_id = order.current_account_id
             fields_changed = ["contact", "company", "web_client",
-                              "is_guest_order", "updated_at"]
+                              "is_guest_order", "charge_contact_personally",
+                              "updated_at"]
             # Clear all customer linkages first so the swap is atomic.
+            # A new customer starts on the default charge (their company,
+            # if they are filed under one); the card then offers the choice.
             order.contact = None
             order.company = None
             order.web_client = None
             order.is_guest_order = False
+            order.charge_contact_personally = False
             if ctype == "contact" and cpk:
                 order.contact = get_object_or_404(Contact, pk=cpk)
             elif ctype == "company" and cpk:
@@ -2942,9 +2962,39 @@ def order_customer_card_view(request, pk):
             prev_current_account_id = order.current_account_id
             order.contact = None
             order.company = None
-            order.save(update_fields=["contact", "company", "updated_at"])
+            order.charge_contact_personally = False
+            order.save(update_fields=["contact", "company",
+                                      "charge_contact_personally", "updated_at"])
             _save_current_account_link(prev_current_account_id)
             mode = "edit"
+
+        # ── Charge the contact's company, or the contact personally ──
+        # Offered only for a contact filed under a company. A split
+        # order's halves are one order to the person taking it, so every
+        # half with this contact follows, each in its own book.
+        elif action == "charge_to" and order.contact_id and order.contact.company_id:
+            personally = (request.POST.get("charge_to") or "").strip() == "contact"
+            halves = [order]
+            if order.split_group:
+                halves = list(Order.objects.filter(
+                    split_group=order.split_group, contact_id=order.contact_id))
+            for half in halves:
+                if half.charge_contact_personally == personally:
+                    continue
+                half.charge_contact_personally = personally
+                half.save(update_fields=["charge_contact_personally", "updated_at"])
+                try:
+                    own_book = half.current_account.book if half.current_account_id else None
+                    account = get_or_create_current_account_for_order(
+                        half, member=member, book=own_book)
+                    if account and half.current_account_id != account.pk:
+                        half.current_account = account
+                        half.save(update_fields=["current_account", "updated_at"])
+                    if account:
+                        post_order_movement(half, member=member)
+                except Exception:
+                    pass
+            mode = "view"
 
         # ── Inline field edit on the linked contact/company ──
         elif action == "update_field":
@@ -3029,7 +3079,9 @@ def order_customer_card_view(request, pk):
                 else:
                     order.contact = new_contact
                     order.company = None
-                    order.save(update_fields=["contact", "company", "updated_at"])
+                    order.charge_contact_personally = False
+                    order.save(update_fields=["contact", "company",
+                                              "charge_contact_personally", "updated_at"])
                     _save_current_account_link(prev_current_account_id)
                     mode = "view"
 
@@ -3040,12 +3092,17 @@ def order_customer_card_view(request, pk):
     # for the template (the snapshot used by HTMX swap is independent of
     # whatever client mode toggle was in effect when the form fired).
     order = get_object_or_404(Order, pk=pk)
-    return render(request, "operating/partials/_customer_card.html", {
+    response = render(request, "operating/partials/_customer_card.html", {
         "order": order,
         "cust_card_mode": mode,
         "cust_card_error": create_error,
         "cust_card_posted": request.POST if create_error else {},
     })
+    if request.method == "POST" and request.POST.get("action") == "charge_to":
+        # The account, its balance and the order's currency are shown
+        # elsewhere on the page too; all of them just changed.
+        response["HX-Refresh"] = "true"
+    return response
 
 
 def base_currency_facts(book=None):
@@ -3882,6 +3939,8 @@ class OrderCreate(View):
                 order.contact = Contact.objects.get(pk=customer_pk)
             except Contact.DoesNotExist:
                 pass
+            order.charge_contact_personally = _charge_contact_personally(
+                request, order.contact)
         elif customer_type == "company" and customer_pk:
             try:
                 order.company = Company.objects.get(pk=customer_pk)

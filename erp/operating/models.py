@@ -711,6 +711,11 @@ class Order(models.Model):
         related_name="orders",
         help_text="Linked current account (auto-resolved from contact/company)"
     )
+    # A contact filed under a company is charged to the COMPANY's account
+    # unless whoever took the order picked "personally" — a choice shown on
+    # the order, never made silently. Every re-resolve of the account
+    # (edit, customer card, split halves) reads it, so none reverts it.
+    charge_contact_personally = models.BooleanField(default=False)
 
     # What this order's prices are IN. Orders used to have no currency at
     # all: every price was taken to be dollars, by a convention written

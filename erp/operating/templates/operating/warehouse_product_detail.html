@@ -1785,22 +1785,31 @@
         <label>{% trans "Name" %}</label>
         <input class="so-input" type="text" name="name" value="{{ product.name|default:'' }}">
       </div>
+      {% if product.catalog_variant_id %}
+      {# The SKU and the main product are the catalog's: renamed and moved there. #}
+      <div class="so-fld">
+        <label>{% trans "SKU" %}</label>
+        <input class="so-input" type="text" name="sku" value="{{ product.sku|default:'' }}" readonly
+               title="{% trans 'Rename it in the catalog' %}"
+               style="background:var(--gray-50);color:var(--gray-600);cursor:not-allowed;">
+        <div style="font-size:12px;color:var(--gray-500);margin-top:4px;">
+          {% trans "Main product" %}: <b>{{ product.catalog_variant.product.title }}</b>{% if product.catalog_variant.product.sku %} ({{ product.catalog_variant.product.sku }}){% endif %}
+          · <a href="{% url 'marketing:product_detail' product.catalog_variant.product_id %}">{% trans "Rename or move it in the catalog" %}</a>
+        </div>
+      </div>
+      {% else %}
       <div class="so-fld">
         <label>{% trans "SKU" %}</label>
         <input class="so-input" type="text" name="sku" value="{{ product.sku|default:'' }}">
       </div>
       <div class="so-fld" style="position:relative;">
         <label>{% trans "Main product (catalog)" %}</label>
-        {% if product.catalog_variant_id and product.catalog_variant.product_id %}
-        <div style="font-size:12px;color:var(--gray-500);margin-bottom:4px;">
-          {% trans "Currently" %}: <b>{{ product.catalog_variant.product.title }}</b>{% if product.catalog_variant.product.sku %} ({{ product.catalog_variant.product.sku }}){% endif %}
-        </div>
-        {% endif %}
         <input class="so-input" type="text" name="catalog_base_name" id="peCatalogBase" value=""
                autocomplete="off" oninput="peCatalogSearch()" onblur="setTimeout(peCatalogHide,180)"
                placeholder="{% trans 'Type to search a main product, or leave blank (auto from SKU)' %}">
         <div id="peCatalogDrop" class="pe-ac-drop"></div>
       </div>
+      {% endif %}
       <div class="so-fld">
         <label>{% trans "Barcode" %}</label>
         <input class="so-input" type="text" name="barcode" value="{{ product.barcode|default:'' }}">

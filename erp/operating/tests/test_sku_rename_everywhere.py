@@ -10,6 +10,10 @@ at all — the row was left renamed beside a variant that was not.
 Now the variant is renamed in place and every other warehouse row that
 carried the old SKU takes the new one.
 
+Since 2026-10-21 the SKU is renamed only in the catalog: the warehouse edit
+refuses a new SKU or main product for a row in the catalog, and a variant
+renamed in the catalog renames every shelf holding it.
+
 Run with:
     python manage.py test operating.tests.test_sku_rename_everywhere
 """
@@ -103,17 +107,64 @@ class RenamingASkuTest(TestCase):
         self.here.refresh_from_db()
         self.assertEqual(self.here.sku, "LZK0000120")
 
-    def test_the_edit_form_renames_both_warehouses(self):
+    def test_the_edit_form_refuses_a_new_sku_and_renames_nothing(self):
+        response = self._edit("SBL-ECRU")
+        self.assertEqual(response.status_code, 400)
+        self.here.refresh_from_db()
+        self.there.refresh_from_db()
+        self.variant.refresh_from_db()
+        self.assertEqual((self.here.sku, self.there.sku, self.variant.variant_sku),
+                         ("LZK0000120",) * 3)
+
+    def test_the_edit_form_refuses_to_move_the_variant(self):
+        Product.objects.create(title="Florenza", sku="K12767", featured=True)
         user = get_user_model().objects.create_superuser("boss", "boss@example.com", "pw")
         self.client.force_login(user)
         response = self.client.post(
             reverse("operating:warehouse_product_edit", args=[self.shop.pk, self.here.pk]),
-            {"name": "SABLE EKRU", "sku": "SBL-ECRU"})
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertIsNone(response.json()["catalog_warning"])
-        self.there.refresh_from_db()
+            {"name": "SABLE EKRU", "sku": "LZK0000120", "catalog_base_name": "Florenza"})
+        self.assertEqual(response.status_code, 400)
         self.variant.refresh_from_db()
-        self.assertEqual((self.there.sku, self.variant.variant_sku), ("SBL-ECRU", "SBL-ECRU"))
+        self.assertEqual(self.variant.product_id, self.product.pk)
+
+    def test_the_edit_form_still_saves_the_rest_when_the_sku_is_unchanged(self):
+        response = self._edit("LZK0000120")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.here.refresh_from_db()
+        self.assertEqual(self.here.sku, "LZK0000120")
+
+
+class RenamingInTheCatalogTest(TestCase):
+    """A variant renamed in the catalog renames every shelf holding it."""
+
+    def setUp(self):
+        book = Book.objects.get_or_create(name="Laleli Fabric")[0]
+        shop = Warehouse.objects.create(name="Laleli", accounting_book=book)
+        factory = Warehouse.objects.create(name="Laleli Fabrika", accounting_book=book)
+        _p, self.variant, _pc, _vc = sync_roll_to_catalog(
+            base_name="Grek", attributes=[("color", "white")], variant_sku="LZK000054")
+        self.rows = [WarehouseProduct.objects.create(
+            warehouse=w, name="GREK 7103 BEYAZ", sku="LZK000054", quantity=0,
+            catalog_variant=self.variant) for w in (shop, factory)]
+
+    def _skus(self):
+        return [WarehouseProduct.objects.get(pk=r.pk).sku for r in self.rows]
+
+    def test_renaming_the_variant_renames_both_shelves(self):
+        self.variant.variant_sku = "GREK.7103-white"
+        self.variant.save(update_fields=["variant_sku"])
+        self.assertEqual(self._skus(), ["GREK.7103-white"] * 2)
+
+    def test_a_full_save_renames_them_too(self):
+        self.variant.variant_sku = "GREK.7103-white"
+        self.variant.save()
+        self.assertEqual(self._skus(), ["GREK.7103-white"] * 2)
+
+    def test_saving_something_else_leaves_the_shelves_alone(self):
+        WarehouseProduct.objects.filter(pk=self.rows[0].pk).update(sku="LZK000054")
+        self.variant.variant_cost = 1
+        self.variant.save(update_fields=["variant_cost"])
+        self.assertEqual(self._skus(), ["LZK000054"] * 2)
 
 
 class OneRowPerVariantTest(TestCase):

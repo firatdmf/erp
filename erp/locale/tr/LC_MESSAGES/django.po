@@ -14676,3 +14676,24 @@ msgstr ""
 "sırayla seçilir. Fotoğraflar yüklenirken yeniden adlandırılır, dosyalarınıza "
 "istediğiniz adı verebilirsiniz. Birden fazla varyantta kullanılacak bir "
 "fotoğrafı ürünün medyasına yükleyin."
+
+#: operating/views_warehouse.py
+msgid "The SKU belongs to the catalog: rename it on the product's page in the catalog."
+msgstr "SKU kataloğa aittir: ürünün katalogdaki sayfasından yeniden adlandırın."
+
+#: operating/views_warehouse.py
+msgid "Move it to another main product on the product's page in the catalog."
+msgstr "Başka bir ana ürüne taşımak için ürünün katalogdaki sayfasını kullanın."
+
+#: operating/templates/operating/warehouse_product_detail.html
+msgid "Rename or move it in the catalog"
+msgstr "Katalogda yeniden adlandırın veya taşıyın"
+
+#: operating/templates/operating/warehouse_detail.html
+msgid "Rename or move it in the catalog."
+msgstr "Katalogda yeniden adlandırın veya taşıyın."
+
+#: operating/templates/operating/warehouse_product_detail.html
+#: operating/templates/operating/warehouse_detail.html
+msgid "Rename it in the catalog"
+msgstr "Katalogda yeniden adlandırın"

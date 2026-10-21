@@ -7396,22 +7396,20 @@ class WarehouseProductEdit(View):
         # main product (the base title typed/picked in the edit modal).
         catalog_base = (request.POST.get("catalog_base_name") or "").strip()
 
-        # The SKU is the catalog variant's, so one that is another
-        # variant's — or none at all — is refused before anything is
-        # written. Saved with a warning, it left the row under one SKU and
-        # its variant under another.
-        if product.catalog_variant_id and (sku or "") != (product.sku or ""):
-            if not sku:
+        # The SKU is the catalog variant's and is renamed there, never from
+        # a shelf: a warehouse screen types a SKU only once, when new stock
+        # creates its variant. The same goes for moving the variant under
+        # another main product. Renamed here, the variant was renamed behind
+        # the catalog's back, and a base code in the SKU moved it.
+        if product.catalog_variant_id:
+            if (sku or "") != (product.sku or ""):
                 return JsonResponse({"success": False, "error": _gettext(
-                    "A product in the catalog needs a SKU.")}, status=400)
-            from marketing.models import ProductVariant
-            taken = (ProductVariant.everywhere.filter(variant_sku=sku)
-                     .exclude(pk=product.catalog_variant_id)
-                     .select_related("product").first())
-            if taken is not None:
+                    "The SKU belongs to the catalog: rename it on the "
+                    "product's page in the catalog.")}, status=400)
+            if catalog_base:
                 return JsonResponse({"success": False, "error": _gettext(
-                    "SKU '%(sku)s' is already %(product)s's.")
-                    % {"sku": sku, "product": taken.product.title}}, status=400)
+                    "Move it to another main product on the product's page "
+                    "in the catalog.")}, status=400)
 
         changes = []
         update_fields = ["updated_at"]

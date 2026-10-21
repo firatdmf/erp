@@ -195,3 +195,23 @@ def update_receipt_liability(sender, instance, **kwargs):
 # Order audit trail — signal receivers live in audit.py; importing
 # here guarantees they are registered alongside the other signals.
 from . import audit  # noqa: E402,F401
+
+
+# ────────────────────────────────────────────────────────────────────
+#  A variant renamed in the catalog renames its shelves.
+# ────────────────────────────────────────────────────────────────────
+# The SKU is the catalog variant's and is renamed only there (the warehouse
+# edit refuses it). Until WarehouseProduct reads its SKU from the variant
+# instead of keeping a copy, every row of the variant takes the new text, so
+# the copy never disagrees: the product form, the admin and scripts all
+# save the variant, and this follows each of them.
+@receiver(post_save, sender="marketing.ProductVariant")
+def warehouse_rows_follow_variant_sku(sender, instance, update_fields=None, **kwargs):
+    if update_fields is not None and "variant_sku" not in update_fields:
+        return
+    from .models import WarehouseProduct
+    sku = instance.variant_sku
+    if not sku:
+        return
+    (WarehouseProduct.objects.filter(catalog_variant_id=instance.pk)
+     .exclude(sku=sku).update(sku=sku))

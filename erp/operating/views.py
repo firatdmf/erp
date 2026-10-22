@@ -5161,6 +5161,7 @@ class OrderPackingList(View):
             for r in p.rows:
                 item_no += 1
                 r["item_no"] = item_no
+                r["unit_label"] = units.unit_short(r["unit"])
 
         unassigned_count = order.stock_reservations.filter(pack__isnull=True).count()
 

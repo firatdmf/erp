@@ -74,8 +74,36 @@
   .pk-roll-sku { font: 500 11px var(--font-mono); color: var(--gray-500); }
   .pk-roll-bc { font: 600 11px var(--font-mono); color: var(--gray-700); background: #F4F7FB; border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
   .pk-roll-m { font: 800 12.5px var(--font-sans); color: var(--nejum-teal-700); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* On a wide screen the tags sit in the row's own line, as if unwrapped. */
+  .pk-roll-tags { display: contents; }
 
   .pk-empty { padding: 20px 16px; text-align: center; color: var(--gray-500); font: 500 12.5px var(--font-sans); }
+
+  /* Phones: one roll is two lines — number, name and quantity on top, its
+     variant, group and barcode wrapping underneath — rather than five
+     things squeezed into one line that left the name as "…". */
+  @media (max-width: 600px) {
+    .pk { padding: 14px 12px 60px; }
+    .pk-title { font-size: 22px; }
+    .pk-warn { flex-wrap: wrap; }
+    .pk-warn a { margin-left: 26px; }
+    .pk-toolbar .pk-btn { flex: 1 1 auto; justify-content: center; }
+    .pk-toolbar .spacer { display: none; }
+
+    .pk-pack-h { padding: 10px 12px; gap: 8px; }
+    .pk-pack-h > div:nth-child(2) { min-width: 0; }
+    .pk-pack-code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pk-pack-meta { white-space: nowrap; }
+    .pk-pack-btn { padding: 8px; }
+
+    .pk-roll-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto;
+                   grid-template-areas: "no name m" ". tags tags"; gap: 5px 8px; padding: 10px 12px; align-items: baseline; }
+    .pk-roll-no { grid-area: no; width: auto; }
+    .pk-roll-name { grid-area: name; white-space: normal; overflow-wrap: anywhere; }
+    .pk-roll-sku { display: block; margin-top: 1px; }
+    .pk-roll-m { grid-area: m; }
+    .pk-roll-tags { grid-area: tags; display: flex; flex-wrap: wrap; gap: 5px; }
+  }
 </style>
 {% endblock %}
 
@@ -146,10 +174,12 @@
           on the printed list so staff can read off the same number.{% endcomment %}
           <span class="pk-roll-no">{{ r.item_no }}</span>
           <span class="pk-roll-name">{{ r.title }} <span class="pk-roll-sku">{{ r.sku }}</span></span>
-          {% if r.variant != "-" %}<span class="pk-roll-variant">{{ r.variant }}</span>{% endif %}
-          <span class="pk-roll-group">{{ r.product_group }}</span>
-          <code class="pk-roll-bc">{{ r.barcode }}</code>
-          <span class="pk-roll-m">{{ r.quantity|floatformat:"2g" }} m</span>
+          <span class="pk-roll-tags">
+            {% if r.variant != "-" %}<span class="pk-roll-variant">{{ r.variant }}</span>{% endif %}
+            <span class="pk-roll-group">{{ r.product_group }}</span>
+            <code class="pk-roll-bc">{{ r.barcode }}</code>
+          </span>
+          <span class="pk-roll-m">{{ r.quantity|floatformat:"2g" }} {{ r.unit_label }}</span>
         </div>
         {% empty %}
         <div class="pk-empty">{% trans "No rolls in this package yet." %}</div>

@@ -1637,8 +1637,12 @@
     if (!skuI || skuI.dataset.touched || skuI.dataset.matchLocked) return;
     const card = vEl.closest('.np-product-card');
     const root = npBaseSku(card);
-    // PARENT.VALUE-VALUE, in the card's attribute order.
-    const sfx = npRowAttrs(vEl).map(function (a) { return slug(a.value); })
+    // PARENT.VALUE-VALUE, in the card's attribute order. "-" parts the
+    // attributes, so the colours of one value ("gold+ecru") join with "_":
+    // 2086.GOLD_ECRU-320, not 2086.GOLD-ECRU-320 (three attributes?).
+    const sfx = npRowAttrs(vEl).map(function (a) {
+      return (a.value || '').split('+').map(slug).filter(Boolean).join('_');
+    })
       .filter(Boolean).join('-') || vEl.dataset.vid;
     skuI.value = root ? (root + '.' + sfx).slice(0, GR_VARIANT_SKU_MAX) : '';
   };

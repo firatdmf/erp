@@ -76,7 +76,7 @@ class CargoReceiptOnCompletion(_AnOrderToComplete, TestCase):
         self.assertTrue(receipts[0].is_pdf)
         self.assertEqual(receipts[0].created_by, self.user)
         self.assertTrue(upload.call_args_list[0].args[1].startswith(
-            f"operating/orders/{self.order.pk}/cargo/"))
+            f"Operating/orders/{self.order.pk}/cargo/"))
         self.assertContains(self.client.get(self.url), "kargo-fisi.pdf")
 
     def test_a_file_that_is_not_an_image_or_pdf_is_turned_away(self, upload):

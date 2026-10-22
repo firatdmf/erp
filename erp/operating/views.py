@@ -140,7 +140,7 @@ def save_cargo_receipts(order, files, user=None):
             jpeg = optimize_receipt_image(f)
             if jpeg is not None:
                 f, ctype, name = jpeg, jpeg.content_type, jpeg.name
-        path = (f"operating/orders/{order.pk}/cargo/"
+        path = (f"Operating/orders/{order.pk}/cargo/"
                 f"{uuid.uuid4().hex}.{OrderCargoReceipt.ALLOWED_TYPES[ctype]}")
         try:
             # The name is a fresh uuid: nothing cached under it to purge.

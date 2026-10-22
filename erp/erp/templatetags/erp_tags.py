@@ -430,7 +430,6 @@ def dashboard_component(csrf_token,path,member):
             try:
                 _user = getattr(member, 'user', None)
                 if _user:
-                    from team.models import TeamMember
                     team_qs = (
                         TeamTask.objects
                         .filter(Q(assignees=_user) | Q(assigned_by=_user))
@@ -441,11 +440,8 @@ def dashboard_component(csrf_token,path,member):
                     )
                     # Which teams does the user have admin/manager/owner role in?
                     # Used to gate the trash icon — matches team.views.delete_task.
-                    _mgmt_team_ids = set(
-                        TeamMember.objects
-                        .filter(user=_user, role__in=['admin', 'manager', 'owner'])
-                        .values_list('team_id', flat=True)
-                    )
+                    from team.access import managed_team_ids
+                    _mgmt_team_ids = managed_team_ids(_user)
                     for tt in team_qs:
                         # TeamTask.due_date is a DateTimeField stored in
                         # UTC. Convert to local time before calling
@@ -594,6 +590,9 @@ def nav_sections(context, surface="desktop"):
     sections gathered under one heading. The items are identical either
     way; only the markup around them differs.
 
+    An operations manager sees nothing that leads into orders, judged
+    the same way (erp.roles.nav_item_reaches_orders).
+
     A sales rep sees only the entries her role can actually open. Which
     those are is not listed anywhere: each item is checked against the
     same gate the middleware enforces (erp.roles.may_use_nav_item), so
@@ -603,13 +602,15 @@ def nav_sections(context, surface="desktop"):
     request either way.
     """
     from erp.nav import NAV_SECTIONS, mobile_sections
-    from erp.roles import is_sales_rep
+    from erp.roles import is_operations_manager, is_sales_rep, nav_item_reaches_orders
     from operating.views_warehouse import _is_admin
 
     user = context.get("user")
     sections = mobile_sections() if surface == "mobile" else NAV_SECTIONS
     if is_sales_rep(user):
         sections = _readable_sections(sections)
+    if is_operations_manager(user):
+        sections = _sections_without(sections, nav_item_reaches_orders)
     if not _is_admin(user):
         sections = _sections_without(sections, lambda i: i.get("admin"))
     return sections

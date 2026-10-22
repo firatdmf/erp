@@ -10,10 +10,13 @@ from django.db import transaction
 import json
 
 from .models import Team, TeamMember, TeamTask, TeamMessage, TeamMeeting, FavoriteTeam, ChatRoom, TeamBoardColumn, TeamTaskHistory
+from .access import has_team_role, is_team_member, team_role, teams_for
 
 def get_user_team(user):
     """Get the user's primary team (first team they belong to or created)"""
-    team = user.teams.first()
+    # An admin in no team opens one of everybody's rather than being
+    # given a new team of their own.
+    team = user.teams.first() or teams_for(user).filter(is_archived=False).first()
     if not team:
         # Create default team for user
         team = Team.objects.create(
@@ -37,7 +40,7 @@ def team_list(request):
     All teams (active + archived) are rendered; tab switching is client-side."""
     filter_type = request.GET.get('filter', 'all')
 
-    teams = request.user.teams.all().prefetch_related('member_objects__user', 'tasks')
+    teams = teams_for(request.user).prefetch_related('member_objects__user', 'tasks')
     favorite_ids = set(FavoriteTeam.objects.filter(user=request.user).values_list('team_id', flat=True))
     for t in teams:
         t.is_favorite = t.id in favorite_ids
@@ -61,7 +64,7 @@ def team_tasks(request):
     """Kanban task board with columns"""
     team_id = request.GET.get('team_id')
     if team_id:
-        team = get_object_or_404(Team, id=team_id, members=request.user)
+        team = get_object_or_404(teams_for(request.user), id=team_id)
     else:
         team = get_user_team(request.user)
     
@@ -244,12 +247,11 @@ def team_tasks(request):
         col.task_list = [t for t in all_tasks if t.column_id == col.id]
 
     # Get current user role
-    current_member = TeamMember.objects.filter(team=team, user=request.user).first()
-    user_role = current_member.role if current_member else 'member'
+    user_role = team_role(request.user, team) or 'member'
 
     context = {
         'team': team,
-        'user_teams': request.user.teams.filter(is_archived=False), # Valid teams for switcher
+        'user_teams': teams_for(request.user).filter(is_archived=False), # Valid teams for switcher
         'members': TeamMember.objects.filter(team=team).select_related('user'),
         'columns': columns, # Pass columns instead of separate task lists
         'page_title': f'{team.name} Tasks',
@@ -284,7 +286,7 @@ def update_task_status(request, task_id):
     # Allowed: Assignees, Creator, or Admin/Manager/Owner
     is_assignee = task.assignees.filter(id=request.user.id).exists()
     is_creator = task.assigned_by == request.user
-    is_admin = TeamMember.objects.filter(team=task.team, user=request.user, role__in=['admin', 'manager', 'owner']).exists()
+    is_admin = has_team_role(request.user, task.team)
 
     if not (is_assignee or is_creator or is_admin):
         return JsonResponse({'success': False, 'error': 'You can only move your own tasks'}, status=403)
@@ -369,7 +371,7 @@ def create_section(request):
     team = get_object_or_404(Team, id=team_id)
     
     # Check permission
-    if not TeamMember.objects.filter(team=team, user=request.user).exists():
+    if not is_team_member(request.user, team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         
     if not title:
@@ -398,7 +400,7 @@ def edit_section(request, column_id):
     column = get_object_or_404(TeamBoardColumn, id=column_id)
     
     # Check permission
-    if not TeamMember.objects.filter(team=column.team, user=request.user).exists():
+    if not is_team_member(request.user, column.team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         
     if title:
@@ -572,7 +574,7 @@ def task_detail(request, task_id):
         'team': task.team,
         'comments': comments,
         'history': history,
-        'can_edit': task.assigned_by == request.user or request.user == task.team.creator # Simplified permission
+        'can_edit': task.assigned_by == request.user or request.user == task.team.creator or has_team_role(request.user, task.team, ('admin',))
     }
     return render(request, 'team_task_detail.html', context)
 
@@ -581,7 +583,7 @@ def task_detail(request, task_id):
 def add_task_comment(request, task_id):
     """Add a comment to a task"""
     task = get_object_or_404(TeamTask, id=task_id)
-    if not task.team.members.filter(id=request.user.id).exists():
+    if not is_team_member(request.user, task.team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
     content = request.POST.get('content')
@@ -618,7 +620,7 @@ def delete_section(request, column_id):
     team = column.team
     
     # Check permission
-    if not TeamMember.objects.filter(team=team, user=request.user).exists():
+    if not is_team_member(request.user, team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
     
     # Move tasks to fallback column if any
@@ -638,7 +640,7 @@ def delete_task(request, task_id):
     # Check permission - assigned_by, or team admin/manager/owner can delete
     can_delete = (
         task.assigned_by == request.user or 
-        TeamMember.objects.filter(team=task.team, user=request.user, role__in=['admin', 'manager', 'owner']).exists()
+        has_team_role(request.user, task.team)
     )
     
     if not can_delete:
@@ -659,7 +661,7 @@ def delete_task_attachment(request, attachment_id):
     # Check permission
     can_delete = (
         attachment.task.assigned_by == request.user or 
-        TeamMember.objects.filter(team=attachment.task.team, user=request.user, role__in=['admin', 'manager', 'owner']).exists()
+        has_team_role(request.user, attachment.task.team)
     )
     if not can_delete:
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -676,7 +678,7 @@ def edit_task(request, task_id):
     # Check permissions
     can_edit = (
         task.assigned_by == request.user or 
-        TeamMember.objects.filter(team=task.team, user=request.user, role__in=['admin', 'manager', 'owner']).exists()
+        has_team_role(request.user, task.team)
     )
     if not can_edit:
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -787,12 +789,12 @@ def team_messages(request):
     """Modern chat interface with rooms"""
     from .models import ChatRoom, ChatMessage
     
-    user_teams = request.user.teams.all()
+    user_teams = teams_for(request.user)
     team_id = request.GET.get('team_id')
     room_id = request.GET.get('room_id')
     
     if team_id:
-        team = get_object_or_404(Team, id=team_id, members=request.user)
+        team = get_object_or_404(teams_for(request.user), id=team_id)
     else:
         team = get_user_team(request.user)
     
@@ -965,20 +967,19 @@ def team_roles(request):
     team_id = request.GET.get('team_id')
     
     if team_id:
-        team = get_object_or_404(Team, id=team_id, members=request.user)
+        team = get_object_or_404(teams_for(request.user), id=team_id)
     else:
         team = get_user_team(request.user)
     
     # Check if user is admin (allow access for testing, can add strict check later)
-    try:
-        user_role = TeamMember.objects.get(team=team, user=request.user)
-    except TeamMember.DoesNotExist:
+    if not is_team_member(request.user, team):
         return redirect('team:team_list')
     
     members = TeamMember.objects.filter(team=team).select_related('user')
     
-    # Check if current user is the team creator
-    is_creator = team.creator == request.user
+    # Whether the current user may change roles: the team's creator, or
+    # an admin, who manages every team.
+    is_creator = team.creator == request.user or has_team_role(request.user, team, ('admin',))
     
     context = {
         'team': team,
@@ -996,8 +997,8 @@ def update_member_role(request, member_id):
     member = get_object_or_404(TeamMember, id=member_id)
     team = member.team
     
-    # Only team creator can change roles
-    if team.creator != request.user:
+    # Only the team's creator, or an admin, can change roles
+    if team.creator != request.user and not has_team_role(request.user, team, ('admin',)):
         return JsonResponse({'success': False, 'error': 'Only team creator can change roles'}, status=403)
     
     new_role = request.POST.get('role')
@@ -1016,8 +1017,8 @@ def remove_member(request, member_id):
     member = get_object_or_404(TeamMember, id=member_id)
     team = member.team
     
-    # Only team creator can remove members
-    if team.creator != request.user:
+    # Only the team's creator, or an admin, can remove members
+    if team.creator != request.user and not has_team_role(request.user, team, ('admin',)):
         return JsonResponse({'success': False, 'error': 'Only team creator can remove members'}, status=403)
     
     # Cannot remove the team creator
@@ -1033,7 +1034,7 @@ def remove_member(request, member_id):
 def team_meetings(request):
     """Display and schedule team meetings"""
     # Fetch all user's teams for the dropdown
-    user_teams = request.user.teams.all()
+    user_teams = teams_for(request.user)
     
     if request.method == 'POST':
         title = request.POST.get('title')
@@ -1053,7 +1054,7 @@ def team_meetings(request):
         if meeting_type == 'team' and team_id:
              target_team = get_object_or_404(Team, id=team_id)
              # Verify user membership
-             if not target_team.members.filter(id=request.user.id).exists():
+             if not is_team_member(request.user, target_team):
                  return HttpResponseForbidden("You are not a member of this team")
         
         # Create Google Meet if requested
@@ -1247,7 +1248,7 @@ def create_instant_meeting(request):
             if not room.members.filter(id=request.user.id).exists():
                 return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         else:
-            if not team.members.filter(id=request.user.id).exists():
+            if not is_team_member(request.user, team):
                  return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
         # Initialize Google Calendar logic
@@ -1479,7 +1480,7 @@ def search_users(request):
         try:
             team = Team.objects.get(id=team_id)
             # Ensure requester is member of team
-            if not TeamMember.objects.filter(team=team, user=request.user).exists():
+            if not is_team_member(request.user, team):
                 return JsonResponse({'users': []}, status=403)
             
             # Filter users to only team members
@@ -1525,7 +1526,7 @@ def add_member(request):
         team = get_user_team(request.user)
     
     # Check admin permission
-    if not TeamMember.objects.filter(team=team, user=request.user, role__in=['admin', 'manager', 'owner']).exists():
+    if not has_team_role(request.user, team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
     
     user_id = request.POST.get('user_id')
@@ -1615,7 +1616,7 @@ def get_team_invitations(request, team_id):
     team = get_object_or_404(Team, id=team_id)
     
     # Check if user is admin
-    if not TeamMember.objects.filter(team=team, user=request.user, role='admin').exists():
+    if not has_team_role(request.user, team, ('admin',)):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
     
     invitations = TeamInvitation.objects.filter(team=team).select_related('invited_user', 'invited_by')
@@ -1648,7 +1649,7 @@ def create_chat_room(request):
     if not team_id:
         return JsonResponse({'success': False, 'error': 'Team required'}, status=400)
     
-    team = get_object_or_404(Team, id=team_id, members=request.user)
+    team = get_object_or_404(teams_for(request.user), id=team_id)
     
     # Handle direct message
     if room_type == 'direct' and user_id:
@@ -1879,7 +1880,7 @@ def send_chat_message(request):
     room = get_object_or_404(ChatRoom, id=room_id)
     
     # Check if user is team member
-    if not TeamMember.objects.filter(team=room.team, user=request.user).exists():
+    if not is_team_member(request.user, room.team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
     
     message = ChatMessage.objects.create(
@@ -1947,7 +1948,7 @@ def toggle_favorite(request, team_id):
     team = get_object_or_404(Team, id=team_id)
     
     # Check if user is member
-    if not TeamMember.objects.filter(team=team, user=request.user).exists():
+    if not is_team_member(request.user, team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
     
     fav, created = FavoriteTeam.objects.get_or_create(user=request.user, team=team)
@@ -1967,7 +1968,7 @@ def archive_team(request, team_id):
     
     # Only creator (and maybe admin) can archive
     # Checking if user is the creator or has admin role in team
-    is_admin = TeamMember.objects.filter(team=team, user=request.user, role='admin').exists()
+    is_admin = has_team_role(request.user, team, ('admin',))
     
     if team.creator != request.user and not is_admin:
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -1980,12 +1981,9 @@ def archive_team(request, team_id):
 @login_required
 def get_manageable_teams(request):
     """Get teams where user has admin/manager/owner role for task assignment"""
-    manageable_memberships = TeamMember.objects.filter(
-        user=request.user,
-        role__in=['admin', 'manager', 'owner']
-    ).select_related('team').filter(team__is_archived=False)
-    
-    teams = [{'id': m.team.id, 'name': m.team.name} for m in manageable_memberships]
+    teams = [{'id': t.id, 'name': t.name}
+             for t in teams_for(request.user).filter(is_archived=False)
+             if has_team_role(request.user, t)]
     return JsonResponse({'teams': teams})
 
 # ------------------- Google Chat Integration -------------------
@@ -2127,9 +2125,8 @@ def get_team_task_edit_form(request, task_id):
     )
     
     # Check permissions and get role
-    try:
-        member = TeamMember.objects.get(team=task.team, user=request.user)
-    except TeamMember.DoesNotExist:
+    role = team_role(request.user, task.team)
+    if role is None:
         return HttpResponseForbidden("Permission denied")
 
     # Determine edit permission
@@ -2137,7 +2134,7 @@ def get_team_task_edit_form(request, task_id):
     # 1. User is the creator/assigner of the task
     # 2. User is an Admin or Manager of the team
     is_assigner = task.assigned_by == request.user
-    is_admin_or_manager = member.role in ['admin', 'manager']
+    is_admin_or_manager = role in ['admin', 'manager']
     
     can_edit = is_assigner or is_admin_or_manager
 

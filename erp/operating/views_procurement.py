@@ -30,7 +30,10 @@ def create_request_partial(request):
         else:
              return JsonResponse({
                 'success': False,
-                'errors': {**form.errors, **(items.errors if hasattr(items, 'errors') else {})} 
+                # A formset's errors are a list, one per line — spread
+                # into the dict they raised a TypeError and the refusal
+                # came back as a 500.
+                'errors': {**form.errors, 'items': items.errors}
             })
     else:
         form = PurchaseRequestForm()
@@ -58,7 +61,10 @@ def create_order_partial(request):
         else:
              return JsonResponse({
                 'success': False,
-                'errors': {**form.errors, **(items.errors if hasattr(items, 'errors') else {})} 
+                # A formset's errors are a list, one per line — spread
+                # into the dict they raised a TypeError and the refusal
+                # came back as a 500.
+                'errors': {**form.errors, 'items': items.errors}
             })
     else:
         form = PurchaseOrderForm()

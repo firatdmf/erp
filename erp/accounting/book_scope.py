@@ -119,6 +119,45 @@ def book_guarded(view, model, book_path="book"):
     return wrapper
 
 
+def order_book_guarded(view, model, book_path="current_account.book", kwarg="pk"):
+    """`book_guarded` for a route that reaches an order — the order, one
+    of its lines — named by `kwarg`, including one with no book.
+
+    An order carries its book through its current account, and an order
+    from the storefront has none. book_guarded refuses a bookless row to
+    everybody; that is right for a ledger row and wrong for a web order,
+    which still has to be shipped. So a bookless order goes to the
+    install's admins (erp.ownership.is_install_admin), whose orders those
+    are, and to nobody whose reach is one business's books.
+
+    Signs in first even where the login wall lets the path through: the
+    order APIs carry an "api/" segment or are csrf_exempt, which is what
+    the wall reads as the storefront's, and so answered anyone.
+    """
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        from erp.ownership import is_install_admin
+
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        obj = get_object_or_404(model, pk=kwargs.get(kwarg))
+        book = obj
+        for step in book_path.split("."):
+            book = getattr(book, step, None)
+            if book is None:
+                break
+        if book is None:
+            if not is_install_admin(request.user):
+                raise Http404("No such record.")
+        else:
+            member = getattr(request.user, "member", None)
+            if not member_can_use_book(member, book):
+                raise Http404("No such record.")
+            request.book = book
+        return view(request, *args, **kwargs)
+    return wrapper
+
+
 def book_guarded_for_sales_rep(view, model, book_path="book"):
     """`book_guarded`, but only for the sales-rep role.
 

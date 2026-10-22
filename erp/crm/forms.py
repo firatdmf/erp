@@ -10,6 +10,26 @@ from django.forms import ModelForm
 from django import forms
 from collections import OrderedDict
 
+
+class WalledChoicesMixin:
+    """Choice lists walled by directory, decided when the form is built.
+
+    A ModelForm makes its choice querysets once, when the form CLASS is
+    defined — at import, outside any request — and the directory wall
+    (crm.models.DirectoryManager) reads the request's user, so the lists
+    came out unwalled: every business's suppliers and products, offered
+    to a member of one, and accepted when posted back. Built again here,
+    inside the request, each list is the reader's own; an id from
+    another directory is then an invalid choice rather than a saved one.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            queryset = getattr(field, "queryset", None)
+            if queryset is not None:
+                field.queryset = queryset & queryset.model._default_manager.all()
+
 class ContactCreateForm(ModelForm):
 
     # This is to allow user the enter company name so we can display matching companies in the DB, if it does not exist, we create a new company in the Database

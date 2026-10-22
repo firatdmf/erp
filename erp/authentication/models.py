@@ -5,9 +5,13 @@ from django.db import models
 # Create your models here.
 ACCESS_LEVEL_CHOICES_DICT = {
     "admin": ("Admin", "Has full access to all resources and settings."),
+    # Stored as "manager", which sat unused until it was given this
+    # meaning. Runs the warehouse and its stock, and has no business with
+    # orders: not seeing them, not raising them. Enforced by
+    # erp.middleware.ReadOnlyRoleMiddleware; see erp.roles.ORDER_PREFIXES.
     "manager": (
-        "Manager",
-        "Can manage teams and projects, but has limited access to settings.",
+        "Operations manager",
+        "Works the warehouse and its stock. Cannot see or create orders.",
     ),
     "employee": ("Employee", "Can access and manage their own tasks and projects."),
     "guest": ("Guest", "Has limited access to view certain resources."),

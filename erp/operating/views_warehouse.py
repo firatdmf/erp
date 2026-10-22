@@ -3854,8 +3854,21 @@ def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
           .filter(warehouse=warehouse, sku__iexact=v_sku).first())
     created = wp is None
     if created:
+        # Stock is always a catalog variant, so the variant comes first and
+        # the row is born linked; one the catalog can't take refuses the
+        # receipt instead of shelving stock nothing in the catalog is.
+        from .catalog_sync import sync_roll_to_catalog, CatalogSyncConflict
+        try:
+            _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
+                base_name=base_name, attributes=ident["attributes"],
+                variant_sku=v_sku, cost=cost_usd,
+                existing_base_product=main_product, refuse_lookalike=True,
+            )
+        except CatalogSyncConflict as exc:
+            raise IntakeError({"success": False, "error": f"{v_sku}: {exc}"}, status=409)
         wp = WarehouseProduct.objects.create(
             warehouse=warehouse, name=wp_name, sku=v_sku,
+            catalog_variant=cat_variant,
             quantity=Decimal("0"),
             purchase_price=(price if (price and price > 0) else None),
             purchase_currency=currency,
@@ -5142,6 +5155,32 @@ class WarehouseProductImport(View):
             # Bulk write to DB
             yield (json.dumps({'phase': 'saving', 'message': 'Writing to database...'}) + '\n').encode('utf-8')
 
+            # Stock is always a catalog variant: each new row's is found or
+            # made before the row is written. A row the catalog can't take
+            # is reported and left out, like any other row it can't read.
+            from django.db import transaction as _tx
+            from .catalog_sync import CatalogSyncConflict, variant_for_new_row
+            linkable = []
+            # A variant stands on a shelf once: a sheet naming one twice, or
+            # in another case than the row already here, is one row.
+            shelved = set(WarehouseProduct.objects.filter(warehouse=warehouse)
+                          .exclude(catalog_variant__isnull=True)
+                          .values_list('catalog_variant_id', flat=True))
+            for wp in to_create:
+                try:
+                    with _tx.atomic():
+                        wp.catalog_variant = variant_for_new_row(
+                            wp.sku, wp.name, barcode=wp.barcode, cost=wp.cost_usd)
+                    if wp.catalog_variant_id in shelved:
+                        raise CatalogSyncConflict(_gettext(
+                            "already on this shelf as another row — not added twice."))
+                    shelved.add(wp.catalog_variant_id)
+                    linkable.append(wp)
+                except CatalogSyncConflict as exc:
+                    errors.append(f"{wp.sku or wp.name}: {exc}")
+                    counters['created'] -= 1
+                    counters['skipped'] += 1
+            to_create = linkable
             if to_create:
                 WarehouseProduct.objects.bulk_create(to_create, batch_size=1000, ignore_conflicts=False)
 
@@ -8170,6 +8209,45 @@ class WarehouseStockOut(View):
         })
 
 
+def _scan_new_variant(request, sku, name, barcode):
+    """File a scanned label the catalog has not got as a new variant, under
+    the main product picked on the form or the one its SKU and name derive.
+    Returns (catalog_info, None), or (None, why) when the catalog can't take
+    it — then nothing is shelved, since stock is always a catalog variant."""
+    from marketing.models import Product as _Prod
+    from .catalog_sync import CatalogSyncConflict, derive_catalog, sync_roll_to_catalog
+
+    if not sku:
+        return None, _gettext("A SKU is needed: stock is always a catalog variant.")
+    cp = derive_catalog(sku, name)
+    base_name = (request.POST.get("catalog_base_name") or cp["base_name"] or name).strip()
+    attribute_name = (request.POST.get("catalog_attribute") or cp["attribute_name"] or "").strip() or None
+    attribute_value = (request.POST.get("catalog_value") or cp["attribute_value"] or "").strip() or None
+    manual_pid = (request.POST.get("catalog_base_product_id") or "").strip()
+    existing_base = _Prod.objects.filter(pk=int(manual_pid)).first() if manual_pid.isdigit() else None
+    from django.db import transaction
+    try:
+        # Its own savepoint: a refusal takes back a main product the sync
+        # made before it found the clash.
+        with transaction.atomic():
+            cat_product, cat_variant, p_created, v_created = sync_roll_to_catalog(
+                base_name=base_name, attribute_name=attribute_name, attribute_value=attribute_value,
+                variant_sku=sku, variant_barcode=barcode, existing_base_product=existing_base,
+            )
+    except CatalogSyncConflict as exc:
+        return None, str(exc)
+    return {
+        "product_id": cat_product.id,
+        "product_title": cat_product.title,
+        "product_created": p_created,
+        "variant_id": cat_variant.id,
+        "variant_sku": cat_variant.variant_sku,
+        "variant_created": v_created,
+        "attribute_name": attribute_name,
+        "attribute_value": attribute_value,
+    }, None
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseRollScan(View):
     """POST endpoint hit by the camera scanner.
@@ -8416,37 +8494,45 @@ class WarehouseRollScan(View):
                 product = WarehouseProduct.objects.filter(
                     warehouse=warehouse, name__iexact=name,
                 ).first()
+            # Stock is always a catalog variant, so a new item's variant is
+            # found or made BEFORE its row is written, and one the catalog
+            # can't take refuses the scan — it used to be shelved anyway,
+            # with a warning, as stock no catalog entry stood behind.
+            catalog_info = None
+            linked_existing_variant = False
             if not product:
-                # No existing product for this SKU (or nameless label) → new one.
+                from marketing.models import ProductVariant as _Variant
+                known = (_Variant.objects.filter(variant_sku__iexact=sku).first()
+                         if sku else None)
+                if known is None:
+                    catalog_info, refusal = _scan_new_variant(request, sku, name, barcode)
+                    if refusal:
+                        return JsonResponse({"success": False, "error": refusal}, status=409)
+                    known = _Variant.objects.get(pk=catalog_info["variant_id"])
                 product = WarehouseProduct.objects.create(
                     warehouse=warehouse,
                     name=name or sku,
-                    sku=sku or None,
+                    sku=sku,
+                    catalog_variant=known,
                     quantity=Decimal("0"),
                 )
+                linked_existing_variant = catalog_info is None
             # A SKU the catalogue already knows IS that variant: its row
-            # here is linked to it outright, and takes what it is carried
-            # at from the same book's other warehouses when no price is
-            # typed. The catalogue sync below is for a SKU nobody has seen —
-            # run on a known one it would rewrite that variant's details
-            # from whatever this form happened to hold.
-            linked_existing_variant = False
-            if sku and not product.catalog_variant_id:
-                from marketing.models import ProductVariant as _Variant
-                known = _Variant.objects.filter(variant_sku__iexact=sku).first()
-                if known is not None:
-                    product.catalog_variant = known
-                    linked_existing_variant = True
-                    if product.cost_usd is None:
-                        sibling = (WarehouseProduct.objects
-                                   .filter(catalog_variant=known, cost_usd__isnull=False,
-                                           warehouse__accounting_book_id=warehouse.accounting_book_id)
-                                   .exclude(pk=product.pk).order_by("-updated_at").first())
-                        if sibling is not None:
-                            product.purchase_price = sibling.purchase_price
-                            product.purchase_currency = sibling.purchase_currency
-                            product.cost_usd = sibling.cost_usd
-                            product.cost_try = sibling.cost_try
+            # here takes what it is carried at from the same book's other
+            # warehouses when no price is typed. The variant itself is left
+            # as it is — rewritten from whatever this form held, it lost
+            # details somebody had put on it.
+            if linked_existing_variant and product.cost_usd is None:
+                sibling = (WarehouseProduct.objects
+                           .filter(catalog_variant_id=product.catalog_variant_id,
+                                   cost_usd__isnull=False,
+                                   warehouse__accounting_book_id=warehouse.accounting_book_id)
+                           .exclude(pk=product.pk).order_by("-updated_at").first())
+                if sibling is not None:
+                    product.purchase_price = sibling.purchase_price
+                    product.purchase_currency = sibling.purchase_currency
+                    product.cost_usd = sibling.cost_usd
+                    product.cost_try = sibling.cost_try
 
             # Price is optional. Barcode is not.
             purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
@@ -8510,69 +8596,12 @@ class WarehouseRollScan(View):
                 created_by=user,
             )
 
-        # ── Mirror into the hidden marketing catalog as a variant of a
-        #    main product. ALWAYS, for a SKU the catalogue has not got: a
-        #    warehouse product with no catalogue product behind it has no
-        #    main product, no unit of its own and nothing to be found by, so
-        #    it is not something the form offers to leave out. A product
-        #    that already has its variant — linked just above, or on an
-        #    earlier arrival — has nothing to add, and is not re-synced from
-        #    whatever this form happened to hold.
-        #    Never let a catalog hiccup roll back the stock write. ──
-        catalog_info = None
+        # A variant made for this scan counts the roll just shelved towards
+        # its cost, the way a receipt's does.
         catalog_warning = None
-        variant_sku = (request.POST.get("catalog_variant_sku") or sku or "").strip()
-        if linked_existing_variant or product.catalog_variant_id:
-            variant_sku = ""
-        if variant_sku and len(variant_sku) > 20:
-            catalog_warning = (_gettext("SKU '%(sku)s' is longer than 20 characters — no catalogue variant was created.")
-                               % {"sku": variant_sku})
-        elif variant_sku:
-            try:
-                from .catalog_sync import (
-                    derive_catalog, sync_roll_to_catalog, CatalogSyncConflict,
-                )
-                from marketing.models import Product as _Prod
-                cp = derive_catalog(variant_sku, name, request.POST.get("catalog_color"))
-                base_name = (request.POST.get("catalog_base_name") or cp["base_name"] or name).strip()
-                attribute_name = (request.POST.get("catalog_attribute") or cp["attribute_name"] or "").strip() or None
-                attribute_value = (request.POST.get("catalog_value") or cp["attribute_value"] or "").strip() or None
-
-                existing_base = None
-                manual_pid = (request.POST.get("catalog_base_product_id") or "").strip()
-                if product.catalog_variant_id and product.catalog_variant and product.catalog_variant.product_id:
-                    existing_base = product.catalog_variant.product
-                elif manual_pid.isdigit():
-                    existing_base = _Prod.objects.filter(pk=int(manual_pid)).first()
-
-                cat_product, cat_variant, p_created, v_created = sync_roll_to_catalog(
-                    base_name=base_name,
-                    attribute_name=attribute_name,
-                    attribute_value=attribute_value,
-                    variant_sku=variant_sku,
-                    variant_barcode=barcode,
-                    cost=product.cost_usd,
-                    existing_base_product=existing_base,
-                )
-                if not product.catalog_variant_id:
-                    product.catalog_variant = cat_variant
-                    product.save(update_fields=["catalog_variant"])
-                catalog_info = {
-                    "product_id": cat_product.id,
-                    "product_title": cat_product.title,
-                    "product_created": p_created,
-                    "variant_id": cat_variant.id,
-                    "variant_sku": cat_variant.variant_sku,
-                    "variant_created": v_created,
-                    "attribute_name": attribute_name,
-                    "attribute_value": attribute_value,
-                }
-            except CatalogSyncConflict as exc:
-                catalog_warning = str(exc)
-            except Exception as exc:
-                import traceback
-                traceback.print_exc()
-                catalog_warning = _gettext("Catalogue sync error: %(error)s") % {"error": exc}
+        if catalog_info and catalog_info.get("variant_created"):
+            from .catalog_sync import remember_stock_cost
+            remember_stock_cost(product.catalog_variant)
 
         return JsonResponse({
             "success": True,

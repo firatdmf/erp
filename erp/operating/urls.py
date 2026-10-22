@@ -8,9 +8,9 @@ from . import picking_list
 from . import pack_label, warehouse_label
 from . import warehouse_excel
 from accounting import views_invoice
-from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped
+from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped, order_book_guarded
 from crm.directories import customer_guarded
-from .models import Order, Pack, Warehouse
+from .models import Order, OrderItem, Pack, Warehouse
 from .split_orders import split_order_guarded
 from django.views.generic import RedirectView
 
@@ -114,7 +114,7 @@ urlpatterns = [
     # HX-Request, for anything still opening the drawer.
     path("orders/create", views.OrderCreate.as_view(), name="create_order"),
     path("orders/edit/<int:pk>/", book_guarded(views.OrderEdit.as_view(), Order, "current_account.book"), name="edit_order"),
-    path("orders/web/<int:pk>/status/", views.WebOrderStatusEdit.as_view(), name="web_order_status"),
+    path("orders/web/<int:pk>/status/", order_book_guarded(views.WebOrderStatusEdit.as_view(), Order), name="web_order_status"),
     # book_guarded, plus the split-order exception: a half in another book
     # leads to the half the viewer may open, which shows the whole order.
     path("orders/<int:pk>/", split_order_guarded(views.OrderDetail.as_view()), name="order_detail"),
@@ -190,12 +190,6 @@ urlpatterns = [
         name="order_packing_list_pdf",
     ),
     path(
-        "packs/<int:pack_pk>/pdf/",
-        customer_guarded(views.pack_pdf, Pack, "order__contact", "order__company",
-                         kwarg="pack_pk", book="order__current_account__book"),
-        name="pack_pdf",
-    ),
-    path(
         "packs/<int:pack_pk>/label/",
         customer_guarded(pack_label.pack_label, Pack, "order__contact", "order__company",
                          kwarg="pack_pk", book="order__current_account__book"),
@@ -237,7 +231,8 @@ urlpatterns = [
     ),
     path(
         "generate_pdf_qr_for_order_item_units/<int:pk>/",
-        views.generate_pdf_qr_for_order_item_units,
+        order_book_guarded(views.generate_pdf_qr_for_order_item_units, OrderItem,
+                           "order.current_account.book"),
         name="generate_pdf_qr_for_order_item_units",
     ),
     path(
@@ -293,20 +288,24 @@ htmx_urlpatterns = [
     path("raw_material_search/", views.raw_material_search, name="raw_material_search"),
 ]
 
+# Each order route here signs in and checks the order's book itself
+# (order_book_guarded): an "api/" path and a csrf_exempt view both pass
+# the login wall, and these read and wrote any order for anyone who asked.
+# track_order alone stays open — the storefront's tracking page asks it.
 api_urlpatterns = [
     path(
         "api/get_order_status/<int:order_id>/",
-        views.get_order_status,
+        order_book_guarded(views.get_order_status, Order, kwarg="order_id"),
         name="get_order_status",
     ),
     path(
         "orders/<int:order_id>/update-ettn/",
-        views.update_order_ettn,
+        order_book_guarded(views.update_order_ettn, Order, kwarg="order_id"),
         name="update-order-ettn",
     ),
     path(
         "api/get_order_detail/<int:user_id>/<int:order_id>/",
-        views.get_order_detail_api,
+        order_book_guarded(views.get_order_detail_api, Order, kwarg="order_id"),
         name="get_order_detail_api",
     ),
     # Order Tracking API endpoints
@@ -317,7 +316,7 @@ api_urlpatterns = [
     ),
     path(
         "orders/<int:order_id>/update-status/",
-        views.update_order_status,
+        order_book_guarded(views.update_order_status, Order, kwarg="order_id"),
         name="update_order_status",
     ),
 ]

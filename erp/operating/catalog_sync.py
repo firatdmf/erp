@@ -492,6 +492,32 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
     return product, variant, product_created, variant_created
 
 
+def variant_for_new_row(sku, name="", *, barcode=None, cost=None):
+    """The catalog variant a NEW warehouse row of `sku` is, found or made
+    before the row is written: stock does not exist without a catalog entry,
+    so a row is never created first and linked later.
+
+    A SKU the catalog already has is that variant, and is left as it is. An
+    unknown one is filed the way a scanned label is — under the main product
+    its SKU and name derive, described by the colour or model they carry.
+    Raises CatalogSyncConflict when there is no SKU, or the catalog cannot
+    take it (another product's, or another business's)."""
+    from marketing.models import ProductVariant
+
+    sku = (sku or "").strip()
+    if not sku:
+        raise CatalogSyncConflict(_gettext("A SKU is needed: stock is always a catalog variant."))
+    known = ProductVariant.objects.filter(variant_sku__iexact=sku).first()
+    if known is not None:
+        return known
+    cat = derive_catalog(sku, name or "")
+    return sync_roll_to_catalog(
+        base_name=cat["base_name"] or name or sku,
+        attribute_name=cat["attribute_name"], attribute_value=cat["attribute_value"],
+        variant_sku=sku, variant_barcode=barcode, cost=cost,
+    )[1]
+
+
 def resync_warehouse_product(wp, base_override=None):
     """Re-sync ONE warehouse product into the catalog after an edit
     (sku / name / main-product change).

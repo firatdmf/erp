@@ -14677,6 +14677,13 @@ msgstr ""
 "istediğiniz adı verebilirsiniz. Birden fazla varyantta kullanılacak bir "
 "fotoğrafı ürünün medyasına yükleyin."
 
+msgid "Charge to"
+msgstr "Kime borçlandırılsın"
+
+#, python-format
+msgid "%(name)s personally"
+msgstr "%(name)s (şahsen)"
+
 #: operating/views_warehouse.py
 msgid "The SKU belongs to the catalog: rename it on the product's page in the catalog."
 msgstr "SKU kataloğa aittir: ürünün katalogdaki sayfasından yeniden adlandırın."
@@ -14698,6 +14705,14 @@ msgstr "Katalogda yeniden adlandırın veya taşıyın."
 msgid "Rename it in the catalog"
 msgstr "Katalogda yeniden adlandırın"
 
+#: operating/catalog_sync.py operating/views_warehouse.py
+msgid "A SKU is needed: stock is always a catalog variant."
+msgstr "SKU gerekli: stok her zaman bir katalog varyantıdır."
+
+#: operating/views_warehouse.py
+msgid "already on this shelf as another row — not added twice."
+msgstr "bu rafta zaten başka bir satır olarak var — ikinci kez eklenmedi."
+
 msgid "Package label"
 msgstr "Paket etiketi"
 
@@ -14712,10 +14727,3 @@ msgstr "Bu paketin etiketini yazdır"
 
 msgid "Warehouse name"
 msgstr "Depodaki adı"
-
-msgid "Charge to"
-msgstr "Kime borçlandırılsın"
-
-#, python-format
-msgid "%(name)s personally"
-msgstr "%(name)s (şahsen)"

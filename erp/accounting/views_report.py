@@ -18,7 +18,6 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 
-from accounting.models import Book
 from .models import CurrentAccount, CurrentAccountMovement, CurrentAccountTransfer
 from .models_ledger import ChartAccount
 
@@ -33,7 +32,7 @@ class ReportIndex(View):
     def get(self, request):
         over_limit_count = (
             CurrentAccount.objects
-            .filter(is_active=True, credit_limit__gt=0)
+            .filter(is_active=True, credit_limit__gt=0, book=request.book)
             .extra(where=["cached_balance > credit_limit"])
             .count()
         )
@@ -140,10 +139,8 @@ class TrialBalance(View):
             "g_closing": g_closing,
             "date_from": date_from,
             "date_to": date_to,
-            "filter_book": book_id,
             "base_currency": getattr(request.book, "base_currency", None),
             "zero_filter": zero_filter,
-            "books": Book.objects.all().order_by("name"),
         })
 
 
@@ -193,8 +190,6 @@ class CreditLimitReport(View):
         return render(request, self.template_name, {
             "rows": rows,
             "view": view,
-            "filter_book": book_id,
-            "books": Book.objects.all().order_by("name"),
         })
 
 

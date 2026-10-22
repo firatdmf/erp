@@ -76,16 +76,28 @@ class ReadOnlyRoleMiddleware(MiddlewareMixin):
     her unless someone widens `erp.roles.READ_PREFIXES` on purpose. See
     erp/roles.py for the two gates and why they are shaped that way.
 
-    Everyone who is not a sales rep passes straight through — this is
-    not a general permission system, it is one role.
+    It also keeps an operations manager out of orders altogether
+    (erp.roles.ORDER_PREFIXES), on the same terms: before resolution, so
+    a new order route is closed to the role by default.
+
+    Everyone else passes straight through — this is not a general
+    permission system, it is two roles.
     """
 
     SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
     def process_request(self, request):
-        from erp.roles import is_sales_rep, may_read, may_write
+        from erp.roles import (is_operations_manager, is_order_path,
+                               is_sales_rep, may_read, may_write)
 
-        if not is_sales_rep(getattr(request, "user", None)):
+        user = getattr(request, "user", None)
+        if is_operations_manager(user):
+            if is_order_path(request.path):
+                return self._deny(request, "Your account does not work with orders.",
+                                  title="No access to orders")
+            return None
+
+        if not is_sales_rep(user):
             return None
 
         if request.method not in self.SAFE_METHODS:
@@ -108,7 +120,7 @@ class ReadOnlyRoleMiddleware(MiddlewareMixin):
         return None
 
     @staticmethod
-    def _deny(request, message):
+    def _deny(request, message, title="Read-only account"):
         from django.http import HttpResponseForbidden, JsonResponse
 
         # Half this app talks to itself over fetch(); a JSON caller that
@@ -121,7 +133,7 @@ class ReadOnlyRoleMiddleware(MiddlewareMixin):
         if wants_json:
             return JsonResponse({"success": False, "error": message}, status=403)
         return HttpResponseForbidden(
-            f"<h1>Read-only account</h1><p>{message}</p>"
+            f"<h1>{title}</h1><p>{message}</p>"
             "<p><a href='/'>Back</a></p>"
         )
 

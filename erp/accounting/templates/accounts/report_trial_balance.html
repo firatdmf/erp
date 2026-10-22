@@ -126,11 +126,8 @@
     <input type="date" name="date_from" value="{{ date_from }}">
     <span class="arrow">→</span>
     <input type="date" name="date_to" value="{{ date_to }}">
-    <span class="fc-lbl">{% trans "Book" %}</span>
-    <select name="book">
-      <option value="">{% trans "All Books" %}</option>
-      {% for b in books %}<option value="{{ b.id }}" {% if filter_book == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
-    </select>
+    {% comment %}No book picker: the book is the one in the address, and
+       a picker listed every book on the install to whoever opened it.{% endcomment %}
     <span class="fc-lbl">{% trans "Show" %}</span>
     <select name="zero">
       <option value="hide" {% if zero_filter == 'hide' %}selected{% endif %}>{% trans "Hide inactive" %}</option>

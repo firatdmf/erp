@@ -61,19 +61,25 @@
   .pk-pack-code { font: 600 11px var(--font-mono); color: var(--gray-500); }
   .pk-pack-meta { font: 700 11.5px var(--font-sans); color: var(--nejum-teal-700); margin-left: auto; font-variant-numeric: tabular-nums; background: var(--nejum-teal-50); padding: 3px 9px; border-radius: 999px; }
   .pk-pack-actions { display: flex; gap: 4px; }
-  .pk-pack-btn { background: transparent; border: 1px solid transparent; color: var(--gray-500); cursor: pointer; padding: 5px 8px; border-radius: 6px; transition: all 140ms; text-decoration: none; display: inline-flex; align-items: center; }
+  .pk-pack-btn { background: transparent; border: 1px solid transparent; color: var(--gray-500); cursor: pointer; padding: 5px 8px; border-radius: 6px; transition: all 140ms; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--font-sans); white-space: nowrap; }
   .pk-pack-btn:hover { color: var(--nejum-teal-700); background: var(--nejum-teal-50); border-color: var(--nejum-teal-300); }
 
   .pk-rolls { padding: 4px 0; }
-  .pk-roll-row { display: flex; align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px solid #F4F7FB; }
+  /* Fixed columns, the same in every package, so variant, group, barcode
+     and quantity line up down the page like a table. Each tag is pinned
+     to its column, so a roll without a variant leaves that cell empty
+     rather than shifting the rest left. */
+  .pk-roll-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) minmax(0, 170px) minmax(0, 130px) minmax(0, 160px) 90px;
+                 align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px solid #F4F7FB; }
   .pk-roll-row:last-child { border-bottom: none; }
-  .pk-roll-no { width: 26px; flex-shrink: 0; text-align: right; font: 700 11.5px var(--font-mono); color: var(--gray-400); font-variant-numeric: tabular-nums; }
-  .pk-roll-name { font: 700 12.5px var(--font-sans); color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pk-roll-variant { flex-shrink: 0; font: 600 11px var(--font-sans); color: var(--gray-600); background: #F4F7FB; border-radius: 5px; padding: 2px 8px; white-space: nowrap; }
-  .pk-roll-group { flex-shrink: 0; font: 700 10.5px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--nejum-teal-700); background: var(--nejum-teal-50); border: 1px solid var(--nejum-teal-100); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
-  .pk-roll-sku { font: 500 11px var(--font-mono); color: var(--gray-500); }
-  .pk-roll-bc { font: 600 11px var(--font-mono); color: var(--gray-700); background: #F4F7FB; border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
-  .pk-roll-m { font: 800 12.5px var(--font-sans); color: var(--nejum-teal-700); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pk-roll-no { text-align: right; font: 700 11.5px var(--font-mono); color: var(--gray-400); font-variant-numeric: tabular-nums; }
+  .pk-roll-name { font: 700 12.5px var(--font-sans); color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pk-roll-variant, .pk-roll-group, .pk-roll-bc { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .pk-roll-variant { grid-column: 3; font: 600 11px var(--font-sans); color: var(--gray-600); background: #F4F7FB; border-radius: 5px; padding: 2px 8px; white-space: nowrap; }
+  .pk-roll-group { grid-column: 4; font: 700 10.5px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--nejum-teal-700); background: var(--nejum-teal-50); border: 1px solid var(--nejum-teal-100); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .pk-roll-sku { margin-left: 6px; font: 500 11px var(--font-mono); color: var(--gray-500); }
+  .pk-roll-bc { grid-column: 5; font: 600 11px var(--font-mono); color: var(--gray-700); background: #F4F7FB; border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
+  .pk-roll-m { grid-column: 6; text-align: right; font: 800 12.5px var(--font-sans); color: var(--nejum-teal-700); white-space: nowrap; font-variant-numeric: tabular-nums; }
   /* On a wide screen the tags sit in the row's own line, as if unwrapped. */
   .pk-roll-tags { display: contents; }
 
@@ -100,7 +106,7 @@
                    grid-template-areas: "no name m" ". tags tags"; gap: 5px 8px; padding: 10px 12px; align-items: baseline; }
     .pk-roll-no { grid-area: no; width: auto; }
     .pk-roll-name { grid-area: name; white-space: normal; overflow-wrap: anywhere; }
-    .pk-roll-sku { display: block; margin-top: 1px; }
+    .pk-roll-sku { display: block; margin: 1px 0 0; }
     .pk-roll-m { grid-area: m; }
     .pk-roll-tags { grid-area: tags; display: flex; flex-wrap: wrap; gap: 5px; }
   }
@@ -136,13 +142,13 @@
 
   <div class="pk-toolbar">
     <a href="{% url 'operating:order_packing_list_pdf' order.pk %}" class="pk-btn primary" target="_blank" rel="noopener">
-      <i class="fa fa-file-pdf-o"></i> {% trans "Open packing list (PDF)" %}
+      <i class="fa fa-file-pdf"></i> {% trans "Open packing list (PDF)" %}
     </a>
     <a href="{% url 'operating:export_packing_list_excel' order.pk %}" class="pk-btn ghost">
-      <i class="fa fa-file-excel-o"></i> {% trans "Download Excel (editable)" %}
+      <i class="fa fa-file-excel"></i> {% trans "Download Excel (editable)" %}
     </a>
     <a href="{% url 'operating:order_pack_labels' order.pk %}" class="pk-btn ghost" target="_blank" rel="noopener">
-      <i class="fa fa-tag"></i> {% trans "Package labels" %}
+      <i class="fa fa-print"></i> {% trans "Package labels" %}
     </a>
     <span class="spacer"></span>
   </div>
@@ -158,11 +164,8 @@
         </div>
         <span class="pk-pack-meta">{{ p.rows|length }} {% trans "items" %}</span>
         <div class="pk-pack-actions">
-          <a class="pk-pack-btn" href="{% url 'operating:pack_pdf' p.pk %}" target="_blank" title="{% trans 'Print this package (PDF)' %}">
-            <i class="fa fa-file-pdf-o"></i>
-          </a>
-          <a class="pk-pack-btn" href="{% url 'operating:pack_label' p.pk %}" target="_blank" title="{% trans 'Package label' %}">
-            <i class="fa fa-tag"></i>
+          <a class="pk-pack-btn" href="{% url 'operating:pack_label' p.pk %}" target="_blank">
+            <i class="fa fa-print"></i> {% trans "Print label" %}
           </a>
         </div>
       </div>

@@ -441,7 +441,7 @@
             <button class="cmd-tab active" data-tab="all" onclick="setCmdTab('all')">{% trans "All" %}</button>
             <button class="cmd-tab" data-tab="contacts" onclick="setCmdTab('contacts')">{% trans "Contacts" %}</button>
             <button class="cmd-tab" data-tab="products" onclick="setCmdTab('products')">{% trans "Products" %}</button>
-            <button class="cmd-tab" data-tab="orders" onclick="setCmdTab('orders')">{% trans "Orders" %}</button>
+            {% if sees_orders %}<button class="cmd-tab" data-tab="orders" onclick="setCmdTab('orders')">{% trans "Orders" %}</button>{% endif %}
             <button class="cmd-tab" data-tab="menu" onclick="setCmdTab('menu')">{% trans "Navigation" %}</button>
           </div>
 
@@ -477,11 +477,11 @@
         <i class="fas fa-warehouse"></i>
         <span class="top-bar-btn-label">{% trans "Warehouse" %}</span>
       </a>
-      <a href="{% url 'operating:order_list' %}" class="top-bar-btn" id="topBarOrdersBtn" title="{% trans 'Orders' %}">
+{% if sees_orders %}      <a href="{% url 'operating:order_list' %}" class="top-bar-btn" id="topBarOrdersBtn" title="{% trans 'Orders' %}">
         <i class="fas fa-cart-shopping"></i>
         <span class="top-bar-btn-label">{% trans "Orders" %}</span>
       </a>
-{% if not is_sales_rep %}      <a href="{% url 'accounts:legacy_list' %}" class="top-bar-btn" id="topBarAccountsBtn" title="{% trans 'Accounts' %}">
+{% endif %}{% if not is_sales_rep %}      <a href="{% url 'accounts:legacy_list' %}" class="top-bar-btn" id="topBarAccountsBtn" title="{% trans 'Accounts' %}">
         <i class="fas fa-id-card"></i>
         <span class="top-bar-btn-label">{% trans "Accounts" context "topbar" %}</span>
       </a>

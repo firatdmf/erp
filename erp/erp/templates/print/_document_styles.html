@@ -40,8 +40,10 @@ fallback lay their margins out differently (see the end).
     .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 7pt; margin-bottom: 10pt; }
     .hdr td { vertical-align: top; }
     /* The house's name, in the house's colour — the markup sets it from
-       erp.nejum_credit.brand_color; this is that function's default. */
-    .hdr .brand { font-size: 16.0pt; font-weight: bold; color: #944F05; line-height: 1.25; max-width: 105mm; }
+       erp.nejum_credit.brand_color; this is that function's default. On
+       one line: the right-hand cell needs only the date and the chip, and
+       a 105mm cap once broke a long house name in two. */
+    .hdr .brand { font-size: 16.0pt; font-weight: bold; color: #944F05; line-height: 1.25; white-space: nowrap; }
     /* The document's number, alone: the chip says what kind it is. */
     .hdr .doc-type { font-size: 10.67pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
     .hdr .date { font-size: 10.67pt; color: #4B5563; }
@@ -49,7 +51,7 @@ fallback lay their margins out differently (see the end).
        edge. The cell was once right-aligned only by an align="right"
        attribute, which the PDF renderer ignores, and the chip drifted to
        the middle of the header. */
-    .hdr td.meta { text-align: right; }
+    .hdr td.meta { text-align: right; width: 1%; white-space: nowrap; padding-left: 8mm; }
     .hdr .stack { display: inline-block; text-align: right; }
     .hdr .kinds { margin-top: 4pt; }
     /* What the document is — QUOTE, ORDER. One width for every word it

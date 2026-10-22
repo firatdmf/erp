@@ -395,6 +395,11 @@ else:
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
+# Shared with the storefront's server (its NEJUM_STOREFRONT_KEY): the
+# calls that cannot prove a customer, like Google sign-in, prove the
+# storefront instead. Unset refuses them. See authentication/client_tokens.py.
+STOREFRONT_API_KEY = config("STOREFRONT_API_KEY", default="")
+
 # Bunny CDN Configuration
 # Set USE_BUNNY_CDN=True in .env to enable Bunny CDN for new uploads
 USE_BUNNY_CDN = config("USE_BUNNY_CDN", default=False, cast=bool)

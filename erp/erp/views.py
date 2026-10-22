@@ -390,16 +390,19 @@ class GlobalSearch(View):
     def _visible(self, results, restricted):
         if not restricted:
             return results
-        from erp.roles import may_read
-        return [r for r in results if may_read(r.get('url') or '')]
+        from erp.roles import is_order_path, is_sales_rep, may_read
+        if is_sales_rep(self.request.user):
+            return [r for r in results if may_read(r.get('url') or '')]
+        # An operations manager: everything but orders.
+        return [r for r in results if not is_order_path(r.get('url') or '')]
 
     def get(self, request, *args, **kwargs):
-        from erp.roles import is_sales_rep
+        from erp.roles import is_operations_manager, is_sales_rep
 
         query = request.GET.get('q', '').strip()
         search_type = request.GET.get('type', 'all')
         # Whether this viewer's reach is narrower than the search's.
-        restricted = is_sales_rep(request.user)
+        restricted = is_sales_rep(request.user) or is_operations_manager(request.user)
         results = []
 
         # If query is empty, we might want to return "Recent" items for specific tabs

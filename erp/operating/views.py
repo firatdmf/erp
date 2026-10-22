@@ -4247,13 +4247,16 @@ class OrderEdit(UpdateView):
     # prevent editing completed orders.
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
-        # Who may touch someone else's order: admins, and the person who
-        # raised it. Checked before the status rules below so a sales rep
-        # poking at another rep's order is refused for the honest reason
-        # rather than being told the order is the wrong status.
+        # Who may touch someone else's order: admins, the person who
+        # raised it, and a sales rep. The rep edits any open order in her
+        # books, a split order's half included, whoever raised it: the
+        # route is book_guarded, so reaching here already means the
+        # order's book is hers. Checked before the status rules below so
+        # a refusal gives the honest reason rather than the order's status.
         from erp.ownership import can_edit
+        from erp.roles import is_sales_rep
 
-        if not can_edit(request.user, self.object):
+        if not (can_edit(request.user, self.object) or is_sales_rep(request.user)):
             messages.error(request, "You can only edit orders you created.")
             return redirect("operating:order_detail", pk=self.object.pk)
         if self.object.status == "completed":
@@ -6239,45 +6242,6 @@ def generate_pdf_qr_for_order_item_units(request, pk):
     )
 
 
-def get_pack_qr_image(pack):
-    import requests
-    from PIL import Image
-    from io import BytesIO
-    import json
-    import segno
-    from marketing.utils.bunny_storage import upload_to_bunny
-
-    if pack.qr_code_url:
-        try:
-            response = requests.get(pack.qr_code_url, timeout=5)
-            response.raise_for_status()
-            return Image.open(BytesIO(response.content)).convert("RGB")
-        except Exception:
-            pass
-    # Generate on the fly if fetch fails or URL is empty
-    payload = {
-        "pack_id": pack.pk,
-        "code": pack.code,
-        "order_id": pack.order.pk,
-        "pack_number": pack.pack_number
-    }
-    qr = segno.make(json.dumps(payload))
-    buf = BytesIO()
-    qr.save(buf, kind="png", scale=5)
-    buf.seek(0)
-    # Also upload it to update/fix the url
-    try:
-        path = f"media/orders/{pack.order.pk}/packs/{pack.pk}/qr_{pack.pk}.png"
-        buf.seek(0)
-        url = upload_to_bunny(buf, path)
-        pack.qr_code_url = url
-        pack.save(update_fields=["qr_code_url"])
-    except Exception:
-        pass
-    buf.seek(0)
-    return Image.open(buf).convert("RGB")
-
-
 def _long_date(d, is_tr):
     """August 20, 2026, or day-month-year in Turkish. strftime("%B") spells
     the month in the server process's C locale, which on the deploy box is
@@ -6292,7 +6256,7 @@ def _long_date(d, is_tr):
 
 def _packing_list_doc_qr(order):
     """One QR for the whole document, top-right. Per-PACKAGE QRs stay on
-    the A6 box labels (pack_pdf) where a scanner meets a package; on the
+    the package labels (pack_label) where a scanner meets a package; on the
     combined list they were one-per-table and left no room for the pack
     column, so this identifies the order instead."""
     import json
@@ -6573,127 +6537,6 @@ def order_packing_list_pdf(request, pk):
     # Downloading-and-editing is what the Excel export is for.
     response['Content-Disposition'] = (
         f'inline; filename="packing_list_{order.order_number or order.pk}.pdf"')
-    return response
-
-def pack_pdf(request, pack_pk):
-    from django.utils.translation import gettext as _
-    from django.utils.translation import get_language
-    from .models import Pack
-    from reportlab.lib.pagesizes import A6
-    from reportlab.lib.units import mm
-    from reportlab.lib import colors
-    from reportlab.lib.styles import ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
-    from .order_notifications import _ensure_pdf_fonts
-    
-    pack = get_object_or_404(Pack, pk=pack_pk)
-    order = pack.order
-    
-    # Determine the active language
-    lang = (get_language() or 'tr').lower()
-    is_tr = lang.startswith('tr')
-    
-    # Text labels mapping dynamically based on active language
-    labels = {
-        'package': _gettext("PACKAGE"),
-        'order': _gettext("Order"),
-        'contents': _gettext("CONTENTS"),
-        'product': _gettext("Product"),
-        'quantity': _gettext("Quantity"),
-    }
-    
-    font = _ensure_pdf_fonts() or "Helvetica"
-    font_bold = f"{font}-Bold" if font != "Helvetica" else "Helvetica-Bold"
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A6,
-        rightMargin=8 * mm,
-        leftMargin=8 * mm,
-        topMargin=8 * mm,
-        bottomMargin=8 * mm,
-        title=f"Pack {pack.code}"
-    )
-    
-    story = []
-    
-    title_style = ParagraphStyle(
-        name="LabelTitle",
-        fontName=font_bold,
-        fontSize=12,
-        textColor=colors.HexColor("#111111"),
-        alignment=1,
-        spaceAfter=4
-    )
-    
-    subtitle_style = ParagraphStyle(
-        name="LabelSub",
-        fontName=font,
-        fontSize=8,
-        textColor=colors.HexColor("#555555"),
-        alignment=1,
-        spaceAfter=10
-    )
-    
-    normal_style = ParagraphStyle(
-        name="LabelNormal",
-        fontName=font,
-        fontSize=8,
-        textColor=colors.HexColor("#111111"),
-        leading=11
-    )
-    
-    code_style = ParagraphStyle(
-        name="LabelCode",
-        fontName=font_bold,
-        fontSize=9,
-        textColor=colors.HexColor("#00696A"),
-        alignment=1,
-        spaceBefore=6
-    )
-
-    story.append(Paragraph(f"<b>{labels['package']} #{pack.pack_number}</b>", title_style))
-    story.append(Paragraph(f"{labels['order']}: {order.order_number or order.pk}", subtitle_style))
-    
-    qr_pil = get_pack_qr_image(pack)
-    qr_io = BytesIO()
-    qr_pil.save(qr_io, format="PNG")
-    qr_io.seek(0)
-    rl_qr_img = RLImage(qr_io, width=40 * mm, height=40 * mm)
-    rl_qr_img.hAlign = 'CENTER'
-    
-    story.append(rl_qr_img)
-    story.append(Paragraph(f"{pack.code}", code_style))
-    story.append(Spacer(1, 8))
-    
-    story.append(Paragraph(f"<b>{labels['contents']}:</b>", normal_style))
-    
-    items_data = [[
-        Paragraph(f"<b>{labels['product']}</b>", normal_style),
-        Paragraph(f"<b>{labels['quantity']}</b>", normal_style)
-    ]]
-
-    for row in _pack_roll_rows(pack):
-        items_data.append([
-            Paragraph(row['title'], normal_style),
-            Paragraph(f"{row['quantity']:.2f} {units.unit_short(row['unit'])}" if row['quantity'] is not None else "-", normal_style),
-        ])
-
-    tbl = Table(items_data, colWidths=[65 * mm, 24 * mm])
-    tbl.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    story.append(tbl)
-    
-    doc.build(story)
-    buffer.seek(0)
-    
-    response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="pack_{pack.code}.pdf"'
     return response
 
 
@@ -7717,10 +7560,7 @@ def create_raw_material_good_json(request):
 
 @require_POST
 def create_raw_material_good_receipt_json(request):
-    from django.forms import modelform_factory
-    
     try:
-        RawMaterialGoodReceiptForm = modelform_factory(RawMaterialGoodReceipt, fields="__all__")
         form = RawMaterialGoodReceiptForm(request.POST, request.FILES)
         
         if form.is_valid():
@@ -7852,12 +7692,7 @@ def delete_raw_material_good_json(request, pk):
 
 
 def create_raw_material_receipt_partial(request):
-    from django.forms import modelform_factory
-    from django import forms
     from datetime import date
-    RawMaterialGoodReceiptForm = modelform_factory(RawMaterialGoodReceipt, fields="__all__", widgets={
-        "date": forms.DateInput(attrs={"type": "date"}),
-    })
     form = RawMaterialGoodReceiptForm(initial={"date": date.today().strftime("%Y-%m-%d")})
     return render(request, "operating/partials/raw_material_receipt_form.html", {"form": form})
 

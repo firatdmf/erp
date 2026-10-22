@@ -1,6 +1,7 @@
 from django import forms
 from django.forms import inlineformset_factory
 from .models import *
+from crm.forms import WalledChoicesMixin
 from crm.views import search_contact
 from datetime import date
 # to order the fields in the form, we can use OrderedDict
@@ -34,7 +35,13 @@ class OrderItemUnitForm(forms.ModelForm):
         )  # We will manually handle setting model fields like `order_item` in the view
 
 
-class RawMaterialGoodReceiptForm(forms.ModelForm):
+class RawMaterialGoodReceiptForm(WalledChoicesMixin, forms.ModelForm):
+    """A receipt, offering only the reader's own suppliers and books.
+
+    The one form for the page, the drawer and its JSON save, which each
+    built their own unwalled copy and so offered — and saved into — every
+    book on the install.
+    """
     class Meta:
         model = RawMaterialGoodReceipt
         fields = "__all__"
@@ -42,9 +49,16 @@ class RawMaterialGoodReceiptForm(forms.ModelForm):
             "date": forms.DateInput(attrs={"type": "date"}),
         }
     def __init__(self, *args, **kwargs):
-        # book = kwargs.pop("book", None)
         super(RawMaterialGoodReceiptForm, self).__init__(*args, **kwargs)
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # The books the person behind the request may use, read the way
+        # the directory wall reads them; outside a request, every book.
+        from accounting.services_accounts import member_books
+        from operating.audit import get_current_user
+
+        user = get_current_user()
+        if user is not None:
+            self.fields["book"].queryset = member_books(getattr(user, "member", None))
     
 
     

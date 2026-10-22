@@ -21,7 +21,10 @@
     }
     .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 7pt; margin-bottom: 10pt; }
     .hdr td { vertical-align: top; }
-    .hdr .brand { font-size: 16pt; font-weight: bold; color: #944F05; line-height: 1.25; max-width: 105mm; }
+    /* On one line, as in print/_document_styles.html: the right-hand cell
+       shrinks to its date and the name takes the rest. */
+    .hdr .brand { font-size: 16pt; font-weight: bold; color: #944F05; line-height: 1.25; white-space: nowrap; }
+    .hdr td + td { width: 1%; white-space: nowrap; padding-left: 8mm; }
     .hdr .doc-type { font-size: 10.67pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
     .hdr .date { font-size: 10.67pt; color: #4B5563; text-align: right; }
 

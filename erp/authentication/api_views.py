@@ -3,6 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.hashers import make_password, check_password
 from .models import WebClient, ClientAddress, Favorite
+from .client_tokens import for_own_client, issue, storefront_key_ok
 import json
 
 
@@ -100,6 +101,7 @@ def create_web_client(request):
 
 
 @csrf_exempt
+@for_own_client
 def add_client_address(request, user_id):
     if request.method == 'OPTIONS':
         response = JsonResponse({})
@@ -163,6 +165,7 @@ def add_client_address(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def set_default_address(request, user_id, address_id):
     if request.method == 'OPTIONS':
         response = JsonResponse({})
@@ -205,6 +208,7 @@ def set_default_address(request, user_id, address_id):
 
 
 @csrf_exempt
+@for_own_client
 def get_client_addresses(request, user_id):
     """Get all addresses for a client"""
     if request.method == 'OPTIONS':
@@ -253,6 +257,7 @@ def get_client_addresses(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def delete_client_address(request, user_id, address_id):
     if request.method == 'OPTIONS':
         response = JsonResponse({})
@@ -342,14 +347,17 @@ def login_web_client(request):
                 'error': 'Invalid credentials'
             }, status=401)
         
+        token = issue(web_client)
         return JsonResponse({
             'message': 'Login successful',
             'user': {
                 'id': web_client.id,
                 'username': web_client.username,
                 'email': web_client.email,
-                'name': web_client.name
-            }
+                'name': web_client.name,
+                'token': token,
+            },
+            'token': token,
         }, status=200)
         
     except json.JSONDecodeError:
@@ -407,6 +415,10 @@ def check_web_client_email(request):
 @require_http_methods(["POST"])
 def create_google_client(request):
     """Create web client from Google OAuth"""
+    # Only an email comes with this call, so it cannot prove a customer;
+    # it must come from the storefront's server. See client_tokens.
+    if not storefront_key_ok(request):
+        return JsonResponse({'error': 'Forbidden'}, status=403)
     try:
         data = json.loads(request.body)
         
@@ -434,6 +446,7 @@ def create_google_client(request):
                 web_client.name = name
                 web_client.save()
             
+            token = issue(web_client)
             return JsonResponse({
                 'message': 'User already exists',
                 'user': {
@@ -441,8 +454,10 @@ def create_google_client(request):
                     'username': web_client.username,
                     'email': web_client.email,
                     'name': web_client.name,
-                    'is_active': web_client.is_active
-                }
+                    'is_active': web_client.is_active,
+                    'token': token,
+                },
+                'token': token,
             }, status=200)
         
         # Create username from email
@@ -461,14 +476,17 @@ def create_google_client(request):
             name=name or 'Google User'
         )
         
+        token = issue(web_client)
         return JsonResponse({
             'message': 'Account created successfully',
             'user': {
                 'id': web_client.id,
                 'username': web_client.username,
                 'email': web_client.email,
-                'name': web_client.name
-            }
+                'name': web_client.name,
+                'token': token,
+            },
+            'token': token,
         }, status=201)
         
     except json.JSONDecodeError:
@@ -482,6 +500,7 @@ def create_google_client(request):
 
 
 @csrf_exempt
+@for_own_client
 def get_web_client_profile(request, user_id):
     if request.method == 'OPTIONS':
         response = JsonResponse({})
@@ -535,6 +554,7 @@ def get_web_client_profile(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def update_web_client_profile(request, user_id):
     if request.method == 'OPTIONS':
         response = JsonResponse({})
@@ -642,6 +662,7 @@ def update_web_client_profile(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def change_password(request, user_id):
     if request.method == 'OPTIONS':
         response = JsonResponse({})
@@ -675,9 +696,12 @@ def change_password(request, user_id):
         # Update password
         web_client.password = make_password(new_password)
         web_client.save()
-        
+
+        # The new password ends every earlier token, this one included,
+        # so the session that changed it carries on with a fresh one.
         response = JsonResponse({
-            'message': 'Password changed successfully'
+            'message': 'Password changed successfully',
+            'token': issue(web_client),
         }, status=200)
         response["Access-Control-Allow-Origin"] = "*"
         return response
@@ -699,6 +723,7 @@ def change_password(request, user_id):
 # ==================== FAVORITE API ENDPOINTS ====================
 
 @csrf_exempt
+@for_own_client
 def get_user_favorites(request, user_id):
     """Get all favorites for a user"""
     if request.method == 'OPTIONS':
@@ -738,6 +763,7 @@ def get_user_favorites(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def toggle_favorite(request, user_id):
     """Add or remove a product from favorites"""
     if request.method == 'OPTIONS':
@@ -797,6 +823,7 @@ def toggle_favorite(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def check_favorite(request, user_id, product_sku):
     """Check if a product is favorited by user"""
     if request.method == 'OPTIONS':
@@ -832,6 +859,7 @@ def check_favorite(request, user_id, product_sku):
 # ==================== CART API ENDPOINTS ====================
 
 @csrf_exempt
+@for_own_client
 def get_cart(request, user_id):
     """Get all cart items for a user"""
     if request.method == 'OPTIONS':
@@ -878,6 +906,7 @@ def get_cart(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def add_to_cart(request, user_id):
     """Add or update item in cart"""
     if request.method == 'OPTIONS':
@@ -998,6 +1027,7 @@ def add_to_cart(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def update_cart_item(request, user_id, item_id):
     """Update cart item quantity"""
     if request.method == 'OPTIONS':
@@ -1071,6 +1101,7 @@ def update_cart_item(request, user_id, item_id):
 
 
 @csrf_exempt
+@for_own_client
 def remove_from_cart(request, user_id, item_id):
     """Remove item from cart"""
     if request.method == 'OPTIONS':
@@ -1112,6 +1143,7 @@ def remove_from_cart(request, user_id, item_id):
 
 
 @csrf_exempt
+@for_own_client
 def clear_cart(request, user_id):
     """Clear all items from user's cart"""
     if request.method == 'OPTIONS':
@@ -1150,6 +1182,7 @@ def clear_cart(request, user_id):
 # ==================== ORDER API ENDPOINTS ====================
 
 @csrf_exempt
+@for_own_client
 def get_user_orders(request, user_id):
     """Get all orders for a user"""
     if request.method == 'OPTIONS':
@@ -1208,6 +1241,7 @@ def get_user_orders(request, user_id):
 
 @csrf_exempt
 @csrf_exempt
+@for_own_client
 def get_order_detail(request, user_id, order_id):
     """Get detailed information about a specific order"""
     if request.method == 'OPTIONS':
@@ -1454,6 +1488,7 @@ def get_exchange_rates(request):
 # ==================== PRODUCT REVIEW API ENDPOINTS ====================
 
 @csrf_exempt
+@for_own_client
 def can_review_product(request, user_id, product_sku):
     """Check if user has purchased the product and can leave a review"""
     if request.method == 'OPTIONS':
@@ -1513,6 +1548,7 @@ def can_review_product(request, user_id, product_sku):
 
 
 @csrf_exempt
+@for_own_client
 def add_product_review(request, user_id):
     """Add a new product review"""
     if request.method == 'OPTIONS':
@@ -1638,6 +1674,7 @@ def get_product_reviews(request, product_sku):
 
 
 @csrf_exempt
+@for_own_client
 def get_user_reviews(request, user_id):
     """Get all reviews by a user"""
     if request.method == 'OPTIONS':
@@ -1689,6 +1726,7 @@ def get_user_reviews(request, user_id):
 
 
 @csrf_exempt
+@for_own_client
 def delete_review(request, user_id, review_id):
     """Delete a user's review"""
     if request.method == 'OPTIONS':

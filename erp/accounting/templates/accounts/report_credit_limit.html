@@ -123,11 +123,8 @@
       <option value="near" {% if view == 'near' %}selected{% endif %}>{% trans "Near + Over Limit (80%+)" %}</option>
       <option value="all"  {% if view == 'all'  %}selected{% endif %}>{% trans "All Limited Accounts" %}</option>
     </select>
-    <span class="fc-lbl">{% trans "Book" %}</span>
-    <select name="book">
-      <option value="">{% trans "All Books" %}</option>
-      {% for b in books %}<option value="{{ b.id }}" {% if filter_book == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
-    </select>
+    {% comment %}No book picker: the book is the one in the address, and
+       a picker listed every book on the install to whoever opened it.{% endcomment %}
     <span class="spacer"></span>
     <button type="submit" class="cl-btn primary"><i data-lucide="filter"></i>{% trans "Apply" %}</button>
   </form>

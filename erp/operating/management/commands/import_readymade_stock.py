@@ -354,6 +354,8 @@ class Command(BaseCommand):
                 defaults={
                     "name": variant.full_name or variant.variant_sku,
                     "quantity": Decimal("0"),
+                    # Born linked: stock is always a catalog variant.
+                    "catalog_variant": variant,
                 },
             )
             stats["products"] += 1

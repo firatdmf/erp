@@ -220,8 +220,10 @@
         </section>
 
         <!-- ORDER HISTORY -->
+        {% if sees_orders %}
         {% trans "No orders yet for this contact." as no_orders_text %}
         {% include "crm/components/_order_history_card.html" with empty_text=no_orders_text %}
+        {% endif %}
 
         <!-- SAMPLES SENT -->
         {% include "crm/components/_samples_card.html" with show_contact=False client_type="contact" client_pk=contact.pk %}

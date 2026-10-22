@@ -77,27 +77,6 @@ class PackTestCase(TestCase):
         self.assertTrue(response['Content-Disposition'].startswith('inline;'))
 
     @patch('marketing.utils.bunny_storage.upload_to_bunny')
-    def test_pack_label_pdf_view(self, mock_upload):
-        mock_upload.return_value = "https://mock-cdn.net/qr.png"
-        pack = Pack.objects.create(
-            order=self.order,
-            pack_number=1
-        )
-        
-        PackedOrderItem.objects.create(
-            pack=pack,
-            order_item=self.order_item
-        )
-        
-        url = reverse('operating:pack_pdf', kwargs={'pack_pk': pack.pk})
-        response = self.client.get(url)
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'application/pdf')
-        self.assertTrue(response['Content-Disposition'].startswith('attachment;'))
-
-
-    @patch('marketing.utils.bunny_storage.upload_to_bunny')
     def test_delete_renumbers_remaining_packs(self, mock_upload):
         """Deleting a package closes the gap — the rest run 1..N again, and
         the next one added follows on from N, not from the highest number

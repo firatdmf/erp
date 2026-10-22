@@ -1,5 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
+from crm.forms import WalledChoicesMixin
 from .models import PurchaseRequest, PurchaseRequestItem, PurchaseOrder, PurchaseOrderItem
 
 class PurchaseRequestForm(forms.ModelForm):
@@ -11,14 +12,18 @@ class PurchaseRequestForm(forms.ModelForm):
             'reason': forms.Textarea(attrs={'rows': 3}),
         }
 
+class PurchaseRequestItemForm(WalledChoicesMixin, forms.ModelForm):
+    """A request line, offering only the reader's own products."""
+
 PurchaseRequestItemFormSet = inlineformset_factory(
     PurchaseRequest, PurchaseRequestItem,
+    form=PurchaseRequestItemForm,
     fields=['product', 'raw_material', 'description', 'quantity', 'unit', 'estimated_price'],
     extra=1,
     can_delete=True
 )
 
-class PurchaseOrderForm(forms.ModelForm):
+class PurchaseOrderForm(WalledChoicesMixin, forms.ModelForm):
     class Meta:
         model = PurchaseOrder
         fields = ['supplier', 'expected_delivery_date', 'shipping_address', 'currency']

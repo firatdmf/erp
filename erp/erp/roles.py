@@ -28,8 +28,9 @@ Two independent gates, both of which must pass:
      id in the MIDDLE of the path so they are neither). The exact-path
      set is exact on purpose: a prefix hands over every route that
      happens to start the same way. Editing is additionally
-     object-scoped — erp.ownership.can_edit lets her change only what
-     she created — but that check lives in the view, not here.
+     object-scoped — an order only in her books and not yet shipped, a
+     customer only if she created it — but that check lives in the
+     view, not here.
 
   2. PATH — a GET must start with one of READ_PREFIXES *and* must not
      contain one of WRITE_SEGMENTS. The second half matters because
@@ -49,6 +50,9 @@ from decimal import ROUND_CEILING, Decimal
 SALES_REP = "sales_rep"
 VIEW_PROFIT = "view_profit"
 MIDDLE_MANAGER = "middle_manager"
+# Stored as "manager", the access level that sat unused before it was
+# given this meaning; the label says what it is.
+OPERATIONS_MANAGER = "manager"
 
 
 # Paths any signed-in member may reach whatever their role: the shell
@@ -178,8 +182,9 @@ WRITE_PATHS = frozenset({
 # Write paths that carry an id, so they cannot be exact strings. Kept
 # tiny and specific for the same reason WRITE_PATHS is exact: each entry
 # here opens every route beneath it. Object-level permission is NOT this
-# gate's job — OrderEdit.dispatch decides whose order it is, via
-# erp.ownership.can_edit. This only decides that the route is reachable.
+# gate's job — the edit route's book guard and OrderEdit.dispatch decide
+# whether the order may be changed. This only decides that the route is
+# reachable.
 WRITE_PREFIXES = (
     "/operating/orders/edit/",
     "/crm/contact/update/",
@@ -272,10 +277,10 @@ WRITE_PATTERNS = (
 def may_write(path):
     """Whether a sales rep may POST to `path`.
 
-    Route-level only. Whether it is HER order or customer is settled by
-    erp.ownership.can_edit inside the view, which is where the object
-    actually is — and, for the packing routes, by the `book_guarded`
-    wrapper on them in operating/urls.py.
+    Route-level only. Whether the order or customer is hers to change is
+    settled inside the view, which is where the object actually is — and,
+    for the order and packing routes, by the `book_guarded` wrapper on
+    them in operating/urls.py.
     """
     return (path in WRITE_PATHS
             or path.startswith(WRITE_PREFIXES)
@@ -334,6 +339,62 @@ def is_middle_manager(actor):
     if member is None:
         return False
     return _has_permission(member, MIDDLE_MANAGER)
+
+
+def is_operations_manager(actor):
+    """True for a Member carrying the Operations manager grant: the
+    person who runs the warehouse and its stock, and has no business with
+    orders — see ORDER_PREFIXES.
+
+    Superusers never are, for the reason is_sales_rep gives.
+    """
+    member, user = _member_and_user(actor)
+    if member is None or getattr(user, "is_superuser", False):
+        return False
+    return _has_permission(member, OPERATIONS_MANAGER)
+
+
+# ── What an operations manager may not reach ──────────────────────────
+# Orders, whole: the list, the page, the form, packing, printing, and the
+# APIs that read one. Refused by ReadOnlyRoleMiddleware before URL
+# resolution, so an order route added tomorrow under these is closed to
+# the role without anyone remembering to come back. "/operating/orders"
+# without its slash, because the order form posts to
+# "/operating/orders/create".
+ORDER_PREFIXES = (
+    "/operating/orders",
+    "/operating/api/order/",
+    "/operating/api/get_order_status/",
+    "/operating/api/get_order_detail/",
+    "/operating/generate_pdf_qr_for_order_item_units/",
+    "/authentication/api/get_user_orders/",
+    "/authentication/api/get_order_detail/",
+)
+# A book's own order list and order form name the book in the middle.
+ORDER_PATTERNS = (
+    re.compile(r"^/operating/books/\d+/orders/"),
+)
+
+
+def is_order_path(path):
+    """Whether `path` is one of the order routes above."""
+    return (path.startswith(ORDER_PREFIXES)
+            or any(pattern.match(path) for pattern in ORDER_PATTERNS))
+
+
+def nav_item_reaches_orders(item):
+    """Whether a nav item leads into orders: its link, or the endpoint its
+    sidebar posts to (NAV_ACTION_ENDPOINTS). Resolved from the item's own
+    route for the reason may_use_nav_item gives."""
+    from django.urls import NoReverseMatch, reverse
+
+    name = NAV_ACTION_ENDPOINTS.get(item["action"]) if item.get("action") else item.get("url")
+    if name:
+        try:
+            return is_order_path(reverse(name))
+        except NoReverseMatch:
+            return False
+    return is_order_path(item.get("href") or "")
 
 
 def may_see_profit(actor):

@@ -43,6 +43,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from operating.catalog_reconcile import reconcile_all_warehouse_links
+from operating.catalog_sync import CatalogSyncConflict, variant_for_new_row
 from operating.models import (StockMovement, Warehouse, WarehouseProduct,
                               WarehouseProductItem)
 
@@ -402,8 +403,15 @@ class Command(BaseCommand):
 
             product = existing.get(desen)
             if product is None:
-                product = WarehouseProduct(warehouse=warehouse, sku=desen,
-                                           quantity=Decimal("0"))
+                # Stock is always a catalog variant: the row is born linked,
+                # and a pattern the catalog can't take stops the import.
+                try:
+                    variant = variant_for_new_row(desen, entry["name"], cost=price)
+                except CatalogSyncConflict as exc:
+                    raise CommandError(f"{desen}: {exc}")
+                product = WarehouseProduct(
+                    warehouse=warehouse, sku=desen, quantity=Decimal("0"),
+                    catalog_variant=variant)
                 stats["products_created"] += 1
                 to_create.append(product)
             else:

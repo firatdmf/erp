@@ -284,40 +284,61 @@ class SalesRepRoleTests(TestCase):
                          {"kind": "company", "name": "Stamped Ltd"})
         self.assertEqual(Company.objects.get(name="Stamped Ltd").created_by, self.user)
 
-    def test_edits_are_limited_to_what_she_created(self):
-        """Route is open; the object decides. Both halves matter."""
+    def test_she_edits_any_open_order_in_her_books(self):
+        """Whoever raised it, a split order's half included — but only in
+        her books, and only while it is still open."""
+        from uuid import uuid4
+
         from accounting.models import Book, CurrencyCategory
         from accounting.models_accounts import CurrentAccount
         from operating.models import Order
+
+        usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        laleli = Book.objects.create(name="Laleli Fabric")
+        ergene = Book.objects.create(name="Ergene Factory")
+        self.user.member.books.add(laleli)
+
+        def order_in(book, **fields):
+            # An Order reaches its book through its current account, and
+            # the edit route is book_guarded on that.
+            account = CurrentAccount.objects.create(
+                book=book, code=f"C-{uuid4().hex[:8]}", name="Karven",
+                type="customer", default_currency=usd)
+            return Order.objects.create(current_account=account, **fields)
+
+        def edit(order):
+            return self.client.get(f"/operating/orders/edit/{order.pk}/")
+
+        # No recorded creator: admin-only under erp.ownership.can_edit,
+        # and still hers to edit.
+        theirs = order_in(laleli, order_status="pending")
+        self.assertEqual(edit(theirs).status_code, 200)
+
+        group = uuid4()
+        her_half = order_in(laleli, order_status="pending", split_group=group)
+        other_half = order_in(ergene, order_status="pending", split_group=group)
+        self.assertEqual(edit(her_half).status_code, 200)
+        self.assertEqual(edit(other_half).status_code, 404)
+
+        self.assertEqual(edit(order_in(ergene, order_status="pending")).status_code, 404)
+
+        completed = order_in(laleli, order_status="pending", status="completed")
+        self.assertEqual(edit(completed).status_code, 403)
+        shipped = order_in(laleli, order_status="shipped")
+        self.assertEqual(edit(shipped).status_code, 302)
+
+    def test_a_customer_stays_editable_by_its_creator_only(self):
+        from crm.models import Contact
         from erp.ownership import can_edit
 
-        mine = Order.objects.create(order_status="pending", created_by=self.user)
-        theirs = Order.objects.create(order_status="pending")  # created_by NULL
-
+        mine = Contact.objects.create(name="Mine", created_by=self.user)
+        theirs = Contact.objects.create(name="Theirs")  # created_by NULL
         self.assertTrue(can_edit(self.user, mine))
         self.assertFalse(can_edit(self.user, theirs))
 
-        # An order with no recorded creator is admin-only, never
-        # everyone's — see erp.ownership.can_edit.
+        # A row with no recorded creator is admin-only, never everyone's.
         boss = User.objects.create_superuser("boss2_test", password="pw-for-test")
         self.assertTrue(can_edit(boss, theirs))
-
-        # The edit route is book_guarded, and an Order reaches its book
-        # through its current account. `theirs` needs one, in a book she
-        # is assigned to — otherwise the guard 404s it before ownership
-        # is ever consulted, and the line below asserts nothing about
-        # who created the order.
-        book = Book.objects.create(name="Laleli Fabric")
-        theirs.current_account = CurrentAccount.objects.create(
-            book=book, code="C-SALES-REP", name="Karven", type="customer",
-            default_currency=CurrencyCategory.objects.create(
-                code="USD", name="US Dollar", symbol="$"))
-        theirs.save(update_fields=["current_account"])
-        self.user.member.books.add(book)
-
-        self.assertEqual(
-            self.client.get(f"/operating/orders/edit/{theirs.pk}/").status_code, 302
-        )
 
     def test_cannot_complete_an_order_through_the_status_funnel(self):
         """The guard that matters: every transition goes through here.

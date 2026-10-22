@@ -1424,8 +1424,11 @@ class CurrentAccountStatementAll(View):
     template_name = "accounts/current_account_statement_all.html"
 
     def get(self, request):
+        # The book the URL names (book_scoped). The page predates book
+        # scoping and once listed every book's accounts, so a member of
+        # one business read the others' customers and balances.
         current_accounts = (
-            CurrentAccount.objects.filter(is_active=True)
+            CurrentAccount.objects.filter(is_active=True, book=request.book)
             .select_related("book", "default_currency")
             .exclude(cached_balance=0)
             .order_by("-cached_balance")

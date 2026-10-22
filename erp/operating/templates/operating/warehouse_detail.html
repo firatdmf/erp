@@ -1378,10 +1378,12 @@
 
   <!-- CRUMBS -->
   <div class="od-crumbs">
+    {% if not list_skipped %}
     <a href="{% url 'operating:warehouse_list' %}" class="od-back">
       <i class="fa fa-arrow-left"></i> {% trans "Back to warehouses" %}
     </a>
     <span class="od-sep">/</span>
+    {% endif %}
     <span class="od-crumb-here">{{ warehouse.name }}</span>
   </div>
 

@@ -1370,31 +1370,44 @@ def warehouse_in_reach(view):
     return wrapper
 
 
+def _listed_warehouses(user):
+    # Only the books this member works in. A warehouse's stock is its
+    # book's asset, so someone assigned to Ergene has no business
+    # reading Laleli's shelves — and a warehouse with no book stated
+    # is shown to nobody rather than to everybody.
+    from accounting.services_accounts import member_books
+    # A combined warehouse has no book of its own. Merging two books'
+    # depots into one is a decision that they are browsed together,
+    # so it is listed for anyone who works in ONE of its members'
+    # books — and, like everything else, shown whole (Warehouse.visible_to).
+    member = getattr(user, "member", None)
+    allowed = set(member_books(member).values_list("pk", flat=True))
+    return [
+        w for w in Warehouse.objects.filter(
+            Q(accounting_book__in=allowed) | Q(kind='combined'),
+        ).annotate(
+            n_products=Count('products'),
+        ).prefetch_related('combined_sources').order_by('name')
+        if not w.is_combined
+        or {m.accounting_book_id for m in w.combined_sources.all()} & allowed
+    ]
+
+
+def _skips_warehouse_list(user, warehouses):
+    """One warehouse in reach: the list is a click with no choice in it,
+    so it opens that warehouse. Admins keep the list — the "new
+    warehouse" button lives there."""
+    return len(warehouses) == 1 and not _is_admin(user)
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseList(View):
     template_name = "operating/warehouse_list.html"
 
     def get(self, request):
-        # Only the books this member works in. A warehouse's stock is its
-        # book's asset, so someone assigned to Ergene has no business
-        # reading Laleli's shelves — and a warehouse with no book stated
-        # is shown to nobody rather than to everybody.
-        from accounting.services_accounts import member_books
-        # A combined warehouse has no book of its own. Merging two books'
-        # depots into one is a decision that they are browsed together,
-        # so it is listed for anyone who works in ONE of its members'
-        # books — and, like everything else, shown whole (Warehouse.visible_to).
-        member = getattr(request.user, "member", None)
-        allowed = set(member_books(member).values_list("pk", flat=True))
-        warehouses = [
-            w for w in Warehouse.objects.filter(
-                Q(accounting_book__in=allowed) | Q(kind='combined'),
-            ).annotate(
-                n_products=Count('products'),
-            ).prefetch_related('combined_sources').order_by('name')
-            if not w.is_combined
-            or {m.accounting_book_id for m in w.combined_sources.all()} & allowed
-        ]
+        warehouses = _listed_warehouses(request.user)
+        if _skips_warehouse_list(request.user, warehouses):
+            return redirect('operating:warehouse_detail', warehouses[0].pk)
         # Combined (ortak) warehouses own no products — their card shows
         # the MEMBERS' variant count and member names instead.
         for w in warehouses:
@@ -2028,6 +2041,9 @@ class WarehouseDetail(View):
 
         ctx = {
             'warehouse': warehouse,
+            # The list would bounce straight back here — no way "back".
+            'list_skipped': _skips_warehouse_list(
+                request.user, _listed_warehouses(request.user)),
             'groups': groups_render,      # main-product groups on this page
             'variants': variants_render,  # flat variant rows on this page (view=variants)
             'view_mode': view_mode,

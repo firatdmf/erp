@@ -38,6 +38,9 @@ class WarehouseCostIsHiddenFromSalesRep(TestCase):
         usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         book = Book.objects.create(name="Laleli Fabric", base_currency=usd)
         self.warehouse = Warehouse.objects.create(name="Laleli depo", accounting_book=book)
+        # A second one, so the list is a list: with one in reach it opens
+        # that warehouse instead.
+        Warehouse.objects.create(name="Laleli shop", accounting_book=book)
         self.product = WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="GREK TÜL", sku="K24593.G07",
             quantity=METRES, purchase_price=PURCHASE_PRICE, purchase_currency="TRY")

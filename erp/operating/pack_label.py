@@ -1,4 +1,4 @@
-"""Mini packing list for the outside of a package: 65 × 45 mm, one label
+"""Mini packing list for the outside of a package: 100 × 100 mm, one label
 per page, for the thermal label printer.
 
 Order number, "package 3 / 7", a QR of the package code and what is inside,
@@ -17,7 +17,7 @@ from marketing import units
 from .models import Order, Pack
 from .warehouse_label import inline_pdf_response
 
-LINES_PER_LABEL = 8
+LINES_PER_LABEL = 10
 
 
 def _pack_lines(pack):
@@ -85,8 +85,8 @@ def labels_pdf_bytes(packs, title):
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "DejaVuSans-Bold" if reg == "DejaVuSans" else "Helvetica-Bold"
 
-    W, H, M = 65 * mm, 45 * mm, 2.5 * mm
-    qsize = 12 * mm
+    W, H, M = 100 * mm, 100 * mm, 5 * mm
+    qsize = 24 * mm
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=(W, H))
     c.setTitle(title)
@@ -112,53 +112,51 @@ def labels_pdf_bytes(packs, title):
         qr = Image.open(qbuf).convert("RGB")
 
         for page_no, page in enumerate(pages, start=1):
-            # ── Header: QR, order number, package number ──
+            # ── Header: QR, then order number over package number ──
             c.drawInlineImage(qr, M, H - M - qsize, qsize, qsize)
-            x = M + qsize + 2.5 * mm
+            x = M + qsize + 4 * mm
+            top = H - M
             c.setFillColorRGB(0.4, 0.4, 0.4)
-            c.setFont(reg, 5.5)
-            c.drawString(x, H - M - 2.5 * mm, _("ORDER").upper())
+            c.setFont(reg, 8)
+            c.drawString(x, top - 3 * mm, _("ORDER").upper())
             package = _("PACKAGE").upper()
             if len(pages) > 1:
                 package += f" · {page_no}/{len(pages)}"
-            c.drawRightString(W - M, H - M - 2.5 * mm, package)
+            c.drawString(x, top - 15 * mm, package)
             c.setFillColorRGB(0, 0, 0)
-            c.setFont(bold, 13)
-            c.drawRightString(W - M, H - M - 8 * mm, f"{pack.pack_number} / {of}")
             # The order number is what gets read off the sack, so it shrinks
             # to fit rather than lose its tail.
             number = str(order.order_number or order.pk)
-            number_w = W - M - x - c.stringWidth(f"{pack.pack_number} / {of}", bold, 13) - 2 * mm
-            size = 13
-            while size > 7 and c.stringWidth(number, bold, size) > number_w:
+            size = 20
+            while size > 10 and c.stringWidth(number, bold, size) > W - M - x:
                 size -= 0.5
             c.setFont(bold, size)
-            c.drawString(x, H - M - 8 * mm, fit(number, bold, size, number_w))
-            c.setFont(reg, 5.5)
-            c.drawString(x, H - M - 11.2 * mm, fit(pack.code or "", reg, 5.5, W - M - x))
+            c.drawString(x, top - 10 * mm, fit(number, bold, size, W - M - x))
+            c.setFont(bold, 20)
+            c.drawString(x, top - 22 * mm, f"{pack.pack_number} / {of}")
 
-            rule = H - M - qsize - 1.5 * mm
-            c.setLineWidth(0.4)
+            rule = top - qsize - 2.5 * mm
+            c.setLineWidth(0.6)
             c.line(M, rule, W - M, rule)
 
             # ── Contents, one line per SKU ──
-            y = rule - 3 * mm
+            y = rule - 6 * mm
             for line in page:
                 amount = _describe(line["items"], line["quantity"], line["unit"], line["pack_type"])
-                c.setFont(reg, 6.5)
+                c.setFont(reg, 10)
                 c.drawRightString(W - M, y, amount)
-                sku_w = W - 2 * M - c.stringWidth(amount, reg, 6.5) - 2 * mm
-                c.setFont(bold, 6.5)
-                c.drawString(M, y, fit(line["sku"], bold, 6.5, sku_w))
-                y -= 2.6 * mm
+                sku_w = W - 2 * M - c.stringWidth(amount, reg, 10) - 3 * mm
+                c.setFont(bold, 10)
+                c.drawString(M, y, fit(line["sku"], bold, 10, sku_w))
+                y -= 4.8 * mm
             if not lines:
-                c.setFont(reg, 6.5)
+                c.setFont(reg, 10)
                 c.drawString(M, y, _("Empty"))
 
             # ── Footer: the whole package's total ──
-            c.line(M, 6 * mm, W - M, 6 * mm)
-            c.setFont(bold, 6.5)
-            c.drawString(M, 3.2 * mm, fit(f"{_('Total')}: {total}", bold, 6.5, W - 2 * M))
+            c.line(M, 14 * mm, W - M, 14 * mm)
+            c.setFont(bold, 11)
+            c.drawString(M, 8 * mm, fit(f"{_('Total')}: {total}", bold, 11, W - 2 * M))
 
             c.showPage()
     c.save()

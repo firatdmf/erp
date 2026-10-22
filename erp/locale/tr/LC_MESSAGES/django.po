@@ -14709,3 +14709,6 @@ msgstr "Etiket"
 
 msgid "Print this package's label"
 msgstr "Bu paketin etiketini yazdır"
+
+msgid "Warehouse name"
+msgstr "Depodaki adı"

@@ -284,6 +284,7 @@
           <tr>
             <th>{% trans "Image" %}</th>
             <th>{% trans "SKU" %}</th>
+            <th>{% trans "Warehouse name" %}</th>
             <th>{% trans "Attributes" %}</th>
             <th>{% trans "Price" %}</th>
             <th>{% trans "In stock" %}</th>
@@ -306,6 +307,11 @@
               {% endwith %}
             </td>
             <td><span class="variant-sku">{{ variant.variant_sku }}</span></td>
+            <td>
+              {% for name in variant.stock_line_names %}
+              <span class="stock-line-name">{{ name }}</span>
+              {% empty %}—{% endfor %}
+            </td>
             <td>
               <div class="attributes">
                 {% for attribute_value in variant.product_variant_attribute_values.all %}
@@ -709,6 +715,9 @@
   .stock-at .q { font: 700 11px 'Plus Jakarta Sans', sans-serif; color: #374151;
                  text-align: right; font-variant-numeric: tabular-nums; }
   .stock-at .wh { font: 500 11px 'Plus Jakarta Sans', sans-serif; color: #6B7280; }
+  /* The warehouse's own name for the variant, one per line. */
+  .stock-line-name { display: block; font: 500 12px 'Plus Jakarta Sans', sans-serif;
+                     color: #374151; white-space: nowrap; }
   .variant-availability.is-out {
     background: #F4F6F8;
     color: #94A3B8;

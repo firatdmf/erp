@@ -295,8 +295,8 @@
                   <span class="pf-fx-note" id="fxNote"></span>
                 </label>
                 <div class="pf-fx-grid">
-                  <input type="number" step="0.000001" min="0" name="exchange_rate"
-                         id="paymentRate" placeholder="0.000000"
+                  <input type="number" step="0.00000001" min="0" name="exchange_rate"
+                         id="paymentRate" placeholder="0.00000000"
                          value="{% if payment and payment.stated_rate %}{{ payment.stated_rate|unlocalize }}{% endif %}">
                   <span class="pf-fx-eq" id="fxEq"></span>
                   <div class="pf-fx-total">
@@ -490,6 +490,10 @@ if (window.lucide) lucide.createIcons();
     // is the starting point, so the notice shows before anything is
     // touched — the same figure the server will use.
     var published = {{ payment.published_rate|default:"null"|unlocalize }};
+    // A fetched rate held to the eight places the rate box and
+    // Payment.published_rate keep, so a rate left as fetched equals the
+    // published one exactly and the notice stays hidden.
+    function toPlaces(rate) { return parseFloat(parseFloat(rate).toFixed(8)); }
     var diffEl = document.getElementById('fxDiff');
     var typeEl = document.getElementById('paymentType');
     var DIFF_TEXT = {
@@ -534,7 +538,7 @@ if (window.lucide) lucide.createIcons();
                                : (inward ? DIFF_TEXT.loss : DIFF_TEXT.lossOut);
           diffEl.className = 'pf-fx-diff ' + (r.gain > 0 ? 'gain' : 'loss');
           diffEl.textContent = fill(tpl, {
-            published: r.rate.toFixed(6), worth: money(r.worth), settled: money(r.settled),
+            published: r.rate.toFixed(8), worth: money(r.worth), settled: money(r.settled),
             diff: money(Math.abs(r.gain)), base: BASE.code
           });
         }
@@ -594,7 +598,7 @@ if (window.lucide) lucide.createIcons();
     function recalcRate() {
       var total = parseFloat(totalEl.value);
       var a = amount();
-      rateEl.value = (total > 0 && a) ? (total / a).toFixed(6) : '';
+      rateEl.value = (total > 0 && a) ? (total / a).toFixed(8) : '';
       syncEquation();
       announce();
     }
@@ -619,8 +623,8 @@ if (window.lucide) lucide.createIcons();
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (data.rate) {
-            published = parseFloat(data.rate);
-            rateEl.value = published.toFixed(6);
+            published = toPlaces(data.rate);
+            rateEl.value = published.toFixed(8);
             userSet = false;
             noteEl.textContent = '{% trans "published rate for" %} ' + (data.date || '');
           } else {
@@ -652,7 +656,7 @@ if (window.lucide) lucide.createIcons();
         + '&date=' + encodeURIComponent(dateEl.value || '');
       fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
-        .then(function (data) { published = data.rate ? parseFloat(data.rate) : null; announce(); })
+        .then(function (data) { published = data.rate ? toPlaces(data.rate) : null; announce(); })
         .catch(function () {});
     }
 

@@ -115,6 +115,17 @@ class TheGapReachesFiveNineHundred(_Base):
         })
         self.assertFalse(JournalLine.objects.filter(account__code="5900").exists())
 
+    def test_a_small_rate_left_alone_records_nothing(self):
+        # Tenge to dollars: at six places 0.00222095 became 0.002221, and
+        # ₸184,000 settled at $408.66 against $408.65 worth — a cent on 5900.
+        kzt = CurrencyCategory.objects.create(code="KZT", name="Tenge", symbol="₸")
+        CurrencyExchangeRate.objects.create(
+            from_currency="KZT", to_currency="USD", rate=Decimal("0.00222095"), date=self.DAY)
+        payment = self._payment("collection", "184000.00", "0.00222095", currency=kzt)
+        self.assertEqual(payment.exchange_rate, Decimal("0.00222095"))
+        self.assertEqual(payment.realised_fx()["difference"], Decimal("0.00"))
+        self.assertFalse(JournalLine.objects.filter(account__code="5900").exists())
+
     def test_no_typed_rate_means_nothing_to_compare(self):
         payment = self._payment("collection", "350.00", None)
         self.assertIsNone(payment.published_rate)

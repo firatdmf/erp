@@ -143,7 +143,9 @@ def get_exchange_rate(from_currency: str, to_currency: str, on_date=None) -> Dec
         return rate_obj.rate
 
     try:
-        rate = _fetch_rate(from_currency, to_currency, on_date=day)
+        # Held to the places the row keeps, so the first answer of the day
+        # is the same figure every later one reads back from the table.
+        rate = _fetch_rate(from_currency, to_currency, on_date=day).quantize(Decimal("0.00000001"))
         CurrencyExchangeRate.objects.create(
             from_currency=from_currency, to_currency=to_currency,
             rate=rate, date=day,

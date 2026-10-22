@@ -113,7 +113,9 @@ def invoice_items_default():
 class CurrencyExchangeRate(models.Model):
     from_currency = models.CharField(max_length=3)  # e.g. 'USD'
     to_currency = models.CharField(max_length=3)  # e.g. 'EUR'
-    rate = models.DecimalField(max_digits=20, decimal_places=6)
+    # Eight places, like the payment rates read against it: six left a
+    # tenge→dollar rate four significant digits, a cent off on 184,000 ₸.
+    rate = models.DecimalField(max_digits=20, decimal_places=8)
     # The day this rate APPLIES to, which is not always the day it was
     # fetched. auto_now_add made those the same thing and so made history
     # unstorable: a rate looked up for the 17th was filed under today, and

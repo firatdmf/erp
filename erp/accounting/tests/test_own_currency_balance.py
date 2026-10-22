@@ -246,7 +246,7 @@ class PaymentRateTowardAccountTest(OwnCurrencyBase):
     def test_the_edit_form_shows_the_saved_rate(self):
         self.post_payment()
         response = self.client.get(self.edit_url(Payment.objects.get()))
-        self.assertContains(response, 'value="48.600000"')
+        self.assertContains(response, 'value="48.60000000"')
 
     # -- what gets saved ---------------------------------------------------
     def test_a_rate_typed_for_a_dollar_payment_is_toward_the_account(self):

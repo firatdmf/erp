@@ -1630,7 +1630,11 @@ class Payment(models.Model):
     # indistinguishable from a deliberate entry: a payment in lira carrying
     # "1.000000" would otherwise read as an instruction to treat one lira as
     # one dollar. Null says nothing, which is what an untouched field means.
-    exchange_rate = models.DecimalField(max_digits=14, decimal_places=6,
+    #
+    # Eight places, the same as published_rate: at six, a tenge→dollar rate
+    # kept four significant digits, so a rate left as fetched came back a
+    # cent off the published one and posted a "loss" on 5900.
+    exchange_rate = models.DecimalField(max_digits=16, decimal_places=8,
                                         null=True, blank=True,
                                         help_text="Rate to the book's base "
                                                   "currency. Blank → the "
@@ -1640,7 +1644,7 @@ class Payment(models.Model):
     # which a dollar payment to a lira supplier came off what we owe them.
     # At most one of the two is typed: see set_stated_rate.
     account_exchange_rate = models.DecimalField(
-        max_digits=14, decimal_places=6, null=True, blank=True,
+        max_digits=16, decimal_places=8, null=True, blank=True,
         help_text="Rate to the account's own currency, when that is not the "
                   "base. Blank → the published rate for the date.")
     # The published rate for `date`, toward the book's base, photographed

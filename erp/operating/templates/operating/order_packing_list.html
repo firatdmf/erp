@@ -111,6 +111,9 @@
     <a href="{% url 'operating:export_packing_list_excel' order.pk %}" class="pk-btn ghost">
       <i class="fa fa-file-excel-o"></i> {% trans "Download Excel (editable)" %}
     </a>
+    <a href="{% url 'operating:order_pack_labels' order.pk %}" class="pk-btn ghost" target="_blank" rel="noopener">
+      <i class="fa fa-tag"></i> {% trans "Package labels" %}
+    </a>
     <span class="spacer"></span>
   </div>
 
@@ -127,6 +130,9 @@
         <div class="pk-pack-actions">
           <a class="pk-pack-btn" href="{% url 'operating:pack_pdf' p.pk %}" target="_blank" title="{% trans 'Print this package (PDF)' %}">
             <i class="fa fa-file-pdf-o"></i>
+          </a>
+          <a class="pk-pack-btn" href="{% url 'operating:pack_label' p.pk %}" target="_blank" title="{% trans 'Package label' %}">
+            <i class="fa fa-tag"></i>
           </a>
         </div>
       </div>

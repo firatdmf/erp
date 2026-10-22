@@ -1,0 +1,182 @@
+"""Mini packing list for the outside of a package: 65 × 45 mm, one label
+per page, for the thermal label printer.
+
+Order number, "package 3 / 7", a QR of the package code and what is inside,
+one line per SKU ("4 rolls · 212.50 m") — rolls of one SKU are added up,
+since a label this size can't list every roll. A package with more SKUs
+than fit carries on onto a second label, marked 2/2, rather than cutting
+anything off.
+"""
+from io import BytesIO
+
+from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext as _
+
+from marketing import units
+
+from .models import Order, Pack
+from .warehouse_label import inline_pdf_response
+
+LINES_PER_LABEL = 8
+
+
+def _pack_lines(pack):
+    """The package's contents added up per SKU, in the order first packed:
+    [{"sku", "unit", "pack_type", "items", "quantity"}]."""
+    from .views import _pack_roll_rows
+
+    lines = {}
+    for row in _pack_roll_rows(pack):
+        line = lines.setdefault(row["sku"], {
+            "sku": row["sku"], "unit": row["unit"], "pack_type": row["pack_type"],
+            "items": 0, "quantity": 0})
+        line["items"] += 1
+        line["quantity"] += row["quantity"] or 0
+    return list(lines.values())
+
+
+def _amount(quantity, unit):
+    """"212.50 m", or "22 pcs" for a count."""
+    if units.sold_by_count(unit) and quantity == int(quantity):
+        number = f"{int(quantity):,}"
+    else:
+        number = f"{quantity:,.2f}"
+    return f"{number} {units.unit_short(unit)}"
+
+
+def _describe(items, quantity, unit, pack_type):
+    """"4 rolls · 212.50 m". Counted goods are just their count: the stock
+    entries behind "22 pcs" are batches, not boxes anyone can find."""
+    amount = _amount(quantity, unit)
+    if units.sold_by_count(unit) or not units.counts_packs(pack_type):
+        return amount
+    return f"{items} {units.pack_noun(pack_type, items)} · {amount}"
+
+
+def _total(lines):
+    """Every unit in the package added up — "9 rolls · 512.30 m · 22 pcs"."""
+    by_unit = {}
+    for line in lines:
+        total = by_unit.setdefault(line["unit"], {"items": 0, "quantity": 0,
+                                                  "pack_type": line["pack_type"]})
+        total["items"] += line["items"]
+        total["quantity"] += line["quantity"]
+        if total["pack_type"] != line["pack_type"]:
+            total["pack_type"] = None  # rolls and bales don't add up to one noun
+    parts = []
+    for unit, t in by_unit.items():
+        if t["pack_type"] is None and not units.sold_by_count(unit):
+            parts.append(_amount(t["quantity"], unit))
+        else:
+            parts.append(_describe(t["items"], t["quantity"], unit, t["pack_type"]))
+    return " · ".join(parts)
+
+
+def labels_pdf_bytes(packs, title):
+    """Labels for these packages of one order, a page each (more for a
+    package that runs over LINES_PER_LABEL SKUs)."""
+    import segno
+    from PIL import Image
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+
+    from .order_notifications import _ensure_pdf_fonts
+
+    reg = _ensure_pdf_fonts() or "Helvetica"
+    bold = "DejaVuSans-Bold" if reg == "DejaVuSans" else "Helvetica-Bold"
+
+    W, H, M = 65 * mm, 45 * mm, 2.5 * mm
+    qsize = 12 * mm
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(W, H))
+    c.setTitle(title)
+
+    def fit(text, font, size, width):
+        if c.stringWidth(text, font, size) <= width:
+            return text
+        while text and c.stringWidth(text + "…", font, size) > width:
+            text = text[:-1]
+        return text + "…"
+
+    for pack in packs:
+        order = pack.order
+        of = order.packs.count()
+        lines = _pack_lines(pack)
+        total = _total(lines)
+        pages = [lines[i:i + LINES_PER_LABEL]
+                 for i in range(0, len(lines), LINES_PER_LABEL)] or [[]]
+
+        qbuf = BytesIO()
+        segno.make(pack.code or str(pack.pk), error="m").save(qbuf, kind="png", scale=8, border=1)
+        qbuf.seek(0)
+        qr = Image.open(qbuf).convert("RGB")
+
+        for page_no, page in enumerate(pages, start=1):
+            # ── Header: QR, order number, package number ──
+            c.drawInlineImage(qr, M, H - M - qsize, qsize, qsize)
+            x = M + qsize + 2.5 * mm
+            c.setFillColorRGB(0.4, 0.4, 0.4)
+            c.setFont(reg, 5.5)
+            c.drawString(x, H - M - 2.5 * mm, _("ORDER").upper())
+            package = _("PACKAGE").upper()
+            if len(pages) > 1:
+                package += f" · {page_no}/{len(pages)}"
+            c.drawRightString(W - M, H - M - 2.5 * mm, package)
+            c.setFillColorRGB(0, 0, 0)
+            c.setFont(bold, 13)
+            c.drawRightString(W - M, H - M - 8 * mm, f"{pack.pack_number} / {of}")
+            # The order number is what gets read off the sack, so it shrinks
+            # to fit rather than lose its tail.
+            number = str(order.order_number or order.pk)
+            number_w = W - M - x - c.stringWidth(f"{pack.pack_number} / {of}", bold, 13) - 2 * mm
+            size = 13
+            while size > 7 and c.stringWidth(number, bold, size) > number_w:
+                size -= 0.5
+            c.setFont(bold, size)
+            c.drawString(x, H - M - 8 * mm, fit(number, bold, size, number_w))
+            c.setFont(reg, 5.5)
+            c.drawString(x, H - M - 11.2 * mm, fit(pack.code or "", reg, 5.5, W - M - x))
+
+            rule = H - M - qsize - 1.5 * mm
+            c.setLineWidth(0.4)
+            c.line(M, rule, W - M, rule)
+
+            # ── Contents, one line per SKU ──
+            y = rule - 3 * mm
+            for line in page:
+                amount = _describe(line["items"], line["quantity"], line["unit"], line["pack_type"])
+                c.setFont(reg, 6.5)
+                c.drawRightString(W - M, y, amount)
+                sku_w = W - 2 * M - c.stringWidth(amount, reg, 6.5) - 2 * mm
+                c.setFont(bold, 6.5)
+                c.drawString(M, y, fit(line["sku"], bold, 6.5, sku_w))
+                y -= 2.6 * mm
+            if not lines:
+                c.setFont(reg, 6.5)
+                c.drawString(M, y, _("Empty"))
+
+            # ── Footer: the whole package's total ──
+            c.line(M, 6 * mm, W - M, 6 * mm)
+            c.setFont(bold, 6.5)
+            c.drawString(M, 3.2 * mm, fit(f"{_('Total')}: {total}", bold, 6.5, W - 2 * M))
+
+            c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def pack_label(request, pack_pk):
+    """One package's label(s), inline for the label printer."""
+    pack = get_object_or_404(Pack.objects.select_related("order"), pk=pack_pk)
+    pdf = labels_pdf_bytes([pack], title=f"{_('Package label')} — {pack.code}")
+    return inline_pdf_response(pdf, f"package-label-{pack.code or pack.pk}")
+
+
+def order_pack_labels(request, pk):
+    """Every package of an order, a label each, to print in one go."""
+    order = get_object_or_404(Order, pk=pk)
+    packs = list(order.packs.select_related("order").order_by("pack_number"))
+    number = order.order_number or order.pk
+    pdf = labels_pdf_bytes(packs, title=f"{_('Package labels')} — {number}")
+    return inline_pdf_response(pdf, f"package-labels-{number}")

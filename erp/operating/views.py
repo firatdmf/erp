@@ -5112,6 +5112,8 @@ def _pack_roll_rows(pack):
             "product_group": _product_group_label(product),
             "barcode": r.stock_item.barcode if r.stock_item_id else "-",
             "quantity": r.quantity,
+            "unit": product.unit if product else units.DEFAULT_UNIT,
+            "pack_type": product.pack_type if product else units.DEFAULT_PACK,
         })
     return rows
 
@@ -6538,7 +6540,7 @@ def pack_pdf(request, pack_pk):
         'order': _gettext("Order"),
         'contents': _gettext("CONTENTS"),
         'product': _gettext("Product"),
-        'quantity': _gettext("Meters"),
+        'quantity': _gettext("Quantity"),
     }
     
     font = _ensure_pdf_fonts() or "Helvetica"
@@ -6616,7 +6618,7 @@ def pack_pdf(request, pack_pk):
     for row in _pack_roll_rows(pack):
         items_data.append([
             Paragraph(row['title'], normal_style),
-            Paragraph(f"{row['quantity']:.2f} m" if row['quantity'] is not None else "-", normal_style),
+            Paragraph(f"{row['quantity']:.2f} {units.unit_short(row['unit'])}" if row['quantity'] is not None else "-", normal_style),
         ])
 
     tbl = Table(items_data, colWidths=[65 * mm, 24 * mm])

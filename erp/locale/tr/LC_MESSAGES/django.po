@@ -14697,3 +14697,15 @@ msgstr "Katalogda yeniden adlandırın veya taşıyın."
 #: operating/templates/operating/warehouse_detail.html
 msgid "Rename it in the catalog"
 msgstr "Katalogda yeniden adlandırın"
+
+msgid "Package label"
+msgstr "Paket etiketi"
+
+msgid "Package labels"
+msgstr "Paket etiketleri"
+
+msgid "Label"
+msgstr "Etiket"
+
+msgid "Print this package's label"
+msgstr "Bu paketin etiketini yazdır"

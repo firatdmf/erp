@@ -203,6 +203,12 @@
     border-radius:8px;padding:4px 9px;font:700 11px var(--pk-font);flex-shrink:0;
     display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
   .pk-pack-scan:hover{border-color:var(--pk-teal);color:var(--pk-teal-700);}
+  /* The package's mini packing list, for the label printer — kept after
+     shipping, since a label can still need reprinting then. */
+  .pk-pack-label{border:1.5px solid var(--pk-line);color:var(--pk-gray);text-decoration:none;
+    border-radius:8px;padding:4px 9px;font:700 11px var(--pk-font);flex-shrink:0;
+    display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+  .pk-pack-label:hover{border-color:var(--pk-teal);color:var(--pk-teal-700);text-decoration:none;}
 
 
   /* While a row is in flight, every package advertises itself as a
@@ -1282,7 +1288,7 @@
     // delete button, which lives there too.
     document.addEventListener('click', function(e){
       if (!e.target || !e.target.closest) return;
-      if (e.target.closest('.pk-pack-del, .pk-pack-grip')) return;
+      if (e.target.closest('.pk-pack-del, .pk-pack-grip, .pk-pack-label')) return;
       var h = e.target.closest('.pk-pack-h'); if (!h) return;
       var pack = h.closest('.pk-pack'); if (!pack) return;
       setCollapsed(pack, !pack.classList.contains('is-collapsed'));
@@ -1442,6 +1448,16 @@
           scanBtn.title = '{% filter escapejs %}{% trans "Scan into this package" %}{% endfilter %}';
           scanBtn.innerHTML = '<i class="fa fa-barcode"></i>' + '{% filter escapejs %}{% trans "Scan here" %}{% endfilter %}';
           h.insertBefore(scanBtn, h.querySelector('.pk-pack-del') || null);
+        }
+        if (!h.querySelector('.pk-pack-label')){
+          var label = document.createElement('a');
+          label.className = 'pk-pack-label';
+          label.href = '{% url "operating:pack_label" 0 %}'.replace('/0/', '/' + pack.dataset.packId + '/');
+          label.target = '_blank';
+          label.rel = 'noopener';
+          label.title = '{% filter escapejs %}{% trans "Print this package's label" %}{% endfilter %}';
+          label.innerHTML = '<i class="fa fa-tag"></i>' + '{% filter escapejs %}{% trans "Label" %}{% endfilter %}';
+          h.insertBefore(label, h.querySelector('.pk-pack-del') || null);
         }
         // Restore the remembered state once, on the package's first pass
         // — never again, or a regroup would undo a manual unfold.

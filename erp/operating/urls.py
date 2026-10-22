@@ -5,7 +5,7 @@ from . import views_samples
 from . import views_transfer
 from . import order_excel
 from . import picking_list
-from . import warehouse_label
+from . import pack_label, warehouse_label
 from . import warehouse_excel
 from accounting import views_invoice
 from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped
@@ -194,6 +194,17 @@ urlpatterns = [
         customer_guarded(views.pack_pdf, Pack, "order__contact", "order__company",
                          kwarg="pack_pk", book="order__current_account__book"),
         name="pack_pdf",
+    ),
+    path(
+        "packs/<int:pack_pk>/label/",
+        customer_guarded(pack_label.pack_label, Pack, "order__contact", "order__company",
+                         kwarg="pack_pk", book="order__current_account__book"),
+        name="pack_label",
+    ),
+    path(
+        "orders/<int:pk>/packing_list/labels/",
+        of_a_customer_in_reach(pack_label.order_pack_labels),
+        name="order_pack_labels",
     ),
     path(
         "raw_material_good/list",

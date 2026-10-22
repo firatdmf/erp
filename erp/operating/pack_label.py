@@ -1,8 +1,9 @@
 """Mini packing list for the outside of a package: 100 × 100 mm, one label
 per page, for the thermal label printer.
 
-The order's brand, the package code (PK-2026-000347-3) beside a QR of it,
-"3 / 7", and what is inside, one line per SKU ("4 rolls · 212.50 m") — rolls of one SKU are added up,
+The order's brand, the package code (PK-2026-000347-3) beside a QR that
+opens this package on the order's packing list, "3 / 7", and what is
+inside, one line per SKU ("4 rolls · 212.50 m") — rolls of one SKU are added up,
 since a label this size can't list every roll. A package with more SKUs
 than fit carries on onto a second label, marked 2/2, rather than cutting
 anything off.
@@ -10,6 +11,7 @@ anything off.
 from io import BytesIO
 
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils.translation import gettext as _
 
 from marketing import units
@@ -72,9 +74,10 @@ def _total(lines):
     return " · ".join(parts)
 
 
-def labels_pdf_bytes(packs, title):
+def labels_pdf_bytes(packs, title, link=None):
     """Labels for these packages of one order, a page each (more for a
-    package that runs over LINES_PER_LABEL SKUs)."""
+    package that runs over LINES_PER_LABEL SKUs). ``link(pack)`` is what
+    the QR opens; without one it holds just the package code."""
     import segno
     from PIL import Image
     from reportlab.lib.units import mm
@@ -112,7 +115,7 @@ def labels_pdf_bytes(packs, title):
                  for i in range(0, len(lines), LINES_PER_LABEL)] or [[]]
 
         qbuf = BytesIO()
-        segno.make(pack.code or str(pack.pk), error="m").save(qbuf, kind="png", scale=8, border=1)
+        segno.make(link(pack) if link else (pack.code or str(pack.pk)), error="m").save(qbuf, kind="png", scale=8, border=1)
         qbuf.seek(0)
         qr = Image.open(qbuf).convert("RGB")
 
@@ -177,10 +180,21 @@ def labels_pdf_bytes(packs, title):
     return buf.getvalue()
 
 
+def _packing_list_link(request):
+    """The QR's target: the order's packing list, scrolled to this package
+    and lit up. Behind the sign-in, like the rest of the ERP — a label is
+    scanned by staff, not by whoever finds the sack."""
+    def link(pack):
+        url = reverse("operating:order_packing_list", kwargs={"pk": pack.order_id})
+        return request.build_absolute_uri(url) + f"#pack-{pack.pk}"
+    return link
+
+
 def pack_label(request, pack_pk):
     """One package's label(s), inline for the label printer."""
     pack = get_object_or_404(Pack.objects.select_related("order"), pk=pack_pk)
-    pdf = labels_pdf_bytes([pack], title=f"{_('Package label')} — {pack.code}")
+    pdf = labels_pdf_bytes([pack], title=f"{_('Package label')} — {pack.code}",
+                           link=_packing_list_link(request))
     return inline_pdf_response(pdf, f"package-label-{pack.code or pack.pk}")
 
 
@@ -189,5 +203,6 @@ def order_pack_labels(request, pk):
     order = get_object_or_404(Order, pk=pk)
     packs = list(order.packs.select_related("order").order_by("pack_number"))
     number = order.order_number or order.pk
-    pdf = labels_pdf_bytes(packs, title=f"{_('Package labels')} — {number}")
+    pdf = labels_pdf_bytes(packs, title=f"{_('Package labels')} — {number}",
+                           link=_packing_list_link(request))
     return inline_pdf_response(pdf, f"package-labels-{number}")

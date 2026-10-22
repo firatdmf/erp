@@ -64,6 +64,21 @@ class PackLabel(TestCase):
         self.assertEqual(resp["Content-Type"], "application/pdf")
         self.assertEqual(resp.content.count(b"/Type /Page\n"), 1)
 
+    def test_the_qr_opens_the_package_on_the_packing_list(self):
+        captured = []
+        real = pack_label.labels_pdf_bytes
+
+        def spy(packs, title, link=None):
+            captured.extend(link(p) for p in packs)
+            return real(packs, title, link=link)
+
+        with patch.object(pack_label, "labels_pdf_bytes", spy):
+            self.client.get(reverse("operating:pack_label", kwargs={"pack_pk": self.pack1.pk}))
+        url = reverse("operating:order_packing_list", kwargs={"pk": self.order.pk})
+        self.assertEqual(captured, [f"http://testserver{url}#pack-{self.pack1.pk}"])
+        page = self.client.get(url)
+        self.assertContains(page, f'id="pack-{self.pack1.pk}"')
+
     def test_the_order_prints_a_label_per_package(self):
         resp = self.client.get(reverse("operating:order_pack_labels", kwargs={"pk": self.order.pk}))
         self.assertEqual(resp.status_code, 200)

@@ -1,7 +1,7 @@
 """Mini packing list for the outside of a package: 100 × 100 mm, one label
 per page, for the thermal label printer.
 
-The order's brand, order number, "package 3 / 7", a QR of the package code and what is inside,
+The order's brand, the package code (PK-ORD-2026-000347-3), "3 / 7", a QR of the package code and what is inside,
 one line per SKU ("4 rolls · 212.50 m") — rolls of one SKU are added up,
 since a label this size can't list every roll. A package with more SKUs
 than fit carries on onto a second label, marked 2/2, rather than cutting
@@ -125,21 +125,21 @@ def labels_pdf_bytes(packs, title):
             c.setFont(bold, size)
             c.drawString(M, H - M - 4.5 * mm, fit(brand, bold, size, W - 2 * M))
 
-            # ── Header: QR, then order number over package number ──
+            # ── Header: QR, then the package code over "3 / 12" ──
             top = H - M - 8 * mm
             c.drawInlineImage(qr, M, top - qsize, qsize, qsize)
             x = M + qsize + 4 * mm
             c.setFillColorRGB(0.4, 0.4, 0.4)
             c.setFont(reg, 8)
-            c.drawString(x, top - 3 * mm, _("ORDER").upper())
             package = _("PACKAGE").upper()
             if len(pages) > 1:
                 package += f" · {page_no}/{len(pages)}"
-            c.drawString(x, top - 15 * mm, package)
+            c.drawString(x, top - 3 * mm, package)
             c.setFillColorRGB(0, 0, 0)
-            # The order number is what gets read off the sack, so it shrinks
-            # to fit rather than lose its tail.
-            number = str(order.order_number or order.pk)
+            # The package code — the order number with the package's own on
+            # the end — is what gets read off the sack, so it shrinks to fit
+            # rather than lose its tail.
+            number = pack.code or str(order.order_number or order.pk)
             size = 20
             while size > 10 and c.stringWidth(number, bold, size) > W - M - x:
                 size -= 0.5

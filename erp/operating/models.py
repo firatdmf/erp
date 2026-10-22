@@ -2957,11 +2957,18 @@ class Pack(models.Model):
     class Meta:
         unique_together = ("order", "pack_number")  # prevent duplicates
 
+    @staticmethod
+    def code_for(order, pack_number):
+        """PK-2026-000347-3: the order's number without its "ORD-", since
+        "PK" already says what the code is, then the package's own. An
+        order not yet numbered goes by its id, PK-347-3."""
+        order_num = (order.order_number or str(order.pk)).removeprefix("ORD-")
+        return f"PK-{order_num}-{pack_number}"
+
     def save(self, *args, **kwargs):
         is_new = self.pk is None
         if not self.code:
-            order_num = self.order.order_number or f"ORD{self.order.pk}"
-            self.code = f"PK-{order_num}-{self.pack_number}"
+            self.code = Pack.code_for(self.order, self.pack_number)
         super().save(*args, **kwargs)
         if is_new and not self.qr_code_url:
             try:

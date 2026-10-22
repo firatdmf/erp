@@ -1,8 +1,8 @@
 """Mini packing list for the outside of a package: 100 × 100 mm, one label
 per page, for the thermal label printer.
 
-The order's brand, the package code (PK-ORD-2026-000347-3), "3 / 7", a QR of the package code and what is inside,
-one line per SKU ("4 rolls · 212.50 m") — rolls of one SKU are added up,
+The order's brand, the package code (PK-2026-000347-3) beside a QR of it,
+"3 / 7", and what is inside, one line per SKU ("4 rolls · 212.50 m") — rolls of one SKU are added up,
 since a label this size can't list every roll. A package with more SKUs
 than fit carries on onto a second label, marked 2/2, rather than cutting
 anything off.

@@ -44,6 +44,15 @@ class PackTestCase(TestCase):
         self.assertTrue(mock_upload.called)
 
     @patch('marketing.utils.bunny_storage.upload_to_bunny')
+    def test_a_numbered_order_s_package_code_drops_the_ord(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        order = Order.objects.create(order_number="ORD-2026-000347", status="pending")
+        self.assertEqual(Pack.objects.create(order=order, pack_number=3).code, "PK-2026-000347-3")
+        unnumbered = Order.objects.create(status="pending")
+        unnumbered.order_number = None
+        self.assertEqual(Pack.code_for(unnumbered, 1), f"PK-{unnumbered.pk}-1")
+
+    @patch('marketing.utils.bunny_storage.upload_to_bunny')
     def test_pdf_list_view(self, mock_upload):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
         pack = Pack.objects.create(

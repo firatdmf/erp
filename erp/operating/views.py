@@ -5254,11 +5254,10 @@ def _renumber_packs(order, ordered_ids=None):
         top = max(p.pack_number for p in packs)
         for k, (_, p) in enumerate(moving, start=1):
             Pack.objects.filter(pk=p.pk).update(pack_number=top + k)
-        order_num = order.order_number or f"ORD{order.pk}"
         now = timezone.now()
         for n, p in moving:
             Pack.objects.filter(pk=p.pk).update(
-                pack_number=n, code=f"PK-{order_num}-{n}", qr_code_url=None, updated_at=now)
+                pack_number=n, code=Pack.code_for(order, n), qr_code_url=None, updated_at=now)
     return {p.pk: n for n, p in enumerate(packs, start=1)}
 
 

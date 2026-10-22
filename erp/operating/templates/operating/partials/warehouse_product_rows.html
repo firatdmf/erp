@@ -1,5 +1,5 @@
 {% load i18n %}
-{% load operating_tags erp_tags %}
+{% load operating_tags erp_tags catalog_wording %}
 {% if view_mode == 'variants' %}
 {% for p in variants %}
 {% comment %}Row links use the product's OWN warehouse id — on a combined
@@ -41,6 +41,9 @@ links so that keeps working.{% endcomment %}
   <td data-label="{% trans 'Name' %}">
     <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
       <div class="pname" style="font-weight:600;">{{ p.name }}</div>
+      {% if p.catalog_variant_id %}{% comment %}The variant's values in the reader's language
+      ("Altın + Ekru · 320 cm" in Turkish): the name above is typed in one
+      language once, these come from the catalog's wordings.{% endcomment %}<div class="psub wh-worded">{% for a in p.catalog_variant.product_variant_attribute_values.all %}{{ a|worded_value }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
       {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
       {% comment %}A merged line shows the name of the member holding the most;
       a member that calls the SKU something else is named here, so the

@@ -1877,8 +1877,11 @@ class WarehouseDetail(View):
 
         if view_mode == 'variants':
             # ── FLAT: list EVERY variant (WarehouseProduct) individually. ──
+            # The variant's values print under each name, worded for the
+            # reader (see the row template) — fetched with the page.
             flat = (WarehouseProduct.with_stock_costs(base_qs)
                     .select_related('catalog_variant__product')
+                    .prefetch_related('catalog_variant__product_variant_attribute_values__product_variant_attribute')
                     .annotate(base=base_expr,
                               roll_count=stock_item_count_subquery(),
                               line_usd=F('stock_value'),
@@ -2297,6 +2300,7 @@ def warehouse_group_variants(request, pk):
               WarehouseProduct.objects.filter(warehouse_id__in=warehouse.scope_ids()))
           .select_related("catalog_variant__product",
                           "warehouse__accounting_book__base_currency")
+          .prefetch_related("catalog_variant__product_variant_attribute_values__product_variant_attribute")
           .annotate(base=base_expr,
                     roll_count=stock_item_count_subquery(),
                     line_usd=F("stock_value"),

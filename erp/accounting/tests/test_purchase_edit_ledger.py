@@ -114,7 +114,7 @@ class PurchaseEditLedgerTest(base.TestCase):
 
     def test_the_purchases_own_entry_is_corrected_in_place(self):
         """One entry for the purchase before and after, at the new figure
-        and still on the purchase's own date."""
+        and still on the day the goods came in."""
         from django.contrib.contenttypes.models import ContentType
         from accounting.models_ledger import JournalEntry
         movement = self._invoice().posted_movement
@@ -123,7 +123,7 @@ class PurchaseEditLedgerTest(base.TestCase):
         self._reprice("4.00")
 
         entry = JournalEntry.objects.get(source_type=ct, source_id=movement.pk)
-        self.assertEqual(str(entry.date), "2026-08-21")
+        self.assertEqual(entry.date, self._invoice().received_on)
         self.assertEqual(entry.lines.get(account__code="1300").debit, Decimal("200.00"))
         self.assertEqual(self._invoice().posted_movement.amount, Decimal("-200.00"))
         self.assertEqual(self._balances()["1300"], Decimal("200.00"))

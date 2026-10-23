@@ -13,7 +13,7 @@ The big picture:
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -485,10 +485,12 @@ def create_purchase_invoice_for_intake(current_account, lines, *, member=None, u
     which posts the CurrentAccountMovement(invoice_purchase, -total) with a source
     link so the current account statement row is clickable through to the invoice.
     `invoice` — an existing DRAFT purchase order being confirmed. Its number,
-    dates and account are already settled, so only its lines are rebuilt (from
-    what actually arrived) before it is issued. Safe to wipe its items first:
-    a draft has no rolls pointing at them yet, which is exactly what makes the
-    order editable right up to the moment it is confirmed.
+    order date and account are already settled, so only its lines are rebuilt
+    (from what actually arrived) and its received date set before it is
+    issued — the supplier is charged on the day the goods came in. Safe to
+    wipe its items first: a draft has no rolls pointing at them yet, which is
+    exactly what makes the order editable right up to the moment it is
+    confirmed.
 
     Returns the issued Invoice.
     """
@@ -519,9 +521,13 @@ def create_purchase_invoice_for_intake(current_account, lines, *, member=None, u
                     discount_rate=Decimal("0"),
                     tax_rate=Decimal("0"),
                 )
-            if invoice.currency_id != currency.pk:
-                invoice.currency = currency
-                invoice.save(update_fields=["currency", "updated_at"])
+            # The order keeps the date it was placed on; the debt starts
+            # today, when the goods are in, and its term runs from here.
+            received = invoice_date or date.today()
+            invoice.received_on = received
+            invoice.due_date = received + timedelta(days=current_account.payment_term_days or 30)
+            invoice.currency = currency
+            invoice.save(update_fields=["received_on", "due_date", "currency", "updated_at"])
             invoice.recompute_totals(save=True)
             invoice.refresh_from_db()
             invoice.issue(user=user)
@@ -530,13 +536,12 @@ def create_purchase_invoice_for_intake(current_account, lines, *, member=None, u
     with transaction.atomic():
         today = invoice_date or date.today()
         term_days = current_account.payment_term_days or 30
-        from datetime import timedelta
         inv = Invoice.objects.create(
             current_account=current_account, book=book,
             series="PUR",
             number=settings_obj.next_invoice_number(series="PUR"),
             type="purchase", status="draft",
-            date=today, due_date=today + timedelta(days=term_days),
+            date=today, received_on=today, due_date=today + timedelta(days=term_days),
             currency=currency,
             created_by=member,
         )

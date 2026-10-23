@@ -8907,6 +8907,12 @@ msgstr "Depoya henüz hiçbir şey girmedi. Onaylandığında mal kabul edilir v
 msgid "Order date"
 msgstr "Sipariş tarihi"
 
+msgid "Received on"
+msgstr "Teslim alınma tarihi"
+
+msgid "received on"
+msgstr "teslim alınma tarihi"
+
 msgid "Order — not yet received"
 msgstr "Sipariş — henüz teslim alınmadı"
 

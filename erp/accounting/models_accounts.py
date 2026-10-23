@@ -1053,6 +1053,10 @@ class Invoice(models.Model):
     date          = models.DateField()
     due_date      = models.DateField()
     delivery_date = models.DateField(null=True, blank=True)
+    # Purchases: the day the goods arrived. A purchase ORDER is dated when
+    # it was placed, but nothing is owed until the goods come in, so the
+    # supplier is charged on this date (posting_date), not on `date`.
+    received_on   = models.DateField(null=True, blank=True)
 
     # Optional link to an existing sales order
     order = models.ForeignKey(
@@ -1228,6 +1232,12 @@ class Invoice(models.Model):
             "proforma":        "invoice_sale",
         }[self.type]
 
+    @property
+    def posting_date(self):
+        """The date this invoice is charged to its account on: a purchase
+        on the day its goods arrived, everything else on its own date."""
+        return self.received_on or self.date
+
     def check_currency(self):
         """Refuse an invoice in a currency other than its account's.
 
@@ -1351,7 +1361,7 @@ class Invoice(models.Model):
         movement = CurrentAccountMovement.objects.create(
             current_account=self.current_account,
             book=self.book,
-            date=self.date,
+            date=self.posting_date,
             due_date=self.due_date,
             amount=amount_signed,
             currency=self.currency,
@@ -1396,7 +1406,8 @@ class Invoice(models.Model):
         mv = self.posted_movement
         if mv is None:
             mv = CurrentAccountMovement.objects.create(
-                current_account=self.current_account, book=self.book, date=self.date, due_date=self.due_date,
+                current_account=self.current_account, book=self.book, date=self.posting_date,
+                due_date=self.due_date,
                 amount=amount, currency=self.currency, movement_type=self.movement_type,
                 description=f"{self.get_type_display()} {self.display_number}",
                 reference=f"{self.display_number}",
@@ -1410,7 +1421,7 @@ class Invoice(models.Model):
 
         mv.amount = amount
         mv.amount_base = Decimal("0")    # force recompute on save
-        mv.date = self.date
+        mv.date = self.posting_date
         mv.due_date = self.due_date
         mv.currency = self.currency
         mv.description = f"{self.get_type_display()} {self.display_number}"

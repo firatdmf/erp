@@ -19,6 +19,7 @@ from .models_accounts import PurchaseChange
 FIELD_LABELS = {
     "date": "date",
     "delivery_date": "delivery date",
+    "received_on": "received on",
     "supplier": "supplier",
     "warehouse": "warehouse",
     "notes": "notes",
@@ -141,6 +142,7 @@ def snapshot_fields(invoice):
         return {
             "date": invoice.date.isoformat() if invoice.date else "",
             "delivery_date": invoice.delivery_date.isoformat() if invoice.delivery_date else "",
+            "received_on": invoice.received_on.isoformat() if invoice.received_on else "",
             "supplier": invoice.current_account.name if invoice.current_account_id else "",
             "warehouse": invoice.intake_warehouse.name if invoice.intake_warehouse_id else "",
             "notes": invoice.notes or "",
@@ -166,7 +168,7 @@ def decorate_changes(changes):
     """Attach the display strings the purchase page prints."""
     from django.utils.translation import gettext as _
     labels = {
-        "date": _("date"), "delivery_date": _("delivery date"),
+        "date": _("date"), "delivery_date": _("delivery date"), "received_on": _("received on"),
         "supplier": _("supplier"), "warehouse": _("warehouse"),
         "notes": _("notes"), "status": _("status"), "order": _("customer order"),
         "quantity": _("quantity"), "price": _("price"), "sale_price": _("sale price"),

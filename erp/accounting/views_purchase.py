@@ -414,6 +414,7 @@ class GoodsReceipt(View):
             "order_date": (doc.date.isoformat() if doc else date.today().isoformat()),
             "delivery_date": (doc.delivery_date.isoformat()
                               if doc and doc.delivery_date else ""),
+            "received_on": (invoice.posting_date.isoformat() if invoice else ""),
             "back_url": back_url,
             # The page's book, same as the warehouses: an account from any
             # other book would be refused on save (_intake_check_book).

@@ -653,6 +653,13 @@
           <label>{% trans "Expected delivery" %}</label>
           <input type="date" id="npDeliveryDate" class="np-input" value="{{ delivery_date }}">
         </div>
+        {% if edit_invoice %}
+        <!-- The supplier is charged on this day, not on the order date. -->
+        <div class="np-field">
+          <label>{% trans "Received on" %}</label>
+          <input type="date" id="npReceivedOn" class="np-input" value="{{ received_on }}">
+        </div>
+        {% endif %}
         <!-- The customer this is bought for. Saving creates their order,
              priced at each variant's sale price; receiving reserves the
              arriving rolls for it. Fixed once the order exists. -->
@@ -2928,6 +2935,8 @@
     payload.warehouse_id = npWhId();
     payload.date = (document.getElementById('npOrderDate') || {}).value || '';
     payload.delivery_date = (document.getElementById('npDeliveryDate') || {}).value || '';
+    const receivedOn = document.getElementById('npReceivedOn');
+    if (receivedOn) payload.received_on = receivedOn.value || '';
     payload.notes = (document.getElementById('npNotes') || {}).value || '';
     return payload;
   }

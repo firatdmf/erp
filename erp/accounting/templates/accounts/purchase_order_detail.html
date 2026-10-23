@@ -160,6 +160,12 @@
       <div class="po-card-l">{% trans "Date" %}</div>
       <div class="po-card-v">{{ invoice.date|date:"d.m.Y" }}</div>
     </div>
+    {% if invoice.received_on and invoice.received_on != invoice.date %}
+    <div class="po-card">
+      <div class="po-card-l">{% trans "Received on" %}</div>
+      <div class="po-card-v">{{ invoice.received_on|date:"d.m.Y" }}</div>
+    </div>
+    {% endif %}
     <div class="po-card">
       <div class="po-card-l">{% trans "Total" %}</div>
       <div class="po-card-v total">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|money }}</div>

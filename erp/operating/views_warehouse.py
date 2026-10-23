@@ -4535,7 +4535,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         # ── The document itself ──
         billing = invoice_currency_for(account)
         order_date = _parse_date(data.get("date")) or invoice.date
-        date_changed = order_date != invoice.date
+        posted_on = invoice.posting_date
         invoice.current_account = account
         if account_changed and account.book_id != invoice.book_id:
             # Numbers run per book, so the one it had could already belong
@@ -4543,9 +4543,14 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             invoice.book = account.book
             invoice.number = (CurrentAccountSettings.for_book(account.book)
                               .next_invoice_number(series=invoice.series or "PUR"))
-        if account_changed or date_changed:
-            invoice.due_date = order_date + timedelta(days=account.payment_term_days or 30)
         invoice.date = order_date
+        # The supplier is charged on the day the goods came in, and the
+        # term runs from there. A purchase received before that day was
+        # recorded has no received date and stays on its order date.
+        if "received_on" in data:
+            invoice.received_on = _parse_date(data.get("received_on")) or invoice.received_on
+        if account_changed or invoice.posting_date != posted_on:
+            invoice.due_date = invoice.posting_date + timedelta(days=account.payment_term_days or 30)
         if "delivery_date" in data:
             invoice.delivery_date = _parse_date(data.get("delivery_date"))
         if "notes" in data:

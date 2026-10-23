@@ -107,6 +107,20 @@ class ReceivedPurchaseEditTest(TestCase):
             warehouse_product=roll.product, quantity=Decimal(qty))
 
     # ── Loading ─────────────────────────────────────────────────────
+    def test_correcting_the_received_date_moves_the_charge(self):
+        r = self.client.get(reverse("accounts:goods_receipt_edit", args=[self.invoice_id]))
+        self.assertEqual(r.context["received_on"], self._invoice().received_on.isoformat())
+
+        form = dict(self._form(), received_on="2026-08-25")
+        r = self._save(form)
+        self.assertTrue(r.json()["success"], r.json())
+
+        inv = self._invoice()
+        self.assertEqual(str(inv.date), "2026-08-21")           # the order date stays
+        self.assertEqual(str(inv.received_on), "2026-08-25")
+        self.assertEqual(str(inv.posted_movement.date), "2026-08-25")
+        self.assertEqual(str(inv.due_date), "2026-09-24")       # 30 days from receipt
+
     def test_it_loads_as_the_forms_own_payload(self):
         form = self._form()
         card = form["products"][0]
@@ -149,6 +163,7 @@ class ReceivedPurchaseEditTest(TestCase):
 
     # ── The document ────────────────────────────────────────────────
     def test_dates_and_notes(self):
+        before = self._invoice()
         form = self._form()
         form.update(date="2026-08-25", delivery_date="2026-09-10", notes="arrived damaged")
         self.assertEqual(self._save(form).status_code, 200)
@@ -156,8 +171,9 @@ class ReceivedPurchaseEditTest(TestCase):
         self.assertEqual(str(inv.date), "2026-08-25")
         self.assertEqual(str(inv.delivery_date), "2026-09-10")
         self.assertEqual(inv.notes, "arrived damaged")
-        self.assertEqual(str(inv.due_date), "2026-09-24")              # 30-day term follows the date
-        self.assertEqual(str(inv.posted_movement.date), "2026-08-25")
+        # The charge stays on the day the goods came in, not the order date.
+        self.assertEqual(inv.due_date, before.due_date)
+        self.assertEqual(inv.posted_movement.date, before.received_on)
 
     def test_moving_it_to_another_account_moves_the_debt(self):
         other = CurrentAccount.objects.create(

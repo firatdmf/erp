@@ -2,6 +2,7 @@
 # python manage.py test accounting.test_purchase_order_flow
 
 import json
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -139,6 +140,18 @@ class PurchaseOrderFlowTest(TestCase):
         self.assertEqual(Invoice.objects.filter(type="purchase").count(), 1)
         for roll in WarehouseProductItem.objects.all():
             self.assertEqual(roll.purchase_invoice_item.invoice_id, inv_id)
+
+    def test_the_supplier_is_charged_on_the_day_the_goods_arrive(self):
+        # Ordered on 2026-08-21 (the plan's date), received today.
+        inv_id = self._save_order().json()["invoice_id"]
+        self.client.post(reverse("accounts:purchase_order_confirm", args=[inv_id]))
+
+        inv = Invoice.objects.get(pk=inv_id)
+        today = date.today()
+        self.assertEqual(str(inv.date), "2026-08-21")           # still the order date
+        self.assertEqual(inv.received_on, today)
+        self.assertEqual(inv.posted_movement.date, today)
+        self.assertEqual(inv.due_date, today + timedelta(days=30))
 
     def test_confirming_twice_is_refused(self):
         inv_id = self._save_order().json()["invoice_id"]

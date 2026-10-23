@@ -31,6 +31,10 @@
         {% if product.category.name %}
           <span class="pr-cat">{{ product.category.name|title }}</span>
         {% endif %}
+        <span class="pr-web {% if product.featured %}on{% else %}off{% endif %}"
+              title="{% if product.featured %}{% trans 'Shown on the storefront' %}{% else %}{% trans 'Hidden from the storefront' %}{% endif %}">
+          <i data-lucide="{% if product.featured %}eye{% else %}eye-off{% endif %}"></i>{% if product.featured %}{% trans "On storefront" %}{% else %}{% trans "Hidden" %}{% endif %}
+        </span>
         {% if product.variant_count %}
           <span class="pr-vars">
             <span class="pr-vars-l">{{ product.variant_count }} variants</span>

@@ -149,6 +149,12 @@ class ProductList(generic.ListView):
         if tag:
             queryset = queryset.filter(tags__contains=[tag])
 
+        # Shown on the storefront or not: the product's Featured tick, which
+        # a group following the stock-and-photo rule keeps up to date.
+        storefront = self.request.GET.get('storefront', '').strip()
+        if storefront in ('shown', 'hidden'):
+            queryset = queryset.filter(featured=storefront == 'shown')
+
         if category_id and category_id != 'all':
             if category_id == 'uncategorized':
                 queryset = queryset.filter(category__isnull=True)
@@ -209,6 +215,9 @@ class ProductList(generic.ListView):
         ctx['tag_filters'] = [
             {'name': name, 'count': tag_counts[name]} for name in sorted(tag_counts)]
         ctx['active_tag'] = self.request.GET.get('tag', '').strip()
+        ctx['active_storefront'] = self.request.GET.get('storefront', '').strip()
+        ctx['storefront_shown_count'] = Product.objects.filter(featured=True).count()
+        ctx['storefront_hidden_count'] = Product.objects.filter(featured=False).count()
 
         total_products = Product.objects.count()
         total_variants = ProductVariant.objects.count()
@@ -399,6 +408,13 @@ class ProductDetail(generic.DetailView):
             variant.stock_line_names = list(dict.fromkeys(
                 row.name for row in variant.warehouse_products.all() if row.name))
             variant.product = self.object   # its markup, without a query each
+        # Why the storefront hides a variant, said where it can be fixed:
+        # no stock, no photo of its own (the group's rule), or by hand.
+        from . import storefront_visibility
+        hidden = storefront_visibility.hidden_reasons(self.object)
+        for variant in variants:
+            variant.storefront_hidden = hidden.get(variant.pk)
+        context["storefront_rule_on"] = storefront_visibility.follows_rule(self.object)
         # Prices are worked out from cost: every variant's in one query.
         attach_live_costs(variants)
         context['product_variants'] = variants  # Cache variants

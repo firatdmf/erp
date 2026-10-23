@@ -282,6 +282,13 @@ def housekeep_now_and_then():
             delete_expired()
         except Exception as exc:
             print(f"[product_images] housekeeping stopped: {exc}")
+        # Same hour, the storefront ticks of rule-following groups: a stock
+        # change made by a bulk update sets off no signal to recheck them.
+        try:
+            from . import storefront_visibility
+            storefront_visibility.apply()
+        except Exception as exc:
+            print(f"[storefront_visibility] hourly recheck stopped: {exc}")
         finally:
             connection.close()
 

@@ -608,6 +608,13 @@
   font: 500 11px var(--font-sans); color: var(--gray-600);
   padding: 1px 8px; background: #F4F7FB; border-radius: 999px;
 }
+.pr-web {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: 500 11px var(--font-sans); padding: 1px 8px; border-radius: 999px;
+}
+.pr-web svg { width: 12px; height: 12px; }
+.pr-web.on { color: #147F74; background: #E9F5F3; }
+.pr-web.off { color: var(--gray-500); background: #F4F7FB; }
 .pr-vars {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 2px 9px 2px 5px;

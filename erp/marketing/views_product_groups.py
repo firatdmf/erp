@@ -84,6 +84,9 @@ def _fill_group_settings(group, request):
     group.care_instructions = (request.POST.get("care_instructions") or "").strip() or None
     group.care_instructions_tr = (request.POST.get("care_instructions_tr") or "").strip() or None
     group.hs_code = (request.POST.get("hs_code") or "").strip()[:20] or None
+    rule = request.POST.get("storefront_rule")
+    if rule in dict(ProductCategory.STOREFRONT_RULES):
+        group.storefront_rule = rule
     image_file = request.FILES.get("image")
     if image_file:
         group._image_file = image_file

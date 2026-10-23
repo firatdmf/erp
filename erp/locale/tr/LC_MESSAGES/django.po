@@ -14859,3 +14859,60 @@ msgstr "Bu siparişin iptali defter yöneticisinin onayını bekliyor — karar 
 
 msgid "%(action)s — waiting for a book admin's approval. Asked by %(who)s."
 msgstr "%(action)s — defter yöneticisinin onayını bekliyor. İsteyen: %(who)s."
+
+msgid "Set by hand"
+msgstr "Elle ayarlanır"
+
+msgid "In stock, with a photo of its own"
+msgstr "Stokta ve kendi fotoğrafı var"
+
+msgid "Which variants the storefront shows"
+msgstr "Mağazada hangi varyantlar gösterilir"
+
+msgid "Set by hand: each variant's Featured tick on the product page decides. In stock, with a photo of its own: a variant shows while it has stock and a photo attached to it (not only to its product), and hides when either runs out — the ticks follow by themselves. A product shows while any of its variants does."
+msgstr "Elle ayarlanır: ürün sayfasındaki her varyantın Öne Çıkan işareti karar verir. Stokta ve kendi fotoğrafı var: bir varyant, stoğu ve kendisine (yalnızca ürüne değil) eklenmiş bir fotoğrafı olduğu sürece gösterilir; biri bitince gizlenir — işaretler kendiliğinden güncellenir. Bir ürün, varyantlarından biri gösterildiği sürece gösterilir."
+
+msgid "Storefront"
+msgstr "Mağaza"
+
+msgid "Shown"
+msgstr "Gösterilen"
+
+msgid "Shown on the storefront"
+msgstr "Mağazada gösteriliyor"
+
+msgid "Hidden from the storefront"
+msgstr "Mağazada gizli"
+
+msgid "On storefront"
+msgstr "Mağazada"
+
+msgid "Hidden from storefront"
+msgstr "Mağazada gizli"
+
+msgid "Hidden: no stock"
+msgstr "Gizli: stok yok"
+
+msgid "Hidden: no photo of its own"
+msgstr "Gizli: kendi fotoğrafı yok"
+
+msgid "Hidden by hand"
+msgstr "Elle gizlendi"
+
+msgid "Its group shows a variant only while it has stock and a photo of its own."
+msgstr "Grubu, bir varyantı yalnızca stoğu ve kendi fotoğrafı olduğu sürece gösterir."
+
+msgid "Attach a photo to this variant (not only to the product) and it shows."
+msgstr "Bu varyanta (yalnızca ürüne değil) bir fotoğraf ekleyin, gösterilir."
+
+msgid "Its Featured tick is off on the product edit page."
+msgstr "Ürün düzenleme sayfasında Öne Çıkan işareti kapalı."
+
+msgid "Shown by the rule of its group: a variant in stock with a photo of its own."
+msgstr "Grubunun kuralıyla gösteriliyor: stokta ve kendi fotoğrafı olan bir varyant var."
+
+msgid "Hidden by the rule of its group: no variant has both stock and a photo of its own."
+msgstr "Grubunun kuralıyla gizli: hiçbir varyantın hem stoğu hem kendi fotoğrafı yok."
+
+msgid "Set by the group: shown while a variant has stock and a photo of its own. Ticks here are put back to that."
+msgstr "Grup belirler: bir varyantın stoğu ve kendi fotoğrafı olduğu sürece gösterilir. Buradaki işaretler buna geri döndürülür."

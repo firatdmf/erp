@@ -220,6 +220,20 @@ class ProductCategory(models.Model):
     # export paperwork for foreign B2B customers.
     hs_code = models.CharField(max_length=20, null=True, blank=True)
 
+    # Which of the group's variants the storefront shows. By hand: each
+    # variant's own Featured tick, as set on the product. By the rule: a
+    # variant shows while it has stock and a photo of its own, and the ticks
+    # are kept that way (marketing/storefront_visibility.py) — so a group
+    # whose shelves change daily needs nobody to tick and untick.
+    STOREFRONT_BY_HAND = "by_hand"
+    STOREFRONT_IN_STOCK_WITH_PHOTO = "in_stock_with_photo"
+    STOREFRONT_RULES = [
+        (STOREFRONT_BY_HAND, _lz("Set by hand")),
+        (STOREFRONT_IN_STOCK_WITH_PHOTO, _lz("In stock, with a photo of its own")),
+    ]
+    storefront_rule = models.CharField(
+        max_length=24, choices=STOREFRONT_RULES, default=STOREFRONT_BY_HAND)
+
     def save(self, *args, **kwargs):
         self.name = self.name.lower().strip().replace(" ", "_")
         image_file = getattr(self, "_image_file", None)

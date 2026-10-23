@@ -84,3 +84,40 @@ def delete_cdn_file(sender, instance, **kwargs):
 @receiver(pre_delete, sender="marketing.VariantAttributeValueImage")
 def delete_swatch_cdn_file(sender, instance, **kwargs):
     delete_from_cdn_after_commit(instance.image_url)
+
+
+# ── Storefront visibility follows stock and photos ──────────────────────
+# A group set to the rule keeps its Featured ticks in step with what each
+# variant has (marketing/storefront_visibility.py); these are the changes
+# that can move a variant across the line. Each recheck waits for the
+# commit and touches one product.
+from django.db.models.signals import post_delete  # noqa: E402
+
+from . import storefront_visibility  # noqa: E402
+
+
+@receiver(post_save, sender="operating.WarehouseProduct")
+@receiver(post_delete, sender="operating.WarehouseProduct")
+def storefront_follows_stock(sender, instance, **kwargs):
+    if instance.catalog_variant_id:
+        storefront_visibility.apply_after_commit(
+            ProductVariant.objects.filter(pk=instance.catalog_variant_id).values_list("product_id", flat=True))
+
+
+@receiver(post_save, sender=ProductFile)
+@receiver(post_delete, sender=ProductFile)
+def storefront_follows_photos(sender, instance, **kwargs):
+    if instance.product_variant_id:
+        storefront_visibility.apply_after_commit([instance.product_id])
+
+
+@receiver(post_save, sender=ProductVariant)
+@receiver(post_save, sender="marketing.Product")
+def storefront_follows_the_product(sender, instance, **kwargs):
+    storefront_visibility.apply_after_commit(
+        [instance.product_id if sender is ProductVariant else instance.pk])
+
+
+@receiver(post_save, sender="marketing.ProductCategory")
+def storefront_follows_the_group(sender, instance, **kwargs):
+    storefront_visibility.apply_after_commit(instance.product_set.values_list("pk", flat=True))

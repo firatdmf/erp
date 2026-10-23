@@ -497,7 +497,11 @@
         <div class="toggle-item">
           <div class="toggle-info">
             <span class="toggle-label">{% trans "Online Store" %}</span>
+            {% if product.category.storefront_rule == "in_stock_with_photo" %}
+            <span class="toggle-desc">{% trans "Set by the group: shown while a variant has stock and a photo of its own. Ticks here are put back to that." %}</span>
+            {% else %}
             <span class="toggle-desc">{% trans "Listed on website" %}</span>
+            {% endif %}
           </div>
           <label class="switch-container">
             {{ form.featured }}

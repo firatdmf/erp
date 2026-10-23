@@ -46,12 +46,22 @@ class SpellingTest(SimpleTestCase):
             with self.subTest(typed=typed):
                 self.assertEqual(normalize_attribute_value("size per panel", typed), "130 x 210 cm")
 
-    def test_other_values_are_lower_case_with_underscores(self):
-        self.assertEqual(normalize_attribute_value("model", "Rod Pocket"), "rod_pocket")
+    def test_other_values_are_lower_case_words(self):
+        self.assertEqual(normalize_attribute_value("header", "Rod Pocket"), "rod pocket")
+        self.assertEqual(normalize_attribute_value("header", "rod_pocket"), "rod pocket")
+
+    def test_a_value_nobody_worded_reads_as_words(self):
+        from marketing.attributes import value_label
+        self.assertEqual(value_label("silver+off white"), "Silver + off white")
+        self.assertEqual(value_label("dark_cream"), "Dark cream")  # an older spelling still reads
+
+    def test_a_combination_is_joined_by_a_plus(self):
+        for typed in ("Silver + Off White", "silver+off_white", "silver  +off white"):
+            self.assertEqual(normalize_attribute_value("color", typed), "silver+off white")
 
     def test_colors_are_spelled_the_american_way(self):
-        self.assertEqual(normalize_attribute_value("color", "Light Grey"), "light_gray")
-        self.assertEqual(normalize_attribute_value("model", "grey"), "grey")
+        self.assertEqual(normalize_attribute_value("color", "Light Grey"), "light gray")
+        self.assertEqual(normalize_attribute_value("fabric", "grey"), "grey")
 
 
 class StoredSpellingTest(TestCase):

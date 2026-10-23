@@ -7,8 +7,12 @@ catalog came to hold `color`, `Color` and `colır`, and "130 x 210cm" beside
 
 The storefront (demfirat) reads these as stored: it keys labels and filters
 on the attribute NAME (`color`, `header`, anything containing `size`) and
-parses sizes as "W x H cm" — so a size keeps its spaces, where every other
-value is lower_case_with_underscores.
+parses sizes as "W x H cm".
+
+A value is written in words: lower case, a space inside one name, "+"
+between the parts of a combination — "off white", "506 white+optic cord".
+"_" belongs to SKUs, where it is what a "+" becomes (`SILVER_OFFWHITE`);
+a value never holds one, so each character means one thing in each place.
 """
 import re
 
@@ -28,9 +32,11 @@ def is_size_attribute(name):
 def normalize_attribute_value(attribute_name, value):
     """The stored spelling of one value of `attribute_name`.
 
-    Sizes read "130 x 210 cm"; everything else "dark_cream". Colours use
-    American spelling ("gray"), which is what the storefront's colour map
-    and Muhammed both prefer.
+    Sizes read "130 x 210 cm"; everything else "dark cream", with "+"
+    joining the parts of a combination and no spaces around it
+    ("silver+off white"), whether it was typed "silver + Off_White" or
+    not. Colours use American spelling ("gray"), which is what the
+    storefront's colour map and Muhammed both prefer.
     """
     text = " ".join(str(value or "").split())
     if not text:
@@ -40,7 +46,8 @@ def normalize_attribute_value(attribute_name, value):
         if m:
             return f"{m.group(1)} x {m.group(2)} cm"
         return text.lower()
-    text = text.lower().replace(" ", "_")
+    text = " ".join(text.lower().replace("_", " ").split())
+    text = re.sub(r"\s*\+\s*", "+", text)
     if normalize_attribute_name(attribute_name) == "color":
         text = text.replace("grey", "gray")
     return text
@@ -124,8 +131,9 @@ def attribute_label(name, language=None):
 
 
 def value_label(value):
-    """How a stored value is shown: "dark_cream" → "Dark cream"."""
-    text = str(value or "").replace("_", " ")
+    """How a stored value is shown: "dark cream" → "Dark cream",
+    "gold+ecru" → "Gold + ecru". Still reads an older "dark_cream"."""
+    text = re.sub(r"\s*\+\s*", " + ", str(value or "").replace("_", " "))
     return text[:1].upper() + text[1:]
 
 

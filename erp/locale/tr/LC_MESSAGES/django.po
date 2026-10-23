@@ -14733,3 +14733,9 @@ msgstr "Bu paketin etiketini yazdır"
 
 msgid "Warehouse name"
 msgstr "Depodaki adı"
+
+msgid "Write each value in words. To combine colours, put + between them: gold+ecru, silver+off white."
+msgstr "Her değeri kelimelerle yazın. Renkleri birleştirmek için aralarına + koyun: gold+ecru, silver+off white."
+
+msgid "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320."
+msgstr "SKU değerlerden oluşturulur: boşluksuz büyük harfler, değerler arasında -, birleştirilen renkler arasında _ kullanılır. 320 cm gold+ecru → 2086.GOLD_ECRU-320."

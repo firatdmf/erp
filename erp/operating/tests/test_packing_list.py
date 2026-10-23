@@ -53,7 +53,7 @@ class PackingListColumns(TestCase):
                     # (attribute, value) is a shared lookup row.
                     value, _ = ProductVariantAttributeValue.objects.get_or_create(
                         product_variant_attribute=self.colour,
-                        product_variant_attribute_value="light_cream")
+                        product_variant_attribute_value="light cream")
                     variant.product_variant_attribute_values.add(value)
                 item = OrderItem.objects.create(
                     order=self.order, product=product, quantity=1, price=10,
@@ -87,7 +87,7 @@ class PackingListColumns(TestCase):
         self.assertEqual([r["item_no"] for r in rows], [1, 2, 3, 4])
 
     def test_rows_carry_the_variant(self):
-        """Attribute values are stored slugged (`light_cream`); the
+        """Attribute values are stored in lower case (`light cream`); the
         column prints them the way the warehouse picker does."""
         pack = self.order.packs.get(pack_number=1)
         self.assertEqual([r["variant"] for r in _pack_roll_rows(pack)],
@@ -100,7 +100,7 @@ class PackingListColumns(TestCase):
         v = ProductVariant.objects.create(
             product=Product.objects.first(), variant_sku="V-MULTI")
         width = ProductVariantAttribute.objects.create(name="width")
-        for attr, value in ((self.colour, "dark_beige"), (width, "150cm")):
+        for attr, value in ((self.colour, "dark beige"), (width, "150cm")):
             row, _ = ProductVariantAttributeValue.objects.get_or_create(
                 product_variant_attribute=attr,
                 product_variant_attribute_value=value)

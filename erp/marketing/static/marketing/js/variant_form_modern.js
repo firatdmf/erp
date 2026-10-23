@@ -31,8 +31,13 @@ function skuRuleMsg(key) {
 function skuParent() {
     return (document.getElementById('id_sku')?.value || '').trim().toUpperCase();
 }
+// One value's part of a SKU, the way the purchase form builds it too:
+// capitals, spaces and symbols dropped, "_" where the value has a "+"
+// ("silver+off white" → SILVER_OFFWHITE).
 function skuSuffixClean(text) {
-    return String(text || '').trim().toUpperCase().replace(/\s+/g, '_');
+    return String(text || '').split('+')
+        .map(p => p.toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/g, ''))
+        .filter(Boolean).join('_');
 }
 function skuSuffixFromValues(values) {
     return values.map(skuSuffixClean).filter(Boolean).join('-');
@@ -162,6 +167,7 @@ function loadExistingVariants() {
                         </div>
                         <div class="option_values_section">
                             <label>${(window.VARIANT_T && window.VARIANT_T.option_values) || 'Option Values'}</label>
+                ${window.VARIANT_T && window.VARIANT_T.values_hint ? `<p class="sku-hint" style="margin:2px 0 8px;">${window.VARIANT_T.values_hint}</p>` : ''}
                             <div class="option_values_list" id="${optionId}_values"></div>
                             <button type="button" class="btn_add_value" onclick="addValueField('${optionId}')">
                                 <i class="fa fa-plus"></i> ${(window.VARIANT_T && window.VARIANT_T.add_value) || 'Add another value'}
@@ -372,6 +378,7 @@ function addNewOption() {
             </div>
             <div class="option_values_section">
                 <label>${(window.VARIANT_T && window.VARIANT_T.option_values) || 'Option Values'}</label>
+                ${window.VARIANT_T && window.VARIANT_T.values_hint ? `<p class="sku-hint" style="margin:2px 0 8px;">${window.VARIANT_T.values_hint}</p>` : ''}
                 <div class="option_values_list" id="${optionId}_values"></div>
                 <button type="button" class="btn_add_value" onclick="addValueField('${optionId}')">
                     <i class="fa fa-plus"></i> ${(window.VARIANT_T && window.VARIANT_T.add_value) || 'Add another value'}

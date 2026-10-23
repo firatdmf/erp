@@ -1313,6 +1313,7 @@
       '<div class="np-variants-wrap">' +
         '<div class="np-variants"></div>' +
         '<button type="button" class="np-add-variant" onclick="npAddVariant(this.closest(\'.np-product-card\'))"><i class="fa fa-plus"></i> {% trans "Add variant" %}</button>' +
+        '<div class="np-hint">{% trans "Write each value in words. To combine colours, put + between them: gold+ecru, silver+off white."|escapejs %} {% trans "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320."|escapejs %}</div>' +
       '</div>';
     // A delivery is mostly one kind of goods, so a new product starts on
     // the unit of the one above it.

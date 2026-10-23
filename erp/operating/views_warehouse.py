@@ -1881,7 +1881,8 @@ class WarehouseDetail(View):
             # reader (see the row template) — fetched with the page.
             flat = (WarehouseProduct.with_stock_costs(base_qs)
                     .select_related('catalog_variant__product')
-                    .prefetch_related('catalog_variant__product_variant_attribute_values__product_variant_attribute')
+                    .prefetch_related('catalog_variant__product_variant_attribute_values__product_variant_attribute',
+                                      variant_photos_prefetch())
                     .annotate(base=base_expr,
                               roll_count=stock_item_count_subquery(),
                               line_usd=F('stock_value'),
@@ -2300,7 +2301,8 @@ def warehouse_group_variants(request, pk):
               WarehouseProduct.objects.filter(warehouse_id__in=warehouse.scope_ids()))
           .select_related("catalog_variant__product",
                           "warehouse__accounting_book__base_currency")
-          .prefetch_related("catalog_variant__product_variant_attribute_values__product_variant_attribute")
+          .prefetch_related("catalog_variant__product_variant_attribute_values__product_variant_attribute",
+                            variant_photos_prefetch())
           .annotate(base=base_expr,
                     roll_count=stock_item_count_subquery(),
                     line_usd=F("stock_value"),
@@ -2363,7 +2365,7 @@ def warehouse_roll_photo(request, warehouse_pk, roll_pk):
 
 
 def _warehouse_col_count(warehouse, user):
-    """Columns in the warehouse product table — 6, plus the Location
+    """Columns in the warehouse product table — 6 (photo first), plus the Location
     column a combined (ortak) warehouse adds to say which member holds
     each row, less the cost Total column a sales rep is not shown.
     Full-width cells span this."""
@@ -6320,6 +6322,20 @@ def reserved_meters_subquery():
         Subquery(sq, output_field=_DF(max_digits=18, decimal_places=2)),
         Decimal("0"), output_field=_DF(max_digits=18, decimal_places=2),
     )
+
+
+def variant_photos_prefetch():
+    """Each row's catalog variant's own photos as `photos`, primary first —
+    the order the catalog shows them in. The row's thumbnail is
+    `photos.0`; a variant without a photo of its own shows none, never
+    its parent product's."""
+    from django.db.models import Prefetch
+    from marketing.models import ProductFile
+    return Prefetch(
+        "catalog_variant__files",
+        queryset=ProductFile.objects.filter(file_type="image")
+        .order_by("-is_primary", "sequence", "id"),
+        to_attr="photos")
 
 
 def stock_item_count_subquery():

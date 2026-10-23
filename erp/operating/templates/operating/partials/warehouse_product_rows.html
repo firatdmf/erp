@@ -19,23 +19,22 @@ links so that keeps working.{% endcomment %}
   on the row (not just SKU or Name). Nested anchors are invalid HTML —
   the SKU cell's external "Open linked product" link stays a sibling
   outside the row-link wrapper.{% endcomment %}
+  <td class="wh-photo-cell{% if not p.catalog_variant_id %} is-blank{% endif %}">{% include "operating/partials/_wh_variant_thumb.html" %}</td>
   <td class="wh-chev-cell" data-label="SKU">
     <i class="fa fa-chevron-right wh-vrow-chev{% if not p.roll_count %} is-empty{% endif %}"
        title="{% blocktrans with n=p.item_noun_plural %}Show the {{ n }} in this product{% endblocktrans %}"></i>
     <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link{% if not p.is_merged %} wh-cell-nav{% endif %}" style="text-decoration:none; color:inherit;">
       {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     </a>
-  </td>
-  <td data-label="{% trans 'Catalog' %}">
+    {% comment %}The catalog product under the SKU pill, rather than a column
+    of its own: it is the part of the SKU before the dot, and the table has
+    no width to spare for saying it twice.{% endcomment %}
     {% if p.catalog_variant_id and p.catalog_variant.product_id %}
       <a href="{% url 'marketing:product_detail' p.catalog_variant.product_id %}"
-         target="_blank" rel="noopener"
-         class="wh-cell-link catalog-link"
+         target="_blank" rel="noopener" class="catalog-link wh-sku-catalog"
          title="{% trans 'Open linked product' %}: {{ p.catalog_variant.product.title }}">
         <i class="fa fa-up-right-from-square"></i> {{ p.catalog_variant.product.sku|default:p.catalog_variant.product.title }}
       </a>
-    {% else %}
-      <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="color:#C5CCD3;">—</a>
     {% endif %}
   </td>
   <td data-label="{% trans 'Name' %}">

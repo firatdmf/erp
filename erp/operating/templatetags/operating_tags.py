@@ -72,3 +72,13 @@ def cost_in_base(value, order):
     in_base = (amount * Decimal(str(rate))).quantize(Decimal("0.01"))
     return format_html('{}{} <span class="od-in-cur">({})</span>',
                        base_symbol, floatformat(in_base, "2g"), own)
+
+
+@register.filter
+def photos_json(files):
+    """A variant's photos as JSON for the warehouse photo viewer:
+    [{"src": …, "alt": …}], in the order given. Autoescape makes it safe
+    inside an attribute."""
+    import json
+    return json.dumps([{"src": f.file_url, "alt": f.alt_text or ""}
+                       for f in files or ()])

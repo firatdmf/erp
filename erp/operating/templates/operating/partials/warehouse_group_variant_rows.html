@@ -7,10 +7,8 @@ warehouse page lists member warehouses' rows.{% endcomment %}
 variant's rolls, the SKU pill opens the product.{% endcomment %}
 <tr class="wh-vrow wh-vrow-nested" style="cursor:pointer;" data-roll-count="{{ p.roll_count|default:0 }}"
     onclick="toggleWhRolls(event, this, '{% if p.is_merged %}{% url 'operating:warehouse_merged_rolls' warehouse.pk %}?ids={{ p.member_ids }}{% else %}{% url 'operating:warehouse_product_rolls' warehouse.pk p.pk %}{% endif %}')">
-  {% comment %}Spans SKU + Catalog: this cell carries both (the catalog link
-  sits inline here rather than in its own column), and without the span every
-  nested row sat one column left of the headings it belongs under.{% endcomment %}
-  <td class="wh-vrow-sku wh-chev-cell" colspan="2" data-label="SKU">
+  <td class="wh-photo-cell{% if not p.catalog_variant_id %} is-blank{% endif %}">{% include "operating/partials/_wh_variant_thumb.html" %}</td>
+  <td class="wh-vrow-sku wh-chev-cell" data-label="SKU">
     <i class="fa fa-chevron-right wh-vrow-chev{% if not p.roll_count %} is-empty{% endif %}"
        title="{% trans 'Show the rolls in this product' %}"></i>
     <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link{% if not p.is_merged %} wh-cell-nav{% endif %}" style="text-decoration:none; color:inherit;">
@@ -19,8 +17,8 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
     {% if p.catalog_variant_id and p.catalog_variant.product_id %}
       <a href="{% url 'marketing:product_detail' p.catalog_variant.product_id %}"
          onclick="event.stopPropagation();" target="_blank" rel="noopener"
-         title="{% trans 'Open linked product' %}: {{ p.catalog_variant.product.title }}"
-         style="margin-left:6px; color:#147F74; text-decoration:none; font-size:12px; white-space:nowrap;">
+         class="catalog-link wh-sku-catalog"
+         title="{% trans 'Open linked product' %}: {{ p.catalog_variant.product.title }}">
         <i class="fa fa-up-right-from-square"></i> {{ p.catalog_variant.product.sku|default:p.catalog_variant.product.title }}
       </a>
     {% endif %}

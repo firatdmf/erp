@@ -1,0 +1,22 @@
+{% load i18n %}
+{% load operating_tags %}
+{% comment %}The catalog variant's own primary photo, in the row's first
+column (photos come from variant_photos_prefetch). A row not linked to the
+catalog shows nothing; a linked variant with no photo of its own shows an
+empty frame. Never the parent product's photo: it would show a colour the
+row does not hold. A click opens every photo of the variant in the viewer
+(whPhotoOpen); it does not expand the row.{% endcomment %}
+{% if p.catalog_variant_id %}
+{% with photos=p.catalog_variant.photos %}
+{% if photos %}
+<button type="button" class="wh-thumb" data-photos="{{ photos|photos_json }}"
+        onclick="event.stopPropagation(); whPhotoOpen(this);"
+        title="{% blocktrans count n=photos|length %}{{ n }} photo{% plural %}{{ n }} photos{% endblocktrans %}">
+  <img src="{{ photos.0.thumbnail_url }}" alt="{{ photos.0.alt_text|default:p.name }}" loading="lazy">
+  {% if photos|length > 1 %}<span class="wh-thumb-n">{{ photos|length }}</span>{% endif %}
+</button>
+{% else %}
+<span class="wh-thumb is-empty" title="{% trans 'No photo of this variant yet' %}"><i class="fa fa-image"></i></span>
+{% endif %}
+{% endwith %}
+{% endif %}

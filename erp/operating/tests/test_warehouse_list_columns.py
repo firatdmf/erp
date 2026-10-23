@@ -430,3 +430,51 @@ class CombinedWarehouseMergesTheSameSku(TestCase):
         self._stock(self.store, "A", "100", "4.00")
         resp = self.client.get(reverse("operating:warehouse_detail", args=[self.store.pk]))
         self.assertEqual(len(self._rows(resp.content.decode())), 1)
+
+
+class RowsShowTheVariantsOwnPhoto(TestCase):
+    """A row's thumbnail is its catalog variant's primary photo. A variant
+    with no photo of its own shows an empty frame, not its product's."""
+
+    def setUp(self):
+        from marketing.models import Product, ProductFile, ProductVariant
+        usd = CurrencyCategory.objects.create(
+            code="USD", name="US Dollar", symbol="$")
+        book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
+        self.wh = Warehouse.objects.create(name="Ergene Fabrika", accounting_book=book)
+        product = Product.objects.create(title="GREK", sku="GREK")
+        ProductFile.objects.create(product=product, file_url="https://cdn.test/parent.avif",
+                                   is_primary=True)
+        shown = ProductVariant.objects.create(product=product, variant_sku="GREK.WHITE")
+        ProductFile.objects.create(product_variant=shown, file_url="https://cdn.test/second.avif",
+                                   sequence=0)
+        ProductFile.objects.create(product_variant=shown, file_url="https://cdn.test/white.avif",
+                                   is_primary=True, sequence=1)
+        bare = ProductVariant.objects.create(product=product, variant_sku="GREK.ECRU")
+        for v in (shown, bare):
+            WarehouseProduct.objects.create(
+                warehouse=self.wh, name=v.variant_sku, sku=v.variant_sku,
+                catalog_variant=v, quantity=Decimal("10"))
+
+        user = get_user_model().objects.create_user("wh", password="pw")
+        user.member.books.add(book)
+        user.member.default_book = book
+        user.member.save()
+        self.client.force_login(user)
+
+    def _check(self, html):
+        # The thumbnail is the primary photo; the viewer holds every photo
+        # of the variant, primary first; the product's own photo is nowhere.
+        self.assertIn('src="https://cdn.test/white.avif"', html)
+        self.assertLess(html.index("white.avif"), html.index("second.avif"))
+        self.assertNotIn("parent.avif", html)
+        self.assertEqual(html.count("wh-thumb is-empty"), 1)
+
+    def test_primary_photo_shown_and_parent_photo_never(self):
+        self._check(self.client.get(
+            reverse("operating:warehouse_detail", args=[self.wh.pk])).content.decode())
+
+    def test_rows_under_a_main_product_show_it_too(self):
+        self._check(self.client.get(
+            reverse("operating:warehouse_group_variants", args=[self.wh.pk]),
+            {"base": "GREK"}).content.decode())

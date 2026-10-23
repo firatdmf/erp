@@ -320,9 +320,14 @@
     color: inherit; text-decoration: none;
   }
   .od-prods td.num .wh-cell-link { text-align: right; }
-  /* "Catalog" cell — the external product link uses the wh-cell-link
-     class to inherit the full-cell padding, but keeps its brand color. */
-  .od-prods .wh-cell-link.catalog-link { color: #147F74; font-size: 12px; white-space: nowrap; }
+  /* The catalog product, tucked under the SKU pill in the same cell; its
+     left edge follows the pill's, past the chevron. */
+  .od-prods .wh-sku-catalog {
+    display: block; margin-top: -7px; padding: 0 10px 11px 30px;
+    color: #147F74; font-size: 12px; white-space: nowrap; text-decoration: none;
+  }
+  .od-prods .wh-sku-catalog:hover { text-decoration: underline; }
+  .od-prods tbody td.wh-vrow-sku > .wh-sku-catalog { padding-left: 54px; }
   .od-prods th {
     font: 700 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--gray-500); background: transparent; border-bottom: 1px solid #E2E8EE;
@@ -357,6 +362,49 @@
   .od-prods .wh-loc-member + .wh-loc-member { margin-top: 3px; }
   .od-prods .wh-loc-qty { font-weight: 500; opacity: 0.8; margin-left: 4px; }
   .od-prods .wh-other-name { color: #94A3B8; }
+  /* The variant's own photo, in its own column on the far left. A linked
+     variant without one keeps an empty frame, so the gaps are easy to spot. */
+  .od-prods .wh-photo-cell,
+  .od-prods tbody td.wh-photo-cell { width: 44px; padding: 6px 0 6px 10px; }
+  .od-prods .wh-thumb {
+    position: relative; width: 44px; height: 44px;
+    padding: 0; border-radius: 6px; overflow: hidden; cursor: zoom-in;
+    display: flex; align-items: center; justify-content: center;
+    background: #F4F7FA; border: 1px solid #E2E8EE;
+  }
+  .od-prods .wh-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .od-prods .wh-thumb.is-empty { color: #CBD5E1; font-size: 14px; cursor: default; }
+  .od-prods .wh-thumb-n {
+    position: absolute; right: 2px; bottom: 2px; padding: 0 4px; border-radius: 4px;
+    background: rgba(15, 20, 25, .7); color: #fff; font: 700 10px/14px var(--font-sans);
+  }
+
+  /* Photo viewer: every photo of one variant, swiped or arrowed through. */
+  .wh-ph { position: fixed; inset: 0; z-index: 3000; display: none;
+           background: rgba(10, 14, 20, .92); }
+  .wh-ph.show { display: block; }
+  .wh-ph-track {
+    position: absolute; inset: 0; display: flex; overflow-x: auto;
+    scroll-snap-type: x mandatory; scrollbar-width: none;
+  }
+  .wh-ph-track::-webkit-scrollbar { display: none; }
+  .wh-ph-slide {
+    flex: 0 0 100%; scroll-snap-align: center;
+    display: flex; align-items: center; justify-content: center; padding: 56px 64px;
+  }
+  .wh-ph-slide img { max-width: 100%; max-height: 100%; object-fit: contain;
+                     border-radius: 6px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  .wh-ph button {
+    position: absolute; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+    width: 44px; height: 44px; background: rgba(255,255,255,.12); color: #fff; font-size: 18px;
+  }
+  .wh-ph button:hover { background: rgba(255,255,255,.24); }
+  .wh-ph-close { top: 12px; right: 12px; }
+  .wh-ph-prev { left: 12px; top: 50%; transform: translateY(-50%); }
+  .wh-ph-next { right: 12px; top: 50%; transform: translateY(-50%); }
+  .wh-ph button[hidden] { display: none; }
+  .wh-ph-count { position: absolute; top: 22px; left: 0; right: 0; text-align: center;
+                 color: #E2E8F0; font: 600 13px var(--font-sans); pointer-events: none; }
   .od-prods .wh-rolls-section + .wh-rolls-section { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #E2E8F0; }
   .od-prods .wh-rolls-count .wh-loc-name { margin-right: 6px; }
   .od-prods .wh-loc-link:hover { background: #EDE9FE; border-color: #C9BCF6; }
@@ -614,6 +662,11 @@
        as the first flex item of the SKU/title row instead. */
     .od-prods tbody td.wh-chev-cell > .wh-cell-link,
     .od-prods tbody td.wh-vrow-sku > .wh-cell-link { padding-left: 0; }
+    /* The photo heads the card, above its SKU. */
+    .od-prods tr.wh-vrow td.wh-photo-cell { justify-content: flex-start; padding: 0 0 8px; }
+    .od-prods tr.wh-vrow td.wh-photo-cell.is-blank { display: none; }
+    .od-prods tbody td > .wh-sku-catalog,
+    .od-prods tbody td.wh-vrow-sku > .wh-sku-catalog { margin: 0 0 0 auto; padding: 0; align-self: center; }
     .wh-vrow-chev {
       position: static; transform: none; align-self: center;
       margin-right: 9px; font-size: 12px;
@@ -1645,8 +1698,8 @@
           <table class="od-prods">
             <thead>
               <tr>
+                <th class="wh-photo-cell" aria-label="{% trans 'Photo' %}"></th>
                 <th>{% trans "SKU" %}</th>
-                <th>{% trans "Catalog" %}</th>
                 <th>{% trans "Name" %}</th>
                 {% comment %}A combined (ortak) warehouse lists its members'
                 stock in one table, so every row has to say WHICH shelf it is
@@ -1836,6 +1889,15 @@
     </button>
     {% endif %}
   </div>
+</div>
+
+<!-- Photo viewer (whPhotoOpen) -->
+<div class="wh-ph" id="whPhotos" role="dialog" aria-modal="true" aria-label="{% trans 'Photos' %}">
+  <div class="wh-ph-track" id="whPhotosTrack"></div>
+  <div class="wh-ph-count" id="whPhotosCount"></div>
+  <button type="button" class="wh-ph-close" onclick="whPhotoClose()" aria-label="{% trans 'Close' %}"><i class="fa fa-xmark"></i></button>
+  <button type="button" class="wh-ph-prev" onclick="whPhotoStep(-1)" aria-label="{% trans 'Previous' %}"><i class="fa fa-chevron-left"></i></button>
+  <button type="button" class="wh-ph-next" onclick="whPhotoStep(1)" aria-label="{% trans 'Next' %}"><i class="fa fa-chevron-right"></i></button>
 </div>
 
 <!-- Import Modal -->
@@ -2532,6 +2594,55 @@
     return (s || '').charAt(0).toUpperCase() + (s || '').slice(1);
   }
 
+  // ── Photo viewer ── one variant's photos side by side in a snap-scrolling
+  // track: swipe or trackpad-scroll on its own, arrows and keys step it.
+  const whPh = document.getElementById('whPhotos');
+  const whPhTrack = document.getElementById('whPhotosTrack');
+  function whPhotoIndex() {
+    return Math.round(whPhTrack.scrollLeft / (whPhTrack.clientWidth || 1));
+  }
+  function whPhotoSync() {
+    const n = whPhTrack.children.length, i = whPhotoIndex();
+    document.getElementById('whPhotosCount').textContent = n > 1 ? (i + 1) + ' / ' + n : '';
+    whPh.querySelector('.wh-ph-prev').hidden = i <= 0;
+    whPh.querySelector('.wh-ph-next').hidden = i >= n - 1;
+  }
+  function whPhotoOpen(btn) {
+    const photos = JSON.parse(btn.dataset.photos || '[]');
+    whPhTrack.replaceChildren(...photos.map(function (ph) {
+      const slide = document.createElement('div');
+      slide.className = 'wh-ph-slide';
+      const img = document.createElement('img');
+      img.src = ph.src; img.alt = ph.alt;
+      slide.appendChild(img);
+      return slide;
+    }));
+    whPh.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    whPhTrack.scrollLeft = 0;
+    whPhotoSync();
+  }
+  function whPhotoClose() {
+    whPh.classList.remove('show');
+    document.body.style.overflow = '';
+    whPhTrack.replaceChildren();
+  }
+  function whPhotoStep(d) {
+    whPhTrack.scrollTo({ left: (whPhotoIndex() + d) * whPhTrack.clientWidth, behavior: 'smooth' });
+  }
+  whPhTrack.addEventListener('scroll', whPhotoSync, { passive: true });
+  // A click on the dark around the photo closes, as on the photo itself
+  // it does not.
+  whPhTrack.addEventListener('click', function (e) {
+    if (e.target.tagName !== 'IMG') whPhotoClose();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!whPh.classList.contains('show')) return;
+    if (e.key === 'Escape') whPhotoClose();
+    else if (e.key === 'ArrowLeft') whPhotoStep(-1);
+    else if (e.key === 'ArrowRight') whPhotoStep(1);
+  });
+
   function toggleWhRolls(evt, rowEl, url) {
     // Let real navigation through: the SKU / catalog links, and any
     // ctrl/cmd/shift/middle-click anywhere on the row.
@@ -2555,9 +2666,9 @@
     const groupCls = Array.from(rowEl.classList).filter(function (c) {
       return c.indexOf('whg-rows-') === 0;
     });
-    // Header cell count, not this row's: a nested (grouped) row spans SKU
-    // and Catalog in one cell, so counting its cells came up short and the
-    // spinner sat in a half-width box.
+    // Header cell count, not this row's: a group's row spans several
+    // columns in one cell, so counting a row's cells can come up short and
+    // leave the spinner in a half-width box.
     const cols = rowEl.closest('table').tHead.rows[0].cells.length;
     rowEl.insertAdjacentHTML('afterend',
       '<tr class="wh-rollrow wh-rolls-loading"><td colspan="' + cols + '" '

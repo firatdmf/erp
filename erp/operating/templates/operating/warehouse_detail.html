@@ -386,25 +386,42 @@
   .wh-ph-track {
     position: absolute; inset: 0; display: flex; overflow-x: auto;
     scroll-snap-type: x mandatory; scrollbar-width: none;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   }
   .wh-ph-track::-webkit-scrollbar { display: none; }
   .wh-ph-slide {
-    flex: 0 0 100%; scroll-snap-align: center;
+    flex: 0 0 100%; box-sizing: border-box; min-width: 0; scroll-snap-align: center;
     display: flex; align-items: center; justify-content: center; padding: 56px 64px;
   }
-  .wh-ph-slide img { max-width: 100%; max-height: 100%; object-fit: contain;
+  .wh-ph-slide img { max-width: 100%; max-height: 100%; min-width: 0; object-fit: contain;
                      border-radius: 6px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  /* base.css makes every <button> a padded, bordered inline-flex with
+     `transition: all` — undone here, or the icons sit off-centre and the
+     arrows slide about as their transform changes. */
   .wh-ph button {
-    position: absolute; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
-    width: 44px; height: 44px; background: rgba(255,255,255,.12); color: #fff; font-size: 18px;
+    position: absolute; z-index: 1; padding: 0; margin: 0; border: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    width: 44px; height: 44px; background: rgba(255,255,255,.14); color: #fff;
+    font-size: 18px; line-height: 1; transition: background-color .15s;
   }
-  .wh-ph button:hover { background: rgba(255,255,255,.24); }
+  .wh-ph button:hover { background: rgba(255,255,255,.26); border: 0; }
   .wh-ph-close { top: 12px; right: 12px; }
   .wh-ph-prev { left: 12px; top: 50%; transform: translateY(-50%); }
   .wh-ph-next { right: 12px; top: 50%; transform: translateY(-50%); }
   .wh-ph button[hidden] { display: none; }
   .wh-ph-count { position: absolute; top: 22px; left: 0; right: 0; text-align: center;
                  color: #E2E8F0; font: 600 13px var(--font-sans); pointer-events: none; }
+  /* Phones: the photo takes the full width (swiping is the way through),
+     and the arrows and counter share one bar under it, clear of the photo
+     and of the home indicator. */
+  @media (max-width: 640px) {
+    .wh-ph-slide { padding: calc(64px + env(safe-area-inset-top)) 8px calc(84px + env(safe-area-inset-bottom)); }
+    .wh-ph-close { top: calc(10px + env(safe-area-inset-top)); right: 10px; }
+    .wh-ph-prev, .wh-ph-next { top: auto; transform: none; bottom: calc(18px + env(safe-area-inset-bottom)); }
+    .wh-ph-prev { left: 16px; }
+    .wh-ph-next { right: 16px; }
+    .wh-ph-count { top: auto; bottom: calc(31px + env(safe-area-inset-bottom)); }
+  }
   .od-prods .wh-rolls-section + .wh-rolls-section { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #E2E8F0; }
   .od-prods .wh-rolls-count .wh-loc-name { margin-right: 6px; }
   .od-prods .wh-loc-link:hover { background: #EDE9FE; border-color: #C9BCF6; }

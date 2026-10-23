@@ -37,10 +37,10 @@ attribute a preset can pick from).
   <div class="pgd-field">
     <label>{% trans "Which variants the storefront shows" %}</label>
     <select class="pgd-input" name="storefront_rule">
-      <option value="by_hand" {% if not group or group.storefront_rule == 'by_hand' %}selected{% endif %}>{% trans "Set by hand" %}</option>
-      <option value="in_stock_with_photo" {% if group.storefront_rule == 'in_stock_with_photo' %}selected{% endif %}>{% trans "In stock, with a photo of its own" %}</option>
+      <option value="in_stock_with_photo" {% if not group or group.storefront_rule == 'in_stock_with_photo' %}selected{% endif %}>{% trans "In stock, with a photo of its own" %}</option>
+      <option value="with_photo" {% if group.storefront_rule == 'with_photo' %}selected{% endif %}>{% trans "With a photo of its own" %}</option>
     </select>
-    <div class="pgd-hint">{% trans "Set by hand: each variant's Featured tick on the product page decides. In stock, with a photo of its own: a variant shows while it has stock and a photo attached to it (not only to its product), and hides when either runs out — the ticks follow by themselves. A product shows while any of its variants does." %}</div>
+    <div class="pgd-hint">{% trans "In stock, with a photo of its own: a variant shows while it has stock and a photo attached to it (not only to its product), and hides when either runs out. With a photo of its own: the same, whether or not it is in stock. The Featured ticks follow by themselves; a product shows while any of its variants does." %}</div>
   </div>
 </div>
 

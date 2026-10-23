@@ -37,9 +37,9 @@
         <span class="badge badge-category">{{ product.category.name|title }}</span>
         {% endif %}
         {% if product.featured %}
-        <span class="badge badge-featured"{% if storefront_rule_on %} title="{% trans 'Shown by the rule of its group: a variant in stock with a photo of its own.' %}"{% endif %}><i class="fa fa-eye"></i> {% trans "On storefront" %}</span>
+        <span class="badge badge-featured"{% if storefront_rule_on %} title="{% trans 'Shown by the rule of its group.' %}"{% endif %}><i class="fa fa-eye"></i> {% trans "On storefront" %}</span>
         {% else %}
-        <span class="badge badge-regular"{% if storefront_rule_on %} title="{% trans 'Hidden by the rule of its group: no variant has both stock and a photo of its own.' %}"{% endif %}><i class="fa fa-eye-slash"></i> {% trans "Hidden from storefront" %}</span>
+        <span class="badge badge-regular"{% if storefront_rule_on %} title="{% trans 'Hidden by the rule of its group: no variant meets it.' %}"{% endif %}><i class="fa fa-eye-slash"></i> {% trans "Hidden from storefront" %}</span>
         {% endif %}
         {% record_sharing "product" product False %}
       </div>
@@ -357,7 +357,7 @@
               {% if not variant.storefront_hidden %}
               <span class="badge badge-featured">{% trans "On storefront" %}</span>
               {% elif variant.storefront_hidden == "no_stock" %}
-              <span class="badge badge-regular" title="{% trans 'Its group shows a variant only while it has stock and a photo of its own.' %}">{% trans "Hidden: no stock" %}</span>
+              <span class="badge badge-regular" title="{% trans 'Its group shows a variant only while it has stock.' %}">{% trans "Hidden: no stock" %}</span>
               {% elif variant.storefront_hidden == "no_photo" %}
               <span class="badge badge-regular" title="{% trans 'Attach a photo to this variant (not only to the product) and it shows.' %}">{% trans "Hidden: no photo of its own" %}</span>
               {% else %}

@@ -220,19 +220,19 @@ class ProductCategory(models.Model):
     # export paperwork for foreign B2B customers.
     hs_code = models.CharField(max_length=20, null=True, blank=True)
 
-    # Which of the group's variants the storefront shows. By hand: each
-    # variant's own Featured tick, as set on the product. By the rule: a
-    # variant shows while it has stock and a photo of its own, and the ticks
-    # are kept that way (marketing/storefront_visibility.py) — so a group
-    # whose shelves change daily needs nobody to tick and untick.
-    STOREFRONT_BY_HAND = "by_hand"
+    # Which of the group's variants the storefront shows: a variant shows
+    # while it has a photo of its own — and stock, under the stricter rule —
+    # and its Featured tick is kept that way (marketing/storefront_visibility.py),
+    # so nobody ticks and unticks as shelves and photos change. Photo only
+    # suits goods made to order or shown while out of stock.
     STOREFRONT_IN_STOCK_WITH_PHOTO = "in_stock_with_photo"
+    STOREFRONT_WITH_PHOTO = "with_photo"
     STOREFRONT_RULES = [
-        (STOREFRONT_BY_HAND, _lz("Set by hand")),
         (STOREFRONT_IN_STOCK_WITH_PHOTO, _lz("In stock, with a photo of its own")),
+        (STOREFRONT_WITH_PHOTO, _lz("With a photo of its own")),
     ]
     storefront_rule = models.CharField(
-        max_length=24, choices=STOREFRONT_RULES, default=STOREFRONT_BY_HAND)
+        max_length=24, choices=STOREFRONT_RULES, default=STOREFRONT_IN_STOCK_WITH_PHOTO)
 
     def save(self, *args, **kwargs):
         self.name = self.name.lower().strip().replace(" ", "_")

@@ -14916,3 +14916,21 @@ msgstr "Grubunun kuralıyla gizli: hiçbir varyantın hem stoğu hem kendi foto�
 
 msgid "Set by the group: shown while a variant has stock and a photo of its own. Ticks here are put back to that."
 msgstr "Grup belirler: bir varyantın stoğu ve kendi fotoğrafı olduğu sürece gösterilir. Buradaki işaretler buna geri döndürülür."
+
+msgid "With a photo of its own"
+msgstr "Kendi fotoğrafı var"
+
+msgid "In stock, with a photo of its own: a variant shows while it has stock and a photo attached to it (not only to its product), and hides when either runs out. With a photo of its own: the same, whether or not it is in stock. The Featured ticks follow by themselves; a product shows while any of its variants does."
+msgstr "Stokta ve kendi fotoğrafı var: bir varyant, stoğu ve kendisine (yalnızca ürüne değil) eklenmiş bir fotoğrafı olduğu sürece gösterilir; biri bitince gizlenir. Kendi fotoğrafı var: aynısı, stokta olsun ya da olmasın. Öne Çıkan işaretleri kendiliğinden güncellenir; bir ürün, varyantlarından biri gösterildiği sürece gösterilir."
+
+msgid "Shown by the rule of its group."
+msgstr "Grubunun kuralıyla gösteriliyor."
+
+msgid "Hidden by the rule of its group: no variant meets it."
+msgstr "Grubunun kuralıyla gizli: hiçbir varyant kuralı karşılamıyor."
+
+msgid "Its group shows a variant only while it has stock."
+msgstr "Grubu, bir varyantı yalnızca stoğu olduğu sürece gösterir."
+
+msgid "Set by the group: shown while a variant has a photo of its own. Ticks here are put back to that."
+msgstr "Grup belirler: bir varyantın kendi fotoğrafı olduğu sürece gösterilir. Buradaki işaretler buna geri döndürülür."

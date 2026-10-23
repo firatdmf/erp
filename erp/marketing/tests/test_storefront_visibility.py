@@ -1,10 +1,10 @@
-"""A product group can leave storefront visibility to a rule.
+"""A product group's rule decides what the storefront shows.
 
-"Set by hand" keeps each variant's Featured tick as somebody set it. "In
-stock, with a photo of its own" shows a variant while it has stock and a
+"In stock, with a photo of its own" shows a variant while it has stock and a
 photo attached to it, hides it otherwise, and shows its product while any
-variant is shown — and keeps the ticks so as stock and photos change, so
-nobody has to tick and untick a group whose shelves move every day.
+variant is shown; "With a photo of its own" asks for the photo alone. The
+ticks are kept so as stock and photos change, so nobody has to tick and
+untick a group whose shelves move every day.
 
 Run with:
     python manage.py test marketing.tests.test_storefront_visibility
@@ -80,17 +80,19 @@ class StorefrontRuleTest(TestCase):
         v.refresh_from_db()
         self.assertFalse(v.variant_featured)
 
-    def test_a_group_set_by_hand_keeps_its_ticks(self):
-        self.group.storefront_rule = ProductCategory.STOREFRONT_BY_HAND
-        self.group.save()
-        v = self._variant("2052.SILVER_ECRU", stock="0")
+    def test_photo_only_shows_a_variant_without_stock(self):
+        self.group.storefront_rule = ProductCategory.STOREFRONT_WITH_PHOTO
         with self.captureOnCommitCallbacks(execute=True):
-            ProductVariant.objects.filter(pk=v.pk).update(variant_featured=True)
-            v.refresh_from_db()
-            v.save()
-        v.refresh_from_db()
-        self.assertTrue(v.variant_featured)
-        self.assertEqual(storefront_visibility.hidden_reasons(self.product), {v.pk: None})
+            self.group.save()
+        sold_out = self._variant("ALBERT.GREY-200X220CM", stock="0", photo=True)
+        bare = self._variant("B-LUCAS.WHITE-200X220CM", stock="40", photo=False)
+        self.assertTrue(sold_out.variant_featured)
+        self.assertFalse(bare.variant_featured)
+        self.assertEqual(storefront_visibility.hidden_reasons(self.product),
+                         {sold_out.pk: None, bare.pk: storefront_visibility.NO_PHOTO})
+
+    def test_a_new_group_starts_on_stock_and_photo(self):
+        self.assertEqual(ProductCategory.objects.create(name="towel", price_multiplier="4/3").storefront_rule, RULE)
 
     def test_the_reasons_say_why(self):
         a = self._variant("A", stock="0", photo=True)

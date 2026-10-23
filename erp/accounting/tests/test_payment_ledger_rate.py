@@ -115,7 +115,7 @@ class InvoiceRateIsNotConsultedTest(LedgerRateTestBase):
 
         invoice = Invoice.objects.create(
             current_account=self.current_account, book=self.book, number="INV-TEST-1",
-            type="sale", status="draft", date="2026-08-17",
+            type="sale", status="ordered", date="2026-08-17",
             due_date="2026-09-17", currency=self.try_,
         )
         self.assertEqual(invoice.exchange_rate, Decimal("1.000000"))

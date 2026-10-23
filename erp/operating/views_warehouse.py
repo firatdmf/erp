@@ -4012,7 +4012,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     nothing.
 
     `invoice` — an existing DRAFT purchase order being confirmed. Its lines
-    are refilled from what actually arrived and it is issued, instead of a
+    are refilled from what actually arrived and it is received, instead of a
     new invoice being minted. Callers passing this MUST wrap the call in a
     transaction: with an invoice in play the bookkeeping step stops being
     best-effort, so an aborted confirm leaves neither stock nor a posting.
@@ -4125,7 +4125,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
 
     # ── Alış faturası (purchase invoice) — the intake above IS a
     # purchase: we now owe this account for the goods, across every
-    # product in the batch. Posted to the CHOSEN current account as ONE issued
+    # product in the batch. Posted to the CHOSEN current account as ONE received
     # purchase invoice so the alım shows up in the invoice list
     # (type=purchase) and the current account statement links straight back to it.
     # Best-effort: a bookkeeping hiccup must never roll back the physical
@@ -4160,7 +4160,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                 log_purchase(inv, "created", user=user,
                              new=_("received into %(warehouse)s") % {"warehouse": warehouse.name})
             else:
-                log_purchase(inv, "status", field="status", old="draft", new=inv.status, user=user)
+                log_purchase(inv, "status", field="status", old="ordered", new=inv.status, user=user)
             # Link each physical stock item back to the invoice line it was
             # received against — items are created in the same order
             # as purchase_lines, so zipping by line_no is exact.
@@ -4394,7 +4394,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             raise IntakeError({"success": False, "error": _gettext("Purchase not found.")}, status=404)
         if invoice.status == "cancelled":
             raise IntakeError({"success": False, "error": _gettext("A cancelled purchase can't be edited.")}, status=400)
-        if invoice.status == "draft":
+        if invoice.status == "ordered":
             raise IntakeError(
                 {"success": False,
                  "error": str(_lz("This purchase is still an order — save it as an order instead."))},
@@ -7843,7 +7843,7 @@ def _purchase_behind(roll):
     if line is None:
         return None
     invoice = line.invoice
-    if invoice.type != "purchase" or invoice.status in ("draft", "cancelled"):
+    if invoice.type != "purchase" or invoice.status in ("ordered", "cancelled"):
         return None
     return invoice
 

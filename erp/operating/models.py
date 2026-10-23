@@ -1186,7 +1186,7 @@ class Order(models.Model):
         """Purchases bought for this order whose goods have not arrived yet
         — a draft purchase is an order placed with the supplier, nothing
         more. Cancelled ones are not waiting for anything."""
-        return self.supplier_purchases.filter(status="draft")
+        return self.supplier_purchases.filter(status="ordered")
 
     @property
     def draft_purchase_numbers(self):
@@ -1350,7 +1350,7 @@ class Order(models.Model):
         qs = cls.objects.all() if qs is None else qs
         return qs.annotate(has_draft_purchase=Exists(
             Invoice.objects.filter(for_order=OuterRef("pk"),
-                                   type="purchase", status="draft")
+                                   type="purchase", status="ordered")
         ))
 
     @property
@@ -1361,7 +1361,7 @@ class Order(models.Model):
         flag = getattr(self, "has_draft_purchase", None)
         if flag is None:
             flag = self.supplier_purchases.filter(type="purchase",
-                                                  status="draft").exists()
+                                                  status="ordered").exists()
         return bool(flag)
 
     @property

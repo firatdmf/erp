@@ -43,7 +43,7 @@ class SupplierDetailPage(TestCase):
         )
         cls.purchase = Invoice.objects.create(
             current_account=cls.acc_laleli, book=cls.laleli, currency=usd,
-            type="purchase", status="issued", number="Purchase-2026-000007",
+            type="purchase", status="received", number="Purchase-2026-000007",
             date=date(2026, 9, 1), due_date=date(2026, 10, 1),
         )
         cls.note = Note.objects.create(supplier=cls.supplier, content="Ships on Fridays")
@@ -82,6 +82,16 @@ class SupplierDetailPage(TestCase):
         self.assertContains(res, "Purchase-2026-000007")
         self.assertContains(
             res, reverse("accounts:purchase_order_detail", args=[self.purchase.pk]))
+
+    def test_a_cancelled_purchase_is_left_out(self):
+        Invoice.objects.create(
+            current_account=self.acc_laleli, book=self.laleli, currency=self.purchase.currency,
+            type="purchase", status="cancelled", number="Purchase-2026-000008",
+            date=date(2026, 9, 2), due_date=date(2026, 10, 2),
+        )
+        res = self.client.get(self.url)
+        self.assertContains(res, "Purchase-2026-000007")
+        self.assertNotContains(res, "Purchase-2026-000008")
 
     def test_creator_is_named(self):
         res = self.client.get(self.url)

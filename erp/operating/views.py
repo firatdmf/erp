@@ -410,7 +410,7 @@ class OrderDetail(DetailView):
         # Goods bought for the order and not received yet hold completion
         # back — the Complete button says so and names the purchases.
         ctx["billing_waits_for"] = (
-            [p for p in ctx["supplier_purchases"] if p.status == "draft"]
+            [p for p in ctx["supplier_purchases"] if p.status == "ordered"]
             if self.object.billing_waits_for_goods() else [])
         # An open order is not a sale yet: its account is charged when it
         # completes (post_order_movement). Said on the account card, or the
@@ -4742,7 +4742,7 @@ def _draft_purchases_prefetch():
     from django.db.models import Prefetch
     from accounting.models_accounts import Invoice
     return Prefetch("supplier_purchases",
-                    queryset=Invoice.objects.filter(status="draft").order_by("pk"),
+                    queryset=Invoice.objects.filter(status="ordered").order_by("pk"),
                     to_attr="draft_purchases")
 
 

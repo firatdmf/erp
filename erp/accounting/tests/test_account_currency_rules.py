@@ -39,7 +39,7 @@ class CurrencyRulesBase(TestCase):
     def invoice(self, currency=None, **kw):
         return Invoice.objects.create(
             current_account=self.account, book=self.book, number=kw.pop("number", "INV-1"),
-            type="sales", status="draft", date="2026-09-11", due_date="2026-10-11",
+            type="sales", status="ordered", date="2026-09-11", due_date="2026-10-11",
             currency=currency or self.usd, **kw)
 
 

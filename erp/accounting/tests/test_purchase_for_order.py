@@ -465,7 +465,7 @@ class PurchaseForCustomerTest(TestCase):
         first = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=first).for_order
         second = Invoice.objects.create(
-            type="purchase", status="draft", for_order=order, series="PUR", number="2",
+            type="purchase", status="ordered", for_order=order, series="PUR", number="2",
             current_account=self.supplier, book=self.book, currency=self.usd,
             date=order.order_date, due_date=order.order_date)
         self.assertTrue(self._confirm(first).json()["success"])
@@ -581,7 +581,7 @@ class PurchaseForCustomerTest(TestCase):
         order = Invoice.objects.get(pk=inv_id).for_order
         order.items.get(product_variant__variant_sku="K24644.G08").delete()
         inv = Invoice.objects.get(pk=inv_id)
-        self.assertEqual(inv.status, "draft")
+        self.assertEqual(inv.status, "ordered")
         self.assertEqual([v["sku"] for v in inv.intake_plan["products"][0]["variants"]], ["K24644.G07"])
         self.assertEqual(inv.total, Decimal("192.50"))
         self.assertEqual([c for c in self._purchase_log(inv_id) if c[0] == "item_removed"][0][2], "order")
@@ -594,7 +594,7 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(inv.status, "cancelled")
         # What it was for still reads on the cancelled purchase.
         self.assertEqual(len(inv.intake_plan["products"][0]["variants"]), 1)
-        self.assertIn(("status", "status", "order", "draft", "cancelled"), self._purchase_log(inv_id))
+        self.assertIn(("status", "status", "order", "ordered", "cancelled"), self._purchase_log(inv_id))
         self.assertIn(("field", "purchase", "%s cancelled — nothing left on it to buy" % inv.number),
                       self._order_log(order))
         order.refresh_from_db()
@@ -611,7 +611,7 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(order.order_status, "cancelled")
         inv = Invoice.objects.get(pk=inv_id)
         self.assertEqual(inv.status, "cancelled")
-        self.assertIn(("status", "status", "order", "draft", "cancelled"), self._purchase_log(inv_id))
+        self.assertIn(("status", "status", "order", "ordered", "cancelled"), self._purchase_log(inv_id))
         self.assertIn(("field", "purchase", "%s cancelled with the order" % inv.number),
                       self._order_log(order))
 
@@ -655,7 +655,7 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(r.status_code, 302)
         order.refresh_from_db()
         self.assertEqual(order.order_status, "cancelled")
-        self.assertEqual(before["status"], "issued")
+        self.assertEqual(before["status"], "received")
         self.assertEqual(self._purchase_facts(inv_id), before)
         self.assertEqual(Invoice.objects.get(pk=inv_id).for_order, order)
         # The rolls it held are free stock again — still on the shelf.
@@ -712,7 +712,7 @@ class PurchaseForCustomerTest(TestCase):
         inv.refresh_from_db()
         self.assertEqual(inv.status, "cancelled")
         self.assertIsNone(inv.for_order)
-        self.assertIn(("status", "status", "order", "draft", "cancelled"), self._purchase_log(inv_id))
+        self.assertIn(("status", "status", "order", "ordered", "cancelled"), self._purchase_log(inv_id))
         self.assertIn(("field", "order", "order", None,
                        "Order %s deleted — this purchase was cancelled with it" % order.order_number),
                       self._purchase_log(inv_id))
@@ -856,7 +856,7 @@ class PurchaseForCustomerTest(TestCase):
     def test_receiving_is_logged(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         self.assertTrue(self._confirm(inv_id).json()["success"])
-        self.assertIn(("status", "status", "purchase", "draft", "issued"), self._purchase_log(inv_id))
+        self.assertIn(("status", "status", "purchase", "ordered", "received"), self._purchase_log(inv_id))
 
     def test_the_purchase_page_lists_its_changes(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]

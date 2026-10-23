@@ -191,7 +191,7 @@ class MovedVariantTakesItsLinesTest(TestCase):
             book=self.book, code="C-1", name="ACME", default_currency=usd)
         invoice = Invoice.objects.create(
             current_account=account, book=self.book, number="INV-1", type="sales",
-            status="draft", date="2026-09-12", due_date="2026-10-12", currency=usd)
+            status="ordered", date="2026-09-12", due_date="2026-10-12", currency=usd)
         self.inv_line = InvoiceItem.objects.create(
             invoice=invoice, description="GREK", product=self.husk, variant=self.variant,
             quantity=Decimal("3.000"), unit_price=Decimal("7.50"), tax_rate=0)

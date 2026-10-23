@@ -469,7 +469,7 @@ def _currency_by_code(code) -> CurrencyCategory:
 
 def create_purchase_invoice_for_intake(current_account, lines, *, member=None, user=None,
                                        invoice_date=None, invoice=None):
-    """Turn a warehouse stock intake into an issued PURCHASE invoice
+    """Turn a warehouse stock intake into a received PURCHASE invoice
     on the given current account.
 
     Takes the current account DIRECTLY rather than a crm.Supplier: the intake panel
@@ -487,12 +487,12 @@ def create_purchase_invoice_for_intake(current_account, lines, *, member=None, u
     `invoice` — an existing DRAFT purchase order being confirmed. Its number,
     order date and account are already settled, so only its lines are rebuilt
     (from what actually arrived) and its received date set before it is
-    issued — the supplier is charged on the day the goods came in. Safe to
+    received — the supplier is charged on the day the goods came in. Safe to
     wipe its items first: a draft has no rolls pointing at them yet, which is
     exactly what makes the order editable right up to the moment it is
     confirmed.
 
-    Returns the issued Invoice.
+    Returns the received Invoice.
     """
     from .models import Invoice, InvoiceItem
 
@@ -530,7 +530,7 @@ def create_purchase_invoice_for_intake(current_account, lines, *, member=None, u
             invoice.save(update_fields=["received_on", "due_date", "currency", "updated_at"])
             invoice.recompute_totals(save=True)
             invoice.refresh_from_db()
-            invoice.issue(user=user)
+            invoice.receive(user=user)
         return invoice
 
     with transaction.atomic():
@@ -540,7 +540,7 @@ def create_purchase_invoice_for_intake(current_account, lines, *, member=None, u
             current_account=current_account, book=book,
             series="PUR",
             number=settings_obj.next_invoice_number(series="PUR"),
-            type="purchase", status="draft",
+            type="purchase", status="ordered",
             date=today, received_on=today, due_date=today + timedelta(days=term_days),
             currency=currency,
             created_by=member,
@@ -562,7 +562,7 @@ def create_purchase_invoice_for_intake(current_account, lines, *, member=None, u
         # .update() in recompute_totals doesn't touch our in-memory obj).
         inv.recompute_totals(save=True)
         inv.refresh_from_db()
-        inv.issue(user=user)
+        inv.receive(user=user)
     return inv
 
 

@@ -2086,8 +2086,8 @@
                 <a href="{% url 'accounts:purchase_order_detail' p.pk %}"><b>{{ p.number }}</b></a>
                 · {{ p.current_account.name }}
               </span>
-              <span style="color:{% if p.status == 'draft' %}#92400E{% else %}#0E6E4A{% endif %}; white-space:nowrap;">
-                {% if p.status == 'draft' %}
+              <span style="color:{% if p.status == 'ordered' %}#92400E{% else %}#0E6E4A{% endif %}; white-space:nowrap;">
+                {% if p.status == 'ordered' %}
                   {% trans "Awaiting delivery" %}{% if p.delivery_date %} · {{ p.delivery_date|date:"d.m.Y" }}{% endif %}
                 {% else %}
                   {% trans "Received" %} · {{ p.held_quantity|floatformat:"-2g" }} {% trans "reserved" %}
@@ -2305,7 +2305,7 @@
       <div class="odc-lbl">{% trans "What happens" %}</div>
       <ul class="odx-list">
         {% for p in supplier_purchases %}
-          {% if p.status == 'draft' %}
+          {% if p.status == 'ordered' %}
           <li>{% blocktrans with number=p.number supplier=p.current_account.name %}Purchase {{ number }} ({{ supplier }}) is cancelled with the order — its goods were never received{% endblocktrans %}</li>
           {% else %}
           <li>{% blocktrans with number=p.number %}Purchase {{ number }} was already received — its rolls stay in stock{% endblocktrans %}</li>

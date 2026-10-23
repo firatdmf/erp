@@ -170,7 +170,7 @@ def post_stock_movement_to_ledger(sender, instance, raw=False, **kwargs):
 def post_purchase_again(invoice):
     """Post a purchase once more, now that its rolls are attached.
 
-    A received purchase is issued, and so posted, before the rolls it
+    A purchase is received, and so posted, before the rolls it
     brought in are linked to its lines. What the rolls are carried at is
     part of the entry (services_posting._purchase_stock_value), so the
     entry is only right once they are there."""

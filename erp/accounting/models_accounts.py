@@ -1033,13 +1033,13 @@ class Invoice(models.Model):
         ("purchase_return", _("Purchase Return")),
         ("proforma",        _("Proforma")),
     ]
+    # A purchase is ordered, then received (the supplier is charged) or
+    # cancelled. Payments settle the supplier's account, not one purchase,
+    # so there is no paid status.
     STATUS_CHOICES = [
-        ("draft",          _("Draft")),
-        ("issued",         _("Issued")),
-        ("partially_paid", _("Partially Paid")),
-        ("paid",           _("Paid")),
-        ("overdue",        _("Overdue")),
-        ("cancelled",      _("Cancelled")),
+        ("ordered",   _("Ordered")),
+        ("received",  _("Received")),
+        ("cancelled", _("Cancelled")),
     ]
 
     current_account   = models.ForeignKey(CurrentAccount, on_delete=models.PROTECT, related_name="invoices")
@@ -1048,7 +1048,7 @@ class Invoice(models.Model):
     series = models.CharField(max_length=10, default="INV")
     number = models.CharField(max_length=30)
     type   = models.CharField(max_length=20, choices=INVOICE_TYPES, default="sales")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ordered")
 
     date          = models.DateField()
     due_date      = models.DateField()
@@ -1290,9 +1290,9 @@ class Invoice(models.Model):
 
     def recompute_payment(self, save=True):
         """
-        Recalculate paid_amount, balance, and status from PaymentAllocations.
+        Recalculate paid_amount and balance from PaymentAllocations.
         Called after a Payment is confirmed/cancelled and after each allocation save.
-        Does NOT touch status if invoice is draft/cancelled (those aren't 'payable').
+        The status is left alone: being paid is not a stage of a purchase.
         """
         agg = self.allocations.filter(payment__status="confirmed").aggregate(
             paid=Sum("amount"),
@@ -1300,26 +1300,15 @@ class Invoice(models.Model):
         self.paid_amount = agg["paid"] or Decimal("0.00")
         self.balance     = self.total - self.paid_amount
 
-        new_status = self.status
-        if self.status not in ("draft", "cancelled"):
-            if self.paid_amount <= Decimal("0"):
-                new_status = "issued"
-            elif self.balance <= Decimal("0.005"):  # rounded-zero
-                new_status = "paid"
-            else:
-                new_status = "partially_paid"
-
         if save:
             Invoice.objects.filter(pk=self.pk).update(
                 paid_amount=self.paid_amount,
                 balance=self.balance,
-                status=new_status,
             )
-            self.status = new_status
 
     # -- lifecycle ---------------------------------------------------------
-    def issue(self, user=None):
-        """Draft → Issued.
+    def receive(self, user=None):
+        """Ordered → Received.
 
         Sign / amount rules:
         - Standalone invoice (no linked order) → posts +/- total to the
@@ -1330,15 +1319,15 @@ class Invoice(models.Model):
           row in the statement that says "Sales Invoice FAT-XXX
           issued" as a paper-trail marker, with no double counting.
         """
-        if self.status not in ("draft",):
-            raise ValidationError(f"Only draft invoices can be issued (current status: {self.status}).")
+        if self.status != "ordered":
+            raise ValidationError(f"Only an ordered purchase can be received (current status: {self.status}).")
         if self.type == "proforma":
             # Proforma doesn't hit the ledger — only flips status
-            self.status = "issued"
+            self.status = "received"
             self.save(update_fields=["status", "updated_at"])
             return None
         if not self.items.exists():
-            raise ValidationError("Cannot issue an invoice with no items.")
+            raise ValidationError("Cannot receive a purchase with no items.")
 
         # An invoice raised against an order posts NOTHING. The order_sale
         # movement already carries the receivable, so this used to write a
@@ -1352,7 +1341,7 @@ class Invoice(models.Model):
         # purchase receipt or a sale with no order behind it, this movement
         # IS the debt and nothing else would create it.
         if self.order_id:
-            self.status = "issued"
+            self.status = "received"
             self.save(update_fields=["status", "updated_at"])
             return None
 
@@ -1373,25 +1362,25 @@ class Invoice(models.Model):
             created_by=user.member if user and hasattr(user, "member") else None,
         )
         self.posted_movement = movement
-        self.status = "issued"
+        self.status = "received"
         self.save(update_fields=["status", "posted_movement", "updated_at"])
         return movement
 
     def resync_posted_movement(self, user=None):
         """Refresh the ledger row after totals/date/currency change on an
-        already-issued invoice. Order-attached invoices post no row at all
+        already-received purchase. Order-attached invoices post no row at all
         (the order carries the receivable); standalone invoices get
         amount/desc/date refreshed in place on the SAME CurrentAccountMovement
         (never delete+recreate — that would break anything referencing it
         by id).
 
-        If `posted_movement` is somehow missing on a non-draft/non-cancelled
+        If `posted_movement` is somehow missing on a received
         invoice (should not happen in normal flow, since issue() always sets
-        it in the same transaction as status→issued), post a fresh one
+        it in the same transaction as status→received), post a fresh one
         instead of silently doing nothing — a purchase/sales edit that
         changes the total must never leave the current account balance stale.
         """
-        if self.status in ("draft", "cancelled"):
+        if self.status != "received":
             return None
         # Nothing to keep in step for an order-attached invoice — it posts
         # no row. Returning early matters as much as issue() not creating
@@ -1431,7 +1420,7 @@ class Invoice(models.Model):
 
     def cancel(self, user=None, reason=""):
         """
-        Cancel an issued invoice. DELETES the posted CurrentAccountMovement outright
+        Cancel a purchase. A received one DELETES its posted CurrentAccountMovement outright
         (mirroring reverse_order_movement's semantics for orders) so the
         current account history shows no trace of the dead invoice, then recomputes
         the balance. An order-attached invoice has no movement to delete —
@@ -1445,7 +1434,7 @@ class Invoice(models.Model):
         """
         if self.status == "cancelled":
             return
-        if self.status == "draft":
+        if self.status == "ordered":
             self.status = "cancelled"
             self.save(update_fields=["status", "updated_at"])
             return
@@ -1453,7 +1442,7 @@ class Invoice(models.Model):
         from django.db import transaction as _tx
         with _tx.atomic():
             # Atomic so a failure between the delete and the status flip
-            # can't leave an 'issued' invoice with no ledger row (which a
+            # can't leave a 'received' purchase with no ledger row (which a
             # later edit would silently re-post via resync_posted_movement).
             if self.posted_movement_id:
                 mv = self.posted_movement

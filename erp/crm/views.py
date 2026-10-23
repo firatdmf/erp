@@ -1747,25 +1747,22 @@ class SupplierDetail(generic.DetailView):
         # other side of the counter: the purchases we have written
         # against this supplier, in every book. A purchase is an
         # Invoice(type=purchase) on one of the supplier's current
-        # accounts, so the link runs through the account.
+        # accounts, so the link runs through the account. A cancelled
+        # purchase is not part of what we bought from them, so it is left out.
         from accounting.models_accounts import CurrentAccount, Invoice
         purchases = list(
             of_books_in_reach(Invoice.objects.filter(
                 type__in=("purchase", "purchase_return"),
                 current_account__supplier=supplier,
-            ))
+            ).exclude(status="cancelled"))
             .select_related("book", "currency")
             .order_by("-date", "-id")[:25]
         )
         # The row's colour, in the order-status palette the card already
-        # has: money still to pay reads as pending, paid as done.
-        pill = {
-            "draft": "pending", "issued": "scheduled",
-            "partially_paid": "preparing", "paid": "completed",
-            "overdue": "cancelled", "cancelled": "cancelled",
-        }
+        # has: blue while it is on its way, green once received.
+        pill = {"ordered": "scheduled", "received": "confirmed"}
         for inv in purchases:
-            inv.pill = pill.get(inv.status, "pending")
+            inv.pill = pill.get(inv.status, "scheduled")
         context["purchases"] = purchases
 
         # ── Ledger accounts across every book ─────────────────

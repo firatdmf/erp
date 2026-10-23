@@ -179,7 +179,7 @@ class PurchaseOrderDetail(View):
         # in their place, marked approximate. Line order matches
         # plan_lines(), which is what built a draft's items.
         planned = []
-        if invoice.status == "draft" and invoice.intake_plan:
+        if invoice.status == "ordered" and invoice.intake_plan:
             planned = plan_lines(invoice.intake_plan)
             if len(planned) != len(items):
                 planned = []
@@ -230,7 +230,7 @@ class PurchaseOrderDetail(View):
             "total_packs": total_packs,
             "total_pack_noun": total_pack_noun,
             "warehouse_id": warehouse_id,
-            "is_order": invoice.status == "draft",
+            "is_order": invoice.status == "ordered",
             "can_confirm": can_confirm_purchase(request.user),
             "changes": decorate_changes(
                 list(invoice.change_logs.select_related("created_by"))),
@@ -356,7 +356,7 @@ class GoodsReceipt(View):
                 # Bought for an order since cancelled: stock now, and the
                 # form only says where it came from.
                 cancelled_order = doc.for_order
-            if doc.status == "draft":
+            if doc.status == "ordered":
                 # Still an order — it owns a plan, not stock, so the form
                 # opens the way it was left and everything stays editable.
                 order = doc
@@ -633,12 +633,12 @@ class PurchaseOrderSave(View):
                 if pk is not None:
                     invoice = get_object_or_404(
                         Invoice.objects.select_for_update(), pk=pk, type="purchase")
-                    if invoice.status != "draft":
+                    if invoice.status != "ordered":
                         return JsonResponse(
                             {"success": False,
                              "error": _gettext("This purchase is confirmed — it can't be edited as an order.")}, status=400)
                 else:
-                    invoice = Invoice(type="purchase", status="draft")
+                    invoice = Invoice(type="purchase", status="ordered")
                 # What the purchase said before this save — the log is the
                 # difference (purchase_audit).
                 before_plan = copy.deepcopy(invoice.intake_plan) if invoice.pk else None
@@ -732,7 +732,7 @@ class PurchaseOrderConfirm(View):
 
     This is the moment the document stops being a plan — the products,
     variants and physical stock items it describes are created, and the order is
-    issued so the supplier is owed for them. All of it in ONE transaction,
+    received, so the supplier is owed for them. All of it in ONE transaction,
     so a failure leaves the order exactly as it was, still a draft, still
     confirmable.
     """
@@ -750,7 +750,7 @@ class PurchaseOrderConfirm(View):
         invoice = get_object_or_404(Invoice, pk=pk, type="purchase")
         if invoice.status == "cancelled":
             return JsonResponse({"success": False, "error": _gettext("A cancelled purchase can't be confirmed.")}, status=400)
-        if invoice.status != "draft":
+        if invoice.status != "ordered":
             return JsonResponse(
                 {"success": False, "error": _gettext("This purchase is already confirmed.")}, status=400)
         plan = invoice.intake_plan or {}
@@ -809,7 +809,7 @@ class PurchaseOrderPrint(View):
         # ours means nothing to them. From the plan while it is an order,
         # from what the receipt recorded once it is in.
         supplier_sku_by_line = {}
-        if invoice.status == "draft":
+        if invoice.status == "ordered":
             # Line order matches plan_lines(), which is what built the items.
             line_no = 0
             for p_in in (plan.get("products") or []):
@@ -838,7 +838,7 @@ class PurchaseOrderPrint(View):
             "items": items,
             "warehouse": invoice.intake_warehouse,
             "brand_line": brand_name_for(invoice.book),
-            "is_order": invoice.status == "draft",
+            "is_order": invoice.status == "ordered",
             "show_supplier_sku": any(it.supplier_sku for it in items),
         }, f"purchase_{invoice.display_number}.pdf")
 

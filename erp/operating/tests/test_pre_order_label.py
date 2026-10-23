@@ -48,7 +48,7 @@ class PreOrderLabelTest(TestCase):
                                  quantity=Decimal("55"), price=Decimal("5"))
         return order
 
-    def _purchase(self, order, status="draft"):
+    def _purchase(self, order, status="ordered"):
         return Invoice.objects.create(
             book=self.book, current_account=self.supplier, type="purchase",
             status=status, number="P-1", currency=self.usd,
@@ -70,7 +70,7 @@ class PreOrderLabelTest(TestCase):
     def test_confirming_the_purchase_ends_the_pre_order(self):
         order = self._order()
         invoice = self._purchase(order)
-        invoice.status = "issued"
+        invoice.status = "received"
         invoice.save(update_fields=["status"])
         self.assertFalse(Order.objects.get(pk=order.pk).is_pre_order)
         self.assertEqual(str(Order.objects.get(pk=order.pk).status_label), "Pending")

@@ -47,7 +47,7 @@ class ObjectPagesAreRefusedAcrossBooks(TestCase):
 
     def _invoice(self, book, current_account):
         return Invoice.objects.create(
-            book=book, current_account=current_account, type="purchase", status="draft",
+            book=book, current_account=current_account, type="purchase", status="ordered",
             date="2026-08-21", due_date="2026-09-21",
             currency=self.usd, total=Decimal("100.00"))
 

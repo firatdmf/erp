@@ -43,7 +43,7 @@ class InvoiceMarkerBase(TestCase):
         inv = Invoice.objects.create(
             current_account=self.current_account, book=self.book,
             number="INV-%s-%s" % (type, "ord" if order else "std"),
-            type=type, status="draft", date="2026-08-27",
+            type=type, status="ordered", date="2026-08-27",
             due_date="2026-09-27", currency=self.usd, order=order)
         InvoiceItem.objects.create(
             invoice=inv, description="fabric",
@@ -59,28 +59,28 @@ class OrderAttachedInvoiceTest(InvoiceMarkerBase):
 
     def test_issuing_posts_no_ledger_row(self):
         inv = self.invoice(order=self.order)
-        self.assertIsNone(inv.issue())
+        self.assertIsNone(inv.receive())
         self.assertEqual(self.movements().count(), 0)
 
-    def test_it_is_still_issued(self):
+    def test_it_is_still_received(self):
         inv = self.invoice(order=self.order)
-        inv.issue()
+        inv.receive()
         inv.refresh_from_db()
-        self.assertEqual(inv.status, "issued")
+        self.assertEqual(inv.status, "received")
         self.assertIsNone(inv.posted_movement)
 
     def test_the_balance_is_untouched(self):
         inv = self.invoice(order=self.order)
-        inv.issue()
+        inv.receive()
         self.current_account.refresh_from_db()
         self.assertEqual(self.current_account.cached_balance, Decimal("0.00"))
 
     def test_editing_it_does_not_resurrect_the_row(self):
         """resync's `mv is None` branch exists to repost a movement that
         went missing. Without a guard it would recreate exactly the row
-        issue() stopped writing, on every edit."""
+        receive() stopped writing, on every edit."""
         inv = self.invoice(order=self.order)
-        inv.issue()
+        inv.receive()
 
         inv.recompute_totals(save=True)
         self.assertIsNone(inv.resync_posted_movement())
@@ -88,7 +88,7 @@ class OrderAttachedInvoiceTest(InvoiceMarkerBase):
 
     def test_cancelling_it_is_a_clean_no_op(self):
         inv = self.invoice(order=self.order)
-        inv.issue()
+        inv.receive()
         inv.cancel(reason="test")
         inv.refresh_from_db()
         self.assertEqual(inv.status, "cancelled")
@@ -103,7 +103,7 @@ class StandaloneInvoiceStillPostsTest(InvoiceMarkerBase):
 
     def test_a_standalone_sale_posts_its_total(self):
         inv = self.invoice(order=None, total="500.00")
-        mv = inv.issue()
+        mv = inv.receive()
         self.assertIsNotNone(mv)
         self.assertEqual(mv.amount, Decimal("500.00"))
         self.current_account.refresh_from_db()
@@ -111,7 +111,7 @@ class StandaloneInvoiceStillPostsTest(InvoiceMarkerBase):
 
     def test_a_standalone_purchase_posts_the_payable(self):
         inv = self.invoice(order=None, type="purchase", total="419.58")
-        mv = inv.issue()
+        mv = inv.receive()
         self.assertIsNotNone(mv)
         self.assertEqual(mv.amount, Decimal("-419.58"))
         self.current_account.refresh_from_db()
@@ -119,7 +119,7 @@ class StandaloneInvoiceStillPostsTest(InvoiceMarkerBase):
 
     def test_editing_a_standalone_one_still_refreshes_its_row(self):
         inv = self.invoice(order=None, total="500.00")
-        mv = inv.issue()
+        mv = inv.receive()
         inv.items.update(unit_price=Decimal("600.00"))
         inv.items.first().save()
         inv.recompute_totals(save=True)

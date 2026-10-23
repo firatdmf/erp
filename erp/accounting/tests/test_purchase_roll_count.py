@@ -128,7 +128,7 @@ class DraftPurchaseExpectedRollsTest(TestCase):
         self.client.force_login(self.user)
         self.invoice = Invoice.objects.create(
             book=self.book, current_account=self.supplier, currency=self.usd,
-            type="purchase", status="draft", number="PUR-000142",
+            type="purchase", status="ordered", number="PUR-000142",
             date=date(2026, 9, 29), due_date=date(2026, 10, 29),
             intake_warehouse=self.wh,
             intake_plan={"products": [{

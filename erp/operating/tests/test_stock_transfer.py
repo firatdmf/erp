@@ -94,7 +94,7 @@ class TheReceivingBook(TransferBase):
     def test_it_gets_a_purchase_at_the_senders_cost(self):
         transfer = self.send()
         invoice = transfer.purchase
-        self.assertEqual((invoice.type, invoice.status), ("purchase", "issued"))
+        self.assertEqual((invoice.type, invoice.status), ("purchase", "received"))
         self.assertEqual(invoice.book, self.laleli)
         self.assertEqual(invoice.current_account, self.shop_side)
         # 112.37 m × 3.40 = 382.058

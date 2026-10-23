@@ -46,7 +46,7 @@ class GoodsReceiptPageTest(TestCase):
     def _purchase(self, warehouse=None, number="PO-1"):
         inv = Invoice.objects.create(
             current_account=self.current_account, book=self.book, series="ALS", number=number,
-            type="purchase", status="issued", date=date(2026, 8, 1),
+            type="purchase", status="received", date=date(2026, 8, 1),
             due_date=date(2026, 8, 31), currency=self.usd,
             total=Decimal("100.00"),
         )

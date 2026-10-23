@@ -49,7 +49,7 @@ class InvoiceDocBase(TestCase):
 
         self.purchase = Invoice.objects.create(
             book=self.book, current_account=self.supplier, type="purchase",
-            series="PUR", number="PUR-2026-000501", status="issued",
+            series="PUR", number="PUR-2026-000501", status="received",
             date=date(2026, 9, 1), due_date=date(2026, 10, 1), currency=self.usd)
         InvoiceItem.objects.create(invoice=self.purchase, line_no=1, product=self.product,
                                    description="Velvet Moss greige", quantity=Decimal("120.00"),

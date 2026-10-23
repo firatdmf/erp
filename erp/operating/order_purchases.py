@@ -503,7 +503,7 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
     sku = (variant.variant_sku if variant is not None else "").strip().lower()
     if not sku:
         return
-    for invoice in (order.supplier_purchases.filter(status="draft")
+    for invoice in (order.supplier_purchases.filter(status="ordered")
                     .select_related("current_account")):
         before = copy.deepcopy(invoice.intake_plan or {})
         plan = copy.deepcopy(before)

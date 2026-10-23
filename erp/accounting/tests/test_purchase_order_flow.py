@@ -81,7 +81,7 @@ class PurchaseOrderFlowTest(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         inv = Invoice.objects.get(pk=r.json()["invoice_id"])
 
-        self.assertEqual(inv.status, "draft")
+        self.assertEqual(inv.status, "ordered")
         self.assertEqual(inv.intake_warehouse, self.wh)
         self.assertEqual(inv.total, Decimal("192.50"))          # 55 × 3.50
         self.assertEqual(inv.items.count(), 1)
@@ -124,7 +124,7 @@ class PurchaseOrderFlowTest(TestCase):
         self.assertTrue(r.json()["success"], r.json())
 
         inv = Invoice.objects.get(pk=inv_id)
-        self.assertEqual(inv.status, "issued")
+        self.assertEqual(inv.status, "received")
         self.assertEqual(inv.total, Decimal("192.50"))
         self.assertIsNotNone(inv.posted_movement)               # the debt is posted now
         self.current_account.refresh_from_db()
@@ -177,7 +177,7 @@ class PurchaseOrderFlowTest(TestCase):
         r = self.client.post(reverse("accounts:purchase_order_confirm", args=[inv_id]))
         self.assertEqual(r.status_code, 400)
         inv = Invoice.objects.get(pk=inv_id)
-        self.assertEqual(inv.status, "draft")                    # still confirmable
+        self.assertEqual(inv.status, "ordered")                    # still confirmable
         self.assertFalse(WarehouseProductItem.objects.exists())
         self.assertIsNone(inv.posted_movement)
 
@@ -242,7 +242,7 @@ class PurchaseListBookScopeTest(TestCase):
             book=book, code=f"C-{supplier[:3].upper()}-{book.pk}", name=supplier,
             type="supplier", default_currency=self.usd)
         Invoice.objects.create(
-            book=book, current_account=current_account, type="purchase", status="draft",
+            book=book, current_account=current_account, type="purchase", status="ordered",
             number=f"PO-{supplier[:3].upper()}",
             date="2026-08-21", due_date="2026-09-21",
             currency=self.usd, total=Decimal(total))
@@ -298,7 +298,7 @@ class PurchaseListBookScopeTest(TestCase):
 
     def test_a_status_filter_still_narrows_the_list(self):
         self._cancelled("Gone", "999.00")
-        ctx = self._page_with(status="draft")
+        ctx = self._page_with(status="ordered")
         self.assertEqual([i.current_account.name for i in ctx["invoices"]], ["Karven"])
 
     def test_the_old_all_link_is_the_default_list(self):

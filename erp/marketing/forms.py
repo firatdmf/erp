@@ -251,8 +251,13 @@ class ProductForm(forms.ModelForm):
                 % {"skus": ", ".join(negative)}
             )
         parent = cleaned_data.get("sku")
-        if not self.is_update and parent:
-            off = sorted(_skus_off_the_parent(self.data.get("variants_json"), parent))
+        if parent:
+            off = _skus_off_the_parent(self.data.get("variants_json"), parent)
+            if self.is_update:
+                # A variant saved before the rule on some other SKU may keep
+                # it; one typed or changed now follows the rule.
+                off -= set(self.instance.variants.values_list("variant_sku", flat=True))
+            off = sorted(off)
             if off:
                 raise forms.ValidationError(
                     _("Each variant SKU must be the product SKU, a dot, then the "
@@ -372,13 +377,13 @@ def _variant_dicts(variants_json):
 
 
 def _skus_off_the_parent(variants_json, parent):
-    """The variant SKUs that do not read PARENT.SUFFIX — the parent SKU, a
-    dot, and a non-empty suffix already in capitals. Enforced on new
-    products only; see ProductForm.clean_sku.
+    """The variant SKUs that do not read PARENT.SUFFIX — the parent SKU (in
+    any case: an old product's may be lower case), a dot, and a non-empty
+    suffix already in capitals. See ProductForm.clean.
 
     A variant with no option values (a single item's one variant) has no
     suffix to build: its SKU is typed by hand, and only has to be there."""
-    prefix = f"{parent}."
+    prefix = f"{parent}.".upper()
     found = set()
     for variant in _variant_dicts(variants_json):
         sku = str(variant.get("variant_sku") or "")
@@ -389,7 +394,7 @@ def _skus_off_the_parent(variants_json, parent):
             if not sku.strip():
                 found.add("?")
             continue
-        suffix = sku[len(prefix):] if sku.startswith(prefix) else ""
+        suffix = sku[len(prefix):] if sku.upper().startswith(prefix) else ""
         if not suffix.strip() or suffix != suffix.upper():
             found.add(sku or "?")
     return found

@@ -14934,3 +14934,9 @@ msgstr "Grubu, bir varyantı yalnızca stoğu olduğu sürece gösterir."
 
 msgid "Set by the group: shown while a variant has a photo of its own. Ticks here are put back to that."
 msgstr "Grup belirler: bir varyantın kendi fotoğrafı olduğu sürece gösterilir. Buradaki işaretler buna geri döndürülür."
+
+msgid "This SKU does not start with the product SKU."
+msgstr "Bu SKU ürün SKU'su ile başlamıyor."
+
+msgid "Put it under the product SKU"
+msgstr "Ürün SKU'sunun altına al"

@@ -519,7 +519,47 @@ class Product(models.Model):
         update_fields = kwargs.get("update_fields")
         if update_fields is not None and "unit" in update_fields:
             kwargs["update_fields"] = {*update_fields, "unit_of_measurement"}
+        old_sku = None
+        if self.pk and (update_fields is None or "sku" in update_fields):
+            old_sku = Product.everywhere.filter(pk=self.pk).values_list("sku", flat=True).first()
         super().save(*args, **kwargs)
+        if old_sku and self.sku and old_sku != self.sku:
+            self.carry_variant_skus(old_sku)
+
+    def carry_variant_skus(self, old_sku):
+        """A variant SKU is PARENT.VALUES, so renaming the parent renames
+        the variants that start with it: S-ORKIDE-15.BEIGE-300-275 becomes
+        S-ORKIDE.BEIGE-300-275 when S-ORKIDE-15 becomes S-ORKIDE. Their
+        warehouse rows follow (operating.signals), and so do the purchases
+        that wait to be received under the old SKU — a stale line would
+        open a new variant on receipt. A variant spelled some other way, or
+        whose new SKU is taken, is left as it is. Returns {old: new}."""
+        import json
+        from accounting.models_accounts import Invoice
+
+        prefix, new_prefix = old_sku.strip().upper() + ".", self.sku.strip().upper() + "."
+        renamed = {}
+        for variant in ProductVariant.everywhere.filter(product=self):
+            sku = variant.variant_sku or ""
+            if not sku.upper().startswith(prefix):
+                continue
+            new = new_prefix + sku[len(prefix):]
+            if ProductVariant.everywhere.filter(variant_sku=new).exclude(pk=variant.pk).exists():
+                continue
+            variant.variant_sku = new
+            variant.save(update_fields=["variant_sku"])
+            renamed[sku] = new
+        if renamed:
+            for invoice in Invoice.objects.exclude(intake_plan=None):
+                text = json.dumps(invoice.intake_plan, ensure_ascii=False)
+                if not any(f'"{old}"' in text for old in renamed):
+                    continue
+                for card in invoice.intake_plan.get("products") or []:
+                    for line in card.get("variants") or []:
+                        if line.get("sku") in renamed:
+                            line["sku"] = renamed[line["sku"]]
+                invoice.save(update_fields=["intake_plan"])
+        return renamed
 
     def clean_fields(self, exclude=None):
         # Settled before the fields are checked: a product validated

@@ -1,9 +1,9 @@
 """A new product's SKUs read PARENT.VALUE-VALUE (K24644.BEYAZ-140).
 
 The product SKU carries no dot and is stored in capitals; each variant SKU
-is that SKU, a dot, and a non-empty suffix in capitals. Only products being
-created are held to it — existing products, and the warehouse items linked
-to them, keep the SKUs they already have.
+is that SKU, a dot, and a non-empty suffix in capitals. A new product is
+held to it whole. On an existing one, a variant saved before the rule on
+some other SKU may keep it — but a SKU typed or changed now follows the rule.
 
 Run with:
     python manage.py test marketing.tests.test_new_product_sku_rule
@@ -13,7 +13,7 @@ import json
 from django.test import TestCase
 
 from marketing.forms import ProductForm, _skus_off_the_parent
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 
 
 def _variants(*skus):
@@ -64,12 +64,28 @@ class TheRuleAppliesOnlyWhenCreating(TestCase):
 
     def test_editing_an_existing_product_keeps_its_skus_as_they_are(self):
         product = Product.objects.create(title="Old", sku="N1718T.G56")
+        ProductVariant.objects.create(product=product, variant_sku="cappucino")
         form = self._errors({"title": "Old", "sku": "N1718T.G56",
                              "variants_json": _variants("cappucino")},
                             is_update=True, instance=product)
         self.assertNotIn("sku", form.errors)
         self.assertFalse(form.non_field_errors())
         self.assertEqual(form.cleaned_data["sku"], "N1718T.G56")
+
+    def test_editing_refuses_a_new_variant_off_the_rule(self):
+        product = Product.objects.create(title="Orkide", sku="S-ORKIDE")
+        ProductVariant.objects.create(product=product, variant_sku="S-ORKIDE.BEIGE-300-275")
+        form = self._errors({"title": "Orkide", "sku": "S-ORKIDE",
+                             "variants_json": _variants("S-ORKIDE.BEIGE-300-275", "orkide-white")},
+                            is_update=True, instance=product)
+        self.assertIn("orkide-white", " ".join(form.non_field_errors()))
+
+    def test_an_old_lower_case_parent_still_counts_as_the_prefix(self):
+        product = Product.objects.create(title="Bamboo", sku="ttm")
+        form = self._errors({"title": "Bamboo", "sku": "ttm",
+                             "variants_json": _variants("TTM.WHITE-320-PLEATED")},
+                            is_update=True, instance=product)
+        self.assertFalse(form.non_field_errors())
 
 
 class TheFormAsksUnitAndPackNotTheStorefrontUnit(TestCase):

@@ -157,14 +157,14 @@
     </div>
   </div>
 
-  {% comment %}New products follow the SKU rule PARENT.VALUE-VALUE
-  (K24644.BEYAZ-140); products that already exist keep the SKUs they have.
-  variant_form_modern.js reads this flag, and ProductForm enforces the same
-  rule on the server.{% endcomment %}
-  <form method="post" id="product_form" class="product-form-layout" enctype="multipart/form-data"{% if not is_update %} data-sku-rule="1"
+  {% comment %}Variants follow the SKU rule PARENT.VALUE-VALUE
+  (K24644.BEYAZ-140); a variant saved before the rule on some other SKU may
+  keep it until somebody changes it. variant_form_modern.js reads this flag,
+  and ProductForm enforces the same rule on the server.{% endcomment %}
+  <form method="post" id="product_form" class="product-form-layout" enctype="multipart/form-data" data-sku-rule="1"
     data-sku-msg-title="{% trans 'SKU needed' %}"
     data-sku-msg-parent="{% trans 'Enter the product SKU first. Each variant SKU is built from it: the product SKU, a dot, then the option values (K24644.WHITE-140).' %}"
-    data-sku-msg-suffix="{% trans 'Every variant needs its own part after the product SKU and the dot. Open the variants with an empty one and fill it in.' %}"{% endif %}>
+    data-sku-msg-suffix="{% trans 'Every variant needs its own part after the product SKU and the dot. Open the variants with an empty one and fill it in.' %}">
     {% csrf_token %}
 
     <!-- LEFT COLUMN (MAIN CONTENT) -->
@@ -2055,6 +2055,8 @@
             <span class="sku-prefix" id="modal_variant_sku_prefix" hidden></span>
             <input type="text" id="modal_variant_sku" class="form-input">
           </div>
+          <p class="sku-hint" id="modal_variant_sku_legacy" hidden>{% trans "This SKU does not start with the product SKU." %}
+            <button type="button" class="btn-link" onclick="moveVariantSkuUnderParent()">{% trans "Put it under the product SKU" %}</button></p>
           <p class="sku-hint" id="modal_variant_sku_hint" hidden>{% trans "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320." %}</p>
         </div>
 

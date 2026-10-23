@@ -39,6 +39,11 @@ function skuSuffixClean(text) {
         .map(p => p.toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/g, ''))
         .filter(Boolean).join('_');
 }
+// A suffix typed by hand keeps its "-" and "_" (BEIGE-300-275): only
+// spaces and other symbols go. skuSuffixClean is for one value.
+function skuSuffixTyped(text) {
+    return String(text || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ_-]/g, '');
+}
 function skuSuffixFromValues(values) {
     return values.map(skuSuffixClean).filter(Boolean).join('-');
 }
@@ -49,7 +54,7 @@ function skuJoin(parent, suffix) {
 }
 function skuSuffixOf(sku, parent) {
     sku = sku || '';
-    if (parent && sku.startsWith(parent + '.')) return sku.slice(parent.length + 1);
+    if (parent && sku.toUpperCase().startsWith(parent.toUpperCase() + '.')) return sku.slice(parent.length + 1);
     return parent ? null : sku;
 }
 
@@ -1296,7 +1301,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
         if (!displayOptions.length) {
             rowHTML += `<td>
-            <input type="text" name="variant_sku_${originalIndex + 1}" value="${vfEsc(sku)}" data-auto-sku="" placeholder="SKU" style="min-width: 180px;" onclick="event.stopPropagation()" oninput="updateVariantRowsBar()">
+            <input type="text" name="variant_sku_${originalIndex + 1}" value="${vfEsc(sku)}" data-auto-sku="" data-saved-sku="${vfEsc(existingData.sku || '')}" placeholder="SKU" style="min-width: 180px;" onclick="event.stopPropagation()" oninput="updateVariantRowsBar()">
         </td>`;
         }
 
@@ -1333,7 +1338,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         rowHTML += `<td style="display:none;">`;
         rowHTML += `<input type="hidden" name="variant_cost_${originalIndex + 1}" value="${cost}">`;
         if (displayOptions.length) {
-            rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}" data-auto-sku="${vfEsc(_autoSku)}">`;
+            rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}" data-auto-sku="${vfEsc(_autoSku)}" data-saved-sku="${vfEsc(existingData.sku || '')}">`;
         }
         rowHTML += `<input type="hidden" name="variant_barcode_${originalIndex + 1}" value="${barcode}">`;
         rowHTML += `<input type="hidden" name="variant_active_${originalIndex + 1}" value="${active}">`;
@@ -2961,8 +2966,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return false;
             }
 
-            // New product: variants need the product SKU to hang off, and
-            // each needs a part of its own after the dot.
+            // Variants hang off the product SKU, each with a part of its
+            // own after the dot. A variant saved some other way before the
+            // rule may stay as it is until somebody changes it.
             if (skuRuleOn() && hasOptionValues()) {
                 const variantSkus = document.querySelectorAll('input[name^="variant_sku_"]');
                 if (variantSkus.length) {
@@ -2973,7 +2979,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('id_sku')?.focus();
                         return false;
                     }
-                    const bare = Array.from(variantSkus).some(inp => !skuSuffixOf(inp.value, parent));
+                    const bare = Array.from(variantSkus).some(inp =>
+                        !skuSuffixOf(inp.value, parent)
+                        && !(inp.dataset.savedSku && inp.value === inp.dataset.savedSku));
                     if (bare) {
                         e.preventDefault();
                         showErrorModal(skuRuleMsg('skuMsgTitle'), skuRuleMsg('skuMsgSuffix'));
@@ -3728,19 +3736,26 @@ function openVariantDetailModal(variantIndex) {
     if (barcodeEl) barcodeEl.value = barcode;
     if (activeEl) activeEl.checked = isActive;
 
-    // New product: the product SKU is a fixed prefix, only the part after
-    // the dot is typed.
+    // The product SKU is a fixed prefix; only the part after the dot is
+    // typed. A variant saved before the rule, on some other SKU, shows it
+    // whole, with a button to put it under the product.
     const prefixEl = document.getElementById('modal_variant_sku_prefix');
     const hintEl = document.getElementById('modal_variant_sku_hint');
+    const legacyEl = document.getElementById('modal_variant_sku_legacy');
     if (skuRuleOn()) {
         const parent = skuParent();
         const suffix = skuSuffixOf(sku, parent);
-        if (skuEl) skuEl.value = suffix === null ? sku : suffix;
-        if (prefixEl) { prefixEl.textContent = parent + '.'; prefixEl.hidden = !parent; }
+        const legacy = suffix === null && !!sku;
+        modal.dataset.skuLegacy = legacy ? '1' : '';
+        if (skuEl) skuEl.value = legacy ? sku : (suffix || '');
+        if (prefixEl) { prefixEl.textContent = parent + '.'; prefixEl.hidden = !parent || legacy; }
         if (hintEl) hintEl.hidden = false;
+        if (legacyEl) legacyEl.hidden = !legacy;
     } else {
+        modal.dataset.skuLegacy = '';
         if (prefixEl) prefixEl.hidden = true;
         if (hintEl) hintEl.hidden = true;
+        if (legacyEl) legacyEl.hidden = true;
     }
 
     const titleEl = document.getElementById('variant_modal_title');
@@ -3768,7 +3783,8 @@ function saveVariantDetailModal() {
     const price = document.getElementById('modal_variant_price').value;
     const cost = document.getElementById('modal_variant_cost').value;
     let sku = document.getElementById('modal_variant_sku').value;
-    if (skuRuleOn()) sku = skuJoin(skuParent(), skuSuffixClean(sku));
+    const modalEl = document.getElementById('variant_detail_modal');
+    if (skuRuleOn() && !(modalEl && modalEl.dataset.skuLegacy)) sku = skuJoin(skuParent(), skuSuffixTyped(sku));
     const barcode = document.getElementById('modal_variant_barcode').value;
     const isActive = document.getElementById('modal_variant_active').checked;
 
@@ -3994,3 +4010,22 @@ document.addEventListener('keydown', (e) => {
     if ((detail && detail.style.display !== 'none') || document.querySelector('[id^="variant_attr_modal_"]')) return;
     toggleVariantFullscreen(false);
 });
+
+
+// "Put it under the product SKU": an old variant SKU becomes PARENT. plus
+// the part its option values give (or an empty one to type).
+function moveVariantSkuUnderParent() {
+    if (currentEditingVariantIndex === null) return;
+    const idx = currentEditingVariantIndex + 1;
+    const parent = skuParent();
+    const input = document.querySelector(`input[name="variant_sku_${idx}"]`);
+    const built = skuSuffixOf(input && input.dataset.autoSku, parent);
+    const modal = document.getElementById('variant_detail_modal');
+    if (modal) modal.dataset.skuLegacy = '';
+    const skuEl = document.getElementById('modal_variant_sku');
+    if (skuEl) { skuEl.value = built || ''; skuEl.focus(); }
+    const prefixEl = document.getElementById('modal_variant_sku_prefix');
+    if (prefixEl) { prefixEl.textContent = parent + '.'; prefixEl.hidden = !parent; }
+    const legacyEl = document.getElementById('modal_variant_sku_legacy');
+    if (legacyEl) legacyEl.hidden = true;
+}

@@ -118,6 +118,9 @@ urlpatterns = [
     # book_guarded, plus the split-order exception: a half in another book
     # leads to the half the viewer may open, which shows the whole order.
     path("orders/<int:pk>/", split_order_guarded(views.OrderDetail.as_view()), name="order_detail"),
+    # Book admins only — cancel_approval checks the order's books itself.
+    path("orders/cancel-requests/<int:pk>/decide/", views.order_cancel_request_decide,
+         name="order_cancel_request_decide"),
     path("orders/<int:pk>/customer/", of_a_customer_in_reach(views.order_customer_card_view), name="order_customer_card"),
     path("orders/<int:pk>/print/", of_a_customer_in_reach(views.OrderPrint.as_view()), name="order_print"),
     # The order's invoice — a printout of the order, nothing stored.

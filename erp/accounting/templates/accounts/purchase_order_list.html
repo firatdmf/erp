@@ -66,9 +66,9 @@
   .po-badge.ordered { background:#DBEAFE; color:#1D4ED8; }
   .po-badge.received { background:#D1FAE5; color:#065F46; }
   .po-badge.cancelled { background:#F1F5F9; color:#94A3B8; }
-  /* A cancelled purchase stays in the list, greyed out: it is there for
-     the record, and its amount is not in the total above. */
-  .po-row.cancelled td { background: #FAFBFC; }
+  /* A cancelled purchase stays in the list, greyed out and struck through:
+     it is there for the record, and its amount is not in the total above. */
+  .po-row.cancelled td { background: #FAFBFC; text-decoration: line-through; }
   .po-row.cancelled .po-num,
   .po-row.cancelled .po-date,
   .po-row.cancelled .po-supplier,

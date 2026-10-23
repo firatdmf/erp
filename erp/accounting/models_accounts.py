@@ -1057,6 +1057,9 @@ class Invoice(models.Model):
     # it was placed, but nothing is owed until the goods come in, so the
     # supplier is charged on this date (posting_date), not on `date`.
     received_on   = models.DateField(null=True, blank=True)
+    # Why it was cancelled. Required for every cancel: typed by whoever
+    # cancels a purchase, or naming the customer order that took it with it.
+    cancel_reason = models.TextField(blank=True, default="")
 
     # Optional link to an existing sales order
     order = models.ForeignKey(

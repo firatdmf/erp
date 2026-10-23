@@ -1119,6 +1119,11 @@
   .odc-actions { display: flex; gap: 8px; justify-content: flex-end; }
   .odc-ic.danger { background: #FEF2F2; color: #DC2626; }
   .odc-warn.danger { background: #FEF2F2; color: #991B1B; border-color: #FECACA; }
+  .od-approval { display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center; margin: 0 0 16px; padding: 12px 16px; border: 1px solid #FCD34D; background: #FFFBEB; border-radius: 12px; font: 500 13px/1.5 var(--font-sans); color: #78350F; }
+  .od-approval-text { display:flex; gap:10px; align-items:flex-start; min-width:0; }
+  .od-approval-text > i { margin-top: 3px; color: #B45309; }
+  .od-approval-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .od-approval-form input { border:1px solid #E5E7EB; border-radius:8px; padding:7px 10px; font: 500 13px var(--font-sans); min-width: 180px; }
   .odx-list { margin: 0 0 14px; padding-left: 18px; font: 500 13px var(--font-sans); color: var(--gray-700); line-height: 1.6; }
   .odx-reason {
     width: 100%; min-height: 72px; box-sizing: border-box; resize: vertical;
@@ -1149,6 +1154,32 @@
     <span class="od-sep">/</span>
     <span class="od-crumb-here">{% if combined_number %}{{ combined_number }}{% elif order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
   </div>
+
+  {% if cancel_request %}
+  <!-- A cancel that would cancel supplier purchases waits for a book admin;
+       the order stands frozen until one decides (operating.cancel_approval). -->
+  <div class="od-approval">
+    <div class="od-approval-text">
+      <i class="fa fa-hourglass-half"></i>
+      <div>
+        <b>{% blocktrans with action=cancel_request.get_action_display who=cancel_request.requested_by.get_full_name|default:cancel_request.requested_by.username %}{{ action }} — waiting for a book admin's approval. Asked by {{ who }}.{% endblocktrans %}</b>
+        {% if cancel_request.reason %}<div>{% trans "Reason" %}: {{ cancel_request.reason }}</div>{% endif %}
+        <div>{% trans "It cancels purchases still on their way in, and the order can't be changed until it is decided." %}</div>
+      </div>
+    </div>
+    {% if can_decide_cancel %}
+    <form method="post" action="{% url 'operating:order_cancel_request_decide' cancel_request.pk %}" class="od-approval-form">
+      {% csrf_token %}
+      <input type="text" name="note" maxlength="500" placeholder="{% trans 'Note (optional)' %}">
+      <button type="submit" name="decision" value="reject" class="ord-btn ghost">{% trans "Reject" %}</button>
+      <button type="submit" name="decision" value="approve" class="ord-btn danger-solid"
+              onclick="return confirm('{% filter escapejs %}{% trans "Approve? The change is made now and the purchases are cancelled." %}{% endfilter %}');">
+        {% trans "Approve" %}
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
 
   <!-- HEAD -->
   <div class="od-head">
@@ -1230,13 +1261,13 @@
       <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost">
         <i class="fa fa-file-excel"></i>{% trans "Excel" %}
       </a>
-      {% if not shipped and not is_terminal %}
+      {% if not shipped and not is_terminal and not cancel_request %}
         <a href="{% url 'operating:edit_order' order.pk %}" class="ord-btn ghost">
           <i class="fa fa-pen"></i>{% trans "Edit" %}
         </a>
       {% endif %}
       {% comment %}A completed order is re-opened first ("Re-open & Fix"), then cancelled — never in one step. Sales reps can't move an order at all.{% endcomment %}
-      {% if not shipped and not is_terminal and not is_sales_rep %}
+      {% if not shipped and not is_terminal and not is_sales_rep and not cancel_request %}
         <button type="button" id="od-cancel-order-btn" class="ord-btn danger">
           <i class="fa fa-ban"></i>{% trans "Cancel order" %}
         </button>
@@ -2316,6 +2347,9 @@
         {% if order.notify_customer %}<li>{% trans "The customer is emailed that the order was cancelled" %}</li>{% endif %}
         <li>{% trans "The order can no longer be edited or packed" %}</li>
       </ul>
+      {% if cancel_needs_approval %}
+      <div class="odc-warn"><i class="fa fa-user-shield"></i><span>{% trans "It cancels supplier purchases, so a book admin must approve it. The order is frozen until they decide." %}</span></div>
+      {% endif %}
       <label class="odc-lbl" for="odxReason">{% trans "Reason (required)" %}</label>
       <textarea id="odxReason" class="odx-reason" maxlength="500"
                 placeholder="{% trans 'e.g. Customer changed their mind' %}"></textarea>
@@ -2324,7 +2358,7 @@
       <div class="odc-actions">
         <button type="button" class="ord-btn ghost" id="odxBack">{% trans "Keep the order" %}</button>
         <button type="button" class="ord-btn danger-solid" id="odxOk" disabled>
-          <i class="fa fa-ban"></i> {% trans "Cancel order" %}
+          <i class="fa fa-ban"></i> {% if cancel_needs_approval %}{% trans "Ask for approval" %}{% else %}{% trans "Cancel order" %}{% endif %}
         </button>
       </div>
     </div>
@@ -3520,6 +3554,9 @@
           const id = delRow.getAttribute('data-item-row');
           if (id && !id.startsWith('new-')) {
             const r = await postUpdate({ action: 'remove_item', item_id: id });
+            // The line is the last of a purchase on its way in: a book
+            // admin decides, and the order is frozen until they do.
+            if (r && r.approval_requested) { alert(r.error); window.location.reload(); return; }
             if (!(r && r.ok)) throw new Error(r && r.error || 'Remove failed');
             if (r.order_total !== undefined) latestTotal = r.order_total;
             if (r.current_account) applyCurrentAccountSnapshot(r.current_account);

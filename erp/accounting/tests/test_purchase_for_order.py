@@ -16,6 +16,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.html import escape
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import (
@@ -339,7 +340,7 @@ class PurchaseForCustomerTest(TestCase):
     def test_an_order_with_no_live_purchase_flags_nothing(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
-        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
         self.assertFalse(any(it.not_on_purchase for it in r.context["order_items_sorted"]))
         self.assertNotContains(r, "not on the purchase")
@@ -360,7 +361,7 @@ class PurchaseForCustomerTest(TestCase):
         order = Invoice.objects.get(pk=inv_id).for_order
         # Being packed from stock: the packing floor owns it now.
         Order.objects.update(order_status="packaging")
-        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         order.refresh_from_db()
         self.assertEqual(order.order_status, "packaging")
@@ -374,12 +375,13 @@ class PurchaseForCustomerTest(TestCase):
     # anyone confirms, not after.
 
     def _cancel_warning(self, inv_id):
-        """What the purchase page's cancel confirmation will say about the
-        order — read off the context, since the page carries it inside a
-        script string, escaped."""
+        """What the purchase page's cancel dialog will say about the order,
+        read off the context and checked to be on the page."""
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
-        self.assertContains(page, "const orderWarning")
-        return page.context["cancel_order_warning"]
+        warning = page.context["cancel_order_warning"]
+        if warning:
+            self.assertContains(page, '<p class="po-dlg-warn">%s</p>' % escape(warning))
+        return warning
 
     def test_the_purchase_cancel_says_packing_has_not_started(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
@@ -404,7 +406,7 @@ class PurchaseForCustomerTest(TestCase):
 
     def test_a_cancelled_purchase_warns_about_no_order(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
-        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertEqual(self._cancel_warning(inv_id), "")
 
     def test_the_order_cancel_says_how_far_packing_has_got(self):
@@ -472,7 +474,7 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(self._complete(order), (False, "goods_not_received"))
         self.assertFalse(self._sale(order).exists())
         # Cancelling the straggler means nothing more is coming.
-        r = self.client.post(reverse("accounts:purchase_cancel", args=[second.pk]))
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[second.pk]), {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         self.assertEqual(self._complete(order), (True, None))
         self.assertTrue(self._sale(order).exists())
@@ -483,7 +485,7 @@ class PurchaseForCustomerTest(TestCase):
         stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
         OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
         self.assertFalse(self._sale(order).exists())
-        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertEqual(self._complete(order), (True, None))
         # The purchased line went with the purchase; the stock line bills.
         [sale] = self._sale(order)
@@ -614,6 +616,26 @@ class PurchaseForCustomerTest(TestCase):
         self.assertIn(("status", "status", "order", "ordered", "cancelled"), self._purchase_log(inv_id))
         self.assertIn(("field", "purchase", "%s cancelled with the order" % inv.number),
                       self._order_log(order))
+        self.assertEqual(inv.cancel_reason,
+                         "Order %s was cancelled" % (order.order_number or order.pk))
+
+    def test_a_purchase_is_not_cancelled_without_a_reason(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        for reason in ({}, {"reason": "   "}):
+            r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), reason)
+            self.assertEqual(r.status_code, 400)
+            self.assertEqual(Invoice.objects.get(pk=inv_id).status, "ordered")
+
+    def test_the_reason_is_kept_and_logged(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]),
+                             {"reason": "  Supplier ran out  "})
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual(Invoice.objects.get(pk=inv_id).cancel_reason, "Supplier ran out")
+        self.assertIn(("field", "cancel_reason", "purchase", None, "Supplier ran out"),
+                      self._purchase_log(inv_id))
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, "Supplier ran out")
 
     # ── A received purchase is out of the order's reach ──────────────
     # Once the goods are in, the purchase is a fact: the stock is on the
@@ -766,7 +788,7 @@ class PurchaseForCustomerTest(TestCase):
         order = Invoice.objects.get(pk=inv_id).for_order
         stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
         OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
-        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         self.assertEqual([it.product.sku for it in order.items.select_related("product")], ["STK0001"])
         order.refresh_from_db()
@@ -780,7 +802,7 @@ class PurchaseForCustomerTest(TestCase):
     def test_cancelling_the_purchase_cancels_an_order_left_empty(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
-        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         order.refresh_from_db()
         self.assertEqual(order.order_status, "cancelled")
@@ -814,7 +836,7 @@ class PurchaseForCustomerTest(TestCase):
         order.notify_customer = True
         order.save(update_fields=["notify_customer"])
         half = self._other_half(order)
-        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         order.refresh_from_db()
         half.refresh_from_db()
@@ -830,7 +852,7 @@ class PurchaseForCustomerTest(TestCase):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
         half = self._other_half(order, with_goods=False)
-        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]))
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         order.refresh_from_db()
         half.refresh_from_db()

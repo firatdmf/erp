@@ -6558,6 +6558,15 @@ SPLIT_NEEDS_ALL_BOOKS_MSG = gettext_lazy(
     "This order is split across books. Only someone with access to every "
     "book it is in can complete, re-open or cancel it.")
 
+# Shown by every caller of apply_order_status_change that gets
+# 'needs_cancel_approval' or 'cancel_pending' back.
+NEEDS_CANCEL_APPROVAL_MSG = gettext_lazy(
+    "Cancelling this order cancels supplier purchases still on their way in, "
+    "so only an admin of its book can do it. Ask from the order page.")
+CANCEL_PENDING_MSG = gettext_lazy(
+    "A cancellation of this order is waiting for a book admin's approval — "
+    "it can't be changed until it is decided.")
+
 
 def order_reservation_shortfalls(order):
     """Items whose ACTIVE (unconsumed) roll reservations do NOT cover
@@ -6726,11 +6735,20 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     Returns (ok: bool, code: str|None). code is a machine-readable
     reason on failure: 'forbidden_sales_rep' | 'order_cancelled_terminal' |
     'cancel_requires_reopen' | 'goods_not_received' | 'needs_all_books' |
-    'error:<detail>'."""
+    'cancel_pending' | 'needs_cancel_approval' | 'error:<detail>'."""
     from erp.roles import is_sales_rep, _member_and_user
 
     if is_sales_rep(user):
         return False, "forbidden_sales_rep"
+    # A cancel that would cancel supplier purchases is a book admin's to
+    # make; anyone else asks (operating.cancel_approval), and nothing moves
+    # while the question is open.
+    from .cancel_approval import needs_approval, pending_request
+    if pending_request(order) is not None:
+        return False, "cancel_pending"
+    if (user is not None and new_status == "cancelled" and order.order_status != "cancelled"
+            and needs_approval(user, order)):
+        return False, "needs_cancel_approval"
     if not order.split_group:
         return _apply_status_to_one(order, new_status, carrier=carrier, tracking=tracking,
                                     user=user, require_cargo_for_ship=require_cargo_for_ship)

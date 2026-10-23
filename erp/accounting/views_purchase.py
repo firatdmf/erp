@@ -852,13 +852,16 @@ class PurchaseCancelBlocked(Exception):
         self.blockers = blockers or []
 
 
-def cancel_purchase_invoice(invoice_pk, user, *, origin="purchase", mirror_order=True):
+def cancel_purchase_invoice(invoice_pk, user, *, reason, origin="purchase", mirror_order=True):
     """Cancel a purchase invoice: hard-deletes every physical stock item it
     brought in (after confirming NONE has ever been reserved into a
     customer order — checked and acted on under a row lock in the SAME
     transaction, so a concurrent scan can't slip past the check), then
     cancels the invoice/current account via Invoice.cancel() (which deletes the
     posted supplier-debt movement and recomputes the balance).
+
+    `reason` — why, kept on the purchase and in its history. A cancel
+    without one is refused (ValueError), whoever starts it.
 
     Raises PurchaseCancelBlocked (nothing mutated) if any stock item is reserved,
     or Invoice.DoesNotExist / ValueError if the invoice can't be cancelled.
@@ -870,6 +873,9 @@ def cancel_purchase_invoice(invoice_pk, user, *, origin="purchase", mirror_order
     """
     from operating.views_warehouse import _resync_wp_catalog
 
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValueError(_gettext("Say why this purchase is cancelled."))
     with transaction.atomic():
         invoice = (Invoice.objects.select_for_update()
                    .select_related("current_account").get(pk=invoice_pk, type="purchase"))
@@ -930,7 +936,11 @@ def cancel_purchase_invoice(invoice_pk, user, *, origin="purchase", mirror_order
 
         was = invoice.status
         invoice.cancel(user=user)
+        invoice.cancel_reason = reason
+        invoice.save(update_fields=["cancel_reason", "updated_at"])
         log_purchase(invoice, "status", field="status", old=was, new="cancelled",
+                     origin=origin, user=user)
+        log_purchase(invoice, "field", field="cancel_reason", new=reason,
                      origin=origin, user=user)
         invoice.order_note = None
         if invoice.for_order_id:
@@ -971,7 +981,8 @@ class PurchaseCancel(View):
             return JsonResponse({"success": False, "error": _gettext("This action needs manager permission.")}, status=403)
 
         try:
-            invoice = cancel_purchase_invoice(pk, request.user)
+            invoice = cancel_purchase_invoice(pk, request.user,
+                                              reason=request.POST.get("reason"))
         except Invoice.DoesNotExist:
             return JsonResponse({"success": False, "error": _gettext("Purchase not found.")}, status=404)
         except ValueError as exc:

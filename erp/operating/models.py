@@ -2919,6 +2919,58 @@ class OrderChange(models.Model):
         return f"{self.action} · order #{self.order_id} · {self.created_at:%Y-%m-%d %H:%M}"
 
 
+class OrderCancelRequest(models.Model):
+    """A cancel that waits for a book admin.
+
+    Cancelling or deleting an order — or removing the lines that leave a
+    purchase with nothing to buy — cancels the supplier purchases still on
+    their way in for it. Someone who is not an admin of the order's book
+    asks instead, and the order stands frozen until an admin approves (the
+    change is then made, in the admin's name) or rejects it
+    (operating.cancel_approval)."""
+
+    ACTION_CHOICES = [
+        ("cancel", _("Cancel the order")),
+        ("delete", _("Delete the order")),
+        ("remove_lines", _("Remove lines")),
+    ]
+    STATUS_CHOICES = [
+        ("pending", _("Waiting for approval")),
+        ("approved", _("Approved")),
+        ("rejected", _("Rejected")),
+    ]
+
+    order = models.ForeignKey(Order, related_name="cancel_requests", on_delete=models.CASCADE)
+    action = models.CharField(max_length=16, choices=ACTION_CHOICES)
+    reason = models.TextField(blank=True, default="")
+    # remove_lines: the OrderItem ids to remove once approved.
+    item_ids = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending",
+                              db_index=True)
+    requested_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="order_cancel_requests",
+    )
+    requested_at = models.DateTimeField(auto_now_add=True)
+    decided_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="order_cancel_decisions",
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-requested_at"]
+        constraints = [
+            # One open question per order at a time.
+            models.UniqueConstraint(fields=["order"], condition=models.Q(status="pending"),
+                                    name="one_pending_cancel_request_per_order"),
+        ]
+
+    def __str__(self):
+        return f"{self.action} · order #{self.order_id} · {self.status}"
+
+
 # A machine is a physical or virtual device that performs tasks in a workstation.
 # not used yet
 class Machine(models.Model):

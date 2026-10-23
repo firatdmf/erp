@@ -20,6 +20,7 @@ FIELD_LABELS = {
     "date": "date",
     "delivery_date": "delivery date",
     "received_on": "received on",
+    "cancel_reason": "reason for cancelling",
     "supplier": "supplier",
     "warehouse": "warehouse",
     "notes": "notes",
@@ -169,6 +170,7 @@ def decorate_changes(changes):
     from django.utils.translation import gettext as _
     labels = {
         "date": _("date"), "delivery_date": _("delivery date"), "received_on": _("received on"),
+        "cancel_reason": _("reason for cancelling"),
         "supplier": _("supplier"), "warehouse": _("warehouse"),
         "notes": _("notes"), "status": _("status"), "order": _("customer order"),
         "quantity": _("quantity"), "price": _("price"), "sale_price": _("sale price"),

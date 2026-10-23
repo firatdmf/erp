@@ -14739,3 +14739,123 @@ msgstr "Her değeri kelimelerle yazın. Renkleri birleştirmek için aralarına 
 
 msgid "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320."
 msgstr "SKU değerlerden oluşturulur: boşluksuz büyük harfler, değerler arasında -, birleştirilen renkler arasında _ kullanılır. 320 cm gold+ecru → 2086.GOLD_ECRU-320."
+
+msgid "Reason for cancelling"
+msgstr "İptal nedeni"
+
+msgid "reason for cancelling"
+msgstr "iptal nedeni"
+
+msgid "Say why this purchase is cancelled."
+msgstr "Bu alımın neden iptal edildiğini yazın."
+
+msgid "Type the purchase number to confirm:"
+msgstr "Onaylamak için alım numarasını yazın:"
+
+msgid "Keep it"
+msgstr "Vazgeç"
+
+msgid "Could not cancel."
+msgstr "İptal edilemedi."
+
+msgid "The purchase number does not match."
+msgstr "Alım numarası eşleşmiyor."
+
+msgid "This permanently deletes the physical stock this purchase brought in and cannot be undone."
+msgstr "Bu, alımla gelen fiziksel stoğu kalıcı olarak siler ve geri alınamaz."
+
+msgid "Order %(number)s was cancelled"
+msgstr "%(number)s numaralı sipariş iptal edildi"
+
+msgid "Order %(number)s was deleted"
+msgstr "%(number)s numaralı sipariş silindi"
+
+msgid "Nothing left on it to buy — the lines were removed from order %(number)s"
+msgstr "Alınacak bir şey kalmadı — satırlar %(number)s numaralı siparişten kaldırıldı"
+
+msgid "Cancel the order"
+msgstr "Siparişi iptal et"
+
+msgid "Delete the order"
+msgstr "Siparişi sil"
+
+msgid "Remove lines"
+msgstr "Satırları kaldır"
+
+msgid "Waiting for approval"
+msgstr "Onay bekliyor"
+
+msgid "Note (optional)"
+msgstr "Not (isteğe bağlı)"
+
+msgid "Ask for approval"
+msgstr "Onay iste"
+
+msgid "Approve or reject it."
+msgstr "Onaylayın ya da reddedin."
+
+msgid "Approved — the change was made."
+msgstr "Onaylandı — değişiklik yapıldı."
+
+msgid "Approved — the order was deleted."
+msgstr "Onaylandı — sipariş silindi."
+
+msgid "Rejected — the order is unchanged."
+msgstr "Reddedildi — sipariş değişmedi."
+
+msgid "Approve? The change is made now and the purchases are cancelled."
+msgstr "Onaylansın mı? Değişiklik şimdi yapılır ve alımlar iptal edilir."
+
+msgid "It cancels purchases still on their way in, and the order can't be changed until it is decided."
+msgstr "Henüz gelmemiş alımları iptal eder; karar verilene kadar sipariş değiştirilemez."
+
+msgid "It cancels supplier purchases, so a book admin must approve it. The order is frozen until they decide."
+msgstr "Tedarikçi alımlarını iptal ettiği için defter yöneticisinin onayı gerekir. Karar verilene kadar sipariş dondurulur."
+
+msgid "These orders have supplier purchases on their way in, so deleting them was sent to a book admin for approval:"
+msgstr "Bu siparişlerin henüz gelmemiş tedarikçi alımları var; silme işlemi onay için defter yöneticisine gönderildi:"
+
+msgid "%(outcome)s: %(action)s %(order)s"
+msgstr "%(outcome)s: %(action)s %(order)s"
+
+msgid "%(who)s asks. It cancels purchases %(numbers)s. %(reason)s"
+msgstr "%(who)s istiyor. %(numbers)s alımlarını iptal eder. %(reason)s"
+
+msgid "A cancellation of this order is already waiting for approval."
+msgstr "Bu siparişin iptali zaten onay bekliyor."
+
+msgid "Approval needed: %(action)s %(order)s"
+msgstr "Onay gerekiyor: %(action)s %(order)s"
+
+msgid "Only an admin of this order's book can decide this."
+msgstr "Buna yalnızca siparişin defter yöneticisi karar verebilir."
+
+msgid "Someone"
+msgstr "Biri"
+
+msgid "The order could not be cancelled: %(code)s"
+msgstr "Sipariş iptal edilemedi: %(code)s"
+
+msgid "This request has already been decided."
+msgstr "Bu talep için zaten karar verildi."
+
+msgid "The cancellation was sent to a book admin for approval — it cancels supplier purchases still on their way in."
+msgstr "İptal, onay için defter yöneticisine gönderildi — henüz gelmemiş tedarikçi alımlarını iptal eder."
+
+msgid "Removing this line cancels purchase %(numbers)s, so it was sent to a book admin for approval. The order can't be changed until it is decided."
+msgstr "Bu satırı kaldırmak %(numbers)s alımını iptal eder; bu yüzden onay için defter yöneticisine gönderildi. Karar verilene kadar sipariş değiştirilemez."
+
+msgid "Removing %(count)s line(s) cancels purchase %(numbers)s, so they were kept and sent to a book admin for approval."
+msgstr "%(count)s satırı kaldırmak %(numbers)s alımını iptal eder; bu yüzden satırlar tutuldu ve onay için defter yöneticisine gönderildi."
+
+msgid "Deleting this order cancels supplier purchases still on their way in, so it was sent to a book admin for approval."
+msgstr "Bu siparişi silmek henüz gelmemiş tedarikçi alımlarını iptal eder; bu yüzden onay için defter yöneticisine gönderildi."
+
+msgid "Cancelling this order cancels supplier purchases still on their way in, so only an admin of its book can do it. Ask from the order page."
+msgstr "Bu siparişi iptal etmek henüz gelmemiş tedarikçi alımlarını iptal eder; bunu yalnızca defter yöneticisi yapabilir. Sipariş sayfasından talep edin."
+
+msgid "A cancellation of this order is waiting for a book admin's approval — it can't be changed until it is decided."
+msgstr "Bu siparişin iptali defter yöneticisinin onayını bekliyor — karar verilene kadar değiştirilemez."
+
+msgid "%(action)s — waiting for a book admin's approval. Asked by %(who)s."
+msgstr "%(action)s — defter yöneticisinin onayını bekliyor. İsteyen: %(who)s."

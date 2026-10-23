@@ -38,6 +38,16 @@
   .po-badge.received { background:#D1FAE5; color:#065F46; }
   .po-badge.cancelled { background:#F1F5F9; color:#94A3B8; }
 
+  .po-dlg { border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px; width: min(460px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(15,20,25,.18); }
+  .po-dlg::backdrop { background: rgba(15,20,25,.35); }
+  .po-dlg h3 { margin: 0 0 10px; font: 700 16px var(--font-sans); color:#0F1419; }
+  .po-dlg p { margin: 0 0 12px; font: 500 13px/1.45 var(--font-sans); color:#475569; }
+  .po-dlg .po-dlg-warn { color:#92400E; background:#FEF3C7; border-radius:8px; padding:8px 10px; }
+  .po-dlg label { display:block; margin: 10px 0 4px; font: 600 12.5px var(--font-sans); color:#334155; }
+  .po-dlg textarea, .po-dlg input { width:100%; box-sizing:border-box; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font: 500 13.5px var(--font-sans); }
+  .po-dlg .po-dlg-err { margin-top:10px; color:#B91C1C; font: 600 12.5px var(--font-sans); }
+  .po-dlg .po-dlg-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
   .po-info { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .po-card { background: white; border:1px solid #E2E8EE; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
   .po-card-l { font: 600 10.5px var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 5px; }
@@ -136,14 +146,11 @@
             </span>
           {% endif %}
         {% endif %}
-        <form method="post" action="{% url 'accounts:purchase_cancel' invoice.pk %}" style="display:inline;"
-              onsubmit="return poConfirmCancel(this);">
-          {% csrf_token %}
-          <button type="submit" class="po-back" style="color:#B91C1C; border-color:#FCA5A5; cursor:pointer;">
-            <i class="fa fa-ban"></i>
-            {% if is_order %}{% trans "Cancel order" %}{% else %}{% trans "Cancel purchase" %}{% endif %}
-          </button>
-        </form>
+        <button type="button" class="po-back" style="color:#B91C1C; border-color:#FCA5A5; cursor:pointer;"
+                onclick="document.getElementById('poCancelDlg').showModal()">
+          <i class="fa fa-ban"></i>
+          {% if is_order %}{% trans "Cancel order" %}{% else %}{% trans "Cancel purchase" %}{% endif %}
+        </button>
       {% endif %}
     </div>
   </div>
@@ -157,6 +164,12 @@
       <div class="po-card-l">{% trans "Date" %}</div>
       <div class="po-card-v">{{ invoice.date|date:"d.m.Y" }}</div>
     </div>
+    {% if invoice.status == 'cancelled' and invoice.cancel_reason %}
+    <div class="po-card">
+      <div class="po-card-l">{% trans "Reason for cancelling" %}</div>
+      <div class="po-card-v" style="font-size:13px; font-weight:600; white-space:pre-line;">{{ invoice.cancel_reason }}</div>
+    </div>
+    {% endif %}
     {% if invoice.received_on and invoice.received_on != invoice.date %}
     <div class="po-card">
       <div class="po-card-l">{% trans "Received on" %}</div>
@@ -322,24 +335,60 @@
   {% endif %}
 </div>
 
+{% if invoice.status != 'cancelled' %}
+<!-- Cancelling a purchase hard-deletes the physical stock it brought in —
+     irreversible, unlike a normal invoice cancel — so it asks why, and asks
+     for the purchase number typed out rather than a click-through. -->
+<dialog id="poCancelDlg" class="po-dlg">
+  <form id="poCancelForm" onsubmit="return poCancel(event);">
+    <h3>{% if is_order %}{% trans "Cancel order" %}{% else %}{% trans "Cancel purchase" %}{% endif %} {{ invoice.display_number }}</h3>
+    {% if cancel_order_warning %}<p class="po-dlg-warn">{{ cancel_order_warning }}</p>{% endif %}
+    <p>{% trans "This permanently deletes the physical stock this purchase brought in and cannot be undone." %}</p>
+    <label for="poCancelReason">{% trans "Reason for cancelling" %}</label>
+    <textarea id="poCancelReason" name="reason" rows="3" required maxlength="2000"></textarea>
+    <label for="poCancelNumber">{% trans "Type the purchase number to confirm:" %} <b>{{ invoice.display_number }}</b></label>
+    <input id="poCancelNumber" type="text" required autocomplete="off">
+    <div class="po-dlg-err" id="poCancelErr" hidden></div>
+    <div class="po-dlg-foot">
+      <button type="button" class="po-back" onclick="document.getElementById('poCancelDlg').close()">{% trans "Keep it" %}</button>
+      <button type="submit" class="po-back" id="poCancelGo" style="color:#fff; background:#B91C1C; border-color:#B91C1C; cursor:pointer;">
+        <i class="fa fa-ban"></i> {% if is_order %}{% trans "Cancel order" %}{% else %}{% trans "Cancel purchase" %}{% endif %}
+      </button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
 <script>
   if (window.lucide) lucide.createIcons();
 
-  // Cancelling a purchase hard-deletes the physical stock it brought in —
-  // irreversible, unlike a normal invoice cancel. A plain confirm() is too
-  // easy to click through by habit, so require typing the purchase number.
-  function poConfirmCancel(form) {
-    // A purchase bought for a customer order changes that order too —
-    // how depends on whether packing has started, so it is said here,
-    // before the number is typed (order_purchases.purchase_cancel_warning).
-    const orderWarning = "{{ cancel_order_warning|escapejs }}";
-    const typed = window.prompt(
-      (orderWarning ? orderWarning + "\n\n" : "") +
-      "{% trans 'This permanently deletes the physical stock this purchase brought in and cannot be undone. Type the purchase number to confirm:' %}\n" +
-      "{{ invoice.display_number }}"
-    );
-    return typed === "{{ invoice.display_number }}";
-  }
+  window.poCancel = function (ev) {
+    ev.preventDefault();
+    const go = document.getElementById('poCancelGo');
+    const err = document.getElementById('poCancelErr');
+    if (document.getElementById('poCancelNumber').value.trim() !== "{{ invoice.display_number|escapejs }}") {
+      err.textContent = '{% filter escapejs %}{% trans "The purchase number does not match." %}{% endfilter %}';
+      err.hidden = false;
+      return false;
+    }
+    const body = new FormData();
+    body.append('reason', document.getElementById('poCancelReason').value.trim());
+    go.disabled = true;
+    err.hidden = true;
+    fetch("{% url 'accounts:purchase_cancel' invoice.pk %}", {
+      method: 'POST', body: body,
+      headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.success) { window.location.reload(); return; }
+        err.textContent = (d && d.error) || '{% filter escapejs %}{% trans "Could not cancel." %}{% endfilter %}';
+        err.hidden = false; go.disabled = false;
+      }).catch(function () {
+        err.textContent = '{% filter escapejs %}{% trans "Network error." %}{% endfilter %}';
+        err.hidden = false; go.disabled = false;
+      });
+    return false;
+  };
 </script>
 <script>
   // Confirm turns this order into stock; it is deliberately a POST with an

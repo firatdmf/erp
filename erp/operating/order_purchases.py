@@ -531,7 +531,10 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
             else:
                 # Nothing left to buy. The plan is kept as it was so the
                 # cancelled purchase still reads what it was for.
-                cancel_purchase_invoice(invoice.pk, user, origin="order", mirror_order=False)
+                cancel_purchase_invoice(
+                    invoice.pk, user, origin="order", mirror_order=False,
+                    reason=_("Nothing left on it to buy — the lines were removed from order %(number)s")
+                    % {"number": order.order_number or order.pk})
                 log_change(order, "field", field="purchase",
                            new=_("%(number)s cancelled — nothing left on it to buy")
                            % {"number": invoice.number})
@@ -554,7 +557,11 @@ def cancel_purchases_for_cancelled_order(order, *, user=None, deleted=False):
     cancelled = []
     for invoice in list(order.unreceived_purchases()):
         with syncing():
-            cancel_purchase_invoice(invoice.pk, user, origin="order", mirror_order=False)
+            cancel_purchase_invoice(
+                invoice.pk, user, origin="order", mirror_order=False,
+                reason=(_("Order %(number)s was deleted") if deleted
+                        else _("Order %(number)s was cancelled"))
+                % {"number": order.order_number or order.pk})
         if deleted:
             log_purchase(invoice, "field", field="order", origin="order", user=user,
                          new=_("Order %(number)s deleted — this purchase was cancelled with it")

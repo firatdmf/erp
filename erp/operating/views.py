@@ -421,6 +421,14 @@ class OrderDetail(DetailView):
         # Cancelling an order that has purchases behind it reaches past the
         # order — the cancel dialog says how far packing has got first.
         ctx["packing"] = packing_state(self.object) if ctx["supplier_purchases"] else None
+        # Cancelling it would cancel purchases still on their way in: a
+        # book admin decides, and an open request freezes the order.
+        from . import cancel_approval
+        ctx["cancel_request"] = cancel_approval.pending_request(self.object)
+        ctx["can_decide_cancel"] = cancel_approval.is_book_admin(self.request.user, self.object)
+        ctx["cancel_needs_approval"] = (
+            ctx["cancel_request"] is None
+            and cancel_approval.needs_approval(self.request.user, self.object))
         # An order created by a purchase is that purchase's mirror — its
         # lines were written on the purchase form and are kept in step from
         # there (order_purchases.sync_customer_order). A line added on the
@@ -660,6 +668,11 @@ class OrderDetail(DetailView):
                        "update_customer", "update_guest"}
                 and order.order_status in {"cancelled", "returned"}):
             return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be edited.")}, status=400)
+        from .cancel_approval import frozen_error
+        if action in {"update_item", "add_item", "remove_item", "update_customer", "update_guest"}:
+            frozen = frozen_error(order)
+            if frozen:
+                return JsonResponse({"ok": False, "error": frozen}, status=400)
 
         def _sync_current_account_total():
             """Re-post the current account movement for this order after its total
@@ -884,6 +897,20 @@ class OrderDetail(DetailView):
             except (TypeError, ValueError):
                 return JsonResponse({"ok": False, "error": "Bad item_id"}, status=400)
             item = get_object_or_404(OrderItem, pk=item_id, order=order)
+            # The last line of a purchase still on its way in: removing it
+            # cancels that purchase, which a book admin decides.
+            from .cancel_approval import (ApprovalError, is_book_admin,
+                                          purchases_emptied_by, request_approval)
+            emptied = purchases_emptied_by(order, [item])
+            if emptied and not is_book_admin(request.user, order):
+                try:
+                    request_approval(order, request.user, "remove_lines", item_ids=[item.pk])
+                except ApprovalError as exc:
+                    return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+                return JsonResponse({"ok": False, "approval_requested": True, "error": _gettext(
+                    "Removing this line cancels purchase %(numbers)s, so it was sent to a book "
+                    "admin for approval. The order can't be changed until it is decided.")
+                    % {"numbers": ", ".join(p.number for p in emptied)}}, status=202)
             item.delete()
             _sync_current_account_total()
             return JsonResponse({
@@ -1003,6 +1030,18 @@ class OrderDetail(DetailView):
         if cancelling and not cancel_reason:
             messages.error(request, _g("Enter a reason to cancel the order."))
             return redirect("operating:order_detail", pk=order.pk)
+        # It would cancel supplier purchases: a book admin decides.
+        from .cancel_approval import ApprovalError, needs_approval, request_approval
+        if cancelling and needs_approval(request.user, order):
+            try:
+                request_approval(order, request.user, "cancel", reason=cancel_reason)
+            except ApprovalError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, _g(
+                    "The cancellation was sent to a book admin for approval — it cancels "
+                    "supplier purchases still on their way in."))
+            return redirect("operating:order_detail", pk=order.pk)
 
         # Cargo receipts ride in with Complete order or Save, and are stored
         # BEFORE the status change: completing the order emails the customer
@@ -1041,6 +1080,9 @@ class OrderDetail(DetailView):
             elif code == "needs_all_books":
                 from .views_warehouse import SPLIT_NEEDS_ALL_BOOKS_MSG
                 error = SPLIT_NEEDS_ALL_BOOKS_MSG
+            elif code == "cancel_pending":
+                from .views_warehouse import CANCEL_PENDING_MSG
+                error = CANCEL_PENDING_MSG
             else:
                 error = _gettext("The order could not be updated: %(error)s") % {"error": (code or '').replace('error:', '')}
             if wants_json:
@@ -1667,6 +1709,10 @@ def order_pack_scan(request, pk):
     if order.order_status in {"cancelled", "returned"}:
         messages.error(request, _gettext("A cancelled order can't be packed."))
         return redirect("operating:order_detail", pk=order.pk)
+    from .cancel_approval import frozen_error
+    if frozen := frozen_error(order):
+        messages.error(request, frozen)
+        return redirect("operating:order_detail", pk=order.pk)
     reservations = list(
         order.stock_reservations
         .select_related("stock_item", "warehouse_product", "warehouse_product__warehouse", "pack")
@@ -1746,6 +1792,9 @@ def order_pack_reserve_add(request, pk):
         # a stock item scanned onto it afterwards would hold warehouse stock
         # forever with nothing to ever release it.
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
+    from .cancel_approval import frozen_error
+    if frozen := frozen_error(order):
+        return JsonResponse({"ok": False, "error": frozen}, status=400)
 
     code = (request.POST.get("barcode") or "").strip()
     if not code:
@@ -1872,6 +1921,9 @@ def order_pack_reserve_update(request, pk):
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
+    from .cancel_approval import frozen_error
+    if frozen := frozen_error(order):
+        return JsonResponse({"ok": False, "error": frozen}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": _gettext("Invalid reservation.")}, status=400)
@@ -1908,6 +1960,9 @@ def order_pack_reserve_remove(request, pk):
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
+    from .cancel_approval import frozen_error
+    if frozen := frozen_error(order):
+        return JsonResponse({"ok": False, "error": frozen}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": _gettext("Invalid reservation.")}, status=400)
@@ -1935,6 +1990,9 @@ def order_pack_reserve_assign_pack(request, pk):
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
+    from .cancel_approval import frozen_error
+    if frozen := frozen_error(order):
+        return JsonResponse({"ok": False, "error": frozen}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": _gettext("Invalid reservation.")}, status=400)
@@ -1967,6 +2025,9 @@ def order_pack_assign_item(request, pk):
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
     if order.order_status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
+    from .cancel_approval import frozen_error
+    if frozen := frozen_error(order):
+        return JsonResponse({"ok": False, "error": frozen}, status=400)
     item_id = (request.POST.get("item_id") or "").strip()
     if not item_id.isdigit():
         return JsonResponse({"ok": False, "error": _gettext("Invalid line.")}, status=400)
@@ -2777,6 +2838,9 @@ def order_pack_complete(request, pk):
         # Also blocks the raw order_status='packaging' save below from
         # reviving a terminal order outside the status funnel.
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be re-opened.")}, status=400)
+    from .cancel_approval import frozen_error
+    if frozen := frozen_error(order):
+        return JsonResponse({"ok": False, "error": frozen}, status=400)
     n = order.stock_reservations.filter(consumed=False).count()
     if n < 1:
         return JsonResponse({"ok": False,
@@ -4270,6 +4334,11 @@ class OrderEdit(UpdateView):
         if self.object.order_status in {"cancelled", "returned"}:
             messages.error(request, _gettext("A cancelled order can't be edited."))
             return redirect("operating:order_detail", pk=self.object.pk)
+        from .cancel_approval import frozen_error
+        frozen = frozen_error(self.object)
+        if frozen:
+            messages.error(request, frozen)
+            return redirect("operating:order_detail", pk=self.object.pk)
         # Once an order is shipped its rolls are already cut and its
         # reservations consumed. Editing items then would desync catalog
         # vs warehouse stock (the item signals adjust catalog while the
@@ -4486,6 +4555,25 @@ class OrderEdit(UpdateView):
                 if deleted_items_json:
                     try:
                         deleted_items = json.loads(deleted_items_json)
+                        # Lines that are the last of a purchase still on its
+                        # way in cancel it when they go: a book admin decides,
+                        # so those are held back and asked about.
+                        from .cancel_approval import (ApprovalError, held_lines,
+                                                      request_approval)
+                        held, emptied = held_lines(self.object, deleted_items, self.request.user)
+                        if held:
+                            deleted_items = [pk for pk in deleted_items if pk not in held]
+                            try:
+                                request_approval(self.object, self.request.user,
+                                                 "remove_lines", item_ids=held)
+                            except ApprovalError as exc:
+                                messages.error(self.request, str(exc))
+                            else:
+                                messages.warning(self.request, _gettext(
+                                    "Removing %(count)s line(s) cancels purchase %(numbers)s, so "
+                                    "they were kept and sent to a book admin for approval.")
+                                    % {"count": len(held),
+                                       "numbers": ", ".join(p.number for p in emptied)})
                         # Release any active roll reservations tied to these items
                         # before deleting them — otherwise SET_NULL on order_item
                         # orphans the reservations and rolls stay "reserved" forever.
@@ -5543,16 +5631,58 @@ def delete_order(request, pk):
         )
         return redirect("operating:order_detail", pk=order.pk)
     # Goods still on their way in for it are not wanted either — same as
-    # cancelling. A received purchase is stock on the shelf and stays.
-    from .order_purchases import cancel_purchases_for_cancelled_order
-    cancelled = cancel_purchases_for_cancelled_order(order, user=request.user, deleted=True)
-    order.delete()
+    # cancelling, and a book admin's to decide the same way. A received
+    # purchase is stock on the shelf and stays.
+    from . import cancel_approval
+    if frozen := cancel_approval.frozen_error(order):
+        messages.error(request, frozen)
+        return redirect("operating:order_detail", pk=order.pk)
+    if cancel_approval.needs_approval(request.user, order):
+        try:
+            cancel_approval.request_approval(order, request.user, "delete",
+                                             reason=request.POST.get("reason"))
+        except cancel_approval.ApprovalError as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(request, _gettext(
+                "Deleting this order cancels supplier purchases still on their way in, so it "
+                "was sent to a book admin for approval."))
+        return redirect("operating:order_detail", pk=order.pk)
+    cancelled = cancel_approval.delete_order(order, request.user)
     messages.success(request, _gettext("Order deleted."))
     if cancelled:
         messages.warning(request, _gettext(
             "Its supplier purchases awaiting delivery were cancelled with it: %(numbers)s")
             % {"numbers": ", ".join(cancelled)})
     return redirect("operating:order_list")
+
+
+@login_required
+@require_POST
+def order_cancel_request_decide(request, pk):
+    """A book admin approves or rejects a cancel request
+    (operating.cancel_approval) — approving makes the change in their name."""
+    from . import cancel_approval
+    from .models import OrderCancelRequest
+    req = get_object_or_404(OrderCancelRequest.objects.select_related("order"), pk=pk)
+    order_pk = req.order_id
+    decision = request.POST.get("decision")
+    try:
+        if decision == "approve":
+            cancel_approval.approve(req, request.user)
+        elif decision == "reject":
+            cancel_approval.reject(req, request.user, request.POST.get("note"))
+        else:
+            raise cancel_approval.ApprovalError(_gettext("Approve or reject it."))
+    except cancel_approval.ApprovalError as exc:
+        messages.error(request, str(exc))
+        return redirect("operating:order_detail", pk=order_pk)
+    if decision == "approve" and req.action == "delete":
+        messages.success(request, _gettext("Approved — the order was deleted."))
+        return redirect("operating:order_list")
+    messages.success(request, _gettext("Approved — the change was made.") if decision == "approve"
+                     else _gettext("Rejected — the order is unchanged."))
+    return redirect("operating:order_detail", pk=order_pk)
 
 
 @require_POST
@@ -5596,16 +5726,24 @@ def bulk_delete_orders(request):
     # (OrderItem post_delete restores catalog stock; current account movement is
     # reversed). bulk delete via qs.delete() would still cascade but
     # we keep it per-row for predictable signal ordering on Postgres.
+    # Goods still on their way in for it go with it — as on cancel, and a
+    # book admin decides that the same way: anyone else's delete of such an
+    # order is sent to them instead. A frozen order is left alone.
+    from . import cancel_approval
+    frozen_ids = [o.pk for o in deletable if cancel_approval.frozen_error(o)]
+    deletable = [o for o in deletable if o.pk not in frozen_ids]
+    requested = [o for o in deletable if cancel_approval.needs_approval(request.user, o)]
+    deletable = [o for o in deletable if o not in requested]
+    for o in requested:
+        cancel_approval.request_approval(o, request.user, "delete")
     deleted_ids = [o.pk for o in deletable]  # capture BEFORE delete() nulls pk
-    from .order_purchases import cancel_purchases_for_cancelled_order
     purchases_cancelled = []
     for o in deletable:
-        # Goods still on their way in for it go with it — as on cancel.
-        purchases_cancelled += cancel_purchases_for_cancelled_order(o, user=request.user, deleted=True)
-        o.delete()
+        purchases_cancelled += cancel_approval.delete_order(o, request.user)
     resp = {"ok": True, "deleted": len(deleted_ids),
             "deleted_ids": deleted_ids,
-            "skipped_ids": skipped_ids,
+            "skipped_ids": skipped_ids + frozen_ids,
+            "approval_requested": [o.order_number or o.pk for o in requested],
             "purchases_cancelled": purchases_cancelled}
     if skipped_ids:
         resp["warning"] = (
@@ -7008,6 +7146,12 @@ def update_order_status(request, order_id):
             if code == "needs_all_books":
                 from .views_warehouse import SPLIT_NEEDS_ALL_BOOKS_MSG
                 return JsonResponse({'error': str(SPLIT_NEEDS_ALL_BOOKS_MSG)}, status=403)
+            if code == "needs_cancel_approval":
+                from .views_warehouse import NEEDS_CANCEL_APPROVAL_MSG
+                return JsonResponse({'error': str(NEEDS_CANCEL_APPROVAL_MSG)}, status=403)
+            if code == "cancel_pending":
+                from .views_warehouse import CANCEL_PENDING_MSG
+                return JsonResponse({'error': str(CANCEL_PENDING_MSG)}, status=409)
             return JsonResponse({'error': _gettext("Status update error"), 'details': (code or '').replace('error:', '')}, status=500)
 
         return JsonResponse({
@@ -7432,6 +7576,12 @@ class WebOrderStatusEdit(View):
             elif code == "needs_all_books":
                 from .views_warehouse import SPLIT_NEEDS_ALL_BOOKS_MSG
                 messages.error(request, SPLIT_NEEDS_ALL_BOOKS_MSG)
+            elif code == "needs_cancel_approval":
+                from .views_warehouse import NEEDS_CANCEL_APPROVAL_MSG
+                messages.error(request, NEEDS_CANCEL_APPROVAL_MSG)
+            elif code == "cancel_pending":
+                from .views_warehouse import CANCEL_PENDING_MSG
+                messages.error(request, CANCEL_PENDING_MSG)
             else:
                 messages.error(request, _gettext("The order could not be updated: %(error)s") % {"error": (code or '').replace('error:', '')})
             next_url = request.POST.get('next') or request.GET.get('next')

@@ -259,7 +259,7 @@ class TakingItBack(TransferBase):
         goods: they go back, not away."""
         transfer = self.send()
         with self.assertRaises(ValueError):
-            cancel_purchase_invoice(transfer.purchase.pk, self.user)
+            cancel_purchase_invoice(transfer.purchase.pk, self.user, reason="Wrong book")
         self.assertEqual(WarehouseProductItem.objects.count(), 2)
         self.assertEqual(self.balance(self.factory_side), Decimal("382.06"))
 

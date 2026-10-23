@@ -1118,6 +1118,9 @@
         if (data.purchases_cancelled && data.purchases_cancelled.length) {
           alert('{% trans "Supplier purchases cancelled with the deleted orders:" %} ' + data.purchases_cancelled.join(', '));
         }
+        if (data.approval_requested && data.approval_requested.length) {
+          alert('{% trans "These orders have supplier purchases on their way in, so deleting them was sent to a book admin for approval:" %} ' + data.approval_requested.join(', '));
+        }
         // Update tab counts.
         document.querySelectorAll('.ord-tab').forEach(t => {
           const pane = document.querySelector(`.ord-list-wrap[data-pane="${t.dataset.tab}"]`);

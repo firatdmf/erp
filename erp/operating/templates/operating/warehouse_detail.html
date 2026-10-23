@@ -298,6 +298,8 @@
     font: 600 10.5px var(--font-sans); color: var(--gray-500);
     text-transform: lowercase; margin-top: 2px; line-height: 1.1; white-space: nowrap;
   }
+  /* "Reserved: 12.00 m" under a quantity, on one line (tops-sub). */
+  .tops-sub.wh-reserved { color: #B45309; font-weight: 700; }
   /* Main-product (group) badge — marks the parent vs its variants. */
   .wh-grp-ico {
     display: inline-flex; align-items: center; justify-content: center;
@@ -337,6 +339,9 @@
   .od-prods tbody tr { transition: background-color 140ms; }
   .od-prods tbody tr:hover { background: #F8FAFC; }
   .od-prods .pname { font: 600 13px var(--font-sans); color: #0F1419; }
+  /* A word too long for its column breaks rather than widening the table;
+     names break after their "+" first (wrap_at_plus). */
+  .od-prods .pname, .od-prods .psub { overflow-wrap: anywhere; }
   .od-prods .psub { font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
   .od-prods .mono { font: 800 14px var(--font-mono); color: #0F1419; letter-spacing: 0.01em; }
   .od-prods .sku-pill {
@@ -345,7 +350,7 @@
     font: 700 13px var(--font-mono); letter-spacing: 0.03em;
     border: 1px solid rgba(20,127,116,0.30);
   }
-  .od-prods .qty { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; }
+  .od-prods .qty { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; white-space: nowrap; }
   /* Location column — only rendered on a combined (ortak) warehouse, where
      each row belongs to a different member. Muted violet, matching the
      "Combined" chip in the header, so the eye reads it as "which shelf"
@@ -626,7 +631,10 @@
   .ord-btn.danger:hover { filter: brightness(1.04); color: white; }
 
   /* RESPONSIVE */
-  @media (max-width: 1100px) {
+  /* The info column goes under the table below 1366px: beside it, the
+     stock table has too little width left and its names fold to a few
+     letters a line. */
+  @media (max-width: 1366px) {
     .od-grid { grid-template-columns: 1fr; }
     .od-right { position: static; }
   }

@@ -97,3 +97,13 @@ def country_choices():
     """(code, name) for every country, for a country <select>."""
     from operating.countries import country_choices as choices
     return choices()
+
+
+@register.filter
+def wrap_at_plus(value):
+    """Escape `value` and let a line break after each "+". Names that join
+    their parts with "+" have no spaces, so without this the longest one
+    sets its column's width and pushes the table past the page."""
+    from django.utils.html import escape
+    from django.utils.safestring import mark_safe
+    return mark_safe(escape(value or "").replace("+", "+<wbr>"))

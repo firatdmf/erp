@@ -39,7 +39,7 @@ links so that keeps working.{% endcomment %}
   </td>
   <td data-label="{% trans 'Name' %}">
     <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
-      <div class="pname" style="font-weight:600;">{{ p.name }}</div>
+      <div class="pname" style="font-weight:600;">{{ p.name|wrap_at_plus }}</div>
       {% if p.catalog_variant_id %}{% comment %}The variant's values in the reader's language
       ("Altın + Ekru · 320 cm" in Turkish): the name above is typed in one
       language once, these come from the catalog's wordings.{% endcomment %}<div class="psub wh-worded">{% for a in p.catalog_variant.product_variant_attribute_values.all %}{{ a|worded_value }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
@@ -47,7 +47,7 @@ links so that keeps working.{% endcomment %}
       {% comment %}A merged line shows the name of the member holding the most;
       a member that calls the SKU something else is named here, so the
       difference stays in sight instead of being folded away.{% endcomment %}
-      {% for other in p.other_names %}<div class="psub wh-other-name" title="{% trans 'Another warehouse names this SKU differently' %}">{{ other }}</div>{% endfor %}
+      {% for other in p.other_names %}<div class="psub wh-other-name" title="{% trans 'Another warehouse names this SKU differently' %}">{{ other|wrap_at_plus }}</div>{% endfor %}
     </a>
   </td>
   {% if warehouse.is_combined %}
@@ -77,7 +77,7 @@ links so that keeps working.{% endcomment %}
     <a {% if not p.is_merged %}href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}"{% endif %} class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
       <div class="qty">{{ p.quantity|floatformat:"2g" }} {{ p.unit_short }}</div>
       {% if p.roll_count and p.counts_packs %}<div class="tops-sub" title="{% blocktrans with n=p.item_noun_plural %}The {{ n }} this product is stored in{% endblocktrans %}">{{ p.roll_count }} {% if p.roll_count == 1 %}{{ p.item_noun }}{% else %}{{ p.item_noun_plural }}{% endif %}</div>{% endif %}
-      {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} {{ p.unit_short }}</div>{% endif %}
+      {% if p.reserved %}<div class="tops-sub wh-reserved" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} {{ p.unit_short }}</div>{% endif %}
     </a>
   </td>
   {% comment %}Unit cost is the quantity-weighted average of the rolls
@@ -130,7 +130,7 @@ links so that keeps working.{% endcomment %}
       <i class="fa fa-chevron-right wh-grp-chev" style="color:#94A3B8; transition:transform .15s; width:10px;"></i>
       <span class="wh-grp-ico"><i class="fa fa-layer-group"></i></span>
       <div>
-        <div class="pname">{{ g.title }}</div>
+        <div class="pname">{{ g.title|wrap_at_plus }}</div>
         <div class="psub">
           {% trans "Main product" %} · {{ g.variant_count }} {% blocktrans count c=g.variant_count %}variant{% plural %}variants{% endblocktrans %}
           {% if not g.is_catalog %} · <span style="color:#C5A572;">{% trans "unlinked" %}</span>{% endif %}
@@ -149,7 +149,7 @@ links so that keeps working.{% endcomment %}
   <td class="num" data-label="{% trans 'Total' %}">
     <div class="qty">{{ g.total_qty|floatformat:"2g" }} {{ g.unit_short }}</div>
     {% if g.roll_total and g.counts_packs %}<div class="tops-sub">{{ g.roll_total }} {% if g.roll_total == 1 %}{{ g.item_noun }}{% else %}{{ g.item_noun_plural }}{% endif %}</div>{% endif %}
-    {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ g.reserved_total|floatformat:"2g" }} {{ g.unit_short }}</div>{% endif %}
+    {% if g.reserved_total %}<div class="tops-sub wh-reserved" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ g.reserved_total|floatformat:"2g" }} {{ g.unit_short }}</div>{% endif %}
   </td>
   {% if is_sales_rep %}
   {# Price derived from the average cost, and no Total — as the flat rows. #}

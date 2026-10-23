@@ -24,12 +24,12 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
     {% endif %}
   </td>
   <td data-label="{% trans 'Name' %}">
-    <div class="pname" style="font-weight:600;">{{ p.name }}</div>
+    <div class="pname" style="font-weight:600;">{{ p.name|wrap_at_plus }}</div>
     {% if p.catalog_variant_id %}{% comment %}The variant's values in the reader's language
       ("Altın + Ekru · 320 cm" in Turkish): the name above is typed in one
       language once, these come from the catalog's wordings.{% endcomment %}<div class="psub wh-worded">{% for a in p.catalog_variant.product_variant_attribute_values.all %}{{ a|worded_value }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
     {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
-    {% for other in p.other_names %}<div class="psub wh-other-name" title="{% trans 'Another warehouse names this SKU differently' %}">{{ other }}</div>{% endfor %}
+    {% for other in p.other_names %}<div class="psub wh-other-name" title="{% trans 'Another warehouse names this SKU differently' %}">{{ other|wrap_at_plus }}</div>{% endfor %}
   </td>
   {% if warehouse.is_combined %}
   {% comment %}Which member warehouse holds this variant — the same Location
@@ -55,7 +55,7 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
   <td class="num" data-label="{% trans 'Stock' %}">
     <div class="qty">{{ p.quantity|floatformat:"2g" }} m</div>
     {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each roll has its own barcode' %}">{{ p.roll_count }} {% blocktrans count c=p.roll_count %}roll{% plural %}rolls{% endblocktrans %}</div>{% endif %}
-    {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} m</div>{% endif %}
+    {% if p.reserved %}<div class="tops-sub wh-reserved" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} m</div>{% endif %}
   </td>
   {% comment %}Weighted average of the stock on the floor, matching the flat
   list — not the SKU's last-purchase price.{% endcomment %}

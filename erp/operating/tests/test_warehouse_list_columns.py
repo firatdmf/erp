@@ -478,3 +478,11 @@ class RowsShowTheVariantsOwnPhoto(TestCase):
         self._check(self.client.get(
             reverse("operating:warehouse_group_variants", args=[self.wh.pk]),
             {"base": "GREK"}).content.decode())
+
+
+class NamesBreakAfterPlus(TestCase):
+    def test_a_break_after_each_plus_and_the_rest_escaped(self):
+        from operating.templatetags.operating_tags import wrap_at_plus
+        self.assertEqual(wrap_at_plus("PERLA+<b>MİRLE"),
+                         "PERLA+<wbr>&lt;b&gt;MİRLE")
+        self.assertEqual(wrap_at_plus(None), "")

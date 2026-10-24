@@ -8,7 +8,7 @@ touches the CDN, and nearly every one of those tests already carries an
 @patch for it — on setUp, where the patch lifts the moment setUp
 returns and the test body goes to the real network. On a developer's
 machine that looked like it worked: .env holds a live
-BUNNY_STORAGE_API_KEY, so the upload really did succeed, against
+BUNNY_STORAGE_ACCESS_KEY, so the upload really did succeed, against
 production storage. CI has no key, so the upload 401s, order creation
 aborts, and twenty-eight tests fail for a reason that has nothing to do
 with what any of them assert.

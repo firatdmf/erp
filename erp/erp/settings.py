@@ -403,7 +403,9 @@ STOREFRONT_API_KEY = config("STOREFRONT_API_KEY", default="")
 # Bunny CDN Configuration
 # Set USE_BUNNY_CDN=True in .env to enable Bunny CDN for new uploads
 USE_BUNNY_CDN = config("USE_BUNNY_CDN", default=False, cast=bool)
-BUNNY_STORAGE_API_KEY = config("BUNNY_STORAGE_API_KEY", default="")
+# The storage zone's own password (Bunny: Storage → zone → FTP & API Access →
+# Password), sent as the AccessKey header — not the account API key.
+BUNNY_STORAGE_ACCESS_KEY = config("BUNNY_STORAGE_ACCESS_KEY", default="")
 BUNNY_ACCOUNT_API_KEY = config("BUNNY_ACCOUNT_API_KEY", default="")
 BUNNY_STORAGE_ZONE = config("BUNNY_STORAGE_ZONE", default="")
 BUNNY_STORAGE_REGION = config("BUNNY_STORAGE_REGION", default="")  # Empty for main region

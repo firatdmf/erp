@@ -13,7 +13,7 @@ import re
 def get_bunny_config():
     """Get Bunny CDN configuration from settings"""
     return {
-        'api_key': getattr(settings, 'BUNNY_STORAGE_API_KEY', ''),
+        'api_key': getattr(settings, 'BUNNY_STORAGE_ACCESS_KEY', ''),
         'account_api_key': getattr(settings, 'BUNNY_ACCOUNT_API_KEY', ''),
         'storage_zone': getattr(settings, 'BUNNY_STORAGE_ZONE', ''),
         'region': getattr(settings, 'BUNNY_STORAGE_REGION', ''),

@@ -82,3 +82,18 @@ def photos_json(files):
     import json
     return json.dumps([{"src": f.file_url, "alt": f.alt_text or ""}
                        for f in files or ()])
+
+
+@register.filter
+def country_name(value):
+    """ "TR" → "Türkiye" (in the reader's language); a typed name as it is.
+    See operating/countries.py."""
+    from operating.countries import country_name as name
+    return name(value)
+
+
+@register.simple_tag
+def country_choices():
+    """(code, name) for every country, for a country <select>."""
+    from operating.countries import country_choices as choices
+    return choices()

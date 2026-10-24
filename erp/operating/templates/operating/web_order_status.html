@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load static %}
+{% load static %}{% load operating_tags %}
 
 {% block title %}{% trans "Order Shipping Status" %} · {{ order.order_number }} | Nejum ERP{% endblock %}
 
@@ -637,7 +637,7 @@
                 </div>
                 <div class="address-content">
                     {{ order.delivery_address|linebreaksbr }}<br>
-                    {{ order.delivery_city }}{% if order.delivery_country %}, {{ order.delivery_country }}{% endif %}
+                    {{ order.delivery_city }}{% if order.delivery_country %}, {{ order.delivery_country|country_name }}{% endif %}
                 </div>
                 {% if order.delivery_phone %}
                 <div class="address-phone">

@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n %}{% load operating_tags %}
 <div id="od-customer-section">
   <section class="od-card{% if cust_card_mode == 'edit' %} editing{% elif cust_card_mode == 'create' %} creating{% endif %}" id="od-customer-card">
     <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
@@ -295,13 +295,21 @@
                  hx-trigger="change"
                  hx-target="#od-customer-section" hx-swap="outerHTML"
                  hx-vals='{"action":"update_delivery","field":"delivery_city"}'>
-          <input type="text" class="od-input" name="value"
-                 value="{{ order.delivery_country|default:'' }}"
-                 placeholder="{% trans 'Country' %}"
-                 hx-post="{% url 'operating:order_customer_card' order.pk %}"
-                 hx-trigger="change"
-                 hx-target="#od-customer-section" hx-swap="outerHTML"
-                 hx-vals='{"action":"update_delivery","field":"delivery_country"}'>
+          {# A code from the list, as the storefront stores it — see operating/countries.py. #}
+          {% country_choices as countries %}
+          <select class="od-input" name="value"
+                  hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                  hx-trigger="change"
+                  hx-target="#od-customer-section" hx-swap="outerHTML"
+                  hx-vals='{"action":"update_delivery","field":"delivery_country"}'>
+            <option value="">{% trans 'Country' %}</option>
+            {% if order.delivery_country and order.delivery_country|country_name == order.delivery_country %}
+              <option value="{{ order.delivery_country }}" selected>{{ order.delivery_country }}</option>
+            {% endif %}
+            {% for code, name in countries %}
+              <option value="{{ code }}"{% if code == order.delivery_country %} selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="form-group" style="margin-top:6px;">
           <input type="text" class="od-input" name="value" style="width:100%;"

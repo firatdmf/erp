@@ -2236,7 +2236,7 @@
           {% if order.delivery_address_title %}<div class="od-addr-name">{{ order.delivery_address_title }}</div>{% endif %}
           {# Typed as it reads on the label, line by line — keep the lines. #}
           <div>{{ order.delivery_address|linebreaksbr }}</div>
-          <div>{{ order.delivery_city }}{% if order.delivery_country %} · {{ order.delivery_country }}{% endif %}</div>
+          <div>{{ order.delivery_city }}{% if order.delivery_country %} · {{ order.delivery_country|country_name }}{% endif %}</div>
           {% if order.delivery_phone %}<div>{{ order.delivery_phone }}</div>{% endif %}
         </div>
       </section>
@@ -2249,7 +2249,7 @@
         <div class="od-addr">
           {% if order.billing_address_title %}<div class="od-addr-name">{{ order.billing_address_title }}</div>{% endif %}
           <div>{{ order.billing_address }}</div>
-          <div>{{ order.billing_city }}{% if order.billing_country %} · {{ order.billing_country }}{% endif %}</div>
+          <div>{{ order.billing_city }}{% if order.billing_country %} · {{ order.billing_country|country_name }}{% endif %}</div>
           {% if order.billing_phone %}<div>{{ order.billing_phone }}</div>{% endif %}
         </div>
       </section>

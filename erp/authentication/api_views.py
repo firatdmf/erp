@@ -27,19 +27,16 @@ def create_web_client(request):
         email = data.get('email')
         password = data.get('password')
         name = data.get('name')
-        # B2B wholesale registration fields. company_name is the primary
-        # identifier for a business account; phone/country/tax_id are
-        # optional so the form still works for buyers without a formal
-        # registered company. Kept generic (no country-specific formats)
-        # since customers are mostly international.
+        # Wholesale sign-up: a business name or a contact name is enough
+        # (either may be all a buyer gives); phone and country are optional.
+        # No tax number is asked for.
         company_name = data.get('company_name')
         phone = data.get('phone')
         country = data.get('country')
-        tax_id = data.get('tax_id')
 
-        if not all([username, email, password, name]):
+        if not all([username, email, password]) or not (name or company_name):
             return JsonResponse({
-                'error': 'All fields (username, email, password, name) are required'
+                'error': 'Email, password and a business or contact name are required'
             }, status=400)
 
         # Check if username already exists
@@ -64,15 +61,13 @@ def create_web_client(request):
             business_settings['company_name'] = company_name
         if country:
             business_settings['country'] = country
-        if tax_id:
-            business_settings['tax_id'] = tax_id
 
         # Create web client
         web_client = WebClient.objects.create(
             username=username,
             email=email,
             password=hashed_password,
-            name=name,
+            name=name or None,
             phone=phone or None,
             web_client_settings=business_settings,
             is_active=False  # User must verify email

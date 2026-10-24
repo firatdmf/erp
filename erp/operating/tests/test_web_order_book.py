@@ -97,6 +97,13 @@ class WebOrderBookTest(TestCase):
         self.assertNotEqual(contact, stranger)
         self.assertEqual(contact.name, f"Ayşe Yılmaz (web #{self.ayse.pk})")
 
+    def test_a_customer_who_gave_only_a_business_name_gets_a_contact_by_it(self):
+        self.ayse.name = None
+        self.ayse.web_client_settings = {"company_name": "Ayşe Tekstil"}
+        self.ayse.save()
+        self.post(self.ayse)
+        self.assertEqual(Order.objects.get().contact.name, "Ayşe Tekstil")
+
     def test_it_shows_in_the_books_order_list(self):
         self.post(self.ayse)
         order = Order.objects.get()

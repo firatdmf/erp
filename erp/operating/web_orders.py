@@ -44,7 +44,9 @@ def contact_for(web_client, book):
 
 
 def _new_contact(web_client, book, email):
-    name = (web_client.name or "").strip() or email or web_client.username
+    # A sign-up may give a business name and no person's name.
+    company = ((web_client.web_client_settings or {}).get("company_name") or "").strip()
+    name = (web_client.name or "").strip() or company or email or web_client.username
     fields = {
         "directory": book.directory,
         "email": [email] if email else [],

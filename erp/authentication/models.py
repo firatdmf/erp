@@ -141,6 +141,14 @@ class WebClient(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     web_client_settings = models.JSONField(default=dict, blank=True)  # Store user preferences (notifications, theme, etc.)
+    # The CRM contact this customer's orders are charged to, made from
+    # their own details on their first order (operating.web_orders). Kept
+    # so a later order finds the same contact even after staff edit its
+    # email; SET_NULL so merging the contact away just makes a new link.
+    contact = models.ForeignKey(
+        "crm.Contact", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="web_clients",
+    )
 
     class Meta:
         db_table = 'web_client'

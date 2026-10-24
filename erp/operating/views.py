@@ -6846,43 +6846,37 @@ def get_order_detail_api(request, user_id, order_id):
 
 @csrf_exempt
 def create_web_order(request):
-    """API endpoint to create orders from web checkout"""
+    """API endpoint to create orders from web checkout.
+
+    Only for a signed-in customer: they are read off the token their
+    login issued (authentication.client_tokens), never off the body, which
+    anybody could fill with somebody else's id. The order is charged to
+    their contact's current account in the book web orders land in
+    (operating.web_orders), so it is that book's order like any other."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
+
+    from authentication.client_tokens import client_from
+    from operating.web_orders import customer_for_order
+
+    web_client = client_from(request)
+    if web_client is None:
+        return JsonResponse({'error': 'Sign in again'}, status=401)
+
     try:
         data = json.loads(request.body)
-        
-        # Get web client (optional for guest checkout)
-        from authentication.models import WebClient
-        web_client_id = data.get('web_client_id')
-        is_guest_order = data.get('is_guest_order', False)
-        web_client = None
-        
-        # For non-guest orders, require web_client
-        if not is_guest_order:
-            if not web_client_id:
-                return JsonResponse({'error': 'web_client_id required for non-guest orders'}, status=400)
-            
-            try:
-                web_client = WebClient.objects.get(pk=web_client_id)
-            except WebClient.DoesNotExist:
-                return JsonResponse({'error': 'Web client not found'}, status=404)
-        
-        # Create order
+
         with transaction.atomic():
+            contact, account, currency = customer_for_order(
+                web_client, data.get('original_currency'))
             order = Order.objects.create(
-                web_client=web_client,  # Can be None for guest orders
+                web_client=web_client,
+                contact=contact,
+                current_account=account,
+                currency=currency,
                 status=data.get('status', 'pending'),
                 notes=data.get('notes', ''),
-                
-                # Guest order info
-                is_guest_order=is_guest_order,
-                guest_email=data.get('guest_email'),
-                guest_phone=data.get('guest_phone'),
-                guest_first_name=data.get('guest_first_name'),
-                guest_last_name=data.get('guest_last_name'),
-                
+
                 # Payment fields
                 payment_id=data.get('payment_id'),
                 payment_method=data.get('payment_method'),

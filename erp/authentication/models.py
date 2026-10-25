@@ -252,8 +252,10 @@ class GoogleChatCredentials(models.Model):
     token = models.TextField()  # JSON stored token
     refresh_token = models.TextField(blank=True, null=True)
     token_uri = models.TextField()
-    client_id = models.TextField()
-    client_secret = models.TextField()
+    # No longer read or written: the client comes from settings (see
+    # google_credentials). Emptied by 0027; the columns go next release.
+    client_id = models.TextField(blank=True, default="")
+    client_secret = models.TextField(blank=True, default="")
     scopes = models.TextField()
     email = models.EmailField(blank=True, null=True)
     avatar_url = models.TextField(blank=True, null=True)
@@ -262,3 +264,18 @@ class GoogleChatCredentials(models.Model):
 
     def __str__(self):
         return f"Google Chat Credentials for {self.user.username}"
+
+    def google_credentials(self):
+        """The account's google-auth Credentials. The ERP's OAuth client ID
+        and secret come from settings, never from the row, so rotating the
+        secret is one variable change and the table holds no secret."""
+        from django.conf import settings
+        from google.oauth2.credentials import Credentials
+        return Credentials(
+            token=self.token or None,
+            refresh_token=self.refresh_token,
+            token_uri=self.token_uri or "https://oauth2.googleapis.com/token",
+            client_id=settings.GOOGLE_OAUTH_CLIENT_ID,
+            client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
+            scopes=(self.scopes or "").replace(",", " ").split(),
+        )

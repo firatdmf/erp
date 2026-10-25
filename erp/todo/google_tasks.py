@@ -1,4 +1,3 @@
-from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from django.utils import timezone
 from authentication.models import GoogleChatCredentials
@@ -17,14 +16,7 @@ def get_tasks_service(user):
         
         # We need the task scope to be present. If it's an old token, it might not have it.
         # But for now, we'll try to build it. If it fails, the caller handles it.
-        creds = Credentials(
-            token=creds_model.token,
-            refresh_token=creds_model.refresh_token,
-            token_uri=creds_model.token_uri,
-            client_id=creds_model.client_id,
-            client_secret=creds_model.client_secret,
-            scopes=creds_model.scopes.split() if creds_model.scopes else []
-        )
+        creds = creds_model.google_credentials()
         
         service = build('tasks', 'v1', credentials=creds)
         return service

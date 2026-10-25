@@ -636,19 +636,18 @@ def _send_via_gmail_oauth(to_email, subject, html_body, pdf_name, pdf_bytes,
     """Send through a connected Google account that has the gmail.send
     scope, using OAuth.
 
-    IMPORTANT: the tokens are minted by the Google sign-in / Chat OAuth
-    client (GoogleChatCredentials.client_id) — NOT settings.GMAIL_CLIENT_ID.
-    Refreshing with the wrong client yields "unauthorized_client", which
-    is exactly what broke the previous attempt. So we build the Gmail
-    service from the credential's OWN client_id / client_secret and
-    refresh against the issuing client, which succeeds.
+    IMPORTANT: the tokens are minted by the ERP's Google sign-in / Chat
+    OAuth client (settings.GOOGLE_OAUTH_CLIENT_ID) — NOT
+    settings.GMAIL_CLIENT_ID. Refreshing with the wrong client yields
+    "unauthorized_client", so the service is built from
+    GoogleChatCredentials.google_credentials(), which refreshes against
+    the issuing client.
 
     Returns True if dispatched, False to let the caller fall back to
     SMTP. Never raises."""
     try:
         from authentication.models import GoogleChatCredentials
         from marketing.gmail_utils import send_email as gmail_send
-        from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
         from googleapiclient.discovery import build
 
@@ -661,15 +660,7 @@ def _send_via_gmail_oauth(to_email, subject, html_body, pdf_name, pdf_bytes,
         if not creds:
             return False
 
-        scopes = (creds.scopes or "").replace(",", " ").split()
-        c = Credentials(
-            token=creds.token or None,
-            refresh_token=creds.refresh_token,
-            token_uri=creds.token_uri or "https://oauth2.googleapis.com/token",
-            client_id=creds.client_id,
-            client_secret=creds.client_secret,
-            scopes=scopes,
-        )
+        c = creds.google_credentials()
         # Proactively refresh — the stored access token is usually stale,
         # and refreshing with the issuing client gets a fresh one. Persist
         # it back so subsequent sends reuse it.

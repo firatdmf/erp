@@ -1294,7 +1294,6 @@ def create_instant_meeting(request):
             def sync_to_google_chat(user_id, space_id, link, sender_name):
                 try:
                     from authentication.models import GoogleChatCredentials
-                    from google.oauth2.credentials import Credentials
                     from googleapiclient.discovery import build
                     from django.contrib.auth import get_user_model
                     
@@ -1302,14 +1301,7 @@ def create_instant_meeting(request):
                     user = User.objects.get(id=user_id)
 
                     creds_model = GoogleChatCredentials.objects.get(user=user)
-                    creds = Credentials(
-                        token=creds_model.token,
-                        refresh_token=creds_model.refresh_token,
-                        token_uri=creds_model.token_uri,
-                        client_id=creds_model.client_id,
-                        client_secret=creds_model.client_secret,
-                        scopes=creds_model.scopes.split(' ') if creds_model.scopes else []
-                    )
+                    creds = creds_model.google_credentials()
                     
                     service = build('chat', 'v1', credentials=creds)
                     
@@ -1988,7 +1980,6 @@ def get_manageable_teams(request):
 
 # ------------------- Google Chat Integration -------------------
 
-from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from authentication.models import GoogleChatCredentials
 
@@ -1997,14 +1988,7 @@ def get_google_chat_service(user):
     try:
         creds_model = GoogleChatCredentials.objects.get(user=user)
         
-        credentials = Credentials(
-            token=creds_model.token,
-            refresh_token=creds_model.refresh_token,
-            token_uri=creds_model.token_uri,
-            client_id=creds_model.client_id,
-            client_secret=creds_model.client_secret,
-            scopes=creds_model.scopes.split(' ')
-        )
+        credentials = creds_model.google_credentials()
         
         return build('chat', 'v1', credentials=credentials)
     except GoogleChatCredentials.DoesNotExist:

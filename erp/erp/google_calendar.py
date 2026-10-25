@@ -1,6 +1,5 @@
 import os
 import datetime
-from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from authentication.models import GoogleChatCredentials
 
@@ -9,14 +8,7 @@ def get_calendar_service(user):
     try:
         creds_model = GoogleChatCredentials.objects.get(user=user)
         
-        creds = Credentials(
-            token=creds_model.token,
-            refresh_token=creds_model.refresh_token,
-            token_uri=creds_model.token_uri,
-            client_id=creds_model.client_id,
-            client_secret=creds_model.client_secret,
-            scopes=creds_model.scopes.split(' ') if creds_model.scopes else []
-        )
+        creds = creds_model.google_credentials()
         
         return build('calendar', 'v3', credentials=creds)
     except Exception as e:

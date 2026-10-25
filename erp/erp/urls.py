@@ -66,7 +66,6 @@ urlpatterns = [
     # /operating/procurement/... . Old links redirect rather than 404; the
     # role gate still runs first, so this opens nothing it did not open before.
     re_path(r"^procurement/(?P<rest>.*)$", RedirectView.as_view(url="/operating/procurement/%(rest)s", permanent=False)),
-    path('accounts/', include('django.contrib.auth.urls')),
     path("testpage/",views.test_page.as_view(),name="test_page"),
     path("testpage2/",views.test_page2.as_view(),name="test_page2"),
     path("search/", views.GlobalSearch.as_view(), name="global_search"),

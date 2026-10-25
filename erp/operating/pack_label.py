@@ -24,14 +24,14 @@ LINES_PER_LABEL = 9
 
 def _pack_lines(pack):
     """The package's contents added up per SKU, in the order first packed:
-    [{"sku", "unit", "pack_type", "items", "quantity"}]."""
+    [{"sku", "unit", "pack_type", "tracking", "items", "quantity"}]."""
     from .views import _pack_roll_rows
 
     lines = {}
     for row in _pack_roll_rows(pack):
         line = lines.setdefault(row["sku"], {
             "sku": row["sku"], "unit": row["unit"], "pack_type": row["pack_type"],
-            "items": 0, "quantity": 0})
+            "tracking": row["tracking"], "items": 0, "quantity": 0})
         line["items"] += 1
         line["quantity"] += row["quantity"] or 0
     return list(lines.values())
@@ -39,18 +39,18 @@ def _pack_lines(pack):
 
 def _amount(quantity, unit):
     """"212.50 m", or "22 pcs" for a count."""
-    if units.sold_by_count(unit) and quantity == int(quantity):
+    if unit in units.WHOLE_UNITS and quantity == int(quantity):
         number = f"{int(quantity):,}"
     else:
         number = f"{quantity:,.2f}"
     return f"{number} {units.unit_short(unit)}"
 
 
-def _describe(items, quantity, unit, pack_type):
-    """"4 rolls · 212.50 m". Counted goods are just their count: the stock
-    entries behind "22 pcs" are batches, not boxes anyone can find."""
+def _describe(items, quantity, unit, pack_type, tracking):
+    """"4 rolls · 212.50 m". Goods tracked by variant are just their count:
+    the stock entries behind "22 pcs" are batches, not boxes anyone can find."""
     amount = _amount(quantity, unit)
-    if units.sold_by_count(unit) or not units.counts_packs(pack_type):
+    if units.by_variant(tracking) or not units.counts_packs(pack_type):
         return amount
     return f"{items} {units.pack_noun(pack_type, items)} · {amount}"
 
@@ -59,18 +59,19 @@ def _total(lines):
     """Every unit in the package added up — "9 rolls · 512.30 m · 22 pcs"."""
     by_unit = {}
     for line in lines:
-        total = by_unit.setdefault(line["unit"], {"items": 0, "quantity": 0,
-                                                  "pack_type": line["pack_type"]})
+        key = (line["unit"], line["tracking"])
+        total = by_unit.setdefault(key, {"items": 0, "quantity": 0,
+                                         "pack_type": line["pack_type"]})
         total["items"] += line["items"]
         total["quantity"] += line["quantity"]
         if total["pack_type"] != line["pack_type"]:
             total["pack_type"] = None  # rolls and bales don't add up to one noun
     parts = []
-    for unit, t in by_unit.items():
-        if t["pack_type"] is None and not units.sold_by_count(unit):
+    for (unit, tracking), t in by_unit.items():
+        if t["pack_type"] is None and not units.by_variant(tracking):
             parts.append(_amount(t["quantity"], unit))
         else:
-            parts.append(_describe(t["items"], t["quantity"], unit, t["pack_type"]))
+            parts.append(_describe(t["items"], t["quantity"], unit, t["pack_type"], tracking))
     return " · ".join(parts)
 
 
@@ -160,7 +161,8 @@ def labels_pdf_bytes(packs, title, link=None):
             # ── Contents, one line per SKU ──
             y = rule - 6 * mm
             for line in page:
-                amount = _describe(line["items"], line["quantity"], line["unit"], line["pack_type"])
+                amount = _describe(line["items"], line["quantity"], line["unit"], line["pack_type"],
+                                   line["tracking"])
                 c.setFont(reg, 10)
                 c.drawRightString(W - M, y, amount)
                 sku_w = W - 2 * M - c.stringWidth(amount, reg, 10) - 3 * mm

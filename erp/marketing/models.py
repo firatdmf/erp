@@ -376,6 +376,11 @@ class Product(models.Model):
         max_length=12, choices=units.PACK_CHOICES, default=units.DEFAULT_PACK,
         help_text="What one stock item of this product physically is",
     )
+    tracking = models.CharField(
+        max_length=8, choices=units.TRACKING_CHOICES, default=units.DEFAULT_TRACKING,
+        help_text="Whether each stock item has a label of its own, or the "
+                  "barcode names the variant",
+    )
 
     # The storefront's coarser unit. Derived from `unit` on every save, so
     # it can't disagree with the stock again; never edit it directly.
@@ -591,10 +596,10 @@ class Product(models.Model):
     def stop_sharing_with(self, directory):
         self.shared_with.remove(directory)
 
-    def set_unit(self, unit=None, pack_type=None):
-        """Change what the product is counted in and/or how it is packed,
-        keeping the storefront unit in step. Saves only what changed; returns
-        whether anything did."""
+    def set_unit(self, unit=None, pack_type=None, tracking=None):
+        """Change what the product is counted in, how it is packed and/or
+        how it is tracked, keeping the storefront unit in step. Saves only
+        what changed; returns whether anything did."""
         changed = []
         if unit and unit != self.unit:
             self.unit = unit
@@ -602,6 +607,9 @@ class Product(models.Model):
         if pack_type and pack_type != self.pack_type:
             self.pack_type = pack_type
             changed.append("pack_type")
+        if tracking and tracking != self.tracking:
+            self.tracking = tracking
+            changed.append("tracking")
         if changed:
             self.save(update_fields=changed)
         return bool(changed)
@@ -628,6 +636,12 @@ class Product(models.Model):
         """False for loose stock, whose page shows a quantity and no count
         of containers (units.counts_packs)."""
         return units.counts_packs(self.pack_type)
+
+    @property
+    def sold_by_count(self):
+        """True where the barcode names the variant, not one item of it
+        (units.by_variant)."""
+        return units.by_variant(self.tracking)
 
     @property
     def quantity_label(self):

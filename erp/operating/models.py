@@ -2198,6 +2198,11 @@ class WarehouseProduct(models.Model):
         return product.pack_type if product is not None else units.DEFAULT_PACK
 
     @property
+    def tracking(self):
+        product = self.catalog_product
+        return product.tracking if product is not None else units.DEFAULT_TRACKING
+
+    @property
     def unit_short(self):
         """The unit as it is printed next to a number — "m", "pcs".
 
@@ -2227,9 +2232,9 @@ class WarehouseProduct(models.Model):
     @property
     def sold_by_count(self):
         """True where the barcode names the variant, not one item of it
-        (units.sold_by_count): an order takes a quantity of this product
+        (units.by_variant): an order takes a quantity of this product
         and the stock entries it comes off are chosen for it."""
-        return units.sold_by_count(self.unit)
+        return units.by_variant(self.tracking)
 
     @property
     def printed_barcode(self):

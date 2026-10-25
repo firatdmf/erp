@@ -89,18 +89,33 @@ def pack_noun(pack_type, count):
     return one if count == 1 else many
 
 
-# Units that count interchangeable things. A meter of cloth comes off one
-# particular roll, which has a barcode of its own; a duvet set is one of
-# many alike, and the barcode printed on it names the VARIANT — every set
-# of it carries the same one. So such a product is sold by a quantity and
-# its variant's barcode, never by picking out one labelled item.
-COUNTED_UNITS = frozenset({"piece", "pack"})
+# How a product's stock is TRACKED — whether each stock item carries a
+# label of its own. A roll of cloth does: its barcode names that roll, which
+# differs from the next in length and lot. A duvet set doesn't: the barcode
+# printed on it names the VARIANT, and every set of it carries the same one.
+# So a product tracked by variant is sold by a quantity and its variant's
+# barcode, never by picking out one labelled item. Separate from the unit on
+# purpose: a mill may label cloth per article, and a box of sets may carry a
+# label of its own.
+TRACKING_CHOICES = [
+    ("item", _("Each item")),
+    ("variant", _("By variant")),
+]
+DEFAULT_TRACKING = "item"
+
+# The tracking a unit starts on when nobody has said otherwise. A starting
+# point, like PACK_FOR_UNIT, not a rule.
+TRACKING_FOR_UNIT = {"m": "item", "kg": "item", "piece": "variant", "pack": "variant"}
 
 
-def sold_by_count(unit):
-    """Whether a product in this unit is sold as a count of alike pieces
-    (see COUNTED_UNITS) rather than item by labelled item."""
-    return unit in COUNTED_UNITS
+def by_variant(tracking):
+    """Whether a product tracked this way is sold as a count of alike pieces
+    rather than item by labelled item."""
+    return tracking == "variant"
+
+
+# Units counted in whole numbers: "22 pcs", never "22.00 pcs".
+WHOLE_UNITS = frozenset({"piece", "pack"})
 
 
 def counts_packs(pack_type):

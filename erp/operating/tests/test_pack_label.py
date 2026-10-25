@@ -25,7 +25,7 @@ class PackLabel(TestCase):
         self.pack2 = Pack.objects.create(order=self.order, pack_number=2)
 
         bergamo = self._line("Bergamo", "BRG-01", "m")
-        towel = self._line("Towel", "TWL-WHITE", "piece")
+        towel = self._line("Towel", "TWL-WHITE", "piece", tracking="variant")
         self._reserve(bergamo, "BC1", Decimal("40.00"), self.pack1)
         self._reserve(bergamo, "BC2", Decimal("12.50"), self.pack1)
         self._reserve(towel, "BC3", Decimal("22"), self.pack1)
@@ -33,9 +33,9 @@ class PackLabel(TestCase):
 
         self.client.force_login(User.objects.create_superuser("packer", "p@a.b", "pw"))
 
-    def _line(self, title, sku, unit):
+    def _line(self, title, sku, unit, tracking="item"):
         product = Product.objects.create(
-            title=title, sku=sku, price=10, unit=unit,
+            title=title, sku=sku, price=10, unit=unit, tracking=tracking,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
         wp = WarehouseProduct.objects.create(
             warehouse=self.wh, name=title, sku=sku, quantity=Decimal("100.00"))
@@ -55,7 +55,7 @@ class PackLabel(TestCase):
         lines = pack_label._pack_lines(self.pack1)
         self.assertEqual([(l["sku"], l["items"], l["quantity"]) for l in lines],
                          [("BRG-01", 2, Decimal("52.50")), ("TWL-WHITE", 1, Decimal("22"))])
-        self.assertEqual(pack_label._describe(2, Decimal("52.50"), "m", "roll"), "2 rolls · 52.50 m")
+        self.assertEqual(pack_label._describe(2, Decimal("52.50"), "m", "roll", "item"), "2 rolls · 52.50 m")
         self.assertEqual(pack_label._total(lines), "2 rolls · 52.50 m · 22 pcs")
 
     def test_one_package_prints_one_label(self):

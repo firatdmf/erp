@@ -67,6 +67,7 @@ BOOK_NAME = "Ergene Fabric"
 # be inferred from the other.
 UNIT = "pack"
 PACK_TYPE = "box"
+TRACKING = "variant"
 
 # The sheet's prices run $12.40-$26.50 a set, the same scale as the Karven
 # spec's own price column, which is dollars.
@@ -363,8 +364,9 @@ class Command(BaseCommand):
             # price or a newly-linked variant lands on a re-import too.
             wp.barcode = barcode or wp.barcode
             wp.catalog_variant = variant
-            # How the sets are counted and packed belongs to their product.
-            variant.product.set_unit(UNIT, PACK_TYPE)
+            # How the sets are counted, packed and tracked belongs to their
+            # product.
+            variant.product.set_unit(UNIT, PACK_TYPE, TRACKING)
             if price:
                 wp.purchase_price = price
                 wp.purchase_currency = PRICE_CURRENCY

@@ -241,12 +241,13 @@ def _stock_taken_label(reservations):
         wp = r.warehouse_product
         unit = wp.unit if wp is not None else units.DEFAULT_UNIT
         pack = wp.pack_type if wp is not None else units.DEFAULT_PACK
-        groups.setdefault((unit, pack), []).append(r)
+        tracking = wp.tracking if wp is not None else units.DEFAULT_TRACKING
+        groups.setdefault((unit, pack, tracking), []).append(r)
     parts = []
-    for (unit, pack), rs in groups.items():
+    for (unit, pack, tracking), rs in groups.items():
         amount = sum((r.quantity or Decimal("0") for r in rs), Decimal("0"))
         said = f"{floatformat(amount, '-2g')} {units.unit_short(unit)}"
-        if units.sold_by_count(unit) or not units.counts_packs(pack):
+        if units.by_variant(tracking) or not units.counts_packs(pack):
             parts.append(said)
         else:
             parts.append(f"{len(rs)} {units.pack_noun(pack, len(rs))} · {said}")
@@ -538,7 +539,7 @@ class OrderDetail(DetailView):
             it.scanned_meters = sum((r.quantity or _D("0") for r in it.item_reservations), _D("0"))
             it.scanned_count = len(it.item_reservations)
             it.scanned_label = _stock_taken_label(it.item_reservations)
-            it.sold_by_count = units.sold_by_count(getattr(it.product, "unit", None))
+            it.sold_by_count = units.by_variant(getattr(it.product, "tracking", None))
             it.variant_lines = _order_item_variant_lines(it)
         # Every item-less reservation, pack or no pack — in this layout
         # nothing else renders them, so filtering pack'd ones out (as the
@@ -1380,7 +1381,7 @@ def _batches_by_printed_barcode(code, books=None):
     """The live stock of whatever product(s) carry `code` as their
     PRINTED barcode — oldest first, the order it should leave in.
 
-    Only for goods sold by count (marketing.units.sold_by_count). Cloth is
+    Only for goods tracked by variant (marketing.units.by_variant). Cloth is
     never found this way: each roll has a barcode of its own, and a code
     that named a whole fabric would not say which roll was meant.
 
@@ -1398,7 +1399,7 @@ def _batches_by_printed_barcode(code, books=None):
           .filter(status__in=["in_stock", "partial"])
           .filter(Q(product__barcode__iexact=code)
                   | Q(product__catalog_variant__variant_barcode__iexact=code))
-          .filter(product__catalog_variant__product__unit__in=units.COUNTED_UNITS))
+          .filter(product__catalog_variant__product__tracking="variant"))
     if books is not None:
         qs = qs.filter(product__warehouse__accounting_book__in=books)
     return qs.order_by(TruncDate("scanned_at"), "pk")
@@ -4402,7 +4403,7 @@ class OrderEdit(UpdateView):
                 "price": float(it.price) if it.price is not None else 0,
                 # Sold by count: the edit form draws this line's card in
                 # its own shape from the start.
-                "counted": bool(it.product and units.sold_by_count(it.product.unit)),
+                "counted": bool(it.product and it.product.sold_by_count),
                 # Stock items already reserved for this line — shown read-only in
                 # the product card. "available" excludes this reservation's
                 # OWN hold from the other-reservations subtraction (same
@@ -5264,6 +5265,7 @@ def _pack_roll_rows(pack):
             "quantity": r.quantity,
             "unit": product.unit if product else units.DEFAULT_UNIT,
             "pack_type": product.pack_type if product else units.DEFAULT_PACK,
+            "tracking": product.tracking if product else units.DEFAULT_TRACKING,
         })
     return rows
 
@@ -6110,7 +6112,7 @@ def product_autocomplete(request):
                    # Sold by count: said with the pick, so the card is drawn
                    # in its own shape at once rather than as a roll card
                    # that changes when the stock list arrives.
-                   f"{'true' if units.sold_by_count(product.unit) else 'false'}")
+                   f"{'true' if product.sold_by_count else 'false'}")
         return row(sku, base_title, qualifier, price, is_cost,
                    stock_cell(stock, allow_oversell), js_args, extra_class)
 

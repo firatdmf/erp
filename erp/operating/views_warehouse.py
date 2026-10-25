@@ -3588,6 +3588,7 @@ def _intake_main_product(item, prefix, *, invoice=None):
                 title=base_name, sku=sku, featured=False,
                 unit=unit or units.DEFAULT_UNIT,
                 pack_type=pack_type or units.PACK_FOR_UNIT[unit or units.DEFAULT_UNIT],
+                tracking=units.TRACKING_FOR_UNIT[unit or units.DEFAULT_UNIT],
                 category=category,
             )
         if desired_sku and not item["sku_is_auto"]:
@@ -3633,7 +3634,11 @@ def _intake_main_product(item, prefix, *, invoice=None):
         if ((unit and unit != main_product.unit
              or pack_type and pack_type != main_product.pack_type)
                 and not _product_stock_elsewhere(main_product, invoice)):
-            main_product.set_unit(unit, pack_type)
+            # A new unit starts on that unit's usual tracking too, as a
+            # brand-new product would.
+            tracking = (units.TRACKING_FOR_UNIT[unit]
+                        if unit and unit != main_product.unit else None)
+            main_product.set_unit(unit, pack_type, tracking)
     return main_product
 
 

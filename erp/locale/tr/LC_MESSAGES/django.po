@@ -14940,3 +14940,9 @@ msgstr "Bu SKU ürün SKU'su ile başlamıyor."
 
 msgid "Put it under the product SKU"
 msgstr "Ürün SKU'sunun altına al"
+
+msgid "Each item"
+msgstr "Her biri ayrı"
+
+msgid "By variant"
+msgstr "Varyant bazında"

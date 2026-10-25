@@ -190,7 +190,8 @@ class ProductCostFieldTest(TestCase):
 
     def _required(self):
         return {"title": "N1522", "sku": "N1522", "unit": self.product.unit,
-                "pack_type": self.product.pack_type, "category": self.product.category_id}
+                "pack_type": self.product.pack_type, "tracking": self.product.tracking,
+                "category": self.product.category_id}
 
     def test_a_posted_price_or_cost_is_ignored(self):
         form = self._form(self.product, {**self._required(), "price": "99", "cost": "99"})
@@ -269,7 +270,8 @@ class SingleItemTest(TestCase):
 
     def _data(self, **extra):
         return {"title": "Sheet", "sku": "SHEET", "unit": self.product.unit,
-                "pack_type": self.product.pack_type, "category": self.product.category_id,
+                "pack_type": self.product.pack_type, "tracking": self.product.tracking,
+                "category": self.product.category_id,
                 "single_item": "1", **extra}
 
     def _form(self, data=None, product=None):
@@ -306,7 +308,8 @@ class SingleItemTest(TestCase):
     def test_a_new_product_gets_its_variant(self):
         new = Product(title="Pillow")
         form = self._form({"title": "Pillow", "sku": "PILLOW", "unit": new.unit,
-                           "pack_type": new.pack_type, "single_item": "1",
+                           "pack_type": new.pack_type, "tracking": new.tracking,
+                           "single_item": "1",
                            "category": self.product.category_id,
                            "item_sku": "PLW-01", "item_cost": "3"}, product=new)
         self.assertTrue(form.is_valid(), form.errors)

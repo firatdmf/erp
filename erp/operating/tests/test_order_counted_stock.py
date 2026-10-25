@@ -1,4 +1,4 @@
-"""Goods sold by count are ordered by quantity, not item by item.
+"""Goods tracked by variant are ordered by quantity, not item by item.
 
 A roll of cloth has a barcode of its own, and an order names the rolls it
 takes. A duvet set does not: the barcode printed on it is its VARIANT's,
@@ -9,6 +9,10 @@ stock item by its barcode, could not pick them at all.
 They now go by a key of their own (WarehouseProductItem.pick_key), the
 form takes a quantity from the oldest stock, and a scan of the printed
 barcode means "one more of these".
+
+Which products those are is the product's tracking (Each item / By
+variant), not its unit: a unit says what a thing is counted in, not
+whether every one of it carries a label of its own.
 """
 import json
 import shutil
@@ -43,7 +47,8 @@ class CountedStock(TestCase):
         self.customer = Contact.objects.create(name="Dana Akhmet")
 
         duvet = Product.objects.create(
-            title="Duvet set", featured=False, unit="piece", pack_type="loose")
+            title="Duvet set", featured=False, unit="piece", pack_type="loose",
+            tracking="variant")
         self.variant = ProductVariant.objects.create(
             product=duvet, variant_sku=EAN, variant_barcode=EAN)
         self.duvets = WarehouseProduct.objects.create(
@@ -111,6 +116,22 @@ class CountedStock(TestCase):
         self.assertTrue(self.duvets.sold_by_count)
         self.assertFalse(self.cloth.sold_by_count)
         self.assertEqual(self.duvets.printed_barcode, EAN)
+
+    def test_the_tracking_decides_not_the_unit(self):
+        """Pieces with a label each are picked one by one; meters a mill
+        labelled per article are taken by quantity."""
+        duvet = self.variant.product
+        duvet.set_unit(tracking="item")
+        self.assertFalse(WarehouseProduct.objects.get(pk=self.duvets.pk).sold_by_count)
+        cloth = self.cloth.catalog_variant.product
+        cloth.set_unit(tracking="variant")
+        self.assertEqual(cloth.unit, "m")
+        self.assertTrue(WarehouseProduct.objects.get(pk=self.cloth.pk).sold_by_count)
+
+    def test_a_printed_barcode_finds_nothing_once_each_item_is_labelled(self):
+        self.variant.product.set_unit(tracking="item")
+        response = self.get("order_create_barcode_resolve", barcode=EAN)
+        self.assertEqual(response.status_code, 404)
 
     # ── the pick list ───────────────────────────────────────────
     def test_the_list_offers_the_batches_oldest_first(self):

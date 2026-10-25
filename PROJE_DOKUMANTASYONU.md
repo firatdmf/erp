@@ -696,7 +696,7 @@ pip install -r requirements.txt
 
 ### 3. Environment Variables (.env)
 ```env
-SECRET_KEY=your-secret-key
+DJANGO_SECRET_KEY=your-secret-key
 DEBUG=True
 
 # Database

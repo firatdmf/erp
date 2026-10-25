@@ -20,7 +20,7 @@ pip install -r erp/requirements.txt
 
 # Set up environment variables
 # Create erp/.env file with:
-# - SECRET_KEY
+# - DJANGO_SECRET_KEY
 # - DEBUG (True/False)
 # - DB_ENGINE (e.g., django.db.backends.postgresql)
 # - DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
@@ -244,7 +244,7 @@ The project has extensive migrations (39+ in accounting alone), indicating activ
 ### Environment Variables Required
 
 Essential `.env` variables in `erp/` directory:
-- `SECRET_KEY`: Django secret key
+- `DJANGO_SECRET_KEY`: Django secret key
 - `DEBUG`: Boolean for debug mode
 - `DB_ENGINE`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`: Database config
 - Bunny CDN credentials (see marketing/utils/bunny_storage.py for exact names)

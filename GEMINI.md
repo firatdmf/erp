@@ -32,7 +32,7 @@ Nejum ERP (**Nejum ERP - Proje Dokümantasyonu**) is a lightweight, modular, and
    pip install -r requirements.txt
    ```
 2. **Configuration:**
-   - Create a `.env` file based on `settings.py` requirements (SECRET_KEY, DB credentials, Bunny CDN, etc.).
+   - Create a `.env` file based on `settings.py` requirements (DJANGO_SECRET_KEY, DB credentials, Bunny CDN, etc.).
 3. **Database:**
    ```bash
    python manage.py migrate

@@ -38,7 +38,7 @@ jobs:
       # settings.py reads these through python-decouple, which falls back
       # to the environment when there is no .env file. Every one of them
       # is required — config() raises without a default.
-      SECRET_KEY: ci-not-a-real-secret
+      DJANGO_SECRET_KEY: ci-not-a-real-secret
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: erp
       DB_USER: erp

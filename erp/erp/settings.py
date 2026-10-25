@@ -298,14 +298,6 @@ WSGI_APPLICATION = "erp.wsgi.app"
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-# DATABASE_URL = 'postgresql://postgres:z5nJKvkJjjrYwgHZZYRz@containers-us-west-99.railway.app:6547/railway'
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
 
 DATABASES = {
     "default": {

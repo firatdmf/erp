@@ -1557,7 +1557,7 @@ class WarehouseCreate(View):
     def post(self, request):
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
-        public_name = (request.POST.get('public_name') or '').strip()
+        city, country = _warehouse_place(request)
         on_storefront = request.POST.get('on_storefront') == 'on'
         description = (request.POST.get('description') or '').strip()
 
@@ -1581,7 +1581,8 @@ class WarehouseCreate(View):
         wh = Warehouse.objects.create(
             name=name,
             location=location or None,
-            public_name=public_name,
+            city=city,
+            country=country,
             on_storefront=on_storefront,
             description=description or None,
             accounting_book=book,
@@ -1591,6 +1592,17 @@ class WarehouseCreate(View):
             wh.combined_sources.set(sources)
         messages.success(request, f"Warehouse '{wh.name}' created")
         return redirect(reverse('operating:warehouse_detail', args=[wh.pk]))
+
+
+def _warehouse_place(request):
+    """The city and country a warehouse form posted. The country is a code
+    from the list (operating/countries.py); anything else is dropped."""
+    from .countries import country_choices
+    city = (request.POST.get('city') or '').strip()
+    country = (request.POST.get('country') or '').strip().upper()
+    if country not in {code for code, _name in country_choices()}:
+        country = ''
+    return city, country
 
 
 @method_decorator(login_required, name='dispatch')
@@ -1624,7 +1636,7 @@ class WarehouseCreatePartial(View):
                                 status=403)
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
-        public_name = (request.POST.get('public_name') or '').strip()
+        city, country = _warehouse_place(request)
         on_storefront = request.POST.get('on_storefront') == 'on'
         description = (request.POST.get('description') or '').strip()
 
@@ -1645,7 +1657,8 @@ class WarehouseCreatePartial(View):
         wh = Warehouse.objects.create(
             name=name,
             location=location or None,
-            public_name=public_name,
+            city=city,
+            country=country,
             on_storefront=on_storefront,
             description=description or None,
             accounting_book=book,
@@ -1670,7 +1683,7 @@ class WarehouseEdit(View):
         warehouse = get_object_or_404(Warehouse, pk=pk)
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
-        public_name = (request.POST.get('public_name') or '').strip()
+        city, country = _warehouse_place(request)
         on_storefront = request.POST.get('on_storefront') == 'on'
         description = (request.POST.get('description') or '').strip()
 
@@ -1695,7 +1708,8 @@ class WarehouseEdit(View):
 
         warehouse.name = name
         warehouse.location = location or None
-        warehouse.public_name = public_name
+        warehouse.city = city
+        warehouse.country = country
         switched = warehouse.on_storefront != on_storefront
         warehouse.on_storefront = on_storefront
         warehouse.description = description or None

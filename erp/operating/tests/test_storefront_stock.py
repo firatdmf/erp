@@ -28,7 +28,7 @@ class StorefrontStock(TestCase):
         ergene = Book.objects.create(name="Ergene Fabric")
         self.shop = Warehouse.objects.create(
             name="Laleli", location="Gümrük Emini Sok. No 20, Fatih",
-            public_name="Istanbul, Türkiye", accounting_book=laleli, on_storefront=True)
+            city="Istanbul", country="TR", accounting_book=laleli, on_storefront=True)
         self.factory = Warehouse.objects.create(name="Ergene Fabrika", accounting_book=ergene,
                                                 on_storefront=True)
         self.abroad = Warehouse.objects.create(
@@ -83,17 +83,20 @@ class StorefrontStock(TestCase):
         self.assertEqual(data["tracking"], "item")
         self.assertEqual(data["unit"], "m")
         self.assertEqual(
-            [(i["id"], i["available"], i["lot"], i["location"]) for i in data["items"]],
-            [(self.rolls["R1"].pk, 48.5, "4471", "Istanbul, Türkiye"),
-             (self.rolls["R2"].pk, 52.0, "4471", "Ergene Fabrika"),
-             (self.rolls["R3"].pk, 30.0, "4502", "Ergene Fabrika")])
+            [(i["id"], i["available"], i["lot"], i["city"], i["country"], i["location"])
+             for i in data["items"]],
+            [(self.rolls["R1"].pk, 48.5, "4471", "Istanbul", "TR", "Istanbul, TR"),
+             (self.rolls["R2"].pk, 52.0, "4471", "", "", "Ergene Fabrika"),
+             (self.rolls["R3"].pk, 30.0, "4502", "", "", "Ergene Fabrika")])
         self.assertEqual(data["locations"],
-                         [{"location": "Istanbul, Türkiye", "available": 48.5},
-                          {"location": "Ergene Fabrika", "available": 82.0}])
+                         [{"location": "Istanbul, TR", "city": "Istanbul", "country": "TR",
+                           "available": 48.5},
+                          {"location": "Ergene Fabrika", "city": "", "country": "",
+                           "available": 82.0}])
 
-    def test_a_blank_public_name_falls_back_to_the_warehouse_name(self):
+    def test_a_blank_city_and_country_fall_back_to_the_warehouse_name(self):
         self.assertEqual(self.factory.shown_as, "Ergene Fabrika")
-        self.shop.public_name = "  "
+        self.shop.city, self.shop.country = "  ", ""
         self.assertEqual(self.shop.shown_as, "Laleli")
 
     def test_what_other_orders_hold_is_not_offered(self):
@@ -119,9 +122,8 @@ class StorefrontStock(TestCase):
         self.assertEqual(data["tracking"], "variant")
         self.assertEqual(data["unit"], "piece")
         self.assertEqual(data["items"], [])
-        self.assertEqual(data["locations"],
-                         [{"location": "Istanbul, Türkiye", "available": 8.0},
-                          {"location": "Ergene Fabrika", "available": 4.0}])
+        self.assertEqual([(p["location"], p["available"]) for p in data["locations"]],
+                         [("Istanbul, TR", 8.0), ("Ergene Fabrika", 4.0)])
 
     def test_a_sku_with_nothing_free_offers_nothing(self):
         self.assertEqual(self.signed_in("NOPE")["locations"], [])
@@ -148,18 +150,31 @@ class StorefrontStock(TestCase):
         self.client.force_login(admin)
         form = {"name": "Ergene Fabrika", "kind": "normal",
                 "accounting_book": str(self.factory.accounting_book_id),
-                "public_name": " Tekirdağ, Türkiye "}
+                "city": " Tekirdağ ", "country": "tr"}
         page = self.client.get(reverse("operating:warehouse_edit", args=[self.factory.pk]))
         self.assertContains(page, 'name="on_storefront"')
         self.client.post(reverse("operating:warehouse_edit", args=[self.factory.pk]),
                          {**form, "on_storefront": "on"})
         self.factory.refresh_from_db()
-        self.assertEqual((self.factory.public_name, self.factory.on_storefront),
-                         ("Tekirdağ, Türkiye", True))
+        self.assertEqual((self.factory.city, self.factory.country, self.factory.on_storefront),
+                         ("Tekirdağ", "TR", True))
+        self.assertContains(self.client.get(reverse("operating:warehouse_edit",
+                                                    args=[self.factory.pk])),
+                            '<option value="TR" selected>')
         # An unticked box posts nothing: that is "off".
         self.client.post(reverse("operating:warehouse_edit", args=[self.factory.pk]), form)
         self.factory.refresh_from_db()
         self.assertFalse(self.factory.on_storefront)
+
+    def test_a_country_not_on_the_list_is_dropped(self):
+        admin = get_user_model().objects.create_superuser("boss2", "b2@t.com", "pw")
+        self.client.force_login(admin)
+        self.client.post(reverse("operating:warehouse_edit", args=[self.factory.pk]), {
+            "name": "Ergene Fabrika", "kind": "normal",
+            "accounting_book": str(self.factory.accounting_book_id),
+            "city": "Tekirdağ", "country": "Turkey", "on_storefront": "on"})
+        self.factory.refresh_from_db()
+        self.assertEqual((self.factory.city, self.factory.country), ("Tekirdağ", ""))
 
     def test_the_warehouses_that_exist_stay_on(self):
         import importlib

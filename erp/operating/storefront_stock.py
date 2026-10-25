@@ -45,15 +45,20 @@ def stock_items(request):
     places = {}
     items = []
     for item, available in free:
+        # The city as typed and the country as its code ("TR"), which the
+        # storefront names in the shopper's language; `location` is the
+        # two together, or the warehouse's name when neither is filled in.
         warehouse = item.product.warehouse
-        place = warehouse.shown_as
-        places[place] = places.get(place, 0) + available
+        place = {"location": warehouse.shown_as, "city": warehouse.city.strip(),
+                 "country": warehouse.country}
+        total = places.setdefault(place["location"], {**place, "available": 0})
+        total["available"] += available
         if not by_variant:
             items.append({
                 "id": item.pk,
                 "available": float(available),
                 "lot": item.lot_number or "",
-                "location": place,
+                **place,
             })
     return JsonResponse({
         "sku": sku,
@@ -61,7 +66,7 @@ def stock_items(request):
         # The code ("m", "piece"), not a label: the storefront words it in
         # the shopper's own language.
         "unit": product.unit if product else "",
-        "locations": [{"location": place, "available": float(total)}
-                      for place, total in places.items()],
+        "locations": [{**place, "available": float(place["available"])}
+                      for place in places.values()],
         "items": items,
     })

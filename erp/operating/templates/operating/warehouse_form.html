@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% load operating_tags %}
 {% load static %}
 
 {% block title %}{% if warehouse %}{% trans "Edit Warehouse" %} · {{ warehouse.name }}{% else %}{% trans "Add Warehouse" %}{% endif %} | Nejum ERP{% endblock %}
@@ -120,6 +121,14 @@
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid #e0e7ff;
+  }
+  .wh-store-place {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+  @media (max-width: 480px) {
+    .wh-store-place { grid-template-columns: minmax(0, 1fr); }
   }
   .wh-form-field input.wh-switch {
     appearance: none;
@@ -266,8 +275,18 @@
                  onchange="document.getElementById('wh-store').classList.toggle('is-on', this.checked)">
         </div>
         <div class="wh-store-name">
-          <label for="id_public_name">{% trans "Shown to customers as" %}</label>
-          <input type="text" name="public_name" id="id_public_name" maxlength="150" placeholder="{{ warehouse.name|default:_('Istanbul, Türkiye') }}" value="{{ warehouse.public_name|default:'' }}">
+          <label>{% trans "Shown to customers as" %}</label>
+          {# A code from the list, as the storefront stores countries — see operating/countries.py. #}
+          {% country_choices as countries %}
+          <div class="wh-store-place">
+            <input type="text" name="city" id="id_city" maxlength="100" aria-label="{% trans 'City' %}" placeholder="{% trans 'City' %}" value="{{ warehouse.city|default:'' }}">
+            <select name="country" id="id_country" aria-label="{% trans 'Country' %}">
+              <option value="">{% trans "Country" %}</option>
+              {% for code, name in countries %}
+                <option value="{{ code }}" {% if warehouse.country == code %}selected{% endif %}>{{ name }}</option>
+              {% endfor %}
+            </select>
+          </div>
           <div class="hint">{% trans "Where the storefront says this stock stands. Left blank, it shows the warehouse name." %}</div>
         </div>
       </div>

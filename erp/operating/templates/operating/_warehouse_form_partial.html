@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load operating_tags %}
 <div class="sidebar-header">
   <button class="sidebar-close" type="button" onclick="closeWarehouseSidebar()" aria-label="{% trans 'Close' %}">
     <i class="fas fa-times"></i>
@@ -35,9 +36,16 @@
     </div>
 
     <div class="form-group">
-      <label for="id_wh_public_name">{% trans "Shown to customers as" %}</label>
-      <input type="text" name="public_name" id="id_wh_public_name" class="form-input" maxlength="150"
-             placeholder="{% trans 'Istanbul, Türkiye' %}">
+      <label for="id_wh_city">{% trans "Shown to customers as" %}</label>
+      {% country_choices as countries %}
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px;">
+        <input type="text" name="city" id="id_wh_city" class="form-input" maxlength="100"
+               aria-label="{% trans 'City' %}" placeholder="{% trans 'City' %}">
+        <select name="country" class="form-input" aria-label="{% trans 'Country' %}">
+          <option value="">{% trans "Country" %}</option>
+          {% for code, name in countries %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+        </select>
+      </div>
       <div style="color:#94a3b8; font-size:12px; margin-top:4px;">{% trans "Where the storefront says this stock stands. Left blank, it shows the warehouse name." %}</div>
     </div>
 

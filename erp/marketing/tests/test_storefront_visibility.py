@@ -29,7 +29,8 @@ class StorefrontRuleTest(TestCase):
                                                     storefront_rule=RULE)
         self.product = Product.objects.create(title="2052", sku="2052", category=self.group)
         self.shelf = Warehouse.objects.create(
-            name="Laleli", accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
+            name="Laleli", accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0],
+            on_storefront=True)
 
     def _variant(self, sku, stock=None, photo=False):
         with self.captureOnCommitCallbacks(execute=True):
@@ -69,6 +70,27 @@ class StorefrontRuleTest(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             row.quantity = Decimal("5")
             row.save()
+        v.refresh_from_db()
+        self.assertTrue(v.variant_featured)
+
+    def test_stock_off_the_storefront_does_not_show_a_variant(self):
+        self.shelf.on_storefront = False
+        self.shelf.save()
+        self.assertFalse(self._variant("2052.GOLD_ECRU", stock="95.7", photo=True).variant_featured)
+
+    def test_switching_the_warehouse_on_shows_its_stock(self):
+        self.shelf.on_storefront = False
+        self.shelf.save()
+        v = self._variant("2052.GOLD_ECRU", stock="95.7", photo=True)
+        self.assertFalse(v.variant_featured)
+        admin = get_user_model().objects.create_superuser("boss", "b@t.com", "pw")
+        self.client.force_login(admin)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(reverse("operating:warehouse_edit", args=[self.shelf.pk]), {
+                "name": "Laleli", "kind": "normal",
+                "accounting_book": str(self.shelf.accounting_book_id),
+                "on_storefront": "on",
+            })
         v.refresh_from_db()
         self.assertTrue(v.variant_featured)
 

@@ -81,7 +81,8 @@ class ProductTakesTheUnitItsStockSays(TransactionTestCase):
     def test_new_rows_still_insert_without_naming_the_old_columns(self):
         """The columns stay one release, NOT NULL; their database defaults
         are what lets this release's inserts leave them out."""
-        from operating.models import Warehouse, WarehouseProduct
+        Warehouse, WarehouseProduct = self._models("operating.Warehouse",
+                                                   "operating.WarehouseProduct")
         WarehouseProduct.objects.create(
             warehouse=Warehouse.objects.get(name="Shop"), name="new", sku="NEW")
         with connection.cursor() as cur:

@@ -14946,3 +14946,24 @@ msgstr "Her biri ayrı"
 
 msgid "By variant"
 msgstr "Varyant bazında"
+
+msgid "Shown to customers as"
+msgstr "Müşteriye görünen konum"
+
+msgid "Where the storefront says this stock stands. Left blank, it shows the warehouse name."
+msgstr "Sitede bu stokun bulunduğu yer olarak gösterilir. Boş bırakılırsa depo adı gösterilir."
+
+msgid "Istanbul, Türkiye"
+msgstr "İstanbul, Türkiye"
+
+msgid "Sign in to see the stock."
+msgstr "Stoku görmek için giriş yapın."
+
+msgid "Offered on the storefront"
+msgstr "Sitede satışa açık"
+
+msgid "Signed-in customers can see and pick this warehouse's stock on the website, and its stock counts in the stock the site shows."
+msgstr "Giriş yapan müşteriler bu deponun stokunu sitede görüp seçebilir; stoku sitede gösterilen stoka dahil edilir."
+
+msgid "Off: this warehouse's stock is never offered on the website and does not count in what it shows. Staff still sell it as before."
+msgstr "Kapalı: bu deponun stoku sitede hiç sunulmaz ve sitede gösterilen stoka dahil edilmez. Personel yine eskisi gibi satabilir."

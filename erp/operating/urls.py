@@ -5,7 +5,7 @@ from . import views_samples
 from . import views_transfer
 from . import order_excel
 from . import picking_list
-from . import pack_label, warehouse_label
+from . import pack_label, storefront_stock, warehouse_label
 from . import warehouse_excel
 from accounting import views_invoice
 from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped, order_book_guarded
@@ -310,6 +310,13 @@ api_urlpatterns = [
         "api/get_order_detail/<int:user_id>/<int:order_id>/",
         order_book_guarded(views.get_order_detail_api, Order, kwarg="order_id"),
         name="get_order_detail_api",
+    ),
+    # The free stock of one variant, for a signed-in customer: checks the
+    # customer's token itself.
+    path(
+        "api/storefront/stock_items/",
+        storefront_stock.stock_items,
+        name="storefront_stock_items",
     ),
     # Order Tracking API endpoints
     path(

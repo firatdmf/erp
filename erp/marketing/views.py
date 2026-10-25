@@ -2860,11 +2860,18 @@ def get_products(request):
                     -- warehouse carries reports NULL, and stock_tracked below
                     -- is what tells the storefront apart from a real zero.
                     -- See ProductVariant.live_quantity.
+                    -- Only warehouses offered on the storefront count (see
+                    -- Warehouse.on_storefront): stock the site's buyers can't
+                    -- be sent is a real zero to them, not made to order.
                     SELECT id, product_id, variant_sku, variant_price,
-                           (SELECT SUM(wp.quantity)
+                           CASE WHEN EXISTS (SELECT 1 FROM operating_warehouseproduct wp0
+                                              WHERE wp0.catalog_variant_id = marketing_productvariant.id)
+                           THEN COALESCE((SELECT SUM(wp.quantity)
                               FROM operating_warehouseproduct wp
+                              JOIN operating_warehouse w ON w.id = wp.warehouse_id
                              WHERE wp.catalog_variant_id = marketing_productvariant.id
-                           ) AS variant_quantity, variant_featured,
+                               AND w.on_storefront), 0)
+                           END AS variant_quantity, variant_featured,
                            -- False = the warehouse doesn't carry this variant, so
                            -- there is no quantity to quote: it's made to order.
                            EXISTS (SELECT 1 FROM operating_warehouseproduct wp2
@@ -3127,11 +3134,17 @@ def get_product(request):
                 p.tags, p.unit_of_measurement,
                 -- No p.quantity column: a product's stock is everything the
                 -- warehouse holds across its variants. NULL = carried by no
-                -- warehouse at all, i.e. made to order.
-                (SELECT SUM(wp.quantity)
+                -- warehouse at all, i.e. made to order. Only warehouses
+                -- offered on the storefront count towards the figure.
+                CASE WHEN EXISTS (SELECT 1 FROM operating_warehouseproduct wp0
+                                   JOIN marketing_productvariant pv0 ON pv0.id = wp0.catalog_variant_id
+                                  WHERE pv0.product_id = p.id)
+                THEN COALESCE((SELECT SUM(wp.quantity)
                    FROM operating_warehouseproduct wp
                    JOIN marketing_productvariant pv ON pv.id = wp.catalog_variant_id
-                  WHERE pv.product_id = p.id) AS quantity,
+                   JOIN operating_warehouse w ON w.id = wp.warehouse_id
+                  WHERE pv.product_id = p.id AND w.on_storefront), 0)
+                END AS quantity,
                 -- Worked out from cost below (marketing/pricing.py).
                 NULL AS price,
                 p.featured, p.selling_while_out_of_stock, p.weight, p.unit_of_weight,
@@ -3202,10 +3215,14 @@ def get_product(request):
                     -- See the list query above: the warehouse is the only
                     -- source, and NULL means no warehouse carries it.
                     SELECT id, variant_sku, variant_barcode,
-                           (SELECT SUM(wp.quantity)
+                           CASE WHEN EXISTS (SELECT 1 FROM operating_warehouseproduct wp0
+                                              WHERE wp0.catalog_variant_id = marketing_productvariant.id)
+                           THEN COALESCE((SELECT SUM(wp.quantity)
                               FROM operating_warehouseproduct wp
+                              JOIN operating_warehouse w ON w.id = wp.warehouse_id
                              WHERE wp.catalog_variant_id = marketing_productvariant.id
-                           ) AS variant_quantity, variant_price,
+                               AND w.on_storefront), 0)
+                           END AS variant_quantity, variant_price,
                            variant_featured, product_id,
                            EXISTS (SELECT 1 FROM operating_warehouseproduct wp2
                                     WHERE wp2.catalog_variant_id = marketing_productvariant.id)

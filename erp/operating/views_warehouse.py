@@ -1557,6 +1557,8 @@ class WarehouseCreate(View):
     def post(self, request):
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
+        public_name = (request.POST.get('public_name') or '').strip()
+        on_storefront = request.POST.get('on_storefront') == 'on'
         description = (request.POST.get('description') or '').strip()
 
         if not name:
@@ -1579,6 +1581,8 @@ class WarehouseCreate(View):
         wh = Warehouse.objects.create(
             name=name,
             location=location or None,
+            public_name=public_name,
+            on_storefront=on_storefront,
             description=description or None,
             accounting_book=book,
             kind=kind,
@@ -1620,6 +1624,8 @@ class WarehouseCreatePartial(View):
                                 status=403)
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
+        public_name = (request.POST.get('public_name') or '').strip()
+        on_storefront = request.POST.get('on_storefront') == 'on'
         description = (request.POST.get('description') or '').strip()
 
         if not name:
@@ -1639,6 +1645,8 @@ class WarehouseCreatePartial(View):
         wh = Warehouse.objects.create(
             name=name,
             location=location or None,
+            public_name=public_name,
+            on_storefront=on_storefront,
             description=description or None,
             accounting_book=book,
         )
@@ -1662,6 +1670,8 @@ class WarehouseEdit(View):
         warehouse = get_object_or_404(Warehouse, pk=pk)
         name = (request.POST.get('name') or '').strip()
         location = (request.POST.get('location') or '').strip()
+        public_name = (request.POST.get('public_name') or '').strip()
+        on_storefront = request.POST.get('on_storefront') == 'on'
         description = (request.POST.get('description') or '').strip()
 
         if not name:
@@ -1685,6 +1695,9 @@ class WarehouseEdit(View):
 
         warehouse.name = name
         warehouse.location = location or None
+        warehouse.public_name = public_name
+        switched = warehouse.on_storefront != on_storefront
+        warehouse.on_storefront = on_storefront
         warehouse.description = description or None
         warehouse.kind = kind
 
@@ -1696,6 +1709,12 @@ class WarehouseEdit(View):
 
         warehouse.save()
         warehouse.combined_sources.set(sources if kind == 'combined' else [])
+        if switched:
+            # Its stock now counts on the storefront, or stops counting:
+            # groups that show what is in stock follow at once.
+            from marketing import storefront_visibility
+            storefront_visibility.apply_after_commit(
+                warehouse.products.values_list("catalog_variant__product_id", flat=True))
         messages.success(request, f"Warehouse '{warehouse.name}' updated")
         return redirect(reverse('operating:warehouse_detail', args=[warehouse.pk]))
 

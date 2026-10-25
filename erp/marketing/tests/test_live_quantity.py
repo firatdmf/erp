@@ -11,9 +11,10 @@ from marketing.models import (Product, ProductVariant, with_live_quantity,
 from operating.models import Warehouse, WarehouseProduct
 
 
-def _warehouse(name):
+def _warehouse(name, on_storefront=True):
     return Warehouse.objects.create(
-        name=name, accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
+        name=name, accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0],
+        on_storefront=on_storefront)
 
 
 class LiveQuantityTest(TestCase):
@@ -169,3 +170,42 @@ class StorefrontApiReadsLiveQuantityTest(TestCase):
         """p.quantity is gone from the table; the endpoint still answers with
         everything the warehouse holds across the product's variants."""
         self.assertAlmostEqual(self._get()["product"]["quantity"], 2035.60, places=2)
+
+    def test_a_warehouse_off_the_storefront_does_not_count(self):
+        """Its goods can't be sent to the site's buyers, so they are no
+        stock of theirs."""
+        abroad = _warehouse("Almaty", on_storefront=False)
+        WarehouseProduct.objects.create(
+            warehouse=abroad, name="x", sku="ONRKZL000050", quantity=Decimal("500"),
+            catalog_variant=self.stocked)
+        data = self._get()
+        by_sku = {v["variant_sku"]: v["variant_quantity"] for v in data["product_variants"]}
+        self.assertAlmostEqual(by_sku["ONRKZL000050"], 2035.60, places=2)
+        self.assertAlmostEqual(data["product"]["quantity"], 2035.60, places=2)
+
+    def test_stock_held_only_off_the_storefront_reads_as_none_left(self):
+        """Out of stock, not made to order: we do stock it, just not where
+        the site's buyers can be sent it from."""
+        abroad = _warehouse("Almaty", on_storefront=False)
+        only_abroad = ProductVariant.objects.create(product=self.product, variant_sku="ALM-1")
+        WarehouseProduct.objects.create(
+            warehouse=abroad, name="x", sku="ALM-1", quantity=Decimal("40"),
+            catalog_variant=only_abroad)
+        by_sku = {v["variant_sku"]: v for v in self._get()["product_variants"]}
+        self.assertIs(by_sku["ALM-1"]["stock_tracked"], True)
+        self.assertEqual(by_sku["ALM-1"]["variant_quantity"], 0)
+
+    def test_the_list_endpoint_counts_the_same_way(self):
+        import json
+        from marketing.models import ProductCategory
+        abroad = _warehouse("Almaty", on_storefront=False)
+        WarehouseProduct.objects.create(
+            warehouse=abroad, name="x", sku="ONRKZL000050", quantity=Decimal("500"),
+            catalog_variant=self.stocked)
+        self.product.category = ProductCategory.objects.create(name="fabric")
+        self.product.save()
+        r = self.client.get("/marketing/api/get_products", {"product_category": "fabric"})
+        self.assertEqual(r.status_code, 200, r.content[:200])
+        by_sku = {v["variant_sku"]: v["variant_quantity"]
+                  for v in json.loads(r.content)["product_variants"]}
+        self.assertAlmostEqual(by_sku["ONRKZL000050"], 2035.60, places=2)

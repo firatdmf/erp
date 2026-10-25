@@ -2708,12 +2708,65 @@ def free_rolls_response(request, books):
     JSON the roll pickers read — oldest first, each with its book. The
     order form passes the books the request may draw from; the quote form
     passes every book, because a quote only names rolls and holds none."""
-    from django.db.models import DecimalField, F, Q
-    from django.db.models.functions import Coalesce, TruncDate
-    from .models import WarehouseProductItem
     sku = (request.GET.get("sku") or "").strip()
     if not sku:
         return JsonResponse({"ok": False, "error": _gettext("The product is missing.")}, status=400)
+    free = free_stock_items(sku, books, exclude_order_id=_editing_order_id(request), limit=60)
+
+    # Each item's cost per unit, beside its quantity — the same basis as
+    # the sort in free_stock_items. A sales rep is sent the price derived
+    # from it instead (erp.roles.sales_rep_price), never the cost: cost is
+    # the margin, and the role does not read it.
+    from erp.roles import is_sales_rep, sales_rep_price
+    show_cost = not is_sales_rep(request.user)
+
+    out = []
+    for roll, avail in free:
+        # Which book owns the shelf. The form badges the row with it and
+        # sends it back on the line, so the save knows which order this
+        # roll belongs to without re-deriving it from the barcode.
+        wh = roll.product.warehouse if (roll.product and roll.product.warehouse_id) else None
+        out.append({
+            "id": roll.pk,
+            # The KEY the form sends back for this item, not always a
+            # barcode: a batch of alike pieces has none of its own and
+            # goes by its id (WarehouseProductItem.pick_key).
+            "barcode": roll.pick_key,
+            "warehouse": (wh.name if wh else ""),
+            "book_id": (wh.accounting_book_id if wh else None),
+            "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
+            "available": float(avail),
+            # What the quantity and the cost are counted in: meters for
+            # cloth, but a box of ready-made curtains is packs.
+            "unit": roll.product.unit_short if roll.product else "",
+            **({"unit_cost": float(roll.unit_cost) if roll.unit_cost is not None else None}
+               if show_cost else
+               {"unit_price": (float(sales_rep_price(roll.unit_cost))
+                               if roll.unit_cost is not None else None)}),
+        })
+    from accounting.models_accounts import _base_currency_symbol
+    # One card is one SKU, so what is true of its first stock item is
+    # true of the card: whether it is sold by count, and the barcode
+    # printed on every piece of it (which a scan may hand the card).
+    first = free[0][0].product if free else None
+    return JsonResponse({
+        "ok": True, "rolls": out, "cost_symbol": _base_currency_symbol(),
+        "counted": bool(first and first.sold_by_count),
+        "printed_barcode": (first.printed_barcode if first else ""),
+    })
+
+
+def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefront=False):
+    """[(stock item, free quantity)] of `sku` on the shelves `books` own —
+    oldest first, only items with something left once other orders' holds
+    are taken off. The order form's roll picker and the storefront's read
+    the same list, so a customer is never offered a roll staff can't sell.
+    `exclude_order_id` drops one order's own holds (an edit form re-picking
+    what it already holds); `limit` caps how many items are looked at;
+    `on_storefront` keeps to the warehouses the storefront offers."""
+    from django.db.models import DecimalField, F, Q
+    from django.db.models.functions import Coalesce, TruncDate
+    from .models import WarehouseProductItem
     # OLDEST first — FIFO. Fabric that has sat longest goes out first
     # instead of ageing on the shelf behind items scanned last week.
     #
@@ -2761,11 +2814,15 @@ def free_rolls_response(request, books):
         .filter(product__warehouse__accounting_book__in=books)
         .filter(Q(product__catalog_variant__variant_sku__iexact=sku) | Q(product__sku__iexact=sku))
         .annotate(unit_cost=unit_cost)
-        .order_by(TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),
-                  F("unit_cost").asc(nulls_last=True), "pk")[:60]
     )
-    editing = _editing_order_id(request)
-    rolls = list(rolls)
+    if on_storefront:
+        rolls = rolls.filter(product__warehouse__on_storefront=True)
+    rolls = (
+        rolls
+        .order_by(TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),
+                  F("unit_cost").asc(nulls_last=True), "pk")
+    )
+    rolls = list(rolls[:limit] if limit else rolls)
     # One grouped aggregate for the whole page of stock_items, not
     # _roll_available_meters() per roll — that was a SUM query each, and
     # against a remote database 60 stock items meant 60 round trips before the
@@ -2773,55 +2830,17 @@ def free_rolls_response(request, books):
     from django.db.models import Sum
     from .models import OrderStockReservation
     holds = OrderStockReservation.objects.filter(stock_item__in=rolls, consumed=False)
-    if editing is not None:
-        holds = holds.exclude(order_id=editing)
+    if exclude_order_id is not None:
+        holds = holds.exclude(order_id=exclude_order_id)
     reserved = dict(holds.values_list("stock_item_id").annotate(s=Sum("quantity")))
 
-    # Each item's cost per unit, beside its quantity — the same basis as
-    # the sort above. A sales rep is sent the price derived from it
-    # instead (erp.roles.sales_rep_price), never the cost: cost is the
-    # margin, and the role does not read it.
-    from erp.roles import is_sales_rep, sales_rep_price
-    show_cost = not is_sales_rep(request.user)
-
-    out = []
+    free = []
     for roll in rolls:
         phys = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
         avail = (phys or _PDecimal("0")) - reserved.get(roll.pk, _PDecimal("0"))
-        if avail <= 0:
-            continue
-        # Which book owns the shelf. The form badges the row with it and
-        # sends it back on the line, so the save knows which order this
-        # roll belongs to without re-deriving it from the barcode.
-        wh = roll.product.warehouse if (roll.product and roll.product.warehouse_id) else None
-        out.append({
-            "id": roll.pk,
-            # The KEY the form sends back for this item, not always a
-            # barcode: a batch of alike pieces has none of its own and
-            # goes by its id (WarehouseProductItem.pick_key).
-            "barcode": roll.pick_key,
-            "warehouse": (wh.name if wh else ""),
-            "book_id": (wh.accounting_book_id if wh else None),
-            "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
-            "available": float(avail),
-            # What the quantity and the cost are counted in: meters for
-            # cloth, but a box of ready-made curtains is packs.
-            "unit": roll.product.unit_short if roll.product else "",
-            **({"unit_cost": float(roll.unit_cost) if roll.unit_cost is not None else None}
-               if show_cost else
-               {"unit_price": (float(sales_rep_price(roll.unit_cost))
-                               if roll.unit_cost is not None else None)}),
-        })
-    from accounting.models_accounts import _base_currency_symbol
-    # One card is one SKU, so what is true of its first stock item is
-    # true of the card: whether it is sold by count, and the barcode
-    # printed on every piece of it (which a scan may hand the card).
-    first = rolls[0].product if rolls else None
-    return JsonResponse({
-        "ok": True, "rolls": out, "cost_symbol": _base_currency_symbol(),
-        "counted": bool(first and first.sold_by_count),
-        "printed_barcode": (first.printed_barcode if first else ""),
-    })
+        if avail > 0:
+            free.append((roll, avail))
+    return free
 
 
 @login_required

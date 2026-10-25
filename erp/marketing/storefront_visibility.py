@@ -20,7 +20,10 @@ def _with_stock_and_photo(variants):
     from operating.models import WarehouseProduct
     from .models import ProductFile
 
-    stock = (WarehouseProduct.objects.filter(catalog_variant=OuterRef("pk"))
+    # Stock the storefront offers: a warehouse switched off it
+    # (Warehouse.on_storefront) can't make a variant "in stock" there.
+    stock = (WarehouseProduct.objects.filter(catalog_variant=OuterRef("pk"),
+                                             warehouse__on_storefront=True)
              .values("catalog_variant").annotate(total=Sum("quantity")).values("total"))
     photo = ProductFile.objects.filter(product_variant=OuterRef("pk"), file_type="image")
     return variants.annotate(

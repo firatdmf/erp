@@ -1859,6 +1859,16 @@ class Warehouse(models.Model):
 
     name = models.CharField(max_length=150, unique=True)
     location = models.CharField(max_length=255, blank=True, null=True)
+    # What the storefront says a roll stands in — "Istanbul, Türkiye".
+    # Blank falls back to the name (see shown_as). Not `location`: that
+    # holds a street address, which is the staff's to know.
+    public_name = models.CharField(max_length=150, blank=True, default="")
+    # Whether the storefront offers this warehouse's stock — in the roll
+    # picker and in the stock figures it shows. A shop abroad whose goods
+    # can't be shipped to the site's buyers is switched off. Off for a new
+    # warehouse, so publishing stock is somebody's decision. Staff sell
+    # from every warehouse either way.
+    on_storefront = models.BooleanField(default=False)
     description = models.TextField(blank=True, null=True)
     # "combined" = a VIRTUAL warehouse that merges other warehouses into
     # one browsing/search view (e.g. Laleli Store + Factory Solids). It
@@ -1905,6 +1915,11 @@ class Warehouse(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def shown_as(self):
+        """Where this warehouse's stock stands, as customers are told."""
+        return self.public_name.strip() or self.name
 
     @property
     def is_combined(self):

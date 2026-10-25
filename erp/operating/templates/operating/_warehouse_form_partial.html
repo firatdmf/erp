@@ -27,6 +27,21 @@
     </div>
 
     <div class="form-group">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" name="on_storefront" style="width:auto;">
+        {% trans "Offered on the storefront" %}
+      </label>
+      <div style="color:#94a3b8; font-size:12px; margin-top:4px;">{% trans "Signed-in customers can see and pick this warehouse's stock on the website, and its stock counts in the stock the site shows." %}</div>
+    </div>
+
+    <div class="form-group">
+      <label for="id_wh_public_name">{% trans "Shown to customers as" %}</label>
+      <input type="text" name="public_name" id="id_wh_public_name" class="form-input" maxlength="150"
+             placeholder="{% trans 'Istanbul, Türkiye' %}">
+      <div style="color:#94a3b8; font-size:12px; margin-top:4px;">{% trans "Where the storefront says this stock stands. Left blank, it shows the warehouse name." %}</div>
+    </div>
+
+    <div class="form-group">
       <label for="id_wh_book">{% trans "Accounting book" %} <span style="color:#ef4444;">*</span></label>
       <select name="accounting_book" id="id_wh_book" class="form-input" required>
         <option value="">{% trans "— Select a book —" %}</option>

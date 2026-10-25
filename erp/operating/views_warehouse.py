@@ -5555,7 +5555,7 @@ def _ocr_label_gemini(image_file):
     """Send the label image to Gemini Vision and ask it to extract
     {sku, name, meters} as structured JSON. Cheap + fast option.
 
-    Requires GEMINI_API_KEY (or GOOGLE_API_KEY) env var.
+    Requires GOOGLE_AI_API_KEY env var (the name the storefront uses too).
     """
     import json as _json
 
@@ -5565,9 +5565,9 @@ def _ocr_label_gemini(image_file):
     except ImportError:
         return "", {"error": "google-genai SDK not installed (pip install google-genai)"}
 
-    api_key = _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
+    api_key = _env("GOOGLE_AI_API_KEY")
     if not api_key:
-        return "", {"error": "GEMINI_API_KEY env var not set"}
+        return "", {"error": "GOOGLE_AI_API_KEY env var not set"}
 
     try:
         image_file.seek(0)
@@ -6004,7 +6004,7 @@ def _ocr_label(image_file):
 
     Selection order:
       1. OCR_BACKEND env var ('gemini' | 'xai' | 'claude' | 'tesseract') wins if set.
-      2. GEMINI_API_KEY or GOOGLE_API_KEY → Gemini (cheap + fast).
+      2. GOOGLE_AI_API_KEY → Gemini (cheap + fast).
       3. XAI_API_KEY → xAI Grok Vision.
       4. ANTHROPIC_API_KEY → Claude (most accurate, slightly costlier).
       5. Tesseract fallback (works offline but mediocre on real labels).
@@ -6017,7 +6017,7 @@ def _ocr_label(image_file):
     """
     backend = (_env("OCR_BACKEND") or "").lower().strip()
     has_openai = bool(_env("OPENAI_API_KEY"))
-    has_gemini = bool(_env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY"))
+    has_gemini = bool(_env("GOOGLE_AI_API_KEY"))
     has_xai = bool(_env("XAI_API_KEY"))
     has_claude = bool(_env("ANTHROPIC_API_KEY"))
 

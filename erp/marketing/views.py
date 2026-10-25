@@ -3845,8 +3845,17 @@ def newsletter_subscribe(request):
 
     The website sends that language with the sign-up. Without one the
     answer stays in the storefront's own language; a language this ERP
-    has no wording for (Russian, say) is answered in English."""
+    has no wording for (Russian, say) is answered in English.
+
+    Only the storefront's server may call this, with the shared key: it
+    checks reCAPTCHA before passing a sign-up on, and a sign-up from the
+    pop-up is answered with a discount code. Open to anyone, it handed a
+    code to every script that asked."""
     from django.utils import translation
+    from authentication.client_tokens import storefront_key_ok
+
+    if not storefront_key_ok(request):
+        return JsonResponse({'success': False, 'error': 'Sign up on the website'}, status=403)
     try:
         language = (json.loads(request.body).get('language') or '').strip().lower()[:2]
     except (ValueError, AttributeError):

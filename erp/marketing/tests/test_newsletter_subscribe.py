@@ -14,17 +14,22 @@ Run with:
 import json
 
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from marketing.models import NewsletterSubscription
 
 
+@override_settings(STOREFRONT_API_KEY="shared-key")
 class SignUp(TestCase):
     url = reverse("marketing:newsletter_subscribe")
 
+    def post(self, body, key="shared-key"):
+        headers = {"HTTP_X_STOREFRONT_KEY": key} if key is not None else {}
+        return self.client.post(self.url, json.dumps(body), content_type="application/json", **headers)
+
     def subscribe(self, **body):
-        return self.client.post(self.url, json.dumps(body), content_type="application/json").json()
+        return self.post(body).json()
 
     def quick(self, **body):
         """What the footer form and the blog box send."""
@@ -145,3 +150,20 @@ class TheAnswerIsInTheVisitorsLanguage(SignUp):
 
     def test_no_language_keeps_the_storefronts_own(self):
         self.assertEqual(self.refusal(), self.refusal(language="tr"))
+
+
+class OnlyFromTheWebsite(SignUp):
+    """The website checks reCAPTCHA, then passes the sign-up on with the
+    shared key. Called directly, this handed a discount code to anyone."""
+
+    def test_a_call_without_the_key_is_refused_and_saves_nothing(self):
+        for key in (None, "", "guessed"):
+            with self.subTest(key=key):
+                response = self.post({"email": "bot@example.com", "phone": "+905551112233"}, key=key)
+                self.assertEqual(response.status_code, 403)
+                self.assertNotIn("code", response.json())
+        self.assertFalse(NewsletterSubscription.objects.exists())
+
+    @override_settings(STOREFRONT_API_KEY="")
+    def test_with_no_key_configured_nothing_gets_in(self):
+        self.assertEqual(self.post({"email": "a@example.com"}, key="").status_code, 403)

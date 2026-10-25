@@ -86,6 +86,11 @@ def delete_swatch_cdn_file(sender, instance, **kwargs):
     delete_from_cdn_after_commit(instance.image_url)
 
 
+@receiver(pre_delete, sender="marketing.GuestReviewImage")
+def delete_review_photo_cdn_file(sender, instance, **kwargs):
+    delete_from_cdn_after_commit(instance.image_url)
+
+
 # ── Storefront visibility follows stock and photos ──────────────────────
 # A group set to the rule keeps its Featured ticks in step with what each
 # variant has (marketing/storefront_visibility.py); these are the changes

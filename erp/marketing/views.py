@@ -4076,24 +4076,56 @@ def newsletter_unsubscribe(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+def _store_review_photo(photo, path):
+    """The photo as AVIF on Bunny at `path`, or None when it isn't a
+    readable image or the upload fails; the review is kept either way."""
+    from marketing.utils.bunny_storage import upload_to_bunny
+    from marketing.utils.image_optimizer import optimize_image_to_avif
+
+    avif = optimize_image_to_avif(photo)
+    if avif is None:
+        print(f"[guest_review] not a readable image: {photo.name}")
+        return None
+    try:
+        return upload_to_bunny(avif, path, content_type="image/avif", purge=False)
+    except Exception as e:
+        print(f"[guest_review] photo upload failed: {e}")
+        return None
+
+
 @answers_in_storefront_language
 @csrf_exempt
 def guest_review(request):
-    """Create a guest product review (no login required)."""
+    """Create a guest product review (no login required).
+
+    The storefront's server posts it as a form with its key, the photos
+    attached under "images"; they are made AVIF and stored on Bunny here,
+    so the storefront holds no Bunny credentials. The older JSON body,
+    naming photos the storefront uploaded itself (image_urls), is still
+    taken while the storefront moves over."""
+    from authentication.client_tokens import storefront_key_ok
     from marketing.models import GuestProductReview, GuestReviewImage, Product
 
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
 
     try:
-        data = json.loads(request.body)
+        if request.content_type == 'multipart/form-data':
+            if not storefront_key_ok(request):
+                return JsonResponse({'success': False, 'error': 'Review on the website'}, status=403)
+            data = request.POST
+            photos = request.FILES.getlist('images')[:5]
+            image_urls = []
+        else:
+            data = json.loads(request.body)
+            photos = []
+            image_urls = data.get('image_urls', [])
         product_sku = data.get('product_sku', '')
         first_name = data.get('first_name', '').strip()
         last_name = data.get('last_name', '').strip()
-        hide_name = data.get('hide_name', False)
+        hide_name = data.get('hide_name', False) in (True, 'true')
         rating = int(data.get('rating', 0))
         comment = data.get('comment', '').strip()
-        image_urls = data.get('image_urls', [])
 
         if not product_sku or not first_name or not last_name:
             return JsonResponse({'success': False, 'error': _gettext("First name, last name and product code are required")})
@@ -4116,6 +4148,10 @@ def guest_review(request):
         )
 
         for url in image_urls[:5]:
+            if url:
+                GuestReviewImage.objects.create(review=review, image_url=url)
+        for n, photo in enumerate(photos, 1):
+            url = _store_review_photo(photo, f"reviews/{product.sku}/{review.pk}-{n}.avif")
             if url:
                 GuestReviewImage.objects.create(review=review, image_url=url)
 

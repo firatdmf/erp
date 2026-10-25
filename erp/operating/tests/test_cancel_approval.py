@@ -147,14 +147,17 @@ class CancelApprovalTest(TestCase):
             self.assertEqual(self._status(), ("pending", "ordered"))
 
     # ── Deleting and removing lines ─────────────────────────────────
-    def test_deleting_waits_too(self):
-        with self.settings(ORDER_DELETE_PASSWORD="pw-delete"):
-            self.client.force_login(self.clerk)
-            self.client.post(reverse("operating:delete_order", args=[self.order.pk]),
-                             {"delete_password": "pw-delete"})
+    def test_only_the_books_admin_deletes_and_the_purchase_goes_with_it(self):
+        # Only admins delete orders (no shared password any more), so a clerk
+        # can't start one; the book's admin deletes at once, cancelling the
+        # purchase still on its way in.
+        url = reverse("operating:delete_order", args=[self.order.pk])
+        self.client.force_login(self.clerk)
+        self.client.post(url)
         self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
-        self.assertEqual(OrderCancelRequest.objects.get().action, "delete")
-        self._decide(self.book_admin, "approve")
+        self.assertFalse(OrderCancelRequest.objects.exists())
+        self.client.force_login(self.book_admin)
+        self.client.post(url)
         self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
         self.purchase.refresh_from_db()
         self.assertEqual(self.purchase.status, "cancelled")

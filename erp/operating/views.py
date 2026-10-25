@@ -5587,24 +5587,13 @@ def export_packing_list_excel(request, pk):
 
 
 def _order_delete_allowed(request):
-    """Admins delete orders freely; everyone else must supply the
-    deletion password (settings.ORDER_DELETE_PASSWORD). The password
-    only ever travels via POST. Returns (ok, error_message)."""
-    from django.conf import settings as _s
+    """Only admins delete orders (views_warehouse._is_admin). Everyone else
+    could once delete with a shared password; it defaulted to a word in this
+    public repository, so it is gone. Returns (ok, error_message)."""
     from .views_warehouse import _is_admin
     if _is_admin(request.user):
         return True, None
-    supplied = (request.POST.get("delete_password") or "").strip()
-    if not supplied and request.content_type == "application/json":
-        try:
-            supplied = (json.loads(request.body.decode() or "{}").get("delete_password") or "").strip()
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            supplied = ""
-    if supplied and supplied == _s.ORDER_DELETE_PASSWORD:
-        return True, None
-    return False, (_gettext("Only an admin may delete orders — enter the delete "
-                            "password to continue.")
-                   if not supplied else _gettext("The delete password is wrong."))
+    return False, _gettext("Only an admin may delete orders.")
 
 
 @require_POST

@@ -11694,8 +11694,8 @@ msgid "The order was updated, but these barcodes could not be reserved — try a
 msgstr "Sipariş güncellendi ama şu barkodlar için rezervasyon yapılamadı, paketleme sayfasından tekrar deneyin: "
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Only an admin may delete orders — enter the delete password to continue."
-msgstr "Sipariş silme yetkisi yalnızca adminde — devam etmek için silme şifresini girin."
+msgid "Only an admin may delete orders."
+msgstr "Sipariş silme yetkisi yalnızca adminde."
 
 #: hardcoded Turkish moved to the catalogue as written
 msgid "The delete password is wrong."

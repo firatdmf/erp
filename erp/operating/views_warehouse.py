@@ -5302,120 +5302,21 @@ _LABEL_PROMPT = (
 )
 
 
-def _ocr_label_openai(image_file):
-    """OpenAI Vision OCR — fast path. Requires OPENAI_API_KEY. Model via
-    the OPENAI_MODEL env var (default 'gpt-4o-mini' — fast + accurate on
-    fabric labels). Uses detail='high' so the tiny dot on a Turkish 'İ'
-    is actually visible to the model. Returns (raw_text, parsed_dict)."""
-    import base64
-    import json as _json
-    import re as _re
-
-    try:
-        from openai import OpenAI
-    except ImportError:
-        return "", {"error": "OpenAI SDK not installed (pip install openai)"}
-
-    api_key = _env("OPENAI_API_KEY")
-    if not api_key:
-        return "", {"error": "OPENAI_API_KEY env var not set"}
-
-    try:
-        image_file.seek(0)
-    except Exception:
-        pass
-    raw_bytes = image_file.read()
-    if not raw_bytes:
-        return "", {"error": "Empty image"}
-
-    media_type = "image/jpeg"
-    if raw_bytes[:8] == b"\x89PNG\r\n\x1a\n":
-        media_type = "image/png"
-    elif raw_bytes[:6] in (b"GIF87a", b"GIF89a"):
-        media_type = "image/gif"
-    elif raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
-        media_type = "image/webp"
-    b64 = base64.b64encode(raw_bytes).decode("ascii")
-    data_uri = f"data:{media_type};base64,{b64}"
-
-    # The fastest OpenAI vision model. Override with OPENAI_MODEL
-    # (e.g. 'gpt-4.1-mini' for a touch more accuracy).
-    model_name = _env("OPENAI_MODEL") or "gpt-4o-mini"
-
-    try:
-        client = OpenAI(api_key=api_key, timeout=30)
-        resp = client.chat.completions.create(
-            model=model_name,
-            temperature=0,
-            max_tokens=400,
-            response_format={"type": "json_object"},
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": _LABEL_PROMPT},
-                    {"type": "image_url",
-                     "image_url": {"url": data_uri, "detail": "high"}},
-                ],
-            }],
-        )
-    except Exception as e:
-        return "", {"error": f"OpenAI call failed: {e}"}
-
-    try:
-        text_out = (resp.choices[0].message.content or "").strip()
-    except Exception:
-        text_out = ""
-
-    start = text_out.find("{")
-    end = text_out.rfind("}")
-    if start == -1 or end == -1:
-        return text_out, {"error": "OpenAI did not return JSON",
-                          "sku": None, "name": None, "quantity": None}
-    try:
-        data = _json.loads(text_out[start:end + 1])
-    except Exception:
-        return text_out, {"error": "OpenAI returned malformed JSON",
-                          "sku": None, "name": None, "quantity": None}
-
-    sku = (data.get("sku") or None)
-    if sku:
-        sku = _tr_upper(str(sku).strip()) or None
-    name = (data.get("name") or None)
-    if name:
-        name = str(name).strip() or None
-    meters = data.get("quantity")
-    try:
-        meters = float(meters) if meters is not None else None
-    except (TypeError, ValueError):
-        meters = None
-    barcode = (data.get("barcode") or None)
-    if barcode:
-        cleaned = _re.sub(r"\D", "", str(barcode))
-        barcode = cleaned or None
-    color = (data.get("color") or None)
-    if color:
-        color = str(color).strip() or None
-    coupon = (data.get("coupon") or None)
-    if coupon:
-        coupon = str(coupon).strip() or None
-
-    return text_out, {"sku": sku, "name": name, "quantity": meters,
-                      "barcode": barcode, "color": color, "coupon": coupon}
+# The models that read a label, most accurate first. A scan the first can't
+# serve (overloaded, an API error, a refusal, unreadable JSON) is retried on
+# the next. Running out of credit stops every Claude model alike, so it is
+# not retried here: the dispatcher moves on to the next provider (Gemini).
+_CLAUDE_LABEL_MODELS = ("claude-opus-5-5", "claude-haiku-5-5")
 
 
 def _ocr_label_claude(image_file):
-    """Send the label image to Claude Vision and ask it to extract
-    {sku, name, meters} as structured JSON. Far more reliable than
-    Tesseract on real-world fabric labels (angles, lighting,
-    reflective surfaces, mixed fonts).
-
-    Returns (raw_text, parsed_dict). On error the parsed dict has an
-    "error" key.
+    """Send the label image to Claude and ask it to extract the label's
+    fields as JSON (see _LABEL_PROMPT). Returns (raw_text, parsed_dict);
+    on error the parsed dict has an "error" key.
 
     Requires ANTHROPIC_API_KEY env var.
     """
     import base64
-    import json as _json
 
     try:
         import anthropic
@@ -5426,7 +5327,6 @@ def _ocr_label_claude(image_file):
     if not api_key:
         return "", {"error": "ANTHROPIC_API_KEY env var not set"}
 
-    # Read + b64 the image.
     try:
         image_file.seek(0)
     except Exception:
@@ -5444,89 +5344,76 @@ def _ocr_label_claude(image_file):
     elif raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
         media_type = "image/webp"
 
-    b64 = base64.b64encode(raw_bytes).decode("ascii")
+    content = [
+        {"type": "image", "source": {"type": "base64", "media_type": media_type,
+                                     "data": base64.b64encode(raw_bytes).decode("ascii")}},
+        {"type": "text", "text": _LABEL_PROMPT},
+    ]
+    client = anthropic.Anthropic(api_key=api_key)
+    failures = []
+    for model in _CLAUDE_LABEL_MODELS:
+        try:
+            resp = client.messages.create(
+                model=model,
+                # Thinking is always on for these models and counts against
+                # max_tokens, so leave it room; the answer itself is short.
+                max_tokens=16000,
+                output_config={"effort": "medium"},
+                messages=[{"role": "user", "content": content}],
+            )
+        except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
+            # The key itself is refused: no other Claude model will do better.
+            return "", {"error": f"Claude key refused: {e.message}"}
+        except anthropic.BadRequestError as e:
+            if "credit balance" in str(e.message).lower():
+                return "", {"error": f"Claude out of credit: {e.message}"}
+            failures.append(f"{model}: {e.message}")
+            continue
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            failures.append(f"{model}: {e}")
+            continue
 
-    prompt = (
-        "This is a photo of a Turkish fabric roll label. Extract these "
-        "fields and return ONLY a single JSON object — no commentary, "
-        "no markdown fences:\n\n"
-        '{"sku": "...", "name": "...", "quantity": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
-        "Field rules:\n"
-        "- sku: the product CODE. Usually an uppercase prefix + zeros + digits "
-        "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9', 'K48083İ.G93'). It is "
-        "printed on the label, NOT the long number under the barcode. If the "
-        "SKU contains a Turkish dotted İ, preserve it exactly (İ, not I).\n"
-        "- name: the product/fabric name as printed — typically a model "
-        "name + colour (e.g. 'S-LINE 1106 EKRU', 'GREK TÜL'). Do NOT "
-        "include the brand name (KARVEN, etc.) here.\n"
-        "- quantity: roll length as a decimal number. Turkish labels write "
-        "'25,00 Metre' or '48,5 m' — interpret comma as decimal point, so "
-        "'25,00' → 25.0, '48,5' → 48.5. Do not include the unit.\n"
-        "- color: the colour/variant text if printed on its own line "
-        "(e.g. 'AÇIK KREM', 'EKRU', 'GÜMÜŞ'); else null.\n"
-        "- coupon: the value after 'Kupon No' / 'Kupon' if present; else null.\n\n"
-        "If a field is illegible or absent, set it to null. "
-        "Do not invent values."
-    )
+        if resp.stop_reason == "refusal":
+            failures.append(f"{model}: declined")
+            continue
+        text_out = "".join(b.text for b in resp.content if b.type == "text")
+        parsed = _parse_label_json(text_out)
+        if parsed.get("error"):
+            failures.append(f"{model}: {parsed['error']}")
+            continue
+        print(f"[OCR]   claude model={model} tokens in={resp.usage.input_tokens} "
+              f"out={resp.usage.output_tokens}", flush=True)
+        return text_out, parsed
 
-    try:
-        client = anthropic.Anthropic(api_key=api_key)
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=400,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": b64,
-                            },
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
-        )
-    except anthropic.APIError as e:
-        return "", {"error": f"Claude API error: {e}"}
-    except Exception as e:
-        return "", {"error": f"Claude call failed: {e}"}
+    return "", {"error": "Claude: " + "; ".join(failures)}
 
-    # Pull the text content out of the response.
-    text_out = ""
-    for block in resp.content:
-        if getattr(block, "type", None) == "text":
-            text_out += block.text
 
-    # Parse the JSON — be tolerant of code fences or stray text.
+def _parse_label_json(text_out):
+    """The label fields from a model's JSON answer, cleaned; an "error" key
+    when there is no JSON object in it."""
+    import json as _json
+    import re as _re
+
     json_str = text_out.strip()
     if "```" in json_str:
-        # extract the first ``` block
-        parts = json_str.split("```")
-        for p in parts:
+        # Take the first fenced block that holds an object.
+        for p in json_str.split("```"):
             if "{" in p:
-                # strip optional language tag
-                if p.startswith("json"):
-                    p = p[4:]
-                json_str = p
+                json_str = p[4:] if p.startswith("json") else p
                 break
     start = json_str.find("{")
     end = json_str.rfind("}")
     if start == -1 or end == -1:
-        return text_out, {"error": "Claude did not return JSON", "sku": None, "name": None, "quantity": None}
+        return {"error": "no JSON in the answer", "sku": None, "name": None, "quantity": None}
     try:
         data = _json.loads(json_str[start:end + 1])
     except Exception:
-        return text_out, {"error": "Claude returned malformed JSON", "sku": None, "name": None, "quantity": None}
+        return {"error": "malformed JSON in the answer", "sku": None, "name": None, "quantity": None}
 
-    sku = (data.get("sku") or None)
+    sku = data.get("sku") or None
     if sku:
         sku = _tr_upper(str(sku).strip()) or None
-    name = (data.get("name") or None)
+    name = data.get("name") or None
     if name:
         name = str(name).strip() or None
     meters = data.get("quantity")
@@ -5534,21 +5421,18 @@ def _ocr_label_claude(image_file):
         meters = float(meters) if meters is not None else None
     except (TypeError, ValueError):
         meters = None
-    barcode = (data.get("barcode") or None)
+    barcode = data.get("barcode") or None
     if barcode:
-        # Digits only — strip whitespace / punctuation the LLM may add.
-        import re as _re
-        cleaned = _re.sub(r"\D", "", str(barcode))
-        barcode = cleaned or None
-    color = (data.get("color") or None)
+        # Digits only — strip whitespace / punctuation the model may add.
+        barcode = _re.sub(r"\D", "", str(barcode)) or None
+    color = data.get("color") or None
     if color:
         color = str(color).strip() or None
-    coupon = (data.get("coupon") or None)
+    coupon = data.get("coupon") or None
     if coupon:
         coupon = str(coupon).strip() or None
-
-    return text_out, {"sku": sku, "name": name, "quantity": meters,
-                      "barcode": barcode, "color": color, "coupon": coupon}
+    return {"sku": sku, "name": name, "quantity": meters,
+            "barcode": barcode, "color": color, "coupon": coupon}
 
 
 def _ocr_label_gemini(image_file):
@@ -6003,10 +5887,11 @@ def _ocr_label(image_file):
     """Dispatcher — picks the best OCR backend available.
 
     Selection order:
-      1. OCR_BACKEND env var ('gemini' | 'xai' | 'claude' | 'tesseract') wins if set.
-      2. GOOGLE_AI_API_KEY → Gemini (cheap + fast).
-      3. XAI_API_KEY → xAI Grok Vision.
-      4. ANTHROPIC_API_KEY → Claude (most accurate, slightly costlier).
+      1. OCR_BACKEND env var ('claude' | 'gemini' | 'xai' | 'tesseract') wins if set.
+      2. ANTHROPIC_API_KEY → Claude (Opus 5.5, retried on Haiku 5.5).
+      3. GOOGLE_AI_API_KEY → Gemini — what reads labels when Claude is out
+         of credit or down.
+      4. XAI_API_KEY → xAI Grok Vision.
       5. Tesseract fallback (works offline but mediocre on real labels).
 
     Vision-API errors auto-fall-back to the next backend so the user
@@ -6016,14 +5901,13 @@ def _ocr_label(image_file):
     overload → falling back to xai").
     """
     backend = (_env("OCR_BACKEND") or "").lower().strip()
-    has_openai = bool(_env("OPENAI_API_KEY"))
     has_gemini = bool(_env("GOOGLE_AI_API_KEY"))
     has_xai = bool(_env("XAI_API_KEY"))
     has_claude = bool(_env("ANTHROPIC_API_KEY"))
 
     print(
         f"\n[OCR] ── new scan ── preferred={backend or 'auto'} "
-        f"has_openai={has_openai} has_xai={has_xai} "
+        f"has_xai={has_xai} "
         f"has_gemini={has_gemini} has_claude={has_claude}",
         flush=True,
     )
@@ -6069,22 +5953,17 @@ def _ocr_label(image_file):
     # Tesseract. This is what the user actually wants: never silently
     # downgrade to bad OCR while a paid API is still available.
     #
-    # Auto-order preference: openai → gemini → xai → claude → tesseract.
-    # OpenAI (gpt-4o-mini, detail=high) leads by default — it's fast and
-    # the user is out of Gemini credit. A set OCR_BACKEND still wins
-    # (it's promoted to the front above). If a backend has no key / no
-    # credit it errors and we fall through to the next.
+    # Auto-order preference: claude → gemini → xai → tesseract. Claude
+    # leads for accuracy; Gemini is the backstop when Claude has no credit.
     order = []
-    if backend in ("openai", "gemini", "xai", "claude"):
+    if backend in ("claude", "gemini", "xai"):
         order.append(backend)
-    if has_openai and "openai" not in order:
-        order.append("openai")
+    if has_claude and "claude" not in order:
+        order.append("claude")
     if has_gemini and "gemini" not in order:
         order.append("gemini")
     if has_xai and "xai" not in order:
         order.append("xai")
-    if has_claude and "claude" not in order:
-        order.append("claude")
     if backend == "tesseract":
         # User explicitly forces tesseract — honour it without trying APIs.
         order = ["tesseract"]
@@ -6092,7 +5971,6 @@ def _ocr_label(image_file):
         order.append("tesseract")  # always the final fallback
 
     fns = {
-        "openai": _ocr_label_openai,
         "gemini": _ocr_label_gemini,
         "xai": _ocr_label_xai,
         "claude": _ocr_label_claude,

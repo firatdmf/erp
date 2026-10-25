@@ -5596,189 +5596,6 @@ def _ocr_label_gemini(image_file):
                       "barcode": barcode, "color": color, "coupon": coupon}
 
 
-def _ocr_label_xai(image_file):
-    """Send the label image to xAI Grok Vision and ask it to extract
-    {sku, name, meters, barcode} as structured JSON.
-
-    Uses xAI's OpenAI-compatible chat completions endpoint
-    (https://api.x.ai/v1/chat/completions). No SDK needed.
-
-    Requires XAI_API_KEY env var. Optional XAI_MODEL env var
-    (defaults to 'grok-2-vision-latest').
-    """
-    import base64
-    import json as _json
-
-    try:
-        import requests
-    except ImportError:
-        return "", {"error": "requests not installed"}
-
-    api_key = _env("XAI_API_KEY")
-    if not api_key:
-        return "", {"error": "XAI_API_KEY env var not set"}
-
-    try:
-        image_file.seek(0)
-    except Exception:
-        pass
-    raw_bytes = image_file.read()
-    if not raw_bytes:
-        return "", {"error": "Empty image"}
-
-    media_type = "image/jpeg"
-    if raw_bytes[:8] == b"\x89PNG\r\n\x1a\n":
-        media_type = "image/png"
-    elif raw_bytes[:6] in (b"GIF87a", b"GIF89a"):
-        media_type = "image/gif"
-    elif raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
-        media_type = "image/webp"
-
-    b64 = base64.b64encode(raw_bytes).decode("ascii")
-    data_url = f"data:{media_type};base64,{b64}"
-
-    prompt = (
-        "This is a photo of a Turkish fabric roll label. Read EXACTLY "
-        "what is printed in THIS image — do not invent, do not "
-        "remember anything from previous images. Return ONLY a single "
-        "JSON object — no commentary, no markdown fences:\n\n"
-        '{"sku": "...", "name": "...", "quantity": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
-        "LABEL STRUCTURE (stock item → bottom):\n"
-        "  1. BRAND   (e.g. KARVEN, DEMFIRAT)  ← IGNORE, never extract\n"
-        "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
-        "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
-        "  4. METERS  (length in meters)               → goes in 'quantity'\n"
-        "  5. BARCODE (the code under the barcode bars) → goes in 'barcode'\n\n"
-        "Field rules:\n"
-        "- sku: the short product CODE printed on the second line "
-        "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9'). Alphanumeric, "
-        "uppercase. Preserve Turkish letters (İ, Ş, Ğ, Ç, Ö, Ü) "
-        "exactly. NOT the long barcode number, NOT the brand.\n"
-        "- name: the MODEL NAME — the descriptive text printed "
-        "DIRECTLY UNDER the sku. Examples: 'S-LINE 1106 EKRU', "
-        "'KADİFE KREM', 'PANAMA 4500 GRİ', 'YAĞMUR DAMLASI ANTRASİT', "
-        "'POLO-203 / KIRIK BEYAZ'. Read this descriptive line "
-        "VERBATIM, exactly as printed. INCLUDE special characters "
-        "(- / + & . ' Turkish letters İŞĞÇÖÜ) and any numbers that "
-        "are part of the model name. DO NOT return the brand "
-        "(KARVEN/DEMFIRAT etc.) for this field — the brand "
-        "is the FIRST line at the very top of the label and must be "
-        "skipped. If there really is no model line between the sku "
-        "and the quantity/barcode area, return null.\n"
-        "- quantity: roll length as a decimal number. Turkish labels "
-        "write '25,00 Metre' or '48,5 m' — interpret comma as decimal "
-        "point ('25,00' → 25.0). No unit.\n"
-        "- barcode: the code printed directly under the barcode strip. "
-        "ALPHANUMERIC — may have a letter prefix like 'KL055555' or "
-        "be all digits like '017400000228'. Copy EXACTLY what is "
-        "printed, including any letters at the start. Typically 8 to "
-        "16 chars. Different from the sku at the top.\n"
-        "- color: a colour/variant on its own line if present "
-        "(e.g. 'AÇIK KREM', 'EKRU', 'GÜMÜŞ'); else null.\n"
-        "- coupon: the value after 'Kupon No' / 'Kupon' if present; else null.\n\n"
-        "If a field is illegible or genuinely not in THIS image, set "
-        "it to null. Do not invent values. Do not fall back to "
-        "previous-scan values."
-    )
-
-    # xAI deprecated the dedicated grok-2-vision models — vision is now
-    # built into the Grok 4 chat models. grok-4.3 is the fast non-reasoning
-    # variant, ideal for OCR. Override with XAI_MODEL if you want
-    # grok-4.20-0309-reasoning for tricky labels.
-    model_name = _env("XAI_MODEL") or "grok-4.3"
-
-    payload = {
-        "model": model_name,
-        "messages": [{
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
-                {"type": "text", "text": prompt},
-            ],
-        }],
-        "temperature": 0,
-        # The output JSON is short (~120 chars). Capping max_tokens
-        # tight cuts response latency noticeably on Grok 4 — there's
-        # no reason to budget for an essay.
-        "max_tokens": 250,
-        "response_format": {"type": "json_object"},
-    }
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-
-    try:
-        resp = requests.post(
-            "https://api.x.ai/v1/chat/completions",
-            json=payload, headers=headers, timeout=30,
-        )
-    except requests.RequestException as e:
-        return "", {"error": f"xAI call failed: {e}"}
-
-    if resp.status_code != 200:
-        snippet = (resp.text or "")[:400]
-        return snippet, {"error": f"xAI HTTP {resp.status_code}: {snippet}"}
-
-    try:
-        body = resp.json()
-        text_out = (body.get("choices", [{}])[0]
-                        .get("message", {})
-                        .get("content", "") or "").strip()
-    except Exception as e:
-        return resp.text, {"error": f"xAI bad response: {e}"}
-
-    if not text_out:
-        return "", {"error": "xAI returned empty content"}
-
-    json_str = text_out.strip()
-    if "```" in json_str:
-        parts = json_str.split("```")
-        for p in parts:
-            if "{" in p:
-                if p.startswith("json"):
-                    p = p[4:]
-                json_str = p
-                break
-    start = json_str.find("{")
-    end = json_str.rfind("}")
-    if start == -1 or end == -1:
-        return text_out, {"error": "xAI did not return JSON", "sku": None, "name": None, "quantity": None}
-    try:
-        data = _json.loads(json_str[start:end + 1])
-    except Exception:
-        return text_out, {"error": "xAI returned malformed JSON", "sku": None, "name": None, "quantity": None}
-
-    sku = (data.get("sku") or None)
-    if sku:
-        sku = _tr_upper(str(sku).strip()) or None
-    name = (data.get("name") or None)
-    if name:
-        name = str(name).strip() or None
-    meters = data.get("quantity")
-    try:
-        meters = float(meters) if meters is not None else None
-    except (TypeError, ValueError):
-        meters = None
-    barcode = (data.get("barcode") or None)
-    if barcode:
-        # Keep alphanumeric (letter prefixes like 'KL055555' are valid).
-        # Strip whitespace/punctuation but preserve letters + digits.
-        import re as _re
-        cleaned = _re.sub(r"[^A-Za-z0-9]", "", str(barcode)).upper()
-        barcode = cleaned or None
-    color = (data.get("color") or None)
-    if color:
-        color = str(color).strip() or None
-    coupon = (data.get("coupon") or None)
-    if coupon:
-        coupon = str(coupon).strip() or None
-
-    return text_out, {"sku": sku, "name": name, "quantity": meters,
-                      "barcode": barcode, "color": color, "coupon": coupon}
-
-
 def _ocr_label_tesseract(image_file):
     """Tesseract fallback — same return shape as _ocr_label_claude."""
     import os
@@ -5887,27 +5704,24 @@ def _ocr_label(image_file):
     """Dispatcher — picks the best OCR backend available.
 
     Selection order:
-      1. OCR_BACKEND env var ('claude' | 'gemini' | 'xai' | 'tesseract') wins if set.
+      1. OCR_BACKEND env var ('claude' | 'gemini' | 'tesseract') wins if set.
       2. ANTHROPIC_API_KEY → Claude (Opus 5.5, retried on Haiku 5.5).
       3. GOOGLE_AI_API_KEY → Gemini — what reads labels when Claude is out
          of credit or down.
-      4. XAI_API_KEY → xAI Grok Vision.
-      5. Tesseract fallback (works offline but mediocre on real labels).
+      4. Tesseract fallback (works offline but mediocre on real labels).
 
     Vision-API errors auto-fall-back to the next backend so the user
     always gets *some* result back even on a network blip. The chain
     of attempts is recorded in `_attempts` so the debug panel can
-    show exactly WHY each tried backend failed (e.g. "gemini: 503
-    overload → falling back to xai").
+    show exactly WHY each tried backend failed (e.g. "claude: out of
+    credit → falling back to gemini").
     """
     backend = (_env("OCR_BACKEND") or "").lower().strip()
     has_gemini = bool(_env("GOOGLE_AI_API_KEY"))
-    has_xai = bool(_env("XAI_API_KEY"))
     has_claude = bool(_env("ANTHROPIC_API_KEY"))
 
     print(
         f"\n[OCR] ── new scan ── preferred={backend or 'auto'} "
-        f"has_xai={has_xai} "
         f"has_gemini={has_gemini} has_claude={has_claude}",
         flush=True,
     )
@@ -5953,17 +5767,15 @@ def _ocr_label(image_file):
     # Tesseract. This is what the user actually wants: never silently
     # downgrade to bad OCR while a paid API is still available.
     #
-    # Auto-order preference: claude → gemini → xai → tesseract. Claude
+    # Auto-order preference: claude → gemini → tesseract. Claude
     # leads for accuracy; Gemini is the backstop when Claude has no credit.
     order = []
-    if backend in ("claude", "gemini", "xai"):
+    if backend in ("claude", "gemini"):
         order.append(backend)
     if has_claude and "claude" not in order:
         order.append("claude")
     if has_gemini and "gemini" not in order:
         order.append("gemini")
-    if has_xai and "xai" not in order:
-        order.append("xai")
     if backend == "tesseract":
         # User explicitly forces tesseract — honour it without trying APIs.
         order = ["tesseract"]
@@ -5972,7 +5784,6 @@ def _ocr_label(image_file):
 
     fns = {
         "gemini": _ocr_label_gemini,
-        "xai": _ocr_label_xai,
         "claude": _ocr_label_claude,
         "tesseract": _ocr_label_tesseract,
     }
@@ -8230,8 +8041,8 @@ class WarehouseRollScan(View):
                     "parsed": {},
                 })
 
-            # Trust the OCR'd SKU as printed — vision LLMs (xAI/Gemini/
-            # Claude) read fabric-label SKUs very reliably, so the old
+            # Trust the OCR'd SKU as printed — vision LLMs (Claude/
+            # Gemini) read fabric-label SKUs very reliably, so the old
             # Levenshtein "auto-correct to nearest existing SKU" behaviour
             # ended up *changing* correct OCR output to a similar-but-
             # wrong DB entry (e.g. KZL000691 → KZL000131). Always show

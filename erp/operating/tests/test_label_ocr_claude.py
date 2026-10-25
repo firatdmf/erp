@@ -84,7 +84,7 @@ class ClaudeLabelReaderTest(SimpleTestCase):
 
 
 class LabelDispatcherTest(SimpleTestCase):
-    def test_claude_out_of_credit_goes_to_gemini_and_openai_is_gone(self):
+    def test_claude_out_of_credit_goes_to_gemini_and_openai_and_xai_are_gone(self):
         env = {"OCR_BACKEND": "claude", "ANTHROPIC_API_KEY": "k", "GOOGLE_AI_API_KEY": "g"}
         gemini = mock.Mock(return_value=("{}", {"sku": "X1", "quantity": 1.0}))
         with mock.patch.object(vw, "_env", lambda k: env.get(k, "")), \
@@ -95,6 +95,7 @@ class LabelDispatcherTest(SimpleTestCase):
         self.assertEqual(parsed["_backend"], "gemini")
         self.assertEqual([a["backend"] for a in parsed["_attempts"]], ["claude", "gemini"])
         self.assertFalse(hasattr(vw, "_ocr_label_openai"))
+        self.assertFalse(hasattr(vw, "_ocr_label_xai"))
 
     def test_claude_leads_without_a_preference(self):
         env = {"ANTHROPIC_API_KEY": "k", "GOOGLE_AI_API_KEY": "g"}

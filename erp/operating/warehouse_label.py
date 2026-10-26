@@ -1,6 +1,6 @@
 """Printable roll/variant labels (PDF) for warehouse products.
 
-Re-creates the physical fabric-roll sticker: brand wordmark, DESEN (main
+Re-creates the physical fabric-roll sticker: DESEN (main
 product) + VARYANT, SKU, METRE, a Code128 barcode and a QR code — one label
 per stock item (each carries its own barcode + quantity), so staff can reprint and
 stick a fresh label on a product.
@@ -62,7 +62,6 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "DejaVuSans-Bold" if reg == "DejaVuSans" else "Helvetica-Bold"
-    brand = (brand_value("BRAND_NAME") or "Nejum").upper()
 
     W, H = 76 * mm, 58 * mm
     buf = BytesIO()
@@ -106,16 +105,9 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
             c.drawInlineImage(Image.open(qbuf).convert("RGB"),
                               W - qsize - 4 * mm, H - qsize - 4 * mm, qsize, qsize)
 
-        # ── Brand ──
-        c.setFillColorRGB(0.58, 0.31, 0.02)
-        c.setFont(bold, 12)
-        brand_w = c.stringWidth(brand, bold, 12)
-        c.drawString(4 * mm, H - 9 * mm, brand)
-        c.setFillColorRGB(0, 0, 0)
-
-        # ── "2nd" badge (right after the brand, only when factory second) ──
+        # ── "2nd" badge (top-left, only when factory second) ──
         if roll and getattr(roll, 'is_second', False):
-            bx = 4 * mm + brand_w + 3 * mm
+            bx = 4 * mm
             by = H - 9.4 * mm
             tag = "2ND QUALITY"
             c.setFont(bold, 7)

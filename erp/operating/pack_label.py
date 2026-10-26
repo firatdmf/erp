@@ -1,7 +1,7 @@
 """Mini packing list for the outside of a package: 100 × 100 mm, one label
 per page, for the thermal label printer.
 
-The order's brand, the order number and "package 3 / 7" beside a QR that
+The order number and "package 3 / 7" beside a QR that
 opens this package on the order's packing list, and what is inside, one
 line per SKU ("4 rolls · 212.50 m") — rolls of one SKU are added up,
 since a label this size can't list every roll. A package with more SKUs
@@ -84,8 +84,6 @@ def labels_pdf_bytes(packs, title, link=None):
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
 
-    from accounting.services_accounts import brand_name_for
-
     from .order_notifications import _ensure_pdf_fonts
 
     reg = _ensure_pdf_fonts() or "Helvetica"
@@ -106,9 +104,6 @@ def labels_pdf_bytes(packs, title, link=None):
 
     for pack in packs:
         order = pack.order
-        # The book the order's money posts to, so each sack carries the
-        # name of the business that sold what is in it.
-        brand = brand_name_for(order.current_account.book if order.current_account_id else None)
         of = order.packs.count()
         lines = _pack_lines(pack)
         total = _total(lines)
@@ -121,16 +116,8 @@ def labels_pdf_bytes(packs, title, link=None):
         qr = Image.open(qbuf).convert("RGB")
 
         for page_no, page in enumerate(pages, start=1):
-            # ── Brand, across the top: who the sack is from ──
-            c.setFillColorRGB(0, 0, 0)
-            size = 14
-            while size > 8 and c.stringWidth(brand, bold, size) > W - 2 * M:
-                size -= 0.5
-            c.setFont(bold, size)
-            c.drawString(M, H - M - 4.5 * mm, fit(brand, bold, size, W - 2 * M))
-
             # ── Header: QR, then the order number over "3 / 12" ──
-            top = H - M - 8 * mm
+            top = H - M
             c.drawInlineImage(qr, M, top - qsize, qsize, qsize)
             x = M + qsize + 4 * mm
             c.setFillColorRGB(0.4, 0.4, 0.4)

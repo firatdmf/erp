@@ -2,6 +2,7 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from . import views
 from . import api_stock_update
+from . import storefront_prices
 from . import views_csv_stock
 from . import views_product_groups
 from . import views_catalog_wording
@@ -58,6 +59,8 @@ urlpatterns = [
     path("api/create_product_category/",views.create_product_category,name="create_product_category"),
     path("api/get_products",views.get_products,name="get_products"),
     path("api/get_product",views.get_product,name="get_product"),
+    # Prices, for a signed-in customer only (marketing/storefront_prices.py).
+    path("api/storefront/prices/", storefront_prices.prices, name="storefront_prices"),
     path("api/update_product_stock/",api_stock_update.update_product_stock,name="update_product_stock"),
     path("api/product_file_delete/",views.ProductFileDelete.as_view(),name="product_file_delete"),
     path("api/update_variant_image_order/",views.update_variant_image_order,name="update_variant_image_order"),

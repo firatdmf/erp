@@ -1,6 +1,7 @@
 # to run this test, use the command:
 # python manage.py test marketing.tests.test_pricing
 
+import json
 from decimal import Decimal
 from fractions import Fraction
 
@@ -110,6 +111,29 @@ class LivePriceTest(TestCase):
         data = self.client.get(reverse("marketing:get_products")).json()
         self.assertEqual(str(data["products"][0]["price"]), "4.80")
         self.assertEqual(data["product_variants"][0]["variant_price"], 4.80)
+
+    def _prices(self, token=None):
+        headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"} if token else {}
+        return self.client.post(reverse("marketing:storefront_prices"),
+                                json.dumps({"product_skus": ["K25289", "NOPE"]}),
+                                content_type="application/json", **headers)
+
+    def test_a_signed_in_customer_is_sent_it(self):
+        from django.contrib.auth.hashers import make_password
+        from authentication.client_tokens import issue
+        from authentication.models import WebClient
+        buyer = WebClient.objects.create(username="buyer", email="b@example.com",
+                                         password=make_password("pw"), is_active=True)
+        data = self._prices(issue(buyer)).json()
+        self.assertEqual(data["products"]["K25289"]["price"], 4.80)
+        self.assertEqual(data["variants"]["K25289.G146"]["variant_price"], 4.80)
+        self.assertIn("USD", data["variants"]["K25289.G146"]["variant_prices"] or {"USD": 0})
+        self.assertNotIn("NOPE", data["products"])
+
+    def test_nobody_else_is(self):
+        for token in (None, "forged"):
+            with self.subTest(token=token):
+                self.assertEqual(self._prices(token).status_code, 401)
 
 
 class GroupMultiplierTest(TestCase):

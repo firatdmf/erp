@@ -853,6 +853,76 @@ def check_favorite(request, user_id, product_sku):
 
 # ==================== CART API ENDPOINTS ====================
 
+def _picked_line_json(cart_item):
+    from operating import storefront_stock
+    return {
+        'id': cart_item.id,
+        'product_sku': cart_item.product_sku,
+        'variant_sku': cart_item.variant_sku,
+        'quantity': str(cart_item.quantity),
+        'stock_items': storefront_stock.describe(cart_item.variant_sku, cart_item.stock_items),
+    }
+
+
+def _rolls_gone_response(ids):
+    response = JsonResponse({'error': 'Some of these rolls are no longer available.',
+                             'gone': ids}, status=409)
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
+def _add_picked_rolls(user_id, product_sku, variant_sku, stock_items):
+    """Put rolls picked off the stock list (operating/storefront_stock.py)
+    in the cart, whole. They join the line already holding picked rolls of
+    the same variant; a line of "this many, you choose" stays apart."""
+    from .models import CartItem
+    from operating import storefront_stock
+
+    if not variant_sku or not storefront_stock.tracked_by_item(variant_sku):
+        return JsonResponse({'error': 'Only fabric sold roll by roll can be picked.'}, status=400)
+    web_client = WebClient.objects.get(id=user_id)
+    line = (CartItem.objects.filter(client=web_client, variant_sku=variant_sku,
+                                    is_custom_curtain=False)
+            .exclude(stock_items=[]).first())
+    kept = line.stock_items if line else []
+    try:
+        picks = storefront_stock.pick(variant_sku, kept + list(stock_items))
+    except storefront_stock.RollsGone as gone:
+        return _rolls_gone_response(gone.ids)
+    if line is None:
+        line = CartItem(client=web_client, product_sku=product_sku, variant_sku=variant_sku)
+    line.stock_items = picks
+    line.quantity = storefront_stock.picked_total(picks)
+    line.save()
+    response = JsonResponse({'message': 'Added to cart', 'cart_item': _picked_line_json(line)},
+                            status=201)
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
+def _update_picked_rolls(user_id, item_id, stock_items):
+    """Keep only `stock_items` of a picked line — the way a roll is taken
+    out of the cart. None left removes the line."""
+    from .models import CartItem
+    from operating import storefront_stock
+
+    web_client = WebClient.objects.get(id=user_id)
+    line = CartItem.objects.get(id=item_id, client=web_client)
+    wanted = storefront_stock._ids(stock_items)
+    picks = [p for p in line.stock_items if p["id"] in wanted]
+    if not picks:
+        line.delete()
+        response = JsonResponse({'message': 'Removed from cart'}, status=200)
+    else:
+        line.stock_items = picks
+        line.quantity = storefront_stock.picked_total(picks)
+        line.save()
+        response = JsonResponse({'message': 'Cart item updated',
+                                 'cart_item': _picked_line_json(line)}, status=200)
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
 @csrf_exempt
 @for_own_client
 def get_cart(request, user_id):
@@ -872,6 +942,8 @@ def get_cart(request, user_id):
         web_client = WebClient.objects.get(id=user_id)
         cart_items = CartItem.objects.filter(client=web_client)
         
+        from operating import storefront_stock
+
         cart_list = [{
             'id': item.id,
             'product_sku': item.product_sku,
@@ -880,6 +952,11 @@ def get_cart(request, user_id):
             'is_custom_curtain': item.is_custom_curtain,
             'custom_attributes': item.custom_attributes,
             'custom_price': str(item.custom_price) if item.custom_price else None,
+            # Rolls picked off the stock list, each saying whether it is
+            # still there as picked — a roll sold or cut since must be
+            # dropped before the order can go through.
+            'stock_items': (storefront_stock.describe(item.variant_sku, item.stock_items)
+                            if item.stock_items else []),
             'created_at': item.created_at.isoformat(),
             'updated_at': item.updated_at.isoformat()
         } for item in cart_items]
@@ -932,6 +1009,9 @@ def add_to_cart(request, user_id):
             return JsonResponse({
                 'error': 'product_sku is required'
             }, status=400)
+
+        if data.get('stock_items'):
+            return _add_picked_rolls(user_id, product_sku, variant_sku, data['stock_items'])
         
         # Convert quantity to Decimal
         try:
@@ -970,11 +1050,13 @@ def add_to_cart(request, user_id):
             message = 'Custom curtain added to cart'
         else:
             # Check if regular item already exists
+            # Never a line of picked rolls: its quantity is its rolls'.
             cart_item = CartItem.objects.filter(
-                client=web_client, 
+                client=web_client,
                 product_sku=product_sku,
                 variant_sku=variant_sku,
-                is_custom_curtain=False
+                is_custom_curtain=False,
+                stock_items=[],
             ).first()
             
             if cart_item:
@@ -1041,6 +1123,9 @@ def update_cart_item(request, user_id, item_id):
         
         data = json.loads(request.body)
         quantity = data.get('quantity')
+
+        if 'stock_items' in data:
+            return _update_picked_rolls(user_id, item_id, data['stock_items'])
         
         if not quantity:
             return JsonResponse({
@@ -1061,6 +1146,10 @@ def update_cart_item(request, user_id, item_id):
         
         web_client = WebClient.objects.get(id=user_id)
         cart_item = CartItem.objects.get(id=item_id, client=web_client)
+        if cart_item.stock_items:
+            # Its quantity is what its rolls hold: change the rolls instead.
+            return JsonResponse({'error': 'This line is picked rolls: add or remove a roll instead.'},
+                                status=400)
         
         cart_item.quantity = quantity
         cart_item.save()

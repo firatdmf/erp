@@ -63,15 +63,79 @@ def _new_contact(web_client, book, email):
         return Contact.objects.create(name=name[:NAME_MAX - len(suffix)] + suffix, **fields)
 
 
-def customer_for_order(web_client, price_currency):
-    """(contact, current account, currency) for a new web order.
+def customer_for_order(web_client, price_currency, book=None):
+    """(contact, current account, currency) for a new web order in `book`
+    (the default book when none is given).
 
     The currency is the one the website priced the lines in, not the
     account's own: an order is priced in what was agreed, and the lines
     carry the website's numbers."""
-    book = get_default_book()
+    book = book or get_default_book()
     contact = contact_for(web_client, book)
     account = get_or_create_current_account_for_contact(contact, book=book)
     currency = (CurrencyCategory.objects.filter(code=(price_currency or "USD").upper()).first()
                 or account.default_currency)
     return contact, account, currency
+
+
+class WebOrderRefused(Exception):
+    """A web order that cannot be placed as sent, said so before anything
+    is written. `gone` names picked rolls no longer there as picked."""
+
+    def __init__(self, message, gone=None):
+        super().__init__(message)
+        self.gone = gone or []
+
+
+def lines_by_book(lines):
+    """Where each line of a web order belongs: [(book, [(line, quantity,
+    picks)])], the default book's first.
+
+    `lines` are (item data, variant) pairs. Stock belongs to the book that
+    owns its warehouse, so the rolls a customer picked go to theirs — a
+    line whose rolls stand in two books' warehouses becomes a line in
+    each. A line of "this many, you choose" goes to the one book whose
+    warehouses the storefront offers it from; held in several, or in none,
+    it goes to the default book, where staff pick it as before.
+
+    Raises WebOrderRefused, naming them, when picked rolls are no longer
+    there as picked: the customer was shown those rolls and is not sold
+    fewer meters, or other rolls, without being asked."""
+    from decimal import Decimal
+    from . import storefront_stock
+
+    default = get_default_book()
+    groups = {default.pk: (default, [])}
+    gone = []
+    for data, variant in lines:
+        picks = storefront_stock._ids(data.get("stock_items"))
+        sku = variant.variant_sku if variant else ""
+        if picks and sku:
+            free = storefront_stock.offered(sku)
+            wanted = {}
+            for record in data.get("stock_items") or []:
+                if isinstance(record, dict) and "quantity" in record:
+                    wanted[int(record["id"])] = Decimal(str(record["quantity"]))
+            by_book = {}
+            for pk in picks:
+                item, available = free.get(pk, (None, Decimal("0")))
+                quantity = wanted.get(pk, available)
+                if item is None or available < quantity or quantity <= 0:
+                    gone.append(pk)
+                    continue
+                book = item.product.warehouse.accounting_book
+                by_book.setdefault(book.pk, (book, []))[1].append((item, quantity))
+            for book, rolls in by_book.values():
+                total = sum((q for _item, q in rolls), Decimal("0"))
+                groups.setdefault(book.pk, (book, []))[1].append((data, total, rolls))
+            continue
+        books = {item.product.warehouse.accounting_book for item, _available
+                 in storefront_stock.offered(sku).values()} if sku else set()
+        book = books.pop() if len(books) == 1 else default
+        groups.setdefault(book.pk, (book, []))[1].append((data, None, []))
+    if gone:
+        raise WebOrderRefused("Some of the rolls in the cart are no longer available.", gone)
+    lead = groups.pop(default.pk)
+    rest = sorted(groups.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
+    return ([lead] if lead[1] or not rest else []) + rest
+

@@ -6860,14 +6860,20 @@ def create_web_order(request):
 
     Only for a signed-in customer: they are read off the token their
     login issued (authentication.client_tokens), never off the body, which
-    anybody could fill with somebody else's id. The order is charged to
-    their contact's current account in the book web orders land in
-    (operating.web_orders), so it is that book's order like any other."""
+    anybody could fill with somebody else's id. Each line goes to the book
+    its stock belongs to (operating.web_orders.lines_by_book) — the rolls
+    the customer picked, held at once, to their warehouse's book — and is
+    charged to the customer's contact's current account there. A cart off
+    two books' shelves becomes two orders tied by one split_group, as the
+    order form makes them."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+    from uuid import uuid4
+    from accounting.services_accounts import SplitCurrencyClash, align_split_account_currency
     from authentication.client_tokens import client_from
-    from operating.web_orders import customer_for_order
+    from operating.split_orders import combined_number
+    from operating.web_orders import WebOrderRefused, customer_for_order, lines_by_book
 
     web_client = client_from(request)
     if web_client is None:
@@ -6876,84 +6882,100 @@ def create_web_order(request):
     try:
         data = json.loads(request.body)
 
-        with transaction.atomic():
-            contact, account, currency = customer_for_order(
-                web_client, data.get('original_currency'))
-            order = Order.objects.create(
-                web_client=web_client,
-                contact=contact,
-                current_account=account,
-                currency=currency,
-                status=data.get('status', 'pending'),
-                notes=data.get('notes', ''),
+        lines = []
+        for item_data in data.get('items', []):
+            product_sku = item_data.get('product_sku')
+            variant_sku = item_data.get('product_variant_sku')
 
-                # Payment fields
-                payment_id=data.get('payment_id'),
-                payment_method=data.get('payment_method'),
-                payment_status=data.get('payment_status'),
-                card_type=data.get('card_type'),
-                card_association=data.get('card_association'),
-                card_last_four=data.get('card_last_four'),
-                
-                # Pricing fields
-                original_currency=data.get('original_currency'),
-                original_price=data.get('original_price'),
-                paid_currency=data.get('paid_currency'),
-                paid_amount=data.get('paid_amount'),
-                exchange_rate=data.get('exchange_rate'),
-                
-                # Delivery address
-                delivery_address_title=data.get('delivery_address_title'),
-                delivery_address=data.get('delivery_address'),
-                delivery_city=data.get('delivery_city'),
-                delivery_country=data.get('delivery_country'),
-                delivery_phone=data.get('delivery_phone'),
-                
-                # Billing address
-                billing_address_title=data.get('billing_address_title'),
-                billing_address=data.get('billing_address'),
-                billing_city=data.get('billing_city'),
-                billing_country=data.get('billing_country'),
-                billing_phone=data.get('billing_phone'),
-            )
-            
-            # Create order items
-            items = data.get('items', [])
-            for item_data in items:
-                product_sku = item_data.get('product_sku')
-                variant_sku = item_data.get('product_variant_sku')
-                
-                product = None
-                variant = None
-                
-                # Get product
-                if product_sku:
-                    try:
-                        product = Product.objects.get(sku=product_sku)
-                    except Product.DoesNotExist:
-                        pass
+            product = None
+            variant = None
 
-                # Get variant if specified — scope by product first to avoid
-                # MultipleObjectsReturned when the same variant_sku string
-                # (e.g. "red-m") exists across multiple products.
-                if variant_sku:
-                    qs = ProductVariant.objects.filter(variant_sku=variant_sku)
-                    if product:
-                        qs = qs.filter(product=product)
-                    variant = qs.first()
-                    if not product and variant:
-                        product = variant.product
-                
+            # Get product
+            if product_sku:
+                try:
+                    product = Product.objects.get(sku=product_sku)
+                except Product.DoesNotExist:
+                    pass
+
+            # Get variant if specified — scope by product first to avoid
+            # MultipleObjectsReturned when the same variant_sku string
+            # (e.g. "red-m") exists across multiple products.
+            if variant_sku:
+                qs = ProductVariant.objects.filter(variant_sku=variant_sku)
                 if product:
+                    qs = qs.filter(product=product)
+                variant = qs.first()
+                if not product and variant:
+                    product = variant.product
+
+            if product:
+                lines.append((item_data, product, variant))
+
+        with transaction.atomic():
+            groups = lines_by_book([(item_data, variant) for item_data, _p, variant in lines])
+            product_of = {id(item_data): product for item_data, product, _v in lines}
+            variant_of = {id(item_data): variant for item_data, _p, variant in lines}
+            split_group = uuid4() if len(groups) > 1 else None
+            orders = []
+            for book, parts in groups:
+                contact, account, currency = customer_for_order(
+                    web_client, data.get('original_currency'), book=book)
+                if split_group:
+                    # One currency across the halves, the website's.
+                    try:
+                        align_split_account_currency(account, currency)
+                    except SplitCurrencyClash as exc:
+                        raise WebOrderRefused(str(exc))
+                order = Order.objects.create(
+                    web_client=web_client,
+                    contact=contact,
+                    current_account=account,
+                    currency=currency,
+                    split_group=split_group,
+                    status=data.get('status', 'pending'),
+                    notes=data.get('notes', ''),
+
+                    # Payment fields
+                    payment_id=data.get('payment_id'),
+                    payment_method=data.get('payment_method'),
+                    payment_status=data.get('payment_status'),
+                    card_type=data.get('card_type'),
+                    card_association=data.get('card_association'),
+                    card_last_four=data.get('card_last_four'),
+
+                    # Pricing fields
+                    original_currency=data.get('original_currency'),
+                    original_price=data.get('original_price'),
+                    paid_currency=data.get('paid_currency'),
+                    paid_amount=data.get('paid_amount'),
+                    exchange_rate=data.get('exchange_rate'),
+
+                    # Delivery address
+                    delivery_address_title=data.get('delivery_address_title'),
+                    delivery_address=data.get('delivery_address'),
+                    delivery_city=data.get('delivery_city'),
+                    delivery_country=data.get('delivery_country'),
+                    delivery_phone=data.get('delivery_phone'),
+
+                    # Billing address
+                    billing_address_title=data.get('billing_address_title'),
+                    billing_address=data.get('billing_address'),
+                    billing_city=data.get('billing_city'),
+                    billing_country=data.get('billing_country'),
+                    billing_phone=data.get('billing_phone'),
+                )
+
+                for item_data, picked_quantity, rolls in parts:
                     # Get custom curtain attributes if present
                     custom_attrs = item_data.get('custom_attributes', {}) or {}
                     is_custom = item_data.get('is_custom_curtain', False)
-                    
-                    OrderItem.objects.create(
+
+                    line = OrderItem.objects.create(
                         order=order,
-                        product=product,
-                        product_variant=variant,
-                        quantity=_as_line_decimal(item_data.get('quantity', 1)),
+                        product=product_of[id(item_data)],
+                        product_variant=variant_of[id(item_data)],
+                        quantity=(picked_quantity if picked_quantity is not None
+                                  else _as_line_decimal(item_data.get('quantity', 1))),
                         price=_as_line_decimal(item_data.get('price', 0)),
                         description=item_data.get('description', ''),
                         # Custom Curtain Fields
@@ -6966,19 +6988,28 @@ def create_web_order(request):
                         custom_wing_type=custom_attrs.get('wingType') if is_custom else None,
                         custom_fabric_used_meters=item_data.get('custom_fabric_used_meters') if is_custom else None,
                     )
+                    # The rolls the customer picked, held for this order
+                    # now: they were promised on the page. Lines of "this
+                    # many" reserve nothing — staff pick them at packing,
+                    # as for manual orders.
+                    for roll, quantity in rolls:
+                        held, capped, err = _create_roll_reservation(order, line, roll, quantity, None)
+                        if err or capped:
+                            raise WebOrderRefused(
+                                "Some of the rolls in the cart are no longer available.", [roll.pk])
+                orders.append(order)
 
-            # ── NO warehouse stock-out at web-order create ────────────
-            # Web orders also start "Açık" and reserve nothing. Staff
-            # process them through packing (scan rolls → reserve) and
-            # shipping (cargo info → real cut) in the ERP, same as
-            # manual orders.
-
+            lead = orders[0]
             return JsonResponse({
                 'success': True,
-                'order_id': order.pk,
-                'order_number': order.order_number or f"DK{str(order.pk).zfill(7)}"
+                'order_id': lead.pk,
+                'order_number': (combined_number(orders) if split_group
+                                 else lead.order_number or f"DK{str(lead.pk).zfill(7)}"),
+                'orders': [{'order_id': o.pk, 'order_number': o.order_number} for o in orders],
             }, status=201)
-            
+
+    except WebOrderRefused as refused:
+        return JsonResponse({'error': str(refused), 'gone': refused.gone}, status=409)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:

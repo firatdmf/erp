@@ -92,9 +92,9 @@ def lines_by_book(lines):
     picks)])], the default book's first.
 
     `lines` are (item data, variant) pairs. Stock belongs to the book that
-    owns its warehouse, so the rolls a customer picked go to theirs — a
-    line whose rolls stand in two books' warehouses becomes a line in
-    each. A line of "this many, you choose" goes to the one book whose
+    owns its warehouse, so the lengths a customer cut from picked rolls go
+    to theirs — a line whose rolls stand in two books' warehouses becomes a
+    line in each. A line of "this many, you choose" goes to the one book whose
     warehouses the storefront offers it from; held in several, or in none,
     it goes to the default book, where staff pick it as before.
 
@@ -108,19 +108,17 @@ def lines_by_book(lines):
     groups = {default.pk: (default, [])}
     gone = []
     for data, variant in lines:
-        picks = storefront_stock._ids(data.get("stock_items"))
+        asked = storefront_stock._requests(data.get("stock_items"))
         sku = variant.variant_sku if variant else ""
-        if picks and sku:
+        if asked and sku:
             free = storefront_stock.offered(sku)
-            wanted = {}
-            for record in data.get("stock_items") or []:
-                if isinstance(record, dict) and "quantity" in record:
-                    wanted[int(record["id"])] = Decimal(str(record["quantity"]))
             by_book = {}
-            for pk in picks:
+            for pk, quantity in asked.items():
                 item, available = free.get(pk, (None, Decimal("0")))
-                quantity = wanted.get(pk, available)
-                if item is None or available < quantity or quantity <= 0:
+                quantity = available if quantity is None else quantity
+                # Cut as the cart said, which may no longer be possible:
+                # the roll sold, or cut down to less than was asked.
+                if item is None or not storefront_stock.can_cut(quantity, available):
                     gone.append(pk)
                     continue
                 book = item.product.warehouse.accounting_book

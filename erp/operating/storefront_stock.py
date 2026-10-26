@@ -15,6 +15,8 @@ could not sell. Left out on purpose: cost, barcodes, books and the
 warehouse's street address. A roll goes by its id, which is what the
 order will send back.
 """
+from decimal import Decimal
+
 from django.http import JsonResponse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_GET
@@ -117,17 +119,69 @@ def _ids(values):
     return out
 
 
+class BadCut(ValueError):
+    """A length that can't be cut: not a whole number of the roll's unit,
+    and not the whole roll either. `ids` names the rolls."""
+
+    def __init__(self, ids):
+        super().__init__(ids)
+        self.ids = ids
+
+
+def _requests(values):
+    """{stock item id: the length asked for, or None for the whole roll},
+    in the order given; a roll named twice keeps the later length."""
+    from decimal import Decimal, InvalidOperation
+    out = {}
+    for value in values or []:
+        raw = value.get("id") if isinstance(value, dict) else value
+        try:
+            pk = int(raw)
+        except (TypeError, ValueError):
+            continue
+        quantity = value.get("quantity") if isinstance(value, dict) else None
+        try:
+            quantity = None if quantity in (None, "") else Decimal(str(quantity))
+        except InvalidOperation:
+            quantity = Decimal("-1")
+        out.pop(pk, None)
+        out[pk] = quantity
+    return out
+
+
+def can_cut(quantity, available):
+    """Whether `quantity` can be taken off a roll with `available` free:
+    the whole roll, whatever it measures, or a whole number of its unit —
+    12 m, never 12.5 m — that the roll holds."""
+    if quantity is None or quantity <= 0 or quantity > available:
+        return False
+    return quantity == available or quantity == quantity.to_integral_value()
+
+
 def pick(sku, values):
-    """The cart's record of picked rolls of `sku`: [{"id", "quantity"}],
-    each roll whole — everything it has free now. Raises RollsGone for the
-    ones the storefront no longer offers."""
+    """The cart's record of picked rolls of `sku`: [{"id", "quantity"}] —
+    the length to cut from each, or the whole roll where none is given.
+    Raises RollsGone for rolls the storefront no longer offers, or that no
+    longer hold what is asked of them, and BadCut for a length that can't
+    be cut (see can_cut)."""
     from decimal import Decimal
-    ids = _ids(values)
+    asked = _requests(values)
     free = offered(sku)
-    gone = [pk for pk in ids if pk not in free]
+    gone = [pk for pk, quantity in asked.items()
+            if pk not in free or (quantity is not None and quantity > free[pk][1])]
     if gone:
         raise RollsGone(gone)
-    return [{"id": pk, "quantity": str(free[pk][1].quantize(Decimal("0.01")))} for pk in ids]
+    picks = []
+    bad = []
+    for pk, quantity in asked.items():
+        available = free[pk][1]
+        quantity = available if quantity is None else quantity
+        if not can_cut(quantity, available):
+            bad.append(pk)
+        picks.append({"id": pk, "quantity": str(quantity.quantize(Decimal("0.01")))})
+    if bad:
+        raise BadCut(bad)
+    return picks
 
 
 def picked_total(picks):
@@ -162,6 +216,9 @@ def describe(sku, picks):
             **(place_of(item.product.warehouse) if item and item.product_id
                else {"location": "", "city": "", "country": ""}),
             "still_free": p["id"] in free and free[p["id"]][1] >= quantity,
+            # What the roll holds free now, so the cart can offer the rest
+            # of it, or say it is a whole roll.
+            "on_roll": float(free[p["id"]][1]) if p["id"] in free else 0.0,
             # The code ("m", "kg"); the storefront words it.
             "unit": item.product.unit if item and item.product_id else "",
         })

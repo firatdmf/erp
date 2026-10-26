@@ -871,10 +871,19 @@ def _rolls_gone_response(ids):
     return response
 
 
+def _bad_cut_response(ids):
+    response = JsonResponse({'error': 'Cut whole meters, or take the whole roll.', 'bad': ids},
+                            status=400)
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
 def _add_picked_rolls(user_id, product_sku, variant_sku, stock_items):
-    """Put rolls picked off the stock list (operating/storefront_stock.py)
-    in the cart, whole. They join the line already holding picked rolls of
-    the same variant; a line of "this many, you choose" stays apart."""
+    """Put lengths cut from rolls picked off the stock list
+    (operating/storefront_stock.py) in the cart — each {"id", "quantity"},
+    or a bare id for the whole roll. They join the line already holding
+    picked rolls of the same variant, a roll already there taking the new
+    length; a line of "this many, you choose" stays apart."""
     from .models import CartItem
     from operating import storefront_stock
 
@@ -884,11 +893,14 @@ def _add_picked_rolls(user_id, product_sku, variant_sku, stock_items):
     line = (CartItem.objects.filter(client=web_client, variant_sku=variant_sku,
                                     is_custom_curtain=False)
             .exclude(stock_items=[]).first())
-    kept = line.stock_items if line else []
     try:
-        picks = storefront_stock.pick(variant_sku, kept + list(stock_items))
+        new = storefront_stock.pick(variant_sku, list(stock_items))
     except storefront_stock.RollsGone as gone:
         return _rolls_gone_response(gone.ids)
+    except storefront_stock.BadCut as bad:
+        return _bad_cut_response(bad.ids)
+    replaced = {p["id"] for p in new}
+    picks = [p for p in (line.stock_items if line else []) if p["id"] not in replaced] + new
     if line is None:
         line = CartItem(client=web_client, product_sku=product_sku, variant_sku=variant_sku)
     line.stock_items = picks
@@ -902,14 +914,28 @@ def _add_picked_rolls(user_id, product_sku, variant_sku, stock_items):
 
 def _update_picked_rolls(user_id, item_id, stock_items):
     """Keep only `stock_items` of a picked line — the way a roll is taken
-    out of the cart. None left removes the line."""
+    out of the cart — each at the length given, or as it was where none
+    is. None left removes the line."""
+    from decimal import Decimal
     from .models import CartItem
     from operating import storefront_stock
 
     web_client = WebClient.objects.get(id=user_id)
     line = CartItem.objects.get(id=item_id, client=web_client)
-    wanted = storefront_stock._ids(stock_items)
-    picks = [p for p in line.stock_items if p["id"] in wanted]
+    wanted = storefront_stock._requests(stock_items)
+    kept = {p["id"]: p for p in line.stock_items}
+    changed = [{"id": pk, "quantity": quantity} for pk, quantity in wanted.items()
+               if pk in kept and quantity is not None
+               and quantity != Decimal(str(kept[pk]["quantity"]))]
+    try:
+        # Only a roll given a new length is checked again: taking another
+        # roll out must not fail on one that has changed meanwhile.
+        recut = {p["id"]: p for p in storefront_stock.pick(line.variant_sku, changed)} if changed else {}
+    except storefront_stock.RollsGone as gone:
+        return _rolls_gone_response(gone.ids)
+    except storefront_stock.BadCut as bad:
+        return _bad_cut_response(bad.ids)
+    picks = [recut.get(pk, kept[pk]) for pk in wanted if pk in kept]
     if not picks:
         line.delete()
         response = JsonResponse({'message': 'Removed from cart'}, status=200)

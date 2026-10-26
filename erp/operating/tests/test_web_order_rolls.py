@@ -212,3 +212,73 @@ class PickedRolls(TestCase):
         self.order([{"product_sku": "2086", "product_variant_sku": "2086.WHITE",
                      "quantity": "12", "price": "4.50"}])
         self.assertEqual(Order.objects.get().current_account.book, self.laleli)
+
+    # ── cutting lengths off rolls ───────────────────────────────
+    def cut(self, lengths):
+        return self.client.post(
+            reverse("authentication:add_to_cart", args=[self.buyer.pk]),
+            json.dumps({"product_sku": "2086", "variant_sku": "2086.WHITE",
+                        "stock_items": [{"id": self.rolls[k].pk, "quantity": q}
+                                        for k, q in lengths.items()]}),
+            content_type="application/json", **self.auth)
+
+    def test_whole_meters_are_cut_off_any_roll(self):
+        self.assertEqual(self.cut({"A": "10", "B": "52"}).status_code, 201)
+        line = CartItem.objects.get()
+        self.assertEqual(line.stock_items, [{"id": self.rolls["A"].pk, "quantity": "10.00"},
+                                            {"id": self.rolls["B"].pk, "quantity": "52.00"}])
+        self.assertEqual(line.quantity, Decimal("62"))
+
+    def test_a_whole_roll_may_measure_anything_but_a_cut_is_whole_meters(self):
+        self.assertEqual(self.cut({"A": "48.5"}).status_code, 201)
+        response = self.cut({"B": "12.5"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["bad"], self.ids("B"))
+
+    def test_more_than_a_roll_holds_cannot_be_cut(self):
+        response = self.cut({"C": "31"})
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(CartItem.objects.exists())
+
+    def test_cutting_a_roll_again_takes_the_new_length(self):
+        self.cut({"A": "10"})
+        self.cut({"A": "20", "C": "5"})
+        line = CartItem.objects.get()
+        self.assertEqual([(p["id"], p["quantity"]) for p in line.stock_items],
+                         [(self.rolls["A"].pk, "20.00"), (self.rolls["C"].pk, "5.00")])
+
+    def test_the_cart_changes_a_rolls_length(self):
+        self.cut({"A": "10", "C": "5"})
+        line = CartItem.objects.get()
+        url = reverse("authentication:update_cart_item", args=[self.buyer.pk, line.pk])
+        response = self.client.put(url, json.dumps({"stock_items": [
+            {"id": self.rolls["A"].pk, "quantity": "15"}, {"id": self.rolls["C"].pk}]}),
+            content_type="application/json", **self.auth)
+        self.assertEqual(response.status_code, 200, response.content)
+        line.refresh_from_db()
+        self.assertEqual(line.quantity, Decimal("20"))
+        bad = self.client.put(url, json.dumps({"stock_items": [
+            {"id": self.rolls["A"].pk, "quantity": "15.5"}]}),
+            content_type="application/json", **self.auth)
+        self.assertEqual(bad.status_code, 400)
+
+    def test_the_order_holds_the_lengths_cut(self):
+        line = {"product_sku": "2086", "product_variant_sku": "2086.WHITE", "quantity": "0",
+                "price": "4.50", "stock_items": [{"id": self.rolls["B"].pk, "quantity": "20"},
+                                                 {"id": self.rolls["C"].pk, "quantity": "30"}]}
+        self.assertEqual(self.order([line]).status_code, 201)
+        order = Order.objects.get()
+        self.assertEqual(order.items.get().quantity, Decimal("50"))
+        self.assertEqual(
+            {r.stock_item_id: r.quantity for r in OrderStockReservation.objects.filter(order=order)},
+            {self.rolls["B"].pk: Decimal("20"), self.rolls["C"].pk: Decimal("30")})
+
+    def test_a_cut_the_roll_no_longer_holds_stops_the_order(self):
+        roll = self.rolls["B"]
+        roll.quantity_remaining = Decimal("15")
+        roll.save()
+        line = {"product_sku": "2086", "product_variant_sku": "2086.WHITE", "quantity": "0",
+                "price": "4.50", "stock_items": [{"id": roll.pk, "quantity": "20"}]}
+        response = self.order([line])
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["gone"], [roll.pk])

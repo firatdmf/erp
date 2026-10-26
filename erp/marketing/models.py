@@ -381,6 +381,13 @@ class Product(models.Model):
         help_text="Whether each stock item has a label of its own, or the "
                   "barcode names the variant",
     )
+    # Grams per square meter of a fabric. With a variant's width it gives
+    # the weight of any length of it, which export papers need and which
+    # most rolls never get weighed for (see operating.weights).
+    gsm = models.DecimalField(
+        max_digits=7, decimal_places=1, null=True, blank=True,
+        help_text="Fabric weight in grams per square meter",
+    )
 
     # The storefront's coarser unit. Derived from `unit` on every save, so
     # it can't disagree with the stock again; never edit it directly.

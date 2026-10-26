@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load i18n %}
 {% load static %}
+{% load l10n %}
 
 {% block title %}{% trans "Packing" %} · {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} | Nejum ERP{% endblock %}
 {% block css %}
@@ -265,6 +266,10 @@
      quantity that ends up on the packing list — so they carry the
      colour while the counts stay grey. */
   .pk-pack-meta [data-meters]{color:var(--pk-teal-700);font-weight:800;}
+  .pk-pack-kg{display:inline-flex;align-items:center;gap:4px;font:600 11px var(--pk-font);color:var(--pk-gray);white-space:nowrap;cursor:default;}
+  .pk-pack-kg input{width:64px;padding:4px 6px;border:1px solid var(--pk-line);border-radius:6px;font:600 12px var(--pk-font);
+    text-align:right;font-variant-numeric:tabular-nums;color:var(--pk-ink);background:#fff;}
+  .pk-pack-kg input:focus{outline:none;border-color:var(--pk-teal);}
   .pk-pack-del{background:none;border:0;color:var(--pk-gray);cursor:pointer;padding:4px 6px;border-radius:6px;}
   .pk-pack-del:hover{color:var(--pk-red);background:#FEF2F2;}
   .pk-pack-body{padding:8px 10px 10px;min-height:56px;}
@@ -534,6 +539,10 @@
               · <span data-meters>{{ p.total_meters|floatformat:"2g" }}</span> m
               <span data-extra {% if not p.item_count %}hidden{% endif %}>· +{{ p.item_count }} {% trans "items" %}</span>
             </span>
+            <label class="pk-pack-kg" title="{% trans "The sack on the scale, packaging included" %}">
+              <input type="text" inputmode="decimal" value="{{ p.gross_kg|default_if_none:''|unlocalize }}" placeholder="{% trans "Gross" %}"
+                     onchange="pkSetGrossKg({{ p.pk }}, this)"> kg
+            </label>
             {% if not shipped %}
             <button type="button" class="pk-pack-del" title="{% trans "Delete package" %}" onclick="pkDeletePack({{ p.pk }})">
               <i class="fa fa-trash"></i>
@@ -990,6 +999,8 @@
             '<span class="pk-pack-title">' + '{% filter escapejs %}{% trans "Package" %}{% endfilter %}' + ' #' + data.pack.number + '</span>' +
             '<span class="pk-pack-meta"><span data-count>0</span> ' + '{% filter escapejs %}{% trans "rolls" %}{% endfilter %}' +
               ' · <span data-meters>0.00</span> m<span data-extra hidden></span></span>' +
+            '<label class="pk-pack-kg" title="{% filter escapejs %}{% trans "The sack on the scale, packaging included" %}{% endfilter %}">' +
+              '<input type="text" inputmode="decimal" placeholder="{% filter escapejs %}{% trans "Gross" %}{% endfilter %}" onchange="pkSetGrossKg(' + data.pack.id + ', this)"> kg</label>' +
             '<button type="button" class="pk-pack-del" onclick="pkDeletePack(' + data.pack.id + ')"><i class="fa fa-trash"></i></button>' +
           '</div>' +
           '<div class="pk-pack-body" data-pack-body><div class="pk-drop-hint" data-empty-hint>' + '{% filter escapejs %}{% trans "Drag rolls here" %}{% endfilter %}' + '</div></div>';
@@ -1032,6 +1043,16 @@
         var ttl = p.querySelector('.pk-pack-title'); if (ttl) ttl.textContent = '{% filter escapejs %}{% trans "Package" %}{% endfilter %}' + ' #' + n;
       });
     }
+
+    // What the sack weighed on the scale, for the export papers. Saved as
+    // soon as it is typed; a refusal puts the field back.
+    window.pkSetGrossKg = function(packId, input){
+      var before = input.defaultValue;
+      pkFetchCrud({action:'set_gross_kg', pack_id: packId, gross_kg: input.value}).then(function(data){
+        if (!data.ok){ toast(data.error || '{% filter escapejs %}{% trans "Could not save." %}{% endfilter %}', 'err'); input.value = before; return; }
+        input.value = input.defaultValue = data.gross_kg;
+      }).catch(function(){ toast('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}','err'); input.value = before; });
+    };
 
     window.pkDeletePack = function(packId){
       if (!confirm('{% filter escapejs %}{% trans "Delete this package? Its rolls will become unassigned." %}{% endfilter %}')) return;
@@ -1288,7 +1309,7 @@
     // delete button, which lives there too.
     document.addEventListener('click', function(e){
       if (!e.target || !e.target.closest) return;
-      if (e.target.closest('.pk-pack-del, .pk-pack-grip, .pk-pack-label')) return;
+      if (e.target.closest('.pk-pack-del, .pk-pack-grip, .pk-pack-label, .pk-pack-kg')) return;
       var h = e.target.closest('.pk-pack-h'); if (!h) return;
       var pack = h.closest('.pk-pack'); if (!pack) return;
       setCollapsed(pack, !pack.classList.contains('is-collapsed'));

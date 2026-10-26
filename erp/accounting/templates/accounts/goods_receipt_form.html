@@ -262,6 +262,8 @@
   .np-v-attrs { flex: 2; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
   .np-v-attrs .np-col { flex: 1 1 110px; }
   .np-main-sku, .np-v-sku, .np-v-supplier-sku { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
+  /* Built from the row's values, never typed. */
+  .np-v-sku[readonly] { background: #F5F7F9; color: var(--gray-600, #4B5563); cursor: default; }
 
   /* Every input says what it is above itself, in the same voice as the
      section labels — one step quieter, since these sit inside a card. */
@@ -280,6 +282,7 @@
   .np-th-no { min-width: 42px; }
   .np-th-qty { flex: 1; }
   .np-th-unit { min-width: 30px; }
+  .np-th-kg { flex: 0 0 96px; }
   .np-th-bc { flex: 1.3; }
   .np-th-state { min-width: 16px; }
   .np-th-x { min-width: 30px; }
@@ -311,6 +314,7 @@
   .np-top-cap { display: none; }
   .np-top-qty { flex: 1; height: 36px; }
   .np-top-unit { font: 600 12px var(--font-sans); color: var(--gray-600); min-width: 30px; }
+  .np-top-kg { flex: 0 0 96px; width: 96px; height: 36px; }
   .np-top-bc { flex: 1.3; height: 36px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; }
   .np-top-bc.bad { border-color: #C0392B; background: #FDF3F2; }
   .np-top-bc.ok  { border-color: #1E8E5A; }
@@ -425,7 +429,7 @@
     .gr .np-input, .gr .np-select,
     .gr .np-variant-row .np-input,
     .gr .np-price-pair .np-input, .gr .np-price-pair .np-select,
-    .gr .np-top-qty, .gr .np-top-bc,
+    .gr .np-top-qty, .gr .np-top-bc, .gr .np-top-kg,
     .gr .np-fx-row input {
       font-size: 16px;
       height: 44px;
@@ -486,9 +490,11 @@
     .gr .np-top-qty      { order: 3; flex: 1 1 110px; }
     .gr .np-top-unit     { order: 4; flex: 0 0 auto; }
     .gr .np-top .np-mini-x, .gr .np-top .np-top-lock { order: 5; }
-    .gr .np-cap-bc       { order: 6; }
-    .gr .np-top-bc       { order: 7; flex: 1 1 calc(100% - 24px); }
-    .gr .np-top-bc-state { order: 8; flex: 0 0 16px; }
+    .gr .np-cap-kg       { order: 6; }
+    .gr .np-top-kg       { order: 7; flex: 1 1 100%; width: auto; }
+    .gr .np-cap-bc       { order: 8; }
+    .gr .np-top-bc       { order: 9; flex: 1 1 calc(100% - 24px); }
+    .gr .np-top-bc-state { order: 10; flex: 0 0 16px; }
 
     /* The buttons get a row to themselves instead of three of them
        sharing a line with the running total. */
@@ -836,6 +842,7 @@
       '<span class="np-th-no"></span>' +
       '<span class="np-th-qty">{% trans "Quantity" %}</span>' +
       '<span class="np-th-unit"></span>' +
+      '<span class="np-th-kg">{% trans "Weight (kg)" %}</span>' +
       '<span class="np-th-bc">{% trans "Barcode" %}</span>' +
       '<span class="np-th-state"></span>' +
       '<span class="np-th-x"></span>' +
@@ -870,9 +877,12 @@
   function npAttrLabel(n) {
     return NP_ATTR_LABELS[n] || (n.charAt(0).toUpperCase() + n.slice(1));
   }
-  function npPresetAttrs(card) {
+  function npCatOf(card) {
     const sel = card.querySelector('.np-main-cat');
-    const cat = NP_CATS.filter(function (c) { return String(c.id) === String(sel && sel.value); })[0];
+    return NP_CATS.filter(function (c) { return String(c.id) === String(sel && sel.value); })[0];
+  }
+  function npPresetAttrs(card) {
+    const cat = npCatOf(card);
     const names = (cat && cat.attribute_names) || [];
     return names.length ? names.slice() : ['color'];
   }
@@ -890,14 +900,13 @@
       n = npAttrKey(n);
       if (n && list.indexOf(n) === -1) list.push(n);
     });
-    if (!list.length) list.push('color');
     card._npAttrs = list;
     const chips = card.querySelector('.np-attr-chips');
     if (chips) {
       chips.innerHTML = list.map(function (n) {
         return '<span class="np-attr-chip">' + npEsc(npAttrLabel(n)) +
-          (list.length > 1 ? '<button type="button" class="np-attr-x" title="{% trans "Remove" %}" data-attr="' +
-            npEsc(n) + '" onclick="npRemoveCardAttr(this)">&times;</button>' : '') + '</span>';
+          '<button type="button" class="np-attr-x" title="{% trans "Remove" %}" data-attr="' +
+            npEsc(n) + '" onclick="npRemoveCardAttr(this)">&times;</button></span>';
       }).join('');
     }
     const add = card.querySelector('.np-attr-add');
@@ -909,6 +918,7 @@
         '<option value="__new">{% trans "New attribute…" %}</option>';
     }
     card.querySelectorAll('.np-variants .np-variant').forEach(function (v) { npRenderRowAttrs(v, card); });
+    npShowVariantRows(card);
   };
   window.npAddCardAttr = function (sel) {
     const card = sel.closest('.np-product-card');
@@ -933,7 +943,12 @@
   };
   window.npCategoryChanged = function (sel) {
     const card = sel.closest('.np-product-card');
-    if (card._npMode !== 'existing') npSetCardAttrs(card, npPresetAttrs(card));
+    if (card._npMode !== 'existing') {
+      npSetCardAttrs(card, npPresetAttrs(card));
+      const unitSel = card.querySelector('.np-main-unit');
+      if (!unitSel.dataset.touched) { unitSel.value = npGroupUnit(card); npRelabelUnits(card); }
+      npSummaryUpdate();
+    }
   };
   // One field per attribute; what was typed survives a rebuild.
   window.npRenderRowAttrs = function (vEl, card) {
@@ -941,7 +956,7 @@
     if (!box) return;
     const typed = {};
     box.querySelectorAll('.np-v-attr').forEach(function (i) { typed[i.dataset.attr] = i.value; });
-    box.innerHTML = (card._npAttrs || ['color']).map(function (n) {
+    box.innerHTML = (card._npAttrs || []).map(function (n) {
       return '<div class="np-col">' +
         '<label>' + npEsc(npAttrLabel(n)) + '</label>' +
         '<input class="np-input np-v-attr" data-attr="' + npEsc(n) + '" value="' + npEsc(typed[n] || '') + '"' +
@@ -951,6 +966,8 @@
   };
   window.npRowAttrInput = function (input) {
     const vEl = input.closest('.np-variant');
+    // The SKU is read from the values, so a saved row's follows them too.
+    delete vEl.querySelector('.np-v-sku').dataset.touched;
     npSuggestVariantSku(vEl);
     npQueueVariantMatch(vEl);
   };
@@ -996,6 +1013,12 @@
   const NP_PACK_SEL = '<select class="np-select np-main-pack" onchange="npPackPicked(this)">' +
     NP_PACKS.choices.map(function (c) { return '<option value="' + c.value + '">' + c.label + '</option>'; }).join('') +
     '</select>';
+  // The unit a new product of the card's group starts on (see
+  // _product_category_choices).
+  function npGroupUnit(card) {
+    const cat = npCatOf(card);
+    return (cat && cat.unit) || 'piece';
+  }
   function npUnitPack(card) {
     return NP_PACKS.for_unit[npUnitOf(card)] || 'roll';
   }
@@ -1009,8 +1032,6 @@
   // Rewrite every pack word inside one card.
   window.npRelabelPack = function (card) {
     const p = npPackOf(card);
-    const vr = card.querySelector('.np-vr-label');
-    if (vr) vr.textContent = '{% trans "Variants & {items}" %}'.replace('{items}', p.many);
     card.querySelectorAll('.np-add-top-label').forEach(function (el) {
       el.textContent = '{% trans "Add {item}" %}'.replace('{item}', p.one).replace('{Item}', p.label);
     });
@@ -1275,6 +1296,12 @@
           '<label>{% trans "Packed as" %}</label>' +
           NP_PACK_SEL + '<div class="np-fact" hidden></div>' +
         '</div>' +
+        // A new fabric's weight per square meter, which the packing list
+        // turns into kilos for export papers. Optional.
+        '<div class="np-col np-col-gsm">' +
+          '<label>{% trans "GSM" %}</label>' +
+          '<input class="np-input np-main-gsm" type="number" inputmode="decimal" min="0" step="0.1" placeholder="{% trans "optional" %}">' +
+        '</div>' +
       '</div>' +
       '<div class="np-hint np-kind-hint" hidden>{% trans "This product already has stock, so its unit and pack are set on the product page." %}</div>' +
       // The questions each variant row is asked.
@@ -1282,13 +1309,7 @@
         '<label>{% trans "Variant attributes" %}</label>' +
         '<div class="np-attr-bar"><span class="np-attr-chips"></span>' +
           '<select class="np-select np-attr-add" onchange="npAddCardAttr(this)"></select></div>' +
-      '</div>' +
-      '<div class="np-field" style="margin-bottom:8px;">' +
-        '<label class="np-vr-label"></label>' +
-        '<div class="np-seg">' +
-          '<button type="button" class="np-seg-btn" data-hv="0" onclick="npSetHasVariants(this, false)">{% trans "No variant" %}</button>' +
-          '<button type="button" class="np-seg-btn active" data-hv="1" onclick="npSetHasVariants(this, true)">{% trans "Has variants" %}</button>' +
-        '</div>' +
+        '<div class="np-hint">{% trans "Write each value in words. To combine colours, put + between them: gold+ecru, silver+off white."|escapejs %} {% trans "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320."|escapejs %}</div>' +
       '</div>' +
       '<div class="np-no-variant" style="display:none;">' +
         '<div class="np-variant">' +
@@ -1313,13 +1334,10 @@
       '<div class="np-variants-wrap">' +
         '<div class="np-variants"></div>' +
         '<button type="button" class="np-add-variant" onclick="npAddVariant(this.closest(\'.np-product-card\'))"><i class="fa fa-plus"></i> {% trans "Add variant" %}</button>' +
-        '<div class="np-hint">{% trans "Write each value in words. To combine colours, put + between them: gold+ecru, silver+off white."|escapejs %} {% trans "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320."|escapejs %}</div>' +
       '</div>';
-    // A delivery is mostly one kind of goods, so a new product starts on
-    // the unit of the one above it.
-    const cards = wrap.querySelectorAll('.np-product-card');
-    if (cards.length) el.querySelector('.np-main-unit').value = npUnitOf(cards[cards.length - 1]);
+    el.querySelector('.np-main-unit').value = npGroupUnit(el);
     el.querySelector('.np-main-pack').value = npUnitPack(el);
+    npShowGsm(el);
     npRelabelPack(el);
     npDefaultCurrencies(el);
     npShowSaleCurrency(el);
@@ -1375,20 +1393,18 @@
     npRefreshVariantMatches(card);
   };
 
-  window.npSetHasVariants = function (btnEl, has) {
-    const card = btnEl.closest('.np-product-card');
-    card._npHasVariants = !!has;
-    card.querySelectorAll('.np-seg-btn[data-hv]').forEach(function (b) {
-      b.classList.toggle('active', (b.getAttribute('data-hv') === '1') === card._npHasVariants);
-    });
+  // A card with no attributes is a product of one variant: its SKU is the
+  // product's, so it is asked only quantities and a price. Rows typed
+  // under attributes stay put, hidden, until one is added back.
+  function npShowVariantRows(card) {
+    card._npHasVariants = (card._npAttrs || []).length > 0;
     card.querySelector('.np-variants-wrap').style.display = card._npHasVariants ? '' : 'none';
     card.querySelector('.np-no-variant').style.display = card._npHasVariants ? 'none' : '';
     if (!card._npHasVariants && !card.querySelector('.np-nv-tops .np-top')) {
       npAddTop(card.querySelector('.np-no-variant .np-variant'));
     }
-    if (card._npHasVariants && !card.querySelectorAll('.np-variants .np-variant').length) npAddVariant(card);
     npSummaryUpdate();
-  };
+  }
 
   // Called by every path that settles the account — the picker, the clear
   // button, an edit load, a plan load — which makes it the one place the
@@ -1757,25 +1773,6 @@
       });
   };
 
-  // Hand-editing a SKU that was locked to an existing variant's real sku
-  // breaks that match — the badge must stop claiming "exists" for a sku the
-  // save will actually ignore (the backend still dedups by attribute, not
-  // by the typed sku, so keeping the old badge up would be misleading).
-  window.npUnlockVariantSku = function (skuI) {
-    skuI.dataset.touched = '1';
-    const wasLocked = !!skuI.dataset.matchLocked;
-    delete skuI.dataset.matchLocked;
-    const vEl = skuI.closest('.np-variant');
-    if (wasLocked) {
-      const badge = vEl && vEl.querySelector('.np-v-match');
-      if (badge) { badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = ''; }
-      skuI.classList.remove('bad');
-    }
-    // Typing an existing variant's SKU is the most direct way to say "add to
-    // that one" — so re-classify on the SKU, not only on the name.
-    if (vEl) { npQueueVariantMatch(vEl); npSyncVariantChips(vEl.closest('.np-product-card')); }
-  };
-
   window.npAddVariant = function (cardEl) {
     npVid += 1;
     const el = document.createElement('div');
@@ -1790,7 +1787,7 @@
         '<div class="np-v-attrs"></div>' +
         '<div class="np-col np-col-sku">' +
           '<label>{% trans "Variant SKU" %}</label>' +
-          '<input class="np-input np-v-sku" maxlength="' + GR_VARIANT_SKU_MAX + '" placeholder="{% trans "auto" %}" oninput="npUnlockVariantSku(this)">' +
+          '<input class="np-input np-v-sku" maxlength="' + GR_VARIANT_SKU_MAX + '" placeholder="{% trans "auto" %}" readonly tabindex="-1">' +
         '</div>' +
         NP_SUPPLIER_SKU +
       '</div>' +
@@ -1865,6 +1862,10 @@
       '<span class="np-top-cap np-cap-qty">{% trans "Quantity" %}</span>' +
       '<input class="np-input np-top-qty" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
       '<span class="np-top-unit">' + unitShort(vEl.closest('.np-product-card')) + '</span>' +
+      // Only when the label prints it; most don't, and the packing list
+      // works the weight out from the fabric's GSM instead.
+      '<span class="np-top-cap np-cap-kg">{% trans "Weight (kg)" %}</span>' +
+      '<input class="np-input np-top-kg" type="number" inputmode="decimal" min="0" step="0.01" placeholder="{% trans "optional" %}">' +
       // Blank = mint one from the account prefix at save. Filled = this stock item
       // arrived already labelled and keeps the code printed on it.
       '<span class="np-top-cap np-cap-bc">{% trans "Barcode" %}</span>' +
@@ -2020,13 +2021,21 @@
   };
   // A card's unit changed: its rows say the new unit, and its pack follows
   // unless someone already picked one.
+  // GSM is asked of a new product counted in meters: an existing one has
+  // its own on the product page, and pieces have no square meters.
+  window.npShowGsm = function (card) {
+    const col = card.querySelector('.np-col-gsm');
+    if (col) col.hidden = card._npMode === 'existing' || npUnitOf(card) !== 'm';
+  };
   window.npRelabelUnits = function (card) {
+    npShowGsm(card);
     const u = unitShort(card);
     card.querySelectorAll('.np-top-unit').forEach(function (s) { s.textContent = u; });
     const sel = card.querySelector('.np-main-pack');
     if (sel && !sel.dataset.touched) { sel.value = npUnitPack(card); npRelabelPack(card); }
   };
   window.npUnitPicked = function (sel) {
+    sel.dataset.touched = '1';
     npRelabelUnits(sel.closest('.np-product-card'));
     npSummaryUpdate();
   };
@@ -2344,8 +2353,9 @@
       text.textContent = (facts && facts[f[3]]) || '';
     });
     card.querySelector('.np-kind-hint').hidden = !locked;
-    npSetCardAttrs(card, (facts && facts.attribute_names && facts.attribute_names.length)
-      ? facts.attribute_names : npPresetAttrs(card));
+    npShowGsm(card);
+    // A product whose variant has no attributes opens as one.
+    npSetCardAttrs(card, (facts && facts.attribute_names) ? facts.attribute_names : npPresetAttrs(card));
     // Rows say the product's unit; not npRelabelUnits, which would also
     // reset the pack to the unit's usual one over the product's own.
     const u = unitShort(card);
@@ -2374,9 +2384,9 @@
         box.classList.remove('empty');
         box.innerHTML = '<span class="np-ev-label">{% trans "Existing variants on this product:" %}</span>' +
           cardEl._npExistingVariants.map(function (v) {
-            // SKU first because that is what identifies the variant, then the
-            // warehouse name, which is how staff recognise the colour.
-            const label = (v.label && v.label !== v.variant_sku)
+            // SKU first because that is what identifies the variant, then
+            // its values.
+            const label = v.label
               ? ' <span class="np-ev-name">' + npEsc(v.label) + '</span>' : '';
             return '<button type="button" class="np-ev-chip" data-sku="' + npEsc(v.variant_sku) + '" onclick="npPickExistingVariant(this.closest(\'.np-product-card\'), \'' + npEsc(v.variant_sku).replace(/'/g, "\\'") + '\', this)" title="{% trans "Click to fill a variant row with this — click again to remove that row" %}">' +
               '<b class="np-ev-sku">' + npEsc(v.variant_sku) + '</b>' + label + ' (' +
@@ -2765,9 +2775,12 @@
       scope.querySelectorAll('.np-top').forEach(function (row) {
         const q = row.querySelector('.np-top-qty');
         const b = row.querySelector('.np-top-bc');
+        const k = row.querySelector('.np-top-kg');
         const val = parseFloat(((q && q.value) || '').replace(',', '.'));
+        const kg = parseFloat(((k && k.value) || '').replace(',', '.'));
         if (!isNaN(val) && val > 0) {
           tops.push({ qty: val, barcode: ((b && b.value) || '').trim(),
+                      weight_kg: (!isNaN(kg) && kg > 0) ? kg : null,
                       stock_item_id: npIdOf(row, 'stockItemId') });
         }
       });
@@ -2886,8 +2899,10 @@
       }
 
       const catSel = card.querySelector('.np-main-cat');
+      const gsmI = card.querySelector('.np-main-gsm');
       products.push({ main_product: main, has_variants: card._npHasVariants, variants: variants,
                       category_id: (catSel && catSel.value) || null,
+                      gsm: (gsmI && !gsmI.closest('.np-col-gsm').hidden && gsmI.value) || null,
                       unit: npUnitOf(card),
                       pack_type: npPackOf(card).value || null });
     }
@@ -3119,6 +3134,7 @@
       const unitSel = card.querySelector('.np-main-unit');
       if (unitSel && (p.unit || plan.unit)) {
         unitSel.value = p.unit || plan.unit;
+        unitSel.dataset.touched = '1';
         npRelabelUnits(card);
       }
       const packSel = card.querySelector('.np-main-pack');
@@ -3129,7 +3145,7 @@
       }
 
       const hasV = p.has_variants !== false;
-      npSetHasVariants(card.querySelector('.np-seg-btn[data-hv="' + (hasV ? '1' : '0') + '"]'), hasV);
+      if (!hasV) npSetCardAttrs(card, []);
 
       const variants = p.variants || [];
       if (hasV) {
@@ -3177,7 +3193,7 @@
     const saleI = vEl.querySelector('.np-v-sale');
     if (saleI && v.sale_price) saleI.value = v.sale_price;
 
-    // One roll row already exists from npAddVariant/npSetHasVariants.
+    // One roll row already exists from npAddVariant/npShowVariantRows.
     const tops = (v.tops || []);
     tops.forEach(function (t, i) {
       if (i > 0) npAddTop(vEl);
@@ -3185,6 +3201,7 @@
       const row = rows[rows.length - 1];
       if (!row) return;
       row.querySelector('.np-top-qty').value = t.qty != null ? t.qty : '';
+      if (t.weight_kg != null) row.querySelector('.np-top-kg').value = t.weight_kg;
       const bc = row.querySelector('.np-top-bc');
       if (t.stock_item_id) {
         row.dataset.stockItemId = t.stock_item_id;

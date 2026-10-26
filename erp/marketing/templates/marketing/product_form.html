@@ -809,6 +809,11 @@
             {{ form.unit_of_weight }}
           </div>
         </div>
+        {# Fabric only: the packing list works each roll's kilos out from it. #}
+        <div class="form-group">
+          <label for="id_gsm">{% trans "GSM (g/m²)" %}</label>
+          {{ form.gsm }}
+        </div>
       </div>
 
       <!-- Product Attributes (Moved to Sidebar) -->

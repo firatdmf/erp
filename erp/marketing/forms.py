@@ -43,6 +43,7 @@ class ProductForm(forms.ModelForm):
         widgets = {
             'featured': forms.CheckboxInput(attrs={'class': 'switch-input'}),
             'selling_while_out_of_stock': forms.CheckboxInput(attrs={'class': 'switch-input'}),
+            'gsm': forms.NumberInput(attrs={'step': '0.1', 'min': '0', 'placeholder': 'e.g. 320'}),
         }
 
     # The input id will be "id_has_variants", this won't be saved to the database, for interactions only. Later we can just do Product.variants.exists()

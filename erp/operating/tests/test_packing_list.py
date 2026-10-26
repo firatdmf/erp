@@ -128,7 +128,7 @@ class PackingListColumns(TestCase):
         with patch.object(SimpleDocTemplate, "build", build):
             self.client.get(reverse("operating:order_packing_list_pdf",
                                     kwargs={"pk": self.order.pk}))
-        tbl = next(f for f in captured if isinstance(f, Table) and len(f._colWidths) == 7)
+        tbl = next(f for f in captured if isinstance(f, Table) and len(f._colWidths) == 8)
         cells = []
         for row in tbl._cellvalues[1:]:
             cell = row[5]
@@ -178,7 +178,7 @@ class PackingListColumns(TestCase):
                           lambda d, s, *a, **k: (captured.extend(s), real_build(d, s, *a, **k))):
             self.client.get(reverse("operating:order_packing_list_pdf",
                                     kwargs={"pk": self.order.pk}))
-        tbl = next(f for f in captured if isinstance(f, Table) and len(f._colWidths) == 7)
+        tbl = next(f for f in captured if isinstance(f, Table) and len(f._colWidths) == 8)
         self.assertAlmostEqual(sum(tbl._colWidths), 180 * mm, places=3)
 
     def test_the_excel_is_the_downloadable_editable_copy(self):
@@ -195,13 +195,15 @@ class PackingListColumns(TestCase):
         self.assertEqual(
             [c.value for c in ws[7]],
             ["Pack", "No", "Product", "Variant", "Product Group", "SKU",
-             "Barcode", "Meters"])
+             "Barcode", "Meters", "Net kg", "Gross kg"])
         # One merged block per package, down its own items.
         self.assertIn("A8:A9", [str(m) for m in ws.merged_cells.ranges])
         tail = [[c for c in row if c is not None]
-                for row in ws.iter_rows(min_row=ws.max_row - 2, values_only=True)]
+                for row in ws.iter_rows(min_row=ws.max_row - 4, values_only=True)]
+        # No GSM and no sack weighed: the weights are blanks, not zeros.
         self.assertEqual(tail, [["Total Packages", 2], ["Total Items", 4],
-                                ["Total Meters", 129.8]])
+                                ["Total Meters", 129.8], ["Total Net kg", "-"],
+                                ["Total Gross kg", "-"]])
 
     def test_totals_say_items_not_rolls(self):
         """"Rolls" only makes sense for fabric; the same list also

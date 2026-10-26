@@ -69,7 +69,7 @@
      and quantity line up down the page like a table. Each tag is pinned
      to its column, so a roll without a variant leaves that cell empty
      rather than shifting the rest left. */
-  .pk-roll-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) minmax(0, 170px) minmax(0, 130px) minmax(0, 160px) 90px;
+  .pk-roll-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) minmax(0, 170px) minmax(0, 130px) minmax(0, 160px) 90px 80px;
                  align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px solid #F4F7FB; }
   .pk-roll-row:last-child { border-bottom: none; }
   .pk-roll-no { text-align: right; font: 700 11.5px var(--font-mono); color: var(--gray-400); font-variant-numeric: tabular-nums; }
@@ -80,10 +80,16 @@
   .pk-roll-sku { margin-left: 6px; font: 500 11px var(--font-mono); color: var(--gray-500); }
   .pk-roll-bc { grid-column: 5; font: 600 11px var(--font-mono); color: var(--gray-700); background: #F4F7FB; border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
   .pk-roll-m { grid-column: 6; text-align: right; font: 800 12.5px var(--font-sans); color: var(--nejum-teal-700); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* Net weight: "~" when worked out from GSM, a dash when nothing says. */
+  .pk-roll-kg { grid-column: 7; text-align: right; font: 600 12px var(--font-sans); color: var(--gray-600); white-space: nowrap; font-variant-numeric: tabular-nums; }
   /* On a wide screen the tags sit in the row's own line, as if unwrapped. */
   .pk-roll-tags { display: contents; }
 
   .pk-empty { padding: 20px 16px; text-align: center; color: var(--gray-500); font: 500 12.5px var(--font-sans); }
+  .pk-pack-kg { font: 600 11.5px var(--font-sans); color: var(--gray-600); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pk-totals { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px 18px; margin-top: 16px; padding: 12px 16px; background: white; border: 1.5px solid #E0E6EE; border-radius: 12px; font: 600 12.5px var(--font-sans); color: var(--gray-600); }
+  .pk-totals b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .pk-totals .pk-note { margin-right: auto; font-weight: 500; color: var(--gray-500); }
 
   /* Phones: one roll is two lines — number, name and quantity on top, its
      variant, group and barcode wrapping underneath — rather than five
@@ -103,7 +109,9 @@
     .pk-pack-btn { padding: 8px; }
 
     .pk-roll-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto;
-                   grid-template-areas: "no name m" ". tags tags"; gap: 5px 8px; padding: 10px 12px; align-items: baseline; }
+                   grid-template-areas: "no name m" ". tags kg"; gap: 5px 8px; padding: 10px 12px; align-items: baseline; }
+    .pk-roll-kg { grid-area: kg; }
+    .pk-pack-kg { display: none; }
     .pk-roll-no { grid-area: no; width: auto; }
     .pk-roll-name { grid-area: name; white-space: normal; overflow-wrap: anywhere; }
     .pk-roll-sku { display: block; margin: 1px 0 0; }
@@ -163,6 +171,10 @@
           <div class="pk-pack-code">{{ p.code }}</div>
         </div>
         <span class="pk-pack-meta">{{ p.rows|length }} {% trans "items" %}</span>
+        <span class="pk-pack-kg">
+          {% trans "Net" %} {% if p.weights.net_kg is not None %}{% if p.weights.net_kg_estimated %}~{% endif %}{{ p.weights.net_kg|floatformat:"2g" }} kg{% else %}—{% endif %}
+          · {% trans "Gross" %} {% if p.weights.gross_kg is not None %}{{ p.weights.gross_kg|floatformat:"2g" }} kg{% else %}—{% endif %}
+        </span>
         <div class="pk-pack-actions">
           <a class="pk-pack-btn" href="{% url 'operating:pack_label' p.pk %}" target="_blank">
             <i class="fa fa-print"></i> {% trans "Print label" %}
@@ -183,6 +195,7 @@
             <code class="pk-roll-bc">{{ r.barcode }}</code>
           </span>
           <span class="pk-roll-m">{{ r.quantity|floatformat:"2g" }} {{ r.unit_label }}</span>
+          <span class="pk-roll-kg">{% if r.net_kg is not None %}{% if r.net_kg_estimated %}~{% endif %}{{ r.net_kg|floatformat:"2g" }} kg{% else %}—{% endif %}</span>
         </div>
         {% empty %}
         <div class="pk-empty">{% trans "No rolls in this package yet." %}</div>
@@ -190,6 +203,12 @@
       </div>
     </div>
     {% endfor %}
+  </div>
+
+  <div class="pk-totals">
+    {% if net_kg_estimated %}<span class="pk-note">{% trans "~ worked out from the fabric's GSM and width" %}</span>{% endif %}
+    <span>{% trans "Total net" %} <b>{% if net_kg is not None %}{% if net_kg_estimated %}~{% endif %}{{ net_kg|floatformat:"2g" }} kg{% else %}—{% endif %}</b></span>
+    <span>{% trans "Total gross" %} <b>{% if gross_kg is not None %}{{ gross_kg|floatformat:"2g" }} kg{% else %}—{% endif %}</b></span>
   </div>
 </div>
 

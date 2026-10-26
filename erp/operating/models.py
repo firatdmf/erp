@@ -2477,6 +2477,13 @@ class WarehouseProductItem(models.Model):
     # price / not counted with first-quality stock for order fulfilment
     # decisions. Staff tag it manually via the roll-edit modal.
     is_second = models.BooleanField(default=False, db_index=True)
+    # What the whole stock item weighed when it arrived, as its label says.
+    # Most labels don't, so most stay blank and their weight is worked
+    # out from the product's GSM instead (see operating.weights).
+    weight_kg = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text="Weight on arrival in kg, when the label states it",
+    )
     notes = models.TextField(blank=True, null=True)
     # Camera-scan provenance
     scanned_at = models.DateTimeField(auto_now_add=True)
@@ -3034,6 +3041,12 @@ class Pack(models.Model):
     pack_number = models.PositiveIntegerField()
     code = models.CharField(max_length=100, blank=True, null=True)
     qr_code_url = models.URLField(max_length=500, blank=True, null=True)
+    # The packed sack on the scale, packaging included — weighed when the
+    # shipment needs export papers.
+    gross_kg = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text="The package's weight on the scale, packaging included",
+    )
 
     class Meta:
         unique_together = ("order", "pack_number")  # prevent duplicates

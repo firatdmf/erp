@@ -52,6 +52,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
 from .utils import get_machine_from_api_key
+from .weights import net_kg
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
@@ -5276,6 +5277,8 @@ def _pack_roll_rows(pack):
             product = getattr(variant, "product", None)
             title = wp.name if wp else "-"
             sku = wp.sku if (wp and wp.sku) else "-"
+        kg, kg_estimated = net_kg(r.quantity, r.stock_item if r.stock_item_id else None,
+                                  product, variant)
         rows.append({
             "title": title, "sku": sku,
             "variant": _variant_label(variant),
@@ -5285,8 +5288,37 @@ def _pack_roll_rows(pack):
             "unit": product.unit if product else units.DEFAULT_UNIT,
             "pack_type": product.pack_type if product else units.DEFAULT_PACK,
             "tracking": product.tracking if product else units.DEFAULT_TRACKING,
+            "net_kg": kg,
+            "net_kg_estimated": kg_estimated,
         })
     return rows
+
+
+def _pack_weights(pack, rows):
+    """A package's net kg — the sum of its lines, None when any line's is
+    unknown, since a total missing a roll would read as the whole sack —
+    whether any of it is estimated, and the gross kg off the scale."""
+    from decimal import Decimal
+    known = [r["net_kg"] for r in rows if r["net_kg"] is not None]
+    net = sum(known, Decimal("0")) if rows and len(known) == len(rows) else None
+    return {"net_kg": net,
+            "net_kg_estimated": any(r["net_kg_estimated"] for r in rows),
+            "gross_kg": pack.gross_kg,
+            "lines": len(rows)}
+
+
+def _order_weights(pack_weights):
+    """(net kg, gross kg) of the whole order, each None unless every
+    package it counts has one — a total short a sack is no total. A
+    package with no stock items is left out of the net, and out of the
+    gross too unless it was weighed."""
+    from decimal import Decimal
+    nets = [w["net_kg"] for w in pack_weights if w["lines"]]
+    grosses = [w["gross_kg"] for w in pack_weights
+               if w["lines"] or w["gross_kg"] is not None]
+    net = sum(nets, Decimal("0")) if nets and None not in nets else None
+    gross = sum(grosses, Decimal("0")) if grosses and None not in grosses else None
+    return net, gross
 
 
 class OrderPackingList(View):
@@ -5329,22 +5361,29 @@ class OrderPackingList(View):
         item_no = 0
         for p in packs:
             p.rows = _pack_roll_rows(p)
+            p.weights = _pack_weights(p, p.rows)
             for r in p.rows:
                 item_no += 1
                 r["item_no"] = item_no
                 r["unit_label"] = units.unit_short(r["unit"])
+        net_kg, gross_kg = _order_weights([p.weights for p in packs])
 
         unassigned_count = order.stock_reservations.filter(pack__isnull=True).count()
 
         return render(request, self.template_name, {
             "order": order,
             "packs": packs,
+            "net_kg": net_kg,
+            "gross_kg": gross_kg,
+            "net_kg_estimated": any(p.weights["net_kg_estimated"] for p in packs),
             "unassigned_count": unassigned_count,
             "shipped": order.order_status in _SHIPPED_CLASS,
         })
 
     def post(self, request, pk):
         order = get_object_or_404(Order, pk=pk)
+        if (request.POST.get("action") or "").strip() == "set_gross_kg":
+            return _set_pack_gross_kg(request, order)
         # Same server-side lock as the reserve/assign endpoints — this
         # was previously only enforced by hiding the buttons in the UI,
         # leaving the endpoint itself open on a shipped order.
@@ -5396,6 +5435,30 @@ class OrderPackingList(View):
             return JsonResponse({"ok": True, "numbers": numbers})
 
         return JsonResponse({"ok": False, "error": "Unknown action"}, status=400)
+
+
+def _set_pack_gross_kg(request, order):
+    """Write what a package weighed on the scale; blank clears it. Open
+    on a shipped order too: the weight is paperwork about the sack, it
+    moves no stock, and papers are often finished after it has gone."""
+    from decimal import Decimal, InvalidOperation
+    if order.order_status in {"cancelled", "returned"}:
+        return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
+    try:
+        pack_id = int(request.POST.get("pack_id") or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "Bad pack_id"}, status=400)
+    pack = get_object_or_404(Pack, pk=pack_id, order=order)
+    raw = (request.POST.get("gross_kg") or "").strip().replace(",", ".")
+    try:
+        value = Decimal(raw).quantize(Decimal("0.01")) if raw else None
+    except InvalidOperation:
+        value = Decimal("-1")
+    if value is not None and not (Decimal("0") < value < Decimal("1000000")):
+        return JsonResponse({"ok": False, "error": _gettext("Enter the weight in kg, e.g. 42.5")}, status=400)
+    pack.gross_kg = value
+    pack.save(update_fields=["gross_kg", "updated_at"])
+    return JsonResponse({"ok": True, "gross_kg": str(value) if value is not None else ""})
 
 
 def _renumber_packs(order, ordered_ids=None):
@@ -5481,7 +5544,8 @@ def export_packing_list_excel(request, pk):
     ws.title = f"Packing List {pk}"
 
     headers = ["Pack", "No", "Product", "Variant", "Product Group", "SKU",
-               "Barcode", "Meters"]
+               "Barcode", "Meters", "Net kg", "Gross kg"]
+    QTY_COL, NET_COL, GROSS_COL = 8, 9, 10
     last_col = len(headers)
     last_letter = get_column_letter(last_col)
 
@@ -5523,25 +5587,32 @@ def export_packing_list_excel(request, pk):
     # the PDF and the screen — not restarted inside each package.
     item_no = 0
     total_meters = Decimal("0")
+    weights = []
     for pack in packs:
         pack_start_row = row
         rows = _pack_roll_rows(pack)
+        weights.append(_pack_weights(pack, rows))
 
         for r in rows:
             item_no += 1
             total_meters += Decimal(r["quantity"] or 0)
             values = [pack.pack_number, item_no, r["title"], r["variant"],
                       r["product_group"], r["sku"], r["barcode"],
-                      float(r["quantity"] or 0)]
+                      float(r["quantity"] or 0),
+                      float(r["net_kg"]) if r["net_kg"] is not None else None, None]
             for col_index, value in enumerate(values, start=1):
                 cell = ws.cell(row=row, column=col_index, value=value)
                 cell.border = grid
                 if col_index in (6, 7):  # SKU, barcode — see erp.xlsx_utils.TEXT
                     cell.number_format = "@"
                 cell.alignment = Alignment(
-                    horizontal="right" if col_index in (2, last_col) else "left",
+                    horizontal="right" if col_index in (2, QTY_COL, NET_COL, GROSS_COL) else "left",
                     vertical="center")
-            ws.cell(row=row, column=last_col).number_format = '0.00" m"'
+            ws.cell(row=row, column=QTY_COL).number_format = '0.00" m"'
+            # "~" marks a weight worked out from GSM rather than read off
+            # the roll; the value underneath stays a number either way.
+            ws.cell(row=row, column=NET_COL).number_format = (
+                '"~"0.00' if r["net_kg_estimated"] else "0.00")
             row += 1
 
         if not rows:
@@ -5553,22 +5624,33 @@ def export_packing_list_excel(request, pk):
 
         # The pack number is one merged block down its own items, the way
         # it prints — plus a heavier rule where the package changes.
+        # So is the sack's weight on the scale, which belongs to the sack
+        # and not to any one roll in it.
         if row - pack_start_row > 1:
             ws.merge_cells(start_row=pack_start_row, start_column=1,
                            end_row=row - 1, end_column=1)
+            ws.merge_cells(start_row=pack_start_row, start_column=GROSS_COL,
+                           end_row=row - 1, end_column=GROSS_COL)
         merged_cell = ws.cell(row=pack_start_row, column=1)
         merged_cell.alignment = Alignment(horizontal="center", vertical="center")
         merged_cell.font = Font(bold=True, color=teal)
+        gross = ws.cell(row=pack_start_row, column=GROSS_COL,
+                        value=float(pack.gross_kg) if pack.gross_kg is not None else None)
+        gross.number_format = "0.00"
+        gross.alignment = Alignment(horizontal="right", vertical="center")
         for c in range(1, last_col + 1):
             cell = ws.cell(row=row - 1, column=c)
             cell.border = Border(left=thin, right=thin, top=thin, bottom=medium)
 
     # ── Totals, under the table, mirroring the PDF ───────────────────
     totals_row = row + 1
+    net, gross = _order_weights(weights)
     for offset, (label, value) in enumerate((
         ("Total Packages", len(packs)),
         ("Total Items", item_no),
         ("Total Meters", float(total_meters)),
+        ("Total Net kg", float(net) if net is not None else "-"),
+        ("Total Gross kg", float(gross) if gross is not None else "-"),
     )):
         r = totals_row + offset
         lbl = ws.cell(row=r, column=last_col - 1, value=label)
@@ -5580,6 +5662,10 @@ def export_packing_list_excel(request, pk):
             val.number_format = '0.00" m"'
             lbl.fill = header_fill
             val.fill = header_fill
+        elif label == "Total Net kg" and any(w["net_kg_estimated"] for w in weights):
+            val.number_format = '"~"0.00'
+        elif label.endswith("kg"):
+            val.number_format = "0.00"
 
     from erp.nejum_credit import set_credit_footer
     set_credit_footer(ws)
@@ -6453,9 +6539,13 @@ def order_packing_list_pdf(request, pk):
         'product_group': _gettext("Product Group"),
         'barcode': _gettext("Barcode"),
         'quantity': _gettext("Meters"),
+        'net_kg': _gettext("Net kg"),
         'total_packages': _gettext("Total Packages"),
         'total_items': _gettext("Total Items"),
         'total_meters': _gettext("Total Meters"),
+        'total_net': _gettext("Total Net Weight"),
+        'total_gross': _gettext("Total Gross Weight"),
+        'estimated': _gettext("~ worked out from the fabric's GSM and width"),
         'empty_pack': _gettext("(empty)"),
         'no_items': _gettext("Nothing has been packed for this order yet."),
     }
@@ -6559,10 +6649,23 @@ def order_packing_list_pdf(request, pk):
         Paragraph(labels['product_group'], th_style),
         Paragraph(labels['barcode'], th_style),
         Paragraph(labels['quantity'], th_num_style),
+        Paragraph(labels['net_kg'], th_num_style),
     ]]
     # (first_row, last_row) per package, so the pack column can be merged
     # down across every item that shares it.
     spans = []
+    weights = []
+
+    def kg(value, estimated=False):
+        return f"{'~' if estimated else ''}{value:.2f}" if value is not None else "-"
+
+    def pack_cell(pack):
+        # The sack's weight on the scale goes under its number, in the
+        # merged cell — it belongs to the sack, not to any roll in it.
+        if pack.gross_kg is None:
+            return Paragraph(str(pack.pack_number), ctr_style)
+        return Paragraph(f"{pack.pack_number}<br/><font size=7 color='#6B7280'>"
+                         f"{pack.gross_kg:.2f} kg</font>", ctr_style)
     item_no = 0
     total_meters = Decimal("0")
 
@@ -6595,19 +6698,20 @@ def order_packing_list_pdf(request, pk):
 
     for pack, rows in rows_by_pack:
         first = len(data)
+        weights.append(_pack_weights(pack, rows))
         if not rows:
             data.append([
-                Paragraph(str(pack.pack_number), ctr_style),
+                pack_cell(pack),
                 "",
                 Paragraph(labels['empty_pack'], cell_style),
-                "", "", "", "",
+                "", "", "", "", "",
             ])
         for row in rows:
             item_no += 1
             if row['quantity'] is not None:
                 total_meters += row['quantity']
             data.append([
-                Paragraph(str(pack.pack_number), ctr_style),
+                pack_cell(pack),
                 Paragraph(str(item_no), cell_style),
                 Paragraph(
                     f"{row['title']}<br/><font size=8 color='#6B7280'>{row['sku']}</font>",
@@ -6617,6 +6721,7 @@ def order_packing_list_pdf(request, pk):
                 barcode_cell(str(row['barcode'])),
                 Paragraph(f"{row['quantity']:.2f} m" if row['quantity'] is not None else "-",
                           num_style),
+                Paragraph(kg(row['net_kg'], row['net_kg_estimated']), num_style),
             ])
         spans.append((first, len(data) - 1))
 
@@ -6627,8 +6732,8 @@ def order_packing_list_pdf(request, pk):
                     # Product Group needs 28mm to keep its header on one
                     # line; the barcode column is sized above, and the
                     # Product column takes whatever is left of 180mm.
-                    colWidths=[14 * mm, 10 * mm, 78 * mm - barcode_w, 26 * mm,
-                               28 * mm, barcode_w, 24 * mm],
+                    colWidths=[16 * mm, 10 * mm, 68 * mm - barcode_w, 24 * mm,
+                               28 * mm, barcode_w, 19 * mm, 15 * mm],
                     repeatRows=1)
         style_cmds = [
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -6655,9 +6760,13 @@ def order_packing_list_pdf(request, pk):
 
         # ── Totals, right-aligned under the table ────────────────────
         story.append(Spacer(1, 10))
+        net, gross = _order_weights(weights)
+        estimated = any(w['net_kg_estimated'] for w in weights)
         totals = [
             (labels['total_packages'], str(len(packs))),
             (labels['total_items'], str(item_no)),
+            (labels['total_net'], kg(net, estimated) + (" kg" if net is not None else "")),
+            (labels['total_gross'], kg(gross) + (" kg" if gross is not None else "")),
             (labels['total_meters'], f"{total_meters:.2f} m"),
         ]
         totals_tbl = Table(
@@ -6675,6 +6784,10 @@ def order_packing_list_pdf(request, pk):
             ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ]))
         story.append(totals_tbl)
+        if estimated:
+            story.append(Spacer(1, 6))
+            story.append(Paragraph(labels['estimated'], ParagraphStyle(
+                name="NoteStyle", parent=cell_style, fontSize=8, textColor=MUTED, alignment=2)))
 
     from erp.nejum_credit import draw_credit
     doc.build(story, onFirstPage=draw_credit, onLaterPages=draw_credit)

@@ -112,6 +112,15 @@ def _safe_decimal(value, default=None):
         return default
 
 
+def _label_kg(value):
+    """A stock item's weight as typed off its label: kg to the hundredth,
+    or None for blank, nonsense, or nothing above zero."""
+    kg = _safe_decimal(value)
+    if kg is None or not kg.is_finite() or kg <= 0 or kg >= Decimal("1000000"):
+        return None
+    return kg.quantize(Decimal("0.01"))
+
+
 def _get_usd_try_rate():
     """Today's published USD->TRY rate, or None when there isn't one.
 
@@ -992,13 +1001,22 @@ def _product_category_choices():
     """ProductCategories for the manual-add "Product Group" select, fabric first
     (it's the default for warehouse-minted products — this is a fabric mill)."""
     try:
-        from marketing.models import ProductCategory
+        from django.db.models import Count
+        from marketing.models import Product, ProductCategory
         rows = list(ProductCategory.objects.all().order_by("name"))
         rows.sort(key=lambda c: (c.name != "fabric", c.name))
+        # A new product starts on the unit most of its group already uses
+        # (its pack follows the unit); a group with none starts on piece.
+        unit_of = {}
+        for r in (Product.objects.filter(category__isnull=False)
+                  .values("category_id", "unit").annotate(n=Count("id"))
+                  .order_by("category_id", "-n", "unit")):
+            unit_of.setdefault(r["category_id"], r["unit"])
         return [{"id": c.id, "name": c.name,
                  "label": str(_CATEGORY_LABELS.get(c.name, c.name)),
                  # What a new product of the group is asked per variant.
                  "attribute_names": c.variant_attribute_names(),
+                 "unit": unit_of.get(c.id, "piece"),
                  "is_default": c.name == "fabric"} for c in rows]
     except Exception:
         return []
@@ -1168,7 +1186,7 @@ def _add_stock_to_variant(wp, stock_items, mint, user, *, notes_supplier=None,
             first_barcode = code
         roll = WarehouseProductItem.objects.create(
             product=wp, quantity=qty, quantity_remaining=qty,
-            barcode=code,
+            barcode=code, weight_kg=_label_kg(t.get("weight_kg")),
             notes=(f"Supplier: {notes_supplier}" if notes_supplier else None),
             scanned_by=user,
             unit_cost_base=(unit_cost if unit_cost is not None else wp.cost_usd),
@@ -2946,28 +2964,13 @@ def catalog_base_search(request, pk):
     return JsonResponse({"results": results})
 
 
-def _warehouse_variant_label(wp, base_name):
-    """The bit of a WarehouseProduct's name that actually distinguishes
-    this variant — its full name (e.g. "1026 / V-106 ALTIN GÜMÜŞ") with
-    the shared base ("1026") stripped off the front, so staff see
-    "V-106 ALTIN GÜMÜŞ" exactly as written in the warehouse, not an
-    English-translated catalog attribute value."""
-    name = wp.name or ""
-    if base_name and name.upper().startswith(base_name.upper()):
-        name = name[len(base_name):]
-    return name.strip(" /-—–") or (wp.name or "")
-
-
 @login_required
 def catalog_product_variants(request, pk, product_id):
     """List the EXISTING variants of one catalog product, for the "New product"
     panel's existing-main-product picker — lets staff see what's already on
     the product BEFORE typing a variant name, instead of guessing.
 
-    Label is sourced from the linked WarehouseProduct's own name rather
-    than the catalog's translated attribute value ("Silver") — staff
-    recognize stock by what's written in the warehouse, not the English
-    catalog mirror.
+    Each is labelled with its values, the words the row's fields take.
 
     Only variants with a REAL WarehouseProduct link are shown. Some
     catalog variants have none — leftover duplicates or test rows from
@@ -2984,28 +2987,24 @@ def catalog_product_variants(request, pk, product_id):
     variants = with_live_quantity(
         product.variants
         .filter(warehouse_products__isnull=False)
-        .prefetch_related("product_variant_attribute_values__product_variant_attribute",
-                          "warehouse_products")
+        .prefetch_related("product_variant_attribute_values__product_variant_attribute")
         .distinct().order_by("variant_sku"))
     from marketing.supplier_items import suppliers_of
     variants = list(variants)
     suppliers = suppliers_of(v.id for v in variants)
     results = []
     for v in variants:
-        av = (v.product_variant_attribute_values.all()[:1] or [None])[0]
-        wp = next(iter(v.warehouse_products.all()), None)
-        label = _warehouse_variant_label(wp, product.title) if wp else None
-        if not label:
-            label = (av.product_variant_attribute_value.replace("_", " ").title() if av else v.variant_sku)
+        values = sorted(v.product_variant_attribute_values.all(), key=lambda x: x.id)
+        av = values[0] if values else None
         results.append({
             "id": v.id,
-            "label": label,
+            # The values the row's fields are written in ("light gray 320").
+            "label": " ".join(x.product_variant_attribute_value for x in values),
             "attribute_name": (av.product_variant_attribute.name if av else None),
             # Every value, so picking the chip fills the row's fields.
             "attributes": [{"name": x.product_variant_attribute.name,
                             "value": x.product_variant_attribute_value}
-                           for x in sorted(v.product_variant_attribute_values.all(),
-                                           key=lambda x: x.id)],
+                           for x in values],
             "variant_sku": v.variant_sku,
             "variant_barcode": v.variant_barcode,
             # Live, not the stored mirror: a variant whose only roll was
@@ -3523,6 +3522,11 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
                     status=400)
             typed_skus[desired_sku.upper()] = i
 
+        # A new fabric's GSM, when the card was given one; nonsense is none.
+        gsm = _safe_decimal(p_in.get("gsm"))
+        if gsm is not None and not (gsm.is_finite() and Decimal("0") < gsm < Decimal("100000")):
+            gsm = None
+
         resolved.append({
             "main_product": main_product, "base_name": base_name,
             "desired_sku": desired_sku, "sku_is_auto": sku_is_auto,
@@ -3530,6 +3534,7 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
             "variants_in": variants_in, "category": category,
             "pack_type": pack_type,
             "unit": _intake_unit(p_in.get("unit") or default_unit),
+            "gsm": gsm.quantize(Decimal("0.1")) if gsm is not None else None,
         })
     return resolved
 
@@ -3622,7 +3627,7 @@ def _intake_main_product(item, prefix, *, invoice=None):
                 unit=unit or units.DEFAULT_UNIT,
                 pack_type=pack_type or units.PACK_FOR_UNIT[unit or units.DEFAULT_UNIT],
                 tracking=units.TRACKING_FOR_UNIT[unit or units.DEFAULT_UNIT],
-                category=category,
+                category=category, gsm=item.get("gsm"),
             )
         if desired_sku and not item["sku_is_auto"]:
             # A code the user typed — never substituted. It was
@@ -4711,6 +4716,10 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                     if code and code.upper() != (roll.barcode or "").upper():
                         roll.barcode = code
                         fields.append("barcode")
+                    # A payload from before the field leaves the weight be.
+                    if "weight_kg" in t and _label_kg(t["weight_kg"]) != roll.weight_kg:
+                        roll.weight_kg = _label_kg(t["weight_kg"])
+                        fields.append("weight_kg")
                     if fields:
                         roll.save(update_fields=fields)
                     if length_changed:
@@ -4933,6 +4942,8 @@ class WarehousePurchaseEdit(View):
                 "currency": invoice.currency.code,
                 "tops": [
                     {"stock_item_id": r.pk, "qty": _plain_decimal(r.quantity),
+                     "weight_kg": (_plain_decimal(r.weight_kg)
+                                   if r.weight_kg is not None else None),
                      "barcode": r.barcode or "", "locked": bool(r.is_locked),
                      "out": float(_roll_meters_out(r)),
                      "holds": [{"label": str(h.order) if h.order_id else "",

@@ -14964,3 +14964,39 @@ msgstr "Giriş yapan müşteriler bu deponun stokunu sitede görüp seçebilir; 
 
 msgid "Off: this warehouse's stock is never offered on the website and does not count in what it shows. Staff still sell it as before."
 msgstr "Kapalı: bu deponun stoku sitede hiç sunulmaz ve sitede gösterilen stoka dahil edilmez. Personel yine eskisi gibi satabilir."
+
+msgid "Weight (kg)"
+msgstr "Ağırlık (kg)"
+
+msgid "GSM"
+msgstr "Gramaj (g/m²)"
+
+msgid "GSM (g/m²)"
+msgstr "Gramaj (g/m²)"
+
+msgid "Gross"
+msgstr "Brüt"
+
+msgid "Total net"
+msgstr "Toplam net"
+
+msgid "Total gross"
+msgstr "Toplam brüt"
+
+msgid "~ worked out from the fabric's GSM and width"
+msgstr "~ kumaşın gramajı ve eninden hesaplandı"
+
+msgid "Net kg"
+msgstr "Net kg"
+
+msgid "Total Net Weight"
+msgstr "Toplam Net Ağırlık"
+
+msgid "Total Gross Weight"
+msgstr "Toplam Brüt Ağırlık"
+
+msgid "The sack on the scale, packaging included"
+msgstr "Çuvalın tartıdaki ağırlığı, ambalaj dahil"
+
+msgid "Enter the weight in kg, e.g. 42.5"
+msgstr "Ağırlığı kg olarak girin, ör. 42,5"

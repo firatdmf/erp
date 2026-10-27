@@ -68,6 +68,28 @@ class AttachmentUpload(TestCase):
 
     @override_settings(USE_BUNNY_CDN=True)
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def test_a_phone_photo_is_stored_as_a_smaller_jpeg(self, mock_upload):
+        import io
+        from PIL import Image
+
+        buf = io.BytesIO()
+        Image.effect_noise((4000, 3000), 64).convert("RGB").save(
+            buf, format="JPEG", quality=98)
+        original = buf.getvalue()
+
+        self._upload(SimpleUploadedFile("IMG_0412.jpeg", original, "image/jpeg"))
+
+        row = Attachment.objects.get()
+        self.assertEqual(row.name, "IMG_0412.jpg")
+        self.assertEqual(row.content_type, "image/jpeg")
+        self.assertLess(row.size, len(original))
+        sent = mock_upload.call_args[0][0]
+        sent.seek(0)
+        self.assertEqual(max(Image.open(sent).size), 2400)
+        self.assertTrue(mock_upload.call_args[0][1].endswith("IMG_0412.jpg"))
+
+    @override_settings(USE_BUNNY_CDN=True)
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def test_two_files_of_one_name_do_not_collide(self, mock_upload):
         mock_upload.return_value = "https://cdn.example/x.pdf"
         self._upload(SimpleUploadedFile("contract.pdf", b"one", "application/pdf"))

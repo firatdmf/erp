@@ -39,8 +39,7 @@ from .attributes import normalize_attribute_name, normalize_attribute_value
 from .utils.bunny_storage import upload_to_bunny, delete_from_bunny
 from .signals import cdn_url_in_use
 
-# AVIF Image Optimizer
-from .utils.image_optimizer import optimize_image_to_avif
+from erp.image_optimizer import WEB, OptimizedImage, optimize_image
 import os
 from . import product_images
 from .product_images import new_file_name
@@ -66,8 +65,8 @@ def smart_upload(file, folder, resource_type="image", product=None):
     if resource_type == 'image':
         original_name = getattr(file, 'name', '') or ''
         if not original_name.lower().endswith('.avif'):
-            optimized = optimize_image_to_avif(file)
-            if optimized is not None:
+            optimized = optimize_image(file, WEB)
+            if isinstance(optimized, OptimizedImage):
                 print(f"[image_optimizer] Converted '{original_name}' → '{optimized.name}'")
                 file = optimized
             else:
@@ -4080,9 +4079,10 @@ def _store_review_photo(photo, path):
     """The photo as AVIF on Bunny at `path`, or None when it isn't a
     readable image or the upload fails; the review is kept either way."""
     from marketing.utils.bunny_storage import upload_to_bunny
-    from marketing.utils.image_optimizer import optimize_image_to_avif
 
-    avif = optimize_image_to_avif(photo)
+    # The input back means it already is a light AVIF; None, that it is
+    # nothing an AVIF can be made of.
+    avif = optimize_image(photo, WEB)
     if avif is None:
         print(f"[guest_review] not a readable image: {photo.name}")
         return None

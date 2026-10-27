@@ -132,14 +132,14 @@ def save_cargo_receipts(order, files, user=None):
         if not ctype or f.size > OrderCargoReceipt.MAX_BYTES:
             rejected.append(name)
             continue
-        # A photo is stored as a JPEG sized for its print (receipt_images):
-        # small enough to mail, and HEIC turned into something every browser
-        # and mail client opens. A PDF, or a photo Pillow can't read, goes
-        # up as it came.
+        # A photo is stored as a DOCUMENT JPEG (erp.image_optimizer): small
+        # enough to mail, and HEIC turned into something every browser and
+        # mail client opens. A PDF, or a photo Pillow can't read, goes up
+        # as it came.
         if ctype.startswith("image/"):
-            from .receipt_images import optimize_receipt_image
-            jpeg = optimize_receipt_image(f)
-            if jpeg is not None:
+            from erp.image_optimizer import DOCUMENT, OptimizedImage, optimize_image
+            jpeg = optimize_image(f, DOCUMENT)
+            if isinstance(jpeg, OptimizedImage):
                 f, ctype, name = jpeg, jpeg.content_type, jpeg.name
         path = (f"Operating/orders/{order.pk}/cargo/"
                 f"{uuid.uuid4().hex}.{OrderCargoReceipt.ALLOWED_TYPES[ctype]}")

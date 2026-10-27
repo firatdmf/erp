@@ -95,15 +95,15 @@ packaging==23.2
 pandas
 passlib==1.7.4
 Pillow>=10.4.0
-# Decodes the AVIF product photos. marketing/utils/image_optimizer.py has
+# Decodes the AVIF product photos. erp/image_optimizer.py's WEB profile has
 # always needed this (it skips AVIF conversion without it) but it was never
 # pinned; the catalog PDF renderer needs it too, or every photo embeds blank.
 # Not required on Pillow >= 11.3, which decodes AVIF natively.
 pillow-avif-plugin==1.5.5
 pillow-avif-plugin>=1.4.1
-# Reads the HEIC photos an iPhone takes, so a cargo receipt shot on one is
-# turned into a JPEG every browser and mail client can open
-# (operating/receipt_images.py). The wheels bundle libheif — no apt package.
+# Reads the HEIC photos an iPhone takes, so a receipt or CRM photo shot on one
+# is turned into a JPEG every browser and mail client can open
+# (erp/image_optimizer.py). The wheels bundle libheif — no apt package.
 pillow-heif>=0.18
 proglog==0.1.12
 proto-plus==1.27.1

@@ -39,7 +39,7 @@ def check_image_support():
 
     Two ways to get there: Pillow >= 11.3 decodes AVIF natively, older ones
     need pillow-avif-plugin, which registers the codec purely as an import
-    side effect (same trick marketing/utils/image_optimizer.py uses).
+    side effect (erp.image_optimizer imports it the same way).
     """
     try:
         import pillow_avif  # noqa: F401  – registers AVIF in Pillow
@@ -65,38 +65,21 @@ def url_fetcher(url: str):
     return pdf_render.url_fetcher(url, image_hook=_downscale)
 
 
-# Longest edge we keep for an embedded photo. The largest frame in the layout
-# is 62mm wide; at 300dpi that is ~730px, so 1200 leaves headroom for bigger
-# frames without bloating the file.
-MAX_IMAGE_EDGE = 1200
-
-
 def _downscale(raw: bytes, content_type: str | None):
     """Shrink a source photo to print resolution before embedding.
 
     WeasyPrint embeds whatever pixels it is given. The CDN originals are
     full-resolution, which made a ONE-page catalog a 9.6MB PDF — a 7-page one
-    would have been unmailable. Downscaling to print resolution is
-    visually lossless at 62mm wide and cuts the file by ~50x.
+    would have been unmailable. The PRINT profile (erp.image_optimizer) is
+    visually lossless at 62mm wide and cuts the file by ~50x. A photo it
+    cannot process is better embedded as-is than dropped.
     """
-    from io import BytesIO
-    try:
-        from PIL import Image
-        image = Image.open(BytesIO(raw))
-        image.load()
-        if max(image.size) > MAX_IMAGE_EDGE:
-            image.thumbnail((MAX_IMAGE_EDGE, MAX_IMAGE_EDGE), Image.LANCZOS)
+    from erp.image_optimizer import PRINT, OptimizedImage, optimize_image
 
-        buffer = BytesIO()
-        if image.mode in ("RGBA", "LA", "P"):
-            image.convert("RGBA").save(buffer, format="PNG", optimize=True)
-            return {"string": buffer.getvalue(), "mime_type": "image/png"}
-        image.convert("RGB").save(buffer, format="JPEG", quality=85, optimize=True)
-        return {"string": buffer.getvalue(), "mime_type": "image/jpeg"}
-    except Exception:
-        # A photo we cannot process is better embedded as-is than dropped.
-        logger.exception("catalog image downscale failed; embedding original")
-        return {"string": raw, "mime_type": content_type}
+    out = optimize_image(raw, PRINT)
+    if isinstance(out, OptimizedImage):
+        return {"string": out.getvalue(), "mime_type": out.content_type}
+    return {"string": raw, "mime_type": content_type}
 
 
 # ---------------------------------------------------------------------------

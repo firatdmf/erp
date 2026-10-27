@@ -2117,6 +2117,16 @@ def upload_attachments(request, kind, pk):
         except ValidationError as exc:
             skipped.append(f"{upload.name}: {exc.messages[0]}")
             continue
+        # A phone photo goes in as a DOCUMENT JPEG: a fraction of the
+        # size, upright, and HEIC turned into something every browser
+        # opens. A PDF, or an image Pillow can't read, is stored as it came.
+        if content_type_for(upload.name).startswith("image/"):
+            from django.core.files.uploadedfile import SimpleUploadedFile
+            from erp.image_optimizer import DOCUMENT, OptimizedImage, optimize_image
+            jpeg = optimize_image(upload, DOCUMENT)
+            if isinstance(jpeg, OptimizedImage):
+                upload = SimpleUploadedFile(
+                    jpeg.name, jpeg.getvalue(), jpeg.content_type)
         try:
             path, local = _store_attachment(upload, kind, owner)
         except AttachmentStorageError as exc:

@@ -72,7 +72,7 @@ class NamesAndFolders(TestCase):
 
 
 @override_settings(BUNNY_CDN_URL=CDN)
-@patch("marketing.views.optimize_image_to_avif", return_value=None)
+@patch("marketing.views.optimize_image", return_value=None)
 @patch("marketing.views.upload_to_bunny", side_effect=lambda file, path, **kw: url(path))
 class Uploading(TestCase):
     def setUp(self):

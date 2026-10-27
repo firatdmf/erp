@@ -2948,7 +2948,7 @@
       let previewUrls = [];
 
       // A phone photo is 3–5 MB and the server keeps a 2400 px JPEG of it
-      // (operating/receipt_images.py — the same edge and quality here), so
+      // (DOCUMENT in erp/image_optimizer.py — the same edge and quality here), so
       // it is made that size before it is sent: a tenth of the upload.
       // What the browser can't draw (HEIC outside Safari, a damaged file)
       // goes up as it is and the server converts it.

@@ -89,7 +89,7 @@ packaging==23.2
 pandas
 passlib==1.7.4
 Pillow==10.1.0
-# Decodes the AVIF product photos. marketing/utils/image_optimizer.py has
+# Decodes the AVIF product photos. erp/image_optimizer.py's WEB profile has
 # always needed this (it skips AVIF conversion without it) but it was never
 # pinned; the catalog PDF renderer needs it too, or every photo embeds blank.
 # Not required on Pillow >= 11.3, which decodes AVIF natively.

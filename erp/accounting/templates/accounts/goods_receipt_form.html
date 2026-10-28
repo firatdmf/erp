@@ -307,6 +307,9 @@
   .np-v-match.bad { background: #FDF3F2; color: #8C2D0E; border-color: #F0C9C2; }
   .np-v-sku.bad, .np-v-supplier-sku.bad { border-color: #C0392B; background: #FDF3F2; }
   .np-v-sale.bad { border-color: #C0392B; background: #FDF3F2; }
+  .np-v-match .np-choice { margin: 4px 4px 0 0; padding: 2px 8px; font: 600 12px var(--font-sans);
+    border: 1px solid currentColor; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+  .np-v-match .np-choice.on { color: #fff; background: var(--nejum-teal-700); border-color: var(--nejum-teal-700); }
   .np-tops { display: flex; flex-direction: column; gap: 7px; }
   .np-top { display: flex; align-items: center; gap: 8px; }
   .np-top-no { font: 600 11px var(--font-sans); color: var(--gray-500); min-width: 42px; }
@@ -1659,8 +1662,12 @@
     // npCheckVariantMatch below) — the auto-suggestion must never overwrite
     // it with a freshly generated code.
     if (!skuI || skuI.dataset.touched || skuI.dataset.matchLocked) return;
-    const card = vEl.closest('.np-product-card');
-    const root = npBaseSku(card);
+    // A received purchase's own line: npCheckVariantMatch decides its SKU.
+    if (vEl.dataset.itemId) return;
+    skuI.value = npAutoSku(vEl);
+  };
+  function npAutoSku(vEl) {
+    const root = npBaseSku(vEl.closest('.np-product-card'));
     // PARENT.VALUE-VALUE, in the card's attribute order. "-" parts the
     // attributes, so the colours of one value ("gold+ecru") join with "_":
     // 2086.GOLD_ECRU-320, not 2086.GOLD-ECRU-320 (three attributes?).
@@ -1668,8 +1675,47 @@
       return (a.value || '').split('+').map(slug).filter(Boolean).join('_');
     })
       .filter(Boolean).join('-') || vEl.dataset.vid;
-    skuI.value = root ? (root + '.' + sfx).slice(0, GR_VARIANT_SKU_MAX) : '';
+    return root ? (root + '.' + sfx).slice(0, GR_VARIANT_SKU_MAX) : '';
+  }
+  function npAttrsKey(attrs) {
+    return JSON.stringify(attrs.map(function (a) { return [a.name, a.value.toLowerCase()]; }).sort());
+  }
+  // A row's SKU, when its values match none of the product's variants,
+  // can mean one of two things: a variant renamed (its values were wrong
+  // or missing) or a separate one. The row asks, listing what else the
+  // variant is on, and the save does what was chosen (_apply_sku_choices).
+  window.npAskSkuChoice = function (vEl, badge, from, to, uses, partial) {
+    const where = uses.length
+      ? ' {% filter escapejs %}{% trans "It is also on:" %}{% endfilter %} ' + npEsc(uses.join(', ')) + '.'
+      : '';
+    const intro = partial
+      ? '{% filter escapejs %}{% trans "{sku} has these values with fewer filled in." %}{% endfilter %}'
+      : '{% filter escapejs %}{% trans "These values are new for {sku}." %}{% endfilter %}';
+    badge.classList.add('show', 'new', 'ask'); badge.classList.remove('bad');
+    badge.dataset.from = from;
+    badge.innerHTML = '<i class="fa fa-question-circle"></i> ' +
+      intro.replace('{sku}', npEsc(from)) + where + ' ' +
+      '<button type="button" class="np-choice" data-choice="rename" onclick="npSkuChoice(this)">' +
+        '{% filter escapejs %}{% trans "Change {sku} for all → {new}" %}{% endfilter %}'
+          .replace('{sku}', npEsc(from)).replace('{new}', npEsc(to)) + '</button> ' +
+      '<button type="button" class="np-choice" data-choice="separate" onclick="npSkuChoice(this)">' +
+        '{% filter escapejs %}{% trans "Separate variant {new}" %}{% endfilter %}'
+          .replace('{new}', npEsc(to)) + '</button>';
+    npShowSkuChoice(vEl);
   };
+  window.npSkuChoice = function (btn) {
+    const vEl = btn.closest('.np-variant');
+    const badge = btn.closest('.np-v-match');
+    vEl.dataset.skuChoice = btn.dataset.choice;
+    vEl.dataset.renameFrom = btn.dataset.choice === 'rename' ? badge.dataset.from : '';
+    vEl.dataset.choiceKey = npAttrsKey(npRowAttrs(vEl));
+    npShowSkuChoice(vEl);
+  };
+  function npShowSkuChoice(vEl) {
+    vEl.querySelectorAll('.np-choice').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.choice === vEl.dataset.skuChoice);
+    });
+  }
 
   // Debounced existing/new classification of a variant card's name, ONLY
   // meaningful when an existing main product is selected (mode=existing).
@@ -1690,6 +1736,18 @@
     const card = vEl.closest('.np-product-card');
     const productId = card.querySelector('.np-main-id').value;
     const attrs = npRowAttrs(vEl);
+    const key = npAttrsKey(attrs);
+    // A row that came with a variant's SKU — a received line, a saved
+    // plan, a picked chip — keeps it while its values are that variant's.
+    // Once they change, the SKU is read from them like any other row's.
+    if (vEl.dataset.baseSku) {
+      skuI.value = key === vEl.dataset.baseKey ? vEl.dataset.baseSku : npAutoSku(vEl);
+    }
+    const ownChanged = !!vEl.dataset.itemId && key !== vEl.dataset.baseKey;
+    // A choice answers the values it was made for, not the next ones.
+    if (vEl.dataset.choiceKey !== key) {
+      delete vEl.dataset.skuChoice; delete vEl.dataset.renameFrom; delete vEl.dataset.choiceKey;
+    }
     // The SKU is the differentiator, so it is what the question leads with —
     // the server answers on it first and falls back to the name.
     const sku = (skuI.value || '').trim();
@@ -1711,14 +1769,16 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (vEl._npMatchToken !== reqToken) return;
+        badge.classList.remove('ask');
         if (d.exists && vEl.dataset.itemId &&
             npSkuKey(d.variant_sku || skuI.value) === npSkuKey(vEl.dataset.origSku)) {
           // A received purchase's own line, still on its own variant: there
           // is nothing to announce, and "will add stock" would be untrue.
-          badge.classList.remove('show', 'new', 'bad'); badge.innerHTML = '';
+          badge.classList.remove('show', 'new', 'bad', 'ask'); badge.innerHTML = '';
           skuI.classList.remove('bad');
           skuI.dataset.matchLocked = '1';
         } else if (d.exists) {
+          badge.classList.remove('ask');
           badge.classList.add('show'); badge.classList.remove('new', 'bad');
           skuI.classList.remove('bad');
           badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "exists" %} — ' +
@@ -1757,8 +1817,24 @@
             '{% trans "same values as" %} ' + npEsc(d.variant_sku) + ' — ' +
             '{% trans "pick that variant, or add a value that tells this one apart" %}';
           delete skuI.dataset.matchLocked;
+        } else if (ownChanged && vEl.dataset.skuFollows) {
+          // Not a new variant: the line's own is renamed on save.
+          badge.classList.add('show'); badge.classList.remove('new', 'bad', 'ask');
+          skuI.classList.remove('bad');
+          badge.innerHTML = '<i class="fa fa-pencil"></i> ' +
+            '{% trans "SKU changes from {old} to {new}" %}'
+              .replace('{old}', npEsc(vEl.dataset.origSku)).replace('{new}', npEsc(sku));
+          skuI.dataset.matchLocked = '1';
+        } else if (ownChanged) {
+          // The line's own variant is on more than this purchase.
+          npAskSkuChoice(vEl, badge, vEl.dataset.origSku, sku,
+                         JSON.parse(vEl.dataset.skuUses || '[]'), false);
+          skuI.dataset.matchLocked = '1';
+        } else if (d.partial) {
+          npAskSkuChoice(vEl, badge, d.variant_sku, sku, d.uses || [], true);
+          skuI.dataset.matchLocked = '1';
         } else {
-          badge.classList.add('show', 'new'); badge.classList.remove('bad');
+          badge.classList.add('show', 'new'); badge.classList.remove('bad', 'ask');
           skuI.classList.remove('bad');
           badge.innerHTML = '<i class="fa fa-plus-circle"></i> {% trans "new" %} — {% trans "will create a new variant" %}';
           delete skuI.dataset.matchLocked;
@@ -2429,6 +2505,8 @@
     npFillRowAttrs(target, cardEl, v.attributes || []);
     skuI.value = v.variant_sku;
     skuI.dataset.matchLocked = '1';
+    target.dataset.baseSku = v.variant_sku;
+    target.dataset.baseKey = npAttrsKey(npRowAttrs(target));
     if (badge) {
       badge.classList.add('show');
       badge.classList.remove('new');
@@ -2837,6 +2915,18 @@
       return;
     }
 
+    // A row asking whether to rename a variant or make a separate one has
+    // to be answered — the save won't guess.
+    const unanswered = Array.prototype.filter.call(
+      document.querySelectorAll('#npProducts .np-v-match.ask'),
+      function (b) { return !b.closest('.np-variant').dataset.skuChoice; }
+    );
+    if (unanswered.length) {
+      alert('{% filter escapejs %}{% trans "Some variants ask whether to change an existing variant for all or make a separate one. Choose on each of them." %}{% endfilter %}');
+      unanswered[0].closest('.np-variant').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     // What the customer is charged. Mandatory on a purchase bought for
     // one — it is the price their order line is billed at, and the server
     // refuses the save without it; checked here so the batch that was
@@ -2881,7 +2971,9 @@
             supplier_sku: npSupplierSku(v),
             price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
             sale_price: (v.querySelector('.np-v-sale') || {}).value || '',
-            invoice_item_id: npIdOf(v, 'itemId')
+            invoice_item_id: npIdOf(v, 'itemId'),
+            sku_choice: v.dataset.skuChoice || '',
+            rename_from: v.dataset.renameFrom || ''
           });
         });
         if (!variants.length) { alert(label + ': {% trans "Add at least one variant with an item." %}'); return; }
@@ -3183,6 +3275,15 @@
         if (first) first.value = v.name;
       }
       if (skuI && v.sku) { skuI.value = v.sku; skuI.dataset.touched = '1'; }
+      if (v.sku) { vEl.dataset.baseSku = v.sku; vEl.dataset.baseKey = npAttrsKey(npRowAttrs(vEl)); }
+      if (v.sku_follows) vEl.dataset.skuFollows = '1';
+      if (v.sku_uses) vEl.dataset.skuUses = JSON.stringify(v.sku_uses);
+      if (v.sku_choice) {
+        // A saved draft remembers what was chosen for its values.
+        vEl.dataset.skuChoice = v.sku_choice;
+        vEl.dataset.renameFrom = v.rename_from || '';
+        vEl.dataset.choiceKey = npAttrsKey(npRowAttrs(vEl));
+      }
     }
     const supI = vEl.querySelector('.np-v-supplier-sku');
     if (supI && v.supplier_sku) { supI.value = v.supplier_sku; supI.dataset.touched = '1'; }

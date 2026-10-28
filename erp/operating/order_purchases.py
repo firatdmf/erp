@@ -214,7 +214,7 @@ def put_plan_in_catalog(plan):
     """
     from .catalog_sync import CatalogSyncConflict, sync_roll_to_catalog
     from .views_warehouse import (
-        IntakeError, _intake_account, _intake_main_product,
+        IntakeError, _apply_sku_choices, _intake_account, _intake_main_product,
         _intake_check_lookalikes, _intake_prefix, _intake_resolve_products,
         _intake_variant_identity, _row_label,
         _intake_variants,
@@ -222,6 +222,7 @@ def put_plan_in_catalog(plan):
 
     check_sale_prices(plan)
     products_in = plan.get("products") or []
+    _apply_sku_choices(products_in)
     account = _intake_account(plan)
     prefix = _intake_prefix(plan, account.name)
     resolved = _intake_resolve_products(products_in, prefix,
@@ -489,7 +490,10 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
     the row itself on a removal. A purchase left with nothing to buy is
     cancelled. Lines the order adds on its own are NOT put on a purchase:
     the order doesn't know a cost price, and they may well be stock.
-    Received purchases are stock now and are left alone."""
+
+    A received purchase is stock now: its rows stay what arrived, and only
+    the sale price follows (_mirror_sale_price_on_received), so the
+    purchase and the order never disagree about what the customer pays."""
     if is_syncing():
         return
     from accounting.purchase_audit import diff_plans
@@ -536,6 +540,86 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
                 log_change(order, "field", field="purchase",
                            new=_("%(number)s cancelled — nothing left on it to buy")
                            % {"number": invoice.number})
+    if not removed:
+        _mirror_sale_price_on_received(order, sku, item.price, user=user)
+
+
+def _mirror_sale_price_on_received(order, sku, price, *, user=None):
+    """Put the order line's price on the rows naming `sku` in the plans of
+    the received purchases bought for `order`. The plan is the purchase's
+    record of what it said; nothing else about it changes."""
+    from accounting.purchase_audit import diff_plans
+    from accounting.models import Invoice
+
+    for invoice in order.supplier_purchases.exclude(status__in=("ordered", "cancelled")):
+        before = invoice.intake_plan or {}
+        plan = copy.deepcopy(before)
+        hit = False
+        for p_in in plan.get("products") or []:
+            for v_in in p_in.get("variants") or []:
+                if ((v_in.get("sku") or "").strip().lower() == sku
+                        and _decimal(v_in.get("sale_price")) != price):
+                    v_in["sale_price"] = str(price)
+                    hit = True
+        if not hit:
+            continue
+        with syncing():
+            diff_plans(invoice, before, plan, origin="order", user=user)
+            Invoice.objects.filter(pk=invoice.pk).update(intake_plan=plan)
+
+
+def order_sale_prices(invoice):
+    """What the order `invoice` is bought for charges per variant,
+    {variant_id: price} — the sale price a received purchase's form shows,
+    read from the order because the order line IS that price. Empty when
+    the purchase is bought for no open order."""
+    order = order_bought_for(invoice)
+    if order is None:
+        return {}
+    return {it.product_variant_id: it.price
+            for it in order.items.all() if it.product_variant_id}
+
+
+def mirror_sale_prices_on_order(invoice, prices, *, member=None):
+    """A received purchase was saved with these sale prices ({variant_id:
+    price}): put each changed one on its line of the order the purchase is
+    bought for. An empty price leaves the line be.
+
+    Not sync_customer_order's packing rule: receiving holds the rolls for
+    the order, which counts as packing, so it would refuse every received
+    purchase — and a price moves nothing the packers handle. What a price
+    can't change is a sale already posted, so a shipped order is left alone
+    and a warning says so. Returns that warning, else None."""
+    from accounting.services_accounts import post_order_movement
+    from .audit import log_change
+    from .views import _as_line_decimal
+
+    order = order_bought_for(invoice)
+    if order is None:
+        return None
+    changed = []
+    for item in order.items.all():
+        price = prices.get(item.product_variant_id)
+        if price is None or price <= 0:
+            continue
+        price = _as_line_decimal(price)
+        if price != item.price:
+            changed.append((item, price))
+    if not changed:
+        return None
+    if not order_is_open(order):
+        return (_("Order %(number)s has already shipped, so its sale prices were not "
+                  "changed — edit them on the order.")
+                % {"number": order.order_number or order.pk})
+    with syncing():
+        for item, price in changed:
+            item.price = price
+            item.save(update_fields=["price"])
+    log_change(order, "field", field="purchase",
+               new=_("%(count)s line(s) changed from purchase %(number)s")
+               % {"count": len(changed), "number": invoice.number})
+    post_order_movement(order, member=member)
+    return None
 
 
 def cancel_purchases_for_cancelled_order(order, *, user=None, deleted=False):

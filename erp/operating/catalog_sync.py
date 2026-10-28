@@ -300,6 +300,26 @@ def find_lookalike(product, attributes, exclude_variant_id=None):
     return None
 
 
+def find_partial(product, attributes):
+    """The variant of `product` whose values are some of `attributes` and
+    no others — the same goods with values nobody filled in yet (white,
+    against white + 320), or None. The one with most values wins; two
+    equally close are no answer."""
+    from marketing.models import ProductVariant
+    wanted = frozenset(_attribute_pairs(attributes, None, None))
+    if not wanted:
+        return None
+    ids = list(ProductVariant.objects.filter(product=product).values_list("id", flat=True))
+    found = [(len(have), vid) for vid, have in _variant_attribute_set(ids).items()
+             if have and have < wanted]
+    if not found:
+        return None
+    found.sort(reverse=True)
+    if len(found) > 1 and found[0][0] == found[1][0]:
+        return None
+    return ProductVariant.objects.get(pk=found[0][1])
+
+
 def set_variant_attributes(variant, attributes, *, replace):
     """Link `variant` to each (name, value). `replace`: drop every value it
     had before (a variant being created, or described in full); otherwise

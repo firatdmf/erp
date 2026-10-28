@@ -55,7 +55,7 @@ def normalize_attribute_value(attribute_name, value):
 
 # The languages a term can be worded in. English is the stored spelling; an
 # English wording is only for a term that reads badly from its key
-# ("750_matte_pearl" → "750 Matte Pearl").
+# ("750_matte_nacre" → "750 Matte Nacre").
 CATALOG_LANGUAGES = ("en", "tr", "ru", "pl")
 
 # What a wording is of: an attribute's own name, one of its values, or a
@@ -145,7 +145,7 @@ def display_value(attribute_name, value, language=None):
     """How one value of `attribute_name` reads on screen.
 
     A value somebody has worded in the reader's language reads that way
-    ("750_matte_pearl" → "750 MAT SEDEF" in Turkish). The rest is for a
+    ("750_matte_nacre" → "750 MAT SEDEF" in Turkish). The rest is for a
     value nobody has.
 
     The underscores are a storage habit, not something to read: a value

@@ -247,16 +247,46 @@ class ReceivedPurchaseEditTest(TestCase):
         self.assertEqual(self._invoice().items.get().description, "K24644 G07 Krem")
         self.assertEqual(WarehouseProductItem.objects.filter(product=wp).count(), 2)
 
+    def test_a_variant_of_this_purchase_alone_is_renamed_with_its_values(self):
+        form = self._form()
+        v = self._variant(form)
+        self.assertTrue(v["sku_follows"])
+        variant = WarehouseProduct.objects.get().catalog_variant
+        v["attributes"] = [{"name": "color", "value": "g07"}, {"name": "width", "value": "300"}]
+        v["sku"] = "K24644.G07-300"
+        r = self._save(form)
+        self.assertEqual(r.status_code, 200, r.content)
+
+        # The same variant and row, under the new SKU — no second one.
+        wp = WarehouseProduct.objects.get()
+        self.assertEqual(wp.sku, "K24644.G07-300")
+        variant.refresh_from_db()
+        self.assertEqual(variant.variant_sku, "K24644.G07-300")
+        self.assertEqual(wp.catalog_variant, variant)
+        self.assertEqual(wp.quantity, Decimal("50.00"))
+        self.assertEqual(self._invoice().items.get().variant, variant)
+
+    def test_a_variant_with_stock_elsewhere_keeps_its_sku(self):
+        wp = WarehouseProduct.objects.get()
+        WarehouseProductItem.objects.create(product=wp, quantity=Decimal("5"),
+                                            barcode="OTHER-1")
+        self.assertFalse(self._variant(self._form())["sku_follows"])
+
     def test_a_different_variant_takes_the_rolls_with_it(self):
+        # Stock from elsewhere makes G07 more than this purchase's line, so
+        # a new SKU on the line is another variant, not a new name for G07.
+        WarehouseProductItem.objects.create(product=WarehouseProduct.objects.get(),
+                                            quantity=Decimal("5"), barcode="OTHER-1")
         form = self._form()
         v = self._variant(form)
         v["attributes"], v["sku"] = [{"name": "model", "value": "G08"}], "K24644.G08"
+        v["sku_choice"] = "separate"
         r = self._save(form)
         self.assertEqual(r.status_code, 200, r.content)
 
         old = WarehouseProduct.objects.get(sku="K24644.G07")
         new = WarehouseProduct.objects.get(sku="K24644.G08")
-        self.assertEqual(old.quantity, Decimal("0"))
+        self.assertEqual(old.quantity, Decimal("5"))
         self.assertEqual(new.quantity, Decimal("50.00"))
         self.assertEqual(self._roll("KRV-A").product, new)
         line = self._invoice().items.get()
@@ -268,6 +298,7 @@ class ReceivedPurchaseEditTest(TestCase):
         form = self._form()
         v = self._variant(form)
         v["attributes"], v["sku"] = [{"name": "model", "value": "G08"}], "K24644.G08"
+        v["sku_choice"] = "separate"
         r = self._save(form)
         self.assertEqual(r.status_code, 422)
         self.assertEqual(r.json()["blocked"][0]["barcode"], "KRV-A")
@@ -602,3 +633,77 @@ class ReceivedPurchaseEditTest(TestCase):
         form = self._form()
         self.client.force_login(plain)
         self.assertEqual(self._save(form).status_code, 403)
+
+
+class ReceivedPurchaseForAnOrderTest(TestCase):
+    """A purchase bought for a customer's order says, line by line, what
+    the customer pays — the order line's price. Edited after receiving, it
+    shows that price and a new one goes onto the order."""
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        from crm.models import Contact
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Laleli Fabric")
+        karven = CurrentAccount.objects.create(
+            book=self.book, code="C-KRV", name="Karven", type="supplier", default_currency=usd)
+        self.wh = Warehouse.objects.create(name="Fabrika", accounting_book=self.book)
+        self.client.force_login(get_user_model().objects.create_superuser(
+            username="for_order_edit", password="pw", email="f@o.e"))
+        r = self.client.post(
+            reverse("accounts:purchase_order_save", kwargs={"book_id": self.book.pk}),
+            data=json.dumps({
+                "warehouse_id": self.wh.pk, "current_account_id": karven.pk,
+                "customer": {"type": "contact", "pk": Contact.objects.create(name="Oleg").pk},
+                "unit": "m", "date": "2026-10-27",
+                "products": [{
+                    "main_product": {"mode": "new", "name": "MT-1014", "sku": "MT-1014"},
+                    "has_variants": True,
+                    "variants": [{"attributes": [{"name": "color", "value": "ecru"}],
+                                  "sku": "MT-1014.ECRU", "price": "2.30", "currency": "USD",
+                                  "sale_price": "2.80",
+                                  "tops": [{"qty": 42.4, "barcode": "MRK-A"}]}],
+                }],
+            }), content_type="application/json")
+        self.invoice_id = r.json()["invoice_id"]
+        confirm = self.client.post(reverse("accounts:purchase_order_confirm", args=[self.invoice_id]))
+        self.assertTrue(confirm.json()["success"], confirm.json())
+        self.order = Invoice.objects.get(pk=self.invoice_id).for_order
+
+    def _edit_url(self):
+        return reverse("operating:warehouse_purchase_edit", args=[self.wh.pk, self.invoice_id])
+
+    def _form(self):
+        loaded = self.client.get(self._edit_url(),
+                                 headers={"x-requested-with": "XMLHttpRequest"}).json()
+        inv = Invoice.objects.get(pk=self.invoice_id)
+        return {"warehouse_id": self.wh.pk, "current_account_id": loaded["current_account_id"],
+                "unit": loaded["unit"], "date": inv.date.isoformat(),
+                "products": loaded["products"]}
+
+    def test_the_order_lines_price_comes_back(self):
+        v = self._form()["products"][0]["variants"][0]
+        self.assertEqual(v["sale_price"], "2.8")
+        # The order's own line is not "elsewhere": the variant still follows.
+        self.assertTrue(v["sku_follows"])
+
+    def test_a_new_sale_price_goes_onto_the_order(self):
+        form = self._form()
+        form["products"][0]["variants"][0]["sale_price"] = "3.10"
+        r = self.client.post(self._edit_url(), data=json.dumps(form),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self.order.items.get().price, Decimal("3.10"))
+
+
+class OrderPriceOnReceivedPurchaseTest(ReceivedPurchaseForAnOrderTest):
+    """A price changed on the order is what the received purchase bought
+    for it says too."""
+
+    def test_the_purchase_remembers_the_orders_new_price(self):
+        item = self.order.items.get()
+        item.price = Decimal("3.25")
+        item.save()
+        plan = Invoice.objects.get(pk=self.invoice_id).intake_plan
+        self.assertEqual(plan["products"][0]["variants"][0]["sale_price"], "3.25")

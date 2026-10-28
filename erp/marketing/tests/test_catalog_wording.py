@@ -32,15 +32,15 @@ def word(kind, scope, key, language, text):
 class WordingTest(TestCase):
     def setUp(self):
         cache.clear()
-        word("value", "yarn", "750_matte_pearl", "tr", "750 MAT SEDEF")
-        word("value", "yarn", "750_matte_pearl", "en", "750 Matte Pearl")
+        word("value", "yarn", "750_matte_nacre", "tr", "750 MAT SEDEF")
+        word("value", "yarn", "750_matte_nacre", "en", "750 Matte Nacre")
         word("name", "", "color", "tr", "Renk")
 
     def test_a_value_reads_in_the_readers_language(self):
         with translation.override("tr"):
-            self.assertEqual(display_value("yarn", "750_matte_pearl"), "750 MAT SEDEF")
+            self.assertEqual(display_value("yarn", "750_matte_nacre"), "750 MAT SEDEF")
         with translation.override("en"):
-            self.assertEqual(display_value("yarn", "750_matte_pearl"), "750 Matte Pearl")
+            self.assertEqual(display_value("yarn", "750_matte_nacre"), "750 Matte Nacre")
 
     def test_a_value_nobody_worded_reads_from_its_key(self):
         with translation.override("tr"):
@@ -79,7 +79,7 @@ class WordingTest(TestCase):
 
     def test_one_wording_per_term_and_language(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
-            word("value", "yarn", "750 matte pearl", "tr", "again")
+            word("value", "yarn", "750 matte nacre", "tr", "again")
 
 
 class WordingPageTest(TestCase):

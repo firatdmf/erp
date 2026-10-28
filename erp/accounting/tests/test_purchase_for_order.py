@@ -764,15 +764,23 @@ class PurchaseForCustomerTest(TestCase):
         self.assertNotContains(page, 'data-draft-purchases="%s"' % inv.number)
 
     def test_editing_the_order_leaves_a_received_purchase_alone(self):
+        # What arrived stays what arrived. Only what the customer pays
+        # follows the order, so the two never disagree about it.
         inv_id, before = self._received()
         order = Invoice.objects.get(pk=inv_id).for_order
         OrderStockReservation.objects.filter(order=order).delete()
         line = order.items.get()
         line.quantity, line.price = Decimal("10"), Decimal("9")
         line.save()
-        self.assertEqual(self._purchase_facts(inv_id), before)
+        after = self._purchase_facts(inv_id)
+        row = after["plan"]["products"][0]["variants"][0]
+        self.assertEqual(row["sale_price"], "9")
+        row["sale_price"] = before["plan"]["products"][0]["variants"][0]["sale_price"]
+        self.assertEqual(len(after.pop("log")), len(before["log"]) + 1)
+        self.assertEqual(after, {k: v for k, v in before.items() if k != "log"})
+        after = self._purchase_facts(inv_id)
         line.delete()
-        self.assertEqual(self._purchase_facts(inv_id), before)
+        self.assertEqual(self._purchase_facts(inv_id), after)
 
     def test_the_cancel_dialog_says_a_received_purchase_stays(self):
         inv_id, _before = self._received()

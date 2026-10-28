@@ -15004,3 +15004,66 @@ msgstr "Çuvalın tartıdaki ağırlığı, ambalaj dahil"
 
 msgid "Enter the weight in kg, e.g. 42.5"
 msgstr "Ağırlığı kg olarak girin, ör. 42,5"
+
+msgid "SKU changes from {old} to {new}"
+msgstr "SKU {old} yerine {new} olacak"
+
+msgid ""
+"Order %(number)s has already shipped, so its sale prices were not changed — "
+"edit them on the order."
+msgstr ""
+"%(number)s siparişi zaten gönderildi, bu yüzden satış fiyatları "
+"değiştirilmedi — siparişin üzerinden düzenleyin."
+
+msgid "It is also on:"
+msgstr "Ayrıca şunlarda var:"
+
+msgid "{sku} has these values with fewer filled in."
+msgstr "{sku} bu değerlere sahip, ama bazıları boş."
+
+msgid "These values are new for {sku}."
+msgstr "Bu değerler {sku} için yeni."
+
+msgid "Change {sku} for all → {new}"
+msgstr "{sku} hepsi için değişsin → {new}"
+
+msgid "Separate variant {new}"
+msgstr "Ayrı varyant {new}"
+
+msgid ""
+"Some variants ask whether to change an existing variant for all or make a "
+"separate one. Choose on each of them."
+msgstr ""
+"Bazı varyantlar, mevcut bir varyantın hepsi için değiştirilmesini mi yoksa "
+"ayrı bir varyant mı açılmasını istediğinizi soruyor. Her birinde seçim yapın."
+
+msgid "%(count)s item(s) from %(document)s"
+msgstr "%(document)s alımından %(count)s ürün"
+
+msgid "%(count)s item(s) with no purchase"
+msgstr "alımı olmayan %(count)s ürün"
+
+msgid "stock has gone out of %(count)s item(s)"
+msgstr "%(count)s üründen stok çıkışı yapılmış"
+
+msgid "purchase or invoice %(number)s"
+msgstr "alım veya fatura %(number)s"
+
+msgid "order %(number)s (%(status)s)"
+msgstr "sipariş %(number)s (%(status)s)"
+
+msgid "draft purchase %(number)s"
+msgstr "taslak alım %(number)s"
+
+msgid "%(sku)s is already used by another variant."
+msgstr "%(sku)s zaten başka bir varyantta kullanılıyor."
+
+msgid "%(sku)s is on the website, so it is renamed on the product page."
+msgstr "%(sku)s web sitesinde, bu yüzden ürün sayfasından yeniden adlandırılır."
+
+msgid ""
+"%(sku)s is used outside this purchase too — choose on its row whether to "
+"rename it for all, or make a separate variant."
+msgstr ""
+"%(sku)s bu alımın dışında da kullanılıyor — satırında hepsi için yeniden "
+"adlandırmayı ya da ayrı bir varyant açmayı seçin."

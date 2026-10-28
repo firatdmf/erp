@@ -3139,7 +3139,7 @@ def catalog_variant_match(request, pk, product_id):
     than attribute fields, `name`."""
     import json as _json
     from marketing.models import ProductVariant
-    from .catalog_sync import find_lookalike, variant_attributes
+    from .catalog_sync import find_lookalike, find_partial, variant_attributes
 
     sku = (request.GET.get("sku") or "").strip()
     try:
@@ -3190,6 +3190,18 @@ def catalog_variant_match(request, pk, product_id):
         return JsonResponse({
             "exists": False, "lookalike": True, "attributes": described,
             "variant_sku": twin.variant_sku,
+        })
+    # Values that only add to a variant's (white + 320 against white) are
+    # most likely that variant with a value nobody filled in, so the row
+    # asks whether to fill it in or keep this one separate. A product on
+    # the website keeps the values the web team gave it, so it isn't asked.
+    partial = (find_partial(product, pairs)
+               if product is not None and not product.featured else None)
+    if partial is not None:
+        return JsonResponse({
+            "exists": False, "partial": True, "attributes": described,
+            "variant_sku": partial.variant_sku,
+            "uses": _variant_uses(partial),
         })
     return JsonResponse({"exists": False, "attributes": described})
 
@@ -4094,8 +4106,11 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     from accounting.services_accounts import invoice_currency_for
     cost_rates = _PurchaseRates(invoice_currency_for(current_account_obj), data.get("rates"))
 
+    renamed = []
     try:
         with transaction.atomic():
+            # Logged on the purchase below, once it exists.
+            renamed = _apply_sku_choices(products_in)
             for item in resolved:
                 main_product = _intake_main_product(item, prefix, invoice=invoice)
                 base_name = item["base_name"]
@@ -4201,9 +4216,12 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
             from accounting.purchase_audit import log_purchase
             if invoice is None:
                 log_purchase(inv, "created", user=user,
-                             new=_("received into %(warehouse)s") % {"warehouse": warehouse.name})
+                             new=_gettext("received into %(warehouse)s") % {"warehouse": warehouse.name})
             else:
                 log_purchase(inv, "status", field="status", old="ordered", new=inv.status, user=user)
+            for old_sku, new_sku in renamed:
+                log_purchase(inv, "item_updated", field="sku", item_label=new_sku,
+                             old=old_sku, new=new_sku, user=user)
             # Link each physical stock item back to the invoice line it was
             # received against — items are created in the same order
             # as purchase_lines, so zipping by line_no is exact.
@@ -4376,6 +4394,176 @@ def _purchase_variant_label(wp, title):
     return name
 
 
+def _variant_uses(variant, item=None):
+    """What carries `variant` besides purchase line `item` (None: besides
+    nothing), as short lines the page can list before a rename: other
+    purchases' items, items no purchase brought, meters gone out, orders
+    other than the one `item`'s purchase is bought for, and draft
+    purchases naming it. Empty: the variant is the line's alone."""
+    from collections import Counter
+    from django.db.models import TextField
+    from django.db.models.functions import Cast
+    from accounting.models import Invoice, InvoiceItem
+    from .models import OrderItem, OrderStockReservation
+
+    if variant is None:
+        return []
+    invoice = item.invoice if item is not None else None
+    rolls = list(WarehouseProductItem.objects
+                 .filter(product__catalog_variant=variant)
+                 .select_related("purchase_invoice_item__invoice"))
+    uses = []
+    by_doc = Counter(
+        r.purchase_invoice_item.invoice.display_number if r.purchase_invoice_item_id else None
+        for r in rolls if item is None or r.purchase_invoice_item_id != item.pk)
+    for doc, count in sorted(by_doc.items(), key=lambda kv: str(kv[0])):
+        uses.append(_gettext("%(count)s item(s) from %(document)s") % {"count": count, "document": doc}
+                    if doc else _gettext("%(count)s item(s) with no purchase") % {"count": count})
+    # Meters that have left went out under this SKU; the barcodes still
+    # name each item, but the paperwork that went with them says the old one.
+    out = sum(1 for r in rolls if _roll_meters_out(r) > 0)
+    if out:
+        uses.append(_gettext("stock has gone out of %(count)s item(s)") % {"count": out})
+    lines = InvoiceItem.objects.filter(variant=variant).select_related("invoice")
+    if item is not None:
+        lines = lines.exclude(invoice_id=item.invoice_id)
+    for number in sorted({li.invoice.display_number for li in lines
+                          if li.invoice.display_number not in by_doc}):
+        uses.append(_gettext("purchase or invoice %(number)s") % {"number": number})
+    orders = {it.order for it in OrderItem.objects.filter(product_variant=variant)
+              .select_related("order")}
+    orders |= {h.order for h in OrderStockReservation.objects
+               .filter(stock_item__product__catalog_variant=variant, order__isnull=False)
+               .select_related("order")}
+    for order in sorted(orders, key=lambda o: o.pk):
+        if invoice is not None and order.pk == invoice.for_order_id:
+            continue
+        uses.append(_gettext("order %(number)s (%(status)s)")
+                    % {"number": order.order_number or order.pk,
+                       "status": order.get_order_status_display()})
+    # A draft purchase names its variants by SKU in its plan.
+    drafts = (Invoice.objects.filter(type="purchase", status="ordered")
+              .annotate(plan_text=Cast("intake_plan", TextField()))
+              .filter(plan_text__icontains=f'"{variant.variant_sku}"'))
+    if invoice is not None:
+        drafts = drafts.exclude(pk=invoice.pk)
+    for draft in drafts:
+        uses.append(_gettext("draft purchase %(number)s") % {"number": draft.display_number})
+    return uses
+
+
+def _apply_sku_choices(products_in, *, invoice=None, user=None):
+    """Rename the variants the page was told to rename. A row carries
+    sku_choice "rename" and rename_from — the SKU of the variant it changes
+    — when its values were new for a variant used elsewhere (a received
+    line's own) or only added to one (white → white + 320), and the
+    person chose to change that variant for everyone rather than make a
+    separate one. The variant takes the row's SKU and values; its rows,
+    rolls, orders and history stay on it.
+
+    Runs before the rows are resolved, so they find the variant under its
+    new SKU. Returns [(old_sku, new_sku)]."""
+    from marketing.models import ProductVariant
+    from .catalog_sync import _attribute_pairs
+
+    renamed = []
+    for p_in in products_in:
+        for v in (p_in.get("variants") or []):
+            if v.get("sku_choice") != "rename":
+                continue
+            old_sku = (v.get("rename_from") or "").strip()
+            new_sku = (v.get("sku") or "").strip()[:SKU_MAX_LENGTH]
+            if not old_sku or not new_sku or old_sku.upper() == new_sku.upper():
+                continue
+            variant = (ProductVariant.objects.select_related("product")
+                       .filter(variant_sku__iexact=old_sku).first())
+            taken = ProductVariant.objects.filter(variant_sku__iexact=new_sku).first()
+            if variant is None:
+                if taken is not None:
+                    continue    # renamed already — a draft saved before confirming
+                raise IntakeError({"success": False,
+                                   "error": str(_lz("This purchase changed while you were editing it — reload the page."))},
+                                  status=409)
+            if taken is not None:
+                raise IntakeError({"success": False,
+                                   "error": _gettext("%(sku)s is already used by another variant.")
+                                   % {"sku": taken.variant_sku}}, status=409)
+            if variant.product.featured:
+                raise IntakeError({"success": False,
+                                   "error": _gettext("%(sku)s is on the website, so it is renamed on the product page.")
+                                   % {"sku": variant.variant_sku}}, status=400)
+            _rename_variant(variant, new_sku, invoice=invoice, user=user,
+                            attributes=_attribute_pairs(_row_attributes(v), None, None))
+            renamed.append((old_sku, variant.variant_sku))
+    return renamed
+
+
+def _rename_variant(variant, new_sku, *, invoice=None, user=None, attributes=None):
+    """Give `variant` a new SKU (and, when given, these values), and say so
+    on the purchase it was done from. Its warehouse rows follow
+    (operating.signals)."""
+    from .catalog_sync import set_variant_attributes
+
+    old_sku = variant.variant_sku
+    variant.variant_sku = new_sku
+    variant.save(update_fields=["variant_sku"])
+    if attributes:
+        set_variant_attributes(variant, attributes, replace=True)
+    if invoice is not None:
+        from accounting.purchase_audit import log_purchase
+        log_purchase(invoice, "item_updated", field="sku", item_label=new_sku,
+                     old=old_sku, new=new_sku, user=user)
+
+
+def _rename_own_variants(products_in, items, rolls, *, invoice=None, user=None):
+    """A received line sent back with a new SKU for its own variant:
+
+    - the variant is the line's alone → renamed in place, no question;
+    - it is used elsewhere and the page asked → done in _apply_sku_choices
+      ("rename") or left to become a separate variant ("separate");
+    - it is used elsewhere and nothing was chosen → refused, so the save
+      never guesses between the two.
+
+    A SKU that is another variant's already means the line moves there.
+    Runs before the rows are resolved, so everything after sees the new SKU."""
+    from marketing.models import ProductVariant
+
+    for p_in in products_in:
+        for v in (p_in.get("variants") or []):
+            item = items.get(_int_or_none(v.get("invoice_item_id")))
+            sku = (v.get("sku") or "").strip()[:SKU_MAX_LENGTH]
+            if item is None or not sku or v.get("sku_choice") in ("rename", "separate"):
+                continue
+            line_rolls = [r for r in rolls.values() if r.purchase_invoice_item_id == item.pk]
+            wps = {r.product_id: r.product for r in line_rolls}
+            if len(wps) != 1:
+                continue
+            wp = next(iter(wps.values()))
+            variant = wp.catalog_variant
+            if (variant is None or sku.upper() == (variant.variant_sku or "").upper()
+                    or ProductVariant.objects.filter(variant_sku__iexact=sku).exists()):
+                continue
+            if _variant_uses(variant, item):
+                raise IntakeError(
+                    {"success": False,
+                     "error": _gettext("%(sku)s is used outside this purchase too — choose on its row "
+                                       "whether to rename it for all, or make a separate variant.")
+                     % {"sku": variant.variant_sku}}, status=400)
+            _rename_variant(variant, sku, invoice=invoice, user=user)
+            for r in line_rolls:
+                r.product.sku = sku
+
+
+def _refresh_renamed_rolls(rolls, renamed):
+    """The rolls perform_purchase_edit loaded still carry the SKUs their
+    rows had; a variant renamed since gave its rows a new one."""
+    new_for = {old.upper(): new for old, new in renamed}
+    for r in rolls.values():
+        new = new_for.get((r.product.sku or "").upper())
+        if new:
+            r.product.sku = new
+
+
 def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None):
     """Apply the goods-receipt form to a purchase that has ALREADY been
     received — all of it, the same form a draft order is edited with.
@@ -4488,6 +4676,9 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             line_meters_before[r.purchase_invoice_item_id] = (
                 line_meters_before.get(r.purchase_invoice_item_id, Decimal("0"))
                 + (r.quantity or Decimal("0")))
+
+        _refresh_renamed_rolls(rolls, _apply_sku_choices(products_in, invoice=invoice, user=user))
+        _rename_own_variants(products_in, items, rolls, invoice=invoice, user=user)
 
         prefix = _intake_prefix(data, account.name)
         _intake_check_rates(products_in, account, data.get("rates"))
@@ -4610,6 +4801,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         # Rolls whose cost this edit changes, for the re-posting at the end.
         repriced_roll_ids = set()
         line_wps = {}
+        sale_prices = {}  # variant id → what the customer pays, as the form says
         for card in resolved:
             main_product = _intake_main_product(card, prefix, invoice=invoice)
             base_name = card["base_name"]
@@ -4805,8 +4997,14 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                     update["description"] = target["wp_name"] + billed["description"]
                 line_updates.append(update)
                 line_wps[wp.pk] = wp
+                if wp.catalog_variant_id:
+                    sale_prices[wp.catalog_variant_id] = _safe_decimal(v.get("sale_price"))
 
         sync_purchase_invoice_items(invoice, line_updates, member=member)
+        from .order_purchases import mirror_sale_prices_on_order
+        warning = mirror_sale_prices_on_order(invoice, sale_prices, member=member)
+        if warning:
+            warnings.append(warning)
         # A line the form dropped altogether: its rolls went above.
         kept_items = {u["invoice_item_id"] for u in line_updates if u["invoice_item_id"]}
         for it in items.values():
@@ -4904,6 +5102,8 @@ class WarehousePurchaseEdit(View):
         supplier_skus = dict(
             SupplierItem.objects.filter(current_account_id=invoice.current_account_id)
             .values_list("variant_id", "supplier_sku"))
+        from .order_purchases import order_sale_prices
+        sale_prices = order_sale_prices(invoice)
 
         groups = {}
         order = []
@@ -4930,15 +5130,26 @@ class WarehousePurchaseEdit(View):
                 }
                 order.append(key)
             title = product.title if product else it.description
+            uses = (_variant_uses(wp.catalog_variant, it)
+                    if wp is not None and wp.catalog_variant_id else [])
             groups[key]["variants"].append({
                 "invoice_item_id": it.pk,
                 "name": _purchase_variant_label(wp, title) if wp is not None else it.description,
                 "attributes": [{"name": n, "value": val} for n, val in variant_attributes(
                     wp.catalog_variant if wp is not None and wp.catalog_variant_id else None)],
                 "sku": (wp.sku or "") if wp is not None else "",
+                # The variant is this line's alone, so a change to its
+                # values may rename it (see _rename_own_variants).
+                "sku_follows": (wp is not None and wp.catalog_variant_id is not None
+                                and len({r.product_id for r in rolls}) == 1 and not uses),
+                # What else carries it, for the row to list when its values
+                # change and it asks whether to rename it for all of them.
+                "sku_uses": uses,
                 "supplier_sku": supplier_skus.get(
                     wp.catalog_variant_id if wp is not None else None, ""),
                 "price": _plain_decimal(it.unit_price),
+                "sale_price": (_plain_decimal(sale_prices[wp.catalog_variant_id])
+                               if wp is not None and wp.catalog_variant_id in sale_prices else ""),
                 "currency": invoice.currency.code,
                 "tops": [
                     {"stock_item_id": r.pk, "qty": _plain_decimal(r.quantity),

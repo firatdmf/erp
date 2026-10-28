@@ -662,12 +662,11 @@ class Order(models.Model):
         help_text=_("Carrier")
     )
 
-    # A frozen, point-in-time copy of the order (customer/address/notes +
-    # every line item, including any rolls already scanned) captured ONCE
-    # right after creation — see build_snapshot(). Backs the "First
-    # Created" (originally created) tab on the order detail page so
-    # staff can always see what the customer actually ordered, even after
-    # later edits change the live OrderItem rows. Never written to again.
+    # A copy of the order as first created, for an "Originally created"
+    # tab. The tab is gone — the order's change history says the same,
+    # line by line — and nothing writes or reads this any more. Kept one
+    # release so the code still running during that deploy can select
+    # it; the next release drops the column.
     original_snapshot = models.JSONField(null=True, blank=True)
 
     # The billable quantity of every line, frozen at the moment the order
@@ -843,21 +842,6 @@ class Order(models.Model):
             return Decimal("0.00")
         return (Decimal(str(amount)) * self.rate_to_base()).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-    @property
-    def snapshot_currency_symbol(self):
-        """The symbol for the frozen "originally created" figures.
-
-        Snapshots taken before orders carried a currency stored no code;
-        they were dollars, like every order of that time.
-        """
-        from accounting.models import CurrencyCategory
-
-        code = (self.original_snapshot or {}).get("currency_code") if self.original_snapshot else None
-        if not code:
-            return "$" if not self.currency_id else self.currency_symbol
-        cur = CurrencyCategory.objects.filter(code=code).first()
-        return (cur.symbol if (cur and cur.symbol) else code)
 
     def total_value_base(self):
         """What this order adds to the book: its total, in base currency.
@@ -1230,72 +1214,6 @@ class Order(models.Model):
         # account is owed as well as what the invoice prints — a delivery
         # fee is owed, a discount is not.
         return self._floor_at_zero(total + self.adjustments_total())
-
-    def build_snapshot(self):
-        """A frozen JSON copy of this order's state, called ONCE right
-        after creation (see OrderCreate.post) to populate
-        original_snapshot — the "First Created" tab. Never call this
-        again later; the whole point is that it does NOT track edits."""
-        def _f(v):
-            return float(v) if v is not None else None
-
-        client_name = ""
-        if self.contact_id:
-            client_name = str(self.contact)
-        elif self.company_id:
-            client_name = str(self.company)
-        elif self.is_guest_order:
-            client_name = (" ".join(x for x in [self.guest_first_name, self.guest_last_name] if x)
-                            or self.guest_email or self.guest_phone or "")
-        elif self.web_client_id:
-            client_name = str(self.web_client)
-
-        items = []
-        for it in (self.items.all()
-                   .select_related("product", "product_variant")
-                   .prefetch_related("stock_reservations__stock_item")):
-            items.append({
-                "product_title": it.product.title if it.product_id else None,
-                "sku": (it.product_variant.variant_sku if it.product_variant_id
-                        else (it.product.sku if it.product_id else None)),
-                "variant_label": (it.product_variant.full_name if it.product_variant_id else None),
-                "description": it.description or "",
-                "quantity": _f(it.quantity),
-                "price": _f(it.price),
-                "subtotal": _f(it.subtotal()),
-                "is_custom_curtain": bool(it.is_custom_curtain),
-                "custom_width": _f(it.custom_width),
-                "custom_height": _f(it.custom_height),
-                "custom_fabric_used_meters": _f(it.custom_fabric_used_meters),
-                "rolls": [
-                    {"barcode": (r.stock_item.barcode if r.stock_item_id else None), "quantity": _f(r.quantity)}
-                    for r in it.stock_reservations.all()
-                ],
-            })
-
-        return {
-            "captured_at": self.created_at.isoformat() if self.created_at else None,
-            "order_number": self.order_number,
-            "client_name": client_name,
-            "notes": self.notes or "",
-            "internal_notes": self.internal_notes or "",
-            "delivery_address_title": self.delivery_address_title or "",
-            "delivery_address": self.delivery_address or "",
-            "delivery_city": self.delivery_city or "",
-            "delivery_country": self.delivery_country or "",
-            "delivery_phone": self.delivery_phone or "",
-            "total_value": _f(self.total_value()),
-            # What those figures are in. Without it the frozen copy is a
-            # number with no money attached, and the tab that exists to
-            # show what the customer originally agreed could not say it.
-            "currency_code": self.currency_code,
-            "items": items,
-            # Delivery, discounts and the like, frozen with the rest: the
-            # total above is net of them, so without these the tab shows
-            # a figure its own lines don't add up to.
-            "adjustments": [{"label": a.label, "amount": _f(a.amount)}
-                            for a in self.adjustments.all()],
-        }
 
     def gross_profit(self):
         """Sum of every item's (price - cost) × quantity, plus the order's

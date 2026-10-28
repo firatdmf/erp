@@ -674,11 +674,6 @@ def quote_convert(request, pk):
     split = len(created) > 1
     for order, book in created:
         try:
-            order.original_snapshot = order.build_snapshot()
-            order.save(update_fields=["original_snapshot"])
-        except Exception:
-            pass
-        try:
             account = get_or_create_current_account_for_order(order, member=member, book=book)
             if account is not None and order.current_account_id != account.pk:
                 order.current_account = account

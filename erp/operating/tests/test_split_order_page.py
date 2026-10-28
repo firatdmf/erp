@@ -72,9 +72,11 @@ class SplitOrderPage(TestCase):
 
     def test_every_half_s_lines_are_in_one_table_with_one_set_of_totals(self):
         html = self._page(self.laleli_half).content.decode()
-        pane = html[html.index('data-item-pane="current"'):html.index('/data-item-pane="current"')]
-        self.assertEqual(pane.count("<table"), 1)
-        table = pane[pane.index("<table"):pane.index("</table>")]
+        self.assertEqual(html.count('<table class="od-prods'), 1)
+        start = html.index('<table class="od-prods')
+        table = html[start:html.index("</table>", start)]
+        # The products card: its table, then the totals under it.
+        pane = html[start:html.index("<!-- NOTES (inline editable)", start)]
         self.assertIn("Krep", table)
         self.assertIn("Tul Ergene", table)
         # A row over each book's lines says whose they are.

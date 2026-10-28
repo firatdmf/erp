@@ -64,7 +64,6 @@ class InternalNotesTest(TestCase):
         order = self._order()
         self.assertEqual(order.notes, PRINTED)
         self.assertEqual(order.internal_notes, INTERNAL)
-        self.assertEqual(order.original_snapshot["internal_notes"], INTERNAL)
 
     def test_the_edit_form_reopens_with_both(self):
         """The edit view saves whatever the boxes hold, so a box that

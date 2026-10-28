@@ -359,8 +359,6 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
             # account's currency, so the order must say so too — otherwise
             # they are read as dollars by everything downstream.
             stamp_order_currency(order, account)
-        order.original_snapshot = order.build_snapshot()
-        order.save(update_fields=["original_snapshot"])
         try:
             generate_machine_qr_for_order(order)
         except Exception:

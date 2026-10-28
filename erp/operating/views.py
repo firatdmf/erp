@@ -3715,11 +3715,14 @@ def save_order_adjustments(order, raw):
             continue
         rows.append((label, amount))
 
+    from .audit import log_adjustments
+    before = [(a.label, a.amount) for a in order.adjustments.order_by("position", "pk")]
     order.adjustments.all().delete()
     OrderAdjustment.objects.bulk_create([
         OrderAdjustment(order=order, label=label, amount=amount, position=i)
         for i, (label, amount) in enumerate(rows)
     ])
+    log_adjustments(order, before, rows)
 
 
 def _pending_new_customer(request):
@@ -4172,23 +4175,12 @@ class OrderCreate(View):
 
     def _finalise_order(self, request, order, *, book, member, split_currency=None,
                         confirm_to_customer=True):
-        """Snapshot, current-account link and deposit for one saved order.
+        """Current-account link and deposit for one saved order.
 
         Runs OUTSIDE the creating transaction, exactly as it always has:
         a ledger hiccup warns and leaves the order standing rather than
         rolling back goods the customer has already been promised.
         """
-        # ── Freeze a point-in-time copy of the order as first
-        # created — the "İlk Oluşturulan" tab on the detail page
-        # always shows this, even after later edits change the
-        # live items. Best-effort: a snapshot hiccup must never
-        # fail order creation.
-        try:
-            order.original_snapshot = order.build_snapshot()
-            order.save(update_fields=["original_snapshot"])
-        except Exception:
-            pass
-
         # ── Auto-link to a CurrentAccount + log the sales-order
         # movement so the customer's ledger reflects this
         # order immediately — retail included: Perakende orders

@@ -173,12 +173,6 @@ class OrderAdjustmentTest(TestCase):
         self.assertEqual(subtotal, Decimal("200.00"))
         self.assertEqual(total, Decimal("225.00"))
 
-    # ── What the snapshot keeps ─────────────────────────────────────
-    def test_the_first_copy_freezes_them_too(self):
-        self._add("Delivery", "45.00")
-        snap = self.order.build_snapshot()
-        self.assertEqual(snap["adjustments"], [{"label": "Delivery", "amount": 45.0}])
-        self.assertEqual(snap["total_value"], 245.0)
 
 
 class AdjustmentsThroughTheFormTest(TestCase):
@@ -240,8 +234,40 @@ class AdjustmentsThroughTheFormTest(TestCase):
         self._ship(order)
         mv = CurrentAccountMovement.objects.get(movement_type="order_sale")
         self.assertEqual(mv.amount, Decimal("180.00"))
-        # And the frozen first copy agrees with it.
-        self.assertEqual(order.original_snapshot["total_value"], 180.0)
+
+    # ── What the history keeps ──────────────────────────────────────
+    def _history(self, order):
+        from operating.models import OrderChange
+        return list(OrderChange.objects.filter(order=order, field="charges_and_discounts")
+                    .order_by("pk").values_list("old_value", "new_value"))
+
+    def test_the_history_says_what_they_were_at_create(self):
+        """The change history is the order's record of what was first
+        agreed — its charges and discounts included."""
+        self._post([{"label": "Delivery", "amount": "45.00"},
+                    {"label": "Partnership discount", "amount": "-20.00"}])
+        order = Order.objects.get()
+        self.assertEqual(self._history(order),
+                         [(None, "Delivery $45.00 · Partnership discount $-20.00")])
+
+    def test_an_edit_that_changes_them_says_before_and_after(self):
+        self._post([{"label": "Delivery", "amount": "45.00"}])
+        order = Order.objects.get()
+        item = order.items.get()
+        self._post([{"label": "Delivery", "amount": "60.00"}],
+                   url=reverse("operating:edit_order", args=[order.pk]), item_id=item.pk)
+        self.assertEqual(self._history(order)[-1],
+                         ("Delivery $45.00", "Delivery $60.00"))
+
+    def test_an_edit_that_leaves_them_alone_says_nothing(self):
+        """The form replaces them all on every save; the history only
+        speaks when they differ."""
+        self._post([{"label": "Delivery", "amount": "45.00"}])
+        order = Order.objects.get()
+        item = order.items.get()
+        self._post([{"label": "Delivery", "amount": "45.00"}],
+                   url=reverse("operating:edit_order", args=[order.pk]), item_id=item.pk)
+        self.assertEqual(len(self._history(order)), 1)
 
     def test_a_row_with_no_label_or_no_amount_is_dropped(self):
         """The form leaves an empty pair behind whenever somebody clicks

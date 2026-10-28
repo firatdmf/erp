@@ -12724,6 +12724,10 @@ msgid "product"
 msgstr "Ürün"
 
 msgctxt "order change"
+msgid "charges and discounts"
+msgstr "Ek ücretler ve indirimler"
+
+msgctxt "order change"
 msgid "revert reason"
 msgstr "Geri açma sebebi"
 

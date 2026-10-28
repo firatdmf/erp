@@ -146,10 +146,26 @@ def _item_label(item):
         return f"item #{item.pk}"
 
 
-def _fmt_qty_price(qty, price):
+def _fmt_qty_price(qty, price, order=None):
+    """"200.00 × €2.00" — in the order's own money, not always dollars."""
     q = f"{qty}" if qty is not None else "?"
     p = f"{price}" if price is not None else "?"
-    return f"{q} × ${p}"
+    symbol = order.currency_symbol if order is not None else "$"
+    return f"{q} × {symbol}{p}"
+
+
+def log_adjustments(order, old, new):
+    """The order's charges and discounts (delivery, packing, a discount),
+    before and after a save — one entry when they differ, since the form
+    replaces them all at once. `old` and `new` are (label, amount) pairs."""
+    if old == new:
+        return
+    symbol = order.currency_symbol
+
+    def said(rows):
+        return " · ".join(f"{label} {symbol}{amount}" for label, amount in rows) or None
+
+    _log(order, "field", field="charges_and_discounts", old=said(old), new=said(new))
 
 
 @receiver(pre_save, sender=OrderItem)
@@ -173,7 +189,7 @@ def _audit_item_saved(sender, instance, created, **kwargs):
         if created:
             _log(instance.order_id, "item_added",
                  item_label=_item_label(instance),
-                 new=_fmt_qty_price(instance.quantity, instance.price))
+                 new=_fmt_qty_price(instance.quantity, instance.price, instance.order))
             return
         old = getattr(instance, "_audit_old_item", None)
         if not old:
@@ -182,7 +198,7 @@ def _audit_item_saved(sender, instance, created, **kwargs):
                 or old.get("product_variant_id") != instance.product_variant_id):
             _log(instance.order_id, "item_updated", field="product",
                  item_label=_item_label(instance),
-                 new=_fmt_qty_price(instance.quantity, instance.price))
+                 new=_fmt_qty_price(instance.quantity, instance.price, instance.order))
             return
         if (old.get("quantity") or 0) != (instance.quantity or 0):
             _log(instance.order_id, "item_updated", field="quantity",
@@ -231,6 +247,6 @@ def _audit_item_deleted(sender, instance, **kwargs):
             return
         _log(instance.order_id, "item_removed",
              item_label=_item_label(instance),
-             old=_fmt_qty_price(instance.quantity, instance.price))
+             old=_fmt_qty_price(instance.quantity, instance.price, instance.order))
     except Exception:
         pass

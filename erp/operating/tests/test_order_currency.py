@@ -175,15 +175,18 @@ class OrderCurrencyTest(TestCase):
         self.assertEqual(line.line_cost(), Decimal("100.00"))
         self.assertEqual(line.gross_profit(), Decimal("100.00"))
 
-    def test_the_snapshot_records_what_its_figures_are_in(self):
+    def test_the_history_says_a_line_in_the_order_s_money(self):
+        """The change history is the record of what was first ordered,
+        so a euro order's lines read in euros there, not dollars."""
+        from operating.models import OrderChange
         order = self._order()
         with patch("accounting.services.get_exchange_rate", return_value=Decimal("1.08")):
             stamp_order_currency(order, self.account)
-            order.freeze_billable_quantities()
         order.refresh_from_db()
-        self.assertEqual(order.build_snapshot()["currency_code"], "EUR")
-        order.original_snapshot = order.build_snapshot()
-        self.assertEqual(order.snapshot_currency_symbol, "€")
+        order.items.create(product=order.items.first().product,
+                           quantity=Decimal("3"), price=Decimal("2.50"))
+        added = OrderChange.objects.filter(order=order, action="item_added").latest("pk")
+        self.assertEqual(added.new_value, "3 × €2.50")
 
     # ── What the customer's invoice says ────────────────────────────
     def test_the_invoice_follows_the_order_not_the_account(self):

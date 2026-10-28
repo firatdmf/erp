@@ -662,13 +662,6 @@ class Order(models.Model):
         help_text=_("Carrier")
     )
 
-    # A copy of the order as first created, for an "Originally created"
-    # tab. The tab is gone — the order's change history says the same,
-    # line by line — and nothing writes or reads this any more. Kept one
-    # release so the code still running during that deploy can select
-    # it; the next release drops the column.
-    original_snapshot = models.JSONField(null=True, blank=True)
-
     # The billable quantity of every line, frozen at the moment the order
     # shipped — {order_item_id (as str): quantity (as str)}.
     #

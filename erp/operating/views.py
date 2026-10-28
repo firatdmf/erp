@@ -255,16 +255,17 @@ def _stock_taken_label(reservations):
     return " · ".join(parts)
 
 
-def _order_item_variant_lines(it):
+def _order_item_variant_lines(it, language=None):
     """The variant of an order line, as the pieces it is made of — one
     warehouse product name, or one entry per attribute value. The order
     page prints each on its own line, which is the only way a value that
     is itself a phrase ("160 x 200 cm") stays readable in a narrow
     column; callers wanting a single string join them.
 
-    Attribute values are spelled for a reader ("Cactus green", "250 cm")
-    rather than as stored. A warehouse product's name is NOT: it is a
-    name someone typed ("2086 GÜMÜŞ ABEYA"), not a slug to tidy up.
+    Attribute values are spelled for a reader ("Cactus green", "250 cm"),
+    in `language` (the reader's when not given), rather than as stored.
+    A warehouse product's name is NOT: it is a name someone typed
+    ("2086 GÜMÜŞ ABEYA"), not a slug to tidy up, nor one to translate.
     """
     from marketing.attributes import display_value
     v = it.product_variant
@@ -278,8 +279,19 @@ def _order_item_variant_lines(it):
             label = label[len(title):].strip(" -·/") or label
         return [label]
     return [display_value(av.product_variant_attribute.name,
-                          av.product_variant_attribute_value)
+                          av.product_variant_attribute_value, language)
             for av in _variant_attribute_values(v)]
+
+
+def _order_item_variant_original(it, shown):
+    """The variant as the catalog holds it — English, the language its
+    values are stored in — for staff matching a line to a label or a
+    supplier's sheet while the page reads in their own language. Only
+    the values that read differently from `shown` (the reader's lines,
+    value for value) — "160 x 200 cm" is the same in any language and
+    is not said twice."""
+    original = _order_item_variant_lines(it, language="en")
+    return [o for o, s in zip(original, shown) if o != s]
 
 
 def _order_item_variant_label(it):
@@ -542,6 +554,7 @@ class OrderDetail(DetailView):
             it.scanned_label = _stock_taken_label(it.item_reservations)
             it.sold_by_count = units.by_variant(getattr(it.product, "tracking", None))
             it.variant_lines = _order_item_variant_lines(it)
+            it.variant_original = _order_item_variant_original(it, it.variant_lines)
         # Every item-less reservation, pack or no pack — in this layout
         # nothing else renders them, so filtering pack'd ones out (as the
         # pack screen does) would make them invisible here.

@@ -106,3 +106,55 @@ class OrderVariantLinesTest(TestCase):
         html = resp.content.decode()
         self.assertIn("<span>Cactus green</span><span>160 x 200 cm</span>", html)
         self.assertNotIn("cactus_green", html)
+
+    def test_the_line_says_its_variant_sku_under_the_name_not_in_a_column(self):
+        """Every product has variants, and a variant's SKU already
+        carries its product's, so the page keeps no SKU column."""
+        item = self._item(self._variant("RMC-CGR", ((self.colour, "cactus_green"),)))
+        self.client.force_login(self.user)
+        html = self.client.get(
+            reverse("operating:order_detail", kwargs={"pk": item.order.pk})).content.decode()
+        self.assertIn('<div class="mono od-line-sku">RMC-CGR</div>', html)
+        self.assertNotIn("<th>SKU</th>", html)
+
+    # ── In the reader's language, and as the catalog holds it ──────
+    def _worded(self):
+        from django.core.cache import cache
+        from marketing.models import CatalogWording
+        cache.clear()
+        CatalogWording.objects.create(kind="value", scope="color", key="cactus_green",
+                                      language="tr", text="Kaktüs yeşili")
+        return self._item(self._variant("V-TR", ((self.colour, "cactus_green"),
+                                                 (self.size, "160 x 200 cm"))))
+
+    def test_a_turkish_reader_gets_the_catalogs_english_under_their_own(self):
+        """Staff match a line to the roll's label, which says what the
+        catalog says."""
+        from django.utils import translation
+        from operating.views import _order_item_variant_original
+        item = self._worded()
+        with translation.override("tr"):
+            shown = _order_item_variant_lines(item)
+            self.assertEqual(shown, ["Kaktüs yeşili", "160 x 200 cm"])
+            # The size reads the same in both, so only the colour is repeated.
+            self.assertEqual(_order_item_variant_original(item, shown),
+                             ["Cactus green"])
+
+    def test_an_english_reader_is_not_told_the_same_thing_twice(self):
+        from django.utils import translation
+        from operating.views import _order_item_variant_original
+        item = self._worded()
+        with translation.override("en"):
+            shown = _order_item_variant_lines(item)
+            self.assertEqual(_order_item_variant_original(item, shown), [])
+
+    def test_the_page_prints_the_original_under_the_readers_wording(self):
+        from django.utils import translation
+        item = self._worded()
+        self.client.force_login(self.user)
+        with translation.override("tr"):
+            html = self.client.get(
+                reverse("operating:order_detail", kwargs={"pk": item.order.pk}),
+                HTTP_ACCEPT_LANGUAGE="tr").content.decode()
+        self.assertIn('<div class="od-variant-name"><span>Kaktüs yeşili</span>', html)
+        self.assertIn('<div class="od-variant-orig"><span>Cactus green</span>', html)

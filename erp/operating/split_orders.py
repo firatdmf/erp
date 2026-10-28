@@ -164,7 +164,8 @@ def other_halves_for_page(order, member, admin=False):
     show what they cost — to an admin only; cost is otherwise its own
     book's business."""
     from decimal import Decimal
-    from .views import _order_item_variant_lines, _stock_taken_label
+    from .views import (_order_item_variant_lines, _order_item_variant_original,
+                        _stock_taken_label)
 
     halves = []
     for half in split_halves(order):
@@ -191,6 +192,7 @@ def other_halves_for_page(order, member, admin=False):
             it.scanned_meters = sum((r.quantity or Decimal("0") for r in rs), Decimal("0"))
             it.scanned_label = _stock_taken_label(rs)
             it.variant_lines = _order_item_variant_lines(it)
+            it.variant_original = _order_item_variant_original(it, it.variant_lines)
         half.page_items = items
         half.book_name = getattr(order_book(half), "name", "")
         half.may_open = member_can_use_book(member, order_book(half))

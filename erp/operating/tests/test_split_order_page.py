@@ -84,10 +84,10 @@ class SplitOrderPage(TestCase):
         # Each book's lines are added up under them; the foot has the one total.
         self.assertEqual(table.count('class="od-sub"'), 2)
         self.assertRegex(table, r"(?s)Krep.*?<b data-order-subtotal>\$25\.00</b>.*Tul Ergene.*?<b>\$72\.50</b>")
-        # Its layout is fixed: every row keeps to the header's seven columns.
+        # Its layout is fixed: every row keeps to the header's six columns.
         for row in re.findall(r"(?s)<tr[ >].*?</tr>", table):
             cells = re.findall(r"<t[dh][ >]", row)
-            self.assertEqual(len(cells), 7, row[:120])
+            self.assertEqual(len(cells), 6, row[:120])
             self.assertNotIn("colspan", row)
         self.assertEqual(pane.count("Grand total"), 1)
         self.assertEqual(pane.count("Subtotal"), 2)

@@ -504,13 +504,12 @@
      Amount) stays the same size — without this the table-auto layout
      stretches them based on content, which made the inline inputs look
      mis-aligned. */
-  .od-prods th:nth-child(1), .od-prods td:nth-child(1) { width: auto; }        /* Product */
-  .od-prods th:nth-child(2), .od-prods td:nth-child(2) { width: 90px; }        /* SKU */
-  .od-prods th:nth-child(3), .od-prods td:nth-child(3) { width: 105px; }       /* Variant */
-  .od-prods th:nth-child(4), .od-prods td:nth-child(4) { width: 96px; }        /* Qty */
-  .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 96px; }        /* Price */
-  .od-prods th:nth-child(6), .od-prods td:nth-child(6) { width: 76px; }        /* Cost */
-  .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 92px; }        /* Amount */
+  .od-prods th:nth-child(1), .od-prods td:nth-child(1) { width: auto; }        /* Product, its SKU under it */
+  .od-prods th:nth-child(2), .od-prods td:nth-child(2) { width: 140px; }       /* Variant */
+  .od-prods th:nth-child(3), .od-prods td:nth-child(3) { width: 80px; }        /* Qty */
+  .od-prods th:nth-child(4), .od-prods td:nth-child(4) { width: 80px; }        /* Price */
+  .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 70px; }        /* Cost */
+  .od-prods th:nth-child(6), .od-prods td:nth-child(6) { width: 88px; }        /* Amount */
   .od-prods th.od-edit-only, .od-prods td.od-edit-only { width: 38px; text-align: center; }        /* Delete btn */
   /* A sales rep's table: the Cost cells are drawn EMPTY and hidden, not
      left out, so every nth-child width above and below still lands on
@@ -702,19 +701,27 @@
   /* Variant labels come from free text staff type — warehouse product
      names or attribute values — and are routinely joined with + and _
      rather than spaces ("mirle_gümüş+lale+gülkurusu"). CSS sees one
-     unbreakable word, and since the Variant column is a fixed 105px
+     unbreakable word, and since the Variant column is a fixed width
      under table-layout:fixed, it painted straight over Qty and Price.
      `anywhere` lets the break land mid-token so the label stays boxed. */
   .od-variant-name { font: 600 12.5px var(--font-sans); color: #0F1419; line-height: 1.3;
     overflow-wrap: anywhere; }
   /* One attribute value per line. Joined with " / " they read as one
      run-on phrase, and a value that is itself spaced ("160 x 200 cm")
-     wrapped wherever the 105px column ran out rather than where the
+     wrapped wherever the column ran out rather than where the
      value ended. */
   .od-variant-name span { display: block; }
-  .od-variant-sku { display: inline-block; margin-top: 2px; font-size: 10.5px; color: #94A3B8;
-    overflow-wrap: anywhere; }
-  .od-phone-variant { display: none; margin-top: 4px; }
+  /* The variant as the catalog holds it, under the reader's wording —
+     for staff matching a line to its label. */
+  .od-variant-orig { margin-top: 3px; font: 500 11.5px var(--font-sans); color: var(--gray-500);
+    line-height: 1.3; overflow-wrap: anywhere; }
+  .od-variant-orig span { display: block; }
+  /* The SKU a line was sold by, under its product name. */
+  /* It breaks at its own hyphens, not anywhere, so a narrow Product
+     column wraps it in pieces that still read as a code. */
+  .od-line-sku { margin-top: 4px; font-size: 11px !important; color: var(--gray-500) !important;
+    overflow-wrap: break-word !important; }
+  .od-phone-variant { display: none; }
   .od-num-val { font: 700 13px var(--font-sans); font-variant-numeric: tabular-nums; color: #0F1419; }
   .od-untracked-note { display: inline-flex; align-items: center; gap: 6px;
     font: 600 10.5px var(--font-sans); color: #64748B; background: #F4F7FB;
@@ -977,12 +984,14 @@
        columns side by side left the name a 60px sliver, broken a letter
        a line. The markup stays a table — the scripts read cells by
        position — and only the boxes are rearranged:
-         [img] Product name                     ×
-               Variant · SKU
+         [img] Product name                     ›
+               Variant · Variant
+               SKU
                chips
-         300 × €2.30                      €690.00
-       SKU, Variant and Cost cells are hidden; the variant and its SKU
-       are repeated under the name (.od-phone-variant). */
+               300 × €2.30                €690.00
+                                        Cost $1.80
+       The Variant cell is hidden; the variant, in the reader's language
+       only, is repeated under the name (.od-phone-variant). */
     .od-prods-scroll { overflow: visible; }
     .od-prods, .od-prods tbody { display: block; min-width: 0; width: 100%; }
     /* The card around it is frame enough. */
@@ -993,20 +1002,20 @@
       border-bottom: 1px solid #EEF1F5; }
     .od-prods tbody:last-child tr:last-child { border-bottom: none; }
     .od-prods th, .od-prods td { width: auto !important; padding: 0; border: 0; }
-    .od-prods td:nth-child(2), .od-prods td:nth-child(3) { display: none; }
+    .od-prods td:nth-child(2) { display: none; }
     .od-prods td:nth-child(1) { grid-column: 1 / -1; padding-bottom: 8px; }
-    .od-prods td:nth-child(4) { grid-column: 1; grid-row: 2; }
-    .od-prods td:nth-child(5) { grid-column: 2; grid-row: 2; }
+    .od-prods td:nth-child(3) { grid-column: 1; grid-row: 2; }
+    .od-prods td:nth-child(4) { grid-column: 2; grid-row: 2; }
     /* Cost on a quiet line of its own under the amount. A sales rep's
        table still hides it (.od-no-cost), and a line with no cost set
        shows nothing here rather than a dash. */
-    .od-prods td:nth-child(6) { grid-column: 1 / -1; grid-row: 3; padding-top: 3px;
+    .od-prods td:nth-child(5) { grid-column: 1 / -1; grid-row: 3; padding-top: 3px;
       font-size: 11.5px; color: var(--gray-500); }
-    .od-prods td:nth-child(6)::before { content: attr(data-cost-label) " "; }
-    .od-prods td:nth-child(6):not(:has(span:not(.od-empty-mute))) { display: none; }
-    .od-prods td:nth-child(5)::before { content: "×"; margin: 0 4px 0 2px; color: var(--gray-400); font-weight: 500; }
-    .od-prods td:nth-child(7) { grid-column: 3; grid-row: 2; text-align: right; }
-    .od-prods td:nth-child(7) b { font-size: 14px; }
+    .od-prods td:nth-child(5)::before { content: attr(data-cost-label) " "; }
+    .od-prods td:nth-child(5):not(:has(span:not(.od-empty-mute))) { display: none; }
+    .od-prods td:nth-child(4)::before { content: "×"; margin: 0 4px 0 2px; color: var(--gray-400); font-weight: 500; }
+    .od-prods td:nth-child(6) { grid-column: 3; grid-row: 2; text-align: right; }
+    .od-prods td:nth-child(6) b { font-size: 14px; }
     .od-prods .od-num-val { font-weight: 600; color: var(--gray-700); }
 
     /* The photo sits in a gutter of its own so the name, variant and
@@ -1020,13 +1029,12 @@
     .od-prod { display: block; }
     .od-prod-img { position: absolute; left: 0; top: 0; width: 40px; height: 40px; }
     .od-prod span:last-child { display: block; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
-    .od-phone-variant { display: block; margin-top: 2px; }
-    .od-phone-variant .od-variant-name { font: 500 12.5px var(--font-sans); color: var(--gray-700); }
-    .od-phone-variant .od-variant-name span { display: inline; }
-    .od-phone-variant .od-variant-name span + span::before { content: " · "; color: var(--gray-400); }
-    .od-phone-variant .od-variant-sku { font-size: 11px; }
-    /* Qty × price lines up with the name above it. */
-    .od-prods td:nth-child(4) { padding-left: 50px; }
+    .od-variant-name.od-phone-variant { display: block; margin-top: 2px;
+      font: 500 12.5px var(--font-sans); color: var(--gray-700); }
+    .od-phone-variant span { display: inline; }
+    .od-phone-variant span + span::before { content: " · "; color: var(--gray-400); }
+    /* Qty × price lines up with the name above it, past the photo. */
+    .od-prods tr:has(.od-prod) td:nth-child(3) { padding-left: 50px; }
     /* The 9px chevron gutter is kept only on rows that open. */
     .od-prods td:nth-child(1) > div > span:first-child:empty { display: none; }
 
@@ -1621,7 +1629,6 @@
           <thead>
             <tr>
               <th>{% trans "Product" %}</th>
-              <th>SKU</th>
               <th>{% trans "Variant" %}</th>
               <th class="num">{% trans "Qty" %}</th>
               <th class="num">{% trans "Price" %}</th>
@@ -1638,7 +1645,7 @@
               <i class="fa fa-book"></i><span>{{ this_book_name }}</span>
               <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
               <span class="od-half-tag">{% trans "This half" %}</span>
-            </div></td><td></td><td></td><td></td><td></td><td class="od-cost-col"></td><td></td></tr>
+            </div></td><td></td><td></td><td></td><td class="od-cost-col"></td><td></td></tr>
           </tbody>
           {% endif %}
           <tbody id="od-items-tbody">
@@ -1671,7 +1678,7 @@
                     {% else %}
                     <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
                     {% endif %}
-                    {% include "operating/partials/od_phone_variant.html" %}
+                    {% include "operating/partials/od_line_sku.html" %}
                     {% if item.is_tracked %}
                       {% if item.scanned_count %}
                       <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
@@ -1692,19 +1699,7 @@
                   </div>
                 </div>
               </td>
-              <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
-              <td>
-                {% if item.product_variant %}
-                  {% if item.variant_lines %}
-                    <div class="od-variant-name">{% for line in item.variant_lines %}<span>{{ line }}</span>{% endfor %}</div>
-                    <span class="mono od-variant-sku">{{ item.product_variant.variant_sku }}</span>
-                  {% else %}
-                    <span class="mono">{{ item.product_variant.variant_sku }}</span>
-                  {% endif %}
-                {% else %}
-                  <span class="od-empty-mute">—</span>
-                {% endif %}
-              </td>
+              {% include "operating/partials/od_variant_cell.html" %}
               <td class="num"><span class="od-num-val">{{ item.quantity|default:0|floatformat:"-2g" }}</span></td>
               <td class="num"><span class="od-num-val">{{ order.currency_symbol }}{{ item.price|default:0|floatformat:"2g" }}</span></td>
               {% if is_sales_rep %}
@@ -1724,7 +1719,7 @@
             </tr>
             {% if item.is_tracked and item.scanned_count %}
             <tr class="od-tops-row" data-tops-for="{{ item.pk }}" style="display:none;">
-              <td colspan="7">
+              <td colspan="6">
                 <div class="od-tops-wrap">
                   <div class="od-tops-list">
                     {% for r in item.item_reservations %}{% include "operating/partials/od_top_row.html" %}{% endfor %}
@@ -1741,7 +1736,7 @@
              its data-order-subtotal.{% endcomment %}
           <tbody>
             <tr class="od-sub">
-              <td></td><td></td><td></td><td></td><td></td><td class="od-cost-col"></td>
+              <td></td><td></td><td></td><td></td><td class="od-cost-col"></td>
               <td class="num"><div class="od-sub-in"><span>{% trans "Subtotal" %}</span><b data-order-subtotal>{{ order.currency_symbol }}{{ order.lines_total|floatformat:"2g" }}</b></div></td>
             </tr>
           </tbody>
@@ -1758,7 +1753,7 @@
               {% if half.may_open %}
               <a class="od-half-open" href="{% url 'operating:order_detail' half.pk %}">{% trans "Open this half" %} <i class="fa fa-arrow-right"></i></a>
               {% endif %}
-            </div></td><td></td><td></td><td></td><td></td><td class="od-cost-col"></td><td></td></tr>
+            </div></td><td></td><td></td><td></td><td class="od-cost-col"></td><td></td></tr>
             {% for item in half.page_items %}
             <tr>
               <td>
@@ -1779,20 +1774,14 @@
                     {% else %}
                     <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
                     {% endif %}
-                    {% include "operating/partials/od_phone_variant.html" %}
+                    {% include "operating/partials/od_line_sku.html" %}
                     {% if item.scanned_count %}
                     <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
                     {% endif %}
                   </div>
                 </div>
               </td>
-              <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
-              <td>
-                {% if item.variant_lines %}
-                  <div class="od-variant-name">{% for line in item.variant_lines %}<span>{{ line }}</span>{% endfor %}</div>
-                {% endif %}
-                {% if item.product_variant %}<span class="mono od-variant-sku">{{ item.product_variant.variant_sku }}</span>{% elif not item.variant_lines %}<span class="od-empty-mute">—</span>{% endif %}
-              </td>
+              {% include "operating/partials/od_variant_cell.html" %}
               <td class="num"><span class="od-num-val">{{ item.quantity|default:0|floatformat:"-2g" }}</span></td>
               <td class="num"><span class="od-num-val">{{ half.currency_symbol }}{{ item.price|default:0|floatformat:"2g" }}</span></td>
               <td class="num od-cost-col" data-cost-label="{% trans 'Cost' %}">
@@ -1807,10 +1796,10 @@
               <td class="num"><b>{{ half.currency_symbol }}{{ item.subtotal|floatformat:"2g" }}</b></td>
             </tr>
             {% empty %}
-            <tr><td class="od-empty-mute od-row-note">{% trans "This order has no items yet" %}</td><td></td><td></td><td></td><td></td><td class="od-cost-col"></td><td></td></tr>
+            <tr><td class="od-empty-mute od-row-note">{% trans "This order has no items yet" %}</td><td></td><td></td><td></td><td class="od-cost-col"></td><td></td></tr>
             {% endfor %}
             <tr class="od-sub">
-              <td></td><td></td><td></td><td></td><td></td><td class="od-cost-col"></td>
+              <td></td><td></td><td></td><td></td><td class="od-cost-col"></td>
               <td class="num"><div class="od-sub-in"><span>{% trans "Subtotal" %}</span><b>{{ half.currency_symbol }}{{ half.lines_total|floatformat:"2g" }}</b></div></td>
             </tr>
           </tbody>
@@ -2016,22 +2005,28 @@
             {% blocktrans with dt=order.created_at|date:"d M Y · H:i" %}Frozen exactly as the order was first created, on {{ dt }}. Later edits never change this view.{% endblocktrans %}
           </div>
           <div class="od-prods-scroll">
-          <table class="od-prods">
+          {% comment %}Laid out like the lines table, column for column, so the
+             same widths and phone card fit it; the snapshot keeps no cost,
+             so its Cost cell stays empty and hidden.{% endcomment %}
+          <table class="od-prods od-no-cost">
             <thead>
               <tr>
                 <th>{% trans "Product" %}</th>
-                <th>SKU</th>
                 <th>{% trans "Variant" %}</th>
                 <th class="num">{% trans "Qty" %}</th>
                 <th class="num">{% trans "Price" %}</th>
+                <th class="num od-cost-col"></th>
                 <th class="num">{% trans "Amount" %}</th>
               </tr>
             </thead>
             <tbody>
               {% for oi in order.original_snapshot.items %}
               <tr>
-                <td>{{ oi.product_title|default:oi.description|default:"—" }}</td>
-                <td><span class="mono">{{ oi.sku|default:"—" }}</span></td>
+                <td>
+                  {{ oi.product_title|default:oi.description|default:"—" }}
+                  {% if oi.variant_label %}<div class="od-variant-name od-phone-variant">{{ oi.variant_label }}</div>{% endif %}
+                  {% if oi.sku %}<div class="mono od-line-sku">{{ oi.sku }}</div>{% endif %}
+                </td>
                 <td>
                   {{ oi.variant_label|default:"—" }}
                   {% if oi.stock_items %}
@@ -2046,6 +2041,7 @@
                 </td>
                 <td class="num">{{ oi.quantity|floatformat:"-2g" }}</td>
                 <td class="num">{{ order.currency_symbol }}{{ oi.price|floatformat:"2g" }}</td>
+                <td class="num od-cost-col"></td>
                 <td class="num"><b>{{ order.currency_symbol }}{{ oi.subtotal|floatformat:"2g" }}</b></td>
               </tr>
               {% empty %}
@@ -2541,12 +2537,11 @@
           return inp ? parseNum(inp.value) : parseShown(flattenText(row.children[idx]));
         };
         return Array.from(rows).map(r => {
-          const sku = flattenText(r.children[2]);
           return {
             name: flattenText(r.querySelector('.od-prod span:last-child')) || '—',
-            sku: sku === '—' ? '' : sku,
-            qty: cellNum(r, 3, 'quantity'),
-            price: cellNum(r, 4, 'price'),
+            sku: flattenText(r.querySelector('.od-line-sku')),
+            qty: cellNum(r, 2, 'quantity'),
+            price: cellNum(r, 3, 'price'),
           };
         });
       } catch (e) { return ORDER_SUMMARY_FALLBACK.slice(); }
@@ -4000,11 +3995,10 @@
             '<div class="od-prod">' + img + '<span>' + esc(it.product_title) + '</span></div>' +
             prodLinkEnd +
             ((it.variant_sku || it.product_sku)
-              ? '<div class="od-phone-variant"><span class="mono od-variant-sku">' + esc(it.variant_sku || it.product_sku) + '</span></div>'
+              ? '<div class="mono od-line-sku">' + esc(it.variant_sku || it.product_sku) + '</div>'
               : '') +
           '</td>' +
-          '<td><span class="mono">' + esc(it.product_sku || '—') + '</span></td>' +
-          '<td><span class="mono">' + esc(it.variant_sku || '—') + '</span></td>' +
+          '<td><span class="od-empty-mute">—</span></td>' +
           '<td class="num"><input type="number" class="od-inline-input" step="0.01" min="0"' +
             ' value="' + q + '" data-item-id="' + tempId + '" data-field="quantity"' +
             ' data-original=""' + stockAttr + oversellAttr + maxAttr +

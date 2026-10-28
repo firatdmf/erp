@@ -1,0 +1,7 @@
+{% comment %}Under a line's product name: the SKU it was sold by — the variant's,
+   which already carries the product's — or the product's own on a line
+   with no variant. On a phone, where the Variant column is hidden, the
+   variant's name comes first. Kept outside .od-prod: the confirm recap
+   reads the name from its last span.{% endcomment %}
+{% if item.variant_lines %}<div class="od-variant-name od-phone-variant">{% for line in item.variant_lines %}<span>{{ line }}</span>{% endfor %}</div>{% endif %}
+{% with sku=item.product_variant.variant_sku|default:item.product.sku %}{% if sku %}<div class="mono od-line-sku">{{ sku }}</div>{% endif %}{% endwith %}

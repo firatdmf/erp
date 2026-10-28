@@ -1,0 +1,11 @@
+{% comment %}The line's variant under its product name, for phones, where the
+   SKU and Variant columns are hidden. Kept outside .od-prod: the confirm
+   recap reads the name from its last span.{% endcomment %}
+{% if item.product_variant %}
+<div class="od-phone-variant">
+  {% if item.variant_lines %}<div class="od-variant-name">{% for line in item.variant_lines %}<span>{{ line }}</span>{% endfor %}</div>{% endif %}
+  <span class="mono od-variant-sku">{{ item.product_variant.variant_sku }}</span>
+</div>
+{% elif item.product.sku %}
+<div class="od-phone-variant"><span class="mono od-variant-sku">{{ item.product.sku }}</span></div>
+{% endif %}

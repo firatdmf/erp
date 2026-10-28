@@ -714,6 +714,7 @@
   .od-variant-name span { display: block; }
   .od-variant-sku { display: inline-block; margin-top: 2px; font-size: 10.5px; color: #94A3B8;
     overflow-wrap: anywhere; }
+  .od-phone-variant { display: none; margin-top: 4px; }
   .od-num-val { font: 700 13px var(--font-sans); font-variant-numeric: tabular-nums; color: #0F1419; }
   .od-untracked-note { display: inline-flex; align-items: center; gap: 6px;
     font: 600 10.5px var(--font-sans); color: #64748B; background: #F4F7FB;
@@ -972,23 +973,83 @@
     .od-tl { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
-    /* On phones the secondary columns are hidden instead of scrolled —
-       drop the desktop min-width so the table fits the screen. */
-    .od-prods { min-width: 0; }
-    /* Products table: hide the secondary columns and tighten the rest
-       so it never overflows on a phone. Keeps Product/Qty/Price/Amount. */
-    .od-prods th:nth-child(2), .od-prods td:nth-child(2),   /* SKU */
-    .od-prods th:nth-child(3), .od-prods td:nth-child(3),   /* Variant */
-    .od-prods th:nth-child(6), .od-prods td:nth-child(6) {  /* Cost */
-      display: none;
-    }
-    .od-prods th, .od-prods td { padding: 8px 6px; }
-    .od-prods th:nth-child(4), .od-prods td:nth-child(4) { width: 66px; }   /* Qty */
-    .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 72px; }   /* Price */
-    .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 76px; }   /* Amount */
-    .od-prod-img { width: 28px; height: 28px; flex-shrink: 0; }
-    /* A long one-word title would otherwise run under the Qty column. */
-    .od-prod span:last-child { font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+    /* On phones each line is a card rather than a table row: four
+       columns side by side left the name a 60px sliver, broken a letter
+       a line. The markup stays a table — the scripts read cells by
+       position — and only the boxes are rearranged:
+         [img] Product name                     ×
+               Variant · SKU
+               chips
+         300 × €2.30                      €690.00
+       SKU, Variant and Cost cells are hidden; the variant and its SKU
+       are repeated under the name (.od-phone-variant). */
+    .od-prods-scroll { overflow: visible; }
+    .od-prods, .od-prods tbody { display: block; min-width: 0; width: 100%; }
+    /* The card around it is frame enough. */
+    .od-prods { border: 0; border-radius: 0; background: transparent; }
+    .od-prods thead { display: none; }
+    .od-prods tr { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto;
+      align-items: baseline; column-gap: 4px; padding: 12px 0;
+      border-bottom: 1px solid #EEF1F5; }
+    .od-prods tbody:last-child tr:last-child { border-bottom: none; }
+    .od-prods th, .od-prods td { width: auto !important; padding: 0; border: 0; }
+    .od-prods td:nth-child(2), .od-prods td:nth-child(3) { display: none; }
+    .od-prods td:nth-child(1) { grid-column: 1 / -1; padding-bottom: 8px; }
+    .od-prods td:nth-child(4) { grid-column: 1; grid-row: 2; }
+    .od-prods td:nth-child(5) { grid-column: 2; grid-row: 2; }
+    /* Cost on a quiet line of its own under the amount. A sales rep's
+       table still hides it (.od-no-cost), and a line with no cost set
+       shows nothing here rather than a dash. */
+    .od-prods td:nth-child(6) { grid-column: 1 / -1; grid-row: 3; padding-top: 3px;
+      font-size: 11.5px; color: var(--gray-500); }
+    .od-prods td:nth-child(6)::before { content: attr(data-cost-label) " "; }
+    .od-prods td:nth-child(6):not(:has(span:not(.od-empty-mute))) { display: none; }
+    .od-prods td:nth-child(5)::before { content: "×"; margin: 0 4px 0 2px; color: var(--gray-400); font-weight: 500; }
+    .od-prods td:nth-child(7) { grid-column: 3; grid-row: 2; text-align: right; }
+    .od-prods td:nth-child(7) b { font-size: 14px; }
+    .od-prods .od-num-val { font-weight: 600; color: var(--gray-700); }
+
+    /* The photo sits in a gutter of its own so the name, variant and
+       chips all run in one column beside it, never under it. */
+    .od-prods tr[data-item-row] td:nth-child(1) > div > div,
+    .od-prods tr:not([class]) td:nth-child(1) > div > div { position: relative; flex: 1; min-height: 40px; padding-left: 50px; }
+    /* A line that opens to its stock items: chevron at the far end. */
+    .od-tops-chev { order: 2; margin: 14px 0 0 auto !important; padding-left: 8px; font-size: 11px; }
+    .od-top-pill { flex-wrap: wrap; row-gap: 3px; }
+    .od-top-pill .bc { overflow: visible; }
+    .od-prod { display: block; }
+    .od-prod-img { position: absolute; left: 0; top: 0; width: 40px; height: 40px; }
+    .od-prod span:last-child { display: block; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+    .od-phone-variant { display: block; margin-top: 2px; }
+    .od-phone-variant .od-variant-name { font: 500 12.5px var(--font-sans); color: var(--gray-700); }
+    .od-phone-variant .od-variant-name span { display: inline; }
+    .od-phone-variant .od-variant-name span + span::before { content: " · "; color: var(--gray-400); }
+    .od-phone-variant .od-variant-sku { font-size: 11px; }
+    /* Qty × price lines up with the name above it. */
+    .od-prods td:nth-child(4) { padding-left: 50px; }
+    /* The 9px chevron gutter is kept only on rows that open. */
+    .od-prods td:nth-child(1) > div > span:first-child:empty { display: none; }
+
+    /* Split order: the book heading and the subtotal, one cell each. */
+    .od-prods tr.od-grp { padding: 7px 8px; border-radius: 7px; margin-top: 6px; }
+    .od-prods tr.od-grp td { padding: 0; border: 0; }
+    .od-prods tr.od-grp td:not(:first-child),
+    .od-prods tr.od-sub td:not(:last-child) { display: none; }
+    .od-prods tr.od-grp td:first-child { padding: 0; }
+    .od-grp-in { width: auto; flex-wrap: wrap; white-space: normal; }
+    .od-prods tr.od-sub td:last-child { grid-column: 1 / -1; grid-row: auto; padding: 0; }
+    /* A line's stock items, opened under its card (the script hides it
+       with an inline display:none, which still wins over this). */
+    .od-prods tr.od-tops-row { display: block; padding: 0 0 10px; }
+    .od-prods tr.od-tops-row > td { display: block; padding: 8px 10px !important; border-radius: 8px; }
+    .od-tops-wrap { position: static; max-width: none; }
+    .od-prods td.od-row-note { grid-column: 1 / -1; white-space: normal; padding: 6px 0; }
+
+    /* Order changes: badge and time on one line, the change in full width
+       under them, not squeezed between the two. */
+    .od-chg { flex-wrap: wrap; row-gap: 4px; }
+    .od-chg > span:last-child { margin-left: auto; }
+    .od-chg .od-chg-txt { order: 3; flex: 1 1 100% !important; overflow-wrap: anywhere; }
     /* Add-item editor stacks: product full width, qty|price, then Add. */
     #od-add-item-row > div { grid-template-columns: 1fr 1fr !important; }
     #od-add-item-row > div > div:first-child,
@@ -1610,6 +1671,7 @@
                     {% else %}
                     <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
                     {% endif %}
+                    {% include "operating/partials/od_phone_variant.html" %}
                     {% if item.is_tracked %}
                       {% if item.scanned_count %}
                       <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
@@ -1648,7 +1710,7 @@
               {% if is_sales_rep %}
               <td class="num od-cost-col" data-item-cost="{{ item.pk }}"></td>
               {% else %}
-              <td class="num od-cost-col" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}">
+              <td class="num od-cost-col" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}" data-cost-label="{% trans 'Cost' %}">
                 {% with uc=item.unit_cost %}
                   {% if uc and uc > 0 %}
                     <span style="color:var(--gray-700);">{{ uc|cost_in_base:order }}</span>
@@ -1717,6 +1779,7 @@
                     {% else %}
                     <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
                     {% endif %}
+                    {% include "operating/partials/od_phone_variant.html" %}
                     {% if item.scanned_count %}
                     <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
                     {% endif %}
@@ -1732,7 +1795,7 @@
               </td>
               <td class="num"><span class="od-num-val">{{ item.quantity|default:0|floatformat:"-2g" }}</span></td>
               <td class="num"><span class="od-num-val">{{ half.currency_symbol }}{{ item.price|default:0|floatformat:"2g" }}</span></td>
-              <td class="num od-cost-col">
+              <td class="num od-cost-col" data-cost-label="{% trans 'Cost' %}">
                 {% if half.show_cost %}{% with uc=item.unit_cost %}
                   {% if uc and uc > 0 %}
                     <span style="color:var(--gray-700);">{{ uc|cost_in_base:half }}</span>
@@ -2039,12 +2102,12 @@
         {% if order_changes_preview %}
         <div>
           {% for c in order_changes_preview %}
-          <div style="display:flex; align-items:flex-start; gap:10px; padding:9px 2px; {% if not forloop.last %}border-bottom:1px solid #F4F7FA;{% endif %}">
+          <div class="od-chg" style="display:flex; align-items:flex-start; gap:10px; padding:9px 2px; {% if not forloop.last %}border-bottom:1px solid #F4F7FA;{% endif %}">
             <span style="flex-shrink:0; display:inline-flex; align-items:center; gap:4px; padding:2px 9px 2px 7px; border-radius:999px; font:700 10px var(--font-sans); margin-top:1px;
               {% if c.action == 'created' %}background:#E5F1F0; color:#005354;{% elif c.action == 'status' %}background:#DBEAFE; color:#1D4ED8;{% elif c.action == 'item_added' %}background:#D1FAE5; color:#065F46;{% elif c.action == 'item_removed' %}background:#FEE2E2; color:#B91C1C;{% elif c.action == 'item_updated' %}background:#FEF3C7; color:#8B5A00;{% else %}background:#F1F5F9; color:#475569;{% endif %}">
               {{ c.action_display }}
             </span>
-            <span style="flex:1; min-width:0; font:500 12.5px var(--font-sans); color:#374151; line-height:1.45;">
+            <span class="od-chg-txt" style="flex:1; min-width:0; font:500 12.5px var(--font-sans); color:#374151; line-height:1.45;">
               {% if c.item_label %}<b style="color:#0F1419;">{{ c.item_label|truncatechars:44 }}</b>{% if c.field_display %} · {{ c.field_display }}{% endif %}{% elif c.field_display %}<b style="color:#0F1419;">{{ c.field_display }}</b>{% endif %}
               {% if c.old_display and c.new_display %}
                 <span style="color:#B91C1C; text-decoration:line-through;">{{ c.old_display|truncatechars:26 }}</span>
@@ -3936,6 +3999,9 @@
           '<td>' + prodLink +
             '<div class="od-prod">' + img + '<span>' + esc(it.product_title) + '</span></div>' +
             prodLinkEnd +
+            ((it.variant_sku || it.product_sku)
+              ? '<div class="od-phone-variant"><span class="mono od-variant-sku">' + esc(it.variant_sku || it.product_sku) + '</span></div>'
+              : '') +
           '</td>' +
           '<td><span class="mono">' + esc(it.product_sku || '—') + '</span></td>' +
           '<td><span class="mono">' + esc(it.variant_sku || '—') + '</span></td>' +

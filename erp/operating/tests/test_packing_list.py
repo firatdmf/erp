@@ -115,6 +115,33 @@ class PackingListColumns(TestCase):
         self.assertTrue(resp["Content-Disposition"].startswith("inline;"))
         self.assertTrue(resp.content.startswith(b"%PDF"))
 
+    def test_a_package_taller_than_a_page_runs_onto_the_next(self):
+        """Order 297 failed with a LayoutError: its package 6 was one
+        merged cell taller than a page. Every page now opens on the
+        package number."""
+        from reportlab.platypus import Table
+        pack = self.order.packs.get(pack_number=1)
+        reservation = pack.stock_reservations.first()
+        for i in range(60):
+            reservation.pk = None
+            reservation.save()
+        firsts = []
+        real_draw = Table.draw
+
+        def draw(tbl):
+            if len(tbl._colWidths) == 8:
+                cell = tbl._cellvalues[1][0]
+                para = cell[0] if isinstance(cell, (list, tuple)) else cell
+                firsts.append(para.getPlainText() if para else "")
+            return real_draw(tbl)
+
+        with patch.object(Table, "draw", draw):
+            resp = self.client.get(reverse("operating:order_packing_list_pdf",
+                                           kwargs={"pk": self.order.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertGreater(len(firsts), 1)
+        self.assertTrue(all(f.startswith("1") for f in firsts), firsts)
+
     def _pdf_barcode_cells(self):
         """Build the PDF and return (column width, [(code, font size)])."""
         from reportlab.platypus import SimpleDocTemplate, Table

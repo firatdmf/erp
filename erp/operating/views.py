@@ -6656,9 +6656,13 @@ def order_packing_list_pdf(request, pk):
         Paragraph(labels['quantity'], th_num_style),
         Paragraph(labels['net_kg'], th_num_style),
     ]]
-    # (first_row, last_row) per package, so the pack column can be merged
-    # down across every item that shares it.
-    spans = []
+    # The package each row belongs to, and the last row of every package.
+    # The pack column is not a merged cell: reportlab cannot break a table
+    # inside a span, so one package taller than a page failed the whole
+    # PDF. The number goes on the package's first row instead, and again
+    # at the top of a page the package runs onto.
+    row_packs = [None]
+    pack_ends = []
     weights = []
 
     def kg(value, estimated=False):
@@ -6666,7 +6670,7 @@ def order_packing_list_pdf(request, pk):
 
     def pack_cell(pack):
         # The sack's weight on the scale goes under its number, in the
-        # merged cell — it belongs to the sack, not to any roll in it.
+        # pack column — it belongs to the sack, not to any roll in it.
         if pack.gross_kg is None:
             return Paragraph(str(pack.pack_number), ctr_style)
         return Paragraph(f"{pack.pack_number}<br/><font size=7 color='#6B7280'>"
@@ -6711,12 +6715,13 @@ def order_packing_list_pdf(request, pk):
                 Paragraph(labels['empty_pack'], cell_style),
                 "", "", "", "", "",
             ])
+            row_packs.append(pack)
         for row in rows:
             item_no += 1
             if row['quantity'] is not None:
                 total_meters += row['quantity']
             data.append([
-                pack_cell(pack),
+                pack_cell(pack) if len(data) == first else "",
                 Paragraph(str(item_no), cell_style),
                 Paragraph(
                     f"{row['title']}<br/><font size=8 color='#6B7280'>{row['sku']}</font>",
@@ -6728,23 +6733,42 @@ def order_packing_list_pdf(request, pk):
                           num_style),
                 Paragraph(kg(row['net_kg'], row['net_kg_estimated']), num_style),
             ])
-        spans.append((first, len(data) - 1))
+            row_packs.append(pack)
+        pack_ends.append(len(data) - 1)
+
+    class PackTable(Table):
+        """Puts the package number back on the first row of the part that
+        goes over onto the next page, when it lands mid-package."""
+        def split(self, availWidth, availHeight):
+            parts = super().split(availWidth, availHeight)
+            if len(parts) == 2:
+                top, rest = parts
+                # The rest repeats the header row, then carries on.
+                rest_packs = [None] + self.row_packs[len(top._cellvalues):]
+                top.row_packs, rest.row_packs = self.row_packs, rest_packs
+                if len(rest._cellvalues) > 1 and rest._cellvalues[1][0] == "":
+                    rest._cellvalues[1][0] = pack_cell(rest_packs[1])
+            return parts
 
     if len(data) == 1:
         story.append(Paragraph(labels['no_items'], normal_style))
     else:
-        tbl = Table(data,
+        tbl = PackTable(data,
                     # Product Group needs 28mm to keep its header on one
                     # line; the barcode column is sized above, and the
                     # Product column takes whatever is left of 180mm.
                     colWidths=[16 * mm, 10 * mm, 68 * mm - barcode_w, 24 * mm,
                                28 * mm, barcode_w, 19 * mm, 15 * mm],
                     repeatRows=1)
+        tbl.row_packs = row_packs
         style_cmds = [
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('VALIGN', (0, 1), (0, -1), 'TOP'),
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#EAF2F1")),
             ('LINEBELOW', (0, 0), (-1, 0), 0.8, TEAL),
-            ('LINEBELOW', (0, 1), (-1, -1), 0.4, RULE),
+            # No rule across the pack column inside a package, so its
+            # rows read as one block under the number.
+            ('LINEBELOW', (1, 1), (-1, -1), 0.4, RULE),
             ('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor("#C9D3DC")),
             ('LINEAFTER', (0, 0), (1, -1), 0.4, RULE),
             ('BACKGROUND', (0, 1), (0, -1), colors.HexColor("#FAFCFB")),
@@ -6753,11 +6777,9 @@ def order_packing_list_pdf(request, pk):
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
             ('RIGHTPADDING', (0, 0), (-1, -1), 5),
         ]
-        for first, last in spans:
-            if last > first:
-                style_cmds.append(('SPAN', (0, first), (0, last)))
+        for last in pack_ends:
             # A rule the full width of the table wherever the package
-            # changes, so the merged cell reads as one block.
+            # changes.
             style_cmds.append(('LINEBELOW', (0, last), (-1, last), 0.8,
                                colors.HexColor("#C9D3DC")))
         tbl.setStyle(TableStyle(style_cmds))

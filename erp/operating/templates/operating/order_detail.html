@@ -2093,7 +2093,6 @@
       </section>
       {% endif %}
 
-      {% with has_packs=order.packs.exists %}
       {% if order.current_account_id or order.status != 'completed' or has_packs %}
       <!-- DOCUMENTS — the invoice (a printout, plus its Excel), the
            production sheet and the packing list, all built from this order
@@ -2125,7 +2124,6 @@
         </div>
       </section>
       {% endif %}
-      {% endwith %}
 
       {% if order.current_account %}
       <!-- CURRENT ACCOUNT — internal ledger snapshot -->

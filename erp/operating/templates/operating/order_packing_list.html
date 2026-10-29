@@ -2,7 +2,7 @@
 {% load i18n %}
 {% load humanize %}
 
-{% block title %}{% trans "Package list" %} · {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} | Nejum ERP{% endblock %}
+{% block title %}{% trans "Package list" %} · {{ number }} | Nejum ERP{% endblock %}
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -128,7 +128,7 @@
       <i class="fa fa-arrow-left"></i> {% trans "Back to order" %}
     </a>
     <span class="pk-sep">/</span>
-    <span class="pk-crumb-here">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
+    <span class="pk-crumb-here">{{ number }}</span>
   </div>
 
   <div class="pk-head">

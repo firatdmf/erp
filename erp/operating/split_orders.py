@@ -39,6 +39,30 @@ def split_halves(order):
                 .order_by("pk"))
 
 
+def order_packs(order):
+    """The packages of the whole order, numbered one run for all its halves.
+
+    The halves go out together, so a sack can hold goods off both books'
+    shelves: a split order's packages are those of every half, and the
+    rolls of either half may go into any of them. A package still belongs
+    to one half (Pack.order) — new ones to the first made, see
+    pack_holder — but that says nothing of what is in it."""
+    from .models import Pack
+    if order.split_group:
+        packs = Pack.objects.filter(order__split_group=order.split_group)
+    else:
+        packs = Pack.objects.filter(order=order)
+    return packs.select_related("order").order_by("pack_number", "order_id")
+
+
+def pack_holder(order):
+    """The order a new package of `order` is made on: the first made half,
+    whichever half the packer has open."""
+    if not order.split_group:
+        return order
+    return Order.objects.filter(split_group=order.split_group).order_by("pk").first()
+
+
 def lend_cargo_info(order, halves):
     """Give `order`, in memory only, the carrier, tracking number and
     shipping dates a sibling has and it lacks — so either half's page

@@ -583,6 +583,10 @@ class OrderDetail(DetailView):
             ctx["profit"] = profit_figures(
                 self.object, getattr(self.request.user, "member", None),
                 admin=self.request.user.is_superuser)
+        # The packing list is the whole order's, so it shows on every half
+        # once any half has a package.
+        from .split_orders import order_packs
+        ctx["has_packs"] = order_packs(self.object).exists()
         if len(halves) > 1:
             ctx["combined_number"] = combined_number(halves)
             ctx["this_book_name"] = getattr(
@@ -1728,19 +1732,25 @@ def order_pack_scan(request, pk):
     if frozen := frozen_error(order):
         messages.error(request, frozen)
         return redirect("operating:order_detail", pk=order.pk)
+    from .models import OrderStockReservation
+    from .split_orders import combined_number, order_packs, pack_holder, split_halves
+    # A split order is packed as the one shipment it is: every half's
+    # rolls, into the same packages.
+    halves = split_halves(order)
     reservations = list(
-        order.stock_reservations
+        OrderStockReservation.objects.filter(order__in=halves)
         .select_related("stock_item", "warehouse_product", "warehouse_product__warehouse", "pack")
         .order_by("-created_at")
     )
-    items = list(order.items.all().select_related("product", "product_variant", "pack"))
+    items = list(OrderItem.objects.filter(order__in=halves)
+                 .select_related("product", "product_variant", "pack"))
 
     # Auto-create Pack #1 the first time this order's packing screen is
     # opened — same convention as OrderPackingList. Retail orders pack
     # exactly like every other order.
-    if not order.packs.exists():
-        Pack.objects.create(order=order, pack_number=1)
-    packs = list(order.packs.order_by("pack_number"))
+    if not order_packs(order).exists():
+        Pack.objects.create(order=pack_holder(order), pack_number=1)
+    packs = list(order_packs(order))
 
     # Split into lines that have a physical stock item to scan ("tracked" — a
     # warehouse/roll match exists) vs. lines that never can (bought-and-
@@ -1749,7 +1759,10 @@ def order_pack_scan(request, pk):
     # untracked ones just need to be visible so staff know to physically
     # pack them too — shown as a plain checklist, not nested under
     # "Okutulan toplar" (there's nothing to scan for them).
-    tracked_map = order.classify_items_by_tracking(items)
+    tracked_map = {}
+    for half in halves:
+        tracked_map.update(half.classify_items_by_tracking(
+            [it for it in items if it.order_id == half.pk]))
     tracked_items = [it for it in items if tracked_map.get(it.pk, False)]
     untracked_items = [it for it in items if not tracked_map.get(it.pk, False)]
 
@@ -1768,6 +1781,7 @@ def order_pack_scan(request, pk):
 
     return render(request, "operating/order_pack_scan.html", {
         "order": order,
+        "number": combined_number(halves),
         "tracked_items": tracked_items,
         "untracked_items": untracked_items,
         "reservations": reservations,
@@ -1819,6 +1833,10 @@ def order_pack_reserve_add(request, pk):
     if not items:
         return JsonResponse({"ok": False, "error": _gettext("The order has no items.")}, status=400)
 
+    from .split_orders import order_packs, split_halves
+    # A split order's halves share their packages, so a roll either half
+    # holds is this order's to place.
+    halves = split_halves(order)
     rolls = list(WarehouseProductItem.objects
                  .select_related("product", "product__catalog_variant", "product__warehouse")
                  .filter(barcode__iexact=code))
@@ -1829,7 +1847,7 @@ def order_pack_reserve_add(request, pk):
         # sack places the next one rather than re-placing the last.
         from django.db.models import F, Q
         held = (OrderStockReservation.objects
-                .filter(order=order, consumed=False)
+                .filter(order__in=halves, consumed=False)
                 .filter(Q(warehouse_product__barcode__iexact=code)
                         | Q(warehouse_product__catalog_variant__variant_barcode__iexact=code))
                 .select_related("stock_item__product__catalog_variant",
@@ -1839,6 +1857,35 @@ def order_pack_reserve_add(request, pk):
     if not rolls:
         return JsonResponse({"ok": False, "kind": "not_found",
                              "error": _gettext("No stock item (roll) was found with this barcode.")}, status=404)
+
+    # The package this scan puts the roll into.
+    target_pack = None
+    pack_id = (request.POST.get("pack_id") or "").strip()
+    if pack_id:
+        target_pack = order_packs(order).filter(pk=pack_id).first()
+        if target_pack is None:
+            return JsonResponse({"ok": False, "error": _gettext("Package not found.")}, status=404)
+    place_only = (request.POST.get("place_only") or "").strip() == "1"
+
+    # Already reserved for this order? Re-scan is a no-op — unless a
+    # package is named and the roll is not in it yet, in which case the
+    # scan moves it there. was_pack_number is where it sat before, so the
+    # screen can say so without asking for a preview first. Asked before
+    # the product match: a roll the order holds was matched when it was
+    # taken, and one of the other half's matches none of this half's lines.
+    for roll in rolls:
+        existing = (OrderStockReservation.objects.select_related("pack")
+                    .filter(order__in=halves, stock_item=roll, consumed=False).first())
+        if existing:
+            was_pack_number = existing.pack.pack_number if existing.pack_id else None
+            moved = False
+            if target_pack is not None and existing.pack_id != target_pack.pk:
+                existing.pack = target_pack
+                existing.save(update_fields=["pack"])
+                moved = True
+            return JsonResponse({"ok": True, "duplicate": True, "moved": moved,
+                                 "placed": place_only, "was_pack_number": was_pack_number,
+                                 "reservation": _reservation_payload(existing)})
 
     # All rolls sharing this barcode whose product belongs to the order
     # (a barcode is code-unique but not DB-unique, so there can be more
@@ -1854,33 +1901,6 @@ def order_pack_reserve_add(request, pk):
             "error": _gettext("This stock item doesn't belong to any product on this order — not added."),
             "product_name": (rolls[0].product.name if rolls[0].product else ""),
         }, status=409)
-
-    # The package this scan puts the roll into.
-    target_pack = None
-    pack_id = (request.POST.get("pack_id") or "").strip()
-    if pack_id:
-        target_pack = Pack.objects.filter(pk=pack_id, order=order).first()
-        if target_pack is None:
-            return JsonResponse({"ok": False, "error": _gettext("Package not found.")}, status=404)
-    place_only = (request.POST.get("place_only") or "").strip() == "1"
-
-    # Already reserved for this order? Re-scan is a no-op — unless a
-    # package is named and the roll is not in it yet, in which case the
-    # scan moves it there. was_pack_number is where it sat before, so the
-    # screen can say so without asking for a preview first.
-    for roll, _mi in matched:
-        existing = (OrderStockReservation.objects.select_related("pack")
-                    .filter(order=order, stock_item=roll, consumed=False).first())
-        if existing:
-            was_pack_number = existing.pack.pack_number if existing.pack_id else None
-            moved = False
-            if target_pack is not None and existing.pack_id != target_pack.pk:
-                existing.pack = target_pack
-                existing.save(update_fields=["pack"])
-                moved = True
-            return JsonResponse({"ok": True, "duplicate": True, "moved": moved,
-                                 "placed": place_only, "was_pack_number": was_pack_number,
-                                 "reservation": _reservation_payload(existing)})
 
     # Nothing held for this roll, and the caller may only place what the
     # order already has. The product matching is not enough: the order
@@ -2011,12 +2031,15 @@ def order_pack_reserve_assign_pack(request, pk):
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": _gettext("Invalid reservation.")}, status=400)
-    r = OrderStockReservation.objects.filter(pk=rid, order=order, consumed=False).first()
+    from .split_orders import order_packs, split_halves
+    # Either half's roll, into any of the order's packages.
+    r = OrderStockReservation.objects.filter(
+        pk=rid, order__in=split_halves(order), consumed=False).first()
     if r is None:
         return JsonResponse({"ok": False, "error": _gettext("Reservation not found.")}, status=404)
     pack_id = (request.POST.get("pack_id") or "").strip()
     if pack_id:
-        pack = Pack.objects.filter(pk=pack_id, order=order).first()
+        pack = order_packs(order).filter(pk=pack_id).first()
         if pack is None:
             return JsonResponse({"ok": False, "error": _gettext("Package not found.")}, status=404)
         r.pack = pack
@@ -2046,12 +2069,13 @@ def order_pack_assign_item(request, pk):
     item_id = (request.POST.get("item_id") or "").strip()
     if not item_id.isdigit():
         return JsonResponse({"ok": False, "error": _gettext("Invalid line.")}, status=400)
-    item = OrderItem.objects.filter(pk=item_id, order=order).first()
+    from .split_orders import order_packs, split_halves
+    item = OrderItem.objects.filter(pk=item_id, order__in=split_halves(order)).first()
     if item is None:
         return JsonResponse({"ok": False, "error": _gettext("Line not found.")}, status=404)
     pack_id = (request.POST.get("pack_id") or "").strip()
     if pack_id:
-        pack = Pack.objects.filter(pk=pack_id, order=order).first()
+        pack = order_packs(order).filter(pk=pack_id).first()
         if pack is None:
             return JsonResponse({"ok": False, "error": _gettext("Package not found.")}, status=404)
         item.pack = pack
@@ -5351,15 +5375,20 @@ class OrderPackingList(View):
     template_name = "operating/order_packing_list.html"
 
     def get(self, request, pk):
+        from .models import OrderStockReservation
+        from .split_orders import combined_number, order_packs, pack_holder, split_halves
         order = get_object_or_404(Order, pk=pk)
+        # A split order has one list: every half's packages, opened from
+        # either half.
+        halves = split_halves(order)
         # Auto-create Pack #1 if none exist — order_pack_scan.html's
         # "drag into a package" panel assumes at least one exists. Never
         # on a terminal (cancelled/returned) order, though: that would
         # write a Pack as a GET side effect on a dead order.
-        if (not order.packs.exists()
+        if (not order_packs(order).exists()
                 and order.order_status not in {"cancelled", "returned"}):
-            Pack.objects.create(order=order, pack_number=1)
-        packs = list(order.packs.order_by("pack_number"))
+            Pack.objects.create(order=pack_holder(order), pack_number=1)
+        packs = list(order_packs(order))
         # Item numbers run 1..N across the whole order rather than
         # restarting inside each package, so a number read off this
         # screen means the same thing on the printed list and the Excel.
@@ -5373,10 +5402,12 @@ class OrderPackingList(View):
                 r["unit_label"] = units.unit_short(r["unit"])
         net_kg, gross_kg = _order_weights([p.weights for p in packs])
 
-        unassigned_count = order.stock_reservations.filter(pack__isnull=True).count()
+        unassigned_count = OrderStockReservation.objects.filter(
+            order__in=halves, pack__isnull=True).count()
 
         return render(request, self.template_name, {
             "order": order,
+            "number": combined_number(halves),
             "packs": packs,
             "net_kg": net_kg,
             "gross_kg": gross_kg,
@@ -5397,10 +5428,12 @@ class OrderPackingList(View):
         if order.order_status in {"cancelled", "returned"}:
             return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
         action = (request.POST.get("action") or "").strip()
+        from .split_orders import order_packs, pack_holder
 
         if action == "add_pack":
-            next_n = (order.packs.aggregate(m=models.Max("pack_number"))["m"] or 0) + 1
-            pack = Pack.objects.create(order=order, pack_number=next_n)
+            # Numbered on from every half's packages, made on the first half.
+            next_n = (order_packs(order).aggregate(m=models.Max("pack_number"))["m"] or 0) + 1
+            pack = Pack.objects.create(order=pack_holder(order), pack_number=next_n)
             return JsonResponse({
                 "ok": True,
                 "pack": {
@@ -5416,9 +5449,9 @@ class OrderPackingList(View):
                 pack_id = int(request.POST.get("pack_id") or 0)
             except (TypeError, ValueError):
                 return JsonResponse({"ok": False, "error": "Bad pack_id"}, status=400)
-            pack = get_object_or_404(Pack, pk=pack_id, order=order)
+            pack = get_object_or_404(order_packs(order), pk=pack_id)
             # Refuse to delete the last remaining pack.
-            if order.packs.count() <= 1:
+            if order_packs(order).count() <= 1:
                 return JsonResponse({"ok": False, "error": "Cannot delete the only pack"}, status=400)
             with transaction.atomic():
                 pack.delete()  # SET_NULL releases its stock_reservations back to unassigned
@@ -5431,7 +5464,8 @@ class OrderPackingList(View):
             except ValueError:
                 return JsonResponse({"ok": False, "error": "Bad pack_ids"}, status=400)
             with transaction.atomic():
-                current = set(order.packs.select_for_update().values_list("pk", flat=True))
+                current = set(order_packs(order).select_for_update(of=("self",))
+                              .values_list("pk", flat=True))
                 # Every package, each once — a stale screen that missed an
                 # add or delete must not leave a package unnumbered.
                 if len(ids) != len(current) or set(ids) != current:
@@ -5453,7 +5487,8 @@ def _set_pack_gross_kg(request, order):
         pack_id = int(request.POST.get("pack_id") or 0)
     except (TypeError, ValueError):
         return JsonResponse({"ok": False, "error": "Bad pack_id"}, status=400)
-    pack = get_object_or_404(Pack, pk=pack_id, order=order)
+    from .split_orders import order_packs
+    pack = get_object_or_404(order_packs(order), pk=pack_id)
     raw = (request.POST.get("gross_kg") or "").strip().replace(",", ".")
     try:
         value = Decimal(raw).quantize(Decimal("0.01")) if raw else None
@@ -5479,11 +5514,15 @@ def _renumber_packs(order, ordered_ids=None):
     cleared — the old QR carries the old number — and the label PDF
     draws a fresh one the next time it is printed.
 
+    A split order's packages are numbered as one run across its halves,
+    each keeping its own half's number in its code.
+
     Returns {pack_id: pack_number} for every package, for the screen to
     relabel its cards without a reload."""
     from django.utils import timezone
+    from .split_orders import order_packs
 
-    packs = list(order.packs.order_by("pack_number"))
+    packs = list(order_packs(order))
     if ordered_ids is not None:
         by_id = {p.pk: p for p in packs}
         packs = [by_id[i] for i in ordered_ids]
@@ -5497,7 +5536,7 @@ def _renumber_packs(order, ordered_ids=None):
         now = timezone.now()
         for n, p in moving:
             Pack.objects.filter(pk=p.pk).update(
-                pack_number=n, code=Pack.code_for(order, n), qr_code_url=None, updated_at=now)
+                pack_number=n, code=Pack.code_for(p.order, n), qr_code_url=None, updated_at=now)
     return {p.pk: n for n, p in enumerate(packs, start=1)}
 
 
@@ -5541,8 +5580,10 @@ def export_packing_list_excel(request, pk):
     from accounting.services_accounts import brand_name_for
     from openpyxl.styles import PatternFill
 
+    from .split_orders import combined_number, order_packs, split_halves
+
     order = Order.objects.get(pk=pk)
-    packs = list(order.packs.order_by("pack_number"))
+    packs = list(order_packs(order))
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -5567,7 +5608,7 @@ def export_packing_list_excel(request, pk):
     ws["A2"].font = Font(size=16, bold=True)
 
     ws["A3"] = "Order No"
-    ws["B3"] = order.order_number or str(order.pk)
+    ws["B3"] = combined_number(split_halves(order))
     ws["A4"] = "Date"
     ws["B4"] = _long_date(_order_dt, False)
     ws["A5"] = "Customer"
@@ -6526,8 +6567,10 @@ def order_packing_list_pdf(request, pk):
     from reportlab.platypus import Image as RLImage
     from .order_notifications import _ensure_pdf_fonts
 
+    from .split_orders import combined_number, order_packs, split_halves
+
     order = get_object_or_404(Order, pk=pk)
-    packs = list(order.packs.all().order_by("pack_number"))
+    packs = list(order_packs(order))
 
     lang = (get_language() or 'tr').lower()
     is_tr = lang.startswith('tr')
@@ -6621,7 +6664,7 @@ def order_packing_list_pdf(request, pk):
         # The list is numbered by the order's own id — the same 270 that
         # is in the URL of the packing screen this PDF prints.
         Paragraph(f"{labels['title']} {order.pk}", title_style),
-        Paragraph(f"<b>{labels['order_no']}:</b> {order.order_number or order.pk}", normal_style),
+        Paragraph(f"<b>{labels['order_no']}:</b> {combined_number(split_halves(order))}", normal_style),
         Paragraph(f"<b>{labels['date']}:</b> {_long_date(_order_dt, is_tr)}", normal_style),
         Paragraph(f"<b>{labels['customer']}:</b> {cust_name or '-'}", normal_style),
     ]

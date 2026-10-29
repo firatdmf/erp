@@ -17,6 +17,7 @@ from django.utils.translation import gettext as _
 from marketing import units
 
 from .models import Order, Pack
+from .split_orders import combined_number, order_packs, split_halves
 from .warehouse_label import inline_pdf_response
 
 LINES_PER_LABEL = 9
@@ -104,7 +105,10 @@ def labels_pdf_bytes(packs, title, link=None):
 
     for pack in packs:
         order = pack.order
-        of = order.packs.count()
+        # A split order's packages are one run across its halves, and a
+        # sack may hold either half's goods: the label names both.
+        halves = split_halves(order)
+        of = order_packs(order).count()
         lines = _pack_lines(pack)
         total = _total(lines)
         pages = [lines[i:i + LINES_PER_LABEL]
@@ -132,7 +136,7 @@ def labels_pdf_bytes(packs, title, link=None):
             # shrinks to fit rather than lose its tail. The package code
             # isn't printed: it is this number and "3 / 12" over again, and
             # the QR already opens this very package.
-            number = str(order.order_number or order.pk)
+            number = combined_number(halves)
             size = 20
             while size > 10 and c.stringWidth(number, bold, size) > W - M - x:
                 size -= 0.5
@@ -192,8 +196,7 @@ def pack_label(request, pack_pk):
 def order_pack_labels(request, pk):
     """Every package of an order, a label each, to print in one go."""
     order = get_object_or_404(Order, pk=pk)
-    packs = list(order.packs.select_related("order").order_by("pack_number"))
-    number = order.order_number or order.pk
-    pdf = labels_pdf_bytes(packs, title=f"{_('Package labels')} — {number}",
+    packs = list(order_packs(order))
+    pdf = labels_pdf_bytes(packs, title=f"{_('Package labels')} — {combined_number(split_halves(order))}",
                            link=_packing_list_link(request))
-    return inline_pdf_response(pdf, f"package-labels-{number}")
+    return inline_pdf_response(pdf, f"package-labels-{order.order_number or order.pk}")

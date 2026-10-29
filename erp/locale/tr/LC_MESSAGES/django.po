@@ -15221,3 +15221,16 @@ msgstr ""
 "Atandığı defterlerin depolarını, siparişlerini ve alımlarını yönetir; "
 "alımları onaylamak da buna dahildir. Kurulumun tamamına ait hiçbir şeyi "
 "yönetemez."
+
+msgid "PRODUCTION"
+msgstr "ÜRETİM"
+
+msgid "Production (beta)"
+msgstr "Üretim (beta)"
+
+#, python-format
+msgid "Open orders in %(book)s. Open one to start its production."
+msgstr "%(book)s içindeki açık siparişler. Üretimini başlatmak için birini açın."
+
+msgid "No open orders."
+msgstr "Açık sipariş yok."

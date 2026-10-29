@@ -173,6 +173,11 @@ urlpatterns = [
         of_a_customer_in_reach(views.OrderProduction.as_view()),
         name="order_production",
     ),
+    # Production is in beta: reached from the Operating menu, not from an
+    # order's documents. Scoped by book like the order list.
+    path("production/", views.ProductionOrderListRedirect.as_view(), name="production_orders"),
+    path("books/<int:book_id>/production/", book_scoped(views.ProductionOrderList.as_view()),
+         name="production_orders_scoped"),
     path(
         "orders/<int:pk>/packing_list/",
         # Guarded with the pack flow above, and for the same reason: the

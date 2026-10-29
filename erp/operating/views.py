@@ -5238,6 +5238,34 @@ class OrderProduction(View):
         )
 
 
+class ProductionOrderListRedirect(RedirectView):
+    """Send /operating/production/ — the menu's link, which knows no book —
+    to the working book's list, as OrderListRedirect does for orders."""
+    permanent = False
+
+    def get_redirect_url(self, *args, **kwargs):
+        from accounting.services_accounts import get_default_book
+        book = get_default_book(getattr(self.request.user, "member", None))
+        return reverse("operating:production_orders_scoped", kwargs={"book_id": book.pk})
+
+
+class ProductionOrderList(ListView):
+    """Production, in beta: one book's open orders, each opening its
+    production sheet. The sheet used to sit among an order's documents;
+    it lives here until it is ready for daily use."""
+    template_name = "operating/production_order_list.html"
+    context_object_name = "orders"
+
+    def get_queryset(self):
+        from django.db.models import Count
+        return (Order.objects
+                .filter(current_account__book=self.request.book,
+                        order_status__in=ORDER_LIST_OPEN_STATUSES)
+                .select_related("contact", "company", "web_client")
+                .annotate(line_count=Count("items"))
+                .order_by("-created_at"))
+
+
 # This is how machines read and update the order status.
 @csrf_exempt
 def machine_update_status(request):

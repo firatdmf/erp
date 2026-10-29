@@ -198,6 +198,9 @@ NAV_SECTIONS = [
                 {"label": _("Create order"), "icon": "plus-circle", "action": "openOrderSidebar"},
                 {"label": _("Order list"),   "icon": "list",        "url": "operating:order_list"},
             ]},
+            {"title": _("PRODUCTION"), "items": [
+                {"label": _("Production (beta)"), "icon": "factory", "url": "operating:production_orders"},
+            ]},
             {"title": _("WAREHOUSE"), "items": [
                 {"label": _("My warehouses"), "icon": "warehouse",   "url": "operating:warehouse_list"},
                 {"label": _("Add warehouse"), "icon": "plus-circle", "url": "operating:create_warehouse", "admin": True},

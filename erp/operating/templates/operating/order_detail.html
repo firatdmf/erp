@@ -2122,11 +2122,6 @@
             <i class="fa fa-file-excel"></i>{% trans "Invoice Excel" %}
           </a>
           {% endif %}
-          {% if order.status != 'completed' %}
-          <a href="{% url 'operating:order_production' order.pk %}" class="ord-btn ghost">
-            <i class="fa fa-industry"></i>{% trans "Production" %}
-          </a>
-          {% endif %}
           <a href="{% url 'operating:order_picking_list' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
             <i class="fa fa-clipboard-list"></i>{% trans "Picking list" %}
           </a>

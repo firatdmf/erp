@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Production (beta)" %} | Nejum ERP{% endblock %}
+
+{% block css %}
+{{ block.super }}
+<style>
+  /* Production is in beta: a plain list of the book's open orders, each
+     opening its production sheet. */
+  .po-wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 40px; font-family: var(--font-sans); }
+  .po-h { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; font: 800 22px var(--font-sans); color: #0F1419; }
+  .po-beta { font: 700 10.5px var(--font-sans); letter-spacing: .04em; text-transform: uppercase;
+    color: #92400E; background: #FEF3C7; border-radius: 999px; padding: 2px 8px; }
+  .po-sub { margin: 0 0 18px; color: #64748B; font-size: 13px; }
+  .po-card { background: #fff; border: 1.5px solid #E2E8EE; border-radius: 14px; overflow: hidden; }
+  .po-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .po-table th { text-align: left; font: 700 11px var(--font-sans); color: #64748B; text-transform: uppercase;
+    letter-spacing: .03em; padding: 10px 14px; background: #F8FAFC; border-bottom: 1px solid #E2E8EE; }
+  .po-table td { padding: 11px 14px; border-bottom: 1px solid #EEF2F6; color: #0F1419; }
+  .po-table tr:last-child td { border-bottom: 0; }
+  .po-table tbody tr:hover { background: #F8FAFC; }
+  .po-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .po-table a { font-weight: 700; color: #00696A; text-decoration: none; }
+  .po-table a:hover { text-decoration: underline; }
+  .po-empty { padding: 28px 14px; text-align: center; color: #64748B; }
+  @media (max-width: 640px) {
+    .po-table .po-date, .po-table .po-status { display: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="po-wrap">
+  <h1 class="po-h">{% trans "Production" %} <span class="po-beta">beta</span></h1>
+  <p class="po-sub">{% blocktrans with book=request.book.name %}Open orders in {{ book }}. Open one to start its production.{% endblocktrans %}</p>
+  <div class="po-card">
+    {% if orders %}
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>{% trans "Order" %}</th>
+          <th>{% trans "Customer" %}</th>
+          <th class="po-date">{% trans "Date" %}</th>
+          <th class="po-status">{% trans "Status" %}</th>
+          <th class="num">{% trans "Lines" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td><a href="{% url 'operating:order_production' order.pk %}">{{ order.order_number|default:order.pk }}</a></td>
+          <td>{% if order.contact %}{{ order.contact.name|capfirst }}{% elif order.company %}{{ order.company.name|capfirst }}{% elif order.web_client %}{{ order.web_client.name|default:order.web_client.username }}{% else %}—{% endif %}</td>
+          <td class="po-date">{{ order.order_date|date:"d.m.Y" }}</td>
+          <td class="po-status">{{ order.get_order_status_display }}</td>
+          <td class="num">{{ order.line_count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="po-empty">{% trans "No open orders." %}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

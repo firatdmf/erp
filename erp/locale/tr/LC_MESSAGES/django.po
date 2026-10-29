@@ -15168,3 +15168,10 @@ msgstr "Etiket yazdırma"
 
 msgid "Can print stock, roll and package labels."
 msgstr "Stok, top ve paket etiketlerini yazdırabilir."
+
+msgid ""
+"A Middle manager also confirms purchases, sees cost and profit, and prints "
+"labels, whatever else is ticked."
+msgstr ""
+"Orta düzey yönetici, başka ne işaretli olursa olsun alımları da onaylar, "
+"maliyet ve kârı görür ve etiket yazdırır."

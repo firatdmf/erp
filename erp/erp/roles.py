@@ -330,9 +330,9 @@ def is_middle_manager(actor):
     """True for a Member of the Middle manager type: the person who runs
     one business on an install carrying several.
 
-    It stands for three grants at once — managing (what Member 'admin'
-    means: erp.ownership.is_admin), confirming purchases, and seeing cost
-    and profit — and each of those is bounded by the books the member is
+    It stands for four grants at once — managing (what Member 'admin'
+    means: erp.ownership.is_admin), confirming purchases, seeing cost
+    and profit, and printing labels — and each of those is bounded by the books the member is
     assigned, because every page it opens is. What it never is, is
     erp.ownership.is_install_admin.
     """
@@ -422,15 +422,16 @@ def may_print_labels(actor):
     purchase line's rolls, a package's.
 
     A grant (the print_labels permission): labels go on the goods, which
-    is operations work, and who does it is set per person in Django
-    admin → Members. Superusers always may.
+    is operations work, and who does it is set per person in Settings →
+    Members & permissions. Superusers always may, and so does a Middle
+    manager, who runs a business's warehouses.
     """
     member, user = _member_and_user(actor)
     if member is None:
         return False
     if getattr(user, "is_superuser", False):
         return True
-    return _has_permission(member, PRINT_LABELS)
+    return _has_permission(member, PRINT_LABELS) or _has_permission(member, MIDDLE_MANAGER)
 
 
 def label_printers_only(view):

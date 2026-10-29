@@ -82,7 +82,7 @@ def _permission_grid():
     """Every member who can sign in, against every permission the app
     knows, for the Members & permissions tab: {"grid_permissions":
     [(name, label, description)], "grid_members": [{member, name, books,
-    granted: {name: bool}}]}. The permissions come from the app's own
+    granted: [(name, label, description, held)]}]}. The permissions come from the app's own
     list (authentication.models.ACCESS_LEVEL_CHOICES_DICT), so a new one
     shows here without touching this page."""
     from authentication.models import ACCESS_LEVEL_CHOICES_DICT, Member
@@ -98,7 +98,7 @@ def _permission_grid():
             "member": member,
             "name": member.user.get_full_name() or member.user.username,
             "books": ", ".join(b.name for b in member.books.all()),
-            "granted": [(name, name in held) for name, _label, _desc in permissions],
+            "granted": [(name, label, desc, name in held) for name, label, desc in permissions],
         })
     return {"grid_permissions": permissions, "grid_members": members}
 

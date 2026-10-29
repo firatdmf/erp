@@ -592,19 +592,19 @@
 }
 
 /* ───────── MEMBERS & PERMISSIONS ───────── */
-/* One row per member, one column per permission. The table scrolls
-   sideways in its card rather than squeezing the columns. */
-#Settings_Page .st-perm-wrap { overflow-x: auto; margin: 0 -22px; padding: 0 22px; }
-#Settings_Page .st-perm { width: 100%; border-collapse: collapse; font: 500 13px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink); }
-#Settings_Page .st-perm th, #Settings_Page .st-perm td { padding: 10px 8px; border-bottom: 1px solid var(--st-border); }
-#Settings_Page .st-perm thead th { font: 700 11.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-3); text-align: center; vertical-align: bottom; white-space: nowrap; cursor: help; }
-#Settings_Page .st-perm thead th:first-child { text-align: left; cursor: default; }
-#Settings_Page .st-perm td { text-align: center; }
-#Settings_Page .st-perm td:first-child { text-align: left; white-space: nowrap; }
-#Settings_Page .st-perm-name { font-weight: 700; }
-#Settings_Page .st-perm-sub { font-size: 11.5px; color: var(--st-ink-3); }
-#Settings_Page .st-perm input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--st-teal); cursor: pointer; }
-#Settings_Page .st-perm tbody tr:hover { background: var(--st-bg-soft); }
+/* One block per member: who, then their permissions as tick-box chips
+   across the card's full width, wrapping as they need. Nothing scrolls
+   sideways at any width. */
+#Settings_Page .st-perm { display: grid; }
+#Settings_Page .st-perm-row { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--st-border); }
+#Settings_Page .st-perm-row:last-child { border-bottom: none; }
+#Settings_Page .st-perm-name { font: 700 13.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink); }
+#Settings_Page .st-perm-sub { font: 500 11.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-3); overflow-wrap: anywhere; }
+#Settings_Page .st-perm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#Settings_Page .st-perm-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--st-border-strong); border-radius: 999px; font: 600 12px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); background: #fff; cursor: pointer; user-select: none; }
+#Settings_Page .st-perm-chip:hover { border-color: var(--st-teal); }
+#Settings_Page .st-perm-chip:has(input:checked) { background: var(--st-teal-bg); border-color: var(--st-teal); color: var(--st-teal-deep); }
+#Settings_Page .st-perm-chip input { width: 14px; height: 14px; margin: 0; accent-color: var(--st-teal); cursor: pointer; }
 #Settings_Page .st-perm-legend { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font: 500 12.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); }
 #Settings_Page .st-perm-legend b { color: var(--st-ink); }
 

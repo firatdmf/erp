@@ -6,7 +6,7 @@
 
 {% block css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=6" />
+<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=7" />
 {% endblock %}
 
 {% block content %}
@@ -595,37 +595,29 @@
             </div>
           </div>
           <div class="st-card-body">
-            <div class="st-perm-wrap">
-              <table class="st-perm">
-                <thead>
-                  <tr>
-                    <th>{% trans "Member" %}</th>
-                    {% for name, label, description in grid_permissions %}
-                    <th title="{% trans description %}">{% trans label %}</th>
-                    {% endfor %}
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for row in grid_members %}
-                  <tr>
-                    <td>
-                      <div class="st-perm-name">{{ row.name }}</div>
-                      <div class="st-perm-sub">@{{ row.member.user.username }}{% if row.member.user.is_superuser %} · {% trans "superuser" %}{% endif %}{% if row.books %} · {{ row.books }}{% endif %}</div>
-                    </td>
-                    {% for name, granted in row.granted %}
-                    <td>
-                      <input type="checkbox" name="granted" {% if granted %}checked{% endif %}
-                             aria-label="{{ row.name }} — {{ name }}"
-                             hx-post="{% url 'member_permission_update' %}" hx-trigger="change"
-                             hx-vals='{"member": "{{ row.member.pk }}", "permission": "{{ name }}"}'
-                             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                             hx-target="#settings-messages" hx-swap="innerHTML">
-                    </td>
-                    {% endfor %}
-                  </tr>
+            {% comment %}One row per member, their permissions as tick-box chips
+            that wrap onto the next line — never a table to scroll sideways.{% endcomment %}
+            <div class="st-perm">
+              {% for row in grid_members %}
+              <div class="st-perm-row">
+                <div class="st-perm-who">
+                  <div class="st-perm-name">{{ row.name }}</div>
+                  <div class="st-perm-sub">@{{ row.member.user.username }}{% if row.member.user.is_superuser %} · {% trans "superuser" %}{% endif %}{% if row.books %} · {{ row.books }}{% endif %}</div>
+                </div>
+                <div class="st-perm-chips">
+                  {% for name, label, description, granted in row.granted %}
+                  <label class="st-perm-chip" title="{% trans description %}">
+                    <input type="checkbox" name="granted" {% if granted %}checked{% endif %}
+                           hx-post="{% url 'member_permission_update' %}" hx-trigger="change"
+                           hx-vals='{"member": "{{ row.member.pk }}", "permission": "{{ name }}"}'
+                           hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                           hx-target="#settings-messages" hx-swap="innerHTML">
+                    {% trans label %}
+                  </label>
                   {% endfor %}
-                </tbody>
-              </table>
+                </div>
+              </div>
+              {% endfor %}
             </div>
             <ul class="st-perm-legend">
               {% for name, label, description in grid_permissions %}

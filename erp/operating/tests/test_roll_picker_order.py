@@ -139,8 +139,10 @@ class RollPicker(TestCase):
     def test_a_book_parameter_cannot_widen_past_the_assignment(self):
         self._top(self._shelf(self.laleli, Decimal("2.16")), "BC-THEIRS")
         self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-MINE")
+        # `book` only orders the list; naming an unassigned one reaches
+        # nothing of it.
         self.assertEqual(
-            [r["barcode"] for r in self._list(book=str(self.laleli.pk))], [])
+            [r["barcode"] for r in self._list(book=str(self.laleli.pk))], ["BC-MINE"])
 
     # --- cost -------------------------------------------------------
     def test_each_item_carries_its_cost_per_meter(self):

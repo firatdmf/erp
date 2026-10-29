@@ -14,8 +14,9 @@ the search silently stopped suggesting anything — on the create sidebar
 and the edit page alike. Nothing appeared server-side, because no
 request was ever sent.
 
-The parameters now travel in two hidden inputs the search pulls in with
-hx-include. The DOM is reachable from both scopes, so there is no
+The book now travels in a hidden input the search pulls in with
+hx-include (the toggle has since gone: the search reaches every
+assigned book). The DOM is reachable from both scopes, so there is no
 expression left to evaluate and nothing to be out of scope.
 
 Run with:
@@ -67,25 +68,13 @@ class TheSearchCarriesItsBook(TestCase):
             book_input, "the edit form lost the hidden book input")
         self.assertEqual(book_input.group(1), str(self.book.pk))
 
-    def test_the_search_pulls_both_parameters_in(self):
+    def test_the_search_pulls_the_book_in(self):
         resp = self.client.get(
             reverse("operating:edit_order", kwargs={"pk": self.order.pk}))
         html = resp.content.decode()
         search = re.search(r'id="co-product-search".*?>', html, re.S)
         self.assertIsNotNone(search, "the product search input is gone")
         self.assertIn("#co-book-input", search.group(0))
-        self.assertIn("#co-cross-book-input", search.group(0))
-        self.assertIn('id="co-cross-book-input"', html)
-
-    def test_the_toggle_writes_where_the_search_reads(self):
-        """Turning on "other books" has to reach the hidden input; a
-        script variable alone would leave the search on one book."""
-        with open(FORM, encoding="utf-8") as fh:
-            form = fh.read()
-        toggle = re.search(
-            r"window\.coToggleCrossBook = function.*?\n  \};", form, re.S)
-        self.assertIsNotNone(toggle)
-        self.assertIn("co-cross-book-input", toggle.group(0))
 
 
 class NoHxValsReachesIntoTheIife(TestCase):

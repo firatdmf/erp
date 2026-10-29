@@ -1,10 +1,10 @@
 """What the order form is ALLOWED to show, and what it says about it.
 
-The pickers stay inside the working book unless the form explicitly asks
-past it (`cross_book=1`, the "show my other books" toggle). Widening the
-view was never the danger — one order spanning two businesses was, and
-the SAVE is what prevents that by splitting. See
-test_cross_book_order_split for the other half.
+The pickers reach every book the member is assigned. Widening the view
+was never the danger — one order spanning two businesses was, and the
+SAVE is what prevents that by splitting. See test_cross_book_order_split
+for the other half. The book the form is working in only decides what
+comes first.
 
 Every row that can be picked names its book, because the line minted from
 it carries that book to the save. A row that could not say which shelf it
@@ -42,8 +42,10 @@ class CrossBookPicker(TestCase):
         product = Product.objects.create(title="Krep", sku="K24644")
         self.variant = ProductVariant.objects.create(
             product=product, variant_sku=SKU)
-        self.l_item = self._stock(self.laleli, "L-0001")
+        # Ergene's stock is entered first, so oldest-first alone would put
+        # it at the top of every list.
         self.e_item = self._stock(self.ergene, "E-0001")
+        self.l_item = self._stock(self.laleli, "L-0001")
 
         User = get_user_model()
         user = User.objects.create_superuser("seller", "s@t.com", "pw")
@@ -54,7 +56,7 @@ class CrossBookPicker(TestCase):
 
     def _stock(self, book, barcode):
         wh = Warehouse.objects.create(
-            name=f"{book.name} depo", accounting_book=book)
+            name=f"Depo {book.name[0]}", accounting_book=book)
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name="Krep", sku=SKU, quantity=Decimal("50"),
             catalog_variant=self.variant)
@@ -68,27 +70,36 @@ class CrossBookPicker(TestCase):
         self.assertEqual(resp.status_code, 200)
         return json.loads(resp.content)["rolls"]
 
-    # ── default: one book ───────────────────────────────────────────
-    def test_the_roll_list_stays_in_the_working_book(self):
-        barcodes = {r["barcode"] for r in self._rolls(book=self.laleli.pk)}
-        self.assertEqual(barcodes, {"L-0001"})
+    def _search(self, **params):
+        return self.client.get(
+            reverse("operating:product_autocomplete"),
+            {"product": "Krep", **params}).content.decode()
 
-    def test_the_toggle_opens_the_other_book(self):
-        barcodes = {r["barcode"]
-                    for r in self._rolls(book=self.laleli.pk, cross_book="1")}
+    # ── the roll list ───────────────────────────────────────────────
+    def test_the_roll_list_reaches_every_assigned_book(self):
+        barcodes = {r["barcode"] for r in self._rolls(book=self.laleli.pk)}
         self.assertEqual(barcodes, {"L-0001", "E-0001"})
+
+    def test_the_working_books_rolls_come_first(self):
+        """Goods sold by count are taken off the top of this list, so the
+        working book's own stock has to lead it, however old the other
+        book's is."""
+        self.assertEqual(
+            [r["barcode"] for r in self._rolls(book=self.laleli.pk)],
+            ["L-0001", "E-0001"])
+        self.assertEqual(
+            [r["barcode"] for r in self._rolls(book=self.ergene.pk)],
+            ["E-0001", "L-0001"])
 
     def test_every_roll_row_names_its_book(self):
         """The card tags its line from this, and the save splits on the
         tag — a row that cannot say which shelf it came from would make
         the whole split guesswork."""
-        for row in self._rolls(book=self.laleli.pk, cross_book="1"):
-            self.assertIn("book_id", row)
-            self.assertIn(row["book"], {"Laleli Fabric", "Ergene Fabric"})
-        by_bc = {r["barcode"]: r for r in
-                 self._rolls(book=self.laleli.pk, cross_book="1")}
+        by_bc = {r["barcode"]: r for r in self._rolls(book=self.laleli.pk)}
         self.assertEqual(by_bc["L-0001"]["book_id"], self.laleli.pk)
+        self.assertEqual(by_bc["L-0001"]["book"], "Laleli Fabric")
         self.assertEqual(by_bc["E-0001"]["book_id"], self.ergene.pk)
+        self.assertEqual(by_bc["E-0001"]["book"], "Ergene Fabric")
 
     # ── the search ──────────────────────────────────────────────────
     def test_one_variant_is_one_row_however_many_shelves_hold_it(self):
@@ -96,33 +107,37 @@ class CrossBookPicker(TestCase):
         only make the reader choose between things they cannot tell
         apart — the shelves come WITH the row, and the stock item list
         names the book of every barcode."""
-        resp = self.client.get(
-            reverse("operating:product_autocomplete"),
-            {"product": "Krep", "book": self.laleli.pk, "cross_book": "1"})
-        body = resp.content.decode()
+        body = self._search(book=self.laleli.pk)
         self.assertEqual(body.count("selectProduct("), 1, body)
         # Both books are named on that one row, because knowing a product
         # is held by two businesses is the useful thing before opening it.
         self.assertIn("Laleli Fabric", body)
         self.assertIn("Ergene Fabric", body)
 
+    def test_the_working_books_shelf_is_named_first(self):
+        body = self._search(book=self.laleli.pk)
+        self.assertLess(body.index("Depo L"), body.index("Depo E"), body)
+
     def test_the_pick_carries_no_book(self):
         """The book belongs to each stock item, not to the product. A row
         that guessed one would put the whole line in that book however the
         stock items were actually ticked."""
-        resp = self.client.get(
-            reverse("operating:product_autocomplete"),
-            {"product": "Krep", "book": self.laleli.pk, "cross_book": "1"})
-        body = resp.content.decode()
+        body = self._search(book=self.laleli.pk)
         self.assertNotIn(f",{self.ergene.pk},'Ergene Fabric')", body)
         self.assertNotIn(f",{self.laleli.pk},'Laleli Fabric')", body)
 
-    def test_the_search_stays_narrow_without_the_toggle(self):
-        resp = self.client.get(
-            reverse("operating:product_autocomplete"),
-            {"product": "Krep", "book": self.laleli.pk})
-        body = resp.content.decode()
-        self.assertNotIn("Ergene Fabric", body)
+    def test_a_one_book_member_sees_no_book_badge(self):
+        """With one book every row would carry the same badge."""
+        User = get_user_model()
+        user = User.objects.create_user("solo", "solo@t.com", "pw")
+        user.member.books.set([self.laleli])
+        user.member.default_book = self.laleli
+        user.member.save()
+        self.client.force_login(user)
+        body = self._search(book=self.laleli.pk)
+        self.assertIn("selectProduct(", body)
+        self.assertNotIn("pa-stock--book", body)
+        self.assertNotIn("Ergene", body)
 
     # ── the scan ────────────────────────────────────────────────────
     def test_a_scanned_barcode_reports_its_book(self):
@@ -130,14 +145,8 @@ class CrossBookPicker(TestCase):
         picked out of the list, or scanning would dodge the split."""
         resp = self.client.get(
             reverse("operating:order_create_barcode_check"),
-            {"barcode": "E-0001", "sku": SKU, "cross_book": "1"})
+            {"barcode": "E-0001", "sku": SKU, "book": self.laleli.pk})
         d = json.loads(resp.content)
         self.assertTrue(d["ok"])
         self.assertEqual(d["book_id"], self.ergene.pk)
         self.assertEqual(d["book"], "Ergene Fabric")
-
-    def test_a_scan_cannot_reach_another_book_without_the_toggle(self):
-        resp = self.client.get(
-            reverse("operating:order_create_barcode_check"),
-            {"barcode": "E-0001", "sku": SKU, "book": self.laleli.pk})
-        self.assertEqual(resp.status_code, 404)

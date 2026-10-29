@@ -1371,7 +1371,7 @@ def _outsourced_qty(item_data):
     return val if val > 0 else _PDecimal("0")
 
 
-def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
+def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None, first_book=None):
     """Find a WarehouseProductItem by barcode whose product matches
     target_sku (variant SKU or plain warehouse SKU) directly. Used when
     the caller already knows exactly which product/variant a barcode
@@ -1383,7 +1383,9 @@ def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
     Pass `books` to restrict the search to the shelves those books own —
     a scan from an order in one book must not reach another book's
     stock. Left None for the internal callers that are already working
-    within a known order's own rolls."""
+    within a known order's own rolls. `first_book` is the book whose
+    stock a printed barcode should come off first (see
+    _batches_by_printed_barcode)."""
     from .models import WarehouseProductItem
     target = (target_sku or "").strip().lower()
     if not target:
@@ -1399,7 +1401,7 @@ def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
         # Not a stock item's own code. For goods sold by count it may be
         # the barcode printed on every piece — which names the product,
         # and the oldest of its stock with anything free is the one.
-        batches = list(_batches_by_printed_barcode(code, books))
+        batches = list(_batches_by_printed_barcode(code, books, first_book=first_book))
         if not batches:
             return None, "not_found"
         mine = [b for b in batches if target in (
@@ -1422,7 +1424,7 @@ def _lookup_roll_by_barcode_for_sku(code, target_sku, books=None):
     return None, "wrong_product"
 
 
-def _batches_by_printed_barcode(code, books=None):
+def _batches_by_printed_barcode(code, books=None, first_book=None):
     """The live stock of whatever product(s) carry `code` as their
     PRINTED barcode — oldest first, the order it should leave in.
 
@@ -1431,6 +1433,7 @@ def _batches_by_printed_barcode(code, books=None):
     that named a whole fabric would not say which roll was meant.
 
     `books` confines it to those books' shelves, as everywhere else.
+    `first_book`'s shelves come before the rest, oldest first within each.
     """
     from django.db.models import Q
     from django.db.models.functions import TruncDate
@@ -1447,7 +1450,10 @@ def _batches_by_printed_barcode(code, books=None):
           .filter(product__catalog_variant__product__tracking="variant"))
     if books is not None:
         qs = qs.filter(product__warehouse__accounting_book__in=books)
-    return qs.order_by(TruncDate("scanned_at"), "pk")
+    order = [TruncDate("scanned_at"), "pk"]
+    if first_book:
+        order.insert(0, _book_first(first_book))
+    return qs.order_by(*order)
 
 
 def _create_roll_reservation(order, order_item, roll, req_meters, user):
@@ -2151,13 +2157,11 @@ def order_create_barcode_check(request):
     sku = (request.GET.get("sku") or "").strip()
     if not code or not sku:
         return JsonResponse({"ok": False, "error": _gettext("The barcode or the product is missing.")}, status=400)
+    books = _books_in_scope(request)
     roll, err = _lookup_roll_by_barcode_for_sku(
-        code, sku, books=_books_in_scope(request))
+        code, sku, books=books,
+        first_book=_picker_working_book_id(request, books))
     if err == "not_found":
-        other = _other_book_holding(code, request)
-        if other is not None:
-            return JsonResponse({"ok": False, "kind": "wrong_book",
-                                 "error": _wrong_book_error(other, request)}, status=404)
         return JsonResponse({"ok": False, "kind": "not_found", "error": _gettext("No stock item was found with this barcode.")}, status=404)
     if err == "wrong_product":
         return JsonResponse({"ok": False, "kind": "wrong_product", "error": _gettext("This stock item doesn't belong to this product.")}, status=409)
@@ -2361,51 +2365,6 @@ def _settle_sibling(request, sibling, book, member, currency=None):
         generate_machine_qr_for_order(sibling)
     except Exception:
         pass
-
-
-def _other_book_holding(code, request, member=None):
-    """The member's OWN book, other than the ones this request may reach,
-    that holds this barcode — or None.
-
-    A scan narrowed to one book reports "no such barcode", which is true
-    of that shelf and useless to the person holding the roll: it exists,
-    it is simply another business's. Naming the book turns a dead end
-    into an instruction, without widening what the scan may actually
-    reserve.
-    """
-    from accounting.services_accounts import member_books
-    from .models import WarehouseProductItem
-
-    in_scope = {b.pk for b in _books_in_scope(request)}
-    mine = {b.pk: b for b in member_books(
-        member if member is not None else getattr(request.user, "member", None))}
-    elsewhere = [pk for pk in mine if pk not in in_scope]
-    if not elsewhere:
-        return None
-    roll = (WarehouseProductItem.objects
-            .select_related("product__warehouse__accounting_book")
-            .filter(barcode__iexact=code,
-                    product__warehouse__accounting_book__in=elsewhere)
-            .first())
-    if roll is None:
-        return None
-    return roll.product.warehouse.accounting_book
-
-
-def _wrong_book_error(book, request):
-    """The message a scan gets when the roll is real but stands in another
-    of the member's books.
-
-    One message for both forms, because they now do the same thing: tick
-    the toggle and the basket may hold both books, since the save sends
-    each line to that book's own order. It briefly said something else
-    while editing — that no such order was possible — which was true only
-    for as long as an edit refused to split.
-    """
-    from django.utils.translation import gettext as _
-    return _("That barcode is on %(book)s's shelf. Tick “Show stock from my "
-             "other books” to add it — the order is split by book when "
-             "you save.") % {"book": book.name}
 
 
 def _working_book(request, member, allowed=None):
@@ -2666,31 +2625,43 @@ def _split_summary_message(created):
 
 
 def _books_in_scope(request):
-    """The books whose shelves this request may draw stock from.
+    """The books whose shelves this request may draw stock from: every
+    book the member is assigned.
 
-    The member's assignments, narrowed to one book when the form says
-    which it is working in. The `book` parameter arrives from the
-    browser, so it can only ever narrow — never widen past what the
-    member is assigned.
+    Stock belongs to the book that owns its warehouse, and an order line
+    off another book's shelf would bill a different business's asset to
+    this book's current account. The pickers still offer every assigned
+    book, because the SAVE is what keeps them apart: it splits the basket
+    into one order per book, each billing its own account. Widening the
+    view was never the danger; one order spanning two businesses was.
 
-    Stock belongs to the book that owns its warehouse. Offering a line
-    from another book's shelf promises a different business's asset and
-    bills it to this book's current account — which is why the form asks
-    for one book by default, and why `cross_book=1` (the "also show other
-    books" toggle) does not lift that rule so much as change who settles
-    it: the picker may then show every shelf the member is assigned, and
-    the SAVE splits the basket into one order per book so each still
-    bills its own account. Widening the view was never the danger; one
-    order spanning two businesses was.
+    The book the form is working in only decides what comes FIRST — see
+    _picker_working_book_id.
     """
     from accounting.services_accounts import member_books
-    allowed = member_books(getattr(request.user, "member", None))
-    if (request.GET.get("cross_book") or "").strip() in {"1", "true", "on"}:
-        return allowed
+    return member_books(getattr(request.user, "member", None))
+
+
+def _picker_working_book_id(request, books):
+    """The id of the book the order form is working in, when it named one
+    of `books` — else None. Its shelves are listed first, so the usual
+    pick is still the top one and stock taken by count comes off its own
+    shelves before another book's."""
     asked = (request.GET.get("book") or "").strip()
-    if asked.isdigit():
-        allowed = allowed.filter(pk=int(asked))
-    return allowed
+    if asked.isdigit() and books.filter(pk=int(asked)).exists():
+        return int(asked)
+    return None
+
+
+def _book_first(book_id, path="product__warehouse__accounting_book_id"):
+    """An order_by term that puts `book_id`'s shelves before the rest, or
+    None when there is no book to favour. Goes ahead of whatever order a
+    list already has, which then holds within each book."""
+    from django.db.models import Case, IntegerField, Value, When
+    if not book_id:
+        return None
+    return Case(When(**{path: book_id}, then=Value(0)),
+                default=Value(1), output_field=IntegerField())
 
 
 @login_required
@@ -2706,25 +2677,26 @@ def order_create_barcode_resolve(request):
     if not code:
         return JsonResponse({"ok": False, "error": _gettext("The barcode is missing.")}, status=400)
     from .models import WarehouseProductItem
-    roll = (WarehouseProductItem.objects
-            .select_related("product__warehouse",
-                            "product__catalog_variant__product")
-            .filter(barcode__iexact=code, status__in=["in_stock", "partial"])
-            .filter(product__warehouse__accounting_book__in=_books_in_scope(request))
-            .first())
+    books = _books_in_scope(request)
+    first_book = _picker_working_book_id(request, books)
+    rolls = (WarehouseProductItem.objects
+             .select_related("product__warehouse",
+                             "product__catalog_variant__product")
+             .filter(barcode__iexact=code, status__in=["in_stock", "partial"])
+             .filter(product__warehouse__accounting_book__in=books))
+    if first_book:
+        rolls = rolls.order_by(_book_first(first_book), "pk")
+    roll = rolls.first()
     editing = _editing_order_id(request)
     if roll is None:
         # The barcode printed on goods sold by count names their product;
-        # the oldest batch of it with anything free stands for it.
-        batches = list(_batches_by_printed_barcode(code, _books_in_scope(request)))
+        # the oldest batch of it with anything free stands for it — the
+        # working book's own first.
+        batches = list(_batches_by_printed_barcode(code, books, first_book=first_book))
         roll = (next((b for b in batches
                       if _roll_available_meters(b, exclude_order_id=editing) > 0), None)
                 or (batches[0] if batches else None))
     if roll is None:
-        other = _other_book_holding(code, request)
-        if other is not None:
-            return JsonResponse({"ok": False, "kind": "wrong_book",
-                                 "error": _wrong_book_error(other, request)}, status=404)
         return JsonResponse({"ok": False, "error": _gettext("No stock item was found with this barcode.")}, status=404)
     avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
@@ -2800,11 +2772,14 @@ def free_rolls_response(request, books):
     """The free stock items of `?sku=` on the shelves `books` own, as the
     JSON the roll pickers read — oldest first, each with its book. The
     order form passes the books the request may draw from; the quote form
-    passes every book, because a quote only names rolls and holds none."""
+    passes every book, because a quote only names rolls and holds none.
+    The book the form is working in is listed first: goods sold by count
+    are taken off the top of this list."""
     sku = (request.GET.get("sku") or "").strip()
     if not sku:
         return JsonResponse({"ok": False, "error": _gettext("The product is missing.")}, status=400)
-    free = free_stock_items(sku, books, exclude_order_id=_editing_order_id(request), limit=60)
+    free = free_stock_items(sku, books, exclude_order_id=_editing_order_id(request), limit=60,
+                            first_book=_picker_working_book_id(request, books))
 
     # Each item's cost per unit, beside its quantity — the same basis as
     # the sort in free_stock_items. A sales rep is sent the price derived
@@ -2849,14 +2824,17 @@ def free_rolls_response(request, books):
     })
 
 
-def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefront=False):
+def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefront=False,
+                     first_book=None):
     """[(stock item, free quantity)] of `sku` on the shelves `books` own —
     oldest first, only items with something left once other orders' holds
     are taken off. The order form's roll picker and the storefront's read
     the same list, so a customer is never offered a roll staff can't sell.
     `exclude_order_id` drops one order's own holds (an edit form re-picking
     what it already holds); `limit` caps how many items are looked at;
-    `on_storefront` keeps to the warehouses the storefront offers."""
+    `on_storefront` keeps to the warehouses the storefront offers;
+    `first_book`'s shelves come before the rest, oldest first within
+    each, so the cap never hides that book's stock behind another's."""
     from django.db.models import DecimalField, F, Q
     from django.db.models.functions import Coalesce, TruncDate
     from .models import WarehouseProductItem
@@ -2910,11 +2888,11 @@ def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefron
     )
     if on_storefront:
         rolls = rolls.filter(product__warehouse__on_storefront=True)
-    rolls = (
-        rolls
-        .order_by(TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),
-                  F("unit_cost").asc(nulls_last=True), "pk")
-    )
+    order = [TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),
+             F("unit_cost").asc(nulls_last=True), "pk"]
+    if first_book:
+        order.insert(0, _book_first(first_book))
+    rolls = rolls.order_by(*order)
     rolls = list(rolls[:limit] if limit else rolls)
     # One grouped aggregate for the whole page of stock_items, not
     # _roll_available_meters() per roll — that was a SUM query each, and
@@ -6058,20 +6036,21 @@ def product_autocomplete(request):
         return reduce(_op.or_, (Q(**{f"{field}__icontains": v}) for v in q_variants))
 
     # ── 1) Warehouse hits, grouped by their catalog variant ──────────
-    # Only the working book's shelves. Offering a line from a warehouse
-    # the book does not own means promising stock that is another
-    # business's asset, and the order would bill it to this book's current account.
-    # `book` is what the form is working in; it is still checked against
-    # the member's assignments, because it arrives from the browser.
+    # Every book the member is assigned. A line off another book's shelf
+    # is not billed to this one: the save sends it to that book's own
+    # order. Each row names the books holding it, so the reader knows
+    # whose stock it is before picking.
     allowed = _books_in_scope(request)
-    # The book the form is working in, when it named one. Decides which
-    # shelf's cost a row pre-fills with; see warehouse_cost.
-    _asked = (request.GET.get("book") or "").strip()
-    working_book_id = int(_asked) if _asked.isdigit() else None
-    # Whether the form asked to see past its own book. Only changes what
-    # the ROW says here — the save is what keeps the books apart.
-    cross_book = (request.GET.get("cross_book") or "").strip() in {"1", "true", "on"}
+    # The book the form is working in, when it named one of them. Its
+    # shelves are listed first, and it decides which shelf's cost a row
+    # pre-fills with; see warehouse_cost.
+    working_book_id = _picker_working_book_id(request, allowed)
+    # With only one book, every row would carry the same badge.
+    several_books = allowed.count() > 1
 
+    order = ["name"]
+    if working_book_id:
+        order.insert(0, _book_first(working_book_id, "warehouse__accounting_book_id"))
     wh_rows = (
         WarehouseProduct.objects
         .filter(catalog_variant__isnull=False)
@@ -6083,7 +6062,7 @@ def product_autocomplete(request):
                         "catalog_variant__product__category")
         .prefetch_related("catalog_variant__product_variant_attribute_values"
                           "__product_variant_attribute")
-        .order_by("name")[:60]
+        .order_by(*order)[:60]
     )
     # What is actually SELLABLE, not what is on the shelf: meters already
     # reserved into another order are spoken for, and offering them here is
@@ -6106,6 +6085,9 @@ def product_autocomplete(request):
     # This used to group by (variant, book) so a pick could say which book
     # it meant. The book is a fact about the ROLL, not about the product,
     # and reading it off the rolls says it exactly once, where it is true.
+    #
+    # Rows and their shelves keep the query's order, so whatever the
+    # working book holds comes first.
     wh_groups = {}          # variant_id -> {"wp", "wps", "books", "stocks"}
     for wp in wh_rows:
         wh = wp.warehouse
@@ -6296,12 +6278,12 @@ def product_autocomplete(request):
         return "".join(out)
 
     def book_cell(books):
-        """Which books hold this product. Drawn only when the search was
-        allowed past one — on an ordinary single-book search every row
-        would carry the same badge, which tells the reader nothing and
-        crowds the row. A product held by two businesses shows both,
-        because that is the useful thing to know before opening it."""
-        if not (cross_book and books):
+        """Which books hold this product. Drawn only for a member with
+        more than one book — with a single book every row would carry the
+        same badge, which tells the reader nothing and crowds the row. A
+        product held by two businesses shows both, because that is the
+        useful thing to know before opening it."""
+        if not (several_books and books):
             return ""
         return "".join(
             f"<span class='pa-stock pa-stock--book'>{escape((n or '')[:18])}</span>"

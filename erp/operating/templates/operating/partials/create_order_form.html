@@ -268,12 +268,6 @@
   person already has.{% endcomment %}
   <input type="hidden" name="book" id="co-book-input"
          value="{% if order %}{{ order.current_account.book_id|default:'' }}{% else %}{{ current_book.pk|default:'' }}{% endif %}">
-  {% comment %}Read by the product search through hx-include, and written by
-  the "other books" toggle. It lives in the DOM rather than in a js: hx-vals
-  expression because the form's script is wrapped in an IIFE: htmx evaluates
-  hx-vals with Function(), whose body only sees globals, so a variable
-  declared in there is a ReferenceError that aborts the request.{% endcomment %}
-  <input type="hidden" name="cross_book" id="co-cross-book-input" value="">
   {% if order %}
     {# Hydration payload for edit mode — read by the script below. #}
     {{ order_items_payload|json_script:"existing-order-items" }}
@@ -514,39 +508,14 @@
         <label>{% trans "Search Product" %}</label>
         <input type="text" id="co-product-search" class="form-input" placeholder="Name, SKU or variant SKU..."
           hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
-          {% comment %}Which book's shelves to search. The server checks it
-          against the member's assignments, so this only narrows. Pulled from
-          the two hidden inputs on every keystroke rather than baked in,
-          because the "other books" toggle changes the answer while the form
-          is open.{% endcomment %}
-          hx-include="#co-book-input, #co-cross-book-input"
+          {% comment %}The search reaches every book the member is assigned;
+          the book the form is working in only puts its own stock first.
+          Pulled from the hidden input on every keystroke rather than baked
+          in.{% endcomment %}
+          hx-include="#co-book-input"
           hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
       </div>
       <div id="co-product-results" class="co-autocomplete-results"></div>
-
-      {% comment %}Opt in to the other books. Stock belongs to the book that
-      owns its warehouse, so this does not put two businesses' goods on one
-      order — it lets you pick them in one pass, and the save writes one
-      order per book, each billing its own current account.
-
-      Offered while EDITING too, and meaning the same thing: this order
-      keeps its own book's lines, and anything from another book goes to
-      that book's order — the one this was already split with, or a new
-      one. What changes is where a line lands, never which book an order
-      belongs to.{% endcomment %}
-      <label id="co-cross-book-row"
-             style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;
-                    border:1px dashed #CBD5E1;border-radius:7px;font-size:11.5px;
-                    color:#475569;cursor:pointer;">
-        <input type="checkbox" id="co-cross-book" style="margin:0;flex-shrink:0;"
-               onchange="coToggleCrossBook(this.checked)">
-        <span>
-          <strong>{% trans "Show stock from my other books" %}</strong><br>
-          <span style="color:#94A3B8;">
-            {% trans "Lines are grouped by book and saved as one order per book — each billing its own current account." %}
-          </span>
-        </span>
-      </label>
 
       {% comment %}Add a stock item by barcode with NO product selected:
       the endpoint resolves the item's product and the form adds the line
@@ -760,6 +729,11 @@
   </div>
 
   <div class="sidebar-footer" style="padding:0;border:none;margin-top:12px; display:flex; flex-direction:column; gap:6px; align-items:stretch;">
+    {% comment %}Said right above the button once the basket draws on two
+    books, so nobody splits an order without seeing it. Filled by
+    coRenderSplitNote.{% endcomment %}
+    <div id="co-split-note" style="display:none;font-size:11.5px;color:#0F766E;background:#ECFDF5;
+         border:1px solid #A7F3D0;border-radius:7px;padding:7px 10px;"></div>
     <button type="submit" id="submit_order_button" class="btn btn-primary w-full" style="flex:1;justify-content:center;">
       <i class="fas fa-check"></i> {% if order %}{% trans "Save changes" %}{% else %}{% trans "Place Order" %}{% endif %}
     </button>
@@ -1568,52 +1542,22 @@
   }
   function coOrderParam() { return CO_ORDER_ID ? ('&order=' + CO_ORDER_ID) : ''; }
 
-  // Off by default: an order almost always draws on one book, and
-  // showing every shelf by default would make picking the wrong
-  // business's stock a one-click mistake on the common case. Turned on,
-  // the pickers widen to every book the member is assigned, each row
-  // badged — and the SAVE then splits the basket into one order per book
-  // so nothing is billed to a business that did not supply it.
-  var coCrossBook = false;
-  function coCrossBookParam() { return coCrossBook ? '&cross_book=1' : ''; }
-
-  // The shelves a picker request may reach.
+  // The pickers reach every book the member is assigned, and the SAVE
+  // splits the basket into one order per book so nothing is billed to a
+  // business that did not supply it. The working book is still sent:
+  // the server lists its stock first.
   //
-  // A card that already knows its book PINS the request to that book and
-  // is never widened: one line's stock ships off one business's shelf, so
-  // a scan into it can only mean that book's roll. Everything else — the
-  // global scanner, a card with no book yet — takes the form's working
-  // book, widened only when the "other books" toggle is on.
-  //
-  // The working book is read off the hidden input rather than a variable,
-  // so this cannot drift from what the product search sends through
-  // hx-include; they are the same value read the same way.
-  function coScopeParams() {
+  // Read off the hidden input rather than a variable, so this cannot
+  // drift from what the product search sends through hx-include; they
+  // are the same value read the same way.
+  function coWorkingBookId() {
     var el = document.getElementById('co-book-input');
-    var v = el ? (el.value || '').trim() : '';
-    // cross_book widens past `book` server-side, so the two are never
-    // both meaningful — send the toggle only when nothing is pinned.
-    return (v ? ('&book=' + encodeURIComponent(v)) : '') + coCrossBookParam();
+    return el ? (el.value || '').trim() : '';
   }
-
-  window.coToggleCrossBook = function (on) {
-    coCrossBook = !!on;
-    // The search reads this off the DOM, so the toggle has to write it
-    // there — the roll-list fetches below read the variable directly.
-    var xb = document.getElementById('co-cross-book-input');
-    if (xb) xb.value = coCrossBook ? '1' : '';
-    // Lines already picked keep their book; only what the pickers OFFER
-    // changes. Re-fetch each card's roll list so a card can gain (or
-    // lose) nothing it was not entitled to — the per-card book filter in
-    // fetchAvailableRolls still applies.
-    orderItems.forEach(function (it) {
-      it.rollsLoading = true;
-      fetchAvailableRolls(it.index, it.sku);
-    });
-    renderProducts();
-    var res = document.getElementById('co-product-results');
-    if (res) res.innerHTML = '';
-  };
+  function coScopeParams() {
+    var v = coWorkingBookId();
+    return v ? ('&book=' + encodeURIComponent(v)) : '';
+  }
 
   // `startAtOne` false: the caller takes the first piece itself (a scan).
   function coSelectProduct(sku, variant, title, price, categoryName, stock, allowOversell, isCost, counted, startAtOne) {
@@ -1995,9 +1939,23 @@
     if (toggle) toggle.addEventListener('change', function () { coRenderDepositBoxes(); });
   })();
 
+  // One line above the save button while the basket spans two books: the
+  // save writes one order per book, and that should not be a surprise.
+  function coRenderSplitNote() {
+    const note = document.getElementById('co-split-note');
+    if (!note) return;
+    const books = coBooksInPlay();
+    if (books.length < 2) { note.style.display = 'none'; note.textContent = ''; return; }
+    note.innerHTML = '<i class="fas fa-code-branch" style="margin-right:5px;"></i>' +
+      esc('{% trans "This will be saved as one order per book:" %}') + ' <strong>' +
+      books.map(function (b) { return esc(b.name); }).join(', ') + '</strong>';
+    note.style.display = '';
+  }
+
   function renderProducts(opts) {
     opts = opts || {};
     coRenderDepositBoxes();
+    coRenderSplitNote();
     coRefreshSteps();
     const el = document.getElementById('co-products-list');
     if (!orderItems.length) { el.innerHTML = '<div class="co-empty">{% trans "No products added yet" %}</div>'; return; }
@@ -2101,21 +2059,26 @@
     return '<div class="co-roll-row" data-bc="' + escAttr((r.barcode || '').toLowerCase()) + '"' + toggleAttrs + ' style="display:flex;align-items:center;gap:8px;padding:8px 9px;margin-top:6px;font-size:12px;background:' + bg + ';border:1px solid ' + border + ';border-radius:7px;' + (locked ? '' : 'cursor:pointer;') + '">' +
       tickHtml +
       '<code style="background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;">' + esc(coRollLabel(r)) + '</code>' +
-      // Where this one is from. The warehouse always; the book too once
-      // the card draws on more than one, because that is the moment the
-      // shelf name stops being enough to tell them apart — and the moment
-      // the line is going to be cut along exactly this seam.
+      // Where this one is from. The warehouse always; the book too when
+      // it is another book's stock, or once the basket draws on more than
+      // one — the moment the line is going to be cut along exactly this
+      // seam (coRollBookHtml).
       '<span style="color:#6b7280;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
         esc(r.warehouse || '') + coRollBookHtml(r) + '</span>' +
       meterHtml + scissorsBtn +
     '</div>';
   }
 
-  // The book a stock item stands in, shown on its row only when the
-  // basket spans more than one — otherwise every row would repeat the
-  // same word and say nothing.
+  // The book a stock item stands in, shown on its row when it is not the
+  // working book's, or when the basket spans more than one. A row of the
+  // working book's own stock in a one-book basket says nothing by
+  // repeating its name; another book's row must say whose it is before
+  // it is picked.
   function coRollBookHtml(r) {
-    if (!r.book || coBooksInPlay().length < 2) return '';
+    if (!r.book) return '';
+    var working = coWorkingBookId();
+    var foreign = working && r.book_id && String(r.book_id) !== working;
+    if (!foreign && coBooksInPlay().length < 2) return '';
     return ' <span style="font-weight:700;font-size:9.5px;color:#0F766E;' +
       'background:#D1FAE5;padding:1px 5px;border-radius:4px;white-space:nowrap;">' +
       esc(r.book) + '</span>';

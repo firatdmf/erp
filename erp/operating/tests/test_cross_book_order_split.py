@@ -360,10 +360,13 @@ class EditSplitsTheSameWay(TestCase):
             },
         )
 
-    def test_the_toggle_is_offered_while_editing(self):
+    def test_the_form_says_when_the_save_splits(self):
+        """No toggle to opt in any more: the note above the save button
+        is what tells the reader the basket became two orders."""
         resp = self.client.get(
             reverse("operating:edit_order", kwargs={"pk": self.order.pk}))
-        self.assertContains(resp, 'id="co-cross-book"')
+        self.assertContains(resp, 'id="co-split-note"')
+        self.assertNotContains(resp, 'id="co-cross-book"')
 
     def test_another_book_s_line_goes_to_that_book_s_order(self):
         self._save([self._line(LALELI_SKU, self.laleli, "L-0001"),

@@ -122,7 +122,7 @@ class ThePriceComesOffTheBooksStock(TestCase):
     def _price_in(self, book):
         body = self.client.get(
             reverse("operating:product_autocomplete"),
-            {"product": "Krep", "book": book.pk, "cross_book": "1"}).content.decode()
+            {"product": "Krep", "book": book.pk}).content.decode()
         return re.search(r",([0-9.]+),'", body.split(SKU, 1)[1]).group(1)
 
     def test_each_book_prices_from_its_own_stock(self):

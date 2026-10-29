@@ -15,7 +15,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book
-from marketing.models import Product, ProductCategory
+from marketing.models import Product, ProductCategory, ProductVariant
 from operating.models import (Order, OrderItem, OrderStockReservation, StockMovement,
                      Warehouse, WarehouseProduct, WarehouseProductItem)
 
@@ -42,8 +42,10 @@ class RollEditTrimsReservations(TestCase):
             title="Bergamo", sku=f"SKU-{number}", price=10,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
         order = Order.objects.create(order_number=number, order_status="pending")
-        item = OrderItem.objects.create(order=order, product=product,
-                                        quantity=qty, price=10)
+        item = OrderItem.objects.create(
+            order=order, product=product, quantity=qty, price=10,
+            product_variant=ProductVariant.objects.create(
+                product=product, variant_sku=f"SKU-{number}.1"))
         res = OrderStockReservation.objects.create(
             order=order, order_item=item, stock_item=self.roll,
             warehouse_product=self.wp, quantity=qty)

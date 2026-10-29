@@ -32,7 +32,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from crm.models import Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 
 from operating.models import Order, OrderItem
 
@@ -145,6 +145,8 @@ class EditingIsNotAWizard(TestCase):
             order_number="DK0000901", current_account=account, contact=contact)
         product = Product.objects.create(title="Krep", sku="K24644")
         OrderItem.objects.create(order=self.order, product=product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=product, variant_sku="K24644.G07"),
                                  quantity=Decimal("50"), price=Decimal("2"))
         User = get_user_model()
         user = User.objects.create_superuser("editor9", "e9@t.com", "pw")

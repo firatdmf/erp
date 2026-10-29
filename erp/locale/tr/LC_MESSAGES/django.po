@@ -9724,10 +9724,10 @@ msgstr "Toplar %(number)s siparişi için rezerve edilemedi: %(error)s"
 #, python-format
 msgid ""
 "Nothing was reserved for order %(number)s — none of the received rolls match "
-"a line it still needs."
+"a line of it."
 msgstr ""
 "%(number)s siparişi için hiçbir şey rezerve edilmedi — gelen topların hiçbiri "
-"siparişin hâlâ ihtiyaç duyduğu bir kaleme uymuyor."
+"siparişin bir kalemine uymuyor."
 
 msgid "None — for stock"
 msgstr "Yok — stok için"
@@ -10845,8 +10845,8 @@ msgstr "CRM'den bir müşteri seçin — siparişin cari hesabı için gerekli."
 msgid "The quote has no lines."
 msgstr "Teklifte satır yok."
 
-msgid "These lines name no catalog product: %(lines)s"
-msgstr "Bu satırlar bir katalog ürünü göstermiyor: %(lines)s"
+msgid "These lines name no product variant: %(lines)s"
+msgstr "Bu satırlar bir ürün varyantı göstermiyor: %(lines)s"
 
 msgid "Line %(n)s"
 msgstr "Satır %(n)s"

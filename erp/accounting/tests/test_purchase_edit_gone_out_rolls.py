@@ -55,6 +55,7 @@ class PurchaseEditGoneOutRollsTest(base.TestCase):
         with patch("marketing.utils.bunny_storage.upload_to_bunny", return_value="https://mock-cdn.net/qr.png"):
             order = Order.objects.create(order_number="DK-KRV-B-2", order_status="pending")
             item = OrderItem.objects.create(order=order, product=first.order_item.product,
+                                            product_variant=first.order_item.product_variant,
                                             quantity=10, price=10)
             second = OrderStockReservation.objects.create(
                 order=order, order_item=item, stock_item=first.stock_item,

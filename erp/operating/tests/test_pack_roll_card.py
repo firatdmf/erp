@@ -21,7 +21,7 @@ from django.urls import reverse
 from django.utils import translation
 
 from accounting.models import Book
-from marketing.models import Product, ProductCategory
+from marketing.models import Product, ProductCategory, ProductVariant
 from operating.models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
                               WarehouseProduct, WarehouseProductItem)
 
@@ -38,10 +38,13 @@ class PackingScreenRolls(TestCase):
         product = Product.objects.create(
             title="Bergamo", sku="BRG-01", price=10,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
+        variant = ProductVariant.objects.create(product=product, variant_sku="BRG-01.1")
         self.wp = WarehouseProduct.objects.create(
-            warehouse=self.wh, name="Bergamo", sku="BRG-01", quantity=Decimal("100.00"))
+            warehouse=self.wh, name="Bergamo", sku="BRG-01", quantity=Decimal("100.00"),
+            catalog_variant=variant)
         self.item = OrderItem.objects.create(
-            order=self.order, product=product, quantity=Decimal("100.00"), price=10)
+            order=self.order, product=product, product_variant=variant,
+            quantity=Decimal("100.00"), price=10)
         # 13 m cut off a 35 m roll — both figures are read by the JS.
         self.roll = WarehouseProductItem.objects.create(
             product=self.wp, quantity=Decimal("35.00"),

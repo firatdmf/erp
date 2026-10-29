@@ -18,7 +18,7 @@ from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
 from accounting.services_accounts import post_order_movement
 from crm.models import Company
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderItem
 
 
@@ -35,6 +35,7 @@ class OrderCustomerChangeTest(TestCase):
             book=self.book, code="C-LT", name="Vilnius", type="customer",
             company=self.right_co, default_currency=self.usd)
         self.product = Product.objects.create(title="Krep", sku="KRP", featured=False)
+        self.variant = ProductVariant.objects.create(product=self.product, variant_sku="KRP.1")
         self.member = getattr(
             get_user_model().objects.create_superuser("firat_cc", "a@b.c", "pw"), "member", None)
 
@@ -42,6 +43,7 @@ class OrderCustomerChangeTest(TestCase):
         order = Order.objects.create(company=self.wrong_co, current_account=self.wrong,
                                      order_status="shipped")
         OrderItem.objects.create(order=order, product=self.product,
+                                 product_variant=self.variant,
                                  quantity=Decimal("100"), price=Decimal("2.00"))
         post_order_movement(order, member=self.member)
         self.wrong.refresh_from_db()

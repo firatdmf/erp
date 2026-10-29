@@ -15,7 +15,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from authentication.models import Permission
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderChange, OrderItem
 from operating.views_warehouse import apply_order_status_change
 
@@ -30,6 +30,8 @@ class OrderCancelBase(TestCase):
             book=self.book, code="C-401", name="Oleg", type="customer",
             default_currency=self.usd)
         self.product = Product.objects.create(title="Velvet Moss", sku="KZL000401", price=10)
+        self.variant = ProductVariant.objects.create(
+            product=self.product, variant_sku="KZL000401.1")
 
         self.user = User.objects.create_user("staff_cancel", password="pw")
         self.user.member.books.add(self.book)
@@ -42,6 +44,7 @@ class OrderCancelBase(TestCase):
             order_number=f"DK0000{Order.objects.count() + 401}",
             current_account=self.account, order_status=status)
         OrderItem.objects.create(order=order, product=self.product,
+                                 product_variant=self.variant,
                                  quantity=Decimal("40.00"), price=Decimal("3.25"))
         return order
 

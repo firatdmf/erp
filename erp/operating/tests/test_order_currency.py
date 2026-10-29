@@ -22,7 +22,7 @@ from accounting.services_accounts import (
     _resolve_currency, post_order_movement, stamp_order_currency,
 )
 from crm.models import Company
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderItem
 
 
@@ -37,6 +37,7 @@ class OrderCurrencyTest(TestCase):
             company=self.company, default_currency=self.eur,
         )
         self.product = Product.objects.create(title="Krep", sku="KRP", featured=False)
+        self.variant = ProductVariant.objects.create(product=self.product, variant_sku="KRP.1")
         self.member = getattr(
             get_user_model().objects.create_superuser("firat_cur", "a@b.c", "pw"), "member", None)
 
@@ -45,6 +46,7 @@ class OrderCurrencyTest(TestCase):
                                      current_account=account or self.account,
                                      order_status=status)
         OrderItem.objects.create(order=order, product=self.product,
+                                 product_variant=self.variant,
                                  quantity=Decimal(qty), price=Decimal(price))
         return order
 

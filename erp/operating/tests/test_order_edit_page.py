@@ -17,7 +17,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderItem
 
 
@@ -36,6 +36,8 @@ class OrderEditIsAFullPage(TestCase):
         self.order = Order.objects.create(order_number="DK0000284", current_account=current_account)
         product = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
         OrderItem.objects.create(order=self.order, product=product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=product, variant_sku="KZL000315.1"),
                                  quantity=Decimal("156.00"), price=Decimal("2.50"))
         self.client.force_login(
             User.objects.create_superuser("editor", "e@t.com", "pw"))
@@ -96,6 +98,8 @@ class SavingAnEditLandsOnTheOrder(TestCase):
         self.order = Order.objects.create(order_number="DK0000294", current_account=current_account)
         product = Product.objects.create(title="Crepe", sku="KZL000316", price=10)
         OrderItem.objects.create(order=self.order, product=product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=product, variant_sku="KZL000316.1"),
                                  quantity=Decimal("10.00"), price=Decimal("2.50"))
         self.client.force_login(User.objects.create_superuser("ed2", "e2@t.com", "pw"))
         self.url = reverse("operating:edit_order", kwargs={"pk": self.order.pk})
@@ -136,6 +140,8 @@ class AnOrderCanBeEmptied(TestCase):
         product = Product.objects.create(title="Crepe", sku="KZL000317", price=10)
         self.item = OrderItem.objects.create(
             order=self.order, product=product,
+            product_variant=ProductVariant.objects.create(
+                product=product, variant_sku="KZL000317.1"),
             quantity=Decimal("12.00"), price=Decimal("2.50"))
         self.client.force_login(User.objects.create_superuser("ed3", "e3@t.com", "pw"))
         self.url = reverse("operating:edit_order", kwargs={"pk": self.order.pk})

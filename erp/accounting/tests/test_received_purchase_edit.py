@@ -20,7 +20,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import (CurrentAccount, Invoice, Payment,
                                         PaymentAllocation)
-from marketing.models import Product, ProductCategory
+from marketing.models import Product, ProductCategory, ProductVariant
 from operating.models import (Order, OrderItem, OrderStockReservation,
                               Warehouse, WarehouseProduct, WarehouseProductItem)
 
@@ -101,7 +101,10 @@ class ReceivedPurchaseEditTest(TestCase):
             title="Order product", sku=f"ORD-{barcode}", price=10,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
         order = Order.objects.create(order_number=f"DK-{barcode}", order_status="pending")
-        item = OrderItem.objects.create(order=order, product=product, quantity=qty, price=10)
+        item = OrderItem.objects.create(
+            order=order, product=product, quantity=qty, price=10,
+            product_variant=ProductVariant.objects.create(
+                product=product, variant_sku=f"ORD-{barcode}.1"))
         return OrderStockReservation.objects.create(
             order=order, order_item=item, stock_item=roll,
             warehouse_product=roll.product, quantity=Decimal(qty))

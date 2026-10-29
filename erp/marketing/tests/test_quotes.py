@@ -205,10 +205,10 @@ class QuoteTest(TestCase):
         quote = Quote.objects.get(pk=self._save().json()["quote_id"])     # has "Cutting service"
         page = self.client.get(reverse("marketing:quote_detail", args=[quote.pk]))
         self.assertContains(page, "Cutting service")
-        self.assertContains(page, "name no catalog product")
+        self.assertContains(page, "name no product variant")
         r = self.client.post(reverse("marketing:quote_convert", args=[quote.pk]), follow=True)
         self.assertFalse(Order.objects.exists())
-        self.assertContains(r, "name no catalog product")
+        self.assertContains(r, "name no product variant")
 
     def test_detail_and_print_total_the_quantities_per_unit(self):
         """A product's line counts in the product's own unit, whatever was

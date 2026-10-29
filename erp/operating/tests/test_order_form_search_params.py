@@ -32,7 +32,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 
 from operating.models import Order, OrderItem
 
@@ -52,6 +52,8 @@ class TheSearchCarriesItsBook(TestCase):
             order_number="DK0000297", current_account=current_account)
         product = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
         OrderItem.objects.create(order=self.order, product=product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=product, variant_sku="KZL000315.1"),
                                  quantity=Decimal("12.00"), price=Decimal("2.50"))
         self.client.force_login(
             User.objects.create_superuser("editor", "e@t.com", "pw"))

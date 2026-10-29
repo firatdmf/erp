@@ -45,6 +45,8 @@ class InvoiceDocBase(TestCase):
                                  product_variant=self.variant,
                                  quantity=Decimal("40.00"), price=Decimal("3.25"))
         OrderItem.objects.create(order=self.order, product=self.product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=self.product, variant_sku="KZL000501.G2"),
                                  quantity=Decimal("0"), price=Decimal("9.00"))
 
         self.purchase = Invoice.objects.create(

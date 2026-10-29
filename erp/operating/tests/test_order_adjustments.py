@@ -22,7 +22,7 @@ from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
 from accounting.services_accounts import post_order_movement
 from crm.models import Company, Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderAdjustment, OrderItem
 
 
@@ -42,6 +42,8 @@ class OrderAdjustmentTest(TestCase):
         self.order = Order.objects.create(company=self.company, current_account=self.account,
                                           currency=self.eur, order_status="shipped")
         OrderItem.objects.create(order=self.order, product=self.product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=self.product, variant_sku="FS.1"),
                                  quantity=Decimal("100"), price=Decimal("2.00"))
 
     def _add(self, label, amount, position=0):
@@ -185,7 +187,9 @@ class AdjustmentsThroughTheFormTest(TestCase):
         CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
         self.customer = Contact.objects.create(name="Oleg Motuzenko")
-        Product.objects.create(title="Krep", sku="KRP", featured=False)
+        ProductVariant.objects.create(
+            product=Product.objects.create(title="Krep", sku="KRP", featured=False),
+            variant_sku="KRP.WHITE")
         user = get_user_model().objects.create_superuser("seller_adj", "s@t.com", "pw")
         user.member.books.add(self.book)
         user.member.default_book = self.book
@@ -194,7 +198,7 @@ class AdjustmentsThroughTheFormTest(TestCase):
 
     def _post(self, adjustments, url=None, extra=None, item_id=None):
         line = {
-            "item_no": 1, "product": {"sku": "KRP", "variant": False},
+            "item_no": 1, "product": {"sku": "KRP.WHITE", "variant": True},
             "description": "", "quantity": 100, "outsourced": 0,
             "price": 2, "is_custom_curtain": False, "rolls": [],
         }

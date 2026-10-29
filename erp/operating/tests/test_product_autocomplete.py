@@ -148,6 +148,11 @@ class WarehouseFirstCatalogOnDemandTest(TestCase):
         self.shelfless = Product.objects.create(
             title="ARDEN PERDE", sku="ARDEN-P", featured=False,
             price=Decimal("11.00"))
+        ProductVariant.objects.create(product=self.shelfless, variant_sku="ARDEN-P.WHITE")
+
+    def test_a_product_with_no_variant_is_not_offered(self):
+        Product.objects.create(title="ARDEN BARE", sku="ARDEN-B", featured=False)
+        self.assertNotIn("ARDEN BARE", self._search())
 
     def _search(self, q="ARDEN"):
         return self.client.get(reverse("operating:product_autocomplete"),

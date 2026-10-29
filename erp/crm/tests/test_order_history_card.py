@@ -17,7 +17,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from crm.models import Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderAdjustment, OrderItem
 
 
@@ -40,8 +40,11 @@ class OrderHistoryCard(TestCase):
                       "type": "customer", "default_currency": self.usd})
         order = Order.objects.create(order_number=number, current_account=account,
                                      contact=self.anna, currency=self.usd, split_group=group)
+        product = Product.objects.create(title=number, sku=number, price=1)
         OrderItem.objects.create(order=order, quantity=Decimal("10"), price=Decimal(price),
-                                 product=Product.objects.create(title=number, sku=number, price=1))
+                                 product=product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=product, variant_sku=f"{number}.1"))
         return order
 
     def _card(self):

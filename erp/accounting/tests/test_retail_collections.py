@@ -26,6 +26,7 @@ class RetailPostingBase(TestCase):
 
     def setUp(self):
         from accounting.models import CurrencyCategory
+        from marketing.models import ProductVariant
         from operating.models import Order, OrderItem, Product
 
         self.user = get_user_model().objects.create_user(
@@ -39,6 +40,8 @@ class RetailPostingBase(TestCase):
         self.order = Order.objects.create(is_retail_order=True, order_status="shipped")
         OrderItem.objects.create(
             order=self.order, product=self.product,
+            product_variant=ProductVariant.objects.create(
+                product=self.product, variant_sku="STAR-BLACKOUT.1"),
             quantity=Decimal("5.60"), price=Decimal("10.18"))
 
     def unship(self):

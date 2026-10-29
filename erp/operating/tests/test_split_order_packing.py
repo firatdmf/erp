@@ -19,7 +19,7 @@ from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from authentication.models import Permission
 from crm.models import Contact
-from marketing.models import Product, ProductCategory
+from marketing.models import Product, ProductCategory, ProductVariant
 from operating.models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
                               WarehouseProduct, WarehouseProductItem)
 
@@ -53,11 +53,12 @@ class SplitOrderPacking(TestCase):
         product = Product.objects.create(
             title=sku, sku=sku, price=1,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
-        item = OrderItem.objects.create(order=order, product=product,
+        variant = ProductVariant.objects.create(product=product, variant_sku=f"{sku}.1")
+        item = OrderItem.objects.create(order=order, product=product, product_variant=variant,
                                         quantity=Decimal("30"), price=Decimal("2"))
         wp = WarehouseProduct.objects.create(
             warehouse=Warehouse.objects.create(name=book.name, accounting_book=book),
-            name=sku, sku=sku, quantity=Decimal("30"))
+            name=sku, sku=sku, quantity=Decimal("30"), catalog_variant=variant)
         roll = WarehouseProductItem.objects.create(
             product=wp, quantity=Decimal("30"), quantity_remaining=Decimal("30"), barcode=barcode)
         reservation = OrderStockReservation.objects.create(

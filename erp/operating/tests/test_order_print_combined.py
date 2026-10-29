@@ -24,7 +24,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from crm.models import Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 
 from operating.models import Order, OrderItem
 
@@ -48,6 +48,8 @@ class OlegOrders:
         self.someone_else = Contact.objects.create(name="BURSA TEKSTIL")
 
         self.crepe = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
+        self.crepe_black = ProductVariant.objects.create(
+            product=self.crepe, variant_sku="KZL000315.BLACK")
 
         # Two Laleli orders and one from the factory — the split that
         # sent this customer three documents.
@@ -70,6 +72,7 @@ class OlegOrders:
         order = Order.objects.create(order_number=number, current_account=current_account,
                                      contact=contact)
         OrderItem.objects.create(order=order, product=self.crepe,
+                                 product_variant=self.crepe_black,
                                  quantity=qty, price=price)
         return order
 
@@ -246,6 +249,8 @@ class CombinedOrderExcel(OlegOrders, TestCase):
             title="GREK TAŞLI VE İNCİ EKRU İNCİ BEYAZ ZEMİN",
             sku="HKN00011", price=10)
         OrderItem.objects.create(order=self.laleli_a, product=long_name,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=long_name, variant_sku="HKN00011.1"),
                                  quantity=Decimal("150"), price=Decimal("4.50"))
         ws = self._book(self.laleli_a)
         row = next(r for r in range(11, ws.max_row + 1)
@@ -265,6 +270,8 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         four = Product.objects.create(title="Ekru Grek Taşlı İnci",
                                       sku="PIL01", price=1)
         OrderItem.objects.create(order=self.laleli_a, product=four,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=four, variant_sku="PIL01.1"),
                                  quantity=Decimal("1"), price=Decimal("1"))
         titles = [self._book(self.laleli_a).cell(r, 1).value
                   for r in range(11, 40)]
@@ -316,6 +323,8 @@ class CombinedOrderExcel(OlegOrders, TestCase):
             title="GREK TAŞLI VE İNCİ EKRU İNCİ BEYAZ ZEMİN",
             sku="HKN00011", price=10)
         OrderItem.objects.create(order=self.laleli_a, product=long_name,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=long_name, variant_sku="HKN00011.1"),
                                  quantity=Decimal("150"), price=Decimal("4.50"))
         ws = self._book(self.laleli_a)
         head = 10
@@ -394,9 +403,11 @@ class SingleOrderPrintUnchanged(TestCase):
             default_currency=usd)
         self.order = Order.objects.create(order_number="DK-284", current_account=current_account,
                                           contact=Contact.objects.create(name="OLEG"))
+        crepe = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
         OrderItem.objects.create(
-            order=self.order,
-            product=Product.objects.create(title="Crepe", sku="KZL000315", price=10),
+            order=self.order, product=crepe,
+            product_variant=ProductVariant.objects.create(
+                product=crepe, variant_sku="KZL000315.BLACK"),
             quantity=Decimal("156.00"), price=Decimal("2.50"))
         self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
 
@@ -429,6 +440,8 @@ class OrderUnitsAndPacks(TestCase):
         self.crepe = Product.objects.create(title="Crepe", sku="KZL000315", price=10,
                                             unit="m", pack_type="roll")
         OrderItem.objects.create(order=self.order, product=self.crepe,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=self.crepe, variant_sku="KZL000315.BLACK"),
                                  quantity=Decimal("156.00"), price=Decimal("2.50"))
         self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
 
@@ -456,6 +469,8 @@ class OrderUnitsAndPacks(TestCase):
         sets = Product.objects.create(title="Curtain set", sku="CS1", price=10,
                                       unit="piece", pack_type="box")
         OrderItem.objects.create(order=self.order, product=sets,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=sets, variant_sku="CS1.1"),
                                  quantity=Decimal("4"), price=Decimal("20"))
         resp = self._print()
         self.assertContains(resp, "4.00&nbsp;pcs")
@@ -492,9 +507,11 @@ class OrderPrintIsAPdf(TestCase):
         CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.order = Order.objects.create(order_number="DK-284",
                                           contact=Contact.objects.create(name="OLEG"))
+        crepe = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
         OrderItem.objects.create(
-            order=self.order,
-            product=Product.objects.create(title="Crepe", sku="KZL000315", price=10),
+            order=self.order, product=crepe,
+            product_variant=ProductVariant.objects.create(
+                product=crepe, variant_sku="KZL000315.BLACK"),
             quantity=Decimal("156.00"), price=Decimal("2.50"))
         self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
         self.url = reverse("operating:order_print", kwargs={"pk": self.order.pk})
@@ -546,11 +563,14 @@ class WhoTheCustomerIs(TestCase):
         mock_upload.return_value = "https://mock-cdn.net/qr.png"
         CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.product = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
+        self.variant = ProductVariant.objects.create(
+            product=self.product, variant_sku="KZL000315.BLACK")
         self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
 
     def _order_for(self, **who):
         order = Order.objects.create(order_number="DK-284", **who)
         OrderItem.objects.create(order=order, product=self.product,
+                                 product_variant=self.variant,
                                  quantity=Decimal("156.00"), price=Decimal("2.50"))
         return self.client.get(
             reverse("operating:order_print", kwargs={"pk": order.pk}), {"html": "1"})
@@ -583,9 +603,11 @@ class TheCreditAtTheFootOfEveryPage(TestCase):
         CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.order = Order.objects.create(order_number="DK-284",
                                           contact=Contact.objects.create(name="OLEG"))
+        crepe = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
         OrderItem.objects.create(
-            order=self.order,
-            product=Product.objects.create(title="Crepe", sku="KZL000315", price=10),
+            order=self.order, product=crepe,
+            product_variant=ProductVariant.objects.create(
+                product=crepe, variant_sku="KZL000315.BLACK"),
             quantity=Decimal("156.00"), price=Decimal("2.50"))
         self.client.force_login(User.objects.create_superuser("boss", "b@t.com", "pw"))
 

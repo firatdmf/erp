@@ -22,7 +22,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CashAccount, CurrencyCategory
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 
 from operating.models import (Order, OrderStockReservation, Warehouse, WarehouseProduct,
                      WarehouseProductItem)
@@ -39,9 +39,11 @@ class RollPayloadKey(TestCase):
         # A retail sale is paid at the counter, into a cash account.
         self.drawer = CashAccount.objects.create(book=book, name="Drawer", currency=usd)
         self.product = Product.objects.create(title="Crepe", sku=SKU, price=10)
+        variant = ProductVariant.objects.create(product=self.product, variant_sku=SKU)
         wh = Warehouse.objects.create(name="Laleli depo", accounting_book=book)
         wp = WarehouseProduct.objects.create(
-            warehouse=wh, name="Crepe", sku=SKU, quantity=Decimal("50"))
+            warehouse=wh, name="Crepe", sku=SKU, quantity=Decimal("50"),
+            catalog_variant=variant)
         self.roll = WarehouseProductItem.objects.create(
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode="20582310112", status="in_stock")
@@ -60,7 +62,7 @@ class RollPayloadKey(TestCase):
             "deposit_cash_account": self.drawer.pk,
             "product_json_input": json.dumps([{
                 "item_no": 1,
-                "product": {"sku": SKU, "variant": False},
+                "product": {"sku": SKU, "variant": True},
                 "description": "",
                 "quantity": quantity,
                 "outsourced": 0,

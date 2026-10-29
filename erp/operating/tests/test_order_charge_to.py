@@ -19,7 +19,7 @@ from accounting.services_accounts import (
     existing_customer_account, get_or_create_current_account_for_order,
 )
 from crm.models import Company, Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order
 
 
@@ -27,7 +27,9 @@ class ChargeToBase(TestCase):
     def setUp(self):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
-        Product.objects.create(title="Krep", sku="KRP", featured=False)
+        ProductVariant.objects.create(
+            product=Product.objects.create(title="Krep", sku="KRP", featured=False),
+            variant_sku="KRP.WHITE")
         user = get_user_model().objects.create_superuser("seller_charge", "s@t.com", "pw")
         user.member.books.add(self.book)
         user.member.default_book = self.book
@@ -39,7 +41,7 @@ class ChargeToBase(TestCase):
         self.fadime = Contact.objects.create(name="Fadime Akdas", company=self.company)
 
     def _create(self, contact, **extra):
-        line = {"item_no": 1, "product": {"sku": "KRP", "variant": False},
+        line = {"item_no": 1, "product": {"sku": "KRP.WHITE", "variant": True},
                 "description": "", "quantity": 10, "outsourced": 0,
                 "price": 2, "is_custom_curtain": False, "rolls": []}
         data = {"customer_type": "contact", "customer_pk": contact.pk,
@@ -157,7 +159,7 @@ class EveryReResolveKeepsTheChoice(ChargeToBase):
     def test_an_edit_keeps_it_on_her(self):
         order = self._create(self.fadime, charge_to="contact")
         line = {"item_no": 1, "item_id": order.items.get().pk,
-                "product": {"sku": "KRP", "variant": False},
+                "product": {"sku": "KRP.WHITE", "variant": True},
                 "description": "", "quantity": 12, "outsourced": 0,
                 "price": 2, "is_custom_curtain": False, "rolls": []}
         self.client.post(reverse("operating:edit_order", kwargs={"pk": order.pk}),

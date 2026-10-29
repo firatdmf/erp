@@ -11,7 +11,7 @@ from decimal import Decimal
 from accounting.models import Book, CurrencyCategory, CurrentAccountMovement
 from accounting.models_accounts import CurrentAccount
 from crm.models import Company, Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order
 
 
@@ -20,7 +20,9 @@ class TheNewCustomerIsSavedWithTheOrder(TestCase):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.eur = CurrencyCategory.objects.create(code="EUR", name="Euro", symbol="€")
         self.book = Book.objects.create(name="Laleli Fabric")
-        Product.objects.create(title="Krep", sku="KRP", featured=False)
+        ProductVariant.objects.create(
+            product=Product.objects.create(title="Krep", sku="KRP", featured=False),
+            variant_sku="KRP.WHITE")
         user = get_user_model().objects.create_superuser("seller_new", "s@t.com", "pw")
         user.member.books.add(self.book)
         user.member.default_book = self.book
@@ -28,7 +30,7 @@ class TheNewCustomerIsSavedWithTheOrder(TestCase):
         self.client.force_login(user)
 
     def _post(self, **extra):
-        line = {"item_no": 1, "product": {"sku": "KRP", "variant": False},
+        line = {"item_no": 1, "product": {"sku": "KRP.WHITE", "variant": True},
                 "description": "", "quantity": 10, "outsourced": 0,
                 "price": 2, "is_custom_curtain": False, "rolls": []}
         data = {"customer_type": "contact", "customer_pk": "", "book": self.book.pk,

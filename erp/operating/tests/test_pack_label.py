@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book
-from marketing.models import Product, ProductCategory
+from marketing.models import Product, ProductCategory, ProductVariant
 from operating import pack_label
 from operating.models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
                               WarehouseProduct, WarehouseProductItem)
@@ -34,12 +34,16 @@ class PackLabel(TestCase):
         self.client.force_login(User.objects.create_superuser("packer", "p@a.b", "pw"))
 
     def _line(self, title, sku, unit, tracking="item"):
+        # The label adds up by the variant's SKU, which is the warehouse's.
         product = Product.objects.create(
-            title=title, sku=sku, price=10, unit=unit, tracking=tracking,
+            title=title, sku=sku.split("-")[0], price=10, unit=unit, tracking=tracking,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
+        variant = ProductVariant.objects.create(product=product, variant_sku=sku)
         wp = WarehouseProduct.objects.create(
-            warehouse=self.wh, name=title, sku=sku, quantity=Decimal("100.00"))
+            warehouse=self.wh, name=title, sku=sku, quantity=Decimal("100.00"),
+            catalog_variant=variant)
         item = OrderItem.objects.create(order=self.order, product=product,
+                                        product_variant=variant,
                                         quantity=Decimal("100.00"), price=10)
         return item, wp
 

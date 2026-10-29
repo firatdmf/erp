@@ -105,9 +105,9 @@ def by_product(lines):
     the same product is consecutive. A line tied to no order line (a
     roll reserved loose) stands alone.
 
-    Each group is {item, product, lines, single}: `single` when the group
-    is one line with no variant — the heading then says everything, and
-    the line gets no row of its own."""
+    Each group is {item, product, lines, single}: `single` for a loose
+    roll's — the heading then says everything, and the line gets no row
+    of its own. An order line always names a variant, which takes a row."""
     groups = []
     for line in lines:
         item = line.item
@@ -118,7 +118,7 @@ def by_product(lines):
         groups.append(SimpleNamespace(key=key, item=item, product=getattr(line, "product", None),
                                       lines=[line]))
     for g in groups:
-        g.single = len(g.lines) == 1 and not (g.item and g.item.product_variant_id)
+        g.single = g.item is None
     return groups
 
 

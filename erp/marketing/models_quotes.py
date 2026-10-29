@@ -116,9 +116,11 @@ class Quote(models.Model):
         items = list(self.items.all())
         if not items:
             why.append(_("The quote has no lines."))
-        free = [it.label() for it in items if not it.product_id]
+        # A quote may offer something in words alone; an order line names
+        # the variant to send (operating.views._line_variant_or_404).
+        free = [it.label() for it in items if not it.product_variant_id]
         if free:
-            why.append(_("These lines name no catalog product: %(lines)s")
+            why.append(_("These lines name no product variant: %(lines)s")
                        % {"lines": ", ".join(free)})
         stale = [link for link in self.roll_links() if link.state != "free"]
         if stale:

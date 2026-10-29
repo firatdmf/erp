@@ -80,11 +80,13 @@ def customer_for_order(web_client, price_currency, book=None):
 
 class WebOrderRefused(Exception):
     """A web order that cannot be placed as sent, said so before anything
-    is written. `gone` names picked rolls no longer there as picked."""
+    is written. `gone` names picked rolls no longer there as picked;
+    `unknown` the SKUs of lines that name no variant the catalog has."""
 
-    def __init__(self, message, gone=None):
+    def __init__(self, message, gone=None, unknown=None):
         super().__init__(message)
         self.gone = gone or []
+        self.unknown = unknown or []
 
 
 def lines_by_book(lines):

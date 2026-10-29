@@ -32,6 +32,7 @@ class OrderPickingListTest(TestCase):
         self.ergene = Book.objects.create(name="Ergene Fabric")
         self.customer = Contact.objects.create(name="Anna Secretname")
         self.product = Product.objects.create(title="Krep", sku="KRP")
+        self.variant = ProductVariant.objects.create(product=self.product, variant_sku="KRP.1")
         self.user = get_user_model().objects.create_user("staff_picking", password="pw")
         self.user.member.books.add(self.laleli, self.ergene)
         self.user.member.default_book = self.laleli
@@ -47,7 +48,8 @@ class OrderPickingListTest(TestCase):
                                     contact=self.customer, **kw)
 
     def _line(self, order, qty, price="7.77", variant=None):
-        return OrderItem.objects.create(order=order, product=self.product, product_variant=variant,
+        return OrderItem.objects.create(order=order, product=self.product,
+                                        product_variant=variant or self.variant,
                                         quantity=Decimal(qty), price=Decimal(price))
 
     def _hold(self, line, barcode, take, warehouse, book, on_roll=None, lot="L1"):
@@ -78,13 +80,15 @@ class OrderPickingListTest(TestCase):
         self._hold(line, "R-200", "10", "Laleli Fabrika", self.laleli, on_roll="45")
 
         rows = self._rows(self._page(order))
-        self.assertEqual([cls for cls, _ in rows], ["wh", "pr", "", "wh", "pr", ""])
+        self.assertEqual([cls for cls, _ in rows], ["wh", "pr", "ln", "", "wh", "pr", "ln", ""])
         self.assertTrue(rows[0][1].startswith("Laleli · 1 roll"), rows[0][1])
-        self.assertIn("20.00 of 30.00 m", rows[1][1])
+        # The line is led by its variant, which says what to pick.
+        self.assertTrue(rows[2][1].startswith("KRP.1"), rows[2][1])
+        self.assertIn("20.00 of 30.00 m", rows[2][1])
         # The whole roll goes: its length, and nothing in the cut column.
-        self.assertEqual(rows[2][1], "1 R-100 7 20.00 m")
+        self.assertEqual(rows[3][1], "1 R-100 7 20.00 m")
         # 10 m off a 45 m roll: the roll's length, then the cut.
-        self.assertEqual(rows[5][1], "1 R-200 L1 45.00 m 10.00 m")
+        self.assertEqual(rows[7][1], "1 R-200 L1 45.00 m 10.00 m")
         body = self._page(order)
         self.assertEqual(body.count('<td class="num cut"><svg'), 1)
 
@@ -155,10 +159,11 @@ class OrderPickingListTest(TestCase):
         page = self._page(ergene)
         self.assertIn("ORD-5 &amp; ORD-6", page)
         rows = self._rows(page)
-        self.assertEqual([cls for cls, _ in rows], ["grp", "wh", "pr", "", "grp", "wh", "pr", ""])
+        self.assertEqual([cls for cls, _ in rows],
+                         ["grp", "wh", "pr", "ln", "", "grp", "wh", "pr", "ln", ""])
         self.assertIn("Laleli Fabric · Order ORD-5", rows[0][1])
-        self.assertIn("R-600", rows[3][1])
-        self.assertIn("R-700", rows[7][1])
+        self.assertIn("R-600", rows[4][1])
+        self.assertIn("R-700", rows[9][1])
 
     def test_a_shipped_roll_prints_what_it_held(self):
         order = self._order(self.laleli, "ORD-7")
@@ -171,4 +176,4 @@ class OrderPickingListTest(TestCase):
         r.save()
 
         rows = self._rows(self._page(order))
-        self.assertEqual(rows[2][1], "1 R-800 L1 20.00 m")      # whole: no cut
+        self.assertEqual(rows[3][1], "1 R-800 L1 20.00 m")      # whole: no cut

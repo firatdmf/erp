@@ -1421,9 +1421,9 @@ class OrderItem(models.Model):
 
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    product_variant = models.ForeignKey(
-        ProductVariant, on_delete=models.PROTECT, blank=True, null=True
-    )
+    # Every product is sold as one of its variants, so every line names
+    # the one to send — the colour to cut, the rolls to match, the price.
+    product_variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )

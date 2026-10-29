@@ -93,7 +93,7 @@
       <tr class="wh"><td colspan="6">{{ shelf.name|default:"—" }} <span>· {% blocktrans count counter=shelf.roll_count %}{{ counter }} roll{% plural %}{{ counter }} rolls{% endblocktrans %}</span></td></tr>
       {% comment %}The parent product once, its variants under it — each
          led by its SKU, which is what the roll's label is read against.
-         A product with one line and no variant is all heading.{% endcomment %}
+         A loose roll, tied to no order line, is all heading.{% endcomment %}
       {% for p in shelf.products %}
       <tr class="pr">
         <td colspan="4">

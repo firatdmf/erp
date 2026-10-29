@@ -1,6 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from operating.models import Order, Pack, PackedOrderItem, OrderItem, Product
+from marketing.models import ProductVariant
 from unittest.mock import patch
 
 class PackTestCase(TestCase):
@@ -24,6 +25,8 @@ class PackTestCase(TestCase):
         self.order_item = OrderItem.objects.create(
             order=self.order,
             product=self.product,
+            product_variant=ProductVariant.objects.create(
+                product=self.product, variant_sku="TP-100.1"),
             quantity=2,
             price=10.00
         )

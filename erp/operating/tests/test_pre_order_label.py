@@ -21,7 +21,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount, Invoice
 from crm.models import Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderItem
 
 
@@ -39,12 +39,14 @@ class PreOrderLabelTest(TestCase):
         )
         self.customer = Contact.objects.create(name="Oleg Motuzenko")
         self.product = Product.objects.create(title="Krep", sku="KRP", featured=False)
+        self.variant = ProductVariant.objects.create(product=self.product, variant_sku="KRP.1")
 
     def _order(self, status="pending"):
         order = Order.objects.create(contact=self.customer,
                                      current_account=self.customer_account,
                                      order_status=status)
         OrderItem.objects.create(order=order, product=self.product,
+                                 product_variant=self.variant,
                                  quantity=Decimal("55"), price=Decimal("5"))
         return order
 

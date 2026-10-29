@@ -6,8 +6,8 @@
 A client asks for something the shelves don't have. The purchase is written
 with the customer and a sale price per variant, and saving it creates the
 customer's order too. Receiving the purchase reserves the arriving rolls for
-that order — up to what it still needs — so they can't be packed into
-another one first.
+that order — each one whole — so they can't be packed into another one
+first.
 """
 import json
 from decimal import Decimal
@@ -28,6 +28,7 @@ from operating.models import (
     Order, OrderItem, OrderStockReservation, Warehouse, WarehouseProduct,
     WarehouseProductItem,
 )
+from operating.order_purchases import syncing
 
 
 @patch("operating.views.generate_machine_qr_for_order", lambda order: None)
@@ -200,9 +201,11 @@ class PurchaseForCustomerTest(TestCase):
             self._variant(), self._variant(name="G08", sku="K24644.G08", tops=(10,)),
         ])).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
+        product = Product.objects.get()
         by_hand = OrderItem.objects.create(
-            order=order, product=Product.objects.get(), quantity=Decimal("1"),
-            price=Decimal("9"))
+            order=order, product=product, quantity=Decimal("1"), price=Decimal("9"),
+            product_variant=ProductVariant.objects.create(
+                product=product, variant_sku="K24644.G99"))
 
         # Reopened, the draft names the product it created as an existing one.
         plan = self._plan(variants=[self._variant(tops=(40,), sale="6.00")], customer=False,
@@ -211,12 +214,12 @@ class PurchaseForCustomerTest(TestCase):
         self.assertTrue(r.json()["success"], r.json())
 
         self.assertEqual(Order.objects.count(), 1)
-        lines = {it.product_variant.variant_sku if it.product_variant_id else None: it
+        lines = {it.product_variant.variant_sku: it
                  for it in Order.objects.get().items.select_related("product_variant")}
-        self.assertEqual(set(lines), {"K24644.G07", None})      # G08 dropped, hand line kept
+        self.assertEqual(set(lines), {"K24644.G07", "K24644.G99"})  # G08 dropped, hand line kept
         self.assertEqual(lines["K24644.G07"].quantity, Decimal("40.00"))
         self.assertEqual(lines["K24644.G07"].price, Decimal("6.00"))
-        self.assertEqual(lines[None].pk, by_hand.pk)
+        self.assertEqual(lines["K24644.G99"].pk, by_hand.pk)
 
     def test_an_order_being_packed_is_left_alone(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
@@ -238,7 +241,7 @@ class PurchaseForCustomerTest(TestCase):
     def test_confirming_holds_the_rolls_for_the_order(self):
         inv_id = self._save(self._plan(variants=[self._variant(tops=(30, 25))])).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
-        # The customer only wants 40 of the 55 coming in.
+        # The customer asked for about 40; all 55 bought for them is theirs.
         order.items.update(quantity=Decimal("40"))
 
         r = self._confirm(inv_id)
@@ -246,7 +249,7 @@ class PurchaseForCustomerTest(TestCase):
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
         self.assertContains(page, "2 rolls reserved for order %s." % order.order_number)
 
-        self.assertEqual(self._held(order), [Decimal("30.00"), Decimal("10.00")])
+        self.assertEqual(self._held(order), [Decimal("30.00"), Decimal("25.00")])
         # Same variant the order points at — nothing minted twice.
         self.assertEqual(ProductVariant.objects.count(), 1)
         # Held, not cut.
@@ -258,10 +261,33 @@ class PurchaseForCustomerTest(TestCase):
         self.assertIsNone(inv.order)
         self.assertIsNotNone(inv.posted_movement)
 
-    def test_rolls_the_order_does_not_need_stay_free(self):
-        inv_id = self._save(self._plan()).json()["invoice_id"]
+    def test_each_roll_is_held_on_the_line_of_its_variant(self):
+        inv_id = self._save(self._plan(variants=[
+            self._variant(), self._variant(name="G08", sku="K24644.G08", tops=(10,)),
+        ])).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
-        OrderItem.objects.filter(order=order).update(outsourced_quantity=Decimal("55"))
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        held = {(r.order_item.product_variant.variant_sku, r.quantity)
+                for r in OrderStockReservation.objects.filter(order=order)
+                .select_related("order_item__product_variant")}
+        self.assertEqual(held, {("K24644.G07", Decimal("30.00")),
+                                ("K24644.G07", Decimal("25.00")),
+                                ("K24644.G08", Decimal("10.00"))})
+
+    def test_rolls_matching_no_line_of_the_order_stay_free(self):
+        inv_id = self._save(self._plan(variants=[
+            self._variant(), self._variant(name="G08", sku="K24644.G08", tops=(10,)),
+        ])).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        # Both lines taken off the order without touching the purchase,
+        # which leaves it one for a variant the purchase does not bring.
+        with syncing():
+            OrderItem.objects.filter(order=order).delete()
+        product = Product.objects.get()
+        OrderItem.objects.create(order=order, product=product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=product, variant_sku="K24644.G99"),
+                                 quantity=Decimal("1"), price=Decimal("9"))
         r = self._confirm(inv_id)
         self.assertTrue(r.json()["success"], r.json())
         self.assertEqual(self._held(order), [])
@@ -330,7 +356,10 @@ class PurchaseForCustomerTest(TestCase):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         invoice = Invoice.objects.get(pk=inv_id)
         order = invoice.for_order
-        extra = OrderItem.objects.create(order=order, product=Product.objects.get(),
+        product = Product.objects.get()
+        extra = OrderItem.objects.create(order=order, product=product,
+                                         product_variant=ProductVariant.objects.create(
+                                             product=product, variant_sku="K24644.G99"),
                                          quantity=Decimal("3"), price=Decimal("9"))
         r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
         named = {it.pk: [p.pk for p in it.purchases] for it in r.context["order_items_sorted"]}
@@ -436,7 +465,9 @@ class PurchaseForCustomerTest(TestCase):
             "so the order is cancelled too." % order.order_number)
         # With a line of its own the order outlives the purchase.
         stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
-        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
+        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"),
+                                 product_variant=ProductVariant.objects.create(
+                                     product=stock, variant_sku="STK0001.1"))
         self.assertIn("Its 1 line(s) from this purchase are removed", self._cancel_warning(inv_id))
 
     def test_the_purchase_cancel_says_packing_has_started(self):
@@ -527,7 +558,9 @@ class PurchaseForCustomerTest(TestCase):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
         stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
-        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
+        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"),
+                                 product_variant=ProductVariant.objects.create(
+                                     product=stock, variant_sku="STK0001.1"))
         self.assertFalse(self._sale(order).exists())
         self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertEqual(self._complete(order), (True, None))
@@ -839,7 +872,9 @@ class PurchaseForCustomerTest(TestCase):
         ])).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
         stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
-        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"))
+        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"),
+                                 product_variant=ProductVariant.objects.create(
+                                     product=stock, variant_sku="STK0001.1"))
         r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         self.assertEqual([it.product.sku for it in order.items.select_related("product")], ["STK0001"])
@@ -877,8 +912,11 @@ class PurchaseForCustomerTest(TestCase):
         half = Order.objects.create(current_account=account, contact=self.customer,
                                     currency=order.currency, split_group=order.split_group)
         if with_goods:
+            tul = Product.objects.create(title="Tul", sku="TUL01", price=1)
             OrderItem.objects.create(order=half, quantity=Decimal("10"), price=Decimal("2"),
-                                     product=Product.objects.create(title="Tul", sku="TUL01", price=1))
+                                     product=tul,
+                                     product_variant=ProductVariant.objects.create(
+                                         product=tul, variant_sku="TUL01.1"))
         return half
 
     @patch("operating.order_notifications.send_order_event_email")

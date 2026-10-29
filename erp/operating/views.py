@@ -829,25 +829,22 @@ class OrderDetail(DetailView):
             if qty <= 0 or price < 0:
                 return JsonResponse({"ok": False, "error": "Bad qty/price"}, status=400)
 
-            variant = None
-            if is_variant:
-                variant = ProductVariant.objects.filter(variant_sku=sku).select_related("product").first()
-                if not variant:
-                    return JsonResponse({"ok": False, "error": "Variant not found"}, status=404)
-                product = variant.product
-            else:
-                product = Product.objects.filter(sku=sku).first()
-                if not product:
-                    return JsonResponse({"ok": False, "error": "Product not found"}, status=404)
+            # A line names a variant (_line_variant_or_404); a bare
+            # product SKU finds none.
+            variant = (ProductVariant.objects.filter(variant_sku=sku).select_related("product").first()
+                       if is_variant else None)
+            if not variant:
+                return JsonResponse({"ok": False, "error": "Variant not found"}, status=404)
+            product = variant.product
 
             allow_oversell = bool(getattr(product, "selling_while_out_of_stock", False))
-            stock = variant.live_quantity if is_variant else product.live_quantity
+            stock = variant.live_quantity
             max_qty = None
             if stock is not None and not allow_oversell:
                 max_qty = float(qty) + float(stock)
                 
             # Cost lives on the variant; a product has none of its own.
-            unit_cost = variant.live_cost if is_variant else None
+            unit_cost = variant.live_cost
 
             return JsonResponse({
                 "ok": True,
@@ -884,16 +881,13 @@ class OrderDetail(DetailView):
             if qty <= 0 or price < 0:
                 return JsonResponse({"ok": False, "error": "Bad qty/price"}, status=400)
 
-            variant = None
-            if is_variant:
-                variant = ProductVariant.objects.filter(variant_sku=sku).select_related("product").first()
-                if not variant:
-                    return JsonResponse({"ok": False, "error": "Variant not found"}, status=404)
-                product = variant.product
-            else:
-                product = Product.objects.filter(sku=sku).first()
-                if not product:
-                    return JsonResponse({"ok": False, "error": "Product not found"}, status=404)
+            # A line names a variant (_line_variant_or_404); a bare
+            # product SKU finds none.
+            variant = (ProductVariant.objects.filter(variant_sku=sku).select_related("product").first()
+                       if is_variant else None)
+            if not variant:
+                return JsonResponse({"ok": False, "error": "Variant not found"}, status=404)
+            product = variant.product
 
             # Back-order is allowed — adding a product whose stock is
             # below the requested qty is fine. Stock isn't touched until
@@ -908,7 +902,7 @@ class OrderDetail(DetailView):
 
             # live_quantity is read from the warehouse on access, so the new
             # row already shows the post-deduction figure.
-            new_stock = variant.live_quantity if variant else product.live_quantity
+            new_stock = variant.live_quantity
             max_qty = None
             if new_stock is not None and not allow_oversell:
                 max_qty = float(qty) + float(new_stock)
@@ -2281,6 +2275,18 @@ def _sibling_order_for_book(order, book, member):
     return sibling, True
 
 
+def _line_variant_or_404(product_data):
+    """The variant an order line is for, from the line's `product` JSON.
+
+    Every product is sold as one of its variants, so a line names one. A
+    parent SKU sent on its own (`variant: false`) is refused rather than
+    saved as a line that no roll, purchase or colour can be matched to."""
+    if not product_data.get("variant"):
+        raise Http404("An order line must name a variant.")
+    return get_object_or_404(ProductVariant.objects.select_related("product"),
+                             variant_sku=product_data["sku"])
+
+
 def _append_lines_to_order(target, book, lines, user, failed_barcodes,
                            short_lines=None):
     """Add lines to an order that did not have them, reserving only off
@@ -2290,13 +2296,8 @@ def _append_lines_to_order(target, book, lines, user, failed_barcodes,
     that order's book, so it can never arrive here as somebody else's.
     """
     for item_data in lines:
-        sku = item_data["product"]["sku"]
-        if item_data["product"].get("variant"):
-            variant = get_object_or_404(ProductVariant, variant_sku=sku)
-            product = variant.product
-        else:
-            product = get_object_or_404(Product, sku=sku)
-            variant = None
+        variant = _line_variant_or_404(item_data["product"])
+        product = variant.product
 
         order_item = OrderItem.objects.create(
             order=target,
@@ -4154,16 +4155,9 @@ class OrderCreate(View):
 
         # Order Items
         for item_data in items:
-            sku = item_data["product"]["sku"]
-            is_variant = item_data["product"]["variant"]
             is_custom = item_data.get("is_custom_curtain", False)
-
-            if is_variant:
-                variant = get_object_or_404(ProductVariant, variant_sku=sku)
-                product = variant.product
-            else:
-                product = get_object_or_404(Product, sku=sku)
-                variant = None
+            variant = _line_variant_or_404(item_data["product"])
+            product = variant.product
 
             order_item = OrderItem.objects.create(
                 order=order,
@@ -4768,33 +4762,16 @@ class OrderEdit(UpdateView):
                                     continue
                             else:
                                 # Add new item
-                                if item_data["product"]["variant"] == False:
-                                    product = get_object_or_404(
-                                        Product, sku=item_data["product"]["sku"]
-                                    )
-                                    order_item = OrderItem(
-                                        order=self.object,
-                                        product=product,
-                                        product_variant=None,
-                                        description=item_data.get("description", ""),
-                                        quantity=_as_line_decimal(item_data.get("quantity", 1)),
-                                        outsourced_quantity=_outsourced_qty(item_data),
-                                        price=_as_line_decimal(item_data.get("price", 0)),
-                                    )
-                                elif item_data["product"]["variant"] == True:
-                                    variant = get_object_or_404(
-                                        ProductVariant,
-                                        variant_sku=item_data["product"]["sku"],
-                                    )
-                                    order_item = OrderItem(
-                                        order=self.object,
-                                        product=variant.product,
-                                        product_variant=variant,
-                                        description=item_data.get("description", ""),
-                                        quantity=_as_line_decimal(item_data.get("quantity", 1)),
-                                        outsourced_quantity=_outsourced_qty(item_data),
-                                        price=_as_line_decimal(item_data.get("price", 0)),
-                                    )
+                                variant = _line_variant_or_404(item_data["product"])
+                                order_item = OrderItem(
+                                    order=self.object,
+                                    product=variant.product,
+                                    product_variant=variant,
+                                    description=item_data.get("description", ""),
+                                    quantity=_as_line_decimal(item_data.get("quantity", 1)),
+                                    outsourced_quantity=_outsourced_qty(item_data),
+                                    price=_as_line_decimal(item_data.get("price", 0)),
+                                )
                                 # add the qr code to the order item
                                 try:
                                     order_item.save()
@@ -6308,29 +6285,23 @@ def product_autocomplete(request):
             f"</li>"
         )
 
-    def render_item(product, variant=None, extra_class=""):
-        """A catalog row: the product is not on any shelf of this book."""
+    def render_item(product, variant, extra_class=""):
+        """A catalog row: the variant is not on any shelf of this book."""
         allow_oversell = bool(getattr(product, "selling_while_out_of_stock", False))
         base_title = (product.title or "").strip()
         cat_js = js_str(product.category.name if product.category else "")
 
-        if variant:
-            sku = variant.variant_sku or ""
-            price, is_cost = (sale_price(product, variant) or 0), False
-            stock = variant.live_quantity
-            qualifier = variant_values(variant, with_names=True)
-            card_label = variant_values(variant)
-        else:
-            sku = product.sku or ""
-            price, is_cost = (sale_price(product) or 0), False
-            stock = product.live_quantity
-            qualifier = card_label = ""
+        sku = variant.variant_sku or ""
+        price, is_cost = (sale_price(product, variant) or 0), False
+        stock = variant.live_quantity
+        qualifier = variant_values(variant, with_names=True)
+        card_label = variant_values(variant)
 
         # The picked item's card must NAME the variant, not just the base
         # product — "2086 — Beyaz", never a bare "2086".
         title_js = js_str(f"{base_title} — {card_label}" if card_label else base_title)
         stock_arg = "null" if stock is None else f"{float(stock):g}"
-        js_args = (f"'{escape(js_str(sku))}',{'true' if variant else 'false'},"
+        js_args = (f"'{escape(js_str(sku))}',true,"
                    f"'{title_js}',{price},'{cat_js}',{stock_arg},"
                    f"{'true' if allow_oversell else 'false'},"
                    f"{'true' if is_cost else 'false'},"
@@ -6428,15 +6399,13 @@ def product_autocomplete(request):
             query in (product.title or "").lower()
             or query in (product.sku or "").lower()
         )
-        if not product.variants.all():
-            if matches_parent:
-                catalog_rows.append((product, None))
-        else:
-            for variant in product.variants.all():
-                if variant.id in linked_ids:
-                    continue
-                if matches_parent or query in (variant.variant_sku or "").lower():
-                    catalog_rows.append((product, variant))
+        # A product is sold as one of its variants, so only they are
+        # offered; one with none yet has nothing to order.
+        for variant in product.variants.all():
+            if variant.id in linked_ids:
+                continue
+            if matches_parent or query in (variant.variant_sku or "").lower():
+                catalog_rows.append((product, variant))
 
     if catalog_rows:
         # With nothing on the shelf there is no default answer to defer
@@ -7150,34 +7119,30 @@ def create_web_order(request):
     try:
         data = json.loads(request.body)
 
+        # Every line names the variant the customer chose. One that names
+        # none, or one the catalog no longer has, refuses the whole order
+        # before anything is written: saved without it, the order would
+        # either lose the line or not say which colour to send.
         lines = []
+        unknown = []
         for item_data in data.get('items', []):
-            product_sku = item_data.get('product_sku')
-            variant_sku = item_data.get('product_variant_sku')
-
-            product = None
+            product_sku = (item_data.get('product_sku') or '').strip()
+            variant_sku = (item_data.get('product_variant_sku') or '').strip()
             variant = None
-
-            # Get product
-            if product_sku:
-                try:
-                    product = Product.objects.get(sku=product_sku)
-                except Product.DoesNotExist:
-                    pass
-
-            # Get variant if specified — scope by product first to avoid
-            # MultipleObjectsReturned when the same variant_sku string
-            # (e.g. "red-m") exists across multiple products.
             if variant_sku:
-                qs = ProductVariant.objects.filter(variant_sku=variant_sku)
-                if product:
-                    qs = qs.filter(product=product)
-                variant = qs.first()
-                if not product and variant:
-                    product = variant.product
-
-            if product:
-                lines.append((item_data, product, variant))
+                # Scoped by product too: the same variant SKU string (e.g.
+                # "red-m") can exist under more than one product.
+                qs = ProductVariant.objects.filter(variant_sku__iexact=variant_sku)
+                if product_sku:
+                    qs = qs.filter(product__sku__iexact=product_sku)
+                variant = qs.select_related('product').first()
+            if variant is None:
+                unknown.append(variant_sku or product_sku)
+                continue
+            lines.append((item_data, variant.product, variant))
+        if unknown:
+            raise WebOrderRefused(
+                "Some items in the cart are not in the catalog as chosen.", unknown=unknown)
 
         with transaction.atomic():
             groups = lines_by_book([(item_data, variant) for item_data, _p, variant in lines])
@@ -7277,7 +7242,8 @@ def create_web_order(request):
             }, status=201)
 
     except WebOrderRefused as refused:
-        return JsonResponse({'error': str(refused), 'gone': refused.gone}, status=409)
+        return JsonResponse({'error': str(refused), 'gone': refused.gone,
+                             'unknown': refused.unknown}, status=409)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:

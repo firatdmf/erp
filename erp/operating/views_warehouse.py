@@ -4283,7 +4283,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
             else:
                 order_hold = ("warning", _t(
                     "Nothing was reserved for order %(number)s — none of the received "
-                    "rolls match a line it still needs.")
+                    "rolls match a line of it.")
                     % {"number": number})
         warnings.append(order_hold[1])
         # The customer's bill was held back while this purchase was on its

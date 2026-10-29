@@ -45,11 +45,10 @@ class PackingListColumns(TestCase):
                 product = Product.objects.create(
                     title=f"Bergamo {pack_no}{i}", sku=f"SKU-{pack_no}{i}",
                     category=cat, price=10)
-                variant = None
+                variant = ProductVariant.objects.create(
+                    product=product, variant_sku=f"V-{pack_no}{i}")
                 if cat is fabric:
-                    # Fabric is sold by colour, so its rolls are variants.
-                    variant = ProductVariant.objects.create(
-                        product=product, variant_sku=f"V-{pack_no}{i}")
+                    # Fabric is sold by colour, so its variant names one.
                     # (attribute, value) is a shared lookup row.
                     value, _ = ProductVariantAttributeValue.objects.get_or_create(
                         product_variant_attribute=self.colour,
@@ -451,8 +450,8 @@ class OrderPrintProductType(TestCase):
         self.assertEqual(self._items()[0].variant_label,
                          _variant_label(self.variant))
 
-    def test_a_line_with_no_variant_drops_the_chip(self):
-        OrderItem.objects.update(product_variant=None)
+    def test_a_variant_with_no_name_drops_the_chip(self):
+        self.variant.product_variant_attribute_values.clear()
         self.assertIsNone(self._items()[0].variant_label)
 
     def test_the_product_and_its_sku_each_hold_a_column(self):

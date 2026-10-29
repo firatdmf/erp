@@ -19,7 +19,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from crm.models import Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import (Order, OrderItem, OrderStockReservation, Warehouse,
                               WarehouseProduct, WarehouseProductItem)
 
@@ -33,6 +33,7 @@ class OrderPrintShelvesTest(TestCase):
         self.ergene = Book.objects.create(name="Ergene Fabric")
         self.customer = Contact.objects.create(name="Anna")
         self.product = Product.objects.create(title="Krep", sku="KRP")
+        self.variant = ProductVariant.objects.create(product=self.product, variant_sku="KRP.1")
         self.user = get_user_model().objects.create_user("staff_shelves", password="pw")
         self.user.member.books.add(self.laleli, self.ergene)
         self.user.member.default_book = self.laleli
@@ -49,6 +50,7 @@ class OrderPrintShelvesTest(TestCase):
 
     def _line(self, order, qty, price="2.00"):
         return OrderItem.objects.create(order=order, product=self.product,
+                                        product_variant=self.variant,
                                         quantity=Decimal(qty), price=Decimal(price))
 
     def _hold(self, line, barcode, meters, warehouse, book):

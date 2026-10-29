@@ -13,7 +13,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from crm.models import Company, Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 
 from operating.models import Order, OrderItem
 
@@ -39,6 +39,8 @@ class TheCustomerIconFollowsTheCustomer(TestCase):
             book=self.book, code="C-1", name="Oleg", type="customer",
             default_currency=usd)
         self.product = Product.objects.create(title="Crepe", sku="KZL000315", price=10)
+        self.variant = ProductVariant.objects.create(
+            product=self.product, variant_sku="KZL000315.1")
         boss = User.objects.create_superuser("boss", "b@t.com", "pw")
         boss.member.books.add(self.book)
         self.client.force_login(boss)
@@ -47,6 +49,7 @@ class TheCustomerIconFollowsTheCustomer(TestCase):
         order = Order.objects.create(order_number="DK-284",
                                      current_account=self.account, **who)
         OrderItem.objects.create(order=order, product=self.product,
+                                 product_variant=self.variant,
                                  quantity=Decimal("156.00"), price=Decimal("2.50"))
         resp = self.client.get(reverse("operating:order_detail", kwargs={"pk": order.pk}))
         self.assertEqual(resp.status_code, 200)

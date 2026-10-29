@@ -19,7 +19,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from authentication.models import Permission
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderCargoReceipt, OrderItem
 
 CDN = "https://cdn.test/receipt"
@@ -47,6 +47,8 @@ class _AnOrderToComplete:
         product = Product.objects.create(title="Crepe", sku="KZL000318",
                                          price=10, cost=Decimal("1"))
         OrderItem.objects.create(order=self.order, product=product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=product, variant_sku="KZL000318.1"),
                                  quantity=Decimal("10"), price=Decimal("2.50"))
         self.user = User.objects.create_user("cargo_rcpt", password="pw")
         self.user.member.books.add(book)

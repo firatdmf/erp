@@ -91,8 +91,8 @@ class OrderVariantLinesTest(TestCase):
         v = self._variant("V-WIDTH-CM", ((width, "150cm"),))
         self.assertEqual(_order_item_variant_lines(self._item(v)), ["150cm"])
 
-    def test_a_line_with_no_variant_has_nothing_to_print(self):
-        item = self._item(None)
+    def test_a_variant_with_no_values_has_nothing_to_print(self):
+        item = self._item(self._variant("V-PLAIN", ()))
         self.assertEqual(_order_item_variant_lines(item), [])
 
     # ── How the page prints them ────────────────────────────────────

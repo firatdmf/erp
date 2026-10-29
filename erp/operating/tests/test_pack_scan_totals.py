@@ -11,7 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book
-from marketing.models import Product, ProductCategory
+from marketing.models import Product, ProductCategory, ProductVariant
 from operating.models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
                      WarehouseProduct, WarehouseProductItem)
 
@@ -42,9 +42,12 @@ class PackHeaderTotals(TestCase):
         product = Product.objects.create(
             title=title, sku=sku, price=10,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
+        variant = ProductVariant.objects.create(product=product, variant_sku=f"{sku}.1")
         self.wp = WarehouseProduct.objects.create(
-            warehouse=self.wh, name=title, sku=sku, quantity=Decimal("100.00"))
+            warehouse=self.wh, name=title, sku=sku, quantity=Decimal("100.00"),
+            catalog_variant=variant)
         return OrderItem.objects.create(order=self.order, product=product,
+                                        product_variant=variant,
                                         quantity=Decimal("100.00"), price=10)
 
     def _reserve(self, barcode, roll_meters, reserved, pack):
@@ -86,6 +89,8 @@ class PackHeaderTotals(TestCase):
         # a number that means nothing.
         trade = Product.objects.create(title="Kutu", sku="KUT-1", price=5)
         OrderItem.objects.create(order=self.order, product=trade,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=trade, variant_sku="KUT-1.1"),
                                  quantity=Decimal("3.00"), price=5,
                                  pack=self.pack2)
         _, packs = self._packs()
@@ -193,9 +198,12 @@ class ScanningStraightIntoAPackage(TestCase):
         product = Product.objects.create(
             title="Bergamo", sku="BRG-01", price=10,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
+        variant = ProductVariant.objects.create(product=product, variant_sku="BRG-01.1")
         self.wp = WarehouseProduct.objects.create(
-            warehouse=self.wh, name="Bergamo", sku="BRG-01", quantity=Decimal("100.00"))
+            warehouse=self.wh, name="Bergamo", sku="BRG-01", quantity=Decimal("100.00"),
+            catalog_variant=variant)
         self.item = OrderItem.objects.create(order=self.order, product=product,
+                                             product_variant=variant,
                                              quantity=Decimal("100.00"), price=10)
         self.stock_item = WarehouseProductItem.objects.create(
             product=self.wp, quantity=Decimal("40.00"),

@@ -17,7 +17,7 @@ from accounting.models_accounts import CurrentAccount
 from authentication.client_tokens import issue
 from authentication.models import WebClient
 from crm.models import Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order
 
 URL = "/operating/orders/create/"
@@ -32,14 +32,16 @@ class WebOrderBookTest(TestCase):
         self.settings.enable()
         self.addCleanup(self.settings.disable)
         self.product = Product.objects.create(title="Krep", sku="KRP", featured=False)
+        ProductVariant.objects.create(product=self.product, variant_sku="KRP.WHITE")
         self.ayse = WebClient.objects.create(
             username="ayse", email="Ayse@Example.com", name="Ayşe Yılmaz", phone="+905551112233",
             password=make_password("pw"), is_active=True)
         self.client = Client()
 
     def post(self, web_client=None, token=None, **extra):
-        body = {"items": [{"product_sku": "KRP", "quantity": 3, "price": "4.50"}],
-                "original_currency": "USD", **extra}
+        items = extra.pop("items", [{"product_sku": "KRP", "product_variant_sku": "KRP.WHITE",
+                                     "quantity": 3, "price": "4.50"}])
+        body = {"items": items, "original_currency": "USD", **extra}
         headers = {}
         if token or web_client:
             headers["HTTP_AUTHORIZATION"] = f"Bearer {token or issue(web_client)}"
@@ -108,3 +110,32 @@ class WebOrderBookTest(TestCase):
         self.post(self.ayse)
         order = Order.objects.get()
         self.assertTrue(Order.objects.filter(current_account__book=self.laleli, pk=order.pk).exists())
+
+    # ── Every line names a variant the catalog has ──────────────────
+    def test_the_line_is_the_variant_chosen(self):
+        self.assertEqual(self.post(self.ayse).status_code, 201)
+        self.assertEqual(Order.objects.get().items.get().product_variant.variant_sku, "KRP.WHITE")
+
+    def test_the_variant_is_found_whatever_its_case(self):
+        r = self.post(self.ayse, items=[{"product_sku": "krp", "product_variant_sku": "krp.white",
+                                         "quantity": 3, "price": "4.50"}])
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(Order.objects.get().items.get().product_variant.variant_sku, "KRP.WHITE")
+
+    def test_a_line_without_a_variant_refuses_the_order(self):
+        good = {"product_sku": "KRP", "product_variant_sku": "KRP.WHITE", "quantity": 1, "price": "4.50"}
+        bare = {"product_sku": "KRP", "quantity": 3, "price": "4.50"}
+        r = self.post(self.ayse, items=[good, bare])
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.json()["unknown"], ["KRP"])
+        self.assertFalse(Order.objects.exists())
+
+    def test_a_variant_the_catalog_does_not_have_refuses_the_order(self):
+        for line in ({"product_sku": "KRP", "product_variant_sku": "KRP.WHITE-SAMPLE"},
+                     {"product_sku": "GONE", "product_variant_sku": "GONE.RED"},
+                     {"product_sku": "OTHER", "product_variant_sku": "KRP.WHITE"}):
+            with self.subTest(line=line):
+                r = self.post(self.ayse, items=[{**line, "quantity": 1, "price": "4.50"}])
+                self.assertEqual(r.status_code, 409)
+                self.assertEqual(r.json()["unknown"], [line["product_variant_sku"]])
+        self.assertFalse(Order.objects.exists())

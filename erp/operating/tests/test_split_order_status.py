@@ -20,7 +20,7 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from crm.models import Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderCargoReceipt, OrderItem
 
 CDN = "https://cdn.test/receipt"
@@ -48,8 +48,11 @@ class _ASplitOrder:
             contact=customer, default_currency=currency)
         order = Order.objects.create(order_number=number, current_account=account,
                                      contact=customer, currency=currency, split_group=group)
+        product = Product.objects.create(title=title, sku=title, price=1)
         OrderItem.objects.create(order=order, quantity=Decimal("10"), price=Decimal("2"),
-                                 product=Product.objects.create(title=title, sku=title, price=1))
+                                 product=product,
+                                 product_variant=ProductVariant.objects.create(
+                                     product=product, variant_sku=f"{title}.1"))
         return order
 
     def _url(self, order):

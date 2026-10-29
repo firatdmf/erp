@@ -14,7 +14,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import CurrencyCategory
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderItem
 
 
@@ -25,6 +25,8 @@ class AnalyticsConvertsForeignOrders(TestCase):
         self.eur = CurrencyCategory.objects.create(code="EUR", name="Euro", symbol="€")
         self.product = Product.objects.create(title="Crepe", sku="KZL000901",
                                               price=10, cost=Decimal("0"))
+        self.variant = ProductVariant.objects.create(
+            product=self.product, variant_sku="KZL000901.1")
         user = User.objects.create_user("an_fx", password="pw")
         self.client.force_login(user)
         self.url = reverse("operating:order_analytics")
@@ -32,6 +34,7 @@ class AnalyticsConvertsForeignOrders(TestCase):
     def _order(self, number, **kw):
         order = Order.objects.create(order_number=number, order_status="pending", **kw)
         OrderItem.objects.create(order=order, product=self.product,
+                                 product_variant=self.variant,
                                  quantity=Decimal("100"), price=Decimal("10.00"))
         return order
 

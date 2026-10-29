@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from erp.branding import clear_cache
 from operating.models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
                               WarehouseProduct, WarehouseProductItem)
@@ -36,11 +36,14 @@ class NejumCreditBase(TestCase):
             order_number="DK0000601", current_account=account,
             notify_customer=True)
         product = Product.objects.create(title="Velvet Moss", sku="KZL000601", price=10)
+        variant = ProductVariant.objects.create(product=product, variant_sku="KZL000601.1")
         item = OrderItem.objects.create(order=self.order, product=product,
+                                        product_variant=variant,
                                         quantity=Decimal("40.00"), price=Decimal("3.25"))
         wh = Warehouse.objects.create(name="WH", accounting_book=self.book)
         wp = WarehouseProduct.objects.create(warehouse=wh, name="Velvet Moss",
-                                             sku="KZL000601", quantity=50)
+                                             sku="KZL000601", quantity=50,
+                                             catalog_variant=variant)
         roll = WarehouseProductItem.objects.create(
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode="LZK0300003477")

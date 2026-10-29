@@ -25,7 +25,7 @@ from django.utils import timezone
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
 from accounting.services_ledger import balance_sheet, ensure_chart
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import (Order, OrderItem, OrderStockReservation, Warehouse,
                               WarehouseProduct, WarehouseProductItem)
 from operating.views_warehouse import apply_order_status_change
@@ -40,6 +40,8 @@ class SaleOnShipBase(TestCase):
             book=self.book, code="C-501", name="Oleg", type="customer",
             default_currency=self.usd)
         self.product = Product.objects.create(title="Velvet Moss", sku="KZL000501", price=10)
+        self.variant = ProductVariant.objects.create(
+            product=self.product, variant_sku="KZL000501.1")
         self.user = User.objects.create_user("staff_ship", password="pw")
         self.user.member.books.add(self.book)
         self.user.member.default_book = self.book
@@ -48,6 +50,7 @@ class SaleOnShipBase(TestCase):
     def order(self, **extra):
         order = Order.objects.create(current_account=self.account, **extra)
         OrderItem.objects.create(order=order, product=self.product,
+                                 product_variant=self.variant,
                                  quantity=Decimal("40.00"), price=Decimal("3.25"))
         return order
 

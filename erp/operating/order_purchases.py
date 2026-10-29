@@ -383,77 +383,52 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     return None
 
 
-def _line_required(item):
-    """What a line needs in stock units — curtains count fabric, not
-    curtains (same rule as order_reservation_shortfalls)."""
-    required = item.quantity or Decimal("0")
-    if getattr(item, "is_custom_curtain", False) and item.custom_fabric_used_meters:
-        required = item.custom_fabric_used_meters
-    return Decimal(str(required))
-
-
-def _reserved_by_line(order):
-    from django.db.models import Sum
-    from .models import OrderStockReservation
-
-    return {
-        r["order_item_id"]: (r["s"] or Decimal("0"))
-        for r in (OrderStockReservation.objects
-                  .filter(order=order, consumed=False, order_item__isnull=False)
-                  .values("order_item_id").annotate(s=Sum("quantity")))
-    }
-
-
-def _line_need(item, reserved):
-    """What a line still has to get from a roll: ordered, minus what rolls
-    already hold, minus what is sourced outside the warehouse."""
-    need = (_line_required(item)
-            - reserved.get(item.pk, Decimal("0"))
-            - (item.outsourced_quantity or Decimal("0")))
-    return need if need > 0 else Decimal("0")
-
-
 def hold_received_rolls(invoice, *, user=None):
     """Reserve the rolls `invoice` brought in for the order it was bought
-    for, up to what each order line still needs.
+    for — each one whole, onto the line of its variant.
 
-    Rolls that match no line of the order, or arrive after the line is
-    covered, stay free stock. Returns one {"barcode", "quantity", "line"}
-    per hold made. Safe to call again: a roll the order already holds is
-    skipped, and a covered line takes nothing more.
+    Whole, not up to what the line asked for: the customer ordered about
+    so much, and what was bought for them is theirs, so a roll that came
+    in longer than ordered goes with the order rather than leaving a
+    remnant on the shelf.
+
+    Only the line of the roll's own variant takes it. The packing scan's
+    looser matches (a variant-less line of the same product, a bare SKU)
+    suit a person at the table who sees what they bound; holding whole
+    rolls unseen, they would hand one variant's rolls to another's line.
+    The purchase put its rows in the catalog as variants before the order
+    lines were made from them, so its rolls and its lines share one.
+    Rolls that match no line stay free stock. Returns one {"barcode",
+    "quantity", "line"} per hold made. Safe to call again: a roll the
+    order already holds is skipped.
     """
     from .models import OrderStockReservation, WarehouseProductItem
-    from .views import (
-        _create_roll_reservation, _match_roll_to_order, _order_item_match_maps,
-    )
+    from .views import _create_roll_reservation
 
     order = invoice.for_order
     if order is None or not order_is_open(order):
         return []
-    items, variant_ids, product_ids, skus = _order_item_match_maps(order)
-    if not items:
+    lines = {}
+    for it in order.items.filter(product_variant__isnull=False).order_by("pk"):
+        lines.setdefault(it.product_variant_id, it)
+    if not lines:
         return []
-    reserved = _reserved_by_line(order)
     already = set(OrderStockReservation.objects
                   .filter(order=order, consumed=False)
                   .values_list("stock_item_id", flat=True))
     rolls = (WarehouseProductItem.objects
              .filter(purchase_invoice_item__invoice=invoice)
              .exclude(pk__in=already)
-             .select_related("product", "product__catalog_variant")
+             .select_related("product")
              .order_by("pk"))
     held = []
     for roll in rolls:
-        line = _match_roll_to_order(roll, items, variant_ids, product_ids, skus)
+        line = lines.get(roll.product.catalog_variant_id) if roll.product_id else None
         if line is None:
             continue
-        need = _line_need(line, reserved)
-        if need <= 0:
-            continue
-        r, _capped, err = _create_roll_reservation(order, line, roll, need, user)
+        r, _capped, err = _create_roll_reservation(order, line, roll, None, user)
         if err or r is None:
             continue
-        reserved[line.pk] = reserved.get(line.pk, Decimal("0")) + r.quantity
         held.append({"barcode": roll.barcode, "quantity": r.quantity,
                      "line": line.pk})
     return held

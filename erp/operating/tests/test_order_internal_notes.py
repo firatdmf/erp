@@ -19,7 +19,7 @@ from django.urls import reverse
 from accounting.invoice_doc import build_order_doc
 from accounting.models import Book, CurrencyCategory
 from crm.models import Contact
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderChange
 
 PRINTED = "Delivery in 3 weeks."
@@ -33,7 +33,9 @@ class InternalNotesTest(TestCase):
         CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Ergene Fabric")
         self.customer = Contact.objects.create(name="Hanefi")
-        Product.objects.create(title="Krep", sku="KRP", featured=False)
+        ProductVariant.objects.create(
+            product=Product.objects.create(title="Krep", sku="KRP", featured=False),
+            variant_sku="KRP.WHITE")
         user = get_user_model().objects.create_superuser("seller_notes", "s@t.com", "pw")
         user.member.books.add(self.book)
         user.member.default_book = self.book
@@ -42,7 +44,7 @@ class InternalNotesTest(TestCase):
 
     def _post(self, url=None, item_id=None, **fields):
         line = {
-            "item_no": 1, "product": {"sku": "KRP", "variant": False},
+            "item_no": 1, "product": {"sku": "KRP.WHITE", "variant": True},
             "description": "", "quantity": 100, "outsourced": 0,
             "price": 2, "is_custom_curtain": False, "rolls": [],
         }

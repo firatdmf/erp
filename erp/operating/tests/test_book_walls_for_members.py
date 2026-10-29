@@ -15,7 +15,7 @@ from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from authentication.models import Permission
 from crm.models import Supplier
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderItem, PurchaseOrder, RawMaterialGoodReceipt
 
 
@@ -41,9 +41,13 @@ class BookWallsForMembers(TestCase):
         cls.other_order = cls.order_in(cls.laleli, "LAL-1")
         cls.other_line = OrderItem.objects.create(
             order=cls.other_order, product=cls.other_product,
+            product_variant=ProductVariant.objects.create(
+                product=cls.other_product, variant_sku="BOSPHORUS-TULLE.1"),
             quantity=Decimal("3"), price=Decimal("7.50"))
         cls.own_line = OrderItem.objects.create(
             order=cls.own_order, product=cls.own_product,
+            product_variant=ProductVariant.objects.create(
+                product=cls.own_product, variant_sku="STEPPE-LINEN.1"),
             quantity=Decimal("3"), price=Decimal("7.50"))
         # From the storefront: no current account, so no book.
         cls.web_order = Order.objects.create(order_status="pending", is_guest_order=True)

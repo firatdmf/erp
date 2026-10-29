@@ -340,6 +340,15 @@ class PurchaseForCustomerTest(TestCase):
                             % reverse("accounts:purchase_order_detail", args=[inv_id]))
         self.assertNotContains(r, "not on the purchase")
 
+    def test_a_line_awaiting_its_purchase_says_what_rolls_are_coming(self):
+        """The plan's two rolls (30 + 25 m), not a bare "no rolls"."""
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
+        [line] = r.context["order_items_sorted"]
+        self.assertEqual(line.expected_label, "2 rolls · 55 m")
+        self.assertContains(r, "≈ 2 rolls · 55 m expected")
+
     def test_a_cancelled_purchase_is_named_on_no_line(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order

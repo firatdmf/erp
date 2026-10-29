@@ -273,6 +273,17 @@ def plan_variant_skus(plan):
             for v in (p.get("variants") or []) if (v.get("sku") or "").strip()}
 
 
+def plan_expected_rolls(plan, sku):
+    """The quantity of each roll a purchase plan expects for `sku` — a
+    guess until the goods arrive and the receipt re-enters them."""
+    sku = (sku or "").strip().lower()
+    return [q for p in ((plan or {}).get("products") or [])
+            for v in (p.get("variants") or [])
+            if sku and (v.get("sku") or "").strip().lower() == sku
+            for t in (v.get("tops") or []) if isinstance(t, dict)
+            for q in [_decimal(t.get("qty"))] if q > 0]
+
+
 def sync_customer_order(invoice, customer, lines, *, book, member=None, previous_skus=()):
     """Create the customer order `invoice` is bought for, or bring its
     lines in step with the purchase. Returns a user-facing warning when the

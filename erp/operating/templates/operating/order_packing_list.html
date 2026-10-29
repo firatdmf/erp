@@ -143,7 +143,7 @@
   {% if unassigned_count %}
   <div class="pk-warn">
     <i class="fa fa-triangle-exclamation"></i>
-    {% blocktrans count c=unassigned_count %}{{ c }} scanned top is not yet in a package.{% plural %}{{ c }} scanned tops are not yet in a package.{% endblocktrans %}
+    {% blocktrans count c=unassigned_count %}{{ c }} scanned roll is not yet in a package.{% plural %}{{ c }} scanned rolls are not yet in a package.{% endblocktrans %}
     <a href="{% url 'operating:order_pack_scan' order.pk %}">{% trans "Finish packing" %} →</a>
   </div>
   {% endif %}

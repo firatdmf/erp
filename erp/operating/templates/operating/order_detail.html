@@ -1639,11 +1639,16 @@
                     <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
                     {% endif %}
                     {% include "operating/partials/od_line_sku.html" %}
-                    {% if item.is_tracked %}
+                    {% comment %}Nothing held yet but on a purchase on its way: what the
+                       purchase says is coming — tracked or not, since a product
+                       has no warehouse stock until its first goods arrive.{% endcomment %}
+                    {% if item.expected_label and not item.scanned_count %}
+                      <span class="od-scan-chip muted" title="{% trans 'On the supplier purchase, not arrived yet — its rolls are a guess until the goods are received' %}"><i class="fa fa-truck"></i> {% blocktrans with what=item.expected_label %}≈ {{ what }} expected{% endblocktrans %}</span>
+                    {% elif item.is_tracked %}
                       {% if item.scanned_count %}
                       <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
                       {% else %}
-                      <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% if item.sold_by_count %}{% trans "none taken from stock" %}{% else %}{% trans "no tops" %}{% endif %}</span>
+                      <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% if item.sold_by_count %}{% trans "none taken from stock" %}{% else %}{% trans "no rolls" %}{% endif %}</span>
                       {% endif %}
                     {% else %}
                       <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% trans "not tracked" %}{% if item.pack_id %} · {% trans "Pack" %} #{{ item.pack.pack_number }}{% endif %}</span>
@@ -1775,7 +1780,7 @@
         <div class="od-unassigned" id="od-unassigned">
           <div class="od-unassigned-h">
             <i class="fa fa-triangle-exclamation"></i>
-            {% trans "Unassigned tops <small>— no longer match an order line, not billed</small>" %}
+            {% trans "Unassigned rolls <small>— no longer match an order line, not billed</small>" %}
           </div>
           <div data-tops-list="">
             {% for r in unassigned_reservations %}
@@ -3943,7 +3948,7 @@
       const topsRow = tbody.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
       const scannedCount = topsRow ? topsRow.querySelectorAll('.od-top-row[data-id]').length : 0;
       if (!id.startsWith('new-') && scannedCount > 0) {
-        const msg = '{% trans 'This line has %(n)s scanned tops. Removing it leaves them "Unassigned" and NOT billed. Continue?' %}'
+        const msg = '{% trans 'This line has %(n)s scanned rolls. Removing it leaves them "Unassigned" and NOT billed. Continue?' %}'
           .replace('%(n)s', scannedCount);
         if (!confirm(msg)) return;
       }

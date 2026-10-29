@@ -75,10 +75,10 @@ class TheOrderDetailPageIsClear(SimpleTestCase):
             f"on an English page: {turkish}")
 
     def test_the_count_it_shows_is_not_glued_together(self):
-        """"This line has N scanned tops" — N sits mid-sentence, and in
+        """"This line has N scanned rolls" — N sits mid-sentence, and in
         Turkish it lands somewhere else, so the sentence cannot be built
         by concatenation around the number."""
-        self.assertIn("%(n)s scanned tops", self.src)
+        self.assertIn("%(n)s scanned rolls", self.src)
         self.assertIn(".replace('%(n)s', scannedCount)", self.src)
 
 

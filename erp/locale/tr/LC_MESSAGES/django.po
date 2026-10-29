@@ -8197,8 +8197,8 @@ msgid "top"
 msgstr "top"
 
 #: operating/templates/operating/order_packing_list.html
-msgid "%(c)s scanned top is not yet in a package."
-msgid_plural "%(c)s scanned tops are not yet in a package."
+msgid "%(c)s scanned roll is not yet in a package."
+msgid_plural "%(c)s scanned rolls are not yet in a package."
 msgstr[0] "%(c)s taranan top henüz bir pakete atanmadı."
 msgstr[1] "%(c)s taranan top henüz bir pakete atanmadı."
 
@@ -9447,13 +9447,13 @@ msgstr "İptal edilmiş sipariş düzenlenemez ve paketlenemez"
 msgid "Completed orders can't be edited — use 'Re-open & Fix' first"
 msgstr "Tamamlanan siparişlerde ürünler düzenlenemez — önce 'Geri Aç & Düzelt' ile siparişi geri açın"
 
-msgid "no tops"
+msgid "no rolls"
 msgstr "top okutulmadı"
 
 msgid "not tracked"
 msgstr "depo takipsiz"
 
-msgid "Unassigned tops <small>— no longer match an order line, not billed</small>"
+msgid "Unassigned rolls <small>— no longer match an order line, not billed</small>"
 msgstr "Atanmamış toplar <small>— artık siparişteki bir kalemle eşleşmiyor, faturalanmaz</small>"
 
 msgid "Not yet scanned"
@@ -9501,7 +9501,7 @@ msgstr "Sipariş yeniden düzenlenebilir olur"
 msgid "Complete it again after fixing. Continue?"
 msgstr "Düzeltmeleri yaptıktan sonra \"Siparişi Tamamla\" ile tekrar kapatın. Devam edilsin mi?"
 
-msgid "This line has %(n)s scanned tops. Removing it leaves them \"Unassigned\" and NOT billed. Continue?"
+msgid "This line has %(n)s scanned rolls. Removing it leaves them \"Unassigned\" and NOT billed. Continue?"
 msgstr "Bu üründe %(n)s okutulmuş top var. Ürünü kaldırırsanız toplar \"Atanmamış\" durumuna düşer ve FATURALANMAZ. Devam edilsin mi?"
 
 msgid "This order is shipped by carrier"
@@ -12163,7 +12163,7 @@ msgid "Look up"
 msgstr "Ara"
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "The same-SKU records below will be merged into one. Tops and movements are preserved. Confirm?"
+msgid "The same-SKU records below will be merged into one. Rolls and movements are preserved. Confirm?"
 msgstr "Aşağıdaki aynı SKU'lu kayıtlar tek üründe birleştirilecek. Toplar ve hareketler korunur. Onaylıyor musun?"
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -12251,7 +12251,7 @@ msgid "No warehouse-tracked products to scan in this order."
 msgstr "Bu siparişte okutulacak (depo takipli) ürün yok."
 
 #: hardcoded Turkish moved to the catalogue as written
-msgid "Unassigned tops"
+msgid "Unassigned rolls"
 msgstr "Atanmamış toplar"
 
 #: hardcoded Turkish moved to the catalogue as written
@@ -15175,3 +15175,9 @@ msgid ""
 msgstr ""
 "Orta düzey yönetici, başka ne işaretli olursa olsun alımları da onaylar, "
 "maliyet ve kârı görür ve etiket yazdırır."
+
+msgid "≈ %(what)s expected"
+msgstr "≈ %(what)s bekleniyor"
+
+msgid "On the supplier purchase, not arrived yet — its rolls are a guess until the goods are received"
+msgstr "Tedarikçi alımında, henüz gelmedi — toplar teslim alınana kadar alımın tahminidir"

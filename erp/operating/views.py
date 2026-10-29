@@ -443,25 +443,18 @@ class OrderDetail(DetailView):
         ctx["cancel_needs_approval"] = (
             ctx["cancel_request"] is None
             and cancel_approval.needs_approval(self.request.user, self.object))
-        # An order created by a purchase is that purchase's mirror — its
-        # lines were written on the purchase form and are kept in step from
-        # there (order_purchases.sync_customer_order). A line added on the
-        # order afterwards is not in the mirror: nobody has been asked to
-        # supply it, and it would otherwise only be noticed when the
-        # delivery arrived short. The lines with a purchase behind them are
-        # the ones the purchase plans name.
+        # Each line names the supplier purchases that bring it in — the
+        # ones whose plans list its SKU — so which lines are bought for
+        # the order, and from where, reads off the line itself.
         from .order_purchases import plan_variant_skus
-        purchased_skus = set()
-        for purchase in ctx["supplier_purchases"]:
-            purchased_skus |= plan_variant_skus(purchase.intake_plan)
-        has_purchase = bool(ctx["supplier_purchases"])
+        purchase_skus = [(p, plan_variant_skus(p.intake_plan))
+                         for p in ctx["supplier_purchases"]]
         # Attach available-stock metadata to each item so the template
         # can show "Stok: N" next to the qty input and compute the max
         # the user can bump it to (current qty + remaining stock).
         for it in self.object.items.all():
-            it.not_on_purchase = has_purchase and (
-                (getattr(it.product_variant, "variant_sku", "") or "").lower()
-                not in purchased_skus)
+            sku = (getattr(it.product_variant, "variant_sku", "") or "").lower()
+            it.purchases = [p for p, skus in purchase_skus if sku and sku in skus]
             if it.product_variant_id and it.product_variant:
                 stock = it.product_variant.live_quantity
             elif it.product_id and it.product:

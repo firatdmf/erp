@@ -324,26 +324,29 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(p.pk, inv_id)
         self.assertContains(r, "Awaiting delivery")
 
-    def test_a_line_added_on_the_order_says_no_purchase_covers_it(self):
-        """Nobody has been asked to supply it — without the chip that only
-        shows up when the delivery arrives short."""
+    def test_a_line_names_the_purchase_that_brings_it_in(self):
+        """A line from the purchase links to it; one added on the order
+        names no purchase."""
         inv_id = self._save(self._plan()).json()["invoice_id"]
-        order = Invoice.objects.get(pk=inv_id).for_order
+        invoice = Invoice.objects.get(pk=inv_id)
+        order = invoice.for_order
         extra = OrderItem.objects.create(order=order, product=Product.objects.get(),
                                          quantity=Decimal("3"), price=Decimal("9"))
         r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
-        flagged = {it.pk: it.not_on_purchase for it in r.context["order_items_sorted"]}
-        self.assertTrue(flagged.pop(extra.pk))
-        self.assertFalse(any(flagged.values()))
-        self.assertContains(r, "not on the purchase")
+        named = {it.pk: [p.pk for p in it.purchases] for it in r.context["order_items_sorted"]}
+        self.assertEqual(named.pop(extra.pk), [])
+        self.assertEqual(list(named.values()), [[inv_id]])
+        self.assertContains(r, 'class="od-scan-chip od-po-chip" href="%s"'
+                            % reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertNotContains(r, "not on the purchase")
 
-    def test_an_order_with_no_live_purchase_flags_nothing(self):
+    def test_a_cancelled_purchase_is_named_on_no_line(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
         self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
-        self.assertFalse(any(it.not_on_purchase for it in r.context["order_items_sorted"]))
-        self.assertNotContains(r, "not on the purchase")
+        self.assertFalse(any(it.purchases for it in r.context["order_items_sorted"]))
+        self.assertNotContains(r, 'class="od-scan-chip od-po-chip"')
 
     def test_the_form_reopens_with_the_customer(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]

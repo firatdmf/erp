@@ -15067,3 +15067,6 @@ msgid ""
 msgstr ""
 "%(sku)s bu alımın dışında da kullanılıyor — satırında hepsi için yeniden "
 "adlandırmayı ya da ayrı bir varyant açmayı seçin."
+
+msgid "Bought in for this order on this supplier purchase"
+msgstr "Bu sipariş için bu tedarikçi alımıyla getirtildi"

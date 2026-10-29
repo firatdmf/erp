@@ -336,7 +336,7 @@ class PurchaseForCustomerTest(TestCase):
         named = {it.pk: [p.pk for p in it.purchases] for it in r.context["order_items_sorted"]}
         self.assertEqual(named.pop(extra.pk), [])
         self.assertEqual(list(named.values()), [[inv_id]])
-        self.assertContains(r, 'class="od-scan-chip od-po-chip" href="%s"'
+        self.assertContains(r, 'class="od-po-chip" href="%s"'
                             % reverse("accounts:purchase_order_detail", args=[inv_id]))
         self.assertNotContains(r, "not on the purchase")
 
@@ -346,7 +346,7 @@ class PurchaseForCustomerTest(TestCase):
         self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
         self.assertFalse(any(it.purchases for it in r.context["order_items_sorted"]))
-        self.assertNotContains(r, 'class="od-scan-chip od-po-chip"')
+        self.assertNotContains(r, 'class="od-po-chip"')
 
     def test_the_form_reopens_with_the_customer(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]

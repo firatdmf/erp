@@ -656,8 +656,14 @@
     font: 700 10.5px var(--font-sans); color: #005354; background: #E5F1F0;
     border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
   .od-scan-chip.muted { color: #64748B; background: #F4F7FB; font-weight: 600; }
-  .od-po-chip { text-decoration: none; }
-  .od-po-chip:hover { text-decoration: underline; }
+  /* The supplier purchase a line is bought in on — a document, not a
+     roll, so an outlined indigo tag rather than the teal roll pill. */
+  .od-po-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
+    font: 600 10.5px var(--font-sans); color: #3730A3; background: #fff;
+    border: 1px solid #C7D2FE; border-radius: 4px; padding: 1px 7px;
+    white-space: nowrap; text-decoration: none; }
+  .od-po-chip b { font: 700 10.5px var(--font-mono); letter-spacing: 0.02em; }
+  .od-po-chip:hover { background: #EEF2FF; border-color: #818CF8; color: #312E81; text-decoration: none; }
   .od-tops-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .od-top-pill {
     display: inline-flex; align-items: center; gap: 7px;
@@ -1653,9 +1659,9 @@
                       <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% trans "not tracked" %}{% if item.pack_id %} · {% trans "Pack" %} #{{ item.pack.pack_number }}{% endif %}</span>
                     {% endif %}
                     {% for p in item.purchases %}
-                    <a class="od-scan-chip od-po-chip" href="{% url 'accounts:purchase_order_detail' p.pk %}"
+                    <a class="od-po-chip" href="{% url 'accounts:purchase_order_detail' p.pk %}"
                        title="{% trans 'Bought in for this order on this supplier purchase' %}">
-                      <i class="fa fa-truck"></i> {{ p.number }}</a>
+                      <i class="fa fa-file-invoice"></i> {% trans "Purchase" context "supplier purchase, noun" %} <b>{{ p.number }}</b></a>
                     {% endfor %}
                   </div>
                 </div>

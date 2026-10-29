@@ -6,7 +6,7 @@
 
 {% block css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=5" />
+<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=6" />
 {% endblock %}
 
 {% block content %}
@@ -57,6 +57,12 @@
         <span class="st-nav-ico"><i class="fas fa-plug"></i></span>
         {% trans "Integrations" %}
       </a>
+      {% if grid_members %}
+      <a href="#permissions" class="st-nav-link" onclick="stSwitchTab('permissions', event)">
+        <span class="st-nav-ico"><i class="fas fa-user-shield"></i></span>
+        {% trans "Members & permissions" %}
+      </a>
+      {% endif %}
 
       <div class="st-nav-group">{% trans "Account" context "sidebar" %}</div>
       <a href="{% url 'authentication:signout' %}" class="st-nav-link st-nav-link--danger">
@@ -573,6 +579,64 @@
           </div>
         </div>
       </section>
+
+      <!-- ========== MEMBERS & PERMISSIONS (superusers only) ========== -->
+      {% comment %}Who may do what: each box gives a member a permission or
+      takes it away, saved as it is clicked (MemberPermissionUpdate). The
+      columns are the app's own list of permissions.{% endcomment %}
+      {% if grid_members %}
+      <section id="permissions-section" class="st-section">
+        <div class="st-card">
+          <div class="st-card-header">
+            <span class="st-card-ico"><i class="fas fa-user-shield"></i></span>
+            <div class="st-card-titles">
+              <h2 class="st-card-title">{% trans "Members & permissions" %}</h2>
+              <p class="st-card-sub">{% trans "Tick a box to give a member a permission, untick it to take it away. Changes are saved at once." %}</p>
+            </div>
+          </div>
+          <div class="st-card-body">
+            <div class="st-perm-wrap">
+              <table class="st-perm">
+                <thead>
+                  <tr>
+                    <th>{% trans "Member" %}</th>
+                    {% for name, label, description in grid_permissions %}
+                    <th title="{% trans description %}">{% trans label %}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in grid_members %}
+                  <tr>
+                    <td>
+                      <div class="st-perm-name">{{ row.name }}</div>
+                      <div class="st-perm-sub">@{{ row.member.user.username }}{% if row.member.user.is_superuser %} · {% trans "superuser" %}{% endif %}{% if row.books %} · {{ row.books }}{% endif %}</div>
+                    </td>
+                    {% for name, granted in row.granted %}
+                    <td>
+                      <input type="checkbox" name="granted" {% if granted %}checked{% endif %}
+                             aria-label="{{ row.name }} — {{ name }}"
+                             hx-post="{% url 'member_permission_update' %}" hx-trigger="change"
+                             hx-vals='{"member": "{{ row.member.pk }}", "permission": "{{ name }}"}'
+                             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                             hx-target="#settings-messages" hx-swap="innerHTML">
+                    </td>
+                    {% endfor %}
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <ul class="st-perm-legend">
+              {% for name, label, description in grid_permissions %}
+              <li><b>{% trans label %}</b> — {% trans description %}</li>
+              {% endfor %}
+            </ul>
+            <p class="st-help" style="margin-top:14px;">{% trans "A superuser may do everything, and no restricting role applies to one: ticks on a superuser’s row change nothing." %}</p>
+          </div>
+        </div>
+      </section>
+      {% endif %}
 
     </main>
   </div>

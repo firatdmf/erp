@@ -74,7 +74,80 @@ class user_settings(View):
             "is_brand_admin": _is_admin(request.user),
             "brand_fields": {f["name"]: f for f in brand_fields},
             "brand_nejum_credit": brand_flag("NEJUM_CREDIT", True),
+            **(_permission_grid() if request.user.is_superuser else {}),
         })
+
+
+def _permission_grid():
+    """Every member who can sign in, against every permission the app
+    knows, for the Members & permissions tab: {"grid_permissions":
+    [(name, label, description)], "grid_members": [{member, name, books,
+    granted: {name: bool}}]}. The permissions come from the app's own
+    list (authentication.models.ACCESS_LEVEL_CHOICES_DICT), so a new one
+    shows here without touching this page."""
+    from authentication.models import ACCESS_LEVEL_CHOICES_DICT, Member
+
+    permissions = [(name, label, description)
+                   for name, (label, description) in ACCESS_LEVEL_CHOICES_DICT.items()]
+    members = []
+    for member in (Member.objects.filter(user__isnull=False, user__is_active=True)
+                   .select_related("user").prefetch_related("permissions", "books")
+                   .order_by("user__username")):
+        held = {p.name for p in member.permissions.all()}
+        members.append({
+            "member": member,
+            "name": member.user.get_full_name() or member.user.username,
+            "books": ", ".join(b.name for b in member.books.all()),
+            "granted": [(name, name in held) for name, _label, _desc in permissions],
+        })
+    return {"grid_permissions": permissions, "grid_members": members}
+
+
+@method_decorator(login_required, name="dispatch")
+class MemberPermissionUpdate(View):
+    """Give a member a permission, or take it away: one checkbox on the
+    Members & permissions tab of Settings.
+
+    Superusers only. A permission decides what someone may see and do
+    across every book on the install, so handing them out belongs to
+    whoever runs the whole install — not to a book's admin, who could
+    otherwise widen their own reach.
+    """
+
+    def post(self, request):
+        from django.utils.translation import gettext as _
+        from authentication.models import ACCESS_LEVEL_CHOICES_DICT, Member, Permission
+
+        def banner(ok, text):
+            colour = ("#d1fae5", "#065f46") if ok else ("#fee2e2", "#991b1b")
+            icon = "check-circle" if ok else "exclamation-circle"
+            return HttpResponse(
+                f'<div class="alert" role="alert" style="padding:1rem;'
+                f'background-color:{colour[0]};color:{colour[1]};'
+                f'border-radius:0.5rem;margin-bottom:1rem;">'
+                f'<i class="fas fa-{icon}"></i> {text}</div>')
+
+        if not request.user.is_superuser:
+            return banner(False, _("Only a superuser can change permissions."))
+        name = request.POST.get("permission") or ""
+        if name not in ACCESS_LEVEL_CHOICES_DICT:
+            return banner(False, _("Unknown permission."))
+        member = (Member.objects.filter(pk=request.POST.get("member") or 0,
+                                        user__isnull=False, user__is_active=True)
+                  .select_related("user").first())
+        if member is None:
+            return banner(False, _("Member not found."))
+
+        from django.utils.html import escape
+        perm, _created = Permission.objects.get_or_create(
+            name=name, defaults={"description": ACCESS_LEVEL_CHOICES_DICT[name][1]})
+        who = escape(member.user.get_full_name() or member.user.username)
+        label = _(ACCESS_LEVEL_CHOICES_DICT[name][0])
+        if request.POST.get("granted") == "on":
+            member.permissions.add(perm)
+            return banner(True, _("%(who)s now has “%(permission)s”.") % {"who": who, "permission": label})
+        member.permissions.remove(perm)
+        return banner(True, _("%(who)s no longer has “%(permission)s”.") % {"who": who, "permission": label})
 
 
 @method_decorator(login_required, name="dispatch")

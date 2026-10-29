@@ -15074,3 +15074,97 @@ msgstr "Bu sipariş için bu tedarikçi alımıyla getirtildi"
 msgctxt "supplier purchase, noun"
 msgid "Purchase"
 msgstr "Alım"
+
+msgid "Members & permissions"
+msgstr "Üyeler ve yetkiler"
+
+msgid ""
+"Tick a box to give a member a permission, untick it to take it away. Changes "
+"are saved at once."
+msgstr ""
+"Bir üyeye yetki vermek için kutuyu işaretleyin, geri almak için işareti "
+"kaldırın. Değişiklikler hemen kaydedilir."
+
+msgid "superuser"
+msgstr "süper kullanıcı"
+
+msgid ""
+"A superuser may do everything, and no restricting role applies to one: ticks "
+"on a superuser’s row change nothing."
+msgstr ""
+"Süper kullanıcı her şeyi yapabilir ve kısıtlayıcı roller ona uygulanmaz: "
+"süper kullanıcının satırındaki işaretler hiçbir şeyi değiştirmez."
+
+msgid "Only a superuser can change permissions."
+msgstr "Yetkileri yalnızca süper kullanıcı değiştirebilir."
+
+msgid "Unknown permission."
+msgstr "Bilinmeyen yetki."
+
+msgid "Member not found."
+msgstr "Üye bulunamadı."
+
+#, python-format
+msgid "%(who)s now has “%(permission)s”."
+msgstr "%(who)s artık “%(permission)s” yetkisine sahip."
+
+#, python-format
+msgid "%(who)s no longer has “%(permission)s”."
+msgstr "%(who)s artık “%(permission)s” yetkisine sahip değil."
+
+msgid "Has full access to all resources and settings."
+msgstr "Tüm kaynaklara ve ayarlara tam erişimi vardır."
+
+msgid "Operations manager"
+msgstr "Operasyon müdürü"
+
+msgid "Works the warehouse and its stock. Cannot see or create orders."
+msgstr "Depoyu ve stoğunu yönetir. Siparişleri göremez ve oluşturamaz."
+
+msgid "Employee"
+msgstr "Çalışan"
+
+msgid "Can access and manage their own tasks and projects."
+msgstr "Kendi görev ve projelerine erişebilir ve bunları yönetebilir."
+
+msgid "Has limited access to view certain resources."
+msgstr "Belirli kaynakları görüntülemek için sınırlı erişimi vardır."
+
+msgid "Confirm purchases"
+msgstr "Alımları onaylama"
+
+msgid "Can confirm a purchase order into warehouse stock (goods receipt)."
+msgstr "Bir alım siparişini depo stoğuna onaylayabilir (mal kabul)."
+
+msgid "Sales rep (read-only)"
+msgstr "Satış temsilcisi (salt okunur)"
+
+msgid "Can view stock quantities, prices and sales. Cannot change anything."
+msgstr ""
+"Stok miktarlarını, fiyatları ve satışları görebilir. Hiçbir şeyi "
+"değiştiremez."
+
+msgid "See cost and profit"
+msgstr "Maliyet ve kârı görme"
+
+msgid "Can see cost of goods, gross profit and margin on orders and analytics."
+msgstr ""
+"Siparişlerde ve analizlerde satılan malın maliyetini, brüt kârı ve marjı "
+"görebilir."
+
+msgid "Middle manager"
+msgstr "Orta düzey yönetici"
+
+msgid ""
+"Manages the books they are assigned: warehouses, orders, purchases, costs and "
+"profit. Nothing install-wide, nothing of another business."
+msgstr ""
+"Atandığı defterleri yönetir: depolar, siparişler, alımlar, maliyetler ve kâr. "
+"Kurulumun tamamına ait hiçbir şeyi ve başka bir işletmeye ait hiçbir şeyi "
+"yönetemez."
+
+msgid "Print labels"
+msgstr "Etiket yazdırma"
+
+msgid "Can print stock, roll and package labels."
+msgstr "Stok, top ve paket etiketlerini yazdırabilir."

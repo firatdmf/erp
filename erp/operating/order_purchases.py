@@ -274,10 +274,12 @@ def plan_variant_skus(plan):
 
 
 def plan_expected_rolls(plan, sku):
-    """The quantity of each roll a purchase plan expects for `sku` — a
-    guess until the goods arrive and the receipt re-enters them."""
+    """Each roll a purchase plan expects for `sku`, as (barcode, quantity)
+    — a guess until the goods arrive and the receipt re-enters them. The
+    barcode is "" until someone gives the roll one; the receipt mints it."""
     sku = (sku or "").strip().lower()
-    return [q for p in ((plan or {}).get("products") or [])
+    return [((t.get("barcode") or "").strip(), q)
+            for p in ((plan or {}).get("products") or [])
             for v in (p.get("variants") or [])
             if sku and (v.get("sku") or "").strip().lower() == sku
             for t in (v.get("tops") or []) if isinstance(t, dict)

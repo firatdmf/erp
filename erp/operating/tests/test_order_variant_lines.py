@@ -127,28 +127,25 @@ class OrderVariantLinesTest(TestCase):
         return self._item(self._variant("V-TR", ((self.colour, "cactus_green"),
                                                  (self.size, "160 x 200 cm"))))
 
-    def test_a_turkish_reader_gets_the_catalogs_english_under_their_own(self):
-        """Staff match a line to the roll's label, which says what the
-        catalog says."""
+    def test_the_description_is_the_catalogs_with_the_readers_wording_under_it(self):
+        """As the warehouse list shows a row: what the catalog (and the
+        roll's label) says, then the reader's own words for it."""
         from django.utils import translation
-        from operating.views import _order_item_variant_original
+        from operating.views import _order_item_description
         item = self._worded()
         with translation.override("tr"):
-            shown = _order_item_variant_lines(item)
-            self.assertEqual(shown, ["Kaktüs yeşili", "160 x 200 cm"])
-            # The size reads the same in both, so only the colour is repeated.
-            self.assertEqual(_order_item_variant_original(item, shown),
-                             ["Cactus green"])
+            self.assertEqual(_order_item_variant_lines(item), ["Kaktüs yeşili", "160 x 200 cm"])
+            self.assertEqual(_order_item_description(item),
+                             (["Cactus green", "160 x 200 cm"], ["Kaktüs yeşili", "160 x 200 cm"]))
 
     def test_an_english_reader_is_not_told_the_same_thing_twice(self):
         from django.utils import translation
-        from operating.views import _order_item_variant_original
+        from operating.views import _order_item_description
         item = self._worded()
         with translation.override("en"):
-            shown = _order_item_variant_lines(item)
-            self.assertEqual(_order_item_variant_original(item, shown), [])
+            self.assertEqual(_order_item_description(item), (["Cactus green", "160 x 200 cm"], []))
 
-    def test_the_page_prints_the_original_under_the_readers_wording(self):
+    def test_the_page_prints_the_readers_wording_under_the_description(self):
         from django.utils import translation
         item = self._worded()
         self.client.force_login(self.user)
@@ -156,5 +153,5 @@ class OrderVariantLinesTest(TestCase):
             html = self.client.get(
                 reverse("operating:order_detail", kwargs={"pk": item.order.pk}),
                 HTTP_ACCEPT_LANGUAGE="tr").content.decode()
-        self.assertIn('<div class="od-variant-name"><span>Kaktüs yeşili</span>', html)
-        self.assertIn('<div class="od-variant-orig"><span>Cactus green</span>', html)
+        self.assertIn('<div class="od-variant-name"><span>Cactus green</span><span>160 x 200 cm</span></div>', html)
+        self.assertIn('<div class="od-variant-orig">Kaktüs yeşili · 160 x 200 cm</div>', html)

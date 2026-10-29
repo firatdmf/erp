@@ -83,7 +83,7 @@
 
   /* Cancelled order: the lines stay readable, but struck through. */
   .od-prods-cancelled td { color: var(--gray-400); }
-  .od-prods-cancelled td .od-prod span,
+  .od-prods-cancelled td .od-prod-title,
   .od-prods-cancelled td .mono,
   .od-prods-cancelled td .od-variant-name,
   .od-prods-cancelled td .od-num-val,
@@ -482,7 +482,7 @@
      stretches them based on content, which made the inline inputs look
      mis-aligned. */
   .od-prods th:nth-child(1), .od-prods td:nth-child(1) { width: auto; }        /* Product, its SKU under it */
-  .od-prods th:nth-child(2), .od-prods td:nth-child(2) { width: 140px; }       /* Variant */
+  .od-prods th:nth-child(2), .od-prods td:nth-child(2) { width: 140px; }       /* Description */
   .od-prods th:nth-child(3), .od-prods td:nth-child(3) { width: 80px; }        /* Qty */
   .od-prods th:nth-child(4), .od-prods td:nth-child(4) { width: 80px; }        /* Price */
   .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 70px; }        /* Cost */
@@ -657,6 +657,8 @@
     font: 700 10.5px var(--font-sans); color: #005354; background: #E5F1F0;
     border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
   .od-scan-chip.muted { color: #64748B; background: #F4F7FB; font-weight: 600; }
+  /* Rolls a purchase is bringing: the pre-order purple, not stock's teal. */
+  .od-scan-chip.expected { color: #6D28D9; background: #EDE9FE; }
   /* The supplier purchase a line is bought in on — a document, not a
      roll, so an outlined indigo tag rather than the teal roll pill. */
   .od-po-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
@@ -672,6 +674,12 @@
     border-radius: 8px; font-size: 11.5px; line-height: 1.4; max-width: 100%;
   }
   .od-top-pill.consumed { background: #F8FAFC; border-style: dashed; }
+  /* A roll a purchase says is coming: not in hand, so dashed, in the
+     line chip's purple. */
+  .od-top-pill.expected { background: #F5F3FF; border: 1px dashed #C4B5FD; color: #6D28D9; }
+  .od-top-pill.expected .bc, .od-top-pill.expected .m { color: #6D28D9; }
+  .od-top-pill.expected .tag { color: #6D28D9; background: #EDE9FE; }
+  .od-top-pill .od-po-chip { margin-top: 0; }
   .od-top-pill .bc { font-family: var(--font-mono, monospace); font-size: 11px; color: #0F1419;
     background: #F1F5F9; border-radius: 5px; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .od-top-pill .m { font-weight: 800; color: #005354; white-space: nowrap; }
@@ -695,8 +703,8 @@
      wrapped wherever the column ran out rather than where the
      value ended. */
   .od-variant-name span { display: block; }
-  /* The variant as the catalog holds it, under the reader's wording —
-     for staff matching a line to its label. */
+  /* Under a line's description, its values in the reader's language,
+     as the warehouse list words them. */
   .od-variant-orig { margin-top: 3px; font: 500 11.5px var(--font-sans); color: var(--gray-500);
     line-height: 1.3; overflow-wrap: anywhere; }
   .od-variant-orig span { display: block; }
@@ -825,9 +833,11 @@
     box-shadow: inset 0 0 0 1px rgba(15,23,31,0.06); object-fit: cover;
     background: linear-gradient(135deg, #E5F1F0, #C2D5D2);
   }
-  .od-prod span:last-child { font: 600 13px var(--font-sans); color: #0F1419; }
+  /* The name with its SKU under it, beside the photo. */
+  .od-prod-text { display: flex; flex-direction: column; min-width: 0; }
+  .od-prod-title { font: 600 13px var(--font-sans); color: #0F1419; }
   .od-prod-link { color: inherit; text-decoration: none; }
-  .od-prod-link:hover .od-prod span:last-child { color: var(--nejum-teal-700); }
+  .od-prod-link:hover .od-prod-title { color: var(--nejum-teal-700); }
   .od-totals { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #E2E8EE; }
   /* An order split across books: the combined name, the note saying which
      half this page is. */
@@ -1012,7 +1022,7 @@
     .od-top-pill .bc { overflow: visible; }
     .od-prod { display: block; }
     .od-prod-img { position: absolute; left: 0; top: 0; width: 40px; height: 40px; }
-    .od-prod span:last-child { display: block; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+    .od-prod-title { display: block; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
     .od-variant-name.od-phone-variant { display: block; margin-top: 2px;
       font: 500 12.5px var(--font-sans); color: var(--gray-700); }
     .od-phone-variant span { display: inline; }
@@ -1589,7 +1599,7 @@
           <thead>
             <tr>
               <th>{% trans "Product" %}</th>
-              <th>{% trans "Variant" %}</th>
+              <th>{% trans "Description" %}</th>
               <th class="num">{% trans "Qty" %}</th>
               <th class="num">{% trans "Price" %}</th>
               <th class="num od-cost-col"{% if not is_sales_rep %} title="{% trans 'Per-unit cost (internal)' %}"{% endif %}>{% if not is_sales_rep %}{% trans "Cost" %}{% endif %}</th>
@@ -1613,10 +1623,10 @@
             {% comment %}The PRODUCT ROW is the accordion trigger — click
                it to reveal the tops below (chevron in the first cell).
                The product-name link still navigates normally.{% endcomment %}
-            <tr data-item-row="{{ item.pk }}"{% if item.is_tracked and item.scanned_count %} class="od-row-toggle" data-toggle-tops="{{ item.pk }}"{% endif %}>
+            <tr data-item-row="{{ item.pk }}"{% if item.is_tracked and item.scanned_count or item.expected_rolls %} class="od-row-toggle" data-toggle-tops="{{ item.pk }}"{% endif %}>
               <td>
                 <div style="display:flex; align-items:flex-start; gap:6px;">
-                  {% if item.is_tracked and item.scanned_count %}
+                  {% if item.is_tracked and item.scanned_count or item.expected_rolls %}
                   <i class="fa fa-chevron-right od-tops-chev" data-chev="{{ item.pk }}" style="margin-top:12px;"></i>
                   {% else %}
                   <span style="width:9px; flex-shrink:0;"></span>
@@ -1632,28 +1642,28 @@
                             <span class="od-prod-img"></span>
                           {% endif %}
                         {% endwith %}
-                        <span>{{ item.product.title }}</span>
+                        <div class="od-prod-text"><span class="od-prod-title">{{ item.product.title }}</span>{% include "operating/partials/od_line_sku.html" %}</div>
                       </div>
                     </a>
                     {% else %}
-                    <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
+                    <div class="od-prod"><span class="od-prod-img"></span><div class="od-prod-text"><span class="od-prod-title od-empty-mute">{% trans "(deleted product)" %}</span>{% include "operating/partials/od_line_sku.html" %}</div></div>
                     {% endif %}
-                    {% include "operating/partials/od_line_sku.html" %}
-                    {% comment %}Nothing held yet but on a purchase on its way: what the
-                       purchase says is coming — tracked or not, since a product
-                       has no warehouse stock until its first goods arrive.{% endcomment %}
-                    {% if item.expected_label and not item.scanned_count %}
-                      <span class="od-scan-chip muted" title="{% trans 'On the supplier purchase, not arrived yet — its rolls are a guess until the goods are received' %}"><i class="fa fa-truck"></i> {% blocktrans with what=item.expected_label %}≈ {{ what }} expected{% endblocktrans %}</span>
-                    {% elif item.is_tracked %}
-                      {% if item.scanned_count %}
+                    {% comment %}What the line holds, and beside it, in purple, what the
+                       purchases still on their way say they bring — tracked or
+                       not, since a product has no warehouse stock until its first
+                       goods arrive. A line with neither says so.{% endcomment %}
+                    {% if item.is_tracked and item.scanned_count %}
                       <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
-                      {% else %}
+                    {% elif item.expected_rolls %}
+                    {% elif item.is_tracked %}
                       <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% if item.sold_by_count %}{% trans "none taken from stock" %}{% else %}{% trans "no rolls" %}{% endif %}</span>
-                      {% endif %}
                     {% else %}
                       <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% trans "not tracked" %}{% if item.pack_id %} · {% trans "Pack" %} #{{ item.pack.pack_number }}{% endif %}</span>
                     {% endif %}
-                    {% for p in item.purchases %}
+                    {% if item.expected_rolls %}
+                      <span class="od-scan-chip expected" title="{% trans 'On the supplier purchase, not arrived yet — its rolls are a guess until the goods are received' %}"><i class="fa fa-truck"></i> {% blocktrans with what=item.expected_label %}≈ {{ what }} expected{% endblocktrans %}</span>
+                    {% endif %}
+                    {% for p in item.line_purchases %}
                     <a class="od-po-chip" href="{% url 'accounts:purchase_order_detail' p.pk %}"
                        target="_blank" rel="noopener"
                        title="{% trans 'Bought in for this order on this supplier purchase' %}">
@@ -1680,12 +1690,13 @@
               {% endif %}
               <td class="num" data-item-subtotal="{{ item.pk }}"><b>{{ order.currency_symbol }}{{ item.subtotal|floatformat:"2g" }}</b></td>
             </tr>
-            {% if item.is_tracked and item.scanned_count %}
+            {% if item.is_tracked and item.scanned_count or item.expected_rolls %}
             <tr class="od-tops-row" data-tops-for="{{ item.pk }}" style="display:none;">
               <td colspan="6">
                 <div class="od-tops-wrap">
                   <div class="od-tops-list">
-                    {% for r in item.item_reservations %}{% include "operating/partials/od_top_row.html" %}{% endfor %}
+                    {% if item.is_tracked %}{% for r in item.item_reservations %}{% include "operating/partials/od_top_row.html" %}{% endfor %}{% endif %}
+                    {% for e in item.expected_rolls %}{% include "operating/partials/od_expected_top_row.html" %}{% endfor %}
                   </div>
                 </div>
               </td>
@@ -1732,12 +1743,11 @@
                           <span class="od-prod-img"></span>
                         {% endif %}
                       {% endwith %}
-                      <span>{{ item.product.title }}</span>
+                      <div class="od-prod-text"><span class="od-prod-title">{{ item.product.title }}</span>{% include "operating/partials/od_line_sku.html" %}</div>
                     </div>
                     {% else %}
-                    <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
+                    <div class="od-prod"><span class="od-prod-img"></span><div class="od-prod-text"><span class="od-prod-title od-empty-mute">{% trans "(deleted product)" %}</span>{% include "operating/partials/od_line_sku.html" %}</div></div>
                     {% endif %}
-                    {% include "operating/partials/od_line_sku.html" %}
                     {% if item.scanned_count %}
                     <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
                     {% endif %}
@@ -2094,7 +2104,7 @@
       {% endif %}
 
       <!-- DOCUMENTS — the invoice (a printout, plus its Excel), the
-           production sheet, the picking list and the packing list, all built
+           picking list and the packing list, all built
            from this order each time they're opened; nothing is stored. The
            picking list is the warehouse's sheet of which rolls to pull, by
            barcode; a split order's prints every half. The packing list is
@@ -2449,7 +2459,7 @@
         };
         return Array.from(rows).map(r => {
           return {
-            name: flattenText(r.querySelector('.od-prod span:last-child')) || '—',
+            name: flattenText(r.querySelector('.od-prod-title')) || '—',
             sku: flattenText(r.querySelector('.od-line-sku')),
             qty: cellNum(r, 2, 'quantity'),
             price: cellNum(r, 3, 'price'),
@@ -3886,11 +3896,12 @@
         }
         tr.innerHTML =
           '<td>' + prodLink +
-            '<div class="od-prod">' + img + '<span>' + esc(it.product_title) + '</span></div>' +
-            prodLinkEnd +
+            '<div class="od-prod">' + img + '<div class="od-prod-text"><span class="od-prod-title">' + esc(it.product_title) + '</span>' +
             ((it.variant_sku || it.product_sku)
               ? '<div class="mono od-line-sku">' + esc(it.variant_sku || it.product_sku) + '</div>'
               : '') +
+            '</div></div>' +
+            prodLinkEnd +
           '</td>' +
           '<td><span class="od-empty-mute">—</span></td>' +
           '<td class="num"><input type="number" class="od-inline-input" step="0.01" min="0"' +

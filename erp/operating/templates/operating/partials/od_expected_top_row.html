@@ -1,0 +1,12 @@
+{% load i18n %}{% comment %}
+A roll a supplier purchase says is coming for this line, drawn as the
+scanned rolls are (od_top_row.html) but in purple, with the quantity marked ≈
+as the estimate it is until the receipt enters the real roll, and the
+purchase bringing it where a held roll names its package. The barcode is
+the plan's when someone gave it one, else a dash.
+{% endcomment %}<span class="od-top-pill expected" title="{% trans 'On the supplier purchase, not arrived yet — its rolls are a guess until the goods are received' %}">
+  <span class="bc">{{ e.barcode|default:'—' }}</span>
+  <span class="m">≈ {{ e.qty|floatformat:"-2g" }} {{ e.unit }}</span>
+  {% if e.warehouse %}<span class="tag wh"><i class="fa fa-warehouse"></i> {{ e.warehouse.name }}</span>{% endif %}
+  <a class="od-po-chip" href="{% url 'accounts:purchase_order_detail' e.purchase.pk %}" target="_blank" rel="noopener"><i class="fa fa-file-invoice"></i> {% trans "Purchase" context "supplier purchase, noun" %} <b>{{ e.purchase.number }}</b></a>
+</span>

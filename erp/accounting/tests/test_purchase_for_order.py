@@ -336,18 +336,50 @@ class PurchaseForCustomerTest(TestCase):
         named = {it.pk: [p.pk for p in it.purchases] for it in r.context["order_items_sorted"]}
         self.assertEqual(named.pop(extra.pk), [])
         self.assertEqual(list(named.values()), [[inv_id]])
-        self.assertContains(r, 'class="od-po-chip" href="%s"\n                       target="_blank"'
-                            % reverse("accounts:purchase_order_detail", args=[inv_id]))
+        # Its goods not in yet, each roll coming names it, the line doesn't.
+        self.assertContains(r, 'class="od-po-chip" href="%s" target="_blank"'
+                            % reverse("accounts:purchase_order_detail", args=[inv_id]), count=2)
+        self.assertEqual([it.line_purchases for it in r.context["order_items_sorted"]], [[], []])
         self.assertNotContains(r, "not on the purchase")
 
-    def test_a_line_awaiting_its_purchase_says_what_rolls_are_coming(self):
-        """The plan's two rolls (30 + 25 m), not a bare "no rolls"."""
+    def test_a_line_awaiting_its_purchase_opens_onto_the_rolls_coming(self):
+        """The plan's two rolls (30 + 25 m), each on its own, not a bare
+        "no rolls"."""
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
         r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
         [line] = r.context["order_items_sorted"]
         self.assertEqual(line.expected_label, "2 rolls · 55 m")
         self.assertContains(r, "≈ 2 rolls · 55 m expected")
+        self.assertEqual([(e["qty"], e["unit"]) for e in line.expected_rolls],
+                         [(Decimal("30"), "m"), (Decimal("25"), "m")])
+        self.assertContains(r, 'class="od-row-toggle" data-toggle-tops="%s"' % line.pk)
+        self.assertContains(r, '<span class="m">≈ 30 m</span>')
+        self.assertContains(r, '<span class="m">≈ 25 m</span>')
+
+    def test_a_line_shows_what_it_holds_beside_what_is_still_coming(self):
+        """One purchase in, another for the same variant on its way: the
+        held rolls and the expected one, each pill naming its purchase."""
+        first = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=first).for_order
+        self.assertTrue(self._confirm(first).json()["success"])
+        plan = self._plan(variants=[self._variant(tops=(40,))])
+        second = Invoice.objects.create(
+            type="purchase", status="ordered", for_order=order, series="PUR", number="2",
+            current_account=self.supplier, book=self.book, currency=self.usd,
+            date=order.order_date, due_date=order.order_date,
+            intake_warehouse=self.wh, intake_plan=plan)
+        r = self.client.get(reverse("operating:order_detail", args=[order.pk]))
+        [line] = r.context["order_items_sorted"]
+        self.assertEqual([e["purchase"].pk for e in line.expected_rolls], [second.pk])
+        # The purchase whose goods are in is named on the line.
+        self.assertEqual([p.pk for p in line.line_purchases], [first])
+        self.assertContains(r, "≈ 1 roll · 40 m expected")
+        self.assertContains(r, '<span class="m">≈ 40 m</span>')
+        self.assertEqual(len(self._held(order)), 2)
+        self.assertContains(r, 'class="od-top-pill"', count=2)
+        self.assertContains(r, 'href="%s" target="_blank"'
+                            % reverse("accounts:purchase_order_detail", args=[second.pk]))
 
     def test_a_cancelled_purchase_is_named_on_no_line(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]

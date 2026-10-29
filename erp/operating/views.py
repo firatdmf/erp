@@ -284,15 +284,20 @@ def _order_item_variant_lines(it, language=None):
             for av in _variant_attribute_values(v)]
 
 
-def _order_item_variant_original(it, shown):
-    """The variant as the catalog holds it — English, the language its
-    values are stored in — for staff matching a line to a label or a
-    supplier's sheet while the page reads in their own language. Only
-    the values that read differently from `shown` (the reader's lines,
-    value for value) — "160 x 200 cm" is the same in any language and
-    is not said twice."""
-    original = _order_item_variant_lines(it, language="en")
-    return [o for o, s in zip(original, shown) if o != s]
+def _order_item_description(it):
+    """An order line's Description, as the warehouse list shows a row:
+    the name typed on its warehouse row — or, with none, the variant's
+    values as the catalog holds them, in English — and under it the
+    values in the reader's language, when they read differently."""
+    from marketing.attributes import display_value
+    v = it.product_variant
+    if v is None:
+        return [], []
+    worded = [display_value(av.product_variant_attribute.name,
+                            av.product_variant_attribute_value)
+              for av in _variant_attribute_values(v)]
+    described = _order_item_variant_lines(it, language="en")
+    return described, ([] if worded == described else worded)
 
 
 def _order_item_variant_label(it):
@@ -378,7 +383,7 @@ class OrderDetail(DetailView):
         return list(
             self.object.supplier_purchases
             .exclude(status="cancelled")
-            .select_related("current_account")
+            .select_related("current_account", "intake_warehouse")
             .annotate(held_quantity=Sum(
                 "items__warehouse_stock_items__reservations__quantity",
                 filter=Q(items__warehouse_stock_items__reservations__order=self.object),
@@ -454,23 +459,36 @@ class OrderDetail(DetailView):
         purchase_skus = [(p, plan_variant_skus(p.intake_plan))
                          for p in ctx["supplier_purchases"]]
 
-        def expected_label(it, sku):
-            rolls = [q for p in it.purchases if p.status == "ordered"
-                     for q in plan_expected_rolls(p.intake_plan, sku)]
+        def expected_rolls(it, sku):
+            """Each roll a purchase still on its way says it brings, for the
+            line to open onto as it would onto its stock: the barcode if the
+            roll has one yet, the quantity, the depot it comes into, and the
+            purchase bringing it."""
+            unit = units.unit_short(getattr(it.product, "unit", None) or units.DEFAULT_UNIT)
+            return [{"barcode": code, "qty": q, "unit": unit,
+                     "warehouse": p.intake_warehouse, "purchase": p}
+                    for p in it.purchases if p.status == "ordered"
+                    for code, q in plan_expected_rolls(p.intake_plan, sku)]
+
+        def expected_label(it, rolls):
+            """All of them at once, for the line itself: "3 rolls · 150 m"."""
             if not rolls:
                 return ""
-            product = it.product
-            pack = getattr(product, "pack_type", None) or units.DEFAULT_PACK
-            unit = getattr(product, "unit", None) or units.DEFAULT_UNIT
+            pack = getattr(it.product, "pack_type", None) or units.DEFAULT_PACK
             return (f"{len(rolls)} {units.pack_noun(pack, len(rolls))} · "
-                    f"{floatformat(sum(rolls), '-2g')} {units.unit_short(unit)}")
+                    f"{floatformat(sum(e['qty'] for e in rolls), '-2g')} {rolls[0]['unit']}")
         # Attach available-stock metadata to each item so the template
         # can show "Stok: N" next to the qty input and compute the max
         # the user can bump it to (current qty + remaining stock).
         for it in self.object.items.all():
             sku = (getattr(it.product_variant, "variant_sku", "") or "").lower()
             it.purchases = [p for p, skus in purchase_skus if sku and sku in skus]
-            it.expected_label = expected_label(it, sku)
+            it.expected_rolls = expected_rolls(it, sku)
+            it.expected_label = expected_label(it, it.expected_rolls)
+            # A purchase still on its way is named on each roll it brings;
+            # the line names the rest — those whose goods are in.
+            named = {e["purchase"].pk for e in it.expected_rolls}
+            it.line_purchases = [p for p in it.purchases if p.pk not in named]
             if it.product_variant_id and it.product_variant:
                 stock = it.product_variant.live_quantity
             elif it.product_id and it.product:
@@ -563,7 +581,7 @@ class OrderDetail(DetailView):
             it.scanned_label = _stock_taken_label(it.item_reservations)
             it.sold_by_count = units.by_variant(getattr(it.product, "tracking", None))
             it.variant_lines = _order_item_variant_lines(it)
-            it.variant_original = _order_item_variant_original(it, it.variant_lines)
+            it.description_lines, it.description_worded = _order_item_description(it)
         # Every item-less reservation, pack or no pack — in this layout
         # nothing else renders them, so filtering pack'd ones out (as the
         # pack screen does) would make them invisible here.

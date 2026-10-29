@@ -1,10 +1,10 @@
-{% comment %}A line's Variant cell: the variant in the reader's language, and
-   under it, quieter, as the catalog holds it — for staff matching the
-   line to a label — when the two differ.{% endcomment %}
+{% comment %}A line's Description cell, as the warehouse list shows a row: the
+   name typed on its warehouse row, or the catalog's values, and under it,
+   quieter, the values in the reader's language when they read differently.{% endcomment %}
 <td>
-  {% if item.variant_lines %}
-    <div class="od-variant-name">{% for line in item.variant_lines %}<span>{{ line }}</span>{% endfor %}</div>
-    {% if item.variant_original %}<div class="od-variant-orig">{% for line in item.variant_original %}<span>{{ line }}</span>{% endfor %}</div>{% endif %}
+  {% if item.description_lines %}
+    <div class="od-variant-name">{% for line in item.description_lines %}<span>{{ line }}</span>{% endfor %}</div>
+    {% if item.description_worded %}<div class="od-variant-orig">{{ item.description_worded|join:" · " }}</div>{% endif %}
   {% else %}
     <span class="od-empty-mute">—</span>
   {% endif %}

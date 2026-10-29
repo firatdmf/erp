@@ -59,6 +59,8 @@ NOTIFY_EVENTS = frozenset({
     "shipped", "in_transit", "out_for_delivery", "delivered",
     "cancelled", "returned",
 })
+# Told again whenever the order comes back to them; the rest only once.
+TOLD_EVERY_TIME = frozenset({"shipped"})
 
 
 def notify_customer_of_status(order, new_status):
@@ -66,8 +68,17 @@ def notify_customer_of_status(order, new_status):
     and for "shipped" a WhatsApp message. Gated on Order.notify_customer
     by the senders themselves. For an order split across books this is
     the whole order's one notice — the senders write it for every half
-    (order_notifications, order_whatsapp)."""
+    (order_notifications, order_whatsapp).
+
+    Each stage is told once: an order that comes back to a stage (packed,
+    unpacked, packed again) has left it before, which its change history
+    shows, and the customer heard then. Shipped is told every time: an
+    order is re-opened and shipped again because the goods or the cargo
+    changed, and the customer needs the new notice."""
     if new_status not in NOTIFY_EVENTS:
+        return
+    if (new_status not in TOLD_EVERY_TIME
+            and order.change_logs.filter(action="status", old_value=new_status).exists()):
         return
     try:
         from .order_notifications import send_order_event_email

@@ -151,6 +151,18 @@ class SplitOrderPacking(TestCase):
             half.refresh_from_db()
             self.assertEqual(half.order_status, "pending")
 
+    def test_the_customer_hears_of_packing_once(self, _upload):
+        Order.objects.filter(pk__in=[self.laleli_half.pk, self.ergene_half.pk]).update(notify_customer=True)
+        sack = Pack.objects.create(order=self.laleli_half, pack_number=1)
+        url = reverse("operating:order_pack_reserve_assign_pack", args=[self.laleli_half.pk])
+        with patch("operating.order_notifications.send_order_event_email") as send:
+            for pack_id in (sack.pk, "", sack.pk):
+                with self.captureOnCommitCallbacks(execute=True):
+                    self.client.post(url, {"reservation_id": self.laleli_roll.pk, "pack_id": pack_id})
+        self.laleli_half.refresh_from_db()
+        self.assertEqual(self.laleli_half.order_status, "packaging")
+        self.assertEqual([c.args[1] for c in send.call_args_list], ["packaging"])
+
     def test_a_roll_off_another_order_is_still_refused(self, _upload):
         sack = Pack.objects.create(order=self.laleli_half, pack_number=1)
         stranger = Order.objects.create(order_number="ORD-2026-000099")

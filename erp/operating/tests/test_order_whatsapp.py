@@ -94,6 +94,14 @@ class ShippedWhatsApp(TestCase):
         self.assertEqual(self._language_sent_to("+7 916 123 45 67", post), "en")
 
     @patch("operating.order_whatsapp._post", return_value=Mock(status_code=200))
+    def test_shipping_a_reopened_order_again_messages_again(self, post):
+        self._ship()
+        self.order.order_status = "packaging"
+        self.order.save()
+        self._ship()
+        self.assertEqual(post.call_count, 2)
+
+    @patch("operating.order_whatsapp._post", return_value=Mock(status_code=200))
     def test_saving_a_shipped_order_again_does_not_message_twice(self, post):
         self._ship()
         self.order.notes = "left with the doorman"

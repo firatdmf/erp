@@ -51,6 +51,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
+import re
 from .utils import get_machine_from_api_key
 from .weights import net_kg
 from django.utils.decorators import method_decorator
@@ -575,7 +576,7 @@ class OrderDetail(DetailView):
         # Change history preview (full page at order_changes).
         ctx["order_changes_preview"] = _decorate_order_changes(list(
             self.object.change_logs.select_related("created_by")[:8]
-        ))
+        ), self.object)
         ctx["order_changes_count"] = self.object.change_logs.count()
 
         # An order split across books is one order on this page: its name
@@ -2956,14 +2957,25 @@ def order_pack_complete(request, pk):
 _CHANGE_CONTEXT = "order change"
 
 
-def _decorate_order_changes(changes):
+# The money in a history row is written as bare figures — "200.00 × 2.00",
+# "Delivery 45.00" — because an order's lines are logged before its
+# currency is stamped. These find the figures to name in its currency;
+# a row written before then already carries its own "$" and is left be.
+_LINE_PRICE_RE = re.compile(r"( × )(-?\d[\d.]*)$")
+_CHARGE_AMOUNT_RE = re.compile(r"(?<= )(-?\d[\d.]*)(?= · |$)")
+
+
+def _decorate_order_changes(changes, order):
     """Attach display attrs (translated labels, resolved status/carrier
-    names) to OrderChange rows for the templates."""
+    names, money in `order`'s currency) to OrderChange rows for the
+    templates."""
     from django.utils.translation import pgettext
     from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
     status_map = {k: str(v) for k, v in ORDER_STATUS_CHOICES}
     from .models import Carrier
     carrier_map = dict(Carrier.objects.values_list("code", "name"))
+
+    symbol = order.currency_symbol
 
     def val_display(c, v):
         if v is None:
@@ -2972,6 +2984,12 @@ def _decorate_order_changes(changes):
             return status_map.get(v, v)
         if c.field == "carrier":
             return carrier_map.get(v, v)
+        if c.field == "price" and v[:1] in "-0123456789":
+            return f"{symbol}{v}"
+        if c.field == "charges_and_discounts":
+            return _CHARGE_AMOUNT_RE.sub(lambda m: symbol + m.group(1), v)
+        if c.action in ("item_added", "item_removed") or c.field == "product":
+            return _LINE_PRICE_RE.sub(lambda m: m.group(1) + symbol + m.group(2), v)
         return v
 
     for c in changes:
@@ -3037,7 +3055,7 @@ def order_changes(request, pk):
         "order": order,
         "page_obj": page,
         "paginator": paginator,
-        "changes": _decorate_order_changes(list(page.object_list)),
+        "changes": _decorate_order_changes(list(page.object_list), order),
         "filter_qs": qd.urlencode(),
         "filters": {"action": action, "from": date_from, "to": date_to, "q": q},
     })

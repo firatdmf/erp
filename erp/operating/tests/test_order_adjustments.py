@@ -248,7 +248,10 @@ class AdjustmentsThroughTheFormTest(TestCase):
                     {"label": "Partnership discount", "amount": "-20.00"}])
         order = Order.objects.get()
         self.assertEqual(self._history(order),
-                         [(None, "Delivery $45.00 · Partnership discount $-20.00")])
+                         [(None, "Delivery 45.00 · Partnership discount -20.00")])
+        # The page names the money in the order's currency.
+        html = self.client.get(reverse("operating:order_changes", args=[order.pk])).content.decode()
+        self.assertIn("Delivery $45.00 · Partnership discount $-20.00", html)
 
     def test_an_edit_that_changes_them_says_before_and_after(self):
         self._post([{"label": "Delivery", "amount": "45.00"}])
@@ -257,7 +260,7 @@ class AdjustmentsThroughTheFormTest(TestCase):
         self._post([{"label": "Delivery", "amount": "60.00"}],
                    url=reverse("operating:edit_order", args=[order.pk]), item_id=item.pk)
         self.assertEqual(self._history(order)[-1],
-                         ("Delivery $45.00", "Delivery $60.00"))
+                         ("Delivery 45.00", "Delivery 60.00"))
 
     def test_an_edit_that_leaves_them_alone_says_nothing(self):
         """The form replaces them all on every save; the history only

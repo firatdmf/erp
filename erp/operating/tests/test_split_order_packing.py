@@ -17,6 +17,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
+from authentication.models import Permission
 from crm.models import Contact
 from marketing.models import Product, ProductCategory
 from operating.models import (Order, OrderItem, OrderStockReservation, Pack, Warehouse,
@@ -40,6 +41,7 @@ class SplitOrderPacking(TestCase):
             self.ergene, "ORD-2026-000024", customer, group, usd, "N1477.G06", "ERG1")
         user = User.objects.create_user("firat", password="pw")
         user.member.books.add(self.laleli, self.ergene)
+        user.member.permissions.add(Permission.objects.get_or_create(name="print_labels")[0])
         self.client.force_login(user)
 
     def _half(self, book, number, customer, group, currency, sku, barcode):

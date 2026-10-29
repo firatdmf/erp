@@ -668,9 +668,11 @@
         <i class="fa fa-up-right-from-square"></i>{% trans "Linked product" %}: {{ product.catalog_variant.product.sku|default:product.catalog_variant.product.title }}
       </a>
       {% endif %}
+      {% if may_print_labels %}
       <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-qrcode"></i>{% trans "Print label" %}
       </a>
+      {% endif %}
       <button type="button" class="ord-btn ghost" onclick="document.getElementById('peOverlay').classList.add('show')">
         <i class="fa fa-pen"></i>{% trans "Edit" %}
       </button>
@@ -840,11 +842,13 @@
                     <i class="fa fa-camera"></i>
                   </a>
                   {% endif %}
+                  {% if may_print_labels %}
                   <a class="roll-delete-btn" style="color:var(--gray-600);"
                      href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}?roll={{ r.pk }}"
                      target="_blank" rel="noopener" title="{% trans 'Print label' %}">
                     <i class="fa fa-qrcode"></i>
                   </a>
+                  {% endif %}
                   <button type="button"
                           class="roll-delete-btn" style="color:var(--nejum-teal-700);"
                           title="{% blocktrans with n=product.item_noun %}Edit this {{ n }}{% endblocktrans %}"
@@ -982,12 +986,14 @@
           <img src="{% url 'operating:warehouse_product_code' warehouse.pk product.pk %}?kind=barcode"
                alt="{% trans 'Barcode' %}" loading="lazy" style="height:58px; max-width:180px; object-fit:contain;">
         </div>
+        {% if may_print_labels %}
         <div style="text-align:center; padding-bottom:10px;">
           <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener"
              style="font:600 12px var(--font-sans); color:var(--nejum-teal-700); text-decoration:none;">
             <i class="fa fa-qrcode"></i> {% trans "Print label (PDF)" %}
           </a>
         </div>
+        {% endif %}
       </section>
 
       <section class="od-card">

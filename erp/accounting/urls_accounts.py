@@ -35,6 +35,8 @@ anyway so the intent is obvious.
 from django.urls import path
 from django.views.generic import TemplateView
 
+from erp.roles import label_printers_only
+
 from . import (
     statement_excel,
     views_check,
@@ -146,7 +148,7 @@ urlpatterns = [
     owned("accounts/purchases/<int:pk>/order/", views_purchase.PurchaseOrderSave.as_view(), "purchase_order_update", Invoice),
     owned("accounts/purchases/<int:pk>/confirm/", views_purchase.PurchaseOrderConfirm.as_view(), "purchase_order_confirm", Invoice),
     owned("accounts/purchases/<int:pk>/print/", views_purchase.PurchaseOrderPrint.as_view(), "purchase_order_print", Invoice),
-    owned("accounts/purchases/<int:pk>/items/<int:item_pk>/labels/", views_purchase.PurchaseItemLabels.as_view(), "purchase_item_labels", Invoice),
+    owned("accounts/purchases/<int:pk>/items/<int:item_pk>/labels/", label_printers_only(views_purchase.PurchaseItemLabels.as_view()), "purchase_item_labels", Invoice),
     owned("accounts/purchases/<int:pk>/", views_purchase.PurchaseOrderDetail.as_view(), "purchase_order_detail", Invoice),
     owned("accounts/purchases/<int:pk>/invoice/", views_invoice.PurchaseInvoice.as_view(), "purchase_invoice", Invoice),
     owned("accounts/purchases/<int:pk>/invoice/excel/", views_invoice.purchase_invoice_excel, "purchase_invoice_excel", Invoice),

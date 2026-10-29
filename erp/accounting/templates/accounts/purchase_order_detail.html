@@ -270,7 +270,7 @@
     {% else %}
     <div class="po-rolls-h">
       <i data-lucide="layers"></i> {% blocktrans with noun=it.pack_many %}Physical {{ noun }} received{% endblocktrans %}
-      {% if it.pack_count %}
+      {% if it.pack_count and may_print_labels %}
       <a class="po-rolls-print" target="_blank" rel="noopener"
          href="{% url 'accounts:purchase_item_labels' invoice.pk it.pk %}"
          title="{% blocktrans with noun=it.pack_one %}One label per {{ noun }} on this line, as one PDF{% endblocktrans %}">

@@ -691,6 +691,7 @@
       ASSIGN_PACK = wrap.dataset.assignPackUrl, ASSIGN_ITEM = wrap.dataset.assignItemUrl,
       PACK_CRUD = wrap.dataset.packCrudUrl;
   var SHIPPED = wrap.dataset.shipped === '1';
+  var MAY_PRINT_LABELS = {{ may_print_labels|yesno:"true,false" }};
 
   // Every roll row, wherever it sits (a product group or a package) —
   // used for count/total refresh and for locating rows by id.
@@ -1473,7 +1474,7 @@
           scanBtn.innerHTML = '<i class="fa fa-barcode"></i>' + '{% filter escapejs %}{% trans "Scan here" %}{% endfilter %}';
           h.insertBefore(scanBtn, h.querySelector('.pk-pack-del') || null);
         }
-        if (!h.querySelector('.pk-pack-label')){
+        if (MAY_PRINT_LABELS && !h.querySelector('.pk-pack-label')){
           var label = document.createElement('a');
           label.className = 'pk-pack-label';
           label.href = '{% url "operating:pack_label" 0 %}'.replace('/0/', '/' + pack.dataset.packId + '/');

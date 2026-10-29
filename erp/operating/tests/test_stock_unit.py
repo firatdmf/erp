@@ -29,6 +29,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
+from authentication.models import Permission
 
 from marketing.models import Product, ProductVariant
 from operating.models import Warehouse, WarehouseProduct, WarehouseProductItem
@@ -135,6 +136,7 @@ class TheLabelSaysWhatItIsCounting(TestCase):
             quantity=Decimal("20"), unit="pack", pack_type="box")
 
         user = get_user_model().objects.create_user("printer", password="pw")
+        user.member.permissions.add(Permission.objects.get_or_create(name="print_labels")[0])
         user.member.books.add(self.book)
         user.member.default_book = self.book
         user.member.save()

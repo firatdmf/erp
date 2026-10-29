@@ -155,9 +155,11 @@
     <a href="{% url 'operating:export_packing_list_excel' order.pk %}" class="pk-btn ghost">
       <i class="fa fa-file-excel"></i> {% trans "Download Excel (editable)" %}
     </a>
+    {% if may_print_labels %}
     <a href="{% url 'operating:order_pack_labels' order.pk %}" class="pk-btn ghost" target="_blank" rel="noopener">
       <i class="fa fa-print"></i> {% trans "Package labels" %}
     </a>
+    {% endif %}
     <span class="spacer"></span>
   </div>
 
@@ -175,11 +177,13 @@
           {% trans "Net" %} {% if p.weights.net_kg is not None %}{% if p.weights.net_kg_estimated %}~{% endif %}{{ p.weights.net_kg|floatformat:"2g" }} kg{% else %}—{% endif %}
           · {% trans "Gross" %} {% if p.weights.gross_kg is not None %}{{ p.weights.gross_kg|floatformat:"2g" }} kg{% else %}—{% endif %}
         </span>
+        {% if may_print_labels %}
         <div class="pk-pack-actions">
           <a class="pk-pack-btn" href="{% url 'operating:pack_label' p.pk %}" target="_blank">
             <i class="fa fa-print"></i> {% trans "Print label" %}
           </a>
         </div>
+        {% endif %}
       </div>
       <div class="pk-rolls">
         {% for r in p.rows %}

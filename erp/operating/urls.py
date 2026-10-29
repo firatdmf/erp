@@ -10,6 +10,7 @@ from . import warehouse_excel
 from accounting import views_invoice
 from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped, order_book_guarded
 from crm.directories import customer_guarded
+from erp.roles import label_printers_only
 from .models import Order, OrderItem, Pack, Warehouse
 from .split_orders import split_order_guarded
 from django.views.generic import RedirectView
@@ -75,7 +76,7 @@ urlpatterns = [
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/", in_reach(views_warehouse.warehouse_product_rolls), name="warehouse_product_rolls"),
     path("warehouses/<int:warehouse_pk>/same-sku-rolls/", in_reach(views_warehouse.warehouse_merged_rolls), name="warehouse_merged_rolls"),
     path("warehouses/<int:warehouse_pk>/rolls/<int:roll_pk>/photo/", in_reach(views_warehouse.warehouse_roll_photo), name="warehouse_roll_photo"),
-    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/", in_reach(warehouse_label.warehouse_product_label), name="warehouse_product_label"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/", label_printers_only(in_reach(warehouse_label.warehouse_product_label)), name="warehouse_product_label"),
     # Not in_reach: what a roll's QR opens, for anyone holding the label.
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/code/", warehouse_label.warehouse_product_code, name="warehouse_product_code"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/info/", warehouse_label.warehouse_product_info, name="warehouse_product_info"),
@@ -194,13 +195,14 @@ urlpatterns = [
     ),
     path(
         "packs/<int:pack_pk>/label/",
-        customer_guarded(pack_label.pack_label, Pack, "order__contact", "order__company",
-                         kwarg="pack_pk", book="order__current_account__book"),
+        label_printers_only(customer_guarded(
+            pack_label.pack_label, Pack, "order__contact", "order__company",
+            kwarg="pack_pk", book="order__current_account__book")),
         name="pack_label",
     ),
     path(
         "orders/<int:pk>/packing_list/labels/",
-        of_a_customer_in_reach(pack_label.order_pack_labels),
+        label_printers_only(of_a_customer_in_reach(pack_label.order_pack_labels)),
         name="order_pack_labels",
     ),
     path(

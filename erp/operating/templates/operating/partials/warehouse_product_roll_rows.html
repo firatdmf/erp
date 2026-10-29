@@ -86,10 +86,12 @@ page — the line itself has no single page to open.{% endcomment %}
             <i class="fa fa-camera"></i>
           </a>
           {% endif %}
+          {% if may_print_labels %}
           <a href="{% url 'operating:warehouse_product_label' product.warehouse_id product.pk %}?roll={{ r.pk }}"
              target="_blank" rel="noopener" title="{% trans 'Print label' %}">
             <i class="fa fa-qrcode"></i>
           </a>
+          {% endif %}
         </div>
       </div>
       {% endfor %}

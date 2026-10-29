@@ -51,6 +51,14 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "Manages the books they are assigned: warehouses, orders, purchases, "
         "costs and profit. Nothing install-wide, nothing of another business.",
     ),
+    # Labels go on the goods — rolls, stock items, packed sacks — which is
+    # operations work. A grant of its own, so who prints them is decided
+    # per person (erp.roles.may_print_labels). Seeded in migration 0030 to
+    # every member who is not a sales rep.
+    "print_labels": (
+        "Print labels",
+        "Can print stock, roll and package labels.",
+    ),
 }
 
 # Convert dictionary to list of tuples for name choices

@@ -50,6 +50,7 @@ from decimal import ROUND_CEILING, Decimal
 SALES_REP = "sales_rep"
 VIEW_PROFIT = "view_profit"
 MIDDLE_MANAGER = "middle_manager"
+PRINT_LABELS = "print_labels"
 # Stored as "manager", the access level that sat unused before it was
 # given this meaning; the label says what it is.
 OPERATIONS_MANAGER = "manager"
@@ -414,6 +415,37 @@ def may_see_profit(actor):
     if getattr(user, "is_superuser", False):
         return True
     return _has_permission(member, VIEW_PROFIT) or _has_permission(member, MIDDLE_MANAGER)
+
+
+def may_print_labels(actor):
+    """Whether this member may print labels: a roll's or stock item's, a
+    purchase line's rolls, a package's.
+
+    A grant (the print_labels permission): labels go on the goods, which
+    is operations work, and who does it is set per person in Django
+    admin → Members. Superusers always may.
+    """
+    member, user = _member_and_user(actor)
+    if member is None:
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return _has_permission(member, PRINT_LABELS)
+
+
+def label_printers_only(view):
+    """Refuse a label's page to a member without the print_labels grant.
+    Applied in the URLconf, beside the other guards on those routes."""
+    from functools import wraps
+
+    from django.core.exceptions import PermissionDenied
+
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if not may_print_labels(request.user):
+            raise PermissionDenied("Printing labels needs the Print labels permission.")
+        return view(request, *args, **kwargs)
+    return wrapper
 
 
 def may_read(path):

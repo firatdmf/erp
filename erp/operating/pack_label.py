@@ -1,7 +1,8 @@
 """Mini packing list for the outside of a package: 100 × 100 mm, one label
 per page, for the thermal label printer.
 
-The order number and "package 3 / 7" beside a QR that
+The order's brand (or none, or another name, as printed), the order number and
+"package 3 / 7" beside a QR that
 opens this package on the order's packing list, and what is inside, one
 line per SKU ("4 rolls · 212.50 m") — rolls of one SKU are added up,
 since a label this size can't list every roll. A package with more SKUs
@@ -18,7 +19,7 @@ from marketing import units
 
 from .models import Order, Pack
 from .split_orders import combined_number, order_packs, split_halves
-from .warehouse_label import inline_pdf_response
+from .warehouse_label import inline_pdf_response, label_brand
 
 LINES_PER_LABEL = 9
 
@@ -76,14 +77,17 @@ def _total(lines):
     return " · ".join(parts)
 
 
-def labels_pdf_bytes(packs, title, link=None):
+def labels_pdf_bytes(packs, title, link=None, brand=None):
     """Labels for these packages of one order, a page each (more for a
     package that runs over LINES_PER_LABEL SKUs). ``link(pack)`` is what
-    the QR opens; without one it holds just the package code."""
+    the QR opens; without one it holds just the package code. ``brand``
+    is warehouse_label.label_brand's choice: None for the order's book."""
     import segno
     from PIL import Image
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
+
+    from accounting.services_accounts import brand_name_for
 
     from .order_notifications import _ensure_pdf_fonts
 
@@ -105,6 +109,11 @@ def labels_pdf_bytes(packs, title, link=None):
 
     for pack in packs:
         order = pack.order
+        # The book the order's money posts to, so each sack carries the
+        # name of the business that sold what is in it — unless the print
+        # button's menu picked white label ("") or a custom name.
+        name = brand if brand is not None else brand_name_for(
+            order.current_account.book if order.current_account_id else None)
         # A split order's packages are one run across its halves, and a
         # sack may hold either half's goods: the label names both.
         halves = split_halves(order)
@@ -120,18 +129,25 @@ def labels_pdf_bytes(packs, title, link=None):
         qr = Image.open(qbuf).convert("RGB")
 
         for page_no, page in enumerate(pages, start=1):
-            # ── Header: QR, then the order number over "3 / 12" ──
+            # ── Brand, across the top: who the sack is from ──
             top = H - M
+            if name:
+                size = 14
+                while size > 8 and c.stringWidth(name, bold, size) > W - 2 * M:
+                    size -= 0.5
+                c.setFont(bold, size)
+                c.drawString(M, H - M - 4.5 * mm, fit(name, bold, size, W - 2 * M))
+                top -= 8 * mm
+
+            # ── Header: QR, then the order number over "3 / 12" ──
             c.drawInlineImage(qr, M, top - qsize, qsize, qsize)
             x = M + qsize + 4 * mm
-            c.setFillColorRGB(0.4, 0.4, 0.4)
             c.setFont(reg, 8)
             c.drawString(x, top - 3 * mm, _("ORDER").upper())
             package = _("PACKAGE").upper()
             if len(pages) > 1:
                 package += f" · {page_no}/{len(pages)}"
             c.drawString(x, top - 15 * mm, package)
-            c.setFillColorRGB(0, 0, 0)
             # The order number is what people say and search for, so it
             # shrinks to fit rather than lose its tail. The package code
             # isn't printed: it is this number and "3 / 12" over again, and
@@ -189,7 +205,7 @@ def pack_label(request, pack_pk):
     """One package's label(s), inline for the label printer."""
     pack = get_object_or_404(Pack.objects.select_related("order"), pk=pack_pk)
     pdf = labels_pdf_bytes([pack], title=f"{_('Package label')} — {pack.code}",
-                           link=_packing_list_link(request))
+                           link=_packing_list_link(request), brand=label_brand(request))
     return inline_pdf_response(pdf, f"package-label-{pack.code or pack.pk}")
 
 
@@ -198,5 +214,5 @@ def order_pack_labels(request, pk):
     order = get_object_or_404(Order, pk=pk)
     packs = list(order_packs(order))
     pdf = labels_pdf_bytes(packs, title=f"{_('Package labels')} — {combined_number(split_halves(order))}",
-                           link=_packing_list_link(request))
+                           link=_packing_list_link(request), brand=label_brand(request))
     return inline_pdf_response(pdf, f"package-labels-{order.order_number or order.pk}")

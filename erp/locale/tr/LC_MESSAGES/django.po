@@ -15286,3 +15286,15 @@ msgid ""
 msgstr ""
 "Kendinizi süper yöneticilikten çıkaramazsınız ve son süper yönetici yerinde "
 "kalır."
+
+msgid "White label"
+msgstr "Beyaz etiket"
+
+msgid "Custom brand name"
+msgstr "Özel marka adı"
+
+msgid "More label options"
+msgstr "Diğer etiket seçenekleri"
+
+msgid "Print with…"
+msgstr "Şununla yazdır…"

@@ -86,10 +86,11 @@
     <div class="actions">
       <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}">{% trans "Full details" %}</a>
       {% if may_print_labels %}
-      <a href="{% url 'operating:warehouse_product_label' product.warehouse_id product.pk %}" target="_blank" rel="noopener">{% trans "Print label" %}</a>
+      <a data-label-print href="{% url 'operating:warehouse_product_label' product.warehouse_id product.pk %}" target="_blank" rel="noopener">{% trans "Print label" %}</a>
       {% endif %}
     </div>
     {% endif %}
   </div>
+{% include "components/_label_print_menu.html" %}
 </body>
 </html>

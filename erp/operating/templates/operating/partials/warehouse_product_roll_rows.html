@@ -87,7 +87,7 @@ page — the line itself has no single page to open.{% endcomment %}
           </a>
           {% endif %}
           {% if may_print_labels %}
-          <a href="{% url 'operating:warehouse_product_label' product.warehouse_id product.pk %}?roll={{ r.pk }}"
+          <a data-label-print="inline" href="{% url 'operating:warehouse_product_label' product.warehouse_id product.pk %}?roll={{ r.pk }}"
              target="_blank" rel="noopener" title="{% trans 'Print label' %}">
             <i class="fa fa-qrcode"></i>
           </a>

@@ -156,7 +156,7 @@
       <i class="fa fa-file-excel"></i> {% trans "Download Excel (editable)" %}
     </a>
     {% if may_print_labels %}
-    <a href="{% url 'operating:order_pack_labels' order.pk %}" class="pk-btn ghost" target="_blank" rel="noopener">
+    <a data-label-print href="{% url 'operating:order_pack_labels' order.pk %}" class="pk-btn ghost" target="_blank" rel="noopener">
       <i class="fa fa-print"></i> {% trans "Package labels" %}
     </a>
     {% endif %}
@@ -179,7 +179,7 @@
         </span>
         {% if may_print_labels %}
         <div class="pk-pack-actions">
-          <a class="pk-pack-btn" href="{% url 'operating:pack_label' p.pk %}" target="_blank">
+          <a data-label-print class="pk-pack-btn" href="{% url 'operating:pack_label' p.pk %}" target="_blank">
             <i class="fa fa-print"></i> {% trans "Print label" %}
           </a>
         </div>
@@ -216,4 +216,5 @@
   </div>
 </div>
 
+{% include "components/_label_print_menu.html" %}
 {% endblock %}

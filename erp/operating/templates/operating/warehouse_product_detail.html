@@ -669,7 +669,7 @@
       </a>
       {% endif %}
       {% if may_print_labels %}
-      <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
+      <a data-label-print href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-qrcode"></i>{% trans "Print label" %}
       </a>
       {% endif %}
@@ -843,7 +843,7 @@
                   </a>
                   {% endif %}
                   {% if may_print_labels %}
-                  <a class="roll-delete-btn" style="color:var(--gray-600);"
+                  <a data-label-print class="roll-delete-btn" style="color:var(--gray-600);"
                      href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}?roll={{ r.pk }}"
                      target="_blank" rel="noopener" title="{% trans 'Print label' %}">
                     <i class="fa fa-qrcode"></i>
@@ -988,7 +988,7 @@
         </div>
         {% if may_print_labels %}
         <div style="text-align:center; padding-bottom:10px;">
-          <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener"
+          <a data-label-print="inline" href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener"
              style="font:600 12px var(--font-sans); color:var(--nejum-teal-700); text-decoration:none;">
             <i class="fa fa-qrcode"></i> {% trans "Print label (PDF)" %}
           </a>
@@ -1985,4 +1985,5 @@
     if (edit) openRollEdit(edit);
   })();
 </script>
+{% include "components/_label_print_menu.html" %}
 {% endblock %}

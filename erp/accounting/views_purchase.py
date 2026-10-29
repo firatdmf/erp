@@ -286,12 +286,13 @@ class PurchaseItemLabels(View):
         if not rolls:
             raise Http404("This purchase line has no rolls to label.")
 
-        from operating.warehouse_label import inline_pdf_response, labels_pdf_bytes
+        from operating.warehouse_label import inline_pdf_response, label_brand, labels_pdf_bytes
 
         invoice = item.invoice
         line = (item.description or "").strip()
         title = f"{_('Roll labels')} — {invoice.display_number}{f' — {line}' if line else ''}"
-        pdf = labels_pdf_bytes([(r.product, r) for r in rolls], title=title)
+        pdf = labels_pdf_bytes([(r.product, r) for r in rolls], title=title,
+                               brand=label_brand(request))
         return inline_pdf_response(pdf, f"rolls-{invoice.display_number}-{item.line_no}")
 
 

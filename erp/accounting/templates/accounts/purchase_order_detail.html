@@ -271,7 +271,7 @@
     <div class="po-rolls-h">
       <i data-lucide="layers"></i> {% blocktrans with noun=it.pack_many %}Physical {{ noun }} received{% endblocktrans %}
       {% if it.pack_count and may_print_labels %}
-      <a class="po-rolls-print" target="_blank" rel="noopener"
+      <a data-label-print class="po-rolls-print" target="_blank" rel="noopener"
          href="{% url 'accounts:purchase_item_labels' invoice.pk it.pk %}"
          title="{% blocktrans with noun=it.pack_one %}One label per {{ noun }} on this line, as one PDF{% endblocktrans %}">
         <i class="fa fa-qrcode"></i> {% blocktrans with noun=it.pack_one %}Print {{ noun }} barcodes{% endblocktrans %}
@@ -409,4 +409,5 @@
       }).catch(function () { alert('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}'); btn.disabled = false; btn.innerHTML = orig; });
   };
 </script>
+{% include "components/_label_print_menu.html" %}
 {% endblock %}

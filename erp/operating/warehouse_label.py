@@ -1,6 +1,6 @@
 """Printable roll/variant labels (PDF) for warehouse products.
 
-Re-creates the physical fabric-roll sticker: DESEN (main
+Re-creates the physical fabric-roll sticker: the business's name, DESEN (main
 product) + VARYANT, SKU, METRE, a Code128 barcode and a QR code — one label
 per stock item (each carries its own barcode + quantity), so staff can reprint and
 stick a fresh label on a product.
@@ -36,20 +36,31 @@ def warehouse_product_info(request, warehouse_pk, product_pk):
     })
 
 
-def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
+def label_brand(request):
+    """The name a label prints, as its print button's menu picked it:
+    None for each label's own business (the book that holds the stock),
+    "" for white label — no name at all — or the custom name typed in."""
+    if request.GET.get("white_label"):
+        return ""
+    return (request.GET.get("brand") or "").strip() or None
+
+
+def _label_pdf_bytes(product, rolls, detail_url=None, title=None, brand=None):
     """One product's labels: a page per roll, or a single product-level
     page when it has none."""
     return labels_pdf_bytes([(product, r) for r in rolls] or [(product, None)],
-                            detail_url=detail_url, title=title)
+                            detail_url=detail_url, title=title, brand=brand)
 
 
-def labels_pdf_bytes(pairs, detail_url=None, title=None):
+def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
     """A label sheet for (product, roll) pairs — one page each, in order.
 
     Pairs rather than one product plus its rolls, because a caller like the
     purchase-order page prints the rolls of a whole delivery line, and those
     can sit on more than one warehouse product; every page has to carry its
-    own roll's product name and SKU.
+    own roll's product name and SKU — and its own business's name, taken
+    from the book of the warehouse the roll stands in, unless ``brand``
+    (see label_brand) says otherwise.
     """
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import mm
@@ -57,11 +68,14 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
     import segno
     from PIL import Image
 
+    from accounting.services_accounts import brand_name_for
+
     from .catalog_sync import derive_catalog
     from .order_notifications import _ensure_pdf_fonts
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "DejaVuSans-Bold" if reg == "DejaVuSans" else "Helvetica-Bold"
+    names = {}  # warehouse id → its business's name
 
     W, H = 76 * mm, 58 * mm
     buf = BytesIO()
@@ -105,25 +119,43 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
             c.drawInlineImage(Image.open(qbuf).convert("RGB"),
                               W - qsize - 4 * mm, H - qsize - 4 * mm, qsize, qsize)
 
-        # ── "2nd" badge (top-left, only when factory second) ──
-        if roll and getattr(roll, 'is_second', False):
-            bx = 4 * mm
+        # ── Brand: the business the roll belongs to ──
+        name = brand
+        if name is None:
+            if product.warehouse_id not in names:
+                names[product.warehouse_id] = brand_name_for(product.warehouse.accounting_book)
+            name = names[product.warehouse_id]
+        second = roll and getattr(roll, 'is_second', False)
+        tag = "2ND QUALITY"
+        pad = 2 * mm
+        # Left of the QR, leaving the badge its room on a factory second.
+        room = W - qsize - 11 * mm
+        if second:
+            room -= c.stringWidth(tag, bold, 7) + 2 * pad + 3 * mm
+        brand_w = 0
+        if name:
+            size = 12
+            while size > 7 and c.stringWidth(name, bold, size) > room:
+                size -= 0.5
+            while len(name) > 1 and c.stringWidth(name, bold, size) > room:
+                name = name[:-1]
+            c.setFont(bold, size)
+            brand_w = c.stringWidth(name, bold, size)
+            c.drawString(4 * mm, H - 9 * mm, name)
+
+        # ── "2nd" badge (right after the brand, only when factory second) ──
+        if second:
+            bx = 4 * mm + (brand_w + 3 * mm if brand_w else 0)
             by = H - 9.4 * mm
-            tag = "2ND QUALITY"
             c.setFont(bold, 7)
             tw = c.stringWidth(tag, bold, 7)
-            pad = 2 * mm
-            c.setFillColorRGB(0.71, 0.32, 0.04)  # amber-ish text
             c.roundRect(bx, by - 1.2 * mm, tw + 2 * pad, 4 * mm, 1 * mm, stroke=1, fill=0)
             c.drawString(bx + pad, by, tag)
-            c.setFillColorRGB(0, 0, 0)
 
         # ── Field stack (left) ──
         def field(label, value, y):
             c.setFont(reg, 6.5)
-            c.setFillColorRGB(0.42, 0.42, 0.42)
             c.drawString(4 * mm, y, label)
-            c.setFillColorRGB(0, 0, 0)
             c.setFont(bold, 9)
             c.drawString(4 * mm, y - 4.4 * mm, str(value)[:26])
             return y - 9.2 * mm
@@ -136,9 +168,7 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None):
 
         # ── QUANTITY (right, under the QR) ──
         c.setFont(reg, 6.5)
-        c.setFillColorRGB(0.42, 0.42, 0.42)
         c.drawRightString(W - 4 * mm, H - qsize - 8 * mm, "QUANTITY")
-        c.setFillColorRGB(0, 0, 0)
         c.setFont(bold, 12)
         # The unit goes on the label now that the warehouse holds more than
         # fabric — "20.00" alone reads as meters to anyone who has only ever
@@ -235,7 +265,8 @@ def warehouse_product_label(request, warehouse_pk, product_pk):
     else:
         title = f"Label — {product_name}"
         stem = f"label-{product.sku or product.pk}"
-    pdf = _label_pdf_bytes(product, rolls, detail_url=detail_url, title=title)
+    pdf = _label_pdf_bytes(product, rolls, detail_url=detail_url, title=title,
+                           brand=label_brand(request))
     return inline_pdf_response(pdf, stem)
 
 

@@ -68,9 +68,9 @@ class PackLabel(TestCase):
         captured = []
         real = pack_label.labels_pdf_bytes
 
-        def spy(packs, title, link=None):
+        def spy(packs, title, link=None, brand=None):
             captured.extend(link(p) for p in packs)
-            return real(packs, title, link=link)
+            return real(packs, title, link=link, brand=brand)
 
         with patch.object(pack_label, "labels_pdf_bytes", spy):
             self.client.get(reverse("operating:pack_label", kwargs={"pack_pk": self.pack1.pk}))
@@ -88,3 +88,57 @@ class PackLabel(TestCase):
         with patch.object(pack_label, "LINES_PER_LABEL", 1):
             pdf = pack_label.labels_pdf_bytes([self.pack1], title="t")
         self.assertEqual(pdf.count(b"/Type /Page\n"), 2)
+
+    def _printed(self, url):
+        """What a label print link draws, with every business named Karven:
+        (the texts drawn, the books brand_name_for was asked about)."""
+        from reportlab.pdfgen.canvas import Canvas
+        drawn = []
+        real = Canvas.drawString
+
+        def spy(canvas, x, y, text, *args, **kwargs):
+            drawn.append(text)
+            return real(canvas, x, y, text, *args, **kwargs)
+
+        with patch("accounting.services_accounts.brand_name_for",
+                   return_value="Karven") as brand_name_for, \
+                patch.object(Canvas, "drawString", spy):
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        return drawn, [call.args[0] for call in brand_name_for.call_args_list]
+
+    def test_a_package_label_carries_the_business_name(self):
+        url = reverse("operating:pack_label", kwargs={"pack_pk": self.pack1.pk})
+        self.assertIn("Karven", self._printed(url)[0])
+
+    def test_a_white_label_package_label_carries_no_name(self):
+        url = reverse("operating:pack_label", kwargs={"pack_pk": self.pack1.pk})
+        drawn, _ = self._printed(url + "?white_label=1")
+        self.assertNotIn("Karven", drawn)
+        self.assertIn("ORD-2026-000347", drawn)
+
+    def test_a_package_label_can_carry_a_name_typed_in(self):
+        url = reverse("operating:order_pack_labels", kwargs={"pk": self.order.pk})
+        drawn, asked = self._printed(url + "?brand=Oleg+Home")
+        self.assertEqual(drawn.count("Oleg Home"), 2)
+        self.assertNotIn("Karven", drawn)
+        self.assertEqual(asked, [])
+
+    def test_a_barcode_label_carries_its_warehouse_business_name(self):
+        wp = WarehouseProduct.objects.get(sku="BRG-01")
+        url = reverse("operating:warehouse_product_label",
+                      kwargs={"warehouse_pk": self.wh.pk, "product_pk": wp.pk})
+        drawn, asked = self._printed(url)
+        self.assertEqual(drawn.count("Karven"), 3)  # a label per roll
+        self.assertEqual(asked, [self.wh.accounting_book])  # looked up once
+
+    def test_a_barcode_label_prints_white_label_or_a_typed_name(self):
+        wp = WarehouseProduct.objects.get(sku="BRG-01")
+        url = reverse("operating:warehouse_product_label",
+                      kwargs={"warehouse_pk": self.wh.pk, "product_pk": wp.pk})
+        drawn, _ = self._printed(url + "?white_label=1")
+        self.assertNotIn("Karven", drawn)
+        self.assertIn("BRG-01", drawn)
+        drawn, _ = self._printed(url + "?brand=Oleg+Home")
+        self.assertEqual(drawn.count("Oleg Home"), 3)
+        self.assertNotIn("Karven", drawn)

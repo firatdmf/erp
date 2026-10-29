@@ -1,0 +1,154 @@
+{% load i18n %}
+{% comment %}
+A menu on every label print link (an <a data-label-print>): the link itself
+prints with the business's own name; the menu prints the same labels white
+label — no name — or with a name typed in. The menu opens on a click of
+the chevron beside the link, and only there. Two looks, by the attribute:
+  "split"  (default) a bordered button: the chevron joins it inside the same border
+  "inline" a text link or bare icon: the chevron right after it
+Include once per page; links added later (the warehouse's roll rows are
+fetched in) are wired as they arrive.
+{% endcomment %}
+<style>
+  .lp-split { display:inline-flex; align-items:stretch; vertical-align:middle; }
+  .lp-chev { width:10px; height:10px; flex:none; }
+  .lp-more { display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+  .lp-joined > a:first-child { border-top-right-radius:0 !important; border-bottom-right-radius:0 !important;
+                               margin-right:0 !important; }
+  .lp-joined > .lp-more { border-top-left-radius:0 !important; border-bottom-left-radius:0 !important;
+                          margin-left:-1px !important; padding-left:9px !important; padding-right:9px !important;
+                          gap:0 !important; flex:0 0 auto !important; min-width:0 !important; width:auto !important; }
+  .lp-inline { padding:0 0 0 3px; color:inherit; text-decoration:none; }
+  .lp-menu { position:fixed; z-index:1000; width:240px; padding:6px; box-sizing:border-box;
+             background:#fff; border:1px solid #E2E8F0; border-radius:10px;
+             box-shadow:0 10px 28px rgba(15,23,42,.16);
+             font:500 13px var(--font-sans, system-ui, -apple-system, sans-serif); color:#0F172A; text-align:left; }
+  .lp-menu[hidden] { display:none; }
+  .lp-menu-h { padding:4px 8px 6px; color:#64748B; font-size:11px; font-weight:700;
+               letter-spacing:.06em; text-transform:uppercase; }
+  .lp-menu svg { width:15px; height:15px; flex:none; color:#147F74; }
+  .lp-menu .lp-item { display:flex; align-items:center; gap:9px; width:100%; margin:0; padding:8px;
+                      border:0; border-radius:6px; background:none; color:inherit; font:inherit;
+                      text-align:left; cursor:pointer; }
+  .lp-menu .lp-item:hover { background:#F1F5F9; }
+  .lp-menu .lp-custom { margin-top:2px; padding:8px; border-top:1px solid #F1F5F9; }
+  .lp-menu label { display:flex; align-items:center; gap:9px; margin:0 0 7px; font:inherit; color:inherit; }
+  .lp-menu form { display:flex; gap:6px; margin:0; }
+  .lp-menu input { flex:1; min-width:0; margin:0; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px;
+                   font:inherit; color:inherit; background:#fff; }
+  .lp-menu input:focus { outline:none; border-color:#147F74; box-shadow:0 0 0 3px rgba(20,127,116,.15); }
+  .lp-menu .lp-go { margin:0; padding:6px 12px; border:0; border-radius:6px; background:#147F74; color:#fff;
+                    font:600 12.5px var(--font-sans, system-ui, sans-serif); cursor:pointer; }
+  .lp-menu .lp-go:hover { background:#0F766E; }
+</style>
+<script>
+(function () {
+  if (window.__labelPrintMenu) return;
+  window.__labelPrintMenu = true;
+
+  const CHEVRON = '<svg class="lp-chev" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5"/></svg>';
+  const TAG = '<path d="M3 3h7l9 9-7 7-9-9z"/><circle cx="7.5" cy="7.5" r="1.3"/>';
+  const ICON_TAG = '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true">' + TAG + '</svg>';
+  const ICON_NO_TAG = '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">' + TAG + '<path d="M2 20 20 2"/></svg>';
+  const MORE = '{% filter escapejs %}{% trans "More label options" %}{% endfilter %}';
+
+  const menu = document.createElement('div');
+  menu.className = 'lp-menu';
+  menu.hidden = true;
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML =
+    '<div class="lp-menu-h">{% filter escapejs %}{% trans "Print with…" %}{% endfilter %}</div>' +
+    '<button type="button" class="lp-item" data-lp="white" role="menuitem">' + ICON_NO_TAG +
+      '<span>{% filter escapejs %}{% trans "White label" %}{% endfilter %}</span></button>' +
+    '<div class="lp-custom"><label for="lp-brand">' + ICON_TAG +
+      '<span>{% filter escapejs %}{% trans "Custom brand name" %}{% endfilter %}</span></label>' +
+    '<form><input id="lp-brand" autocomplete="off" required>' +
+    '<button type="submit" class="lp-go">{% filter escapejs %}{% trans "Print" %}{% endfilter %}</button></form></div>';
+  const input = menu.querySelector('input');
+  let link = null, anchor = null;
+
+  function withParam(href, key, value) {
+    const url = new URL(href, location.href);
+    url.searchParams.set(key, value);
+    return url.toString();
+  }
+  function open(forLink, at) {
+    if (anchor && anchor !== at) anchor.setAttribute('aria-expanded', 'false');
+    link = forLink;
+    anchor = at;
+    anchor.setAttribute('aria-expanded', 'true');
+    if (!input.value) { try { input.value = localStorage.getItem('labelBrand') || ''; } catch (_) {} }
+    menu.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(r.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+    const below = r.bottom + 4;
+    menu.style.top = (below + menu.offsetHeight > window.innerHeight
+                      ? Math.max(8, r.top - menu.offsetHeight - 4) : below) + 'px';
+  }
+  function close() {
+    menu.hidden = true;
+    if (anchor) anchor.setAttribute('aria-expanded', 'false');
+  }
+  function print(key, value) {
+    window.open(withParam(link.href, key, value), '_blank', 'noopener');
+    close();
+  }
+
+  menu.addEventListener('click', function (e) {
+    if (e.target.closest('[data-lp="white"]')) print('white_label', '1');
+  });
+  menu.querySelector('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const name = input.value.trim();
+    if (!name) return;
+    try { localStorage.setItem('labelBrand', name); } catch (_) {}
+    print('brand', name);
+  });
+  document.addEventListener('click', function (e) {
+    if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('.lp-more')) close();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  window.addEventListener('scroll', function () { if (document.activeElement !== input) close(); }, true);
+
+  function chevron(a, look) {
+    const more = document.createElement('a');
+    more.href = '#';
+    more.setAttribute('role', 'button');
+    more.className = (look === 'inline' ? '' : a.className + ' ') + 'lp-more' + (look === 'inline' ? ' lp-inline' : '');
+    more.title = MORE;
+    more.setAttribute('aria-label', MORE);
+    more.setAttribute('aria-haspopup', 'menu');
+    more.setAttribute('aria-expanded', 'false');
+    more.innerHTML = CHEVRON;
+    more.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!menu.hidden && anchor === more) { close(); return; }
+      open(a, more);
+    });
+    return more;
+  }
+
+  function wire() {
+    document.querySelectorAll('a[data-label-print]:not([data-lp-ready])').forEach(function (a) {
+      a.setAttribute('data-lp-ready', '');
+      const look = a.getAttribute('data-label-print') || 'split';
+      const wrap = document.createElement('span');
+      wrap.className = 'lp-split' + (look === 'split' ? ' lp-joined' : '');
+      a.parentNode.insertBefore(wrap, a);
+      wrap.appendChild(a);
+      const more = chevron(a, look);
+      if (look === 'inline') more.style.color = getComputedStyle(a).color;
+      wrap.appendChild(more);
+    });
+  }
+
+  function start() {
+    document.body.appendChild(menu);
+    wire();
+    new MutationObserver(wire).observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>

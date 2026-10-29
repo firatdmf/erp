@@ -49,7 +49,6 @@ from decimal import ROUND_CEILING, Decimal
 
 SALES_REP = "sales_rep"
 VIEW_PROFIT = "view_profit"
-MIDDLE_MANAGER = "middle_manager"
 PRINT_LABELS = "print_labels"
 # Stored as "manager", the access level that sat unused before it was
 # given this meaning; the label says what it is.
@@ -326,22 +325,6 @@ def is_sales_rep(actor):
     return _has_permission(member, SALES_REP)
 
 
-def is_middle_manager(actor):
-    """True for a Member of the Middle manager type: the person who runs
-    one business on an install carrying several.
-
-    It stands for four grants at once — managing (what Member 'admin'
-    means: erp.ownership.is_admin), confirming purchases, seeing cost
-    and profit, and printing labels — and each of those is bounded by the books the member is
-    assigned, because every page it opens is. What it never is, is
-    erp.ownership.is_install_admin.
-    """
-    member, _user = _member_and_user(actor)
-    if member is None:
-        return False
-    return _has_permission(member, MIDDLE_MANAGER)
-
-
 def is_operations_manager(actor):
     """True for a Member carrying the Operations manager grant: the
     person who runs the warehouse and its stock, and has no business with
@@ -404,7 +387,7 @@ def may_see_profit(actor):
 
     A grant (the view_profit permission), not the absence of a role, so
     the numbers can be given to or taken from anyone in one place —
-    Django admin → Members. Superusers always may; nobody else without
+    Settings → Members & permissions. Superusers always may; nobody else without
     the row. The per-unit cost a sales rep is shown a marked-up price in
     place of (sales_rep_price) stays on the role: that is a substitution,
     not a hide.
@@ -414,7 +397,7 @@ def may_see_profit(actor):
         return False
     if getattr(user, "is_superuser", False):
         return True
-    return _has_permission(member, VIEW_PROFIT) or _has_permission(member, MIDDLE_MANAGER)
+    return _has_permission(member, VIEW_PROFIT)
 
 
 def may_print_labels(actor):
@@ -423,15 +406,14 @@ def may_print_labels(actor):
 
     A grant (the print_labels permission): labels go on the goods, which
     is operations work, and who does it is set per person in Settings →
-    Members & permissions. Superusers always may, and so does a Middle
-    manager, who runs a business's warehouses.
+    Members & permissions. Superusers always may.
     """
     member, user = _member_and_user(actor)
     if member is None:
         return False
     if getattr(user, "is_superuser", False):
         return True
-    return _has_permission(member, PRINT_LABELS) or _has_permission(member, MIDDLE_MANAGER)
+    return _has_permission(member, PRINT_LABELS)
 
 
 def label_printers_only(view):

@@ -206,22 +206,27 @@ class AProductOfBoth(TwoCatalogues):
 
 
 class TheMiddleManager(TwoCatalogues):
-    """One user type for whoever runs one business on the install."""
+    """Whoever runs one business on the install: a role made of managing
+    their books, confirming purchases, seeing cost and profit and printing
+    labels — not a permission of its own."""
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        from authentication.models import Permission
-        middle = Permission.objects.get(name="middle_manager")
-        cls.burak.member.permissions.set([middle])
+        from authentication.member_roles import permission_row, put_in_role
+        from authentication.models import Role
+        role = Role.objects.create(name="Middle manager")
+        role.permissions.add(*[permission_row(n) for n in
+                               ("admin", "purchase_confirm", "view_profit", "print_labels")])
+        put_in_role(cls.burak.member, role)
 
     def test_it_manages_confirms_purchases_and_sees_profit(self):
         from accounting.views_purchase import can_confirm_purchase
         from erp.ownership import is_admin, is_install_admin
-        from erp.roles import is_middle_manager, is_sales_rep, may_see_profit
+        from erp.roles import is_sales_rep, may_print_labels, may_see_profit
         from operating.views_warehouse import _is_admin
 
-        self.assertTrue(is_middle_manager(self.burak))
+        self.assertTrue(may_print_labels(self.burak))
         self.assertTrue(is_admin(self.burak))
         self.assertTrue(_is_admin(self.burak))
         self.assertTrue(can_confirm_purchase(self.burak))
@@ -233,7 +238,7 @@ class TheMiddleManager(TwoCatalogues):
 
     def test_somebody_without_it_is_none_of_those(self):
         from erp.ownership import is_admin
-        from erp.roles import is_middle_manager, may_see_profit
-        self.assertFalse(is_middle_manager(self.cuma))
+        from erp.roles import may_print_labels, may_see_profit
+        self.assertFalse(may_print_labels(self.cuma))
         self.assertFalse(is_admin(self.cuma))
         self.assertFalse(may_see_profit(self.cuma))

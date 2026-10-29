@@ -35,10 +35,11 @@ class TeamAccessTests(TestCase):
         self.assertFalse(TeamMember.objects.filter(team=self.team, user=boss).exists())
 
     def test_anyone_else_reaches_only_their_own_teams(self):
-        # A middle manager included: a team belongs to the install, not a book.
+        # Someone who manages their books included: a team belongs to the
+        # install, not a book.
         outsider = User.objects.create_user("burak_team_test", password="pw-for-test")
         Member.objects.get_or_create(user=outsider)[0].permissions.add(
-            Permission.objects.get_or_create(name="middle_manager")[0])
+            Permission.objects.get_or_create(name="admin")[0])
         client = self.client_for(outsider)
         self.assertNotContains(client.get("/team/members/"), "Zircon Squad")
         self.assertEqual(client.get(f"/team/tasks/?team_id={self.team.pk}").status_code, 404)

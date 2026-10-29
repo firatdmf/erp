@@ -83,3 +83,30 @@ class RoleBoard(TestCase):
         r = self.client.post(self.url, {"action": "move", "member": self.cuma.member.pk, "role": self.ops.pk})
         self.assertEqual(r.status_code, 403)
         self.assertEqual(self._held(self.cuma), {"view_profit"})
+
+
+class MiddleManagerIntoItsPermissions(TestCase):
+    """Migration 0033: whoever held "Middle manager", a person or a role,
+    gets the permissions it stood for, and the old row goes."""
+
+    def test_people_and_roles_get_what_it_stood_for(self):
+        import importlib
+        from django.apps import apps
+        from erp.ownership import is_admin
+        from accounting.views_purchase import can_confirm_purchase
+
+        old = Permission.objects.create(name="middle_manager")
+        ali = User.objects.create_user("ali", password="pw")
+        ali.member.permissions.add(old)
+        role = Role.objects.create(name="Middle manager")
+        role.permissions.add(old)
+
+        importlib.import_module(
+            "authentication.migrations.0033_middle_manager_into_its_permissions").split(apps, None)
+
+        want = {"admin", "purchase_confirm", "view_profit", "print_labels"}
+        self.assertEqual(set(ali.member.permissions.values_list("name", flat=True)), want)
+        self.assertEqual(set(role.permissions.values_list("name", flat=True)), want)
+        self.assertFalse(Permission.objects.filter(name="middle_manager").exists())
+        for check in (is_admin, can_confirm_purchase, may_see_profit, may_print_labels):
+            self.assertTrue(check(ali), check.__name__)

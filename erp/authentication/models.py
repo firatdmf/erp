@@ -4,7 +4,15 @@ from django.db import models
 
 # Create your models here.
 ACCESS_LEVEL_CHOICES_DICT = {
-    "admin": ("Admin", "Has full access to all resources and settings."),
+    # Stored as "admin". Manages the books the member is assigned — their
+    # warehouses, orders and purchases (erp.ownership.is_admin) — and
+    # nothing that belongs to the install as a whole, which is a
+    # superuser's (erp.ownership.is_install_admin).
+    "admin": (
+        "Manage their books",
+        "Manages the warehouses, orders and purchases of the books they are "
+        "assigned, confirming purchases included. Nothing install-wide.",
+    ),
     # Stored as "manager", which sat unused until it was given this
     # meaning. Runs the warehouse and its stock, and has no business with
     # orders: not seeing them, not raising them. Enforced by
@@ -38,18 +46,6 @@ ACCESS_LEVEL_CHOICES_DICT = {
     "view_profit": (
         "See cost and profit",
         "Can see cost of goods, gross profit and margin on orders and analytics.",
-    ),
-    # A user type, not a single grant: whoever runs one business on an
-    # install that carries several. They manage the books they are
-    # assigned — its warehouses, orders and purchases, with their costs —
-    # and nothing that belongs to the install as a whole or to another
-    # business. One row instead of admin + purchase_confirm + view_profit
-    # handed out together, so what a branch's manager may do is decided in
-    # one place (erp.roles.is_middle_manager) and says what it is.
-    "middle_manager": (
-        "Middle manager",
-        "Manages the books they are assigned: warehouses, orders, purchases, "
-        "costs and profit. Nothing install-wide, nothing of another business.",
     ),
     # Labels go on the goods — rolls, stock items, packed sacks — which is
     # operations work. A grant of its own, so who prints them is decided

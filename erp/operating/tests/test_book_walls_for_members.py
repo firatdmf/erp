@@ -53,7 +53,9 @@ class BookWallsForMembers(TestCase):
         member.books.set([cls.almaty])
         member.default_book = cls.almaty
         member.save(update_fields=["default_book"])
-        member.permissions.add(Permission.objects.get_or_create(name="middle_manager")[0])
+        # A branch's manager: what the Middle manager role is made of.
+        member.permissions.add(*[Permission.objects.get_or_create(name=n)[0] for n in
+                                 ("admin", "purchase_confirm", "view_profit", "print_labels")])
 
     @classmethod
     def order_in(cls, book, code):

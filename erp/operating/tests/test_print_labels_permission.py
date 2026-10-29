@@ -65,10 +65,6 @@ class PrintLabelsPermission(TestCase):
         self._member("ruzana", "sales_rep")
         self.assertEqual(self._labels(), [403, 403])
 
-    def test_a_middle_manager_may_without_the_grant(self, _upload):
-        self._member("burak", "middle_manager")
-        self.assertEqual(self._labels(), [200, 200])
-
     def test_a_superuser_always_may(self, _upload):
         self._member("muhammed", superuser=True)
         self.assertEqual(self._labels(), [200, 200])

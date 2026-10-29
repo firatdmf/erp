@@ -1,0 +1,18 @@
+{% load i18n %}
+{% comment %}One person on the role board: dragged between roles, or moved with
+the menu where dragging is awkward (a phone). Someone in no role yet also
+shows the permissions they hold one by one.{% endcomment %}
+<div class="st-member" draggable="true" data-member="{{ m.pk }}">
+  <i class="fas fa-grip-vertical st-member-grip" aria-hidden="true"></i>
+  <div class="st-member-who">
+    <div class="st-member-name">{{ m.display_name }}</div>
+    <div class="st-member-sub">@{{ m.user.username }}{% if m.book_names %} · {{ m.book_names }}{% endif %}</div>
+    {% if not m.role_id and m.held %}<div class="st-member-sub">{{ m.held|join:", " }}</div>{% endif %}
+  </div>
+  <select aria-label="{% trans "Move to role" %}" title="{% trans "Move to role" %}">
+    {% if not m.role_id %}<option value="" selected disabled>{% trans "Move to…" %}</option>{% endif %}
+    {% for r in role_board.roles %}
+    <option value="{{ r.role.pk }}" {% if r.role.pk == m.role_id %}selected{% endif %}>{{ r.role.name }}</option>
+    {% endfor %}
+  </select>
+</div>

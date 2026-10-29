@@ -15078,23 +15078,6 @@ msgstr "Alım"
 msgid "Members & permissions"
 msgstr "Üyeler ve yetkiler"
 
-msgid ""
-"Tick a box to give a member a permission, untick it to take it away. Changes "
-"are saved at once."
-msgstr ""
-"Bir üyeye yetki vermek için kutuyu işaretleyin, geri almak için işareti "
-"kaldırın. Değişiklikler hemen kaydedilir."
-
-msgid "superuser"
-msgstr "süper kullanıcı"
-
-msgid ""
-"A superuser may do everything, and no restricting role applies to one: ticks "
-"on a superuser’s row change nothing."
-msgstr ""
-"Süper kullanıcı her şeyi yapabilir ve kısıtlayıcı roller ona uygulanmaz: "
-"süper kullanıcının satırındaki işaretler hiçbir şeyi değiştirmez."
-
 msgid "Only a superuser can change permissions."
 msgstr "Yetkileri yalnızca süper kullanıcı değiştirebilir."
 
@@ -15103,14 +15086,6 @@ msgstr "Bilinmeyen yetki."
 
 msgid "Member not found."
 msgstr "Üye bulunamadı."
-
-#, python-format
-msgid "%(who)s now has “%(permission)s”."
-msgstr "%(who)s artık “%(permission)s” yetkisine sahip."
-
-#, python-format
-msgid "%(who)s no longer has “%(permission)s”."
-msgstr "%(who)s artık “%(permission)s” yetkisine sahip değil."
 
 msgid "Has full access to all resources and settings."
 msgstr "Tüm kaynaklara ve ayarlara tam erişimi vardır."
@@ -15181,3 +15156,72 @@ msgstr "≈ %(what)s bekleniyor"
 
 msgid "On the supplier purchase, not arrived yet — its rolls are a guess until the goods are received"
 msgstr "Tedarikçi alımında, henüz gelmedi — toplar teslim alınana kadar alımın tahminidir"
+
+msgid ""
+"Drag a person onto a role to give them its permissions. Tick a role's "
+"permissions to change them for everyone in it. Changes are saved at once."
+msgstr ""
+"Bir kişiyi bir role sürükleyerek o rolün yetkilerini verin. Bir rolün "
+"yetkilerini işaretleyerek o roldeki herkes için değiştirin. Değişiklikler "
+"hemen kaydedilir."
+
+msgid "No role yet"
+msgstr "Henüz rolü yok"
+
+msgid ""
+"They keep the permissions they were given one by one until you put them in "
+"a role."
+msgstr ""
+"Bir role yerleştirilene kadar kendilerine tek tek verilen yetkileri korurlar."
+
+msgid "Role name"
+msgstr "Rol adı"
+
+msgid "Delete role"
+msgstr "Rolü sil"
+
+msgid "Drag people here"
+msgstr "Kişileri buraya sürükleyin"
+
+msgid "New role"
+msgstr "Yeni rol"
+
+msgid "e.g. Operations"
+msgstr "örn. Operasyon"
+
+msgid "Add role"
+msgstr "Rol ekle"
+
+msgid "Superusers may do everything, whatever role they are in:"
+msgstr "Süper kullanıcılar, hangi rolde olurlarsa olsunlar her şeyi yapabilir:"
+
+msgid "Move to role"
+msgstr "Role taşı"
+
+msgid "Move to…"
+msgstr "Taşı…"
+
+msgid "Moved."
+msgstr "Taşındı."
+
+msgid "Saved for everyone in the role."
+msgstr "Roldeki herkes için kaydedildi."
+
+msgid "Saved."
+msgstr "Kaydedildi."
+
+msgid "Delete this role?"
+msgstr "Bu rol silinsin mi?"
+
+msgid "Role not found."
+msgstr "Rol bulunamadı."
+
+msgid "Give the role a name."
+msgstr "Role bir ad verin."
+
+#, python-format
+msgid "There is already a role called “%(name)s”."
+msgstr "“%(name)s” adında bir rol zaten var."
+
+msgid "Move everyone out of the role before deleting it."
+msgstr "Silmeden önce rolündeki herkesi başka bir role taşıyın."

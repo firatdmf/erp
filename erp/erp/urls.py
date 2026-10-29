@@ -36,8 +36,8 @@ urlpatterns = [
     # The company's own identity — what its documents print (admin only).
     path("settings/brand/", views.BrandProfileUpdate.as_view(), name="brand_profile_update"),
     path("settings/whatsapp/", views.WhatsAppSettingsUpdate.as_view(), name="whatsapp_settings_update"),
-    # Who holds which permission (superusers only).
-    path("settings/permissions/", views.MemberPermissionUpdate.as_view(), name="member_permission_update"),
+    # Roles and who is in them (superusers only).
+    path("settings/roles/", views.RoleBoardUpdate.as_view(), name="role_board_update"),
     # Built-in i18n endpoint: POST { language: 'tr' } sets cookie + redirects
     path("i18n/", include("django.conf.urls.i18n")),
     path("admin/", admin.site.urls),

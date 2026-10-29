@@ -84,10 +84,35 @@ class Permission(models.Model):
     def __str__(self):
         return self.get_name_display()
 
+class Role(models.Model):
+    """A set of permissions people are given together — "Operations",
+    "Sales rep" — and the people who hold it.
+
+    A member is in one role at most, and a member in a role has exactly
+    the role's permissions: they are written onto Member.permissions
+    (authentication.member_roles), which is what every check in the app
+    reads. A member in no role keeps whatever permissions they were given
+    directly. Roles are made, renamed and filled by a superuser in
+    Settings → Members & permissions.
+    """
+    name = models.CharField(max_length=60, unique=True)
+    permissions = models.ManyToManyField(Permission, related_name="roles", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 # The reason I create another Member is because it is so unethical to change the base user model that django provides, so we clone it, sync it, and add more depth to it.
 class Member(models.Model):
     user = models.OneToOneField(User, null=True, on_delete=models.CASCADE)
     permissions = models.ManyToManyField(Permission, related_name="members", blank=True)
+    # The role whose permissions this member has; see Role.
+    role = models.ForeignKey(Role, on_delete=models.PROTECT, null=True, blank=True,
+                             related_name="members")
     # company_name = models.CharField(max_length=100)
 
     # Which business this member works for. Orders they create, and the

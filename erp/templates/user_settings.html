@@ -6,7 +6,7 @@
 
 {% block css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=7" />
+<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=9" />
 {% endblock %}
 
 {% block content %}
@@ -57,7 +57,7 @@
         <span class="st-nav-ico"><i class="fas fa-plug"></i></span>
         {% trans "Integrations" %}
       </a>
-      {% if grid_members %}
+      {% if role_board %}
       <a href="#permissions" class="st-nav-link" onclick="stSwitchTab('permissions', event)">
         <span class="st-nav-ico"><i class="fas fa-user-shield"></i></span>
         {% trans "Members & permissions" %}
@@ -581,51 +581,67 @@
       </section>
 
       <!-- ========== MEMBERS & PERMISSIONS (superusers only) ========== -->
-      {% comment %}Who may do what: each box gives a member a permission or
-      takes it away, saved as it is clicked (MemberPermissionUpdate). The
-      columns are the app's own list of permissions.{% endcomment %}
-      {% if grid_members %}
+      {% comment %}The role board: each role a card with its permissions and
+      its people. Drag a person onto another role (or pick one from their
+      menu), tick a role's permissions — every change is saved at once
+      (RoleBoardUpdate) and a member always has exactly their role's
+      permissions. The cards wrap; nothing scrolls sideways.{% endcomment %}
+      {% if role_board %}
       <section id="permissions-section" class="st-section">
         <div class="st-card">
           <div class="st-card-header">
             <span class="st-card-ico"><i class="fas fa-user-shield"></i></span>
             <div class="st-card-titles">
               <h2 class="st-card-title">{% trans "Members & permissions" %}</h2>
-              <p class="st-card-sub">{% trans "Tick a box to give a member a permission, untick it to take it away. Changes are saved at once." %}</p>
+              <p class="st-card-sub">{% trans "Drag a person onto a role to give them its permissions. Tick a role's permissions to change them for everyone in it. Changes are saved at once." %}</p>
             </div>
           </div>
           <div class="st-card-body">
-            {% comment %}One row per member, their permissions as tick-box chips
-            that wrap onto the next line — never a table to scroll sideways.{% endcomment %}
-            <div class="st-perm">
-              {% for row in grid_members %}
-              <div class="st-perm-row">
-                <div class="st-perm-who">
-                  <div class="st-perm-name">{{ row.name }}</div>
-                  <div class="st-perm-sub">@{{ row.member.user.username }}{% if row.member.user.is_superuser %} · {% trans "superuser" %}{% endif %}{% if row.books %} · {{ row.books }}{% endif %}</div>
+            <div class="st-roles" id="stRoles" data-url="{% url 'role_board_update' %}">
+              {% if role_board.unplaced %}
+              <div class="st-role st-role--unplaced">
+                <div class="st-role-h"><span class="st-role-title">{% trans "No role yet" %}</span></div>
+                <p class="st-help">{% trans "They keep the permissions they were given one by one until you put them in a role." %}</p>
+                <div class="st-role-people">
+                  {% for m in role_board.unplaced %}{% include "partials/role_member_card.html" with m=m %}{% endfor %}
+                </div>
+              </div>
+              {% endif %}
+              {% for r in role_board.roles %}
+              <div class="st-role" data-role="{{ r.role.pk }}">
+                <div class="st-role-h">
+                  <input class="st-role-name" value="{{ r.role.name }}" aria-label="{% trans "Role name" %}" data-was="{{ r.role.name }}">
+                  <span class="st-role-count" data-count>{{ r.members|length }}</span>
+                  <button type="button" class="st-role-del" title="{% trans "Delete role" %}" data-delete><i class="fas fa-trash"></i></button>
                 </div>
                 <div class="st-perm-chips">
-                  {% for name, label, description, granted in row.granted %}
+                  {% for name, label, description, granted in r.granted %}
                   <label class="st-perm-chip" title="{% trans description %}">
-                    <input type="checkbox" name="granted" {% if granted %}checked{% endif %}
-                           hx-post="{% url 'member_permission_update' %}" hx-trigger="change"
-                           hx-vals='{"member": "{{ row.member.pk }}", "permission": "{{ name }}"}'
-                           hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                           hx-target="#settings-messages" hx-swap="innerHTML">
+                    <input type="checkbox" data-permission="{{ name }}" {% if granted %}checked{% endif %}>
                     {% trans label %}
                   </label>
                   {% endfor %}
                 </div>
+                <div class="st-role-people" data-drop>
+                  {% for m in r.members %}{% include "partials/role_member_card.html" with m=m %}{% endfor %}
+                  <div class="st-role-empty" data-empty>{% trans "Drag people here" %}</div>
+                </div>
               </div>
               {% endfor %}
+              <form class="st-role st-role--new" id="stNewRole">
+                <div class="st-role-title">{% trans "New role" %}</div>
+                <input class="st-input" name="name" maxlength="60" placeholder="{% trans "e.g. Operations" %}" required>
+                <button type="submit" class="st-btn st-btn--primary"><i class="fas fa-plus"></i> {% trans "Add role" %}</button>
+              </form>
             </div>
-            <ul class="st-perm-legend">
-              {% for name, label, description in grid_permissions %}
-              <li><b>{% trans label %}</b> — {% trans description %}</li>
-              {% endfor %}
-            </ul>
-            <p class="st-help" style="margin-top:14px;">{% trans "A superuser may do everything, and no restricting role applies to one: ticks on a superuser’s row change nothing." %}
-              {% trans "A Middle manager also confirms purchases, sees cost and profit, and prints labels, whatever else is ticked." %}</p>
+            {% if role_board.superusers %}
+            <p class="st-help" style="margin-top:14px;">
+              <i class="fas fa-crown"></i>
+              {% trans "Superusers may do everything, whatever role they are in:" %}
+              {% for m in role_board.superusers %}{{ m.display_name }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+            </p>
+            {% endif %}
+            <p class="st-help">{% trans "A Middle manager also confirms purchases, sees cost and profit, and prints labels, whatever else is ticked." %}</p>
           </div>
         </div>
       </section>
@@ -674,5 +690,120 @@
       });
     }
   });
+</script>
+<script>
+  // The role board (Members & permissions). Every change posts at once;
+  // a refusal puts the board back as it was.
+  (function () {
+    const board = document.getElementById('stRoles');
+    if (!board) return;
+    const URL = board.dataset.url;
+    const CSRF = '{{ csrf_token }}';
+    const say = (text, ok) => {
+      const box = document.getElementById('settings-messages');
+      box.innerHTML = '<div class="alert" role="alert" style="padding:1rem;border-radius:0.5rem;margin-bottom:1rem;' +
+        (ok ? 'background:#d1fae5;color:#065f46' : 'background:#fee2e2;color:#991b1b') + '"></div>';
+      box.firstChild.textContent = text;
+    };
+    const post = (data) => {
+      const body = new URLSearchParams(data);
+      return fetch(URL, {method: 'POST', body, headers: {'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'}})
+        .then(r => r.json().catch(() => ({ok: false, error: '{% filter escapejs %}{% trans "Could not save." %}{% endfilter %}'})));
+    };
+    const recount = () => board.querySelectorAll('.st-role[data-role]').forEach(role => {
+      const n = role.querySelectorAll('.st-member').length;
+      role.querySelector('[data-count]').textContent = n;
+      role.querySelector('[data-empty]').hidden = n > 0;
+      // Only an empty role can go, so only an empty role offers to.
+      role.querySelector('[data-delete]').hidden = n > 0;
+    });
+    recount();
+
+    // Moving a person: dragged onto a role, or picked from their menu.
+    const move = (card, role) => {
+      const from = card.parentElement, before = card.nextSibling;
+      if (card.closest('.st-role') === role) return;
+      role.querySelector('[data-drop]').insertBefore(card, role.querySelector('[data-empty]'));
+      card.querySelector('select').value = role.dataset.role;
+      recount();
+      post({action: 'move', member: card.dataset.member, role: role.dataset.role}).then(d => {
+        if (d.ok) { say('{% filter escapejs %}{% trans "Moved." %}{% endfilter %}', true); return; }
+        from.insertBefore(card, before); recount(); say(d.error, false);
+      });
+    };
+    let dragged = null;
+    board.addEventListener('dragstart', e => {
+      dragged = e.target.closest('.st-member');
+      if (dragged) { dragged.classList.add('is-dragging'); e.dataTransfer.effectAllowed = 'move'; }
+    });
+    board.addEventListener('dragend', () => {
+      if (dragged) dragged.classList.remove('is-dragging');
+      dragged = null;
+      board.querySelectorAll('.is-over').forEach(el => el.classList.remove('is-over'));
+    });
+    board.addEventListener('dragover', e => {
+      const role = e.target.closest('.st-role[data-role]');
+      if (!dragged || !role) return;
+      e.preventDefault();
+      board.querySelectorAll('.is-over').forEach(el => el !== role && el.classList.remove('is-over'));
+      role.classList.add('is-over');
+    });
+    board.addEventListener('drop', e => {
+      const role = e.target.closest('.st-role[data-role]');
+      if (!dragged || !role) return;
+      e.preventDefault();
+      role.classList.remove('is-over');
+      move(dragged, role);
+    });
+    board.addEventListener('change', e => {
+      const t = e.target;
+      if (t.matches('.st-member select')) {
+        move(t.closest('.st-member'), board.querySelector('.st-role[data-role="' + t.value + '"]'));
+      } else if (t.matches('[data-permission]')) {
+        const role = t.closest('.st-role');
+        post({action: 'permission', role: role.dataset.role, permission: t.dataset.permission,
+              granted: t.checked ? 'on' : 'off'}).then(d => {
+          if (d.ok) { say('{% filter escapejs %}{% trans "Saved for everyone in the role." %}{% endfilter %}', true); return; }
+          t.checked = !t.checked; say(d.error, false);
+        });
+      }
+    });
+    // Renaming: saved when the name field is left or Enter is pressed.
+    board.addEventListener('keydown', e => {
+      if (e.target.matches('.st-role-name') && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+    });
+    board.addEventListener('focusout', e => {
+      const input = e.target;
+      if (!input.matches('.st-role-name')) return;
+      const name = input.value.trim();
+      if (!name || name === input.dataset.was) { input.value = input.dataset.was; return; }
+      post({action: 'rename', role: input.closest('.st-role').dataset.role, name}).then(d => {
+        if (!d.ok) { input.value = input.dataset.was; say(d.error, false); return; }
+        input.value = input.dataset.was = d.name;
+        board.querySelectorAll('.st-member select option[value="' + d.role + '"]').forEach(o => o.textContent = d.name);
+        say('{% filter escapejs %}{% trans "Saved." %}{% endfilter %}', true);
+      });
+    });
+    board.addEventListener('click', e => {
+      const del = e.target.closest('[data-delete]');
+      if (!del) return;
+      const role = del.closest('.st-role');
+      if (!confirm('{% filter escapejs %}{% trans "Delete this role?" %}{% endfilter %}')) return;
+      post({action: 'delete', role: role.dataset.role}).then(d => {
+        if (!d.ok) { say(d.error, false); return; }
+        board.querySelectorAll('.st-member select option[value="' + role.dataset.role + '"]').forEach(o => o.remove());
+        role.remove();
+      });
+    });
+    // A new role comes back as a fresh page, so it is a card like the rest.
+    document.getElementById('stNewRole').addEventListener('submit', e => {
+      e.preventDefault();
+      post({action: 'create', name: e.target.name.value}).then(d => {
+        if (!d.ok) { say(d.error, false); return; }
+        window.location.hash = 'permissions';
+        window.location.reload();
+      });
+    });
+  })();
 </script>
 {% endblock %}

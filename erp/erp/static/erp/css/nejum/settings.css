@@ -591,26 +591,43 @@
   line-height: 1.55;
 }
 
-/* ───────── MEMBERS & PERMISSIONS ───────── */
-/* One block per member: who, then their permissions as tick-box chips
-   across the card's full width, wrapping as they need. Nothing scrolls
-   sideways at any width. */
-#Settings_Page .st-perm { display: grid; }
-#Settings_Page .st-perm-row { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--st-border); }
-#Settings_Page .st-perm-row:last-child { border-bottom: none; }
-#Settings_Page .st-perm-name { font: 700 13.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink); }
-#Settings_Page .st-perm-sub { font: 500 11.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-3); overflow-wrap: anywhere; }
-#Settings_Page .st-perm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-#Settings_Page .st-perm-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--st-border-strong); border-radius: 999px; font: 600 12px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); background: #fff; cursor: pointer; user-select: none; }
+/* ───────── MEMBERS & PERMISSIONS: the role board ───────── */
+/* Each role a card — its name, its permissions as tick-box chips, its
+   people — the cards wrapping across the width. Nothing scrolls sideways. */
+#Settings_Page .st-roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; align-items: start; }
+#Settings_Page .st-role { display: grid; gap: 10px; padding: 14px; border: 1.5px solid var(--st-border); border-radius: var(--st-radius-sm); background: var(--st-bg-soft); transition: border-color .15s, background .15s; }
+#Settings_Page .st-role.is-over { border-color: var(--st-teal); background: var(--st-teal-bg); }
+#Settings_Page .st-role--unplaced { border-style: dashed; }
+#Settings_Page .st-role--new { align-content: start; border-style: dashed; }
+#Settings_Page .st-role-h { display: flex; align-items: center; gap: 8px; }
+#Settings_Page .st-role-title { font: 700 14px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink); }
+#Settings_Page .st-role-name { flex: 1; min-width: 0; font: 700 14px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 4px 6px; }
+#Settings_Page .st-role-name:hover { border-color: var(--st-border-strong); }
+#Settings_Page .st-role-name:focus { outline: none; border-color: var(--st-teal); background: #fff; }
+#Settings_Page .st-role-count { font: 700 11px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-3); background: #fff; border: 1px solid var(--st-border); border-radius: 999px; padding: 1px 8px; }
+#Settings_Page .st-role-del { padding: 4px 6px; border: 0; background: none; color: var(--st-ink-4); cursor: pointer; border-radius: 6px; }
+#Settings_Page .st-role-del:hover { color: #B91C1C; background: #FEF2F2; }
+#Settings_Page .st-perm-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+#Settings_Page .st-perm-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border: 1px solid var(--st-border-strong); border-radius: 999px; font: 600 11.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); background: #fff; cursor: pointer; user-select: none; }
 #Settings_Page .st-perm-chip:hover { border-color: var(--st-teal); }
 #Settings_Page .st-perm-chip:has(input:checked) { background: var(--st-teal-bg); border-color: var(--st-teal); color: var(--st-teal-deep); }
-#Settings_Page .st-perm-chip input { width: 14px; height: 14px; margin: 0; accent-color: var(--st-teal); cursor: pointer; }
-#Settings_Page .st-perm-legend { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font: 500 12.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); }
-#Settings_Page .st-perm-legend b { color: var(--st-ink); }
+#Settings_Page .st-perm-chip input { width: 13px; height: 13px; margin: 0; accent-color: var(--st-teal); cursor: pointer; }
+#Settings_Page .st-role-people { display: grid; gap: 6px; min-height: 44px; }
+#Settings_Page .st-role-empty[hidden], #Settings_Page .st-role-del[hidden] { display: none; }
+#Settings_Page .st-role-empty { display: grid; place-items: center; min-height: 44px; border: 1.5px dashed var(--st-border-strong); border-radius: var(--st-radius-xs); font: 500 12px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-4); }
+#Settings_Page .st-member { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #fff; border: 1px solid var(--st-border); border-radius: var(--st-radius-xs); cursor: grab; }
+#Settings_Page .st-member:active { cursor: grabbing; }
+#Settings_Page .st-member.is-dragging { opacity: .45; }
+#Settings_Page .st-member-grip { color: var(--st-ink-4); font-size: 12px; }
+#Settings_Page .st-member-who { flex: 1; min-width: 0; }
+#Settings_Page .st-member-name { font: 700 13px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink); }
+#Settings_Page .st-member-sub { font: 500 11px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-3); overflow-wrap: anywhere; }
+#Settings_Page .st-member select { flex-shrink: 0; width: 132px; font: 600 12px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); border: 1px solid var(--st-border); border-radius: 6px; padding: 3px 4px; background: #fff; }
 
 /* ───────── MOBILE ───────── */
 @media (max-width: 1024px) {
-  #Settings_Page .st-layout { grid-template-columns: 1fr; }
+  /* minmax(0, …) so a wide card shrinks to the screen instead of widening it. */
+  #Settings_Page .st-layout { grid-template-columns: minmax(0, 1fr); }
   #Settings_Page .st-nav { position: static; }
   #Settings_Page .st-form-grid { grid-template-columns: 1fr; }
 }

@@ -1,5 +1,8 @@
-"""Settings → Members & permissions: a superuser gives and takes
-permissions, one checkbox at a time.
+"""Settings → Members & permissions: the role board.
+
+A superuser puts people in roles and sets each role's permissions; a
+member in a role has exactly its permissions, which is what every check in
+the app reads.
 
 Run with:
     python manage.py test erp.tests.test_member_permissions
@@ -8,57 +11,75 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from authentication.models import ACCESS_LEVEL_CHOICES_DICT, Permission
+from authentication.models import Permission, Role
+from erp.roles import may_print_labels, may_see_profit
 
 
-class MemberPermissions(TestCase):
+class RoleBoard(TestCase):
     def setUp(self):
         self.root = User.objects.create_superuser("muhammed", "m@x.test", "pw")
         self.cuma = User.objects.create_user("cuma", password="pw", first_name="Cuma")
-        self.url = reverse("member_permission_update")
+        self.cuma.member.permissions.add(Permission.objects.get_or_create(name="view_profit")[0])
+        self.ops = Role.objects.create(name="Operations")
+        self.ops.permissions.add(Permission.objects.get_or_create(name="print_labels")[0])
+        self.url = reverse("role_board_update")
+        self.client.force_login(self.root)
 
     def _held(self, user):
         return set(user.member.permissions.values_list("name", flat=True))
 
-    def test_a_superuser_sees_every_member_against_every_permission(self):
-        self.client.force_login(self.root)
+    def test_the_page_shows_roles_people_and_who_has_no_role_yet(self):
         page = self.client.get(reverse("user_settings"))
-        self.assertContains(page, 'id="permissions-section"')
-        self.assertEqual([p[0] for p in page.context["grid_permissions"]],
-                         list(ACCESS_LEVEL_CHOICES_DICT))
-        self.assertIn("cuma", [r["member"].user.username for r in page.context["grid_members"]])
+        board = page.context["role_board"]
+        self.assertEqual([r["role"].name for r in board["roles"]], ["Operations"])
+        self.assertEqual([m.user.username for m in board["unplaced"]], ["cuma"])
+        self.assertEqual([m.user.username for m in board["superusers"]], ["muhammed"])
+        self.assertContains(page, 'data-member="%d"' % self.cuma.member.pk)
 
-    def test_ticking_grants_and_unticking_takes_away(self):
-        self.client.force_login(self.root)
-        member = self.cuma.member.pk
-        resp = self.client.post(self.url, {"member": member, "permission": "print_labels",
-                                           "granted": "on"})
-        self.assertContains(resp, "now has")
-        self.assertIn("print_labels", self._held(self.cuma))
-        # An unticked box sends no "granted" at all.
-        self.client.post(self.url, {"member": member, "permission": "print_labels"})
-        self.assertNotIn("print_labels", self._held(self.cuma))
+    def test_moving_someone_gives_them_exactly_the_role_s_permissions(self):
+        r = self.client.post(self.url, {"action": "move", "member": self.cuma.member.pk,
+                                        "role": self.ops.pk})
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(self._held(self.cuma), {"print_labels"})
+        self.assertTrue(may_print_labels(self.cuma))
+        self.assertFalse(may_see_profit(self.cuma))
 
-    def test_a_permission_not_yet_in_the_table_is_made_on_first_grant(self):
-        Permission.objects.filter(name="purchase_confirm").delete()
-        self.client.force_login(self.root)
-        self.client.post(self.url, {"member": self.cuma.member.pk,
-                                    "permission": "purchase_confirm", "granted": "on"})
-        self.assertIn("purchase_confirm", self._held(self.cuma))
+    def test_a_role_s_permission_changes_for_everyone_in_it(self):
+        self.client.post(self.url, {"action": "move", "member": self.cuma.member.pk, "role": self.ops.pk})
+        self.client.post(self.url, {"action": "permission", "role": self.ops.pk,
+                                    "permission": "view_profit", "granted": "on"})
+        self.assertEqual(self._held(self.cuma), {"print_labels", "view_profit"})
+        self.client.post(self.url, {"action": "permission", "role": self.ops.pk,
+                                    "permission": "print_labels", "granted": "off"})
+        self.assertEqual(self._held(self.cuma), {"view_profit"})
+        self.assertFalse(may_print_labels(self.cuma))
 
-    def test_an_unknown_permission_is_refused(self):
-        self.client.force_login(self.root)
-        resp = self.client.post(self.url, {"member": self.cuma.member.pk,
-                                           "permission": "god_mode", "granted": "on"})
-        self.assertContains(resp, "Unknown permission")
-        self.assertFalse(Permission.objects.filter(name="god_mode").exists())
+    def test_roles_are_made_renamed_and_deleted_only_when_empty(self):
+        made = self.client.post(self.url, {"action": "create", "name": "Sales"}).json()
+        self.assertTrue(made["ok"])
+        clash = self.client.post(self.url, {"action": "rename", "role": made["role"], "name": "Operations"})
+        self.assertFalse(clash.json()["ok"])
+        self.client.post(self.url, {"action": "rename", "role": made["role"], "name": "Sales rep"})
+        self.assertEqual(Role.objects.get(pk=made["role"]).name, "Sales rep")
+
+        self.client.post(self.url, {"action": "move", "member": self.cuma.member.pk, "role": self.ops.pk})
+        refused = self.client.post(self.url, {"action": "delete", "role": self.ops.pk})
+        self.assertFalse(refused.json()["ok"])
+        self.assertTrue(Role.objects.filter(pk=self.ops.pk).exists())
+        self.assertTrue(self.client.post(self.url, {"action": "delete", "role": made["role"]}).json()["ok"])
+
+    def test_an_unknown_permission_and_a_superuser_are_not_moved_around(self):
+        r = self.client.post(self.url, {"action": "permission", "role": self.ops.pk,
+                                        "permission": "god_mode", "granted": "on"})
+        self.assertFalse(r.json()["ok"])
+        r = self.client.post(self.url, {"action": "move", "member": self.root.member.pk, "role": self.ops.pk})
+        self.assertFalse(r.json()["ok"])
 
     def test_nobody_but_a_superuser_sees_or_changes_it(self):
         admin = User.objects.create_user("zeynep", password="pw", is_staff=True)
         admin.member.permissions.add(Permission.objects.get_or_create(name="admin")[0])
         self.client.force_login(admin)
         self.assertNotContains(self.client.get(reverse("user_settings")), 'id="permissions-section"')
-        resp = self.client.post(self.url, {"member": admin.member.pk,
-                                           "permission": "view_profit", "granted": "on"})
-        self.assertContains(resp, "Only a superuser")
-        self.assertNotIn("view_profit", self._held(admin))
+        r = self.client.post(self.url, {"action": "move", "member": self.cuma.member.pk, "role": self.ops.pk})
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(self._held(self.cuma), {"view_profit"})

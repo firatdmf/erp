@@ -328,6 +328,37 @@ html.dk-init *, html.dk-init *::before, html.dk-init *::after { transition: none
 [data-theme="dark"] #Settings_Page .st-help {
   color: #9AA5AD !important;
 }
+/* The role board (Members & permissions). */
+[data-theme="dark"] #Settings_Page .st-role {
+  background: #161B21 !important;
+  border-color: #2A3038 !important;
+}
+[data-theme="dark"] #Settings_Page .st-role.is-over {
+  background: rgba(0, 128, 128, 0.14) !important;
+  border-color: var(--nejum-teal-500, #008080) !important;
+}
+[data-theme="dark"] #Settings_Page .st-member,
+[data-theme="dark"] #Settings_Page .st-perm-chip,
+[data-theme="dark"] #Settings_Page .st-role-count,
+[data-theme="dark"] #Settings_Page .st-member select,
+[data-theme="dark"] #Settings_Page .st-role-name:focus {
+  background: #1F252C !important;
+  border-color: #33393F !important;
+  color: #C5CDD3 !important;
+}
+[data-theme="dark"] #Settings_Page .st-perm-chip:has(input:checked) {
+  background: rgba(0, 128, 128, 0.18) !important;
+  border-color: rgba(0, 128, 128, 0.55) !important;
+  color: var(--nejum-teal-200, #99D6D6) !important;
+}
+[data-theme="dark"] #Settings_Page .st-role-name,
+[data-theme="dark"] #Settings_Page .st-role-title,
+[data-theme="dark"] #Settings_Page .st-member-name {
+  color: #F1F5F8 !important;
+}
+[data-theme="dark"] #Settings_Page .st-role-empty {
+  border-color: #33393F !important;
+}
 [data-theme="dark"] #Settings_Page .st-card-header {
   background: linear-gradient(180deg, #1F252C 0%, #1A1F26 100%) !important;
   border-bottom: 1px solid #262C34 !important;

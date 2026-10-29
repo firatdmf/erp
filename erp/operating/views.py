@@ -1800,6 +1800,23 @@ def order_pack_scan(request, pk):
     })
 
 
+def _packing_follows_packages(order, user):
+    """What is in the packages just changed: an open order is being packed
+    while anything sits in one of them, and is open again once nothing
+    does. Through the status funnel, which moves a split order's halves
+    together and leaves a sales rep's order where it is."""
+    from .models import OrderStockReservation
+    from .split_orders import order_packs
+    from .views_warehouse import apply_order_status_change
+    packs = order_packs(order)
+    packed = (OrderStockReservation.objects.filter(pack__in=packs, consumed=False).exists()
+              or OrderItem.objects.filter(pack__in=packs).exists())
+    if packed and order.order_status in ("pending", "confirmed", "preparing"):
+        apply_order_status_change(order, "packaging", user=user)
+    elif not packed and order.order_status == "packaging":
+        apply_order_status_change(order, "pending", user=user)
+
+
 @login_required
 @require_POST
 def order_pack_reserve_add(request, pk):
@@ -1891,6 +1908,7 @@ def order_pack_reserve_add(request, pk):
                 existing.pack = target_pack
                 existing.save(update_fields=["pack"])
                 moved = True
+                _packing_follows_packages(order, request.user)
             return JsonResponse({"ok": True, "duplicate": True, "moved": moved,
                                  "placed": place_only, "was_pack_number": was_pack_number,
                                  "reservation": _reservation_payload(existing)})
@@ -1944,6 +1962,7 @@ def order_pack_reserve_add(request, pk):
     if target_pack is not None:
         r.pack = target_pack
         r.save(update_fields=["pack"])
+        _packing_follows_packages(order, request.user)
     # The current account receivable is sourced from scanned meters (see
     # Order.billable_value) — a fresh scan changes it, so re-post now
     # rather than waiting for some unrelated OrderItem save.
@@ -2013,7 +2032,10 @@ def order_pack_reserve_remove(request, pk):
     if r is None:
         return JsonResponse({"ok": False, "error": _gettext("Reservation not found.")}, status=404)
     removed = r.id
+    was_packed = bool(r.pack_id)
     r.delete()
+    if was_packed:
+        _packing_follows_packages(order, request.user)
     if order.current_account_id:
         from accounting.services_accounts import post_order_movement
         post_order_movement(order)
@@ -2046,6 +2068,7 @@ def order_pack_reserve_assign_pack(request, pk):
     if r is None:
         return JsonResponse({"ok": False, "error": _gettext("Reservation not found.")}, status=404)
     pack_id = (request.POST.get("pack_id") or "").strip()
+    was_pack_id = r.pack_id
     if pack_id:
         pack = order_packs(order).filter(pk=pack_id).first()
         if pack is None:
@@ -2054,6 +2077,8 @@ def order_pack_reserve_assign_pack(request, pk):
     else:
         r.pack = None
     r.save(update_fields=["pack"])
+    if r.pack_id != was_pack_id:
+        _packing_follows_packages(order, request.user)
     return JsonResponse({"ok": True, "reservation_id": r.pk, "pack_id": r.pack_id})
 
 
@@ -2082,6 +2107,7 @@ def order_pack_assign_item(request, pk):
     if item is None:
         return JsonResponse({"ok": False, "error": _gettext("Line not found.")}, status=404)
     pack_id = (request.POST.get("pack_id") or "").strip()
+    was_pack_id = item.pack_id
     if pack_id:
         pack = order_packs(order).filter(pk=pack_id).first()
         if pack is None:
@@ -2090,6 +2116,8 @@ def order_pack_assign_item(request, pk):
     else:
         item.pack = None
     item.save(update_fields=["pack"])
+    if item.pack_id != was_pack_id:
+        _packing_follows_packages(order, request.user)
     return JsonResponse({"ok": True, "item_id": item.pk, "pack_id": item.pack_id})
 
 
@@ -5461,9 +5489,12 @@ class OrderPackingList(View):
             # Refuse to delete the last remaining pack.
             if order_packs(order).count() <= 1:
                 return JsonResponse({"ok": False, "error": "Cannot delete the only pack"}, status=400)
+            had_goods = pack.stock_reservations.exists() or pack.catalog_items.exists()
             with transaction.atomic():
                 pack.delete()  # SET_NULL releases its stock_reservations back to unassigned
                 numbers = _renumber_packs(order)
+            if had_goods:
+                _packing_follows_packages(order, request.user)
             return JsonResponse({"ok": True, "numbers": numbers})
 
         if action == "reorder_packs":

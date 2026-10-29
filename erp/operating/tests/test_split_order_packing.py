@@ -103,6 +103,54 @@ class SplitOrderPacking(TestCase):
                          [["LAL1", "ERG1"]])
         self.assertEqual(page.context["unassigned_count"], 0)
 
+    def test_the_first_roll_in_a_sack_starts_packing_both_halves(self, _upload):
+        sack = Pack.objects.create(order=self.laleli_half, pack_number=1)
+        # Taking a roll out of every sack is not packing.
+        self.client.post(reverse("operating:order_pack_reserve_assign_pack",
+                                 args=[self.ergene_half.pk]),
+                         {"reservation_id": self.laleli_roll.pk, "pack_id": ""})
+        self.laleli_half.refresh_from_db()
+        self.assertEqual(self.laleli_half.order_status, "pending")
+
+        self.client.post(reverse("operating:order_pack_reserve_add", args=[self.ergene_half.pk]),
+                         {"barcode": "ERG1", "pack_id": sack.pk, "place_only": "1"})
+        for half in (self.laleli_half, self.ergene_half):
+            half.refresh_from_db()
+            self.assertEqual(half.order_status, "packaging")
+
+        # A second sack with the Laleli roll; emptying the first is not
+        # emptying the order.
+        Pack.objects.filter(pk=sack.pk).update(pack_number=2)
+        other = Pack.objects.create(order=self.laleli_half, pack_number=1)
+        self.client.post(reverse("operating:order_pack_reserve_assign_pack",
+                                 args=[self.laleli_half.pk]),
+                         {"reservation_id": self.laleli_roll.pk, "pack_id": other.pk})
+        self.client.post(reverse("operating:order_pack_reserve_assign_pack",
+                                 args=[self.laleli_half.pk]),
+                         {"reservation_id": self.ergene_roll.pk, "pack_id": ""})
+        self.laleli_half.refresh_from_db()
+        self.assertEqual(self.laleli_half.order_status, "packaging")
+
+        # Deleting the last sack with goods in it leaves nothing packed.
+        self._crud(self.laleli_half, action="delete_pack", pack_id=other.pk)
+        for half in (self.laleli_half, self.ergene_half):
+            half.refresh_from_db()
+            self.assertEqual(half.order_status, "pending")
+
+    def test_unpacking_the_last_roll_opens_the_order_again(self, _upload):
+        sack = Pack.objects.create(order=self.laleli_half, pack_number=1)
+        url = reverse("operating:order_pack_reserve_assign_pack", args=[self.laleli_half.pk])
+        for roll in (self.laleli_roll, self.ergene_roll):
+            self.client.post(url, {"reservation_id": roll.pk, "pack_id": sack.pk})
+        self.client.post(url, {"reservation_id": self.laleli_roll.pk, "pack_id": ""})
+        self.laleli_half.refresh_from_db()
+        self.assertEqual(self.laleli_half.order_status, "packaging")
+        self.client.post(reverse("operating:order_pack_reserve_remove", args=[self.ergene_half.pk]),
+                         {"reservation_id": self.ergene_roll.pk})
+        for half in (self.laleli_half, self.ergene_half):
+            half.refresh_from_db()
+            self.assertEqual(half.order_status, "pending")
+
     def test_a_roll_off_another_order_is_still_refused(self, _upload):
         sack = Pack.objects.create(order=self.laleli_half, pack_number=1)
         stranger = Order.objects.create(order_number="ORD-2026-000099")

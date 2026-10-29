@@ -145,6 +145,7 @@
   /* GRID */
   .od-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; }
   .od-left, .od-right { display: flex; flex-direction: column; gap: 16px; }
+  .od-foot { display: flex; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--gray-200); }
 
   /* CARDS */
   .od-card {
@@ -1305,11 +1306,6 @@
       <a href="{% if print_ids %}{% url 'operating:order_print_combined' %}?ids={{ print_ids }}{% else %}{% url 'operating:order_print' order.pk %}{% endif %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
-      {% comment %}The warehouse's sheet: which rolls to pull, by barcode.
-         A split order's prints every half, so it needs no ids.{% endcomment %}
-      <a href="{% url 'operating:order_picking_list' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
-        <i class="fa fa-clipboard-list"></i>{% trans "Picking list" %}
-      </a>
       <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost">
         <i class="fa fa-file-excel"></i>{% trans "Excel" %}
       </a>
@@ -1317,12 +1313,6 @@
         <a href="{% url 'operating:edit_order' order.pk %}" class="ord-btn ghost">
           <i class="fa fa-pen"></i>{% trans "Edit" %}
         </a>
-      {% endif %}
-      {% comment %}A completed order is re-opened first ("Re-open & Fix"), then cancelled — never in one step. Sales reps can't move an order at all.{% endcomment %}
-      {% if not shipped and not is_terminal and not is_sales_rep and not cancel_request %}
-        <button type="button" id="od-cancel-order-btn" class="ord-btn danger">
-          <i class="fa fa-ban"></i>{% trans "Cancel order" %}
-        </button>
       {% endif %}
     </div>
   </div>
@@ -2097,10 +2087,11 @@
       </section>
       {% endif %}
 
-      {% if order.current_account_id or order.status != 'completed' or has_packs %}
       <!-- DOCUMENTS — the invoice (a printout, plus its Excel), the
-           production sheet and the packing list, all built from this order
-           each time they're opened; nothing is stored. The packing list is
+           production sheet, the picking list and the packing list, all built
+           from this order each time they're opened; nothing is stored. The
+           picking list is the warehouse's sheet of which rolls to pull, by
+           barcode; a split order's prints every half. The packing list is
            the printout of what the pack screen put in each package, so it
            shows only once there are packages — opening it on an order with
            none would create Pack #1 as a side effect. -->
@@ -2120,6 +2111,9 @@
             <i class="fa fa-industry"></i>{% trans "Production" %}
           </a>
           {% endif %}
+          <a href="{% url 'operating:order_picking_list' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
+            <i class="fa fa-clipboard-list"></i>{% trans "Picking list" %}
+          </a>
           {% if has_packs %}
           <a href="{% url 'operating:order_packing_list' order.pk %}" class="ord-btn ghost">
             <i class="fa fa-box"></i>{% trans "Packing list" %}
@@ -2127,7 +2121,6 @@
           {% endif %}
         </div>
       </section>
-      {% endif %}
 
       {% if order.current_account %}
       <!-- CURRENT ACCOUNT — internal ledger snapshot -->
@@ -2231,6 +2224,15 @@
       {% endif %}
     </div>
   </div>
+
+  {% comment %}A completed order is re-opened first ("Re-open & Fix"), then cancelled — never in one step. Sales reps can't move an order at all.{% endcomment %}
+  {% if not shipped and not is_terminal and not is_sales_rep and not cancel_request %}
+  <div class="od-foot">
+    <button type="button" id="od-cancel-order-btn" class="ord-btn danger">
+      <i class="fa fa-ban"></i>{% trans "Cancel order" %}
+    </button>
+  </div>
+  {% endif %}
 </div>
 
 <!-- COMPLETE-ORDER CONFIRM — the last look at the lines before stock

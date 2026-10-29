@@ -217,7 +217,8 @@ class TheMiddleManager(TwoCatalogues):
         from authentication.models import Role
         role = Role.objects.create(name="Middle manager")
         role.permissions.add(*[permission_row(n) for n in
-                               ("admin", "purchase_confirm", "view_profit", "print_labels")])
+                               ("orders", "beyond_sales", "admin", "purchase_confirm",
+                                "view_profit", "print_labels")])
         put_in_role(cls.burak.member, role)
 
     def test_it_manages_confirms_purchases_and_sees_profit(self):

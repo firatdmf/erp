@@ -1,0 +1,23 @@
+{% load i18n %}
+{% comment %}One role on the board: its name, its permissions as tick-boxes,
+its people. Drawn for every role on the page, and by RoleBoardUpdate for a
+role just made, so the page can add it without reloading.{% endcomment %}
+<div class="st-role" data-role="{{ r.role.pk }}">
+  <div class="st-role-h">
+    <input class="st-role-name" value="{{ r.role.name }}" aria-label="{% trans "Role name" %}" data-was="{{ r.role.name }}">
+    <span class="st-role-count" data-count>{{ r.members|length }}</span>
+    <button type="button" class="st-role-del" title="{% trans "Delete role" %}" data-delete><i class="fas fa-trash"></i></button>
+  </div>
+  <div class="st-perm-chips">
+    {% for name, label, description, granted in r.granted %}
+    <label class="st-perm-chip" title="{% trans description %}">
+      <input type="checkbox" data-permission="{{ name }}" {% if granted %}checked{% endif %}>
+      {% trans label %}
+    </label>
+    {% endfor %}
+  </div>
+  <div class="st-role-people" data-drop>
+    {% for m in r.members %}{% include "partials/role_member_card.html" with m=m %}{% endfor %}
+    <div class="st-role-empty" data-empty>{% trans "Drag people here" %}</div>
+  </div>
+</div>

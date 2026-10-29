@@ -4,6 +4,25 @@ from django.db import models
 
 # Create your models here.
 ACCESS_LEVEL_CHOICES_DICT = {
+    # What a member may do. A role is a set of these (Role); the role
+    # board in Settings shows them as tick-boxes — all but RESTRICTIONS.
+    #
+    # Sees and takes orders. A role without it never sees an order — what
+    # an Operations manager is: someone who runs the warehouse and its
+    # stock and has no business with sales.
+    "orders": (
+        "Orders",
+        "Sees and takes orders. Without it, no order is shown at all.",
+    ),
+    # Everything beyond selling: warehouses, purchases, accounts, the
+    # catalog. A role without it only looks up stock and customers and
+    # takes orders, seeing prices where others see cost — a sales rep.
+    "beyond_sales": (
+        "Beyond sales",
+        "Warehouses, purchases, accounts and the catalog. Without it, only "
+        "looking up stock and customers and taking orders, with prices shown "
+        "in place of cost.",
+    ),
     # Stored as "admin". Manages the books the member is assigned — their
     # warehouses, orders and purchases (erp.ownership.is_admin) — and
     # nothing that belongs to the install as a whole, which is a
@@ -13,49 +32,42 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "Manages the warehouses, orders and purchases of the books they are "
         "assigned, confirming purchases included. Nothing install-wide.",
     ),
-    # Stored as "manager", which sat unused until it was given this
-    # meaning. Runs the warehouse and its stock, and has no business with
-    # orders: not seeing them, not raising them. Enforced by
-    # erp.middleware.ReadOnlyRoleMiddleware; see erp.roles.ORDER_PREFIXES.
-    "manager": (
-        "Operations manager",
-        "Works the warehouse and its stock. Cannot see or create orders.",
-    ),
-    "employee": ("Employee", "Can access and manage their own tasks and projects."),
-    "guest": ("Guest", "Has limited access to view certain resources."),
-    # Granted per person rather than implied by rank: confirming a purchase
-    # order turns it into real warehouse stock AND posts the debt to the
-    # supplier, so it is held separately from "manager".
+    # Confirming a purchase order turns it into real warehouse stock AND
+    # posts the debt to the supplier, so it is a permission of its own.
     "purchase_confirm": (
         "Confirm purchases",
         "Can confirm a purchase order into warehouse stock (goods receipt).",
     ),
-    # Read-only, and narrower than "guest": a sales rep sees the two
-    # things she quotes from — stock (quantity and price) and sales —
-    # and cannot write anything anywhere. Enforced in one place, by
-    # erp.middleware.ReadOnlyRoleMiddleware; see erp/roles.py.
-    "sales_rep": (
-        "Sales rep (read-only)",
-        "Can view stock quantities, prices and sales. Cannot change anything.",
-    ),
-    # What an order cost us and what we made on it is the margin. Held as
-    # a grant of its own rather than implied by "not a sales rep", so a
-    # role can be given or refused the numbers without touching what
-    # else it may do. Seeded to every existing non-rep member in
-    # migration 0021; a new member has to be granted it.
+    # What an order cost us and what we made on it is the margin.
     "view_profit": (
         "See cost and profit",
         "Can see cost of goods, gross profit and margin on orders and analytics.",
     ),
     # Labels go on the goods — rolls, stock items, packed sacks — which is
-    # operations work. A grant of its own, so who prints them is decided
-    # per person (erp.roles.may_print_labels). Seeded in migration 0030 to
-    # every member who is not a sales rep.
+    # operations work (erp.roles.may_print_labels).
     "print_labels": (
         "Print labels",
         "Can print stock, roll and package labels.",
     ),
+    # The two restrictions the checks read (erp.roles.is_operations_manager,
+    # is_sales_rep; enforced by erp.middleware.ReadOnlyRoleMiddleware). Not
+    # handed out: a role writes one onto its members when it lacks the
+    # permission RESTRICTIONS names (authentication.member_roles).
+    "manager": (
+        "No orders",
+        "Set on whoever lacks the Orders permission.",
+    ),
+    "sales_rep": (
+        "Sales only",
+        "Set on whoever lacks the Beyond sales permission.",
+    ),
 }
+
+# restriction → the permission whose absence sets it.
+RESTRICTIONS = {"manager": "orders", "sales_rep": "beyond_sales"}
+
+# What a role can be given: every permission but the restrictions.
+GRANTS = [name for name in ACCESS_LEVEL_CHOICES_DICT if name not in RESTRICTIONS]
 
 # Convert dictionary to list of tuples for name choices
 ACCESS_LEVEL_NAME_CHOICES = [

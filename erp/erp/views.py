@@ -86,7 +86,7 @@ class RoleBoardUpdate(View):
 
     action=move        member, role   — put a member in a role
     action=permission  role, permission, granted=on|off
-    action=create      name           — a new, empty role
+    action=create      name           — a new, empty role; answers with its card
     action=rename      role, name
     action=delete      role           — only an empty one
 
@@ -100,8 +100,9 @@ class RoleBoardUpdate(View):
         from django.db import IntegrityError, transaction
         from django.http import JsonResponse
         from django.utils.translation import gettext as _
-        from authentication.member_roles import put_in_role, set_role_permission
-        from authentication.models import ACCESS_LEVEL_CHOICES_DICT, Member, Role
+        from django.template.loader import render_to_string
+        from authentication.member_roles import put_in_role, role_card, set_role_permission
+        from authentication.models import GRANTS, Member, Role
 
         def refuse(text):
             return JsonResponse({"ok": False, "error": text}, status=400)
@@ -127,7 +128,7 @@ class RoleBoardUpdate(View):
             return JsonResponse({"ok": True})
         if action == "permission":
             perm = request.POST.get("permission") or ""
-            if perm not in ACCESS_LEVEL_CHOICES_DICT:
+            if perm not in GRANTS:
                 return refuse(_("Unknown permission."))
             set_role_permission(role, perm, request.POST.get("granted") == "on")
             return JsonResponse({"ok": True})
@@ -143,7 +144,13 @@ class RoleBoardUpdate(View):
                         role.save(update_fields=["name"])
             except IntegrityError:
                 return refuse(_("There is already a role called “%(name)s”.") % {"name": name})
-            return JsonResponse({"ok": True, "role": role.pk, "name": role.name})
+            out = {"ok": True, "role": role.pk, "name": role.name}
+            if action == "create":
+                # The new card, drawn as the board draws its others, for
+                # the page to put in place without reloading.
+                out["html"] = render_to_string("partials/role_card.html",
+                                               {"r": role_card(role)}, request=request)
+            return JsonResponse(out)
         if action == "delete":
             if role.members.exists():
                 return refuse(_("Move everyone out of the role before deleting it."))

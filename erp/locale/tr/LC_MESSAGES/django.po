@@ -15234,3 +15234,31 @@ msgstr "%(book)s içindeki açık siparişler. Üretimini başlatmak için birin
 
 msgid "No open orders."
 msgstr "Açık sipariş yok."
+
+msgid "Beyond sales"
+msgstr "Satışın ötesi"
+
+msgid "Sees and takes orders. Without it, no order is shown at all."
+msgstr "Siparişleri görür ve alır. Bu yetki olmadan hiçbir sipariş gösterilmez."
+
+msgid ""
+"Warehouses, purchases, accounts and the catalog. Without it, only looking up "
+"stock and customers and taking orders, with prices shown in place of cost."
+msgstr ""
+"Depolar, alımlar, cari hesaplar ve katalog. Bu yetki olmadan yalnızca stok ve "
+"müşteri bakılır ve sipariş alınır; maliyetin yerine fiyat gösterilir."
+
+msgid "No orders"
+msgstr "Sipariş yok"
+
+msgid "Set on whoever lacks the Orders permission."
+msgstr "Siparişler yetkisi olmayan herkese konur."
+
+msgid "Sales only"
+msgstr "Yalnızca satış"
+
+msgid "Set on whoever lacks the Beyond sales permission."
+msgstr "Satışın ötesi yetkisi olmayan herkese konur."
+
+msgid "Role added."
+msgstr "Rol eklendi."

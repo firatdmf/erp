@@ -6,7 +6,7 @@
 
 {% block css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=9" />
+<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=10" />
 {% endblock %}
 
 {% block content %}
@@ -607,33 +607,18 @@
                 </div>
               </div>
               {% endif %}
-              {% for r in role_board.roles %}
-              <div class="st-role" data-role="{{ r.role.pk }}">
-                <div class="st-role-h">
-                  <input class="st-role-name" value="{{ r.role.name }}" aria-label="{% trans "Role name" %}" data-was="{{ r.role.name }}">
-                  <span class="st-role-count" data-count>{{ r.members|length }}</span>
-                  <button type="button" class="st-role-del" title="{% trans "Delete role" %}" data-delete><i class="fas fa-trash"></i></button>
-                </div>
-                <div class="st-perm-chips">
-                  {% for name, label, description, granted in r.granted %}
-                  <label class="st-perm-chip" title="{% trans description %}">
-                    <input type="checkbox" data-permission="{{ name }}" {% if granted %}checked{% endif %}>
-                    {% trans label %}
-                  </label>
-                  {% endfor %}
-                </div>
-                <div class="st-role-people" data-drop>
-                  {% for m in r.members %}{% include "partials/role_member_card.html" with m=m %}{% endfor %}
-                  <div class="st-role-empty" data-empty>{% trans "Drag people here" %}</div>
-                </div>
-              </div>
-              {% endfor %}
+              {% for r in role_board.roles %}{% include "partials/role_card.html" %}{% endfor %}
               <form class="st-role st-role--new" id="stNewRole">
                 <div class="st-role-title">{% trans "New role" %}</div>
                 <input class="st-input" name="name" maxlength="60" placeholder="{% trans "e.g. Operations" %}" required>
                 <button type="submit" class="st-btn st-btn--primary"><i class="fas fa-plus"></i> {% trans "Add role" %}</button>
               </form>
             </div>
+            <ul class="st-perm-legend">
+              {% for name, label, description in role_board.grants %}
+              <li><b>{% trans label %}</b> — {% trans description %}</li>
+              {% endfor %}
+            </ul>
             {% if role_board.superusers %}
             <p class="st-help" style="margin-top:14px;">
               <i class="fas fa-crown"></i>
@@ -794,13 +779,23 @@
         role.remove();
       });
     });
-    // A new role comes back as a fresh page, so it is a card like the rest.
-    document.getElementById('stNewRole').addEventListener('submit', e => {
+    // A new role comes back as its card, drawn by the server like the
+    // rest; it goes in before the New role form, and into every person's
+    // menu, without reloading the page.
+    const newRole = document.getElementById('stNewRole');
+    newRole.addEventListener('submit', e => {
       e.preventDefault();
-      post({action: 'create', name: e.target.name.value}).then(d => {
+      post({action: 'create', name: newRole.name.value}).then(d => {
         if (!d.ok) { say(d.error, false); return; }
-        window.location.hash = 'permissions';
-        window.location.reload();
+        newRole.insertAdjacentHTML('beforebegin', d.html);
+        board.querySelectorAll('.st-member select').forEach(sel => {
+          const opt = document.createElement('option');
+          opt.value = d.role; opt.textContent = d.name;
+          sel.appendChild(opt);
+        });
+        newRole.reset();
+        recount();
+        say('{% filter escapejs %}{% trans "Role added." %}{% endfilter %}', true);
       });
     });
   })();

@@ -624,6 +624,9 @@
 #Settings_Page .st-member-sub { font: 500 11px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-3); overflow-wrap: anywhere; }
 #Settings_Page .st-member select { flex-shrink: 0; width: 132px; font: 600 12px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); border: 1px solid var(--st-border); border-radius: 6px; padding: 3px 4px; background: #fff; }
 
+#Settings_Page .st-perm-legend { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font: 500 12.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); }
+#Settings_Page .st-perm-legend b { color: var(--st-ink); }
+
 /* ───────── MOBILE ───────── */
 @media (max-width: 1024px) {
   /* minmax(0, …) so a wide card shrinks to the screen instead of widening it. */

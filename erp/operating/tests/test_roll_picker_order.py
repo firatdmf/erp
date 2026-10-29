@@ -93,8 +93,13 @@ class RollPicker(TestCase):
 
     def test_within_one_day_the_barcode_decides(self):
         """A stock count enters a shelf in whatever order the rolls were
-        picked up, so the minute is noise; the label sequence is not."""
-        start = self._aged(7)
+        picked up, so the minute is noise; the label sequence is not.
+
+        The afternoon LZK00003 went in, 17 June — a fixed date, not one
+        counted back from now, which put the hour across midnight
+        whenever the test ran late in the evening."""
+        from django.utils import timezone
+        start = timezone.make_aware(datetime.datetime(2026, 6, 17, 14, 0))
         wp = self._shelf(self.ergene, Decimal("2.40"))
         for minutes, barcode in ((0, "LZK0300003495"), (1, "LZK0300003492"),
                                  (26, "LZK0300003070"), (60, "LZK0300003478")):

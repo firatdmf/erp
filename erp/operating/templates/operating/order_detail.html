@@ -1650,6 +1650,7 @@
                     {% endif %}
                     {% for p in item.purchases %}
                     <a class="od-po-chip" href="{% url 'accounts:purchase_order_detail' p.pk %}"
+                       target="_blank" rel="noopener"
                        title="{% trans 'Bought in for this order on this supplier purchase' %}">
                       <i class="fa fa-file-invoice"></i> {% trans "Purchase" context "supplier purchase, noun" %} <b>{{ p.number }}</b></a>
                     {% endfor %}

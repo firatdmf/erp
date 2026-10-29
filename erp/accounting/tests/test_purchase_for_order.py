@@ -336,7 +336,7 @@ class PurchaseForCustomerTest(TestCase):
         named = {it.pk: [p.pk for p in it.purchases] for it in r.context["order_items_sorted"]}
         self.assertEqual(named.pop(extra.pk), [])
         self.assertEqual(list(named.values()), [[inv_id]])
-        self.assertContains(r, 'class="od-po-chip" href="%s"'
+        self.assertContains(r, 'class="od-po-chip" href="%s"\n                       target="_blank"'
                             % reverse("accounts:purchase_order_detail", args=[inv_id]))
         self.assertNotContains(r, "not on the purchase")
 

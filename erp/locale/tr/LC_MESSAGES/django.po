@@ -15177,9 +15177,6 @@ msgstr "örn. Operasyon"
 msgid "Add role"
 msgstr "Rol ekle"
 
-msgid "Superusers may do everything, whatever role they are in:"
-msgstr "Süper kullanıcılar, hangi rolde olurlarsa olsunlar her şeyi yapabilir:"
-
 msgid "Move to role"
 msgstr "Role taşı"
 
@@ -15262,3 +15259,30 @@ msgstr "Satışın ötesi yetkisi olmayan herkese konur."
 
 msgid "Role added."
 msgstr "Rol eklendi."
+
+msgid "Superadmin"
+msgstr "Süper yönetici"
+
+msgid "Everything, in every book and warehouse — this page included."
+msgstr "Her şey, her defterde ve depoda — bu sayfa da dahil."
+
+msgid "All books"
+msgstr "Tüm defterler"
+
+msgid "Works in this book"
+msgstr "Bu defterde çalışır"
+
+msgid "You can't take yourself out of Superadmin."
+msgstr "Kendinizi süper yöneticilikten çıkaramazsınız."
+
+msgid "The last superadmin can't be moved out."
+msgstr "Son süper yönetici çıkarılamaz."
+
+msgid "Book not found."
+msgstr "Defter bulunamadı."
+
+msgid ""
+"You can't take yourself out of Superadmin, and the last superadmin stays."
+msgstr ""
+"Kendinizi süper yöneticilikten çıkaramazsınız ve son süper yönetici yerinde "
+"kalır."

@@ -35,7 +35,7 @@ class RoleBoard(TestCase):
         board = page.context["role_board"]
         self.assertEqual([r["role"].name for r in board["roles"]], ["Operations"])
         self.assertEqual([m.user.username for m in board["unplaced"]], ["cuma"])
-        self.assertEqual([m.user.username for m in board["superusers"]], ["muhammed"])
+        self.assertEqual([m.user.username for m in board["superadmin"]["members"]], ["muhammed"])
         self.assertContains(page, 'data-member="%d"' % self.cuma.member.pk)
         # Only what a role can be given: no Sales rep or Operations manager
         # boxes — those are roles.
@@ -170,3 +170,72 @@ class OrdersAndBeyondSalesFromTheOldFlags(TestCase):
         self.assertTrue(is_operations_manager(loose))
         self.assertFalse(Permission.objects.filter(name__in=("employee", "guest")).exists())
 
+
+
+class SuperadminAndBooks(TestCase):
+    """The board's Superadmin card and each person's books."""
+
+    def setUp(self):
+        from accounting.models import Book
+        self.laleli = Book.objects.create(name="Laleli Fabric")
+        self.ergene = Book.objects.create(name="Ergene Fabric")
+        self.root = User.objects.create_superuser("muhammed", "m@x.test", "pw")
+        self.cuma = User.objects.create_user("cuma", password="pw")
+        self.staff = Role.objects.create(name="Staff")
+        self.staff.permissions.add(*[Permission.objects.get_or_create(name=n)[0]
+                                     for n in ("orders", "beyond_sales")])
+        self.url = reverse("role_board_update")
+        self.client.force_login(self.root)
+
+    def _move(self, user, role):
+        return self.client.post(self.url, {"action": "move", "member": user.member.pk, "role": role}).json()
+
+    def test_the_superadmins_have_a_fixed_card_of_their_own(self):
+        page = self.client.get(reverse("user_settings"))
+        self.assertEqual([m.user.username for m in page.context["role_board"]["superadmin"]["members"]],
+                         ["muhammed"])
+        self.assertContains(page, 'data-role="superadmin"')
+        self.assertContains(page, "All books")
+
+    def test_moving_in_and_out_of_superadmin(self):
+        d = self._move(self.cuma, "superadmin")
+        self.assertTrue(d["ok"])
+        self.assertIn("All books", d["html"])
+        self.cuma.refresh_from_db()
+        self.assertTrue(self.cuma.is_superuser and self.cuma.is_staff)
+
+        d = self._move(self.cuma, self.staff.pk)
+        self.assertTrue(d["ok"])
+        self.cuma.refresh_from_db()
+        self.assertFalse(self.cuma.is_superuser or self.cuma.is_staff)
+        self.assertEqual(self.cuma.member.role, self.staff)
+        self.assertEqual(set(self.cuma.member.permissions.values_list("name", flat=True)),
+                         {"orders", "beyond_sales"})
+
+    def test_nobody_takes_themselves_out_and_the_last_one_stays(self):
+        from authentication.member_roles import Refused, leave_superadmin
+        d = self._move(self.root, self.staff.pk)
+        self.assertFalse(d["ok"])
+        self.assertIn("yourself", d["error"])
+        # The last superadmin stays, whoever asks. (On the board the one
+        # asking is a superadmin too, so this guards every other way in.)
+        with self.assertRaises(Refused):
+            leave_superadmin(self.root.member, self.staff, by=self.cuma)
+        self.root.refresh_from_db()
+        self.assertTrue(self.root.is_superuser)
+
+    def test_a_person_s_books_are_ticked_on_their_card(self):
+        post = lambda book, on: self.client.post(self.url, {
+            "action": "books", "member": self.cuma.member.pk, "book": book.pk,
+            "assigned": "on" if on else "off"}).json()
+        self.assertTrue(post(self.laleli, True)["ok"])
+        self.assertTrue(post(self.ergene, True)["ok"])
+        member = self.cuma.member
+        member.refresh_from_db()
+        self.assertEqual(set(member.books.all()), {self.laleli, self.ergene})
+        self.assertEqual(member.default_book, self.laleli)
+        # Taking away the book they work in moves them to the next.
+        post(self.laleli, False)
+        member.refresh_from_db()
+        self.assertEqual(list(member.books.all()), [self.ergene])
+        self.assertEqual(member.default_book, self.ergene)

@@ -1,18 +1,32 @@
 {% load i18n %}
 {% comment %}One person on the role board: dragged between roles, or moved with
-the menu where dragging is awkward (a phone). Someone in no role yet also
-shows the permissions they hold one by one.{% endcomment %}
+the menu where dragging is awkward (a phone). Under the name, the books they
+work in, each a tick-box — a superadmin works in every one. Someone in no
+role yet also shows the permissions they hold one by one.{% endcomment %}
 <div class="st-member" draggable="true" data-member="{{ m.pk }}">
   <i class="fas fa-grip-vertical st-member-grip" aria-hidden="true"></i>
   <div class="st-member-who">
     <div class="st-member-name">{{ m.display_name }}</div>
-    <div class="st-member-sub">@{{ m.user.username }}{% if m.book_names %} · {{ m.book_names }}{% endif %}</div>
-    {% if not m.role_id and m.held %}<div class="st-member-sub">{{ m.held|join:", " }}</div>{% endif %}
+    <div class="st-member-sub">@{{ m.user.username }}</div>
+    {% if not m.role_id and m.held and not m.user.is_superuser %}<div class="st-member-sub">{{ m.held|join:", " }}</div>{% endif %}
   </div>
   <select aria-label="{% trans "Move to role" %}" title="{% trans "Move to role" %}">
-    {% if not m.role_id %}<option value="" selected disabled>{% trans "Move to…" %}</option>{% endif %}
+    {% if not m.role_id and not m.user.is_superuser %}<option value="" selected disabled>{% trans "Move to…" %}</option>{% endif %}
+    <option value="superadmin" {% if m.user.is_superuser %}selected{% endif %}>{% trans "Superadmin" %}</option>
     {% for r in role_board.roles %}
-    <option value="{{ r.role.pk }}" {% if r.role.pk == m.role_id %}selected{% endif %}>{{ r.role.name }}</option>
+    <option value="{{ r.role.pk }}" {% if r.role.pk == m.role_id and not m.user.is_superuser %}selected{% endif %}>{{ r.role.name }}</option>
     {% endfor %}
   </select>
+  <div class="st-member-books">
+    {% if m.user.is_superuser %}
+    <span class="st-book-chip is-all"><i class="fas fa-book"></i> {% trans "All books" %}</span>
+    {% else %}
+    {% for book, works_in in m.book_choices %}
+    <label class="st-book-chip" title="{% trans "Works in this book" %}">
+      <input type="checkbox" data-book="{{ book.pk }}" {% if works_in %}checked{% endif %}>
+      {{ book.name }}
+    </label>
+    {% endfor %}
+    {% endif %}
+  </div>
 </div>

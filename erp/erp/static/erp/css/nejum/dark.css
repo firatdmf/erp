@@ -356,6 +356,22 @@ html.dk-init *, html.dk-init *::before, html.dk-init *::after { transition: none
 [data-theme="dark"] #Settings_Page .st-member-name {
   color: #F1F5F8 !important;
 }
+[data-theme="dark"] #Settings_Page .st-role--super,
+[data-theme="dark"] #Settings_Page .st-book-chip.is-all {
+  background: rgba(183, 121, 31, 0.10) !important;
+  border-color: rgba(232, 199, 122, 0.45) !important;
+  color: #F6D58E !important;
+}
+[data-theme="dark"] #Settings_Page .st-book-chip {
+  background: #1F252C !important;
+  border-color: #33393F !important;
+  color: #9AA5AD !important;
+}
+[data-theme="dark"] #Settings_Page .st-book-chip:has(input:checked) {
+  background: rgba(0, 128, 128, 0.18) !important;
+  border-color: rgba(0, 128, 128, 0.55) !important;
+  color: var(--nejum-teal-200, #99D6D6) !important;
+}
 [data-theme="dark"] #Settings_Page .st-role-empty {
   border-color: #33393F !important;
 }

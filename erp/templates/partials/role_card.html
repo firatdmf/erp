@@ -1,17 +1,27 @@
 {% load i18n %}
 {% comment %}One role on the board: its name, its permissions as tick-boxes,
 its people. Drawn for every role on the page, and by RoleBoardUpdate for a
-role just made, so the page can add it without reloading.{% endcomment %}
-<div class="st-role" data-role="{{ r.role.pk }}">
+role just made, so the page can add it without reloading. With `superadmin`
+it is the superusers' card: everything, in every book, fixed — not a role
+anyone renames, deletes or changes the ticks of.{% endcomment %}
+<div class="st-role{% if superadmin %} st-role--super{% endif %}" data-role="{% if superadmin %}superadmin{% else %}{{ r.role.pk }}{% endif %}">
   <div class="st-role-h">
+    {% if superadmin %}
+    <span class="st-role-title"><i class="fas fa-crown"></i> {% trans "Superadmin" %}</span>
+    <span class="st-role-count" data-count>{{ r.members|length }}</span>
+    {% else %}
     <input class="st-role-name" value="{{ r.role.name }}" aria-label="{% trans "Role name" %}" data-was="{{ r.role.name }}">
     <span class="st-role-count" data-count>{{ r.members|length }}</span>
     <button type="button" class="st-role-del" title="{% trans "Delete role" %}" data-delete><i class="fas fa-trash"></i></button>
+    {% endif %}
   </div>
+  {% if superadmin %}
+  <p class="st-help" style="margin:0;">{% trans "Everything, in every book and warehouse — this page included." %}</p>
+  {% endif %}
   <div class="st-perm-chips">
     {% for name, label, description, granted in r.granted %}
     <label class="st-perm-chip" title="{% trans description %}">
-      <input type="checkbox" data-permission="{{ name }}" {% if granted %}checked{% endif %}>
+      <input type="checkbox" data-permission="{{ name }}" {% if granted %}checked{% endif %}{% if superadmin %} disabled{% endif %}>
       {% trans label %}
     </label>
     {% endfor %}

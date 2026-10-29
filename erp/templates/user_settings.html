@@ -6,7 +6,7 @@
 
 {% block css %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=10" />
+<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=12" />
 {% endblock %}
 
 {% block content %}
@@ -598,6 +598,7 @@
           </div>
           <div class="st-card-body">
             <div class="st-roles" id="stRoles" data-url="{% url 'role_board_update' %}">
+              {% include "partials/role_card.html" with r=role_board.superadmin superadmin=True %}
               {% if role_board.unplaced %}
               <div class="st-role st-role--unplaced">
                 <div class="st-role-h"><span class="st-role-title">{% trans "No role yet" %}</span></div>
@@ -619,13 +620,7 @@
               <li><b>{% trans label %}</b> — {% trans description %}</li>
               {% endfor %}
             </ul>
-            {% if role_board.superusers %}
-            <p class="st-help" style="margin-top:14px;">
-              <i class="fas fa-crown"></i>
-              {% trans "Superusers may do everything, whatever role they are in:" %}
-              {% for m in role_board.superusers %}{{ m.display_name }}{% if not forloop.last %}, {% endif %}{% endfor %}.
-            </p>
-            {% endif %}
+            <p class="st-help" style="margin-top:14px;">{% trans "You can't take yourself out of Superadmin, and the last superadmin stays." %}</p>
           </div>
         </div>
       </section>
@@ -699,7 +694,8 @@
       role.querySelector('[data-count]').textContent = n;
       role.querySelector('[data-empty]').hidden = n > 0;
       // Only an empty role can go, so only an empty role offers to.
-      role.querySelector('[data-delete]').hidden = n > 0;
+      const del = role.querySelector('[data-delete]');
+      if (del) del.hidden = n > 0;
     });
     recount();
 
@@ -711,8 +707,12 @@
       card.querySelector('select').value = role.dataset.role;
       recount();
       post({action: 'move', member: card.dataset.member, role: role.dataset.role}).then(d => {
-        if (d.ok) { say('{% filter escapejs %}{% trans "Moved." %}{% endfilter %}', true); return; }
-        from.insertBefore(card, before); recount(); say(d.error, false);
+        if (!d.ok) { from.insertBefore(card, before); recount(); say(d.error, false); return; }
+        // The card comes back redrawn — "All books" for a superadmin, the
+        // book boxes for anyone else.
+        card.insertAdjacentHTML('afterend', d.html);
+        card.remove();
+        say('{% filter escapejs %}{% trans "Moved." %}{% endfilter %}', true);
       });
     };
     let dragged = null;
@@ -743,6 +743,12 @@
       const t = e.target;
       if (t.matches('.st-member select')) {
         move(t.closest('.st-member'), board.querySelector('.st-role[data-role="' + t.value + '"]'));
+      } else if (t.matches('[data-book]')) {
+        post({action: 'books', member: t.closest('.st-member').dataset.member, book: t.dataset.book,
+              assigned: t.checked ? 'on' : 'off'}).then(d => {
+          if (d.ok) { say('{% filter escapejs %}{% trans "Saved." %}{% endfilter %}', true); return; }
+          t.checked = !t.checked; say(d.error, false);
+        });
       } else if (t.matches('[data-permission]')) {
         const role = t.closest('.st-role');
         post({action: 'permission', role: role.dataset.role, permission: t.dataset.permission,

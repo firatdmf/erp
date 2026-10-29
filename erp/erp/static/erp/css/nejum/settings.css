@@ -615,7 +615,7 @@
 #Settings_Page .st-role-people { display: grid; gap: 6px; min-height: 44px; }
 #Settings_Page .st-role-empty[hidden], #Settings_Page .st-role-del[hidden] { display: none; }
 #Settings_Page .st-role-empty { display: grid; place-items: center; min-height: 44px; border: 1.5px dashed var(--st-border-strong); border-radius: var(--st-radius-xs); font: 500 12px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-4); }
-#Settings_Page .st-member { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #fff; border: 1px solid var(--st-border); border-radius: var(--st-radius-xs); cursor: grab; }
+#Settings_Page .st-member { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; background: #fff; border: 1px solid var(--st-border); border-radius: var(--st-radius-xs); cursor: grab; }
 #Settings_Page .st-member:active { cursor: grabbing; }
 #Settings_Page .st-member.is-dragging { opacity: .45; }
 #Settings_Page .st-member-grip { color: var(--st-ink-4); font-size: 12px; }
@@ -624,6 +624,16 @@
 #Settings_Page .st-member-sub { font: 500 11px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-3); overflow-wrap: anywhere; }
 #Settings_Page .st-member select { flex-shrink: 0; width: 132px; font: 600 12px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); border: 1px solid var(--st-border); border-radius: 6px; padding: 3px 4px; background: #fff; }
 
+/* The superadmins' card: everything, fixed — its ticks are not for changing. */
+#Settings_Page .st-role--super { border-color: #E8C77A; background: #FFFBEB; }
+#Settings_Page .st-role--super .st-role-title i { color: #B7791F; }
+#Settings_Page .st-role--super .st-perm-chip { cursor: default; opacity: .85; }
+/* The books a person works in, under their name. */
+#Settings_Page .st-member-books { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; padding-left: 20px; }
+#Settings_Page .st-book-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border: 1px solid var(--st-border-strong); border-radius: 999px; font: 600 10.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-3); background: #fff; cursor: pointer; user-select: none; }
+#Settings_Page .st-book-chip:has(input:checked) { border-color: var(--st-teal); color: var(--st-teal-deep); background: var(--st-teal-bg); }
+#Settings_Page .st-book-chip input { width: 11px; height: 11px; margin: 0; accent-color: var(--st-teal); cursor: pointer; }
+#Settings_Page .st-book-chip.is-all { cursor: default; border-color: #E8C77A; color: #92400E; background: #FFFBEB; }
 #Settings_Page .st-perm-legend { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font: 500 12.5px 'Plus Jakarta Sans', sans-serif; color: var(--st-ink-2); }
 #Settings_Page .st-perm-legend b { color: var(--st-ink); }
 

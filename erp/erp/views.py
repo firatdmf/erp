@@ -84,7 +84,10 @@ class RoleBoardUpdate(View):
     """Settings → Members & permissions: the role board's every change,
     one POST each, answered in JSON.
 
-    action=move        member, role   — put a member in a role
+    action=move        member, role   — put a member in a role, or in or out of
+                                        Superadmin (role=superadmin); answers
+                                        with their card, redrawn
+    action=books       member, book, assigned=on|off — the books they work in
     action=permission  role, permission, granted=on|off
     action=create      name           — a new, empty role; answers with its card
     action=rename      role, name
@@ -101,7 +104,10 @@ class RoleBoardUpdate(View):
         from django.http import JsonResponse
         from django.utils.translation import gettext as _
         from django.template.loader import render_to_string
-        from authentication.member_roles import put_in_role, role_card, set_role_permission
+        from accounting.models import Book
+        from authentication.member_roles import (
+            SUPERADMIN, Refused, board, leave_superadmin, make_superadmin, put_in_role,
+            role_card, set_member_book, set_role_permission)
         from authentication.models import GRANTS, Member, Role
 
         def refuse(text):
@@ -112,20 +118,46 @@ class RoleBoardUpdate(View):
                                 status=403)
         action = request.POST.get("action") or ""
         name = (request.POST.get("name") or "").strip()[:60]
+        member = None
+        if action in ("move", "books"):
+            member = (Member.objects.filter(pk=request.POST.get("member") or 0,
+                                            user__isnull=False, user__is_active=True)
+                      .select_related("user").first())
+            if member is None:
+                return refuse(_("Member not found."))
+        if action == "books":
+            book = Book.objects.filter(pk=request.POST.get("book") or 0).first()
+            if book is None:
+                return refuse(_("Book not found."))
+            set_member_book(member, book, request.POST.get("assigned") == "on")
+            return JsonResponse({"ok": True})
+
+        to_superadmin = action == "move" and request.POST.get("role") == SUPERADMIN
         role = None
-        if action != "create":
+        if action != "create" and not to_superadmin:
             role = Role.objects.filter(pk=request.POST.get("role") or 0).first()
             if role is None:
                 return refuse(_("Role not found."))
 
         if action == "move":
-            member = Member.objects.filter(pk=request.POST.get("member") or 0,
-                                           user__isnull=False, user__is_active=True,
-                                           user__is_superuser=False).first()
-            if member is None:
-                return refuse(_("Member not found."))
-            put_in_role(member, role)
-            return JsonResponse({"ok": True})
+            try:
+                if to_superadmin:
+                    make_superadmin(member)
+                elif member.user.is_superuser:
+                    leave_superadmin(member, role, request.user)
+                else:
+                    put_in_role(member, role)
+            except Refused as why:
+                return refuse(str(why))
+            # Their card, redrawn: a superadmin's shows all books, anyone
+            # else's the books they work in.
+            now = board()
+            mine = next(m for m in (now["superadmin"]["members"]
+                                    + [p for r in now["roles"] for p in r["members"]])
+                        if m.pk == member.pk)
+            html = render_to_string("partials/role_member_card.html",
+                                    {"m": mine, "role_board": now}, request=request)
+            return JsonResponse({"ok": True, "html": html})
         if action == "permission":
             perm = request.POST.get("permission") or ""
             if perm not in GRANTS:

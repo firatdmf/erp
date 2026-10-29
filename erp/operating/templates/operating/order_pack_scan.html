@@ -257,7 +257,10 @@
   .pk-pack{border:1.5px solid var(--pk-line);border-radius:12px;background:#FAFCFB;overflow:hidden;
     transition:border-color 140ms,box-shadow 140ms;}
   .pk-pack.is-target{border-color:var(--pk-teal);box-shadow:0 0 0 4px rgba(20,127,116,.14);background:#fff;}
-  .pk-pack-h{display:flex;align-items:center;gap:9px;padding:9px 12px;background:#fff;border-bottom:1px solid var(--pk-line);}
+  /* Wraps: number, counts, kg, Scan here, Label and delete are ~610px in
+     one line — wider than a phone, or than a package in the two-column
+     layout — and the card clips what runs over. */
+  .pk-pack-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px 9px;padding:9px 12px;background:#fff;border-bottom:1px solid var(--pk-line);}
   .pk-pack-num{width:26px;height:26px;border-radius:7px;background:var(--pk-teal-600);color:#fff;
     display:inline-flex;align-items:center;justify-content:center;font:800 12px var(--pk-font);flex-shrink:0;}
   .pk-pack-title{font-weight:700;font-size:13px;}

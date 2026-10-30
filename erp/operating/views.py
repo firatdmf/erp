@@ -3585,6 +3585,8 @@ class OrderPrint(DetailView):
         ctx["is_pdf"] = True   # template can strip JS auto-print when rendering for PDF
         ctx["has_customer_info"] = bool(order.contact_id or order.company_id or order.web_client_id)
         ctx["has_delivery_info"] = order_has_delivery_info(order)
+        from .order_balance import order_balances
+        ctx["order_balances"] = order_balances([order], {order.pk: total})
         return ctx
 
     def render_to_response(self, context, **response_kwargs):
@@ -3696,8 +3698,10 @@ def combined_print_context(orders):
     # book records anyway, and says so rather than adding the two.
     base_total = Decimal("0.00")
     codes = {o.currency_code for o in orders}
+    totals = {}
     for o in orders:
         rows, o_total, o_qty, o_packs = build_order_print_rows(o)
+        totals[o.pk] = o_total
         shelves, has_rolls = order_print_shelves(o, rows)
         groups.append({"order": o, "items": rows, "shelves": shelves, "has_rolls": has_rolls})
         items.extend(rows)
@@ -3726,6 +3730,7 @@ def combined_print_context(orders):
     dates = [o.order_date for o in orders if o.order_date]
 
     from .split_orders import combined_number
+    from .order_balance import order_balances
     return {
         "order": primary,
         "combined": True,
@@ -3746,6 +3751,7 @@ def combined_print_context(orders):
         "has_customer_info": bool(primary.contact_id or primary.company_id
                                   or primary.web_client_id),
         "has_delivery_info": order_has_delivery_info(primary),
+        "order_balances": order_balances(orders, totals),
     }
 
 

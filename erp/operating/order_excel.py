@@ -232,6 +232,37 @@ def _firstv(v):
     return v or ""
 
 
+def _write_balances(ws, r, balances, label_from, value_col, combined=False):
+    """The customer's balance under the totals, as the printed sheet has
+    it — see operating.order_balance. Returns the next free row.
+
+    Every figure stays a positive number in its account's currency, so it
+    sums; whether the customer owes or is in credit is said by the label,
+    the way the printed sheet says it."""
+    for bal in balances:
+        money = _money_format(bal["currency_code"])
+        r += 1
+        if len(balances) > 1:
+            cell(ws, r, label_from, bal["account"].book.name, font=F_VALB, align=RIGHT)
+            merge(ws, r, label_from, value_col)
+            r += 1
+        previous, after = bal["previous"], bal["after"]
+        rows = [
+            ("Previous balance (in credit)" if previous < 0 else "Previous balance",
+             abs(previous), False),
+            ("These orders" if combined else "This order", bal["this_orders"], False),
+            ("Balance due" if after > 0 else "In credit", abs(after), True),
+        ]
+        for lbl, val, strong in rows:
+            font = F_TOTAL if strong else F_VALB
+            cell(ws, r, label_from, lbl, font=font, border=GRID, align=RIGHT)
+            merge(ws, r, label_from, value_col - 1)
+            merge_border(ws, r, label_from, value_col - 1, GRID)
+            cell(ws, r, value_col, _dec(val), font=font, border=GRID, align=RIGHT, fmt=money)
+            r += 1
+    return r
+
+
 def build_order_workbook(order):
     from openpyxl import Workbook
 
@@ -411,6 +442,10 @@ def build_order_workbook(order):
         cell(ws, r, NCOLS, val, font=(F_TOTAL if strong else F_VALB), border=GRID, align=RIGHT, fmt=money)
         r += 1
 
+    # ── The customer's balance ──
+    from .order_balance import order_balances
+    r = _write_balances(ws, r, order_balances([order], {order.pk: Decimal(str(grand))}), 4, NCOLS)
+
     # ── Notes ──
     if order.notes:
         r += 1
@@ -511,9 +546,10 @@ def build_combined_workbook(orders):
     r += 1
 
     # ── Items ──
-    rows, packs = [], set()
+    rows, packs, totals = [], set(), {}
     for o in orders:
-        o_rows, _t, _q, o_packs = build_order_print_rows(o)
+        o_rows, o_total, _q, o_packs = build_order_print_rows(o)
+        totals[o.pk] = o_total
         rows.extend((o, it) for it in o_rows)
         # A pack scanned onto two lines is one pack, so the total is the
         # size of the SET — the rule the printed sheet's foot goes by.
@@ -579,6 +615,12 @@ def build_combined_workbook(orders):
     cell(ws, r, C_AMOUNT, _dec(total), font=F_GRAND, fill=FILL_TOTAL,
          border=BORDER_TOTAL, align=RIGHT, fmt=money)
     ws.row_dimensions[r].height = 22
+    total_row = r
+
+    # ── The customer's balance ── under the money columns, after the
+    # table is measured: its labels are wider than any Price figure.
+    from .order_balance import order_balances
+    balances = order_balances(orders, totals)
 
     # The item rows get a filter, which is the first thing anyone who
     # exported this will want — by order, by product, by colour.
@@ -590,6 +632,7 @@ def build_combined_workbook(orders):
     # every column to the whole of itself.
     fit_columns(ws, head_row - 1, r, CNCOLS, header_row=head_row - 1)
     fit_rows(ws, head_row, r, CNCOLS)
+    r = _write_balances(ws, total_row + 1, balances, C_QTY, C_AMOUNT, combined=True)
 
     last_col = chr(ord("A") + CNCOLS - 1)
     if rows:

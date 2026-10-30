@@ -204,9 +204,16 @@ class CombinedOrderExcel(OlegOrders, TestCase):
 
     AMOUNT = 9  # the last column — see COMBINED_HEADS
 
+    @staticmethod
+    def _total_row(ws):
+        """The TOTAL row — the table's last. The customer's balance is
+        written under it, outside the table (see test_order_print_balance)."""
+        return next(r for r in range(1, ws.max_row + 1)
+                    if ws.cell(r, 1).value == "TOTAL")
+
     def test_it_comes_to_what_the_printed_sheet_comes_to(self):
         ws = self._book(self.laleli_a, self.laleli_b, self.ergene_a)
-        self.assertEqual(ws.cell(ws.max_row, self.AMOUNT).value, 654.15)
+        self.assertEqual(ws.cell(self._total_row(ws), self.AMOUNT).value, 654.15)
 
     def test_money_is_a_number_a_spreadsheet_can_add(self):
         """The point of exporting is to do arithmetic on it, so the
@@ -215,7 +222,7 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         ws = self._book(self.laleli_a)
         # int or float — openpyxl reads a whole number back as an int.
         # What matters is that it is not a string that looks like money.
-        cell = ws.cell(ws.max_row, self.AMOUNT)
+        cell = ws.cell(self._total_row(ws), self.AMOUNT)
         self.assertIsInstance(cell.value, (int, float))
         # A number FORMAT — the sign and separators are display, and
         # what the cell holds is a figure arithmetic can reach.
@@ -226,7 +233,7 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         carrying its currency as text has to be stripped before it can
         be summed, which is the one thing a spreadsheet is for."""
         ws = self._book(self.laleli_a)
-        cell = ws.cell(ws.max_row, self.AMOUNT)
+        cell = ws.cell(self._total_row(ws), self.AMOUNT)
         self.assertEqual(cell.number_format, '"$"#,##0.00')
         self.assertIsInstance(cell.value, (int, float))
         for row in ws.iter_rows(min_row=1, values_only=True):
@@ -281,7 +288,8 @@ class CombinedOrderExcel(OlegOrders, TestCase):
         """At the foot of thirty half-bold rows, bold alone is not a
         difference anyone sees."""
         ws = self._book(self.laleli_a, self.laleli_b, self.ergene_a)
-        last, line = ws.max_row, ws.max_row - 1
+        last = self._total_row(ws)
+        line = last - 1
         for c in range(1, 10):
             total, item = ws.cell(last, c), ws.cell(line, c)
             self.assertEqual(total.fill.fgColor.rgb, "FFF3F6F8")
@@ -333,7 +341,7 @@ class CombinedOrderExcel(OlegOrders, TestCase):
             width = ws.column_dimensions[get_column_letter(c)].width
             # As it READS: "156.00 m" is what a quantity cell shows.
             widest = max(_display_len(ws.cell(r, c))
-                         for r in range(head, ws.max_row + 1))
+                         for r in range(head, self._total_row(ws) + 1))
             # Wide enough for what is in it...
             self.assertGreaterEqual(width, widest)
             # ...and not wide enough to be holding room for anything

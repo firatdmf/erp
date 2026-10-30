@@ -15298,3 +15298,21 @@ msgstr "Diğer etiket seçenekleri"
 
 msgid "Print with…"
 msgstr "Şununla yazdır…"
+
+msgid "Previous balance"
+msgstr "Önceki bakiye"
+
+msgid "in credit"
+msgstr "alacak"
+
+msgid "These orders"
+msgstr "Bu siparişler"
+
+msgid "This order"
+msgstr "Bu sipariş"
+
+msgid "Balance due"
+msgstr "Ödenecek bakiye"
+
+msgid "In credit"
+msgstr "Alacak bakiyesi"

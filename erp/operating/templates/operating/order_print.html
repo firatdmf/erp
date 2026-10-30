@@ -30,6 +30,16 @@
     table.items tbody td.lbl-left { text-align: left; color: #374151; }
     table.items tbody tr.sum td { padding: 0 5.0pt 3pt; font-size: 0.8em; font-weight: bold;
                                   color: #6B7280; border-bottom: none; }
+    /* The customer's balance: a small block at the right, under the
+       Amount column it continues, quieter than the Total above it. */
+    table.balance { width: 45%; margin: 8pt 0 0 auto; border-collapse: collapse;
+                    font-size: 10.67pt; break-inside: avoid; page-break-inside: avoid; }
+    table.balance td { padding: 2pt 5.0pt; color: #374151; }
+    table.balance td.val { text-align: right; font-weight: bold; white-space: nowrap;
+                           font-variant-numeric: tabular-nums; color: #0F1419; }
+    table.balance td.book { font-size: 0.85em; font-weight: bold; color: #6B7280;
+                            letter-spacing: 0.8pt; text-transform: uppercase; padding-top: 4pt; }
+    table.balance tr.after td { border-top: 1px solid #0F1419; padding-top: 4pt; font-weight: bold; color: #0F1419; }
   </style>
 </head>
 <body>
@@ -215,6 +225,31 @@
       {% endif %}
     </tbody>
   </table>
+
+  {% comment %}The customer's account under the total: what they owed
+     before these goods, the goods, and where that leaves them. One block
+     per account billed — a sheet across books owes in each. See
+     operating.order_balance for what "previous" leaves out, and why
+     nothing prints when the balance comes to zero.{% endcomment %}
+  {% for bal in order_balances %}
+  <table class="balance" cellspacing="0" cellpadding="0">
+    {% if order_balances|length > 1 %}
+    <tr><td class="book" colspan="2">{{ bal.account.book.name }}</td></tr>
+    {% endif %}
+    <tr>
+      <td class="lbl">{% trans "Previous balance" %}</td>
+      <td class="val">{{ bal.symbol }}{{ bal.previous|floatformat:"2u"|intcomma:False|cut:"-" }}{% if bal.previous < 0 %} {% trans "in credit" %}{% endif %}</td>
+    </tr>
+    <tr>
+      <td class="lbl">{% if combined %}{% trans "These orders" %}{% else %}{% trans "This order" %}{% endif %}</td>
+      <td class="val">{{ bal.symbol }}{{ bal.this_orders|floatformat:"2u"|intcomma:False }}</td>
+    </tr>
+    <tr class="after">
+      <td class="lbl">{% if bal.after > 0 %}{% trans "Balance due" %}{% else %}{% trans "In credit" %}{% endif %}</td>
+      <td class="val">{{ bal.symbol }}{{ bal.after|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
+    </tr>
+  </table>
+  {% endfor %}
 
   <!-- NOTES — on a combined sheet each order keeps its own note under
        its own number; merging them into one block would attribute one

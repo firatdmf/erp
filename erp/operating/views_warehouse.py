@@ -828,7 +828,7 @@ def _slug_token(text):
     return "".join(ch for ch in folded if ch.isalnum())[:10]
 
 
-def _account_choices(book=None):
+def _account_choices(book=None, include=None):
     """Current account accounts for the goods-receipt account picker, each with its derived
     barcode prefix so the UI can preview it instantly.
 
@@ -851,10 +851,18 @@ def _account_choices(book=None):
     try:
         from accounting.models_accounts import CurrentAccount
         from accounting.services_accounts import get_default_book
+        # Every account, uncapped: the picker's search only looks through
+        # this list, so an account cut off here can't be picked at all —
+        # and typing its name offers "New account", minting a duplicate.
+        # `include` — the account a reopened document is already posted
+        # to, listed even if it has been deactivated since.
+        wanted = Q(book=book or get_default_book(), is_active=True)
+        if include:
+            wanted |= Q(pk=include)
         rows = (CurrentAccount.objects
-                .filter(book=book or get_default_book(), is_active=True)
+                .filter(wanted)
                 .select_related("default_currency")
-                .order_by("name")[:1000])
+                .order_by("name"))
         base = getattr(_dj_settings, "BASE_CURRENCY_CODE", "USD")
         return [{"id": c.id, "name": c.name,
                  "type": c.get_type_display(),

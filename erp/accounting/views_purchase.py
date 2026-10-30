@@ -419,7 +419,8 @@ class GoodsReceipt(View):
             "back_url": back_url,
             # The page's book, same as the warehouses: an account from any
             # other book would be refused on save (_intake_check_book).
-            "accounts": _account_choices(getattr(request, "book", None)),
+            "accounts": _account_choices(getattr(request, "book", None),
+                                         include=doc.current_account_id if doc else None),
             "product_categories": _product_category_choices(),
             "pack_types": _pack_type_choices(),
             # Every attribute a variant can be described by, for "+ Attribute".

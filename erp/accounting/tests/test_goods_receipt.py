@@ -95,6 +95,27 @@ class GoodsReceiptPageTest(TestCase):
         r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         self.assertEqual([a["id"] for a in r.context["accounts"]], [self.current_account.pk])
 
+    def test_new_page_lists_every_account_in_a_large_book(self):
+        # The search looks only through this list: an account cut off here
+        # can't be picked, and typing its name mints a duplicate instead.
+        CurrentAccount.objects.bulk_create(
+            CurrentAccount(book=self.book, code=f"BULK-{n:04d}", name=f"Account {n:04d}",
+                           type="supplier", default_currency=self.usd)
+            for n in range(1100))
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
+        self.assertIn(self.current_account.pk, [a["id"] for a in r.context["accounts"]])
+        self.assertEqual(len(r.context["accounts"]), 1101)
+
+    def test_reopened_draft_lists_its_own_deactivated_account(self):
+        inv = self._purchase(self.store)
+        inv.status = "ordered"
+        inv.intake_warehouse = self.store
+        inv.save(update_fields=["status", "intake_warehouse"])
+        self.current_account.is_active = False
+        self.current_account.save(update_fields=["is_active"])
+        r = self.client.get(reverse("accounts:goods_receipt_edit", args=[inv.pk]))
+        self.assertEqual([a["id"] for a in r.context["accounts"]], [self.current_account.pk])
+
     def test_new_page_ignores_another_books_warehouse_in_the_link(self):
         r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}),
                             {"warehouse": self.elsewhere.pk})

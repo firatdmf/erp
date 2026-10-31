@@ -994,17 +994,53 @@ class EquityExpense(models.Model):
 
 
 class EquityDivident(models.Model):
+    """Money an owner takes out of the book, and where it came from.
+
+    Usually a cash account. But an owner can also be paid by somebody who
+    owes the book — a marketplace paying the seller's payout straight into
+    the owner's own bank, say. No cash account of the book's ever holds
+    that money, so the dividend is funded by that party's current account
+    instead: what they owe the book goes down by what they paid the owner.
+    Exactly one of the two, the same rule EquityExpense keeps.
+    """
+
     class Meta:
         verbose_name_plural = "Equity Dividents"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(cash_account__isnull=False,
+                             paid_by_current_account__isnull=True)
+                    | models.Q(cash_account__isnull=True,
+                               paid_by_current_account__isnull=False)
+                ),
+                name="equitydivident_one_funding_source",
+            )
+        ]
 
     def __str__(self):
-        return f"{self.book} | {self.member} is paid {self.currency.symbol}{self.amount} Divident on {self.date} "
+        symbol = self.currency.symbol if self.currency_id else ""
+        return f"{self.book} | {self.member} is paid {symbol}{self.amount} Divident on {self.date} "
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True)
+    # Nullable only because paid_by_current_account can stand in its
+    # place — see the constraint above.
     cash_account = models.ForeignKey(
-        CashAccount, on_delete=models.CASCADE, blank=False, null=False
+        CashAccount, on_delete=models.CASCADE, blank=True, null=True
+    )
+    # Whoever paid the owner on the book's behalf. PROTECT for the reason
+    # EquityExpense gives: deleting the account must not quietly delete
+    # the dividend that explains its balance.
+    paid_by_current_account = models.ForeignKey(
+        "accounting.CurrentAccount",
+        on_delete=models.PROTECT,
+        blank=True, null=True,
+        related_name="funded_dividends",
+        verbose_name="Paid by (current account)",
+        help_text="Somebody who owes the book paid the owner directly. "
+                  "Leave the cash account blank; what they owe goes down instead.",
     )
     currency = models.ForeignKey(
         CurrencyCategory,
@@ -1023,6 +1059,34 @@ class EquityDivident(models.Model):
                   "Blank → the published rate for the date.",
     )
     description = models.CharField(max_length=200, unique=False, blank=True)
+
+    def clean(self):
+        """Exactly one funding source — EquityExpense.clean, said for a dividend."""
+        super().clean()
+        if self.cash_account_id and self.paid_by_current_account_id:
+            raise ValidationError(
+                {
+                    "cash_account": "A dividend is paid once. Name the cash "
+                                    "account it left, or the current account "
+                                    "of whoever paid it — not both."
+                }
+            )
+        if not self.cash_account_id and not self.paid_by_current_account_id:
+            raise ValidationError(
+                {
+                    "cash_account": "Say what paid this dividend: a cash "
+                                    "account, or the current account of "
+                                    "whoever paid the owner for the book."
+                }
+            )
+
+    def ledger_exchange_rate(self):
+        """The rate the current account movement this dividend posts converts at.
+
+        See EquityExpense.ledger_exchange_rate; only asked on the
+        paid_by_current_account path.
+        """
+        return self.exchange_rate
 
 
 # Used in transfers between cash accounts within the same book.

@@ -162,7 +162,22 @@
         </div>
       </div>
       {% empty %}
+      {% if ledger_movement %}
+      <div class="xd-posted">
+        <div class="who">
+          <a class="name" href="{% url 'accounts:detail' ledger_movement.current_account_id %}">{{ ledger_movement.current_account.name }}</a>
+          <span class="code">{{ ledger_movement.currency.code }}</span>
+        </div>
+        <span class="amt">{{ ledger_movement.amount|format_money }} {{ ledger_movement.currency.code }}</span>
+        <div class="n">
+          {{ ledger_movement.date|date:"d.m.Y" }} ·
+          {% trans "No cash moved: paid by this account, which now owes the book less." %}
+          <a href="{% url 'accounts:movement_detail' ledger_movement.current_account_id ledger_movement.pk %}">{% trans "See this ledger row" %} &rarr;</a>
+        </div>
+      </div>
+      {% else %}
       <div class="xd-posted"><div class="n"><span class="gone">{% if source.in_goods %}{% trans "Paid in goods — no cash moved. The ledger holds it as Inventory against Share Capital." %}{% else %}{% trans "No cash entry is posted for this." %}{% endif %}</span></div></div>
+      {% endif %}
       {% endfor %}
     </div>
   </div>

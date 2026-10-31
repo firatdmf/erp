@@ -925,6 +925,13 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
                     reverse("accounting:equity_expense_detail",
                             kwargs={"pk": mv.book_id, "expense_pk": mv.source_id}),
                     False)
+        if model is not None and model.__name__ == "EquityDivident":
+            # A dividend this account paid an owner for the book — corrected
+            # on the dividend, for the same reason as an expense.
+            return (_("Dividend"),
+                    reverse("accounting:equity_dividend_detail",
+                            kwargs={"pk": mv.book_id, "source_pk": mv.source_id}),
+                    False)
         if model is not None and model.__name__ == "CurrentAccountTransfer":
             # One leg of a pair. Editing it alone would move a balance out
             # of one account without moving it into the other, so the row

@@ -15316,3 +15316,11 @@ msgstr "Ödenecek bakiye"
 
 msgid "In credit"
 msgstr "Alacak bakiyesi"
+
+#: accounting/views.py
+msgid "Paid by"
+msgstr "Ödeyen"
+
+#: accounting/templates/accounting/cash_source_detail.html
+msgid "No cash moved: paid by this account, which now owes the book less."
+msgstr "Kasadan para çıkmadı: bu hesap ödedi, deftere borcu o kadar azaldı."

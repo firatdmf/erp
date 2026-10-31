@@ -555,10 +555,19 @@ class EquityDividentForm(ExchangeRateFormMixin, forms.ModelForm):
         # Today for a new entry; an edit opens on the date it was made.
         if not self.instance.pk:
             self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # Neither funding field is "required" alone; EquityDivident.clean
+        # asks whether exactly one was given — see EquityExpenseForm.
+        self.fields["cash_account"].required = False
+        self.fields["paid_by_current_account"].required = False
+        self.fields["cash_account"].empty_label = "— paid by a current account —"
+        self.fields["paid_by_current_account"].empty_label = "— paid from cash —"
         if book:
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
             ).select_related("currency", "book").order_by("name")
+            self.fields["paid_by_current_account"].queryset = CurrentAccount.objects.filter(
+                book=book, is_active=True
+            ).select_related("default_currency").order_by("name")
             # The values_list method in Django's QuerySet API is used to create a list (or tuple) of values from the specified fields of the model.
             # The flat=True argument ensures that the result is a flat list rather than a list of tuples.
             members = StakeholderBook.objects.filter(book=book).values_list(
@@ -567,6 +576,22 @@ class EquityDividentForm(ExchangeRateFormMixin, forms.ModelForm):
             self.fields["member"].queryset = Member.objects.filter(id__in=members).select_related("user")
 
         self._setup_exchange_rate(book)
+
+    def clean(self):
+        """The dividend's currency, from whatever paid it.
+
+        A cash account's own currency, always. A current account's default
+        currency — the form asks for no other, since a payout is made in
+        the currency the account trades in.
+        """
+        cleaned = super().clean()
+        cash = cleaned.get("cash_account")
+        current_account = cleaned.get("paid_by_current_account")
+        if cash and not current_account:
+            cleaned["currency"] = cash.currency
+        elif current_account and not cash:
+            cleaned["currency"] = current_account.default_currency
+        return cleaned
 
 
 class InTransferForm(forms.ModelForm):

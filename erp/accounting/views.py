@@ -949,22 +949,36 @@ def handle_expense_on_account(book, expense, member=None):
     agree — and so CurrentAccountMovement.entered_rate can ask the expense what rate
     it was recorded at, via EquityExpense.ledger_exchange_rate.
     """
+    return _post_paid_by_account(
+        book, expense, member,
+        expense.description
+        or (expense.category.name if expense.category else "")
+        or "Expense paid on the book's behalf",
+    )
+
+
+def _post_paid_by_account(book, source, member, description):
+    """The current account movement for an equity row somebody else paid.
+
+    Shared by expenses and dividends: either way the money left their
+    pocket rather than a kasa of the book's, and what changes is what the
+    book and they owe each other. The ledger reads the contra off the
+    source's model (services_posting.CASH_CONTRA_BY_SOURCE), so the same
+    `adjustment` lands on 5100 for an expense and 3300 for a dividend.
+    """
     return CurrentAccountMovement.objects.create(
-        current_account=expense.paid_by_current_account,
+        current_account=source.paid_by_current_account,
         book=book,
-        date=expense.date,
-        # Negative: the book owes them. Same sign convention the current account
-        # detail page reads, where a negative balance is a payable.
-        amount=-abs(expense.amount),
-        currency=expense.currency,
+        date=source.date,
+        # Negative: in the book's favour no longer. Same sign convention the
+        # current account detail page reads, where a negative balance is a
+        # payable.
+        amount=-abs(source.amount),
+        currency=source.currency,
         movement_type="adjustment",
-        source_type=ContentType.objects.get_for_model(EquityExpense),
-        source_id=expense.pk,
-        description=(
-            expense.description
-            or (expense.category.name if expense.category else "")
-            or "Expense paid on the book's behalf"
-        )[:300],
+        source_type=ContentType.objects.get_for_model(source.__class__),
+        source_id=source.pk,
+        description=description[:300],
         created_by=member,
     )
 
@@ -1283,14 +1297,33 @@ def post_cash_inflow(book, obj):
 
 
 def unpost_cash_outflow(obj):
-    """Undo what handle_equity_transaction did for a dividend: give it back."""
+    """Undo what post_cash_outflow did for a dividend: give the cash back,
+    or take back the movement on whoever paid it."""
+    if obj.paid_by_current_account_id:
+        # post_delete recomputes the account's balance and drops the
+        # journal entry — see signals_accounts.recompute_after_delete.
+        CurrentAccountMovement.objects.filter(
+            source_type=ContentType.objects.get_for_model(obj), source_id=obj.pk,
+        ).delete()
+        return
     CashAccount.objects.filter(pk=obj.cash_account_id).update(
         balance=F("balance") + obj.amount
     )
     _delete_cash_rows(obj)
 
 
-def post_cash_outflow(book, obj):
+def post_cash_outflow(book, obj, member=None):
+    if obj.paid_by_current_account_id:
+        obj.currency = obj.paid_by_current_account.default_currency
+        obj.save()
+        _post_paid_by_account(
+            book, obj, member,
+            obj.description or (
+                f"Paid to {obj.member} for the book" if obj.member_id
+                else "Paid to an owner for the book"
+            ),
+        )
+        return
     obj.currency = obj.cash_account.currency
     obj.save()
     try:
@@ -1742,23 +1775,63 @@ class DividendSource:
         unpost_cash_outflow(obj)
 
     def post_entry(self, book, obj):
-        post_cash_outflow(book, obj)
+        post_cash_outflow(book, obj, getattr(self.request.user, "member", None))
 
     def accounts(self, obj):
-        return [obj.cash_account_id]
+        # A dividend paid by a current account moves no cash account; there
+        # is nothing to check for overdrawing.
+        return [obj.cash_account_id] if obj.cash_account_id else []
 
 
 @method_decorator(login_required, name="dispatch")
 class EquityDividendDetail(DividendSource, CashSourceDetail):
     def facts(self, obj):
+        paid_by = obj.paid_by_current_account
         return [f for f in [
             (_g("Date"), obj.date.strftime("%d.%m.%Y"), None),
             (_g("Member"), str(obj.member) if obj.member_id else "—", None),
             (_g("Amount"), f"{format_money(obj.amount)} {obj.currency.code}", None),
+            (_g("Paid by"), paid_by.name,
+             reverse("accounts:detail", args=[paid_by.pk])) if paid_by else None,
             self.conversion_fact(obj),
             (_g("Book"), obj.book.name, None),
             (_g("Recorded"), timezone.localtime(obj.created_at).strftime("%d.%m.%Y %H:%M"), None),
         ] if f]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # The other half of a dividend a current account paid: the row on
+        # that account, read back rather than restated, as the expense page
+        # does.
+        context["ledger_movement"] = (
+            CurrentAccountMovement.objects
+            .filter(source_type=ContentType.objects.get_for_model(EquityDivident),
+                    source_id=self.object.pk)
+            .select_related("currency", "current_account")
+            .first()
+        ) if self.object.paid_by_current_account_id else None
+        return context
+
+    def conversion_fact(self, obj):
+        if not obj.paid_by_current_account_id:
+            return super().conversion_fact(obj)
+        # Read off the movement, which is what posted, for the reason
+        # CashSourceDetail.conversion_fact reads off the cash row.
+        base = obj.book.effective_base_currency
+        movement = (
+            CurrentAccountMovement.objects
+            .filter(source_type=ContentType.objects.get_for_model(EquityDivident),
+                    source_id=obj.pk)
+            .first()
+        )
+        if obj.currency_id == base.pk or not movement or not movement.exchange_rate:
+            return None
+        return (
+            _g("Exchange rate"),
+            f"{format_rate(movement.exchange_rate)} = "
+            f"{base.symbol}{format_money(abs(movement.amount_base))}",
+            None,
+        )
 
 
 @method_decorator(login_required, name="dispatch")
@@ -2206,24 +2279,16 @@ class AddEquityDivident(generic.edit.CreateView):
         book_pk = self.kwargs.get("pk")
         book = Book.objects.get(pk=book_pk)
 
-        # divident amount given to stakeholder
-        amount = form.cleaned_data.get("amount")
-        cash_account = form.cleaned_data.get("cash_account")
-        if not cash_account:
-            form.add_error("cash_account", "Please select a valid cash account.")
-            return self.form_invalid(form)
-            # Set the currency to the deposited_cash_account's currency
-        currency = cash_account.currency
+        # Paid from a cash account or by a current account — exactly one,
+        # which the form has already insisted on (EquityDivident.clean).
         self.object = form.save(commit=False)
-        self.object.currency = currency
-        self.object.save()
-        equity_pk = self.object.pk
-        equity_instance = self.object
-        result = handle_equity_transaction(
-            book, amount, currency, equity_instance, equity_pk, cash_account
-        )
-        if result is not True:
-            form.add_error(None, "Form error: in handle_equity_transaction function")
+        self.object.book = book
+        try:
+            with transaction.atomic():
+                post_cash_outflow(book, self.object,
+                                  getattr(self.request.user, "member", None))
+        except CashOverdrawn as exc:
+            form.add_error("cash_account", _overdrawn_message(exc))
             return self.form_invalid(form)
 
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':

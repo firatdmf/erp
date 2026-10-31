@@ -91,6 +91,39 @@ class DividendPaidOnAccountTests(TestCase):
         self.assertContains(response, "Etsy")
         self.assertNotContains(response, "Somebody Else")
 
+    def test_the_page_is_the_expense_pages_layout(self):
+        response = self.client.get(
+            reverse("accounting:add_equity_divident", kwargs={"pk": self.book.pk})
+        )
+        self.assertTemplateUsed(response, "accounting/partials/pf_entry_form_css.html")
+        self.assertContains(response, 'id="fundCurrentAccount"')
+        self.assertContains(response, 'id="currentAccountSearch"')
+
+    def test_saving_lands_on_the_dividend(self):
+        response = self._post()
+        dividend = EquityDivident.objects.get()
+        self.assertRedirects(response, reverse(
+            "accounting:equity_dividend_detail",
+            kwargs={"pk": self.book.pk, "source_pk": dividend.pk},
+        ))
+
+    def test_the_edit_page_opens_on_the_account_that_paid(self):
+        self._post()
+        dividend = EquityDivident.objects.get()
+        response = self.client.get(reverse(
+            "accounting:edit_equity_dividend",
+            kwargs={"pk": self.book.pk, "source_pk": dividend.pk},
+        ))
+        self.assertTemplateUsed(response, "accounting/add_equity_divident.html")
+        html = response.content.decode()
+        self.assertRegex(html, r'<input type="radio"[^>]*id="fundCurrentAccount"\s+checked')
+        self.assertRegex(html, r'<option value="%d"[^>]*selected' % self.etsy.pk)
+        self.assertContains(response, 'value="2026-10-31"')
+        self.assertContains(response, reverse(
+            "accounting:delete_equity_dividend",
+            kwargs={"pk": self.book.pk, "source_pk": dividend.pk},
+        ))
+
     def test_it_moves_no_cash(self):
         self._post()
         dividend = EquityDivident.objects.get()

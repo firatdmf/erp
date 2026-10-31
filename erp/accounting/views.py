@@ -1764,6 +1764,39 @@ class DeleteEquityExchange(ExchangeSource, CashSourceDelete):
 
 # --- Dividend --------------------------------------------------------------
 
+class DividendFormPage:
+    """What the dividend page needs, recording one or correcting one.
+
+    The same page either way, in the expense page's style: it renders its
+    own controls instead of {{ form.as_p }}, so the options come as data. The
+    form's querysets stay the authority on what is accepted; these only
+    decide what is offered.
+    """
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        book = Book.objects.filter(pk=self.kwargs.get("pk")).first()
+        form = context.get("form")
+        context["book"] = book
+        context["base_currency"] = fx_context_json(book)
+        context["date_value"] = EquityExpensePage._date_value(self, form)
+        if form is not None:
+            context["cash_accounts"] = form.fields["cash_account"].queryset
+            context["current_account_options"] = [
+                {
+                    "id": c.pk,
+                    "code": c.code,
+                    "name": c.name,
+                    "type": c.get_type_display(),
+                    "currency_id": c.default_currency_id,
+                    "currency_code": c.default_currency.code,
+                }
+                for c in form.fields["paid_by_current_account"].queryset
+            ]
+            context["members"] = form.fields["member"].queryset
+        return context
+
+
 class DividendSource:
     model = EquityDivident
     kind = "dividend"
@@ -1835,8 +1868,9 @@ class EquityDividendDetail(DividendSource, CashSourceDetail):
 
 
 @method_decorator(login_required, name="dispatch")
-class EditEquityDividend(DividendSource, CashSourceEdit):
+class EditEquityDividend(DividendFormPage, DividendSource, CashSourceEdit):
     form_class = EquityDividentForm
+    template_name = "accounting/add_equity_divident.html"
 
 
 @method_decorator(login_required, name="dispatch")
@@ -2242,16 +2276,10 @@ class EditEquityExpense(EquityExpensePage, generic.edit.UpdateView):
             return self.form_invalid(form)
         return self._respond(form)
 @method_decorator(login_required, name="dispatch")
-class AddEquityDivident(generic.edit.CreateView):
+class AddEquityDivident(DividendFormPage, generic.edit.CreateView):
     model = EquityDivident
     form_class = EquityDividentForm
     template_name = "accounting/add_equity_divident.html"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        book = Book.objects.filter(pk=self.kwargs.get("pk")).first()
-        context["base_currency"] = fx_context_json(book)
-        return context
 
     def get_template_names(self):
         if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -2302,8 +2330,11 @@ class AddEquityDivident(generic.edit.CreateView):
         return super().form_valid(form)
 
     def get_success_url(self) -> str:
+        # Lands on the dividend, as an expense does: the page that says what
+        # was recorded and what it posted.
         return reverse(
-            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
+            "accounting:equity_dividend_detail",
+            kwargs={"pk": self.kwargs.get("pk"), "source_pk": self.object.pk},
         )
 
     # what happens when form validation fails

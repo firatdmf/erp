@@ -15324,3 +15324,59 @@ msgstr "Ödeyen"
 #: accounting/templates/accounting/cash_source_detail.html
 msgid "No cash moved: paid by this account, which now owes the book less."
 msgstr "Kasadan para çıkmadı: bu hesap ödedi, deftere borcu o kadar azaldı."
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "Pay a dividend"
+msgstr "Kâr payı öde"
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "Edit dividend"
+msgstr "Kâr payını düzenle"
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "Delete dividend"
+msgstr "Kâr payını sil"
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "The dividend"
+msgstr "Kâr payı"
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "This dividend was not saved."
+msgstr "Bu kâr payı kaydedilmedi."
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "Every dividend has one source"
+msgstr "Her kâr payının tek bir kaynağı vardır"
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "Paid by someone who owes the book"
+msgstr "Deftere borçlu biri ödedi"
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "They paid the owner directly. Cash is untouched; what they owe goes down."
+msgstr "Ortağa doğrudan ödediler. Kasaya dokunulmaz; borçları o kadar azalır."
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "The dividend is recorded in this account's currency."
+msgstr "Kâr payı bu hesabın para biriminde kaydedilir."
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "What this account owes the book goes down by the amount below, in the account's own currency."
+msgstr "Bu hesabın deftere borcu, aşağıdaki tutar kadar, hesabın kendi para biriminde azalır."
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "Who was paid, how much, and when"
+msgstr "Kime, ne kadar ve ne zaman ödendi"
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "What was this dividend for?"
+msgstr "Bu kâr payı ne için ödendi?"
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "Choose what paid this dividend."
+msgstr "Bu kâr payını neyin ödediğini seçin."
+
+#: accounting/templates/accounting/add_equity_divident.html
+msgid "Cash is untouched. What {name} owes the book goes down by this amount."
+msgstr "Kasaya dokunulmaz. {name} hesabının deftere borcu bu tutar kadar azalır."

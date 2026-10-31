@@ -1,16 +1,426 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load i18n %}
-{% block title %}{% trans "Dividend" %} | Nejum ERP{% endblock %}
+{% load l10n %}
+{% load static %}
+{% block title %}{% if object.pk %}{% trans "Edit dividend" %} · #{{ object.pk }}{% else %}{% trans "Pay a dividend" %}{% endif %} | Nejum ERP{% endblock %}
+
+{% comment %}
+  Pay a dividend, or correct one — the expense page's layout and controls
+  (add_equity_expense.html), for money an owner takes out of the book.
+
+  Paid from one of the book's cash accounts, or by the current account of
+  somebody who owes the book and paid the owner directly. Exactly one, as
+  EquityDivident's check constraint says.
+
+  Every name and id is EquityDividentForm's own — id_amount, id_date,
+  id_cash_account, id_paid_by_current_account, id_exchange_rate — because
+  partials/fx_rate_field.html finds its inputs by those ids. The currency is
+  not asked: it is the paying account's, decided in EquityDividentForm.clean.
+{% endcomment %}
+
+{% block css %}
+{% include "accounting/partials/pf_entry_form_css.html" %}
+{% endblock %}
+
 {% block content %}
-  {% load static %}
-  {% block css %}
-    {% comment %} <link rel="stylesheet" href="{% static 'accounting/cs/index.css' %}" /> {% endcomment %}
-  {% endblock %}
-  <form method="post">
+<div class="pf">
+  <a href="{% if object.pk %}{{ detail_url }}{% else %}{% url 'accounting:book_detail' pk=book.pk %}{% endif %}"
+     class="pf-back">&larr; {% if object.pk %}{% trans "The dividend" %}{% else %}{{ book.name }}{% endif %}</a>
+
+  <div class="pf-head">
+    <div>
+      <div class="pf-eyebrow">{% trans "Dividend" %}{% if object.pk %} · #{{ object.pk }}{% endif %}</div>
+      <h1 class="pf-title">
+        {% if object.pk %}{% trans "Edit dividend" %}{% else %}{% trans "Pay a dividend" %}{% endif %}
+      </h1>
+    </div>
+  </div>
+
+  {% if form.errors %}
+  <div class="pf-err">
+    <div>
+      <strong>{% trans "This dividend was not saved." %}</strong>
+      <ul>
+        {% for err in form.non_field_errors %}<li>{{ err }}</li>{% endfor %}
+        {% for field in form %}{% for err in field.errors %}<li>{{ field.label }}: {{ err }}</li>{% endfor %}{% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" id="dividendForm">
     {% csrf_token %}
-    {{ form.as_p }}
-    <input type="submit" value="Save" />
+    <input type="hidden" name="book" value="{{ book.pk }}">
+    {# Overruled by the paying account's currency on save; carried so an edit posts what it opened with. #}
+    <input type="hidden" name="currency" id="id_currency" value="{{ form.currency.value|default_if_none:'' }}">
+
+    <div class="pf-grid">
+      <div>
+        <div class="pf-card">
+          <div class="pf-sect">
+            <div class="pf-sect-h">
+              <span class="ico"><i class="fa fa-wallet"></i></span>
+              <h3>{% trans "Paid by" %}</h3>
+              <span class="sub">{% trans "Every dividend has one source" %}</span>
+            </div>
+
+            <div class="pf-seg">
+              <label>
+                <input type="radio" name="funding_source" value="cash" id="fundCash"
+                       {% if not form.paid_by_current_account.value %}checked{% endif %}>
+                <span>
+                  <span class="t">{% trans "Paid from cash" %}</span>
+                  <span class="d">{% trans "The money left one of the book's own accounts." %}</span>
+                </span>
+              </label>
+              <label>
+                <input type="radio" name="funding_source" value="current_account" id="fundCurrentAccount"
+                       {% if form.paid_by_current_account.value %}checked{% endif %}>
+                <span>
+                  <span class="t">{% trans "Paid by someone who owes the book" %}</span>
+                  <span class="d">{% trans "They paid the owner directly. Cash is untouched; what they owe goes down." %}</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="pf-fund" id="fundCashPane">
+              <div class="pf-row wide">
+                <div class="pf-f">
+                  <label>{% trans "Cash Account" %}</label>
+                  <select name="cash_account" id="id_cash_account">
+                    <option value="">{% trans "— Select account —" %}</option>
+                    {% for ca in cash_accounts %}
+                      <option value="{{ ca.pk }}"
+                              data-currency="{{ ca.currency_id }}"
+                              data-currency-code="{{ ca.currency.code }}"
+                              data-label="{{ ca.label }} ({{ ca.currency.code }})"
+                              {% if form.cash_account.value|stringformat:'s' == ca.pk|stringformat:'s' %}selected{% endif %}>
+                        {{ ca.label }} ({{ ca.currency.code }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <span class="hint">{% trans "The dividend is recorded in this account's currency." %}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pf-fund" id="fundCurrentAccountPane" hidden>
+              <div class="pf-row wide">
+                <div class="pf-f">
+                  <label>{% trans "Current Account" %}</label>
+
+                  {% comment %}
+                    The hidden <select> is the single source of truth, as on
+                    the expense page: the form validates this name, and
+                    fx_rate_field.html reads the currency off the selected
+                    option. The search box and chip only set it.
+                  {% endcomment %}
+                  <select name="paid_by_current_account" id="id_paid_by_current_account" style="display:none;">
+                    <option value=""></option>
+                    {% for c in current_account_options %}
+                      <option value="{{ c.id }}"
+                              data-currency="{{ c.currency_id }}"
+                              data-currency-code="{{ c.currency_code }}"
+                              data-type="{{ c.type }}"
+                              data-label="{{ c.code }} — {{ c.name }}"
+                              {% if form.paid_by_current_account.value|stringformat:'s' == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                  </select>
+
+                  <div class="np-sup" id="currentAccountBox">
+                    <input type="text" id="currentAccountSearch" class="np-input" autocomplete="off"
+                           placeholder="{% trans 'Type an account name…' %}">
+                    <div class="np-sup-results" id="currentAccountResults" hidden></div>
+                  </div>
+
+                  <div class="np-sup-chip" id="currentAccountChip" hidden>
+                    <i class="fa fa-user"></i>
+                    <span id="currentAccountChipName"></span>
+                    <button type="button" class="np-sup-clear" id="currentAccountClear"
+                            title="{% trans 'Change account' %}">&times;</button>
+                  </div>
+
+                  <span class="hint">{% trans "What this account owes the book goes down by the amount below, in the account's own currency." %}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pf-card">
+          <div class="pf-sect">
+            <div class="pf-sect-h">
+              <span class="ico"><i class="fa fa-hand-holding-usd"></i></span>
+              <h3>{% trans "The dividend" %}</h3>
+              <span class="sub">{% trans "Who was paid, how much, and when" %}</span>
+            </div>
+
+            <div class="pf-row">
+              <div class="pf-f">
+                <label>{% trans "Member" %}</label>
+                <select name="member" id="id_member">
+                  <option value="">{% trans "— Select —" %}</option>
+                  {% for m in members %}
+                    <option value="{{ m.pk }}" {% if form.member.value|stringformat:'s' == m.pk|stringformat:'s' %}selected{% endif %}>{{ m }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="pf-f">
+                <label>{% trans "Amount" %}</label>
+                {# unlocalized: a number input only accepts a dot decimal, never 1234,56 #}
+                <input type="number" step="0.01" min="0.01" required
+                       name="amount" id="id_amount"
+                       value="{% if form.amount.value %}{{ form.amount.value|unlocalize }}{% endif %}"
+                       placeholder="{{ 0|floatformat:2 }}">
+              </div>
+              <div class="pf-f">
+                <label>{% trans "Date" %}</label>
+                {# ISO always — see EquityExpensePage._date_value. #}
+                <input type="date" name="date" id="id_date" required value="{{ date_value }}">
+              </div>
+            </div>
+
+            <div class="pf-row wide" style="margin-top:14px;">
+              <div class="pf-f">
+                <label>{% trans "Exchange rate" %}</label>
+                <input type="number" step="0.000001" min="0"
+                       name="exchange_rate" id="id_exchange_rate"
+                       value="{% if form.exchange_rate.value %}{{ form.exchange_rate.value|unlocalize }}{% endif %}"
+                       placeholder="0.000000">
+                <span class="hint">{% trans "Leave as fetched, or type the rate you actually got — either box updates the other." %}</span>
+              </div>
+            </div>
+
+            <div class="pf-row wide" style="margin-top:14px;">
+              <div class="pf-f">
+                <label>{% trans "Description" %}</label>
+                <input type="text" name="description" maxlength="200"
+                       value="{{ form.description.value|default_if_none:'' }}"
+                       placeholder="{% trans 'What was this dividend for?' %}">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="pf-card" style="position: sticky; top: 16px;">
+          <div class="pf-sect">
+            <div class="pf-sect-h">
+              <span class="ico"><i class="fa fa-calculator"></i></span>
+              <h3>{% trans "Summary" %}</h3>
+            </div>
+            <div class="pf-sum">
+              <div class="row"><span class="lbl">{% trans "Amount" %}</span><span class="val" id="sumAmount">{{ 0|floatformat:"2g" }}</span></div>
+              <div class="row grand"><span class="lbl">{% trans "Currency" %}</span><span class="val" id="sumCurrency">—</span></div>
+            </div>
+
+            <div class="pf-effect" id="sumEffect">
+              {% trans "Choose what paid this dividend." %}
+            </div>
+
+            <div class="pf-actions">
+              <button type="submit" class="pf-btn primary">
+                {% if object.pk %}{% trans "Save changes" %}{% else %}{% trans "Pay dividend" %}{% endif %}
+              </button>
+              <a href="{% if object.pk %}{{ detail_url }}{% else %}{% url 'accounting:book_detail' pk=book.pk %}{% endif %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
+
+              {% if object.pk %}
+              {% comment %}
+                formaction, not a form of its own: a <form> cannot nest
+                inside this one. Still a POST — see CashSourceDelete.
+              {% endcomment %}
+              <button type="submit" class="pf-btn danger" id="deleteDividend"
+                      formaction="{{ delete_url }}" formmethod="post" formnovalidate>
+                {% trans "Delete dividend" %}
+              </button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </form>
 
+  {% comment %}
+    The script's strings, as data attributes rather than JS literals — an
+    apostrophe in a translation would otherwise break the page. See the
+    expense page.
+  {% endcomment %}
+  <span id="dividendStrings" hidden
+        data-no-match="{% trans "No account matches" %}"
+        data-choose="{% trans "Choose what paid this dividend." %}"
+        data-owed-down="{% trans "Cash is untouched. What {name} owes the book goes down by this amount." %}"
+        data-cash-down="{% trans "The balance of {name} goes down by this amount." %}"
+        data-delete-confirm="{{ delete_confirm }}"></span>
+</div>
+
+<script src="{% static 'erp/js/amount_input.js' %}?v=2"></script>
+<script>
+  if (window.NejumAmount) NejumAmount.attach(document.getElementById('id_amount'));
+</script>
 {% include "accounting/partials/fx_rate_field.html" with date_field="date" %}
+
+<script>
+(function () {
+  var cashPane = document.getElementById('fundCashPane');
+  var currentAccountPane = document.getElementById('fundCurrentAccountPane');
+  var cashSel  = document.getElementById('id_cash_account');
+  var currentAccountSel  = document.getElementById('id_paid_by_current_account');
+  var amountEl = document.getElementById('id_amount');
+  var S = document.getElementById('dividendStrings').dataset;
+
+  var del = document.getElementById('deleteDividend');
+  if (del) del.addEventListener('click', function (e) {
+    if (!confirm(S.deleteConfirm)) e.preventDefault();
+  });
+
+  // ── Funding source ────────────────────────────────────────────────
+  // One pane shown and the other cleared, so "exactly one" is true of the
+  // POST and not just the layout: a hidden select still submits its value.
+  function applyFunding() {
+    var onAccount = document.getElementById('fundCurrentAccount').checked;
+    currentAccountPane.hidden = !onAccount;
+    cashPane.hidden = onAccount;
+    if (onAccount) { cashSel.value = ''; } else { setCurrentAccount(''); }
+    cashSel.dispatchEvent(new Event('change'));
+    syncSummary();
+  }
+  ['fundCash', 'fundCurrentAccount'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', applyFunding);
+  });
+
+  // ── Account picker ────────────────────────────────────────────────
+  // The expense page's: type-to-search over the hidden <select>'s options.
+  var search  = document.getElementById('currentAccountSearch');
+  var results = document.getElementById('currentAccountResults');
+  var chip    = document.getElementById('currentAccountChip');
+  var box     = document.getElementById('currentAccountBox');
+  var active  = -1;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function fold(s) {
+    return (s || '').toLocaleUpperCase('tr')
+      .replace(/[ÇĞİIÖŞÜ]/g, function (c) {
+        return { 'Ç':'C','Ğ':'G','İ':'I','I':'I','Ö':'O','Ş':'S','Ü':'U' }[c];
+      }).trim();
+  }
+
+  function options() {
+    return Array.prototype.slice.call(currentAccountSel.options).filter(function (o) { return o.value; });
+  }
+
+  function labelOf(o) { return o.getAttribute('data-label') || o.textContent; }
+
+  function render(q) {
+    var needle = fold(q);
+    var matches = options().filter(function (o) {
+      return !needle || fold(labelOf(o)).indexOf(needle) !== -1;
+    });
+    active = -1;
+    var html = matches.map(function (o, i) {
+      var t = o.getAttribute('data-type') || '';
+      return '<div class="np-sup-opt" data-id="' + esc(o.value) + '" data-i="' + i + '">' +
+             '<span>' + esc(labelOf(o)) +
+             (t ? ' <span style="color:var(--gray-500);font-size:11px;">· ' + esc(t) + '</span>' : '') +
+             '</span>' +
+             '<span class="pfx">' + esc(o.getAttribute('data-currency-code') || '') + '</span></div>';
+    }).join('');
+    if (!matches.length) {
+      html = '<div class="np-sup-empty">' + esc(S.noMatch) + '</div>';
+    }
+    results.innerHTML = html;
+    results.hidden = false;
+    Array.prototype.forEach.call(results.querySelectorAll('.np-sup-opt'), function (el) {
+      el.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        setCurrentAccount(el.dataset.id);
+      });
+    });
+  }
+
+  // Every path funnels through here, so the hidden <select> and the chip
+  // never disagree, and the `change` lets fx_rate_field.html follow.
+  function setCurrentAccount(id) {
+    currentAccountSel.value = id || '';
+    syncChip();
+    currentAccountSel.dispatchEvent(new Event('change'));
+    syncSummary();
+  }
+
+  function syncChip() {
+    var opt = currentAccountSel.options[currentAccountSel.selectedIndex];
+    var picked = !!(opt && opt.value);
+    chip.hidden = !picked;
+    box.hidden = picked;
+    results.hidden = true;
+    if (picked) { document.getElementById('currentAccountChipName').textContent = labelOf(opt); }
+    else { search.value = ''; }
+  }
+
+  document.getElementById('currentAccountClear').addEventListener('click', function () {
+    setCurrentAccount('');
+    search.focus();
+  });
+  search.addEventListener('input', function () { render(this.value); });
+  search.addEventListener('focus', function () { render(this.value); });
+  search.addEventListener('blur', function () {
+    setTimeout(function () { results.hidden = true; }, 120);
+  });
+  search.addEventListener('keydown', function (e) {
+    var rows = results.hidden ? [] : results.querySelectorAll('.np-sup-opt[data-id]');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!rows.length) return;
+      e.preventDefault();
+      active = (active + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length;
+      Array.prototype.forEach.call(rows, function (r, i) { r.classList.toggle('active', i === active); });
+      rows[active].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      var row = rows[active] || rows[0];
+      if (row) setCurrentAccount(row.dataset.id);
+    } else if (e.key === 'Escape') {
+      results.hidden = true;
+    }
+  });
+
+  currentAccountSel.addEventListener('change', function () { syncChip(); syncSummary(); });
+  cashSel.addEventListener('change', syncSummary);
+  amountEl.addEventListener('input', syncSummary);
+
+  // ── Summary ───────────────────────────────────────────────────────
+  function fmt(n) {
+    return window.NejumAmount ? NejumAmount.format(n) : n.toFixed(2);
+  }
+
+  function syncSummary() {
+    var amount = parseFloat(amountEl.value);
+    document.getElementById('sumAmount').textContent = fmt(isFinite(amount) ? amount : 0);
+
+    var onAccount = document.getElementById('fundCurrentAccount').checked;
+    var sel = onAccount ? currentAccountSel : cashSel;
+    var opt = sel.options[sel.selectedIndex];
+    var picked = !!(opt && opt.value);
+    // The paying account's currency is the dividend's — see the form.
+    document.getElementById('sumCurrency').textContent =
+      picked ? (opt.getAttribute('data-currency-code') || '—') : '—';
+
+    var effect = document.getElementById('sumEffect');
+    if (!picked) {
+      effect.textContent = S.choose;
+    } else {
+      var tpl = onAccount ? S.owedDown : S.cashDown;
+      effect.innerHTML = esc(tpl).replace('{name}', '<b>' + esc(labelOf(opt)) + '</b>');
+    }
+  }
+
+  syncChip();
+  applyFunding();
+})();
+</script>
 {% endblock %}

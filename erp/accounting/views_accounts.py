@@ -1376,32 +1376,6 @@ def _cancelled_documents(current_account, date_from="", date_to=""):
     return docs
 
 
-def _statement_chart(opening, rows):
-    """The running balance as a series the statement can draw.
-
-    One point per live row, in ledger order, each carrying enough for a
-    hover readout: the balance after it, the date, the type and a short
-    description. Floats, not Decimals — this is a picture of the ledger,
-    the table beside it is the record. `None` when there is nothing to
-    draw: a single step is a number, not a line.
-    """
-    if len(rows) < 2:
-        return None
-    return {
-        "opening": float(opening),
-        "points": [
-            {
-                "d": r["mv"].date.strftime("%d.%m.%Y"),
-                "b": float(r["balance_after"]),
-                "a": float(r["mv"].amount_base),
-                "t": str(r["mv"].type_label),
-                "s": (r["description"] or "")[:90],
-            }
-            for r in rows
-        ],
-    }
-
-
 @method_decorator(login_required, name="dispatch")
 class CurrentAccountStatement(View):
     template_name = "accounts/current_account_statement.html"
@@ -1462,9 +1436,6 @@ class CurrentAccountStatement(View):
             running += mv.amount_base
             rows.append({"mv": mv, "balance_after": running})
         _attach_links(rows)
-        # Built here, before the display sort: the chart walks oldest to
-        # newest whichever way the table is read.
-        chart = _statement_chart(opening, rows)
 
         # Reading order is a DISPLAY choice, made after the walk. The
         # query itself has to stay oldest-first whatever the user picks:
@@ -1498,7 +1469,6 @@ class CurrentAccountStatement(View):
             "sort":         sort,
             "opening":      opening,
             "closing":      running,
-            "chart":        chart,
             "debit_total":  debit_total,
             "credit_total": credit_total,
             "date_from":    date_from,

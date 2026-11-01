@@ -82,23 +82,26 @@ class StatementReadabilityTests(TestCase):
         self._row("-297872.48", "2026-07-16", description="Hacim 1")
         self._row("872700.29", "2026-07-20", description="the opening")
         self._row("-500.00", "2026-07-27", description="x")
-        # Read newest-first: the picture still goes oldest to newest.
-        resp = self._statement(sort="desc")
-        chart = resp.context["chart"]
-        self.assertEqual([p["b"] for p in chart["points"]], [-297872.48, 574827.81, 574327.81])
-        self.assertEqual(chart["points"][1]["s"], "the opening")
-        self.assertIn('id="stmt-chart-data"', resp.content.decode())
+        # Read newest-first: each row still carries the balance after it
+        # in ledger order, oldest to newest.
+        rows = self._statement(sort="desc").context["rows"]
+        self.assertEqual([r["balance_after"] for r in rows],
+                         [Decimal("574327.81"), Decimal("574827.81"), Decimal("-297872.48")])
 
-    def test_a_single_row_is_a_number_not_a_line(self):
+    def test_there_is_no_chart(self):
+        """Removed 2026-11-01: one step per entry, not per day, read as a
+        timeline it was not, and said nothing the tiles and table do not."""
         self._row("100.00", "2026-07-16")
+        self._row("50.00", "2026-08-01")
         resp = self._statement()
-        self.assertIsNone(resp.context["chart"])
+        self.assertNotIn("chart", resp.context)
         self.assertNotIn('id="stmt-chart"', resp.content.decode())
 
-    def test_series_starts_from_the_filtered_opening(self):
+    def test_the_balance_starts_from_the_filtered_opening(self):
         self._row("100.00", "2026-07-16")
         self._row("50.00", "2026-08-01")
         self._row("-20.00", "2026-08-10")
-        chart = self._statement(date_from="2026-08-01").context["chart"]
-        self.assertEqual(chart["opening"], 100.0)
-        self.assertEqual([p["b"] for p in chart["points"]], [150.0, 130.0])
+        resp = self._statement(date_from="2026-08-01")
+        self.assertEqual(resp.context["opening"], Decimal("100.00"))
+        self.assertEqual([r["balance_after"] for r in resp.context["rows"]],
+                         [Decimal("150.00"), Decimal("130.00")])

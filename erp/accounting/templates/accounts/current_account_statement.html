@@ -165,33 +165,6 @@
              font:500 12.5px var(--font-sans); color:#78350F; line-height:1.5; white-space:pre-wrap; }
   .st-note i, .st-note svg { width:15px; height:15px; flex:none; margin-top:2px; }
 
-  /* Running balance, one step per entry. Single series: the line is the
-     ink, the wash under it is the same hue at a tenth. */
-  .st-chart-card { margin-bottom: 16px; }
-  .st-chart-h { display:flex; justify-content:space-between; gap:12px; padding: 12px 16px 0;
-                font: 600 10.5px var(--font-sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gray-500); }
-  .st-chart-h .muted { font-weight: 500; letter-spacing: 0; text-transform: none; }
-  .st-chart { position: relative; height: 170px; padding: 6px 8px 4px; }
-  .st-chart svg { display:block; width:100%; height:100%; overflow: visible; }
-  .st-chart .grid { stroke: #EEF1F5; stroke-width: 1; }
-  .st-chart .zero { stroke: #D7DEE6; stroke-width: 1; }
-  .st-chart .tick { font: 500 10.5px var(--font-sans); fill: var(--gray-500); }
-  .st-chart .line { fill: none; stroke: var(--nejum-teal-700, #005354); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-  .st-chart .area { fill: var(--nejum-teal-700, #005354); fill-opacity: 0.1; }
-  .st-chart .end  { fill: var(--nejum-teal-700, #005354); stroke: #fff; stroke-width: 2; }
-  .st-chart .hair { stroke: var(--gray-500); stroke-width: 1; pointer-events: none; }
-  .st-chart .dot  { fill: var(--nejum-teal-700, #005354); stroke: #fff; stroke-width: 2; pointer-events: none; }
-  .st-chart .hit  { fill: transparent; cursor: crosshair; }
-  .st-tip { position:absolute; z-index: 20; pointer-events:none; min-width: 180px; max-width: 320px;
-            padding: 9px 11px; background: #fff; border: 1px solid #E2E8EE; border-radius: 9px;
-            box-shadow: 0 6px 18px rgba(15,23,31,0.10); font: 500 12px var(--font-sans); color: var(--gray-600); line-height: 1.45; }
-  .st-tip .v { display:block; font: 700 15px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
-  .st-tip .m { display:block; font: 600 11px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
-  .st-tip .a { font-variant-numeric: tabular-nums; }
-  .st-tip .a.pos { color: #B23B12; }
-  .st-tip .a.neg { color: #0E6E4A; }
-  .st-tip .s { display:block; margin-top: 4px; color: var(--ink); }
-
   /* The correction rows carry a paragraph each. One line by default,
      the whole text on a click; the pill says who entered it on hover. */
   .st-desc { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }

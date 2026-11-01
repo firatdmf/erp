@@ -14,9 +14,9 @@
     table.items col.c-date    { width: 13%; }
     table.items td.date { white-space: nowrap; }
     table.items col.c-acct    { width: 11%; }
-    table.items col.c-debit   { width: 13%; }
-    table.items col.c-credit  { width: 13%; }
-    table.items col.c-balance { width: 14%; }
+    table.items col.c-debit   { width: 12%; }
+    table.items col.c-credit  { width: 12%; }
+    table.items col.c-balance { width: 13%; }
     table.items td.acct { white-space: nowrap; color: #4B5563; font-size: 0.9em; }
     table.items tbody td.val { text-align: right; color: #0F1419; }
     table.items tbody td.lbl-left { text-align: left; color: #374151; }
@@ -26,15 +26,16 @@
     table.items tbody tr.lines > td { padding: 0 5pt 5pt; }
     /* Fixed columns, so every order's lines line up with the next's. */
     table.lines { width: 100%; border-collapse: collapse; table-layout: fixed;
-                  font-size: 8.67pt; color: #374151; }
-    table.lines col.l-qty { width: 33%; }
-    table.lines col.l-amount { width: 19%; }
+                  font-size: 8.2pt; color: #374151; }
+    table.lines col.l-qty { width: 32%; }
+    table.lines col.l-amount { width: 16%; }
     table.lines td { padding: 1.5pt 4pt; border-bottom: 0.5pt solid #EEF2F6; vertical-align: top; }
     table.lines tr:last-child td { border-bottom: none; }
     /* Under table.items' own td.num rule, which is bold. */
-    /* On its own line under the variant's name, in the page's font: the
-       code font is wider than the room, and broke a SKU mid-code. */
-    table.items table.lines .sku { display: block; font-family: inherit; font-size: 0.85em; color: #6B7280; }
+    /* The equals signs in a column of their own: one straight line,
+       whatever the amount's width. */
+    table.lines col.l-eq { width: 4%; }
+    table.lines td.eq { text-align: center; padding-left: 0; padding-right: 0; }
     table.items table.lines td.num { text-align: right; white-space: nowrap; font-weight: normal; }
     /* The total of the ledger's columns, at the ledger's size: the
        figure the reader wants is the balance block under it, which is
@@ -104,19 +105,20 @@
         <td></td>{% if many %}<td></td>{% endif %}
         <td>
           <table class="lines" cellspacing="0" cellpadding="0">
-            <colgroup><col><col class="l-qty"><col class="l-amount"></colgroup>
+            <colgroup><col><col class="l-qty"><col class="l-eq"><col class="l-amount"></colgroup>
             {% for item in lines.items %}
             <tr>
-              {% comment %}The variant's name, its SKU under it; the product's name
-              only for a line with no variant name to give.{% endcomment %}
-              <td>{{ item.variant_label|default:item.product.title|default:item.product }}{% if item.product_variant.variant_sku %}<span class="sku">{{ item.product_variant.variant_sku }}</span>{% endif %}</td>
+              {% comment %}The variant's SKU alone; the product's SKU, then its
+              name, for a line that has none.{% endcomment %}
+              <td>{{ item.product_variant.variant_sku|default:item.product.sku|default:item.product }}</td>
               <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }} × {{ lines.symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
+              <td class="eq">=</td>
               <td class="num">{{ lines.symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
             </tr>
             {% endfor %}
             {% for adj in lines.adjustments %}
             <tr>
-              <td colspan="2">{{ adj.label }}</td>
+              <td colspan="3">{{ adj.label }}</td>
               <td class="num">{% if adj.amount < 0 %}−{% endif %}{{ lines.symbol }}{{ adj.amount|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
             </tr>
             {% endfor %}

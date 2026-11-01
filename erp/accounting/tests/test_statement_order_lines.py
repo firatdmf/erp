@@ -96,7 +96,6 @@ class StatementOrderLines(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'class="kind">STATEMENT<')
         self.assertContains(resp, "ACC-095")
-        self.assertContains(resp, "Crepe")
         self.assertContains(resp, "KZL000315.BLACK")
         self.assertContains(resp, 'class="lines"')
         self.assertContains(resp, "Delivery")

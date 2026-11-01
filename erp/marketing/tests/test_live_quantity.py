@@ -183,6 +183,22 @@ class StorefrontApiReadsLiveQuantityTest(TestCase):
         self.assertAlmostEqual(by_sku["ONRKZL000050"], 2035.60, places=2)
         self.assertAlmostEqual(data["product"]["quantity"], 2035.60, places=2)
 
+    def test_second_quality_items_do_not_count(self):
+        """Seconds are sold in person: what they hold comes off the figure the
+        storefront offers, on the variant and on the product."""
+        from operating.models import WarehouseProductItem
+        row = WarehouseProduct.objects.get(warehouse=self.wh2, catalog_variant=self.stocked)
+        WarehouseProductItem.objects.create(
+            product=row, quantity=Decimal("5"), quantity_remaining=Decimal("5"),
+            status="in_stock", is_second=True)
+        WarehouseProductItem.objects.create(  # sold out: nothing left to take off
+            product=row, quantity=Decimal("3"), quantity_remaining=Decimal("0"),
+            status="consumed", is_second=True)
+        data = self._get()
+        by_sku = {v["variant_sku"]: v["variant_quantity"] for v in data["product_variants"]}
+        self.assertAlmostEqual(by_sku["ONRKZL000050"], 2030.60, places=2)
+        self.assertAlmostEqual(data["product"]["quantity"], 2030.60, places=2)
+
     def test_stock_held_only_off_the_storefront_reads_as_none_left(self):
         """Out of stock, not made to order: we do stock it, just not where
         the site's buyers can be sent it from."""

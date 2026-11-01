@@ -2833,7 +2833,8 @@ def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefron
     the same list, so a customer is never offered a roll staff can't sell.
     `exclude_order_id` drops one order's own holds (an edit form re-picking
     what it already holds); `limit` caps how many items are looked at;
-    `on_storefront` keeps to the warehouses the storefront offers;
+    `on_storefront` keeps to the warehouses the storefront offers, and
+    leaves second-quality items out;
     `first_book`'s shelves come before the rest, oldest first within
     each, so the cap never hides that book's stock behind another's."""
     from django.db.models import DecimalField, F, Q
@@ -2888,7 +2889,8 @@ def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefron
         .annotate(unit_cost=unit_cost)
     )
     if on_storefront:
-        rolls = rolls.filter(product__warehouse__on_storefront=True)
+        # Second-quality items are sold in person, never offered online.
+        rolls = rolls.filter(product__warehouse__on_storefront=True, is_second=False)
     order = [TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),
              F("unit_cost").asc(nulls_last=True), "pk"]
     if first_book:

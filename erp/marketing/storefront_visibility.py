@@ -8,7 +8,7 @@ them right — here, whenever stock, a variant's photos, a product or its
 group change (marketing/signals.py), and once an hour for whatever changed
 behind those signals' backs (product_images.housekeep_now_and_then).
 """
-from django.db.models import DecimalField, Exists, OuterRef, Subquery, Sum, Value
+from django.db.models import DecimalField, Exists, F, OuterRef, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 
 NO_STOCK = "no_stock"
@@ -17,14 +17,22 @@ BY_HAND = "by_hand"
 
 
 def _with_stock_and_photo(variants):
-    from operating.models import WarehouseProduct
+    from operating.models import WarehouseProduct, WarehouseProductItem
     from .models import ProductFile
 
     # Stock the storefront offers: a warehouse switched off it
-    # (Warehouse.on_storefront) can't make a variant "in stock" there.
-    stock = (WarehouseProduct.objects.filter(catalog_variant=OuterRef("pk"),
-                                             warehouse__on_storefront=True)
-             .values("catalog_variant").annotate(total=Sum("quantity")).values("total"))
+    # (Warehouse.on_storefront) can't make a variant "in stock" there, and
+    # second-quality items are never offered, so what they hold comes off.
+    seconds = (WarehouseProductItem.objects
+               .filter(product=OuterRef("pk"), is_second=True,
+                       status__in=("in_stock", "partial"))
+               .values("product").annotate(s=Sum("quantity_remaining")).values("s"))
+    offered = (WarehouseProduct.objects
+               .filter(catalog_variant=OuterRef("pk"), warehouse__on_storefront=True)
+               .annotate(offered=F("quantity") - Coalesce(
+                   Subquery(seconds), Value(0), output_field=DecimalField())))
+    stock = (offered.values("catalog_variant").annotate(total=Sum("offered"))
+             .values("total"))
     photo = ProductFile.objects.filter(product_variant=OuterRef("pk"), file_type="image")
     return variants.annotate(
         stock_total=Coalesce(Subquery(stock), Value(0), output_field=DecimalField()),

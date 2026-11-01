@@ -125,6 +125,20 @@ class StorefrontStock(TestCase):
         self.assertEqual([(p["location"], p["available"]) for p in data["locations"]],
                          [("Istanbul, TR", 8.0), ("Ergene Fabrika", 4.0)])
 
+    def test_second_quality_is_not_offered(self):
+        """Seconds are sold in person, never online."""
+        WarehouseProductItem.objects.create(
+            product=WarehouseProduct.objects.get(warehouse=self.shop, sku="DUV.160"),
+            quantity=Decimal("2"), quantity_remaining=Decimal("2"), status="in_stock",
+            is_second=True)
+        roll = self.rolls["R1"]
+        roll.is_second = True
+        roll.save()
+        data = self.signed_in("DUV.160")
+        self.assertEqual([(p["location"], p["available"]) for p in data["locations"]],
+                         [("Istanbul, TR", 8.0), ("Ergene Fabrika", 4.0)])
+        self.assertNotIn(roll.pk, [i["id"] for i in self.signed_in("2086.WHITE")["items"]])
+
     def test_a_sku_with_nothing_free_offers_nothing(self):
         self.assertEqual(self.signed_in("NOPE")["locations"], [])
 

@@ -54,6 +54,24 @@ class StorefrontRuleTest(TestCase):
                                    file_type="image")  # the product's, not the variant's
         self.assertFalse(self._variant("2052.SILVER_ECRU", stock="302", photo=False).variant_featured)
 
+    def test_stock_that_is_all_second_quality_hides_it(self):
+        from operating.models import WarehouseProductItem
+        with self.captureOnCommitCallbacks(execute=True):
+            v = ProductVariant.objects.create(product=self.product, variant_sku="2052.SECOND",
+                                              variant_featured=False)
+            row = WarehouseProduct.objects.create(warehouse=self.shelf, name="2052.SECOND",
+                                                  sku="2052.SECOND", quantity=Decimal("4"),
+                                                  catalog_variant=v)
+            WarehouseProductItem.objects.create(product=row, quantity=Decimal("4"),
+                                                quantity_remaining=Decimal("4"),
+                                                status="in_stock", is_second=True)
+            ProductFile.objects.create(product=self.product, product_variant=v,
+                                       file_url="https://cdn.example/2052.SECOND.avif",
+                                       file_type="image")
+        storefront_visibility.apply([self.product.pk])
+        v.refresh_from_db()
+        self.assertFalse(v.variant_featured)
+
     def test_no_stock_hides_it(self):
         self.assertFalse(self._variant("2052.GOLD_OFFWHITE", stock="0", photo=True).variant_featured)
         self.product.refresh_from_db()

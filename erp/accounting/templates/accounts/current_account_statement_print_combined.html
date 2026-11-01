@@ -27,13 +27,12 @@
     /* Fixed columns, so every order's lines line up with the next's. */
     table.lines { width: 100%; border-collapse: collapse; table-layout: fixed;
                   font-size: 8.67pt; color: #374151; }
-    table.lines col.l-qty { width: 34%; }
+    table.lines col.l-qty { width: 37%; }
     table.lines col.l-amount { width: 19%; }
     table.lines td { padding: 1.5pt 4pt; border-bottom: 0.5pt solid #EEF2F6; vertical-align: top; }
     table.lines tr:last-child td { border-bottom: none; }
     /* Under table.items' own td.num rule, which is bold. */
     table.items table.lines td.num { text-align: right; white-space: nowrap; font-weight: normal; }
-    table.lines .sku { display: block; font-size: 0.82em; }
     /* The total of the ledger's columns, at the ledger's size: the
        figure the reader wants is the balance block under it, which is
        why the Balance cell here is left empty rather than said twice. */
@@ -105,8 +104,8 @@
             <colgroup><col><col class="l-qty"><col class="l-amount"></colgroup>
             {% for item in lines.items %}
             <tr>
-              <td>{{ item.product.title|default:item.product }}{% if item.variant_label %} · {{ item.variant_label }}{% endif %}
-                <span class="sku">{{ item.product_variant.variant_sku|default:item.product.sku }}</span></td>
+              {% comment %}Name and variant, no SKU: one line a customer reads.{% endcomment %}
+              <td>{{ item.product.title|default:item.product }}{% if item.variant_label %} · {{ item.variant_label }}{% endif %}</td>
               <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }} × {{ lines.symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
               <td class="num">{{ lines.symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
             </tr>

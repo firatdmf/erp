@@ -139,7 +139,7 @@
 <div class="mf">
 
   <a class="mf-back" href="{% if movement %}{% url 'accounts:statement' current_account.pk %}{% else %}{% url 'accounts:detail' current_account.pk %}{% endif %}">
-    <i data-lucide="arrow-left"></i> {% if movement %}{% trans "Statement" %}{% else %}{{ current_account.name }}{% endif %}
+    <i data-lucide="arrow-left"></i> {% if movement %}{% trans "Account Statement" %}{% else %}{{ current_account.name }}{% endif %}
   </a>
 
   <div class="mf-head">

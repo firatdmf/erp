@@ -976,7 +976,8 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
     return None, None, True
 
 
-def _row_description(mv, linked_payment=None, linked_invoice=None, is_cancel_row=False):
+def _row_description(mv, linked_payment=None, linked_invoice=None, is_cancel_row=False,
+                     linked_order=None):
     """The text the Description column should print for this ledger row.
 
     A movement posted by a document gets an auto-generated description
@@ -1003,6 +1004,11 @@ def _row_description(mv, linked_payment=None, linked_invoice=None, is_cancel_row
     if linked_invoice is not None:
         # Invoices have no description of their own — only internal
         # notes, which are not for the statement.
+        return ""
+    if linked_order is not None:
+        # "Order #314": the order's database id, beside the order NUMBER
+        # in the Reference column — one order named twice, two ways. Its
+        # lines are what describe it (statement_order_lines).
         return ""
     return (mv.description or "").strip()
 
@@ -1048,6 +1054,16 @@ def _attach_links(rows):
     pay_map = {p.pk: p for p in Payment.objects.filter(pk__in=cancel_pay_ids)} if cancel_pay_ids else {}
     inv_map = {i.pk: i for i in Invoice.objects.filter(pk__in=cancel_inv_ids)} if cancel_inv_ids else {}
 
+    # The order behind each sale and its reversal — one query.
+    from accounting.services_accounts import ORDER_MOVEMENT_TYPES
+    from operating.models import Order
+    order_ct = ContentType.objects.get_for_model(Order)
+    order_map = Order.objects.in_bulk({
+        r["mv"].source_id for r in rows
+        if r["mv"].source_type_id == order_ct.id and r["mv"].source_id
+        and r["mv"].movement_type in ORDER_MOVEMENT_TYPES
+    })
+
     for r in rows:
         mv = r["mv"]
         linked_pay = None
@@ -1074,10 +1090,16 @@ def _attach_links(rows):
                 linked_inv = inv_map.get(mv.source_id)
                 is_cancel = bool(linked_inv)
 
+        linked_order = (order_map.get(mv.source_id)
+                        if mv.source_type_id == order_ct.id
+                        and mv.movement_type in ORDER_MOVEMENT_TYPES else None)
+
         r["linked_payment"] = linked_pay
         r["linked_invoice"] = linked_inv
+        r["linked_order"] = linked_order
         r["is_cancel_row"] = is_cancel
-        r["description"] = _row_description(mv, linked_pay, linked_inv, is_cancel)
+        r["description"] = _row_description(mv, linked_pay, linked_inv, is_cancel,
+                                             linked_order)
 
         owner_label, owner_url, editable = _movement_owner(
             mv, linked_pay, linked_inv, is_cancel)
@@ -1089,6 +1111,46 @@ def _attach_links(rows):
             if editable else owner_url
         )
     return rows
+
+
+def statement_order_lines(order):
+    """What an order row of a statement opens to: its lines and the
+    delivery or discount added on top, as the order sheet prints them
+    (operating.views.build_order_print_rows — one rule, so the statement
+    and the order sheet cannot word a line differently)."""
+    from operating.views import build_order_print_rows
+    items, total, _qty, _packs = build_order_print_rows(order)
+    return {
+        "order": order,
+        "items": items,
+        "adjustments": list(order.adjustments.order_by("position", "pk")),
+        "total": total,
+        "symbol": order.currency_symbol,
+    }
+
+
+class CurrentAccountStatementOrderLines(View):
+    """An order row's lines, fetched when its chevron is opened.
+
+    Only an order that has a sale or its reversal on THIS account: the
+    address names both, and the account is what the viewer was let into
+    (see `owned`), so an order billed elsewhere is not read through it."""
+
+    def get(self, request, pk, order_pk):
+        from django.contrib.contenttypes.models import ContentType
+        from accounting.services_accounts import ORDER_MOVEMENT_TYPES
+        from operating.models import Order
+
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
+        on_this_account = current_account.movements.filter(
+            source_type=ContentType.objects.get_for_model(Order),
+            source_id=order_pk, movement_type__in=ORDER_MOVEMENT_TYPES,
+        ).exists()
+        if not on_this_account:
+            raise Http404("No such order on this account.")
+        order = get_object_or_404(Order, pk=order_pk)
+        return render(request, "accounts/_statement_order_lines.html",
+                      {"lines": statement_order_lines(order)})
 
 
 # ---------------------------------------------------------------------------
@@ -2044,11 +2106,18 @@ class CurrentAccountStatementPrintCombined(View):
         # document behind it — the same text the single-account statement
         # prints, so the two cannot describe one movement differently.
         _attach_links(rows)
+        # Each order's lines under its sale. Not under a reversal: those
+        # are the same goods taken back, and printing them twice would
+        # read as two lots.
+        for r in rows:
+            if r["linked_order"] is not None and r["mv"].movement_type == "order_sale":
+                r["order_lines"] = statement_order_lines(r["linked_order"])
 
         primary = accounts[0]
         from erp.pdf_render import document_response
         return document_response(request, self.template_name, {
             "accounts": accounts,
+            "statement_number": " & ".join(a.code for a in accounts),
             "customer": primary.crm_link or primary,
             "customer_name": (getattr(primary.crm_link, "name", None)
                               or getattr(primary.crm_link, "company_name", None)

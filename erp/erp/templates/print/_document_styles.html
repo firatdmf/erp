@@ -146,6 +146,18 @@ fallback lay their margins out differently (see the end).
     table.items tbody tr.grand td { border-top: 2px solid #0F1419; border-bottom: none; padding: 5pt 5.0pt;
                                     font-size: 13.33pt; font-weight: bold; }
 
+    /* The customer's balance: a small block at the right, under the money
+       column it continues, quieter than the Total above it. The order
+       sheet's balance and the statement's closing line. */
+    table.balance { width: 45%; margin: 8pt 0 0 auto; border-collapse: collapse;
+                    font-size: 10.67pt; break-inside: avoid; page-break-inside: avoid; }
+    table.balance td { padding: 2pt 5.0pt; color: #374151; }
+    table.balance td.val { text-align: right; font-weight: bold; white-space: nowrap;
+                           font-variant-numeric: tabular-nums; color: #0F1419; }
+    table.balance td.book { font-size: 0.85em; font-weight: bold; color: #6B7280;
+                            letter-spacing: 0.8pt; text-transform: uppercase; padding-top: 4pt; }
+    table.balance tr.after td { border-top: 1px solid #0F1419; padding-top: 4pt; font-weight: bold; color: #0F1419; }
+
     /* ── Notes, footer, credit ──────────────────────────────────────── */
     /* pre-line: a note keeps the lines it was typed in. */
     .notes { padding: 7.5pt 11.25pt; border-left: 3pt solid #147F74; background: #F8FAFA; font-size: 10.67pt; color: #374151; white-space: pre-line; }

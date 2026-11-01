@@ -74,6 +74,7 @@
         {% with link_url='' pay=r.linked_payment inv=r.linked_invoice %}
           {% if pay %}{% url 'accounts:payment_detail' pay.pk as link_url %}
           {% elif inv %}{% url 'accounts:purchase_order_detail' inv.pk as link_url %}
+          {% elif r.linked_order %}{% url 'operating:order_detail' r.linked_order.pk as link_url %}
           {% endif %}
       <tr {% if link_url %}class="mv-link" data-href="{{ link_url }}" style="cursor:pointer;"{% endif %}>
         <td>
@@ -81,6 +82,16 @@
           {% if r.mv.due_date %}<span class="st-due">{% trans "due" %} {{ r.mv.due_date|date:"d.m.Y" }}</span>{% endif %}
         </td>
         <td>
+          {% if r.linked_order %}
+            {% comment %}Opens the order's lines under the row, fetched on
+            the first click — see statement_order_lines.{% endcomment %}
+            <button type="button" class="st-chev" aria-expanded="false"
+                    aria-controls="lines-{{ r.mv.pk }}"
+                    data-lines-url="{% url 'accounts:statement_order_lines' current_account.pk r.linked_order.pk %}"
+                    title="{% trans 'Show the order lines' %}">
+              <i data-lucide="chevron-right"></i>
+            </button>
+          {% endif %}
           {% if link_url %}
             <a class="mv-type mv-type-link" href="{{ link_url }}" onclick="event.stopPropagation();">
               {{ r.mv.type_label }}
@@ -105,6 +116,10 @@
             <a href="{% url 'accounts:purchase_order_detail' inv.pk %}"
                class="mv-ref"
                onclick="event.stopPropagation();">{{ inv.display_number }}</a>
+          {% elif r.linked_order %}
+            <a href="{% url 'operating:order_detail' r.linked_order.pk %}"
+               class="mv-ref"
+               onclick="event.stopPropagation();">{{ r.linked_order.order_number|default:r.mv.reference }}</a>
           {% else %}
             <span class="st-ref"{% if r.mv.reference %} title="{{ r.mv.reference }}"{% endif %}>{{ r.mv.reference|default:"—" }}</span>
           {% endif %}
@@ -164,6 +179,9 @@
           {% endif %}
         </td>
       </tr>
+      {% if r.linked_order %}
+      <tr class="st-lines" id="lines-{{ r.mv.pk }}" hidden><td colspan="8"></td></tr>
+      {% endif %}
         {% endwith %}
       {% endfor %}
       {% if sort == 'desc' %}
@@ -358,6 +376,30 @@
     var pending;
     window.addEventListener('resize', function () { clearTimeout(pending); pending = setTimeout(draw, 120); });
   })();
+  // An order row's chevron: its lines, fetched once, then shown and hidden.
+  document.querySelectorAll('.st-chev[data-lines-url]').forEach(function (btn) {
+    if (btn.__bound) return;
+    btn.__bound = true;
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var row = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!row) return;
+      var open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      row.hidden = !open;
+      if (!open || row.__loaded) return;
+      row.__loaded = true;
+      var cell = row.firstElementChild;
+      cell.innerHTML = '<div class="st-lines-box muted">{{ _("Loading…")|escapejs }}</div>';
+      fetch(btn.dataset.linesUrl, { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then(function (html) { cell.innerHTML = html; })
+        .catch(function () {
+          row.__loaded = false;
+          cell.innerHTML = '<div class="st-lines-box muted">{{ _("The order lines could not be loaded.")|escapejs }}</div>';
+        });
+    });
+  });
   document.querySelectorAll('tr.mv-link[data-href]').forEach(function (tr) {
     if (tr.__bound) return;
     tr.__bound = true;

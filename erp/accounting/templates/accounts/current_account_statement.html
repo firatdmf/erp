@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
-{% block title %}{% blocktrans with name=current_account.name %}Statement — {{ name }}{% endblocktrans %} | Nejum ERP{% endblock %}
+{% block title %}{% blocktrans with name=current_account.name %}Account Statement — {{ name }}{% endblocktrans %} | Nejum ERP{% endblock %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,7 +31,6 @@
 
   .st-head { display:flex; align-items:flex-end; justify-content:space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
   .st-head-l { min-width: 0; flex: 1; }
-  .st-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
   .st-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0 0 6px; }
   .st-sub { font: 500 13px var(--font-sans); color: var(--gray-500); margin: 0; }
   .st-sub .code { font-family: var(--font-mono); }
@@ -340,6 +339,26 @@
   .st-empty h3 { font: 700 18px var(--font-sans); color: var(--ink); margin: 0 0 8px; }
   .st-empty p { font: 500 13px var(--font-sans); color: var(--gray-500); margin: 0; }
 
+  /* An order row's chevron and the lines it opens. A bare icon button:
+     base.css pads every <button>, so the padding is reset here. */
+  .st-chev { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px;
+             margin:0 4px 0 -4px; padding:0; border:0; border-radius:6px; background:none;
+             color: var(--gray-500); cursor:pointer; vertical-align:middle; }
+  .st-chev:hover { background:#F1F5F9; color: var(--ink); }
+  .st-chev i, .st-chev svg { width:14px; height:14px; transition: transform 140ms; }
+  .st-chev[aria-expanded="true"] svg { transform: rotate(90deg); }
+  tr.st-lines > td { padding: 0 14px 12px 40px; background:#FAFBFD; }
+  .st-lines-box { padding: 8px 0 0; font: 500 12.5px var(--font-sans); }
+  .st-lines-box.muted { color: var(--gray-500); }
+  .st-lines-tbl { width:100%; border-collapse:collapse; }
+  .st-lines-tbl th { text-align:left; font: 700 10.5px var(--font-sans); letter-spacing:.05em;
+                     text-transform:uppercase; color: var(--gray-500); padding: 4px 8px; border-bottom:1px solid #E2E8EE; }
+  .st-lines-tbl td { padding: 5px 8px; border-bottom:1px solid #EEF2F6; color: var(--gray-700); vertical-align:top; }
+  .st-lines-tbl .num { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; }
+  .st-lines-tbl tfoot td { border-bottom:0; font-weight:700; color: var(--ink); }
+  .st-lines-tbl tfoot a { color: var(--nejum-teal-700); font-weight:600; text-decoration:none; }
+  .st-lines-sku { display:block; font: 500 11px ui-monospace, monospace; color: var(--gray-500); }
+
   @media print {
     .no-print { display: none !important; }
     tr .st-desc { display: block; -webkit-line-clamp: unset; white-space: pre-wrap; }
@@ -362,16 +381,18 @@
 
   <div class="st-head">
     <div class="st-head-l">
-      <div class="st-eyebrow">{% trans "Account Statement" %}</div>
-      <h1 class="st-title">{% blocktrans with name=current_account.name %}Statement — {{ name }}{% endblocktrans %}</h1>
+      <h1 class="st-title">{% blocktrans with name=current_account.name %}Account Statement — {{ name }}{% endblocktrans %}</h1>
       <p class="st-sub"><span class="code">{{ current_account.code }}</span> · {{ current_account.book.name }}{% if date_from or date_to %} · {{ date_from|default:'…' }} → {{ date_to|default:'…' }}{% endif %}</p>
       {% if current_account.notes %}
       <div class="st-note"><i data-lucide="sticky-note"></i><div>{{ current_account.notes }}</div></div>
       {% endif %}
     </div>
-    <button class="st-btn ghost no-print" onclick="window.print();">
+    {% comment %}The printed statement — the same PDF the CRM pages print,
+    with each order's lines under it.{% endcomment %}
+    <a class="st-btn ghost no-print" target="_blank" rel="noopener"
+       href="{% url 'accounts:statement_print_combined' %}?ids={{ current_account.pk }}">
       <i data-lucide="printer"></i> {% trans "Print" %}
-    </button>
+    </a>
   </div>
 
   <form class="st-toolbar no-print"

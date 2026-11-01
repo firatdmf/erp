@@ -124,6 +124,8 @@ urlpatterns = [
     # ------------------------------------------------------------------
     owned("accounts/<int:pk>/", views.CurrentAccountDetail.as_view(), "detail", CurrentAccount),
     owned("accounts/<int:pk>/statement/", views.CurrentAccountStatement.as_view(), "statement", CurrentAccount),
+    owned("accounts/<int:pk>/statement/orders/<int:order_pk>/lines/",
+          views.CurrentAccountStatementOrderLines.as_view(), "statement_order_lines", CurrentAccount),
     owned("accounts/<int:pk>/edit/", views.CurrentAccountEdit.as_view(), "edit", CurrentAccount),
     owned("accounts/<int:pk>/crm-link/", views.CurrentAccountCrmLink.as_view(), "crm_link", CurrentAccount),
     owned("accounts/<int:pk>/crm-search/", views.CurrentAccountCrmSearch.as_view(), "crm_search", CurrentAccount),

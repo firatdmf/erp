@@ -6552,7 +6552,7 @@ msgid "<a href=\"{{ report_index_url }}\">Report Center</a> → 4 major reports:
 msgstr ""
 
 msgid "Account Statement"
-msgstr ""
+msgstr "Cari Hesap Ekstresi"
 
 msgid "Account, type, method & amount"
 msgstr ""
@@ -15407,3 +15407,24 @@ msgstr "Bakiyesiz"
 
 msgid "White label, no balance"
 msgstr "Beyaz etiket, bakiyesiz"
+
+msgid "Account Statement — %(name)s"
+msgstr "Cari Hesap Ekstresi — %(name)s"
+
+msgid "STATEMENT"
+msgstr "EKSTRE"
+
+msgid "Entry"
+msgstr "Kayıt"
+
+msgid "Account statement"
+msgstr "Cari hesap ekstresi"
+
+msgid "Show the order lines"
+msgstr "Sipariş satırlarını göster"
+
+msgid "The order lines could not be loaded."
+msgstr "Sipariş satırları yüklenemedi."
+
+msgid "Open the order"
+msgstr "Siparişi aç"

@@ -97,7 +97,7 @@ class StatementOrderLines(TestCase):
         self.assertContains(resp, 'class="kind">STATEMENT<')
         self.assertContains(resp, "ACC-095")
         self.assertContains(resp, "Crepe")
-        self.assertNotContains(resp, "KZL000315.BLACK")
+        self.assertContains(resp, "KZL000315.BLACK")
         self.assertContains(resp, 'class="lines"')
         self.assertContains(resp, "Delivery")
         self.assertContains(resp, "Balance due")

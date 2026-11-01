@@ -27,11 +27,14 @@
     /* Fixed columns, so every order's lines line up with the next's. */
     table.lines { width: 100%; border-collapse: collapse; table-layout: fixed;
                   font-size: 8.67pt; color: #374151; }
-    table.lines col.l-qty { width: 37%; }
+    table.lines col.l-qty { width: 33%; }
     table.lines col.l-amount { width: 19%; }
     table.lines td { padding: 1.5pt 4pt; border-bottom: 0.5pt solid #EEF2F6; vertical-align: top; }
     table.lines tr:last-child td { border-bottom: none; }
     /* Under table.items' own td.num rule, which is bold. */
+    /* On its own line under the variant's name, in the page's font: the
+       code font is wider than the room, and broke a SKU mid-code. */
+    table.items table.lines .sku { display: block; font-family: inherit; font-size: 0.85em; color: #6B7280; }
     table.items table.lines td.num { text-align: right; white-space: nowrap; font-weight: normal; }
     /* The total of the ledger's columns, at the ledger's size: the
        figure the reader wants is the balance block under it, which is
@@ -104,8 +107,9 @@
             <colgroup><col><col class="l-qty"><col class="l-amount"></colgroup>
             {% for item in lines.items %}
             <tr>
-              {% comment %}Name and variant, no SKU: one line a customer reads.{% endcomment %}
-              <td>{{ item.product.title|default:item.product }}{% if item.variant_label %} · {{ item.variant_label }}{% endif %}</td>
+              {% comment %}The variant's name, its SKU under it; the product's name
+              only for a line with no variant name to give.{% endcomment %}
+              <td>{{ item.variant_label|default:item.product.title|default:item.product }}{% if item.product_variant.variant_sku %}<span class="sku">{{ item.product_variant.variant_sku }}</span>{% endif %}</td>
               <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }} × {{ lines.symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
               <td class="num">{{ lines.symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
             </tr>

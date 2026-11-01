@@ -24,9 +24,10 @@ Run with:
 import re
 from unittest.mock import patch
 
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from django.utils import timezone
 
+from erp.testing import TransactionTestCase
 from operating.models import Order, OrderNumberSequence
 
 HOUSE_SHAPE = re.compile(r"^ORD-\d{4}-\d{6}$")

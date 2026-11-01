@@ -5,7 +5,8 @@ Run with:
 """
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TransactionTestCase
+
+from erp.testing import TransactionTestCase
 
 BEFORE = [("marketing", "0085_price_and_cost_not_negative"),
           ("operating", "0091_warehouse_costs_not_negative")]

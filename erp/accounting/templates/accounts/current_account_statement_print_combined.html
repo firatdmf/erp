@@ -54,16 +54,14 @@
   {% trans "STATEMENT" as kind %}
   {% include "print/_document_header.html" with brand_line=brand_name number=statement_number kind=kind date=printed_at %}
 
-  <h3>{% trans "Customer" %}</h3>
+  {% comment %}The book the account is kept in, beside the heading; the
+  card under it is the customer's name alone.{% endcomment %}
+  <h3>{% trans "Customer" %} - {% for a in accounts %}{{ a.book.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</h3>
   <table class="twocol" cellspacing="0" cellpadding="0">
     <tr>
       <td class="full">
         <div class="card">
           <div class="name">{{ customer_name|capfirst }}</div>
-          {% comment %}Each account's code with the book it belongs to: a
-          reader reconciling a line needs to see which ledger it sits in.{% endcomment %}
-          <div class="line"><b>{% if accounts|length > 1 %}{% trans "Accounts" %}{% else %}{% trans "Account" %}{% endif %}:</b>
-            {% for a in accounts %}{{ a.code }} ({{ a.book.name }}){% if not forloop.last %} · {% endif %}{% endfor %}</div>
         </div>
       </td>
     </tr>

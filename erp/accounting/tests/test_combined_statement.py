@@ -197,11 +197,13 @@ class ThePrintedSheet(CombinedStatementBase):
         self.assertEqual(r.context["closing"], Decimal("227.04"))
         self.assertContains(r, "227.04")
 
-    def test_the_header_names_each_book_beside_its_code(self):
+    def test_the_customer_heading_names_each_book(self):
+        """The book beside "Customer"; the codes are in the header and on
+        every row (see below), not under the customer's name."""
         self._both()
         r = self._print(self.laleli_account, self.ergene_account)
-        self.assertContains(r, "LAL-069 (Laleli Fabric)")
-        self.assertContains(r, "ACC-050 (Ergene Fabric)")
+        self.assertContains(r, "Customer - Ergene Fabric, Laleli Fabric")
+        self.assertNotContains(r, "LAL-069 (Laleli Fabric)")
 
     def test_every_row_names_the_account_it_came_from(self):
         """A merged sheet foots to one balance, so without this there is

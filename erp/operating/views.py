@@ -371,6 +371,39 @@ def _order_current_account_snapshot(order):
         return None
 
 
+def attach_line_purchases(items, purchases):
+    """Give each line the supplier purchases that bring it in — the ones
+    whose plans list its SKU — and, until their goods arrive, the rolls
+    they say are coming: it.purchases, it.expected_rolls (barcode if the
+    roll has one yet, quantity, the depot it comes into, the purchase
+    bringing it), it.expected_label ("3 rolls · 150 m") and
+    it.line_purchases, the purchases not already named on a coming roll."""
+    from django.template.defaultfilters import floatformat
+    from .order_purchases import plan_expected_rolls, plan_variant_skus
+
+    purchase_skus = [(p, plan_variant_skus(p.intake_plan)) for p in purchases]
+    for it in items:
+        sku = (getattr(it.product_variant, "variant_sku", "") or "").lower()
+        it.purchases = [p for p, skus in purchase_skus if sku and sku in skus]
+        unit = units.unit_short(getattr(it.product, "unit", None) or units.DEFAULT_UNIT)
+        it.expected_rolls = [{"barcode": code, "qty": q, "unit": unit,
+                              "warehouse": p.intake_warehouse, "purchase": p}
+                             for p in it.purchases if p.status == "ordered"
+                             for code, q in plan_expected_rolls(p.intake_plan, sku)]
+        it.expected_label = ""
+        if it.expected_rolls:
+            pack = getattr(it.product, "pack_type", None) or units.DEFAULT_PACK
+            n = len(it.expected_rolls)
+            it.expected_label = (
+                f"{n} {units.pack_noun(pack, n)} · "
+                f"{floatformat(sum(e['qty'] for e in it.expected_rolls), '-2g')} "
+                f"{it.expected_rolls[0]['unit']}")
+        # A purchase still on its way is named on each roll it brings;
+        # the line names the rest — those whose goods are in.
+        named = {e["purchase"].pk for e in it.expected_rolls}
+        it.line_purchases = [p for p in it.purchases if p.pk not in named]
+
+
 class OrderDetail(DetailView):
     model = Order
     template_name = "operating/order_detail.html"
@@ -396,13 +429,11 @@ class OrderDetail(DetailView):
         # read costs without extra queries (the template also iterates
         # items for the line breakdown). The variant's warehouse products
         # + attribute values feed the human-readable variant label.
+        from .split_orders import page_line_prefetches
         return Order.objects.select_related(
             "contact", "company", "web_client", "current_account",
         ).prefetch_related(
-            "items__product", "items__product_variant",
-            "items__product_variant__warehouse_products",
-            "items__product_variant__product_variant_attribute_values"
-            "__product_variant_attribute",
+            *page_line_prefetches(),
             # Delivery, discounts: read by the totals block and by every
             # money method on the page.
             "adjustments",
@@ -410,10 +441,10 @@ class OrderDetail(DetailView):
 
     def get_context_data(self, **kwargs):
         from accounting.services_accounts import brand_name_for
-        from .split_orders import split_halves, lend_cargo_info
+        from .split_orders import page_halves, lend_cargo_info
         # A split order has one status section: cargo info saved before
         # its halves moved together may sit on one half only.
-        halves = split_halves(self.object)
+        halves = page_halves(self.object)
         lend_cargo_info(self.object, halves)
         ctx = super().get_context_data(**kwargs)
         ctx["cargo_receipts"] = self.object.shipment_receipts()
@@ -454,41 +485,11 @@ class OrderDetail(DetailView):
         # the order, and from where, reads off the line itself. Until its
         # goods arrive, a purchase's plan also says what rolls are coming:
         # "3 rolls · 150 m expected" rather than a bare "no rolls".
-        from django.template.defaultfilters import floatformat
-        from .order_purchases import plan_expected_rolls, plan_variant_skus
-        purchase_skus = [(p, plan_variant_skus(p.intake_plan))
-                         for p in ctx["supplier_purchases"]]
-
-        def expected_rolls(it, sku):
-            """Each roll a purchase still on its way says it brings, for the
-            line to open onto as it would onto its stock: the barcode if the
-            roll has one yet, the quantity, the depot it comes into, and the
-            purchase bringing it."""
-            unit = units.unit_short(getattr(it.product, "unit", None) or units.DEFAULT_UNIT)
-            return [{"barcode": code, "qty": q, "unit": unit,
-                     "warehouse": p.intake_warehouse, "purchase": p}
-                    for p in it.purchases if p.status == "ordered"
-                    for code, q in plan_expected_rolls(p.intake_plan, sku)]
-
-        def expected_label(it, rolls):
-            """All of them at once, for the line itself: "3 rolls · 150 m"."""
-            if not rolls:
-                return ""
-            pack = getattr(it.product, "pack_type", None) or units.DEFAULT_PACK
-            return (f"{len(rolls)} {units.pack_noun(pack, len(rolls))} · "
-                    f"{floatformat(sum(e['qty'] for e in rolls), '-2g')} {rolls[0]['unit']}")
+        attach_line_purchases(self.object.items.all(), ctx["supplier_purchases"])
         # Attach available-stock metadata to each item so the template
         # can show "Stok: N" next to the qty input and compute the max
         # the user can bump it to (current qty + remaining stock).
         for it in self.object.items.all():
-            sku = (getattr(it.product_variant, "variant_sku", "") or "").lower()
-            it.purchases = [p for p, skus in purchase_skus if sku and sku in skus]
-            it.expected_rolls = expected_rolls(it, sku)
-            it.expected_label = expected_label(it, it.expected_rolls)
-            # A purchase still on its way is named on each roll it brings;
-            # the line names the rest — those whose goods are in.
-            named = {e["purchase"].pk for e in it.expected_rolls}
-            it.line_purchases = [p for p in it.purchases if p.pk not in named]
             if it.product_variant_id and it.product_variant:
                 stock = it.product_variant.live_quantity
             elif it.product_id and it.product:
@@ -609,7 +610,7 @@ class OrderDetail(DetailView):
             from .split_orders import profit_figures
             ctx["profit"] = profit_figures(
                 self.object, getattr(self.request.user, "member", None),
-                admin=self.request.user.is_superuser)
+                admin=self.request.user.is_superuser, halves=halves)
         # The packing list is the whole order's, so it shows on every half
         # once any half has a package.
         from .split_orders import order_packs
@@ -620,7 +621,7 @@ class OrderDetail(DetailView):
                 getattr(self.object.current_account, "book", None), "name", "")
             ctx["other_halves"] = other_halves_for_page(
                 self.object, getattr(self.request.user, "member", None),
-                admin=self.request.user.is_superuser)
+                admin=self.request.user.is_superuser, halves=halves)
             ctx["combined_totals"] = combined_totals(halves)
             # The halves complete together, so goods still on their way in
             # for any of them hold the whole order back.

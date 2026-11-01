@@ -39,6 +39,45 @@ def split_halves(order):
                 .order_by("pk"))
 
 
+def page_line_prefetches():
+    """What an order page reads off every line, fetched in a few queries
+    for all of them rather than a few per line: product and variant, the
+    product's photos (first one shown), the warehouse rows and attribute
+    values the line is described by."""
+    from django.db.models import Prefetch
+    from marketing.models import ProductFile
+    return [
+        "items__product", "items__product_variant",
+        Prefetch("items__product__files", queryset=ProductFile.objects.order_by("pk")),
+        "items__product_variant__warehouse_products",
+        "items__product_variant__product_variant_attribute_values"
+        "__product_variant_attribute",
+    ]
+
+
+def page_halves(order):
+    """split_halves for the order's page — reading only — with every
+    half's lines, their costs and adjustments loaded in one go. `order`
+    itself stands in for its own half, so what the page already loaded
+    for it is used rather than fetched again.
+
+    Not for anything that changes lines: the loaded lines would go stale."""
+    from marketing.models import attach_live_costs
+    if not order.split_group:
+        halves = [order]
+    else:
+        halves = [order if h.pk == order.pk else h for h in
+                  Order.objects.filter(split_group=order.split_group)
+                  .select_related("current_account__book", "currency")
+                  .prefetch_related(*page_line_prefetches(), "adjustments")
+                  .order_by("pk")]
+    # Every line's cost in one query: the cost and profit figures read
+    # them line by line.
+    attach_live_costs(it.product_variant for h in halves for it in h.items.all()
+                      if it.product_variant_id)
+    return halves
+
+
 def order_packs(order):
     """The packages of the whole order, numbered one run for all its halves.
 
@@ -181,27 +220,34 @@ def order_rows(orders):
     return rows
 
 
-def other_halves_for_page(order, member, admin=False):
+def other_halves_for_page(order, member, admin=False, halves=None):
     """The other halves of `order`, dressed for its page: lines in the same
     order the page lists its own, with the rolls scanned for each, the
     half's totals, whether the viewer may open it, and whether its lines
     show what they cost — to an admin only; cost is otherwise its own
     book's business."""
     from decimal import Decimal
+    from marketing import units
     from .views import (_order_item_variant_lines, _order_item_description,
-                        _stock_taken_label)
+                        _stock_taken_label, attach_line_purchases)
 
-    halves = []
-    for half in split_halves(order):
+    others = []
+    for half in (halves if halves is not None else page_halves(order)):
         if half.pk == order.pk:
             continue
         items = sorted(
-            half.items.select_related("product", "product_variant"),
+            half.items.all(),
             key=lambda i: ((getattr(i.product, "title", "") or "").casefold(),
                            (getattr(i.product_variant, "variant_sku", "") or ""), i.pk))
+        # Each line opens onto its rolls as this half's own lines do: the
+        # ones held for it, and those its purchases say are coming.
+        attach_line_purchases(items, half.supplier_purchases.exclude(status="cancelled")
+                              .select_related("intake_warehouse").order_by("-date", "-pk"))
+        tracked = half.classify_items_by_tracking(items)
         held = {}
         reservations = list(half.stock_reservations.select_related(
-            "warehouse_product__catalog_variant__product"))
+            "stock_item", "warehouse_product__warehouse", "pack",
+            "warehouse_product__catalog_variant__product").order_by("-created_at"))
         for r in reservations:
             if r.order_item_id:
                 held.setdefault(r.order_item_id, []).append(r)
@@ -215,14 +261,17 @@ def other_halves_for_page(order, member, admin=False):
             it.scanned_count = len(rs)
             it.scanned_meters = sum((r.quantity or Decimal("0") for r in rs), Decimal("0"))
             it.scanned_label = _stock_taken_label(rs)
+            it.item_reservations = rs
+            it.is_tracked = bool(tracked.get(it.pk, False))
+            it.sold_by_count = units.by_variant(getattr(it.product, "tracking", None))
             it.variant_lines = _order_item_variant_lines(it)
             it.description_lines, it.description_worded = _order_item_description(it)
         half.page_items = items
         half.book_name = getattr(order_book(half), "name", "")
         half.may_open = member_can_use_book(member, order_book(half))
         half.show_cost = admin
-        halves.append(half)
-    return halves
+        others.append(half)
+    return others
 
 
 def combined_totals(halves):
@@ -235,7 +284,7 @@ def combined_totals(halves):
     return list(totals.items())
 
 
-def profit_figures(order, member, admin=False):
+def profit_figures(order, member, admin=False, halves=None):
     """What the order's page says the order cost and made: cost, profit,
     revenue and margin, and under "others" what the other halves put in.
 
@@ -255,7 +304,8 @@ def profit_figures(order, member, admin=False):
         }
 
     others = []
-    halves = split_halves(order)
+    if halves is None:
+        halves = page_halves(order)
     if (len(halves) > 1 and len({h.currency_symbol for h in halves}) == 1
             and (admin or all(member_can_use_book(member, order_book(h)) for h in halves))):
         others = [h for h in halves if h.pk != order.pk]

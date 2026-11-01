@@ -1637,7 +1637,7 @@
                     {% if item.product %}
                     <a href="{% url 'marketing:product_detail' item.product.pk %}" class="od-prod-link">
                       <div class="od-prod">
-                        {% with first_file=item.product.files.first %}
+                        {% with first_file=item.product.files.all|first %}
                           {% if first_file and first_file.file_url %}
                             <img class="od-prod-img" src="{{ first_file.file_url }}" alt="">
                           {% else %}
@@ -1731,14 +1731,18 @@
               {% endif %}
             </div></td><td></td><td></td><td></td><td class="od-cost-col"></td><td></td></tr>
             {% for item in half.page_items %}
-            <tr>
+            <tr{% if item.is_tracked and item.scanned_count or item.expected_rolls %} class="od-row-toggle" data-toggle-tops="{{ item.pk }}"{% endif %}>
               <td>
                 <div style="display:flex; align-items:flex-start; gap:6px;">
+                  {% if item.is_tracked and item.scanned_count or item.expected_rolls %}
+                  <i class="fa fa-chevron-right od-tops-chev" data-chev="{{ item.pk }}" style="margin-top:12px;"></i>
+                  {% else %}
                   <span style="width:9px; flex-shrink:0;"></span>
+                  {% endif %}
                   <div style="min-width:0;">
                     {% if item.product %}
                     <div class="od-prod">
-                      {% with first_file=item.product.files.first %}
+                      {% with first_file=item.product.files.all|first %}
                         {% if first_file and first_file.file_url %}
                           <img class="od-prod-img" src="{{ first_file.file_url }}" alt="">
                         {% else %}
@@ -1752,6 +1756,9 @@
                     {% endif %}
                     {% if item.scanned_count %}
                     <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_label }}</span>
+                    {% endif %}
+                    {% if item.expected_rolls %}
+                      <span class="od-scan-chip expected" title="{% trans 'On the supplier purchase, not arrived yet — its rolls are a guess until the goods are received' %}"><i class="fa fa-truck"></i> {% blocktrans with what=item.expected_label %}≈ {{ what }} expected{% endblocktrans %}</span>
                     {% endif %}
                   </div>
                 </div>
@@ -1770,6 +1777,18 @@
               </td>
               <td class="num"><b>{{ half.currency_symbol }}{{ item.subtotal|floatformat:"2g" }}</b></td>
             </tr>
+            {% if item.is_tracked and item.scanned_count or item.expected_rolls %}
+            <tr class="od-tops-row" data-tops-for="{{ item.pk }}" style="display:none;">
+              <td colspan="6">
+                <div class="od-tops-wrap">
+                  <div class="od-tops-list">
+                    {% if item.is_tracked %}{% for r in item.item_reservations %}{% include "operating/partials/od_top_row.html" %}{% endfor %}{% endif %}
+                    {% for e in item.expected_rolls %}{% include "operating/partials/od_expected_top_row.html" %}{% endfor %}
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% empty %}
             <tr><td class="od-empty-mute od-row-note">{% trans "This order has no items yet" %}</td><td></td><td></td><td></td><td class="od-cost-col"></td><td></td></tr>
             {% endfor %}
@@ -3678,14 +3697,17 @@
   //  link keeps navigating normally.
   // ──────────────────────────────────────────────────────────
   (function () {
+    // On the whole table, so a split order's other halves' lines open too;
+    // each line's rolls sit in the same tbody as the line.
     const tbody = document.getElementById('od-items-tbody');
-    if (!tbody) return;
-    tbody.addEventListener('click', function (e) {
+    const table = tbody && tbody.closest('table');
+    if (!table) return;
+    table.addEventListener('click', function (e) {
       if (e.target.closest('a')) return;               // links win
       const row = e.target.closest('tr.od-row-toggle');
       if (!row) return;
       const id = row.getAttribute('data-toggle-tops');
-      const tops = tbody.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
+      const tops = row.parentElement.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
       if (!tops) return;
       const open = tops.style.display === 'none';
       tops.style.display = open ? '' : 'none';

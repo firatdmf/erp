@@ -130,6 +130,24 @@ class SplitOrderPage(TestCase):
         self.assertRegex(resp.content.decode(), r"data-order-cost[^>]*>\$40\.00<")    # 10 + 30
         self.assertRegex(resp.content.decode(), r"data-order-profit[^>]*>\$57\.50<")  # 97.50 - 40
 
+    def test_the_other_book_s_lines_open_onto_their_rolls_too(self):
+        from operating.models import OrderStockReservation, Warehouse, WarehouseProduct, WarehouseProductItem
+        wh = Warehouse.objects.create(name="Ergene depo", accounting_book=self.ergene)
+        line = self.ergene_half.items.get()
+        wp = WarehouseProduct.objects.create(warehouse=wh, name="roll", sku=line.product_variant.variant_sku,
+                                             catalog_variant=line.product_variant)
+        roll = WarehouseProductItem.objects.create(product=wp, barcode="ERG-ROLL-1", quantity=Decimal("50"))
+        OrderStockReservation.objects.create(order=self.ergene_half, stock_item=roll, warehouse_product=wp,
+                                             order_item=line, quantity=Decimal("4.5"))
+        html = self._page(self.laleli_half).content.decode()
+        start = html.index(f'<tbody id="od-half-{self.ergene_half.pk}">')
+        half = html[start:html.index("</tbody>", start)]
+        self.assertIn(f'data-toggle-tops="{line.pk}"', half)
+        self.assertIn(f'data-chev="{line.pk}"', half)
+        tops = half[half.index(f'data-tops-for="{line.pk}"'):]
+        self.assertIn("ERG-ROLL-1", tops)
+        self.assertIn("Ergene depo", tops)
+
     def test_the_other_book_s_cost_stays_with_those_who_may_open_it(self):
         from marketing.models import Product
         ProductVariant.objects.filter(product__title="Krep").update(variant_cost=Decimal("1.00"))

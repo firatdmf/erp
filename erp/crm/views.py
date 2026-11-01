@@ -95,6 +95,23 @@ class ContactList(generic.ListView):
         return context
 
 
+def account_types_by_company(company_ids):
+    """{company id: [(type, label), …]} — what each company is to us, read
+    off its accounts in the books the reader reaches, one entry per type.
+
+    A company's status only says where it stands as a sales lead; that it
+    is a supplier, a customer or one of our own books is its accounts'.
+    """
+    from accounting.models import CurrentAccount
+    labels = dict(CurrentAccount.TYPE_CHOICES)
+    rows = (of_books_in_reach(CurrentAccount.objects.filter(company_id__in=company_ids))
+            .values_list("company_id", "type").distinct().order_by("company_id", "type"))
+    types = {}
+    for company_id, kind in rows:
+        types.setdefault(company_id, []).append((kind, labels.get(kind, kind)))
+    return types
+
+
 class CompanyList(generic.ListView):
     model = Company
     # number_of_companies = len(Company.objects.all())
@@ -124,6 +141,9 @@ class CompanyList(generic.ListView):
         context = super().get_context_data(**kwargs)
         # Pass search query to template
         context['search_query'] = self.request.GET.get('search', '')
+        types = account_types_by_company([c.pk for c in context["companies"]])
+        for company in context["companies"]:
+            company.account_types = types.get(company.pk, [])
         return context
 
 
@@ -614,6 +634,7 @@ class CompanyDetail(generic.DetailView):
         context["fields"] = self.object._meta.fields
         # It retrieves the Company object using self.get_object().
         company = self.get_object()
+        context["account_types"] = account_types_by_company([company.pk]).get(company.pk, [])
         # Get the contacts for the current company
         # It fetches related objects (notes, contacts, tasks) associated with the company and adds them to the context.
         context["notes"] = Note.objects.filter(company=company)

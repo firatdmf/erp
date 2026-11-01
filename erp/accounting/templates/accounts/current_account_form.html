@@ -202,6 +202,9 @@
           <div class="cf-f span-2">
             <label id="cf-name-label">{% trans "Name" %}<span class="req">*</span></label>
             <input type="text" name="name" id="cf-name-input" required maxlength="200" value="{{ current_account.name|default:'' }}" placeholder="{% trans 'e.g., Acme Inc.' %}">
+            {% if current_account.crm_link %}
+              <div class="cf-etype-hint">{% trans "The name is shared with the CRM record: changing it here renames the record and its accounts in every book." %}</div>
+            {% endif %}
           </div>
 
           {% if current_account %}

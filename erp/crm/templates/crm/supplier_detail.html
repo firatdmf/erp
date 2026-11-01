@@ -37,6 +37,7 @@ or company record it doubles as.
   <div class="od-head">
     <div>
       <div class="od-head-row">
+        <span class="od-head-ico" title="{% trans 'Supplier' %}"><i class="fa fa-truck"></i></span>
         <h1 class="od-title">{{ supplier.company_name|default:supplier.contact_name }}</h1>
         {% if supplier.company_name and supplier.contact_name %}
           <span class="od-chip teal"><i class="fa fa-user"></i>{{ supplier.contact_name }}</span>

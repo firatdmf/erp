@@ -306,6 +306,22 @@ class CurrentAccount(models.Model):
         field = self.crm_link_field
         return getattr(self, field) if field else None
 
+    # ── One name per party ────────────────────────────────────────────
+    # A linked account is called what its CRM record is called. The two
+    # used to be typed separately and drifted ("OLEG" beside "OLEG
+    # MOTUZENKO", "TATYANA VARŞOVA" beside "Tatyana Warsaw"), so the same
+    # customer read differently on a statement and in the CRM. The record
+    # holds the name; signals_accounts copies it onto every account, in
+    # every book, and the account form renames the record.
+
+    @property
+    def crm_name(self):
+        """The linked record's name, or "" when nothing is linked."""
+        record = self.crm_link
+        if record is None:
+            return ""
+        return (getattr(record, record.unique_name_field) or "").strip()
+
     def recompute_balance(self, save=True):
         """Recalculate cached_balance from movements. Safe to call any time.
 

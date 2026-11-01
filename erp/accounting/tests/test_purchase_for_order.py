@@ -309,11 +309,11 @@ class PurchaseForCustomerTest(TestCase):
 
     def test_a_customer_with_an_account_prices_in_its_currency(self):
         try_ = CurrencyCategory.objects.create(code="TRY", name="Lira", symbol="₺")
-        CurrentAccount.objects.create(book=self.book, code="C-OLG", name="Oleg",
+        CurrentAccount.objects.create(book=self.book, code="C-OLG", name=self.customer.name,
                                       type="customer", contact=self.customer,
                                       default_currency=try_)
         self.assertEqual(self._currency("contact", self.customer.pk),
-                         {"currency": "TRY", "account": "Oleg"})
+                         {"currency": "TRY", "account": self.customer.name})
         # In a book where they have no account yet, the one the order
         # would open is in the default currency.
         self.assertEqual(self._currency("contact", self.customer.pk, self.other_wh),

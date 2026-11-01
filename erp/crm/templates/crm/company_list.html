@@ -253,6 +253,16 @@
   .ord-status.customer  .ord-status-dot { background: var(--nejum-teal-500); }
   .ord-status.unknown   { color: var(--gray-600); background: #F3F4F6; }
   .ord-status.unknown   .ord-status-dot { background: #9CA3AF; }
+  /* Account type pills: what the company is to us, from its accounts */
+  .ord-status[class*="account-"]   { color: var(--gray-600); background: #F3F4F6; }
+  .ord-status[class*="account-"]   .ord-status-dot { background: #9CA3AF; }
+  .ord-status.account-customer, .ord-status.account-both { color: #0B5F60; background: var(--nejum-teal-50); }
+  .ord-status.account-customer .ord-status-dot, .ord-status.account-both .ord-status-dot { background: var(--nejum-teal-500); }
+  .ord-status.account-supplier     { color: #334155; background: #E2E8F0; }
+  .ord-status.account-supplier     .ord-status-dot { background: #64748B; }
+  .ord-status.account-intercompany { color: #5B21B6; background: #EDE9FE; }
+  .ord-status.account-intercompany .ord-status-dot { background: #8B5CF6; }
+  .ord-row .cell-status { display: flex; flex-wrap: wrap; gap: 4px; }
 
   /* Contact count pill */
   .ord-pill {
@@ -576,9 +586,14 @@
             <span class="ord-status qualified"><span class="ord-status-dot"></span>{% trans "Qualified" %}</span>
           {% elif company.status == 'customer' %}
             <span class="ord-status customer"><span class="ord-status-dot"></span>{% trans "Customer" %}</span>
-          {% else %}
-            <span class="ord-status unknown"><span class="ord-status-dot"></span>{{ company.status|title|default:"—" }}</span>
+          {% elif company.status %}
+            <span class="ord-status unknown"><span class="ord-status-dot"></span>{{ company.status|title }}</span>
           {% endif %}
+          {% for kind, label in company.account_types %}
+            <span class="ord-status account-{{ kind }}"><span class="ord-status-dot"></span>{{ label }}</span>
+          {% empty %}
+            {% if not company.status %}<span class="ord-cell-text muted">—</span>{% endif %}
+          {% endfor %}
         </div>
         <div class="cell-contacts">
           {% if company.contacts_count > 0 %}

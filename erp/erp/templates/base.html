@@ -855,14 +855,16 @@
 
           <div class="form-group">
             <label for="id_company_status">{% trans "Status" %}</label>
-            <select name="status" id="id_company_status" class="form-input" required>
+            <select name="status" id="id_company_status" class="form-input"
+                    onchange="syncCompanyFollowupOption()">
+              <option value="" selected>{% trans "Not a lead" %}</option>
               <option value="prospect">{% trans "Prospect" %}</option>
               <option value="qualified">{% trans "Qualified" %}</option>
             </select>
           </div>
 
-          <!-- Email Follow-up Option -->
-          <div class="email-followup-option">
+          <!-- Email Follow-up Option: follow-ups go to prospects only -->
+          <div class="email-followup-option" id="companyFollowupOption" style="display: none;">
             <div class="email-checkbox-wrapper">
               <input type="checkbox" name="send_followup_emails" id="send_followup_emails" class="email-checkbox">
               <label for="send_followup_emails" class="email-checkbox-label">
@@ -2012,12 +2014,21 @@
         });
     }
 
+    // The follow-up emails are for prospects; for any other status the
+    // option is hidden and unticked, so it can't be sent by accident.
+    function syncCompanyFollowupOption() {
+      const isProspect = document.getElementById('id_company_status').value === 'prospect';
+      document.getElementById('companyFollowupOption').style.display = isProspect ? '' : 'none';
+      if (!isProspect) document.getElementById('send_followup_emails').checked = false;
+    }
+
     // Original close function
     function _closeCompanySidebarOriginal() {
       document.getElementById('companySidebarOverlay').classList.remove('active');
       document.body.style.overflow = '';
       // Reset form
       document.getElementById('companyForm').reset();
+      syncCompanyFollowupOption();
       // Hide all attachment sections
       document.getElementById('companyContactSection').style.display = 'none';
       document.getElementById('companyNoteSection').style.display = 'none';

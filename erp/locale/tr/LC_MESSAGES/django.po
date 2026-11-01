@@ -15317,6 +15317,27 @@ msgstr "Ödenecek bakiye"
 msgid "In credit"
 msgstr "Alacak bakiyesi"
 
+msgid "Not a lead"
+msgstr "Aday değil"
+
+msgid "Inter-company"
+msgstr "Şirketler arası"
+
+#, python-format
+msgid ""
+"%(record)s can hold a name of %(limit)s characters at most; put the rest in "
+"a note on it."
+msgstr ""
+"%(record)s en fazla %(limit)s karakterlik bir ad alabilir; gerisini kayda "
+"not olarak ekleyin."
+
+msgid ""
+"The name is shared with the CRM record: changing it here renames the record "
+"and its accounts in every book."
+msgstr ""
+"Ad, CRM kaydıyla ortaktır: burada değiştirmek kaydı ve her defterdeki "
+"hesaplarını yeniden adlandırır."
+
 #: accounting/views.py
 msgid "Paid by"
 msgstr "Ödeyen"

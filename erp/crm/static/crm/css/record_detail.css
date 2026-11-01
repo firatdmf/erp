@@ -41,6 +41,13 @@
 }
 .od-head-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .od-title { font: 800 28px var(--font-sans); letter-spacing: -0.01em; color: #0F1419; margin: 0; }
+/* What kind of record this is, at a glance: building, person or truck. */
+.od-head-ico {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--nejum-teal-50, #E6F4F2); color: var(--nejum-teal-700, #0B5F60);
+  font-size: 17px;
+}
 .od-meta { display: flex; align-items: center; gap: 10px; font: 500 12.5px var(--font-sans); color: var(--gray-600); flex-wrap: wrap; }
 .od-meta i { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; color: var(--gray-500); }
 .od-meta a { color: inherit; text-decoration: none; }
@@ -532,6 +539,17 @@
 .ord-status.customer .ord-status-dot, .ord-status.active .ord-status-dot { background: #10B981; }
 .ord-status.inactive   { color: #4B5563; background: #E5E7EB; }
 .ord-status.inactive   .ord-status-dot { background: #6B7280; }
+
+/* ACCOUNT TYPE PILLS (what the company is to us, from its accounts) —
+   the same colours as on the company list. */
+.ord-status[class*="account-"]   { color: #4B5563; background: #F3F4F6; }
+.ord-status[class*="account-"]   .ord-status-dot { background: #9CA3AF; }
+.ord-status.account-customer, .ord-status.account-both { color: #0E6E4A; background: #D1FAE5; }
+.ord-status.account-customer .ord-status-dot, .ord-status.account-both .ord-status-dot { background: #10B981; }
+.ord-status.account-supplier     { color: #334155; background: #E2E8F0; }
+.ord-status.account-supplier     .ord-status-dot { background: #64748B; }
+.ord-status.account-intercompany { color: #5B21B6; background: #EDE9FE; }
+.ord-status.account-intercompany .ord-status-dot { background: #8B5CF6; }
 
 /* LINKED CONTACTS */
 .od-contact-list { display: flex; flex-direction: column; gap: 8px; }

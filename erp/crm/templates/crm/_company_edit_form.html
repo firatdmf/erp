@@ -34,7 +34,7 @@
     <label for="id_edit_company_status">{% trans "Status" %}</label>
     <select name="status" id="id_edit_company_status" class="form-input">
       {% for value, label in form.fields.status.choices %}
-        <option value="{{ value }}" {% if company.status == value %}selected{% endif %}>{{ label }}</option>
+        <option value="{{ value }}" {% if company.status == value %}selected{% endif %}>{% if value %}{{ label }}{% else %}{% trans "Not a lead" %}{% endif %}</option>
       {% endfor %}
     </select>
   </div>

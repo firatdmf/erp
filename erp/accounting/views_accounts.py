@@ -566,6 +566,14 @@ class CurrentAccountEdit(View):
         current_account = get_object_or_404(CurrentAccount, pk=pk)
 
         current_account.name = request.POST.get("name", current_account.name).strip()
+        # A linked account's name is its CRM record's: renamed here, the
+        # record is renamed, and with it the party's accounts in every book.
+        record = current_account.crm_link
+        if record is not None and current_account.name and current_account.name != current_account.crm_name:
+            refused = _rename_record(record, current_account.name)
+            if refused:
+                messages.error(request, refused)
+                return redirect("accounts:edit", pk=current_account.pk)
         current_account.type = request.POST.get("type", current_account.type)
         current_account.payment_term_days = int(request.POST.get("payment_term_days") or current_account.payment_term_days)
         current_account.credit_limit = Decimal(request.POST.get("credit_limit") or "0")
@@ -643,6 +651,27 @@ def _crm_subtitle(obj):
 def _crm_model(kind):
     from crm.models import Company, Contact, Supplier
     return {"contact": Contact, "company": Company, "supplier": Supplier}[kind]
+
+
+def _rename_record(record, name):
+    """Give a CRM record a new name; its accounts follow (signals_accounts).
+
+    Returns why not, or "" when done. A contact's name holds 50
+    characters where an account's holds 200, and the name must be free
+    in the record's directory: refused rather than cut short or doubled.
+    """
+    from crm.models import DuplicateName
+    field = record.unique_name_field
+    limit = record._meta.get_field(field).max_length
+    if limit and len(name) > limit:
+        return _g("%(record)s can hold a name of %(limit)s characters at most; "
+                  "put the rest in a note on it.") % {"record": record, "limit": limit}
+    setattr(record, field, name)
+    try:
+        record.save(update_fields=[field])
+    except DuplicateName as exc:
+        return str(exc)
+    return ""
 
 
 _CRM_SEARCH_LIMIT = 8
@@ -802,7 +831,8 @@ class CurrentAccountCrmLink(View):
         # re-pointing a link has to clear the old one to obey that.
         for field in _CRM_KINDS:
             setattr(current_account, field, obj if field == kind else None)
-        current_account.save(update_fields=[*_CRM_KINDS, "updated_at"])
+        # "name" too: linked, the account takes the record's name.
+        current_account.save(update_fields=[*_CRM_KINDS, "name", "updated_at"])
         messages.success(request, _g("Linked to %(name)s.") % {"name": str(obj)})
         return redirect("accounts:detail", pk=current_account.pk)
 

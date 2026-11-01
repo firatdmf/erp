@@ -276,7 +276,9 @@ class CreateLinkedToExistingRecord(TestCase):
         self.assertEqual(Company.objects.count(), 1)
         current_account = CurrentAccount.objects.get(company=self.company)
         self.assertEqual(current_account.book_id, self.book.pk)
-        self.assertEqual(current_account.name, "Gürhan (Laleli)")
+        # Linked, the account is called what the record is called, whatever
+        # was typed (test_account_name_follows_crm).
+        self.assertEqual(current_account.name, self.company.name)
         self.assertEqual(current_account.tax_number, "123")
 
     def test_the_link_decides_the_kind(self):

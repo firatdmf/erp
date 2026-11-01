@@ -463,9 +463,13 @@ class Company(UniqueNameMixin, models.Model):
         blank=True,
         related_name="companies",
     )
+    # Where a company stands as a sales lead, and only that: a prospect is
+    # who the follow-up emails go to. Blank means not a lead, which is most
+    # companies (suppliers, our own books, customers we already trade
+    # with); what such a company IS shows from its accounts' types.
     status = models.CharField(
         choices=[("prospect", "Prospect"), ("qualified", "Qualified")],
-        default=("prospect"),
+        default="", blank=True,
     )
 
     objects = DirectoryManager()

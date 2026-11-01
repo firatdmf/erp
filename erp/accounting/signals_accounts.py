@@ -42,6 +42,37 @@ def assign_current_account_code(sender, instance, **kwargs):
 
 
 # ---------------------------------------------------------------------------
+# 1a. A linked account is called what its CRM record is called
+#
+#     Saved with a link, an account takes the record's name, whatever it
+#     was given. Renamed in the CRM, a record passes its name to all of
+#     its accounts, in every book. (A queryset .update() on a record goes
+#     round both, like every other signal here.)
+# ---------------------------------------------------------------------------
+@receiver(pre_save, sender=CurrentAccount)
+def name_account_after_its_record(sender, instance, **kwargs):
+    name = instance.crm_name
+    if name:
+        instance.name = name
+
+
+def _pass_name_to_accounts(sender, instance, **kwargs):
+    if kwargs.get("raw"):
+        return
+    name = (getattr(instance, instance.unique_name_field) or "").strip()
+    if not name:
+        return
+    field = {"Contact": "contact", "Company": "company", "Supplier": "supplier"}[sender.__name__]
+    (CurrentAccount.objects.filter(**{field: instance}).exclude(name=name)
+     .update(name=name))
+
+
+for _model in ("Contact", "Company", "Supplier"):
+    post_save.connect(_pass_name_to_accounts, sender=f"crm.{_model}",
+                      dispatch_uid=f"pass_name_to_accounts_{_model}")
+
+
+# ---------------------------------------------------------------------------
 # 1b. Suppliers deliberately DON'T auto-create a current account any more.
 #
 #     This used to fire on every Supplier post_save, which is how the

@@ -36,6 +36,7 @@ follow-up email campaign while it is still a prospect.
   <div class="od-head">
     <div>
       <div class="od-head-row">
+        <span class="od-head-ico" title="{% trans 'Company' %}"><i class="fa fa-building"></i></span>
         <h1 class="od-title">{{ company.name|capfirst }}</h1>
 
         {% if company.group %}
@@ -48,6 +49,9 @@ follow-up email campaign while it is still a prospect.
             {{ company.get_status_display }}
           </span>
         {% endif %}
+        {% for kind, label in account_types %}
+          <span class="ord-status account-{{ kind }}"><span class="ord-status-dot"></span>{{ label }}</span>
+        {% endfor %}
       </div>
       <div class="od-meta">
         {% if company.website %}

@@ -308,7 +308,12 @@ DATABASES = {
         "HOST": config("DB_HOST"),  # an empty string means localhost
         "PORT": config("DB_PORT"),
         # Connection pooling for better performance
-        "CONN_MAX_AGE": 0,  # Must be 0 when using PgBouncer/Railway poolers to prevent InterfaceError
+        # 0 on prod: it must be, behind PgBouncer/Railway poolers, to prevent
+        # InterfaceError. A local checkout reaching prod over the public
+        # proxy sets DB_CONN_MAX_AGE=60: one connection a minute instead of
+        # one per request, so the proxy's occasional dropped connect is
+        # met far less often.
+        "CONN_MAX_AGE": config("DB_CONN_MAX_AGE", default=0, cast=int),
         "CONN_HEALTH_CHECKS": True,  # Prevent InterfaceError when connection drops
         "OPTIONS": {
             # PostgreSQL specific optimizations

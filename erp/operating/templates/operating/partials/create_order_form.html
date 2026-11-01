@@ -273,7 +273,7 @@
     {{ order_items_payload|json_script:"existing-order-items" }}
     <div style="padding:10px 12px;margin-bottom:14px;background:#FEF3C7;color:#8B5A00;border:1px solid #F5D78B;border-radius:9px;font:600 12px var(--font-sans,sans-serif);display:flex;align-items:center;gap:8px;">
       <i class="fas fa-pen-to-square"></i>
-      {% trans "Editing order" %} #{{ order.pk }}{% if order.order_number %} — {{ order.order_number }}{% endif %}
+      {% trans "Editing order" %} #{{ order.pk }}{% if combined_number %} — {{ combined_number }}{% elif order.order_number %} — {{ order.order_number }}{% endif %}
     </div>
   {% endif %}
 
@@ -822,6 +822,10 @@
           custom_mounting_type: '', custom_wing_type: '',
           custom_fabric_used_meters: '',
           existing_item_id: it.item_id || null,
+          // The book of the half this saved line is on — a split order is
+          // edited whole, so a line with no stock picked still says where
+          // it belongs.
+          homeBook: it.book_id ? { key: it.book_id, name: it.book || '' } : null,
           // Saved reservations hydrate STRAIGHT into `rolls` so they
           // behave exactly like fresh picks — tick off to deselect,
           // scissors for a partial cut. Nothing hits the server until
@@ -1718,12 +1722,18 @@
   function coBooksInPlay() {
     const seen = [];
     orderItems.forEach(function (it) {
-      (it.rolls || []).concat(it.existingRolls || []).forEach(function (r) {
+      const picked = (it.rolls || []).concat(it.existingRolls || []);
+      picked.forEach(function (r) {
         if (!r.book_id) return;
         if (!seen.some(function (b) { return b.key === r.book_id; })) {
           seen.push({ key: r.book_id, name: r.book || '' });
         }
       });
+      // A saved line with nothing picked stays on its own half.
+      const home = it.homeBook;
+      if (!picked.length && home && !seen.some(function (b) { return b.key === home.key; })) {
+        seen.push(home);
+      }
     });
     return seen;
   }
@@ -1759,6 +1769,7 @@
     (item.rolls || []).concat(item.existingRolls || []).forEach(function (r) {
       if (r.book && names.indexOf(r.book) === -1) names.push(r.book);
     });
+    if (!names.length && item.homeBook && item.homeBook.name) names.push(item.homeBook.name);
     if (!names.length) return '';
     return names.map(function (n) {
       return '<span style="margin-left:6px;font-weight:700;font-size:9.5px;color:#0F766E;' +

@@ -432,3 +432,128 @@ class EditSplitsTheSameWay(TestCase):
         stranger = Book.objects.create(name="Somebody Else Fabric")
         self._save([self._line(LALELI_SKU, stranger, "L-0001")])
         self.assertEqual(Order.objects.count(), 1)
+
+
+class EditingASplitOrderWhole(TestCase):
+    """A split order is one request on screen, so its edit form is the
+    whole order's: opening either half shows every half's lines, and each
+    is saved back onto the half it is on — never moved to the half that
+    happened to be opened."""
+
+    @patch("marketing.utils.bunny_storage.upload_to_bunny")
+    def setUp(self, mock_upload):
+        mock_upload.return_value = "https://mock-cdn.net/qr.png"
+        usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.laleli = Book.objects.create(name="Laleli Fabric")
+        self.ergene = Book.objects.create(name="Ergene Fabric")
+        self.customer = Contact.objects.create(name="Oleg Motuzenko")
+        accounts = {
+            book.pk: CurrentAccount.objects.create(
+                book=book, code=f"C-{book.pk}", name="Oleg", type="customer",
+                contact=self.customer, default_currency=usd)
+            for book in (self.laleli, self.ergene)}
+        from uuid import uuid4
+        group = uuid4()
+        self.l_order = Order.objects.create(
+            order_number="ORD-L", current_account=accounts[self.laleli.pk],
+            contact=self.customer, split_group=group, currency=usd)
+        self.e_order = Order.objects.create(
+            order_number="ORD-E", current_account=accounts[self.ergene.pk],
+            contact=self.customer, split_group=group, currency=usd)
+        self.l_line = self._held_line(self.l_order, self.laleli, LALELI_SKU, "Krep", "L-0001")
+        self.e_line = self._held_line(self.e_order, self.ergene, ERGENE_SKU, "Tul", "E-0001")
+
+        User = get_user_model()
+        self.user = User.objects.create_superuser("whole", "w@t.com", "pw")
+        self.user.member.books.add(self.laleli, self.ergene)
+        self.user.member.default_book = self.laleli
+        self.user.member.save()
+        self.client.force_login(self.user)
+
+    def _held_line(self, order, book, sku, title, barcode):
+        parent, _ = Product.objects.get_or_create(sku=sku.split(".")[0], defaults={"title": title})
+        variant, _ = ProductVariant.objects.get_or_create(product=parent, variant_sku=sku)
+        wh, _ = Warehouse.objects.get_or_create(
+            name=f"{book.name} depo", defaults={"accounting_book": book})
+        wp = WarehouseProduct.objects.create(
+            warehouse=wh, name=title, sku=sku, quantity=Decimal("50"), catalog_variant=variant)
+        roll = WarehouseProductItem.objects.create(
+            product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
+            barcode=barcode, status="in_stock")
+        line = order.items.create(product=parent, product_variant=variant,
+                                  quantity=Decimal("20"), price=Decimal("2"))
+        OrderStockReservation.objects.create(
+            order=order, order_item=line, stock_item=roll, warehouse_product=wp,
+            quantity=Decimal("20"))
+        return line
+
+    def _saved(self, line, book, barcode, qty=20, price=2):
+        return {
+            "item_id": line.pk, "item_no": 1,
+            "product": {"sku": line.product_variant.variant_sku, "variant": True},
+            "description": "", "quantity": qty, "outsourced": 0, "price": price,
+            "is_custom_curtain": False,
+            "rolls": [{"barcode": barcode, "quantity": qty, "book": book.pk}],
+        }
+
+    def _save(self, lines, deleted=()):
+        return self.client.post(
+            reverse("operating:edit_order", kwargs={"pk": self.l_order.pk}),
+            {"customer_type": "contact", "customer_pk": self.customer.pk,
+             "book": self.laleli.pk, "notes": "",
+             "product_json_input": json.dumps(lines),
+             "deleted_items": json.dumps(list(deleted))})
+
+    def _payload_ids(self, resp):
+        return {line["item_id"] for line in resp.context["order_items_payload"]}
+
+    def test_the_form_shows_every_half_s_lines(self):
+        resp = self.client.get(reverse("operating:edit_order", kwargs={"pk": self.l_order.pk}))
+        self.assertEqual(self._payload_ids(resp), {self.l_line.pk, self.e_line.pk})
+        self.assertContains(resp, "ORD-L &amp; ORD-E")
+
+    def test_the_other_half_s_line_is_saved_on_its_own_half(self):
+        self._save([self._saved(self.l_line, self.laleli, "L-0001"),
+                    self._saved(self.e_line, self.ergene, "E-0001", qty=15, price=3)])
+        self.e_line.refresh_from_db()
+        self.assertEqual(self.e_line.order_id, self.e_order.pk)
+        self.assertEqual(self.e_line.quantity, Decimal("15"))
+        self.assertEqual(self.e_line.price, Decimal("3"))
+        self.assertEqual(Order.objects.count(), 2)
+        self.assertEqual(self.l_order.items.count(), 1)
+        self.assertEqual(self.e_order.items.count(), 1)
+        held = OrderStockReservation.objects.get(order_item=self.e_line)
+        self.assertEqual((held.order_id, held.quantity), (self.e_order.pk, Decimal("15")))
+
+    def test_the_other_half_s_line_can_be_removed(self):
+        self._save([self._saved(self.l_line, self.laleli, "L-0001")], deleted=[self.e_line.pk])
+        self.assertFalse(self.e_order.items.exists())
+        self.assertFalse(OrderStockReservation.objects.filter(order=self.e_order).exists())
+        self.assertEqual(self.l_order.items.count(), 1)
+
+    def test_the_rep_who_raised_it_edits_the_other_book_s_lines(self):
+        User = get_user_model()
+        rep = User.objects.create_user("rep", "r@t.com", "pw")
+        rep.member.books.add(self.laleli)
+        rep.member.default_book = self.laleli
+        rep.member.save()
+        Order.objects.filter(pk=self.l_order.pk).update(created_by=rep)
+        self.client.force_login(rep)
+        resp = self.client.get(reverse("operating:edit_order", kwargs={"pk": self.l_order.pk}))
+        self.assertEqual(self._payload_ids(resp), {self.l_line.pk, self.e_line.pk})
+        self._save([self._saved(self.l_line, self.laleli, "L-0001"),
+                    self._saved(self.e_line, self.ergene, "E-0001", qty=12)])
+        self.e_line.refresh_from_db()
+        self.assertEqual((self.e_line.order_id, self.e_line.quantity),
+                         (self.e_order.pk, Decimal("12")))
+
+    def test_a_half_the_editor_may_not_change_stays_off_the_form(self):
+        User = get_user_model()
+        clerk = User.objects.create_user("clerk9", "c9@t.com", "pw")
+        clerk.member.books.add(self.laleli)
+        clerk.member.default_book = self.laleli
+        clerk.member.save()
+        Order.objects.filter(pk=self.l_order.pk).update(created_by=self.user)
+        self.l_order.refresh_from_db()
+        from operating.views import _editable_halves
+        self.assertEqual(_editable_halves(self.l_order, clerk), [])

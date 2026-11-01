@@ -2184,9 +2184,34 @@ def order_create_barcode_check(request):
     })
 
 
-def _take_foreign_book_lines(order, items, member):
-    """Split an edit payload into this order's own lines and the ones
-    belonging to other books.
+def _editable_halves(order, user):
+    """The other halves of a split `order` that its edit form changes too.
+
+    A split order is one request on screen, so its edit form is the whole
+    order's: every half's lines, each saved back onto its own half. A half
+    is left out — not shown, not touched — when the editor may not change
+    it: neither in one of their books nor an order they raised themselves
+    (the sales rep who took the order edits the other book's lines too,
+    though never its account), standing somewhere else (cancelled on its
+    own), or frozen by a cancel waiting for approval."""
+    from accounting.services_accounts import member_can_use_book
+    from erp.ownership import can_edit
+    from .cancel_approval import frozen_error
+    from .split_orders import order_book, split_halves
+
+    if not order.split_group:
+        return []
+    member = getattr(user, "member", None)
+    raised_it = can_edit(user, order)
+    return [h for h in split_halves(order)
+            if h.pk != order.pk and order_book(h) is not None
+            and h.order_status == order.order_status
+            and (raised_it or member_can_use_book(member, order_book(h)))
+            and not frozen_error(h)]
+
+
+def _route_edit_lines(order, halves, items, member):
+    """Sort an edit payload onto the halves of the order it edits.
 
     An order belongs to ONE book — its account is billed there and its
     holds are on that book's shelves — so a line from elsewhere can never
@@ -2194,40 +2219,114 @@ def _take_foreign_book_lines(order, items, member):
     line: the customer wants it either way. It goes to that book's order
     instead, exactly as it would have at create.
 
-    Returns (own_lines, [(book, lines), ...]) with the foreign groups in
-    book order. Untagged lines are this order's own, which is every line
-    of every order placed before any of this existed.
+    A saved line goes back to the half it is on (`halves` are the other
+    halves the form shows, see _editable_halves); a new or untagged one is
+    `order`'s own. Stock picked off another book's shelf is cut off the
+    line and goes to that book's order, as at create.
+
+    Returns (own_lines, {half pk: lines}, [(book, lines), ...], moved):
+    `order`'s own lines, the other halves' saved lines, the new lines for
+    other books in book order, and the saved lines none of whose stock is
+    left in their own book — they went whole to another book's order, so
+    the line they were is removed.
 
     Raises ValueError for a book the member is not assigned: the tag
     comes from the browser and can claim anything.
     """
     from accounting.services_accounts import member_books
+    from .split_orders import order_book
 
-    book_id = getattr(getattr(order, "current_account", None), "book_id", None)
-    allowed = {b.pk: b for b in member_books(member)}
-
-    # This order's own book is the "working" one, so the part of a line
-    # that stays here keeps its item_id and its outsourced meters, and
-    # only genuinely foreign stock is carried off.
-    own_book = None
-    if book_id is not None:
-        own_book = allowed.get(book_id)
+    own_book = order_book(order)
     if own_book is None:
-        # A book the member cannot see, or none at all: nothing to
-        # compare against, so nothing is foreign and the order is left
-        # exactly as it was.
-        return list(items or []), []
+        # No book at all: nothing to compare against, so nothing is
+        # foreign and the order is left exactly as it was.
+        return list(items or []), {}, [], []
 
-    own, foreign = [], {}
+    homes = {h.pk: h for h in [order, *halves]}
+    allowed = {b.pk: b for b in member_books(member)}
+    # Each half's own book, so its saved stock is accepted back even from
+    # a rep kept out of that book.
+    for half in homes.values():
+        allowed.setdefault(order_book(half).pk, order_book(half))
+    owner_of = dict(OrderItem.objects.filter(order__in=list(homes))
+                    .values_list("pk", "order_id"))
+
+    updates = {pk: [] for pk in homes}
+    new, moved = {}, []
     for line in items or []:
-        for book, part in _line_parts_by_book(line, allowed, own_book):
-            if book.pk == own_book.pk:
-                own.append(part)
+        raw = line.get("item_id")
+        if raw:
+            owner = owner_of.get(int(raw))
+            if owner is None:
+                # Not a line of this order any more (removed elsewhere).
+                continue
+            home = homes[owner]
+        else:
+            home = order
+        home_book = order_book(home)
+        kept = False
+        for book, part in _line_parts_by_book(line, allowed, home_book):
+            if raw and book.pk == home_book.pk and "item_id" in part:
+                updates[home.pk].append(part)
+                kept = True
             else:
-                foreign.setdefault(book.pk, (book, []))[1].append(part)
+                part.pop("item_id", None)
+                new.setdefault(book.pk, (book, []))[1].append(part)
+        if raw and not kept:
+            moved.append(int(raw))
 
-    ordered = sorted(foreign.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
-    return own, ordered
+    own = updates.pop(order.pk) + new.pop(own_book.pk, (own_book, []))[1]
+    foreign = sorted(new.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
+    return own, {pk: lines for pk, lines in updates.items() if lines}, foreign, moved
+
+
+def _update_half_line(half, item_data, user, failed_barcodes, short_lines=None):
+    """Save one of a split order's other half's lines from the edit form,
+    as the form saves its own: description, quantity, price, and the
+    rolls ticked for it — off that half's book's shelves only."""
+    from .split_orders import order_book
+
+    order_item = OrderItem.objects.filter(pk=item_data["item_id"], order=half).first()
+    if order_item is None:
+        return
+    order_item.description = item_data.get("description", "")
+    order_item.quantity = _as_line_decimal(item_data.get("quantity", 1))
+    order_item.outsourced_quantity = _outsourced_qty(item_data)
+    order_item.price = _as_line_decimal(item_data.get("price", 0))
+    order_item.save()
+    _order_edit_reserve_rolls(
+        half, order_item, item_data.get("rolls") or [], user, failed_barcodes,
+        books=[order_book(half)], short_lines=short_lines)
+
+
+def _remove_edit_lines(request, order, item_ids):
+    """Remove `order`'s lines the edit form took out. Lines that are the
+    last of a purchase still on its way in cancel it when they go: a book
+    admin decides, so those are held back and asked about."""
+    from .cancel_approval import ApprovalError, held_lines, request_approval
+
+    item_ids = list(order.items.filter(pk__in=item_ids).values_list("pk", flat=True))
+    if not item_ids:
+        return
+    held, emptied = held_lines(order, item_ids, request.user)
+    if held:
+        item_ids = [pk for pk in item_ids if pk not in held]
+        try:
+            request_approval(order, request.user, "remove_lines", item_ids=held)
+        except ApprovalError as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.warning(request, _gettext(
+                "Removing %(count)s line(s) cancels purchase %(numbers)s, so "
+                "they were kept and sent to a book admin for approval.")
+                % {"count": len(held),
+                   "numbers": ", ".join(p.number for p in emptied)})
+    # Release any active roll reservations tied to these items before
+    # deleting them — otherwise SET_NULL on order_item orphans the
+    # reservations and rolls stay "reserved" forever.
+    OrderStockReservation.objects.filter(
+        order_item__pk__in=item_ids, order=order, consumed=False).delete()
+    OrderItem.objects.filter(pk__in=item_ids, order=order).delete()
 
 
 def _sibling_order_for_book(order, book, member):
@@ -4482,7 +4581,16 @@ class OrderEdit(UpdateView):
         context["base_currency_code"] = self.object.currency_code
         context["base_is_reporting"] = (
             self.object.currency_code == context["catalog_currency_code"])
-        items = (self.object.items.all()
+        # A split order is edited whole: the other halves' lines are on the
+        # form too, each saved back onto its own half (see form_valid).
+        from .split_orders import combined_number, order_book
+        halves = _editable_halves(self.object, self.request.user)
+        book_of = {o.pk: order_book(o) for o in [self.object, *halves]}
+        context["combined_number"] = (
+            combined_number(sorted([self.object, *halves], key=lambda o: o.pk))
+            if halves else "")
+        items = (OrderItem.objects.filter(order__in=[self.object, *halves])
+                 .order_by("order_id", "pk")
                  .select_related("product", "product_variant")
                  .prefetch_related(
                      "stock_reservations__stock_item__product__warehouse",
@@ -4503,6 +4611,10 @@ class OrderEdit(UpdateView):
         context["order_items_payload"] = [
             {
                 "item_id": it.pk,
+                # The book of the half the line is on, which a split
+                # order's form shows on the card.
+                "book_id": getattr(book_of.get(it.order_id), "pk", None),
+                "book": getattr(book_of.get(it.order_id), "name", "") or "",
                 # Human title for the product card header — the sidebar
                 # otherwise falls back to the (often auto-minted,
                 # meaningless) SKU and staff can't tell products apart.
@@ -4674,41 +4786,16 @@ class OrderEdit(UpdateView):
                 # Handle order items
                 product_json_input = self.request.POST.get("product_json_input")
                 deleted_items_json = self.request.POST.get("deleted_items")
+                # A split order's other halves the form showed: their lines
+                # are saved back onto them, see _editable_halves.
+                halves = _editable_halves(self.object, self.request.user)
 
-                # Delete removed items
+                # Delete removed items, off whichever half each was on.
                 if deleted_items_json:
                     try:
                         deleted_items = json.loads(deleted_items_json)
-                        # Lines that are the last of a purchase still on its
-                        # way in cancel it when they go: a book admin decides,
-                        # so those are held back and asked about.
-                        from .cancel_approval import (ApprovalError, held_lines,
-                                                      request_approval)
-                        held, emptied = held_lines(self.object, deleted_items, self.request.user)
-                        if held:
-                            deleted_items = [pk for pk in deleted_items if pk not in held]
-                            try:
-                                request_approval(self.object, self.request.user,
-                                                 "remove_lines", item_ids=held)
-                            except ApprovalError as exc:
-                                messages.error(self.request, str(exc))
-                            else:
-                                messages.warning(self.request, _gettext(
-                                    "Removing %(count)s line(s) cancels purchase %(numbers)s, so "
-                                    "they were kept and sent to a book admin for approval.")
-                                    % {"count": len(held),
-                                       "numbers": ", ".join(p.number for p in emptied)})
-                        # Release any active roll reservations tied to these items
-                        # before deleting them — otherwise SET_NULL on order_item
-                        # orphans the reservations and rolls stay "reserved" forever.
-                        OrderStockReservation.objects.filter(
-                            order_item__pk__in=deleted_items,
-                            order=self.object,
-                            consumed=False,
-                        ).delete()
-                        OrderItem.objects.filter(
-                            pk__in=deleted_items, order=self.object
-                        ).delete()
+                        for half in [self.object, *halves]:
+                            _remove_edit_lines(self.request, half, deleted_items)
                     except json.JSONDecodeError:
                         messages.error(self.request, "Invalid deleted items format.")
 
@@ -4721,6 +4808,7 @@ class OrderEdit(UpdateView):
                 # a name bound only inside the branch would not be there.
                 edit_member = getattr(self.request.user, "member", None)
                 foreign_groups = []
+                half_lines = {}
                 split_currency = None
                 if product_json_input:
                     try:
@@ -4755,19 +4843,29 @@ class OrderEdit(UpdateView):
                         # book's order instead of being refused. Taken out
                         # here, before anything below counts the payload as
                         # this order's own; added to their own orders once
-                        # this one is finished, further down.
-                        product_json_input, foreign_groups = _take_foreign_book_lines(
-                            self.object, product_json_input, edit_member)
+                        # this one is finished, further down. The other
+                        # halves' saved lines are taken out too, and saved
+                        # back onto their own halves.
+                        product_json_input, half_lines, foreign_groups, moved = _route_edit_lines(
+                            self.object, halves, product_json_input, edit_member)
                         # Lines for another book only go if that book's
                         # order can be in this order's currency — raised
                         # here, the whole edit rolls back untouched.
                         split_currency = _split_currency_at_edit(
                             self.object, foreign_groups)
+                        for half in [self.object, *halves]:
+                            _remove_edit_lines(self.request, half, moved)
 
                         # Unticked stock items go back to the pool BEFORE any line
                         # reserves, so a stock item moved between lines in one save
                         # isn't blocked by its own soon-to-be-dropped hold.
                         _order_edit_release_unticked(self.object, product_json_input)
+                        for half in halves:
+                            _order_edit_release_unticked(half, half_lines.get(half.pk, []))
+                        for half in halves:
+                            for item_data in half_lines.get(half.pk, []):
+                                _update_half_line(half, item_data, self.request.user,
+                                                  failed_barcodes, short_lines=short_lines)
 
                         for item_data in product_json_input:
                             if "item_id" in item_data:
@@ -4839,6 +4937,20 @@ class OrderEdit(UpdateView):
                     _settle_sibling(self.request, sibling, _book, edit_member,
                                     currency=split_currency)
                     spun_off.append((sibling, _book, is_new))
+                # The other halves the form showed post what their lines
+                # now come to; one that took new lines above already has.
+                settled = {sibling.pk for sibling, _book, _new in spun_off}
+                for half in halves:
+                    if half.pk in settled:
+                        continue
+                    try:
+                        from accounting.services_accounts import post_order_movement
+                        post_order_movement(half, member=edit_member)
+                    except Exception as _e:
+                        messages.warning(self.request, _gettext(
+                            "Order updated, but %(number)s's current account could not "
+                            "be updated: %(error)s") % {"number": half.order_number or f"#{half.pk}",
+                                                       "error": _e})
 
                 if failed_barcodes:
                     messages.warning(

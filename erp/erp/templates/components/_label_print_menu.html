@@ -85,6 +85,8 @@ fetched in) are wired as they arrive.
     return url.toString();
   }
   function open(forLink, at) {
+    // A link with nowhere to go yet — Order history's, before a row is ticked.
+    if (!forLink.getAttribute('href')) return;
     if (anchor && anchor !== at) anchor.setAttribute('aria-expanded', 'false');
     link = forLink;
     anchor = at;

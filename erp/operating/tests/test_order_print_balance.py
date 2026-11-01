@@ -213,3 +213,12 @@ class PrintMenuChoices(OlegsAccount, TestCase):
         resp = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
         self.assertContains(resp, 'data-print-options="balance plain"', count=2)
         self.assertContains(resp, "White label, no balance")
+
+    def test_the_contact_pages_order_card_offers_them_too(self):
+        """Order history's Print selected and Excel: links pointed at the
+        ticked orders by script, so they start with no address at all."""
+        resp = self.client.get(reverse("crm:contact_detail", kwargs={"pk": self.oleg.pk}))
+        self.assertContains(resp, 'data-print-options="balance plain"', count=2)
+        self.assertContains(resp, 'data-base-href="%s"' % reverse("operating:order_print_combined"))
+        self.assertContains(resp, 'data-base-href="%s"' % reverse("operating:order_excel_combined"))
+        self.assertContains(resp, "White label, no balance")

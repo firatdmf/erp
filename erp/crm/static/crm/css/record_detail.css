@@ -335,11 +335,15 @@
   padding: 5px 11px; border-radius: 8px; cursor: pointer;
   border: 1px solid var(--nejum-teal-500); background: white;
   color: var(--nejum-teal-700); font: 600 11.5px var(--font-sans);
-  transition: all 140ms;
+  text-decoration: none; transition: all 140ms;
 }
-.od-print-orders:hover:not(:disabled) { background: #E6F4F1; }
-.od-print-orders:disabled {
+.od-print-orders:hover:not(:disabled):not([aria-disabled="true"]) { background: #E6F4F1; }
+/* A link has no :disabled — Order history's are links (see setPickTarget),
+   greyed by aria-disabled, and their chevron with them. */
+.od-print-orders:disabled, .od-print-orders[aria-disabled="true"],
+.lp-split:has(> .od-print-orders[aria-disabled="true"]) > .lp-more {
   opacity: 0.45; cursor: default; border-color: #E2E8EE; color: var(--gray-500);
+  pointer-events: none;
 }
 .od-order-row {
   display: grid;

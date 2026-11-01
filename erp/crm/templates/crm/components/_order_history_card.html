@@ -13,23 +13,31 @@
     <span class="od-card-sub">{{ orders|length }} {% blocktrans count counter=orders|length %}order{% plural %}orders{% endblocktrans %}</span>
   </div>
   {% if orders %}
+    {% comment %}Links, not buttons, so they carry the order page's chevron
+    (no balance, white label): record_detail.js points them at the ticked
+    orders and greys them out while none are. Excel opens in place — the
+    response is an attachment, and a new tab would take it and sit blank.{% endcomment %}
     <div class="od-card-tools">
-      <button type="button" id="printOrdersBtn" class="od-print-orders" disabled
-              onclick="printSelectedOrders()"
-              data-label-idle="{% trans 'Print selected' %}"
-              data-label-picked="{% trans 'Print' %}">
+      <a id="printOrdersBtn" class="od-print-orders" aria-disabled="true"
+         target="_blank" rel="noopener"
+         data-base-href="{% url 'operating:order_print_combined' %}"
+         data-label-print data-print-options="balance plain"
+         data-label-idle="{% trans 'Print selected' %}"
+         data-label-picked="{% trans 'Print' %}">
         <i class="fa fa-print"></i>
         <span id="printOrdersLabel">{% trans "Print selected" %}</span>
-      </button>
-      <button type="button" id="excelOrdersBtn" class="od-print-orders" disabled
-              onclick="excelSelectedOrders()"
-              data-label-idle="{% trans 'Excel' %}"
-              data-label-picked="{% trans 'Excel' %}"
-              title="{% trans 'Download the selected orders as a spreadsheet' %}">
+      </a>
+      <a id="excelOrdersBtn" class="od-print-orders" aria-disabled="true"
+         data-base-href="{% url 'operating:order_excel_combined' %}"
+         data-label-print data-print-options="balance plain"
+         data-label-idle="{% trans 'Excel' %}"
+         data-label-picked="{% trans 'Excel' %}"
+         title="{% trans 'Download the selected orders as a spreadsheet' %}">
         <i class="fa fa-file-excel"></i>
         <span id="excelOrdersLabel">{% trans "Excel" %}</span>
-      </button>
+      </a>
     </div>
+    {% include "components/_label_print_menu.html" %}
   {% endif %}
 
   <div class="od-order-list">

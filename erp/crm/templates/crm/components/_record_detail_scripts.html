@@ -27,8 +27,6 @@
       emails: "{{ emails_url|default:'' }}",
       sharedFiles: "{{ shared_files_url|default:'' }}",
       compose: "{% url 'marketing:compose_email' %}",
-      orderPrint: "{% url 'operating:order_print_combined' %}",
-      orderExcel: "{% url 'operating:order_excel_combined' %}",
       statementPrint: "{% url 'accounts:statement_print_combined' %}",
       statementExcel: "{% url 'accounts:statement_excel_combined' %}"
     },

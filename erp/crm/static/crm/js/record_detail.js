@@ -663,13 +663,29 @@ function pickedIds(selector) {
               .map(function (cb) { return cb.value; });
 }
 
+// A pick button is a <button> run by its onclick, or a link (Order
+// history's, which carry the print menu's chevron) pointed at the ticked
+// rows: data-base-href?ids=…, and no href at all while nothing is ticked.
+function setPickTarget(el, ids) {
+  if (!el) return;
+  if (el.tagName !== 'A') { el.disabled = ids.length === 0; return; }
+  if (ids.length) {
+    el.href = el.dataset.baseHref + '?ids=' + ids.join(',');
+    el.removeAttribute('aria-disabled');
+  } else {
+    el.removeAttribute('href');
+    el.setAttribute('aria-disabled', 'true');
+  }
+}
+
 function syncPickButtons(selector, prefix) {
   const btn = document.getElementById(`print${prefix}Btn`);
   if (!btn) return;
-  const n = pickedIds(selector).length;
-  btn.disabled = n === 0;
+  const ids = pickedIds(selector);
+  const n = ids.length;
+  setPickTarget(btn, ids);
   const xls = document.getElementById(`excel${prefix}Btn`);
-  if (xls) xls.disabled = n === 0;
+  setPickTarget(xls, ids);
   // Labels come off data- attributes rather than being written into
   // this script: they are translated per page render.
   document.getElementById(`print${prefix}Label`).textContent =
@@ -684,25 +700,11 @@ function syncPickButtons(selector, prefix) {
 
 // ── Combined order sheet ───────────────────────────────────────────
 // Tick several of this client's orders and print them onto one page
-// (operating:order_print_combined). It is a document and nothing else
-// — no invoice, no ledger row — so the only state there is to keep is
-// what happens to be ticked right now.
+// (operating:order_print_combined), or download it as a spreadsheet.
+// It is a document and nothing else — no invoice, no ledger row — so
+// the only state there is to keep is what happens to be ticked right
+// now. The two buttons are links; see setPickTarget.
 function syncPrintSelection() { syncPickButtons('.od-order-check', 'Orders'); }
-
-function printSelectedOrders() {
-  const ids = pickedIds('.od-order-check');
-  if (!ids.length) return;
-  window.open(RD.urls.orderPrint + '?ids=' + ids.join(','), '_blank');
-}
-
-// The same sheet as a spreadsheet. Navigates rather than opening a
-// tab: the response is an attachment, so a new tab would open, take
-// the download and sit there blank.
-function excelSelectedOrders() {
-  const ids = pickedIds('.od-order-check');
-  if (!ids.length) return;
-  window.location = RD.urls.orderExcel + '?ids=' + ids.join(',');
-}
 
 // ── Account history: pick, print, export ────────────────────────────
 function syncAccountSelection() { syncPickButtons('.od-account-check', 'Accounts'); }

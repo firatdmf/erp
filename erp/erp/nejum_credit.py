@@ -1,15 +1,17 @@
 """The "<Brand> is powered by Nejum" credit at the foot of documents.
 
 Every document a customer receives — the printed order, its Excel sheet,
-the packing list and the order emails — ends by saying who sent it and
+the packing list, the printed account statement and the order emails —
+ends by saying who sent it and
 what made it. It is a line of its own at the bottom of the page, never
 folded into the document's own footer: the house's name in the house's
 colour, Nejum in teal, small type.
 
 It is a brand-profile setting, edited on the Settings page; switched off
 there, every document drops the line at once.
-Invoices and account statements never carry it: a software credit on a
-financial document reads as though someone else issued it.
+Invoices never carry it: a software credit on an invoice reads as though
+someone else issued it. The printed account statement does, since
+2026-11-01 — it is drawn as the order sheet is, and signed the same way.
 
     credit_runs()   → [(text, colour), …] — the sentence, split to colour
     credit_text()   → the same, flattened, for plain text and Excel

@@ -43,8 +43,10 @@
   </style>
 </head>
 <body>
-  {% comment %}No Nejum credit: a software credit on a financial document
-  reads as though someone else issued it (see erp/nejum_credit.py).{% endcomment %}
+  {% comment %}The Nejum credit, first thing in the body for the PDF: a
+  running element appears only from the page it is reached on, so at the
+  end it printed on the last page alone. See operating/order_print.html.{% endcomment %}
+  {% if is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
 
   {% trans "STATEMENT" as kind %}
   {% include "print/_document_header.html" with brand_line=brand_name number=statement_number kind=kind date=printed_at %}
@@ -149,6 +151,7 @@
       <td class="right">{% now "d M Y · H:i" %}</td>
     </tr>
   </table>
+  {% if not is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
 
   {% if not is_pdf %}
   <script>

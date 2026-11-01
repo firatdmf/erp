@@ -102,3 +102,9 @@ class StatementOrderLines(TestCase):
         self.assertContains(resp, "Delivery")
         self.assertContains(resp, "Balance due")
         self.assertNotContains(resp, f"Order #{self.order.pk}")
+
+    def test_the_printed_statement_is_signed_like_the_order_sheet(self):
+        resp = self.client.get(reverse("accounts:statement_print_combined"),
+                               {"ids": str(self.account.pk), "html": "1"})
+        self.assertContains(resp, 'class="nejum"')
+        self.assertContains(resp, "Nejum")

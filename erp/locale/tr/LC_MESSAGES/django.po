@@ -15404,3 +15404,6 @@ msgstr "Kasaya dokunulmaz. {name} hesabının deftere borcu bu tutar kadar azal�
 
 msgid "No balance"
 msgstr "Bakiyesiz"
+
+msgid "White label, no balance"
+msgstr "Beyaz etiket, bakiyesiz"

@@ -7,9 +7,10 @@ the chevron beside the link, and only there. Two looks, by the attribute:
   "split"  (default) a bordered button: the chevron joins it inside the same border
   "inline" a text link or bare icon: the chevron right after it
 The choices the menu offers are the link's data-print-options, any of
-"balance" (no customer balance), "white" and "brand"; "white brand" when
-it names none, which is what every label link wants. The order's Print
-and Excel buttons ask for "balance white".
+"balance" (no customer balance), "white", "plain" (white label and no
+balance, for a sheet with nothing of ours on it) and "brand"; "white
+brand" when it names none, which is what every label link wants. The
+order's Print and Excel buttons ask for "balance plain".
 A link that opens in a new tab prints the choice in a new tab; one that
 does not (a download) fetches it in place.
 Include once per page; links added later (the warehouse's roll rows are
@@ -69,6 +70,8 @@ fetched in) are wired as they arrive.
       '<span>{% filter escapejs %}{% trans "No balance" %}{% endfilter %}</span></button>' +
     '<button type="button" class="lp-item" data-lp="white" data-lp-opt="white" role="menuitem">' + ICON_NO_TAG +
       '<span>{% filter escapejs %}{% trans "White label" %}{% endfilter %}</span></button>' +
+    '<button type="button" class="lp-item" data-lp="plain" data-lp-opt="plain" role="menuitem">' + ICON_NO_TAG +
+      '<span>{% filter escapejs %}{% trans "White label, no balance" %}{% endfilter %}</span></button>' +
     '<div class="lp-custom" data-lp-opt="brand"><label for="lp-brand">' + ICON_TAG +
       '<span>{% filter escapejs %}{% trans "Custom brand name" %}{% endfilter %}</span></label>' +
     '<form><input id="lp-brand" autocomplete="off" required>' +
@@ -102,8 +105,9 @@ fetched in) are wired as they arrive.
     menu.hidden = true;
     if (anchor) anchor.setAttribute('aria-expanded', 'false');
   }
-  function print(key, value) {
-    const url = withParam(link.href, key, value);
+  function print(key, value, key2, value2) {
+    let url = withParam(link.href, key, value);
+    if (key2) url = withParam(url, key2, value2);
     if (link.target === '_blank') window.open(url, '_blank', 'noopener');
     else location.href = url;
     close();
@@ -112,6 +116,7 @@ fetched in) are wired as they arrive.
   menu.addEventListener('click', function (e) {
     if (e.target.closest('[data-lp="white"]')) print('white_label', '1');
     if (e.target.closest('[data-lp="balance"]')) print('balance', '0');
+    if (e.target.closest('[data-lp="plain"]')) print('white_label', '1', 'balance', '0');
   });
   menu.querySelector('form').addEventListener('submit', function (e) {
     e.preventDefault();

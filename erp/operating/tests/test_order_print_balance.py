@@ -211,4 +211,5 @@ class PrintMenuChoices(OlegsAccount, TestCase):
 
     def test_the_order_page_offers_the_choices(self):
         resp = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
-        self.assertContains(resp, 'data-print-options="balance white"', count=2)
+        self.assertContains(resp, 'data-print-options="balance plain"', count=2)
+        self.assertContains(resp, "White label, no balance")

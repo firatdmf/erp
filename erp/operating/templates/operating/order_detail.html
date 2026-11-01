@@ -1315,10 +1315,10 @@
       </div>
     </div>
     <div class="od-head-r">
-      <a href="{% if print_ids %}{% url 'operating:order_print_combined' %}?ids={{ print_ids }}{% else %}{% url 'operating:order_print' order.pk %}{% endif %}" target="_blank" rel="noopener" class="ord-btn ghost" data-label-print data-print-options="balance white">
+      <a href="{% if print_ids %}{% url 'operating:order_print_combined' %}?ids={{ print_ids }}{% else %}{% url 'operating:order_print' order.pk %}{% endif %}" target="_blank" rel="noopener" class="ord-btn ghost" data-label-print data-print-options="balance plain">
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
-      <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost" data-label-print data-print-options="balance white">
+      <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost" data-label-print data-print-options="balance plain">
         <i class="fa fa-file-excel"></i>{% trans "Excel" %}
       </a>
       {% if not shipped and not is_terminal and not cancel_request %}

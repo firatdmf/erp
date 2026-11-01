@@ -26,7 +26,7 @@ nothing they assert, wherever none did. They get a fixed table instead.
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.test.runner import DiscoverRunner
+from django.test.runner import DiscoverRunner, ParallelTestSuite
 
 # What one unit is worth in dollars. Roughly true, so a test that only
 # says "300 lira is well under 50 dollars" still means something; a test
@@ -50,21 +50,45 @@ def _fixed_rate(from_currency, to_currency, on_date=None):
     return (_IN_DOLLARS[fc] / _IN_DOLLARS[tc]).quantize(Decimal("0.000001"))
 
 
-class NoCdnTestRunner(DiscoverRunner):
-    def run_tests(self, *args, **kwargs):
-        patcher = patch("marketing.utils.bunny_storage.upload_to_bunny",
-                        return_value="https://mock-cdn.invalid/test.png")
+def _offline_patches():
+    """The stubs, started: the CDN, WhatsApp and the rate services."""
+    patches = [
+        patch("marketing.utils.bunny_storage.upload_to_bunny",
+              return_value="https://mock-cdn.invalid/test.png"),
         # WhatsApp too: nothing in the suite may reach Meta, whatever a
         # test has configured.
-        whatsapp = patch("operating.order_whatsapp._post",
-                         side_effect=AssertionError("WhatsApp is off limits in tests"))
-        rates = patch("accounting.services._fetch_rate", side_effect=_fixed_rate)
-        patcher.start()
-        whatsapp.start()
-        rates.start()
+        patch("operating.order_whatsapp._post",
+              side_effect=AssertionError("WhatsApp is off limits in tests")),
+        patch("accounting.services._fetch_rate", side_effect=_fixed_rate),
+    ]
+    for p in patches:
+        p.start()
+    return patches
+
+
+def _offline_worker(*args):
+    # --parallel on macOS spawns its workers: fresh interpreters that
+    # inherit none of the patches started in run_tests, and would upload
+    # to the real CDN. Each one starts its own here. (Forked workers
+    # inherit them, and Django calls this only for spawned ones.) Django
+    # calls it before its own django.setup(), and the patch targets import
+    # models, so the apps are loaded first; setup() is safe to repeat.
+    import django
+    django.setup()
+    _offline_patches()
+
+
+class OfflineParallelTestSuite(ParallelTestSuite):
+    process_setup = _offline_worker
+
+
+class NoCdnTestRunner(DiscoverRunner):
+    parallel_test_suite = OfflineParallelTestSuite
+
+    def run_tests(self, *args, **kwargs):
+        patches = _offline_patches()
         try:
             return super().run_tests(*args, **kwargs)
         finally:
-            rates.stop()
-            whatsapp.stop()
-            patcher.stop()
+            for p in reversed(patches):
+                p.stop()

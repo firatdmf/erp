@@ -15401,3 +15401,6 @@ msgstr "Bu kâr payını neyin ödediğini seçin."
 #: accounting/templates/accounting/add_equity_divident.html
 msgid "Cash is untouched. What {name} owes the book goes down by this amount."
 msgstr "Kasaya dokunulmaz. {name} hesabının deftere borcu bu tutar kadar azalır."
+
+msgid "No balance"
+msgstr "Bakiyesiz"

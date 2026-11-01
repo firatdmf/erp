@@ -965,6 +965,8 @@
   @media (max-width: 900px) {
     .od-head-r { width: 100%; justify-content: flex-start; }
     .od-head-r .ord-btn { flex: 1 1 auto; justify-content: center; }
+    /* Print and Excel sit in their chevron's wrapper; it is what shares the row. */
+    .od-head-r .lp-split { flex: 1 1 auto; }
   }
   @media (max-width: 700px) {
     .ord { padding: 16px 12px 96px; }
@@ -1313,10 +1315,10 @@
       </div>
     </div>
     <div class="od-head-r">
-      <a href="{% if print_ids %}{% url 'operating:order_print_combined' %}?ids={{ print_ids }}{% else %}{% url 'operating:order_print' order.pk %}{% endif %}" target="_blank" rel="noopener" class="ord-btn ghost">
+      <a href="{% if print_ids %}{% url 'operating:order_print_combined' %}?ids={{ print_ids }}{% else %}{% url 'operating:order_print' order.pk %}{% endif %}" target="_blank" rel="noopener" class="ord-btn ghost" data-label-print data-print-options="balance white">
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
-      <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost">
+      <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost" data-label-print data-print-options="balance white">
         <i class="fa fa-file-excel"></i>{% trans "Excel" %}
       </a>
       {% if not shipped and not is_terminal and not cancel_request %}
@@ -4052,4 +4054,6 @@
     }
   })();
 </script>
+{% comment %}The chevron on Print and Excel: no balance, or no name.{% endcomment %}
+{% include "components/_label_print_menu.html" %}
 {% endblock %}

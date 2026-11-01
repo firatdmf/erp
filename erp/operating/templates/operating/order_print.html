@@ -49,7 +49,7 @@
   on — left at the foot of the document it printed on the LAST page
   alone. In the HTML fallback it stays where a reader expects it, under
   the footer at the end.{% endcomment %}
-  {% if is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
+  {% if is_pdf and NEJUM_CREDIT_HTML and not white_label %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
 
   <!-- HEADER — the number alone, the chip naming the document. A combined
        print names every order it covers, the way a split order is named
@@ -269,11 +269,11 @@
   <!-- FOOTER -->
   <table class="foot" cellspacing="0" cellpadding="0">
     <tr>
-      <td>{{ brand_line|default:"Nejum ERP" }} · {% if combined %}{% trans "Orders" %}{% else %}{% trans "Order" %}{% endif %}</td>
+      <td>{% if not white_label %}{{ brand_line|default:"Nejum ERP" }} · {% endif %}{% if combined %}{% trans "Orders" %}{% else %}{% trans "Order" %}{% endif %}</td>
       <td class="right">{% now "d M Y · H:i" %}</td>
     </tr>
   </table>
-  {% if not is_pdf and NEJUM_CREDIT_HTML %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
+  {% if not is_pdf and NEJUM_CREDIT_HTML and not white_label %}<div class="nejum">{{ NEJUM_CREDIT_HTML }}</div>{% endif %}
 
   {% if not is_pdf %}
     <script>

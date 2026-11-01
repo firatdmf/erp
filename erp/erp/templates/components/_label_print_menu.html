@@ -6,6 +6,12 @@ label — no name — or with a name typed in. The menu opens on a click of
 the chevron beside the link, and only there. Two looks, by the attribute:
   "split"  (default) a bordered button: the chevron joins it inside the same border
   "inline" a text link or bare icon: the chevron right after it
+The choices the menu offers are the link's data-print-options, any of
+"balance" (no customer balance), "white" and "brand"; "white brand" when
+it names none, which is what every label link wants. The order's Print
+and Excel buttons ask for "balance white".
+A link that opens in a new tab prints the choice in a new tab; one that
+does not (a download) fetches it in place.
 Include once per page; links added later (the warehouse's roll rows are
 fetched in) are wired as they arrive.
 {% endcomment %}
@@ -23,7 +29,7 @@ fetched in) are wired as they arrive.
              background:#fff; border:1px solid #E2E8F0; border-radius:10px;
              box-shadow:0 10px 28px rgba(15,23,42,.16);
              font:500 13px var(--font-sans, system-ui, -apple-system, sans-serif); color:#0F172A; text-align:left; }
-  .lp-menu[hidden] { display:none; }
+  .lp-menu[hidden], .lp-menu [hidden] { display:none !important; }
   .lp-menu-h { padding:4px 8px 6px; color:#64748B; font-size:11px; font-weight:700;
                letter-spacing:.06em; text-transform:uppercase; }
   .lp-menu svg { width:15px; height:15px; flex:none; color:#147F74; }
@@ -49,6 +55,7 @@ fetched in) are wired as they arrive.
   const CHEVRON = '<svg class="lp-chev" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5"/></svg>';
   const TAG = '<path d="M3 3h7l9 9-7 7-9-9z"/><circle cx="7.5" cy="7.5" r="1.3"/>';
   const ICON_TAG = '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true">' + TAG + '</svg>';
+  const ICON_NO_BALANCE = '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M5 2h12v18l-3-2-3 2-3-2-3 2z"/><path d="M8 7h6M8 11h6"/><path d="M2 20 20 2"/></svg>';
   const ICON_NO_TAG = '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">' + TAG + '<path d="M2 20 20 2"/></svg>';
   const MORE = '{% filter escapejs %}{% trans "More label options" %}{% endfilter %}';
 
@@ -58,9 +65,11 @@ fetched in) are wired as they arrive.
   menu.setAttribute('role', 'menu');
   menu.innerHTML =
     '<div class="lp-menu-h">{% filter escapejs %}{% trans "Print with…" %}{% endfilter %}</div>' +
-    '<button type="button" class="lp-item" data-lp="white" role="menuitem">' + ICON_NO_TAG +
+    '<button type="button" class="lp-item" data-lp="balance" data-lp-opt="balance" role="menuitem">' + ICON_NO_BALANCE +
+      '<span>{% filter escapejs %}{% trans "No balance" %}{% endfilter %}</span></button>' +
+    '<button type="button" class="lp-item" data-lp="white" data-lp-opt="white" role="menuitem">' + ICON_NO_TAG +
       '<span>{% filter escapejs %}{% trans "White label" %}{% endfilter %}</span></button>' +
-    '<div class="lp-custom"><label for="lp-brand">' + ICON_TAG +
+    '<div class="lp-custom" data-lp-opt="brand"><label for="lp-brand">' + ICON_TAG +
       '<span>{% filter escapejs %}{% trans "Custom brand name" %}{% endfilter %}</span></label>' +
     '<form><input id="lp-brand" autocomplete="off" required>' +
     '<button type="submit" class="lp-go">{% filter escapejs %}{% trans "Print" %}{% endfilter %}</button></form></div>';
@@ -76,6 +85,10 @@ fetched in) are wired as they arrive.
     if (anchor && anchor !== at) anchor.setAttribute('aria-expanded', 'false');
     link = forLink;
     anchor = at;
+    const opts = (link.getAttribute('data-print-options') || 'white brand').split(/\s+/);
+    menu.querySelectorAll('[data-lp-opt]').forEach(function (el) {
+      el.hidden = opts.indexOf(el.getAttribute('data-lp-opt')) < 0;
+    });
     anchor.setAttribute('aria-expanded', 'true');
     if (!input.value) { try { input.value = localStorage.getItem('labelBrand') || ''; } catch (_) {} }
     menu.hidden = false;
@@ -90,12 +103,15 @@ fetched in) are wired as they arrive.
     if (anchor) anchor.setAttribute('aria-expanded', 'false');
   }
   function print(key, value) {
-    window.open(withParam(link.href, key, value), '_blank', 'noopener');
+    const url = withParam(link.href, key, value);
+    if (link.target === '_blank') window.open(url, '_blank', 'noopener');
+    else location.href = url;
     close();
   }
 
   menu.addEventListener('click', function (e) {
     if (e.target.closest('[data-lp="white"]')) print('white_label', '1');
+    if (e.target.closest('[data-lp="balance"]')) print('balance', '0');
   });
   menu.querySelector('form').addEventListener('submit', function (e) {
     e.preventDefault();

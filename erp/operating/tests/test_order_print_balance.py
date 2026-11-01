@@ -31,7 +31,8 @@ from operating.models import Order, OrderItem
 User = get_user_model()
 
 
-class OrderPrintBalance(TestCase):
+class OlegsAccount:
+    """One open order for 390.00 on Oleg's Laleli account."""
 
     @patch("marketing.utils.bunny_storage.upload_to_bunny")
     def setUp(self, mock_upload):
@@ -73,6 +74,10 @@ class OrderPrintBalance(TestCase):
     def _sheet(self, order=None):
         order = order or self.order
         return self.client.get(reverse("operating:order_print", args=[order.pk]), {"html": "1"})
+
+
+
+class OrderPrintBalance(OlegsAccount, TestCase):
 
     def _only_balance(self, resp):
         balances = resp.context["order_balances"]
@@ -159,3 +164,51 @@ class OrderPrintBalance(TestCase):
         self.assertIn(["Previous balance (in credit)", 500.0], values)
         self.assertIn(["In credit", 110.0], values)
         self.assertIn(["Balance due", 87.75], values)
+
+
+class PrintMenuChoices(OlegsAccount, TestCase):
+    """The chevron on the order page's Print and Excel: ?balance=0 leaves
+    the balance off, ?white_label=1 leaves the business's name off."""
+
+    def test_no_balance_leaves_it_off_the_sheet(self):
+        self._move("100.00")
+        resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]),
+                               {"html": "1", "balance": "0"})
+        self.assertEqual(resp.context["order_balances"], [])
+        self.assertNotContains(resp, "Previous balance")
+
+    def test_white_label_prints_no_name(self):
+        resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]),
+                               {"html": "1", "white_label": "1"})
+        self.assertNotContains(resp, 'class="brand"')
+        self.assertNotContains(resp, 'class="nejum"')
+        # The balance stays: white label takes the name off, nothing else.
+        self.assertContains(resp, 'class="balance"')
+
+    def test_a_plain_click_still_prints_both(self):
+        resp = self._sheet()
+        self.assertContains(resp, 'class="brand"')
+        self.assertContains(resp, 'class="balance"')
+
+    def test_the_combined_sheet_takes_the_same_choices(self):
+        self._move("100.00")
+        resp = self.client.get(reverse("operating:order_print_combined"),
+                               {"ids": str(self.order.pk), "html": "1",
+                                "balance": "0", "white_label": "1"})
+        self.assertEqual(resp.context["order_balances"], [])
+        self.assertNotContains(resp, 'class="brand"')
+
+    def test_the_excel_takes_the_same_choices(self):
+        from openpyxl import load_workbook
+        self._move("100.00")
+        resp = self.client.get(reverse("operating:order_excel", args=[self.order.pk]),
+                               {"balance": "0", "white_label": "1"})
+        ws = load_workbook(BytesIO(resp.content)).active
+        values = [c for row in ws.iter_rows(values_only=True) for c in row if c is not None]
+        self.assertNotIn("Previous balance", values)
+        self.assertFalse(ws.cell(1, 1).value)
+        self.assertFalse(ws.oddFooter.center.text)
+
+    def test_the_order_page_offers_the_choices(self):
+        resp = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
+        self.assertContains(resp, 'data-print-options="balance white"', count=2)

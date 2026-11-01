@@ -3596,8 +3596,30 @@ class OrderPrint(DetailView):
 
         order = self.object
         return document_response(
-            self.request, self.template_name, dict(context),
+            self.request, self.template_name,
+            apply_print_choices(self.request, dict(context)),
             f"order_{order.order_number or order.pk}.pdf")
+
+
+def print_choices(request):
+    """What the Print button's menu asked for, as (white_label, balance).
+
+    A click on the button itself prints with the business's name and the
+    customer's balance; the chevron's menu (components/_label_print_menu)
+    adds ?white_label=1 for a sheet with no name on it, or ?balance=0 for
+    one without the balance. Shared by the printed sheet and its Excel."""
+    return bool(request.GET.get("white_label")), request.GET.get("balance") != "0"
+
+
+def apply_print_choices(request, ctx):
+    """`ctx` as print_choices says the sheet should print."""
+    white_label, balance = print_choices(request)
+    if white_label:
+        ctx["white_label"] = True
+        ctx["brand_line"] = ""
+    if not balance:
+        ctx["order_balances"] = []
+    return ctx
 
 
 def select_combined_orders(request):
@@ -3678,7 +3700,7 @@ class OrderPrintCombined(LoginRequiredMixin, View):
         orders, refusal = select_combined_orders(request)
         if refusal is not None:
             return refusal
-        ctx = combined_print_context(orders)
+        ctx = apply_print_choices(request, combined_print_context(orders))
         return document_response(request, "operating/order_print.html", ctx,
                                  f"orders_{ctx['order'].order_number or ctx['order'].pk}.pdf")
 

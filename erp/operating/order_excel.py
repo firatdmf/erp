@@ -263,14 +263,16 @@ def _write_balances(ws, r, balances, label_from, value_col, combined=False):
     return r
 
 
-def build_order_workbook(order):
+def build_order_workbook(order, white_label=False, balance=True):
+    """`white_label` and `balance` are the Print button menu's choices —
+    see operating.views.print_choices."""
     from openpyxl import Workbook
 
     # The order's own print header wins, then the ledger book's brand
     # name — same precedence as order_print.html, so the two documents
     # for one order sign with the same name.
     from accounting.services_accounts import brand_name_for
-    brand = brand_name_for()
+    brand = "" if white_label else brand_name_for()
     ccode = (order.original_currency or order.paid_currency or "USD")
     # The same currency FORMAT the combined sheet uses — "$2.45", the
     # sign worn by the number. This carried the ISO code as a suffix
@@ -443,8 +445,9 @@ def build_order_workbook(order):
         r += 1
 
     # ── The customer's balance ──
-    from .order_balance import order_balances
-    r = _write_balances(ws, r, order_balances([order], {order.pk: Decimal(str(grand))}), 4, NCOLS)
+    if balance:
+        from .order_balance import order_balances
+        r = _write_balances(ws, r, order_balances([order], {order.pk: Decimal(str(grand))}), 4, NCOLS)
 
     # ── Notes ──
     if order.notes:
@@ -455,7 +458,8 @@ def build_order_workbook(order):
         merge_border(ws, r, 1, NCOLS, GRID)
         ws.row_dimensions[r].height = 46
 
-    set_credit_footer(ws)
+    if not white_label:
+        set_credit_footer(ws)
     return wb
 
 
@@ -471,7 +475,7 @@ CNCOLS = len(COMBINED_HEADS)
 C_QTY, C_PACKS, C_PRICE, C_AMOUNT = 6, 7, 8, 9
 
 
-def build_combined_workbook(orders):
+def build_combined_workbook(orders, white_label=False, balance=True):
     """One customer's orders as a single sheet of line items.
 
     The lines come from build_order_print_rows — the same builder the
@@ -486,7 +490,7 @@ def build_combined_workbook(orders):
     from .views import build_order_print_rows
 
     primary = orders[-1]
-    brand = brand_name_for()
+    brand = "" if white_label else brand_name_for()
     ccode = (primary.original_currency or primary.paid_currency or "USD")
     # A currency FORMAT, not a currency written into the cell: the cell
     # holds 2.45 and shows $2.45, so it sums, charts and multiplies like
@@ -620,7 +624,7 @@ def build_combined_workbook(orders):
     # ── The customer's balance ── under the money columns, after the
     # table is measured: its labels are wider than any Price figure.
     from .order_balance import order_balances
-    balances = order_balances(orders, totals)
+    balances = order_balances(orders, totals) if balance else []
 
     # The item rows get a filter, which is the first thing anyone who
     # exported this will want — by order, by product, by colour.
@@ -638,7 +642,8 @@ def build_combined_workbook(orders):
     if rows:
         ws.auto_filter.ref = f"A{head_row - 1}:{last_col}{head_row + len(rows) - 1}"
     ws.freeze_panes = ws.cell(head_row, 1)
-    set_credit_footer(ws)
+    if not white_label:
+        set_credit_footer(ws)
 
     # ── How it prints ────────────────────────────────────────────────
     # Nine columns of a customer's goods do not fit the width of a
@@ -672,11 +677,12 @@ def build_combined_workbook(orders):
 @login_required
 def combined_order_excel(request):
     """Download several of one customer's orders as one .xlsx."""
-    from .views import select_combined_orders
+    from .views import print_choices, select_combined_orders
     orders, refusal = select_combined_orders(request)
     if refusal is not None:
         return refusal
-    wb = build_combined_workbook(orders)
+    white_label, balance = print_choices(request)
+    wb = build_combined_workbook(orders, white_label=white_label, balance=balance)
     buf = BytesIO()
     wb.save(buf)
     who = orders[-1].contact or orders[-1].company or orders[-1].web_client
@@ -697,7 +703,11 @@ def order_excel(request, pk):
     # A split order downloads whole from either half, as it prints.
     from .split_orders import split_halves
     halves = split_halves(order)
-    wb = build_combined_workbook(halves) if len(halves) > 1 else build_order_workbook(order)
+    from .views import print_choices
+    white_label, balance = print_choices(request)
+    wb = (build_combined_workbook(halves, white_label=white_label, balance=balance)
+          if len(halves) > 1 else
+          build_order_workbook(order, white_label=white_label, balance=balance))
     buf = BytesIO()
     wb.save(buf)
     label = order.order_number or f"order-{order.pk}"

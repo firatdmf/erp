@@ -10,11 +10,13 @@ chip naming the kind of document on the right.
                when the two differ
   brand_line, brand_color — from the view; the colour falls back to the
                stylesheet's
+  white_label — from the view: no name at all, for a sheet handed on
+               under someone else's
 {% endcomment %}
 <table class="hdr" cellspacing="0" cellpadding="0">
   <tr>
     <td>
-      <div class="brand"{% if brand_color %} style="color: {{ brand_color }};"{% endif %}>{{ brand_line|default:"Nejum ERP" }}</div>
+      {% if not white_label %}<div class="brand"{% if brand_color %} style="color: {{ brand_color }};"{% endif %}>{{ brand_line|default:"Nejum ERP" }}</div>{% endif %}
       <div class="doc-type">{{ number }}</div>
     </td>
     <td class="meta">

@@ -226,6 +226,36 @@ class DividendPaidOnAccountTests(TestCase):
             kwargs={"pk": self.book.pk, "source_pk": dividend.pk},
         ))
 
+    def test_the_statement_names_the_row_a_dividend(self):
+        self._post()
+        movement = self._movement(EquityDivident.objects.get()).get()
+        self.assertEqual(str(movement.type_label), "Dividend")
+        response = self.client.get(reverse("accounts:detail", args=[self.etsy.pk]))
+        self.assertContains(response, '<span class="mv-type">Dividend</span>')
+        self.assertNotContains(response, "Offset / Adjustment")
+
+    def test_an_expense_it_paid_is_named_an_expense(self):
+        from accounting.models import EquityExpense, ExpenseCategory
+        from accounting.views import post_expense
+        expense = EquityExpense.objects.create(
+            book=self.book, category=ExpenseCategory.objects.create(name="Fees"),
+            paid_by_current_account=self.etsy, currency=self.usd,
+            amount=Decimal("8.59"), date="2026-10-10", description="Etsy fees",
+        )
+        post_expense(self.book, expense, self.member)
+        movement = CurrentAccountMovement.objects.get(
+            source_type=ContentType.objects.get_for_model(EquityExpense))
+        self.assertEqual(str(movement.type_label), "Expense")
+
+    def test_other_rows_keep_their_type(self):
+        opening = CurrentAccountMovement.objects.get(movement_type="opening")
+        self.assertEqual(str(opening.type_label), str(opening.get_movement_type_display()))
+        manual = CurrentAccountMovement.objects.create(
+            current_account=self.etsy, book=self.book, date="2026-10-02",
+            amount=Decimal("-1.00"), currency=self.usd, movement_type="adjustment",
+        )
+        self.assertEqual(str(manual.type_label), str(manual.get_movement_type_display()))
+
     def test_naming_both_funding_sources_is_rejected(self):
         response = self._post(cash_account=self.kasa.pk)
         self.assertEqual(response.status_code, 200)

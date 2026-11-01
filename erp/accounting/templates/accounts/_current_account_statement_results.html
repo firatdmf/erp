@@ -83,11 +83,11 @@
         <td>
           {% if link_url %}
             <a class="mv-type mv-type-link" href="{{ link_url }}" onclick="event.stopPropagation();">
-              {{ r.mv.get_movement_type_display }}
+              {{ r.mv.type_label }}
               <i data-lucide="arrow-up-right" style="width:11px;height:11px;margin-left:2px;vertical-align:-1px;opacity:0.7;"></i>
             </a>
           {% else %}
-            <span class="mv-type"{% if r.mv.created_by %} title="{% blocktrans with name=r.mv.created_by %}by {{ name }}{% endblocktrans %}"{% endif %}>{{ r.mv.get_movement_type_display }}</span>
+            <span class="mv-type"{% if r.mv.created_by %} title="{% blocktrans with name=r.mv.created_by %}by {{ name }}{% endblocktrans %}"{% endif %}>{{ r.mv.type_label }}</span>
           {% endif %}
         </td>
         <td class="desc">

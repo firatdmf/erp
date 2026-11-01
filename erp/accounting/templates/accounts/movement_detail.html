@@ -2,7 +2,7 @@
 {% load i18n %}
 {% load humanize %}
 {% load accounting_tags accounts_tags %}
-{% block title %}{{ mv.get_movement_type_display }} #{{ mv.pk }} | Nejum ERP{% endblock %}
+{% block title %}{{ mv.type_label }} #{{ mv.pk }} | Nejum ERP{% endblock %}
 
 {% comment %}
   One ledger row, in full.
@@ -87,7 +87,7 @@
     <div>
       <div class="md-eyebrow">{% trans "Account movement" %}</div>
       <h1 class="md-title">
-        {{ mv.get_movement_type_display }}<span class="md-id">#{{ mv.pk }}</span>
+        {{ mv.type_label }}<span class="md-id">#{{ mv.pk }}</span>
       </h1>
     </div>
     <div class="md-actions">
@@ -154,7 +154,7 @@
           <span class="k">{% trans "Balance after" %}</span>
           <span class="v">{{ balance_after|money }}</span>
         </div>
-        <div class="md-fact"><span class="k">{% trans "Type" %}</span><span class="v">{{ mv.get_movement_type_display }}</span></div>
+        <div class="md-fact"><span class="k">{% trans "Type" %}</span><span class="v">{{ mv.type_label }}</span></div>
         <div class="md-fact"><span class="k">{% trans "Reference" %}</span><span class="v">{{ mv.reference|default:"—" }}</span></div>
         <div class="md-fact"><span class="k">{% trans "Entered by" %}</span><span class="v">{% if mv.created_by %}{{ mv.created_by }}{% else %}—{% endif %}</span></div>
         <div class="md-fact"><span class="k">{% trans "Book" %}</span><span class="v">{{ mv.book.name }}</span></div>

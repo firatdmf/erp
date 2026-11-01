@@ -829,6 +829,28 @@ class CurrentAccountMovement(models.Model):
         """
         return self._stated_by_source("ledger_account_rate")
 
+    # Rows filed as an `adjustment` because no money moved through the book
+    # (accounting.views._post_paid_by_account), named on a statement by what
+    # they are rather than by the type they were filed under.
+    LABEL_BY_SOURCE = {
+        "equityexpense": _("Expense"),
+        "equitydivident": _("Dividend"),
+    }
+
+    @property
+    def type_label(self):
+        """What a statement calls this row.
+
+        The type, except where the document behind the row says more: an
+        expense or a dividend somebody's account paid is an "Offset /
+        Adjustment" by type, which reads as a correction when it is neither.
+        """
+        if self.movement_type == "adjustment" and self.source_type_id:
+            model = ContentType.objects.get_for_id(self.source_type_id).model
+            if model in self.LABEL_BY_SOURCE:
+                return self.LABEL_BY_SOURCE[model]
+        return self.get_movement_type_display()
+
     def _stated_by_source(self, method):
         """The rate the posting document returns from `method`, or None."""
         if not (self.source_type_id and self.source_id):

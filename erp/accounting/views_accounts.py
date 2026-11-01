@@ -1332,7 +1332,7 @@ def _statement_chart(opening, rows):
                 "d": r["mv"].date.strftime("%d.%m.%Y"),
                 "b": float(r["balance_after"]),
                 "a": float(r["mv"].amount_base),
-                "t": str(r["mv"].get_movement_type_display()),
+                "t": str(r["mv"].type_label),
                 "s": (r["description"] or "")[:90],
             }
             for r in rows

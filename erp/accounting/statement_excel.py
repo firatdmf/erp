@@ -81,7 +81,7 @@ def build_statement_workbook(accounts, data, *, customer_name, brand_name):
         cell(ws, r, 1, mv.date.strftime("%d.%m.%Y") if mv.date else "—",
              font=F_VAL, border=GRID)
         cell(ws, r, 2, mv.current_account.code, font=F_VAL, border=GRID)
-        cell(ws, r, 3, mv.get_movement_type_display(), font=F_VAL, border=GRID)
+        cell(ws, r, 3, mv.type_label, font=F_VAL, border=GRID)
         cell(ws, r, 4, row.get("description") or mv.description or "",
              font=F_VAL, border=GRID)
         cell(ws, r, 5, mv.reference or "", font=F_VAL, border=GRID)

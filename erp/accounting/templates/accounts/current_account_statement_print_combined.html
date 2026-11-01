@@ -125,7 +125,7 @@
         <tr {% if forloop.counter0|divisibleby:2 %}{% else %}class="alt"{% endif %}>
           <td>{{ r.mv.date|date:"d.m.Y" }}</td>
           <td class="acct">{{ r.mv.current_account.code }}</td>
-          <td>{{ r.mv.get_movement_type_display }}</td>
+          <td>{{ r.mv.type_label }}</td>
           <td>{{ r.description|default:r.mv.description|default:"" }}</td>
           <td>{{ r.mv.reference|default:"" }}</td>
           <td class="num">{% if r.mv.amount_base > 0 %}{{ r.mv.amount_base|floatformat:"2g" }}{% endif %}</td>

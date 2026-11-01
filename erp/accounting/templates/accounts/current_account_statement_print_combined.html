@@ -12,21 +12,34 @@
        — a sale, a payment — and its document number share one column,
        the number under the kind the way a SKU sits under its product. */
     table.items col.c-date    { width: 13%; }
-    table.items col.c-acct    { width: 12%; }
-    table.items col.c-debit   { width: 15%; }
-    table.items col.c-credit  { width: 15%; }
-    table.items col.c-balance { width: 17%; }
+    table.items td.date { white-space: nowrap; }
+    table.items col.c-acct    { width: 11%; }
+    table.items col.c-debit   { width: 13%; }
+    table.items col.c-credit  { width: 13%; }
+    table.items col.c-balance { width: 14%; }
     table.items td.acct { white-space: nowrap; color: #4B5563; font-size: 0.9em; }
     table.items tbody td.val { text-align: right; color: #0F1419; }
     table.items tbody td.lbl-left { text-align: left; color: #374151; }
-    /* An order's lines, under its sale: a table of their own in the
-       room from Entry to Balance, quieter than the ledger rows. */
-    table.items tbody tr.lines > td { padding: 0 5pt 5pt; border-bottom: 1px solid #E2E8EE; }
-    table.lines { width: 100%; border-collapse: collapse; font-size: 8.67pt; color: #374151; }
+    /* An order's lines, under its sale: a table of their own INSIDE the
+       Entry column. Spread under Debit, Credit and Balance, a line's
+       amount read as a running balance. */
+    table.items tbody tr.lines > td { padding: 0 5pt 5pt; }
+    /* Fixed columns, so every order's lines line up with the next's. */
+    table.lines { width: 100%; border-collapse: collapse; table-layout: fixed;
+                  font-size: 8.67pt; color: #374151; }
+    table.lines col.l-qty { width: 34%; }
+    table.lines col.l-amount { width: 19%; }
     table.lines td { padding: 1.5pt 4pt; border-bottom: 0.5pt solid #EEF2F6; vertical-align: top; }
     table.lines tr:last-child td { border-bottom: none; }
-    table.lines td.num { text-align: right; white-space: nowrap; font-weight: normal; }
-    table.lines .sku { font-size: 0.9em; }
+    /* Under table.items' own td.num rule, which is bold. */
+    table.items table.lines td.num { text-align: right; white-space: nowrap; font-weight: normal; }
+    table.lines .sku { display: block; font-size: 0.82em; }
+    /* The total of the ledger's columns, at the ledger's size: the
+       figure the reader wants is the balance block under it, which is
+       why the Balance cell here is left empty rather than said twice. */
+    table.items tbody tr.grand td { font-size: 10.67pt; }
+    /* Under Debit, Credit and Balance — the columns it closes. */
+    table.balance { width: 40%; }
   </style>
 </head>
 <body>
@@ -71,7 +84,7 @@
     <tbody>
       {% for r in rows %}
       <tr>
-        <td>{{ r.mv.date|date:"d M Y" }}</td>
+        <td class="date">{{ r.mv.date|date:"d M Y" }}</td>
         {% if many %}<td class="acct">{{ r.mv.current_account.code }}</td>{% endif %}
         <td>
           <div class="pname">{{ r.mv.type_label }}</div>
@@ -85,25 +98,26 @@
       {% if r.order_lines %}{% with lines=r.order_lines %}
       <tr class="lines">
         <td></td>{% if many %}<td></td>{% endif %}
-        <td colspan="4">
+        <td>
           <table class="lines" cellspacing="0" cellpadding="0">
+            <colgroup><col><col class="l-qty"><col class="l-amount"></colgroup>
             {% for item in lines.items %}
             <tr>
               <td>{{ item.product.title|default:item.product }}{% if item.variant_label %} · {{ item.variant_label }}{% endif %}
                 <span class="sku">{{ item.product_variant.variant_sku|default:item.product.sku }}</span></td>
-              <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }}</td>
-              <td class="num">× {{ lines.symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
+              <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }} × {{ lines.symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
               <td class="num">{{ lines.symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
             </tr>
             {% endfor %}
             {% for adj in lines.adjustments %}
             <tr>
-              <td colspan="3">{{ adj.label }}</td>
+              <td colspan="2">{{ adj.label }}</td>
               <td class="num">{% if adj.amount < 0 %}−{% endif %}{{ lines.symbol }}{{ adj.amount|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
             </tr>
             {% endfor %}
           </table>
         </td>
+        <td colspan="3"></td>
       </tr>
       {% endwith %}{% endif %}
       {% empty %}
@@ -114,7 +128,7 @@
         <td class="lbl-left" colspan="{% if many %}3{% else %}2{% endif %}">{% trans "Total" %}</td>
         <td class="val">{{ currency_symbol }}{{ debit_total|floatformat:"2u"|intcomma:False }}</td>
         <td class="val">{{ currency_symbol }}{{ credit_total|floatformat:"2u"|intcomma:False }}</td>
-        <td class="val">{% if closing < 0 %}−{% endif %}{{ currency_symbol }}{{ closing|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
+        <td></td>
       </tr>
       {% endif %}
     </tbody>

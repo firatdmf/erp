@@ -478,6 +478,24 @@
               </div>
             </div>
 
+            <!-- Etsy -->
+            {% if is_brand_admin %}
+            <div class="st-row">
+              <div class="st-row-info">
+                <span class="st-row-icon" style="background:#F1641E;color:#fff;"><i class="fab fa-etsy"></i></span>
+                <div class="st-row-text">
+                  <h3 class="st-row-name">Etsy</h3>
+                  <p class="st-row-desc">{% trans "Reads a book's Etsy shop: its orders, Etsy's fees and the payouts to the bank." %}</p>
+                </div>
+              </div>
+              <div class="st-row-actions">
+                <a href="{% url 'integrations:etsy_index' %}" class="st-btn st-btn--secondary">
+                  <i class="fas fa-cog"></i> {% trans "Open" %}
+                </a>
+              </div>
+            </div>
+            {% endif %}
+
             <!-- WhatsApp -->
             <div class="st-row">
               <div class="st-row-info">

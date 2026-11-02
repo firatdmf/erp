@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}Etsy · {{ book.name }} | Nejum ERP{% endblock %}
+
+{% comment %}
+  One book's Etsy shop: the connection, where its sales are recorded, and a
+  read-only preview of what the sync would record for a stretch of days.
+  Nothing on this page writes to the books.
+{% endcomment %}
+
+{% block css %}
+{% include "accounting/partials/pf_entry_form_css.html" %}
+<style>
+  .ey-meta { font:500 12px var(--font-sans); color:var(--gray-500); line-height:1.5; }
+  .ey-ok { color:#1B7A4B; font-weight:700; }
+  .ey-warn { color:#B23B12; font-weight:700; }
+  .ey-table { width:100%; border-collapse:collapse; font:500 12.5px var(--font-sans); }
+  /* The site's own table styles paint rows white; these sit on the card. */
+  .ey-table, .ey-table tr, .ey-table th, .ey-table td { background: transparent; color: inherit; }
+  .ey-table th { text-align:left; font:700 10.5px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--gray-500); padding:8px 6px; border-bottom:1px solid #E2E8EE; }
+  .ey-table td { padding:8px 6px; border-bottom:1px solid #EEF1F5; vertical-align:top; overflow-wrap:anywhere; }
+  .ey-table td.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ey-chip { display:inline-block; padding:1px 7px; border-radius:6px; font:700 11px var(--font-mono); background:#F1F5F9; color:var(--gray-700); margin:1px 2px 1px 0; }
+  .ey-chip.bad { background:#FEF2F2; color:#991B1B; }
+  .ey-sum { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; }
+  .ey-sum div { background:#F8FAFC; border:1px solid #E7ECF2; border-radius:10px; padding:10px 12px; }
+  .ey-sum b { display:block; font:800 16px var(--font-sans); color:var(--ink); font-variant-numeric:tabular-nums; margin-top:2px; }
+  @media (max-width: 720px) { .ey-table thead { display:none; } .ey-table tr { display:block; border-bottom:1px solid #E2E8EE; padding:6px 0; } .ey-table td { display:block; border:none; padding:2px 0; } .ey-table td.n { text-align:left; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pf">
+  <a href="{% url 'integrations:etsy_index' %}" class="pf-back">&larr; Etsy</a>
+  <div class="pf-head">
+    <div>
+      <div class="pf-eyebrow">Etsy · {{ book.name }}</div>
+      <h1 class="pf-title">{% if connection.is_connected %}{{ connection.shop_name }}{% else %}{% trans "Connect an Etsy shop" %}{% endif %}</h1>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}
+  <div class="{% if m.tags == 'error' %}pf-err{% else %}pf-effect{% endif %}" style="margin-bottom:14px;"><div>{{ m }}</div></div>
+  {% endfor %}{% endif %}
+
+  <div class="pf-grid">
+    <div>
+      <div class="pf-card"><div class="pf-sect">
+        <div class="pf-sect-h">
+          <span class="ico"><i class="fa fa-link"></i></span>
+          <h3>{% trans "Connection" %}</h3>
+          <span class="sub">{% trans "Read-only: orders, fees and payouts" %}</span>
+        </div>
+        {% if connection.is_connected %}
+          <p class="ey-meta">
+            {% blocktrans with shop=connection.shop_name id=connection.shop_id %}Shop {{ shop }} (#{{ id }}){% endblocktrans %}{% if connection.connected_at %} ·
+            {% blocktrans with when=connection.connected_at|date:"d.m.Y H:i" %}connected {{ when }}{% endblocktrans %}{% if connection.connected_by %} · {{ connection.connected_by.get_full_name|default:connection.connected_by.username }}{% endif %}{% endif %}
+          </p>
+          <form method="post" action="{% url 'integrations:etsy_disconnect' book_pk=book.pk %}" style="margin-top:12px;"
+                onsubmit="return confirm(this.dataset.confirm);" data-confirm="{% trans 'Disconnect this Etsy shop? Its settings are kept.' %}">
+            {% csrf_token %}
+            <button class="pf-btn danger" type="submit">{% trans "Disconnect" %}</button>
+          </form>
+        {% elif app_configured %}
+          <p class="ey-meta">{% trans "You will sign in on Etsy and come back here. Only reading is asked for." %}</p>
+          <p class="ey-meta">{% blocktrans %}Etsy must have this callback registered on the app, exactly: {{ callback_uri }}{% endblocktrans %}</p>
+          <form method="post" action="{% url 'integrations:etsy_connect' book_pk=book.pk %}" style="margin-top:12px;">
+            {% csrf_token %}
+            <button class="pf-btn primary" type="submit">{% trans "Connect Etsy" %}</button>
+          </form>
+        {% else %}
+          <p class="ey-warn">{% trans "The Etsy app's keystring and shared secret are not set on this install." %}</p>
+        {% endif %}
+      </div></div>
+
+      {% if connection.is_connected %}
+      <div class="pf-card"><div class="pf-sect">
+        <div class="pf-sect-h">
+          <span class="ico"><i class="fa fa-search"></i></span>
+          <h3>{% trans "Preview" %}</h3>
+          <span class="sub">{% trans "What the sync would record — nothing is written" %}</span>
+        </div>
+        <form method="get" class="pf-row">
+          <input type="hidden" name="preview" value="1">
+          <div class="pf-f"><label>{% trans "From" %}</label><input type="date" name="start" value="{{ start|date:'Y-m-d' }}"></div>
+          <div class="pf-f"><label>{% trans "To" %}</label><input type="date" name="end" value="{{ end|date:'Y-m-d' }}"></div>
+          <div class="pf-f"><label>&nbsp;</label><button class="pf-btn primary" type="submit">{% trans "Preview" %}</button></div>
+        </form>
+        {% if problem %}<div class="pf-err" style="margin-top:14px;"><div>{{ problem }}</div></div>{% endif %}
+      </div>
+
+      {% if result %}
+      <div class="pf-sect">
+        <div class="pf-sect-h"><h3>{% trans "Totals" %}</h3></div>
+        <div class="ey-sum">
+          <div>{% trans "Sales (orders, without tax)" %}<b>{{ result.etsy.sales|floatformat:2 }}</b></div>
+          <div>{% trans "Fees" %}<b>{{ result.etsy.fees|floatformat:2 }}</b></div>
+          <div>{% trans "Payouts" %}<b>{{ result.etsy.payouts|floatformat:2 }}</b></div>
+          <div>{% trans "Needs a person" %}<b>{{ result.etsy.other|floatformat:2 }}</b></div>
+          <div>{% trans "Books would move Etsy's account by" %}<b>{{ result.etsy.books_net|floatformat:2 }}</b></div>
+          <div>{% trans "Etsy's balance after the last entry" %}<b>{% if result.etsy.closing_balance is not None %}{{ result.etsy.closing_balance|floatformat:2 }}{% else %}—{% endif %}</b></div>
+        </div>
+        {% if result.erp %}
+        <p class="ey-meta" style="margin-top:12px;">
+          {% blocktrans with s=result.erp.sales|floatformat:2 e=result.erp.expenses|floatformat:2 d=result.erp.dividends|floatformat:2 n=result.erp.net|floatformat:2 %}Already in the ERP on Etsy's account for these days: sales {{ s }}, fees {{ e }}, payouts {{ d }} — {{ n }} in all.{% endblocktrans %}
+        </p>
+        {% endif %}
+        <p class="ey-meta">{% blocktrans with p=result.etsy.ledger_sales|floatformat:2 t=result.etsy.ledger_tax|floatformat:2 %}Ledger entries read as the buyers' payments: {{ p }}; as sales tax: {{ t }}. The orders record the sales, so these are not written.{% endblocktrans %}</p>
+      </div>
+
+      <div class="pf-sect">
+        <div class="pf-sect-h"><h3>{% trans "Orders" %}</h3><span class="sub">{% trans "Each becomes a draft order to Etsy" %}</span></div>
+        <table class="ey-table">
+          <thead><tr><th>{% trans "Etsy order" %}</th><th>{% trans "Lines" %}</th><th>{% trans "Sale" %}</th><th>{% trans "State" %}</th></tr></thead>
+          <tbody>
+          {% for r in result.receipts %}
+            <tr>
+              <td>#{{ r.receipt_id }}<div class="ey-meta">{{ r.created|date:"d.m.Y" }} · {{ r.buyer }}</div></td>
+              <td>{% for l in r.lines %}<span class="ey-chip{% if not l.matched %} bad{% endif %}">{{ l.quantity }} × {{ l.sku }} @ {{ l.price|floatformat:2 }}</span>{% endfor %}
+                {% if r.discount %}<div class="ey-meta">{% blocktrans with d=r.discount|floatformat:2 %}discount −{{ d }}{% endblocktrans %}</div>{% endif %}
+                {% if r.shipping %}<div class="ey-meta">{% blocktrans with s=r.shipping|floatformat:2 %}shipping {{ s }}{% endblocktrans %}</div>{% endif %}</td>
+              <td class="n">{{ r.sale|floatformat:2 }}<div class="ey-meta">{% blocktrans with t=r.tax|floatformat:2 %}tax {{ t }} left out{% endblocktrans %}</div></td>
+              <td>{{ r.status }}{% if r.shipped %} · {% trans "shipped" %}{% endif %}
+                {% if r.recorded %}<div class="ey-ok">{% trans "Already recorded" %}</div>{% endif %}
+                {% if r.unmatched %}<div class="ey-warn">{% trans "SKU not in the warehouse" %}</div>{% endif %}
+                {% if r.refunded %}<div class="ey-warn">{% trans "Refund — for a person" %}</div>{% endif %}</td>
+            </tr>
+          {% empty %}<tr><td colspan="4" class="ey-meta">{% trans "No Etsy orders in these days." %}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pf-sect">
+        <div class="pf-sect-h"><h3>{% trans "Ledger entries by Etsy's labels" %}</h3><span class="sub">{% trans "Check each label's meaning before the sync relies on it" %}</span></div>
+        <table class="ey-table">
+          <thead><tr><th>{% trans "Type" %}</th><th>{% trans "Refers to" %}</th><th>{% trans "Description" %}</th><th>{% trans "Count" %}</th><th>{% trans "Total" %}</th><th>{% trans "Read as" %}</th></tr></thead>
+          <tbody>
+          {% for g in result.groups %}
+            <tr><td>{{ g.ledger_type }}</td><td>{{ g.reference_type }}</td><td>{{ g.description }}</td><td class="n">{{ g.count }}</td><td class="n">{{ g.total|floatformat:2 }}</td><td>{{ g.kind_label }}</td></tr>
+          {% empty %}<tr><td colspan="6" class="ey-meta">{% trans "No ledger entries in these days." %}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pf-sect">
+        <div class="pf-sect-h"><h3>{% trans "Every ledger entry" %}</h3></div>
+        <table class="ey-table">
+          <thead><tr><th>{% trans "Date" %}</th><th>{% trans "Entry" %}</th><th>{% trans "Amount" %}</th><th>{% trans "Balance" %}</th><th>{% trans "Read as" %}</th></tr></thead>
+          <tbody>
+          {% for e in result.ledger %}
+            <tr><td>{{ e.created|date:"d.m.Y H:i" }}</td>
+                <td>{{ e.ledger_type }}{% if e.description %} · {{ e.description }}{% endif %}<div class="ey-meta">{{ e.reference_type }} {{ e.reference_id }} · #{{ e.entry_id }}</div></td>
+                <td class="n">{{ e.amount|floatformat:2 }}</td><td class="n">{{ e.balance|floatformat:2 }}</td><td>{{ e.kind_label }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div>
+      <div class="pf-card" style="position: sticky; top: 16px;"><div class="pf-sect">
+        <div class="pf-sect-h">
+          <span class="ico"><i class="fa fa-cog"></i></span>
+          <h3>{% trans "Where its sales go" %}</h3>
+        </div>
+        <form method="post" action="{% url 'integrations:etsy_settings' book_pk=book.pk %}">
+          {% csrf_token %}
+          <div class="pf-row wide">
+            <div class="pf-f"><label>{% trans "Warehouse" %}</label>
+              <select name="warehouse"><option value="">—</option>
+                {% for w in warehouses %}<option value="{{ w.pk }}" {% if connection.warehouse_id == w.pk %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+              </select><span class="hint">{% trans "The shelves Etsy orders are picked from." %}</span></div>
+          </div>
+          <div class="pf-row wide">
+            <div class="pf-f"><label>{% trans "Etsy's account" %}</label>
+              <select name="current_account"><option value="">—</option>
+                {% for a in accounts %}<option value="{{ a.pk }}" {% if connection.current_account_id == a.pk %}selected{% endif %}>{{ a.code }} — {{ a.name }}</option>{% endfor %}
+              </select><span class="hint">{% trans "Sales are billed to it; fees and payouts are paid by it." %}</span></div>
+          </div>
+          <div class="pf-row wide">
+            <div class="pf-f"><label>{% trans "Fee category" %}</label>
+              <select name="fee_category"><option value="">—</option>
+                {% for c in categories %}<option value="{{ c.pk }}" {% if connection.fee_category_id == c.pk %}selected{% endif %}>{{ c }}</option>{% endfor %}
+              </select></div>
+          </div>
+          <div class="pf-row wide">
+            <div class="pf-f"><label>{% trans "Payouts go to" %}</label>
+              <select name="payout_member"><option value="">—</option>
+                {% for m in members %}<option value="{{ m.pk }}" {% if connection.payout_member_id == m.pk %}selected{% endif %}>{{ m }}</option>{% endfor %}
+              </select><span class="hint">{% trans "Each deposit to the bank is a dividend to this stakeholder." %}</span></div>
+          </div>
+          <div class="pf-actions"><button class="pf-btn primary" type="submit">{% trans "Save settings" %}</button></div>
+        </form>
+        <p class="ey-meta" style="margin-top:16px;">
+          {% trans "The term 'Etsy' is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc." %}
+          {% if contact_email %}{% blocktrans %}Questions about this application: {{ contact_email }}{% endblocktrans %}{% endif %}
+        </p>
+      </div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

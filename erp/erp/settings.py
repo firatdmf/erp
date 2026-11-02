@@ -61,6 +61,12 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
 GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET", default="") # Fixed case sensitivity
 
+# Etsy Open API app (integrations/etsy_api.py). The app's keystring and shared
+# secret live here, never in the database; a shop's tokens are stored there,
+# encrypted. Blank means the Etsy page offers no connection.
+ETSY_KEYSTRING = config("ETSY_KEYSTRING", default="")
+ETSY_SHARED_SECRET = config("ETSY_SHARED_SECRET", default="")
+
 ALLOWED_HOSTS = [
     ".vercel.app",
     "demfirat.com",
@@ -162,6 +168,7 @@ INSTALLED_APPS = [
     "notifications",  # Notification system
     "team",  # Team management system
     "notes", # My Notes system
+    "integrations",  # Marketplace connections (Etsy)
     # Migrations-only stub. Purchasing now lives in `operating`; this app stays
     # registered so its own migration history and operating's adoption
     # migration keep resolving. See its apps.py.

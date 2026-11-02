@@ -15449,3 +15449,197 @@ msgstr "Alınan satırları göster"
 
 msgid "Open the purchase"
 msgstr "Alımı aç"
+
+# Etsy integration (integrations/)
+
+msgid "Connect an Etsy shop"
+msgstr "Bir Etsy mağazası bağlayın"
+
+msgid "Connection"
+msgstr "Bağlantı"
+
+msgid "Read-only: orders, fees and payouts"
+msgstr "Yalnızca okuma: siparişler, ücretler ve ödemeler"
+
+msgid "You will sign in on Etsy and come back here. Only reading is asked for."
+msgstr "Etsy'de oturum açıp buraya geri döneceksiniz. Yalnızca okuma izni istenir."
+
+msgid "Connect Etsy"
+msgstr "Etsy'yi bağla"
+
+msgid "The Etsy app's keystring and shared secret are not set on this install."
+msgstr "Bu kurulumda Etsy uygulamasının anahtarı ve paylaşılan sırrı tanımlı değil."
+
+msgid "What the sync would record — nothing is written"
+msgstr "Eşitlemenin kaydedeceği — hiçbir şey yazılmaz"
+
+msgid "Sales (orders, without tax)"
+msgstr "Satışlar (siparişler, vergisiz)"
+
+msgid "Fees"
+msgstr "Ücretler"
+
+msgid "Payouts"
+msgstr "Ödemeler"
+
+msgid "Needs a person"
+msgstr "Bir kişinin bakması gerekir"
+
+msgid "Books would move Etsy's account by"
+msgstr "Defter Etsy hesabını şu kadar değiştirir"
+
+msgid "Etsy's balance after the last entry"
+msgstr "Son kayıttan sonra Etsy bakiyesi"
+
+msgid "Each becomes a draft order to Etsy"
+msgstr "Her biri Etsy'ye taslak sipariş olur"
+
+msgid "Etsy order"
+msgstr "Etsy siparişi"
+
+msgid "State"
+msgstr "Durum"
+
+msgid "shipped"
+msgstr "gönderildi"
+
+msgid "Already recorded"
+msgstr "Zaten kayıtlı"
+
+msgid "SKU not in the warehouse"
+msgstr "SKU depoda yok"
+
+msgid "Refund — for a person"
+msgstr "İade — bir kişinin bakması gerekir"
+
+msgid "No Etsy orders in these days."
+msgstr "Bu günlerde Etsy siparişi yok."
+
+msgid "Ledger entries by Etsy's labels"
+msgstr "Etsy etiketlerine göre hesap hareketleri"
+
+msgid "Check each label's meaning before the sync relies on it"
+msgstr "Eşitleme kullanmadan önce her etiketin anlamını kontrol edin"
+
+msgid "Refers to"
+msgstr "İlgili"
+
+msgid "Count"
+msgstr "Adet"
+
+msgid "Read as"
+msgstr "Okunuşu"
+
+msgid "No ledger entries in these days."
+msgstr "Bu günlerde hesap hareketi yok."
+
+msgid "Every ledger entry"
+msgstr "Tüm hesap hareketleri"
+
+msgid "Where its sales go"
+msgstr "Satışların kaydedildiği yer"
+
+msgid "The shelves Etsy orders are picked from."
+msgstr "Etsy siparişlerinin toplandığı raflar."
+
+msgid "Etsy's account"
+msgstr "Etsy hesabı"
+
+msgid "Sales are billed to it; fees and payouts are paid by it."
+msgstr "Satışlar bu hesaba yazılır; ücretler ve ödemeler bu hesaptan ödenir."
+
+msgid "Fee category"
+msgstr "Ücret kategorisi"
+
+msgid "Payouts go to"
+msgstr "Ödemelerin gittiği kişi"
+
+msgid "Each deposit to the bank is a dividend to this stakeholder."
+msgstr "Bankaya yapılan her ödeme bu ortağa kâr payıdır."
+
+msgid "The term 'Etsy' is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc."
+msgstr "\"Etsy\" ifadesi Etsy, Inc.'in ticari markasıdır. Bu uygulama Etsy API'sini kullanır ancak Etsy, Inc. tarafından onaylanmamış veya sertifikalandırılmamıştır."
+
+msgid "Disconnect this Etsy shop? Its settings are kept."
+msgstr "Bu Etsy mağazasının bağlantısı kesilsin mi? Ayarları korunur."
+
+#, python-format
+msgid "Shop %(shop)s (#%(id)s)"
+msgstr "Mağaza %(shop)s (#%(id)s)"
+
+#, python-format
+msgid "connected %(when)s"
+msgstr "%(when)s tarihinde bağlandı"
+
+#, python-format
+msgid "Etsy must have this callback registered on the app, exactly: %(callback_uri)s"
+msgstr "Etsy uygulamasında bu geri dönüş adresi tam olarak kayıtlı olmalıdır: %(callback_uri)s"
+
+#, python-format
+msgid "Already in the ERP on Etsy's account for these days: sales %(s)s, fees %(e)s, payouts %(d)s — %(n)s in all."
+msgstr "Bu günler için ERP'de Etsy hesabında zaten olan: satışlar %(s)s, ücretler %(e)s, ödemeler %(d)s — toplam %(n)s."
+
+#, python-format
+msgid "Ledger entries read as the buyers' payments: %(p)s; as sales tax: %(t)s. The orders record the sales, so these are not written."
+msgstr "Alıcı ödemesi olarak okunan hareketler: %(p)s; satış vergisi olarak: %(t)s. Satışları siparişler kaydeder, bu yüzden bunlar yazılmaz."
+
+#, python-format
+msgid "discount −%(d)s"
+msgstr "indirim −%(d)s"
+
+#, python-format
+msgid "shipping %(s)s"
+msgstr "kargo %(s)s"
+
+#, python-format
+msgid "tax %(t)s left out"
+msgstr "vergi %(t)s hariç"
+
+#, python-format
+msgid "Questions about this application: %(contact_email)s"
+msgstr "Bu uygulamayla ilgili sorular: %(contact_email)s"
+
+msgid "The Etsy app's keystring and shared secret are not set on this install, so no shop can be connected yet."
+msgstr "Bu kurulumda Etsy uygulamasının anahtarı ve paylaşılan sırrı tanımlı değil, bu yüzden henüz mağaza bağlanamaz."
+
+msgid "Shops by book"
+msgstr "Deftere göre mağazalar"
+
+msgid "A book's Etsy sales come off its shelves and are owed to it by Etsy"
+msgstr "Bir defterin Etsy satışları kendi raflarından çıkar ve Etsy bu deftere borçlanır"
+
+msgid "No shop connected"
+msgstr "Bağlı mağaza yok"
+
+#, python-format
+msgid "Connected: %(shop)s"
+msgstr "Bağlı: %(shop)s"
+
+msgid "Only an administrator can manage the Etsy connection."
+msgstr "Etsy bağlantısını yalnızca bir yönetici yönetebilir."
+
+msgid "Preview up to two months at a time, ending on or after the day it starts."
+msgstr "Önizleme en fazla iki aylık olabilir ve bitiş tarihi başlangıçtan önce olamaz."
+
+msgid "Etsy settings saved."
+msgstr "Etsy ayarları kaydedildi."
+
+msgid "The Etsy app's keystring and shared secret are not set."
+msgstr "Etsy uygulamasının anahtarı ve paylaşılan sırrı tanımlı değil."
+
+msgid "That Etsy sign-in did not start here, or has expired. Try again."
+msgstr "Bu Etsy oturum açma işlemi burada başlamadı ya da süresi doldu. Tekrar deneyin."
+
+#, python-format
+msgid "Etsy did not connect: %(why)s"
+msgstr "Etsy bağlanmadı: %(why)s"
+
+#, python-format
+msgid "Etsy shop %(shop)s connected."
+msgstr "Etsy mağazası %(shop)s bağlandı."
+
+msgid "Etsy disconnected. Its settings are kept for when it is connected again."
+msgstr "Etsy bağlantısı kesildi. Ayarları yeniden bağlandığında kullanılmak üzere korunur."
+
+msgid "Reads a book's Etsy shop: its orders, Etsy's fees and the payouts to the bank."
+msgstr "Bir defterin Etsy mağazasını okur: siparişlerini, Etsy ücretlerini ve bankaya yapılan ödemeleri."

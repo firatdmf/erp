@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}Etsy | Nejum ERP{% endblock %}
+
+{% block css %}
+{% include "accounting/partials/pf_entry_form_css.html" %}
+<style>
+  .ey-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0; border-bottom:1px solid #EEF1F5; }
+  .ey-row:last-child { border-bottom:none; }
+  .ey-name { font:700 14px var(--font-sans); color:var(--ink); }
+  .ey-meta { font:500 12px var(--font-sans); color:var(--gray-500); margin-top:3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pf" style="max-width:880px;">
+  <a href="{% url 'user_settings' %}" class="pf-back">&larr; {% trans "Settings" %}</a>
+  <div class="pf-head">
+    <div>
+      <div class="pf-eyebrow">{% trans "Integrations" %}</div>
+      <h1 class="pf-title">Etsy</h1>
+    </div>
+  </div>
+
+  {% if not app_configured %}
+  <div class="pf-err"><div>{% trans "The Etsy app's keystring and shared secret are not set on this install, so no shop can be connected yet." %}</div></div>
+  {% endif %}
+
+  <div class="pf-card"><div class="pf-sect">
+    <div class="pf-sect-h">
+      <span class="ico"><i class="fa fa-store"></i></span>
+      <h3>{% trans "Shops by book" %}</h3>
+      <span class="sub">{% trans "A book's Etsy sales come off its shelves and are owed to it by Etsy" %}</span>
+    </div>
+    {% for row in books %}
+    <div class="ey-row">
+      <div>
+        <div class="ey-name">{{ row.book.name }}</div>
+        <div class="ey-meta">
+          {% if row.connection.is_connected %}{% blocktrans with shop=row.connection.shop_name %}Connected: {{ shop }}{% endblocktrans %}{% else %}{% trans "No shop connected" %}{% endif %}
+        </div>
+      </div>
+      <a class="pf-btn ghost" href="{% url 'integrations:etsy_book' book_pk=row.book.pk %}">{% trans "Open" %}</a>
+    </div>
+    {% endfor %}
+  </div></div>
+
+  <p class="ey-meta" style="margin-top:14px;">{% trans "The term 'Etsy' is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc." %}</p>
+</div>
+{% endblock %}

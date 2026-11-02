@@ -64,6 +64,7 @@ urlpatterns = [
     path("notifications/", include("notifications.urls")),
     path("team/", include("team.urls")),
     path("notes/", include("notes.urls")),
+    path("integrations/", include("integrations.urls")),
     # Procurement moved into `operating` and now lives at
     # /operating/procurement/... . Old links redirect rather than 404; the
     # role gate still runs first, so this opens nothing it did not open before.

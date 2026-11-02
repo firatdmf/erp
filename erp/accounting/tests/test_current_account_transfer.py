@@ -118,6 +118,18 @@ class CurrentAccountTransferModelTest(TransferTestBase):
         )
         self.assertEqual(t.from_movement.exchange_rate, t.to_movement.exchange_rate)
 
+    def test_both_legs_read_as_a_transfer_on_a_statement(self):
+        """Filed as `adjustment`, but a customer paying Dad by hand is not
+        a correction — "Offset / Adjustment" read as one."""
+        t = CurrentAccountTransfer.objects.create(
+            book=self.book, date="2026-02-01", from_current_account=self.a, to_current_account=self.b,
+            amount=Decimal("400.00"), currency=self.usd,
+        )
+        t.post()
+
+        self.assertEqual(str(t.from_movement.type_label), "Transfer")
+        self.assertEqual(str(t.to_movement.type_label), "Transfer")
+
     def test_posting_twice_writes_one_pair(self):
         t = CurrentAccountTransfer.objects.create(
             book=self.book, date="2026-02-01", from_current_account=self.a, to_current_account=self.b,

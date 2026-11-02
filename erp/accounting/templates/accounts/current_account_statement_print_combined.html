@@ -13,16 +13,21 @@
        the number under the kind the way a SKU sits under its product. */
     table.items col.c-date    { width: 13%; }
     table.items td.date { white-space: nowrap; }
-    table.items col.c-acct    { width: 11%; }
-    table.items col.c-debit   { width: 12%; }
-    table.items col.c-credit  { width: 12%; }
-    table.items col.c-balance { width: 13%; }
+    /* Wide enough for "ACCOUNT" on one line, and for a six-figure total
+       in the Total row's larger type — at 12% "$47,528.41" ran out of
+       its Debit cell into Credit's. */
+    table.items col.c-acct    { width: 12%; }
+    table.items col.c-debit   { width: 15%; }
+    table.items col.c-credit  { width: 15%; }
+    table.items col.c-balance { width: 15%; }
     table.items td.acct { white-space: nowrap; color: #4B5563; font-size: 0.9em; }
     table.items tbody td.val { text-align: right; color: #0F1419; }
     table.items tbody td.lbl-left { text-align: left; color: #374151; }
-    /* An order's lines, under its sale: a table of their own INSIDE the
-       Entry column. Spread under Debit, Credit and Balance, a line's
-       amount read as a running balance. */
+    /* An order's lines, under its sale: a table of their own across
+       Date, Account and Entry — Entry alone is too narrow for
+       "318.60 m × $5.27 = $1,679.02", which printed over itself. Never
+       under Debit, Credit and Balance: there a line's amount read as a
+       running balance. */
     table.items tbody tr.lines > td { padding: 0 5pt 5pt; }
     /* Fixed columns, so every order's lines line up with the next's. */
     table.lines { width: 100%; border-collapse: collapse; table-layout: fixed;
@@ -42,7 +47,7 @@
        why the Balance cell here is left empty rather than said twice. */
     table.items tbody tr.grand td { font-size: 10.67pt; }
     /* Under Debit, Credit and Balance — the columns it closes. */
-    table.balance { width: 40%; }
+    table.balance { width: 45%; }
   </style>
 </head>
 <body>
@@ -98,20 +103,19 @@
         <td class="num">{% if r.mv.amount_base < 0 %}{{ currency_symbol }}{{ r.mv.amount_base|floatformat:"2u"|intcomma:False|cut:"-" }}{% endif %}</td>
         <td class="num">{% if r.balance_after < 0 %}−{% endif %}{{ currency_symbol }}{{ r.balance_after|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
       </tr>
-      {% if r.order_lines %}{% with lines=r.order_lines %}
+      {% if r.lines %}{% with lines=r.lines %}
       <tr class="lines">
-        <td></td>{% if many %}<td></td>{% endif %}
-        <td>
+        <td colspan="{% if many %}3{% else %}2{% endif %}">
           <table class="lines" cellspacing="0" cellpadding="0">
             <colgroup><col><col class="l-qty"><col class="l-eq"><col class="l-amount"></colgroup>
             {% for item in lines.items %}
             <tr>
               {% comment %}The variant's SKU alone; the product's SKU, then its
-              name, for a line that has none.{% endcomment %}
-              <td>{{ item.product_variant.variant_sku|default:item.product.sku|default:item.product }}</td>
-              <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }} × {{ lines.symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
+              name (a purchase's typed text), for a line that has none.{% endcomment %}
+              <td>{{ item.variant_sku|default:item.sku|default:item.name }}</td>
+              <td class="num">{{ item.quantity|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit }} × {{ lines.symbol }}{{ item.price|floatformat:"2u"|intcomma:False }}</td>
               <td class="eq">=</td>
-              <td class="num">{{ lines.symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
+              <td class="num">{{ lines.symbol }}{{ item.amount|floatformat:"2u"|intcomma:False }}</td>
             </tr>
             {% endfor %}
             {% for adj in lines.adjustments %}

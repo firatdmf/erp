@@ -79,6 +79,14 @@
                     title="{% trans 'Show the order lines' %}">
               <i data-lucide="chevron-right"></i>
             </button>
+          {% elif inv and inv.type == 'purchase' and not r.is_cancel_row %}
+            {% comment %}The same for a purchase — statement_purchase_lines.{% endcomment %}
+            <button type="button" class="st-chev" aria-expanded="false"
+                    aria-controls="lines-{{ r.mv.pk }}"
+                    data-lines-url="{% url 'accounts:statement_purchase_lines' current_account.pk inv.pk %}"
+                    title="{% trans 'Show the purchased lines' %}">
+              <i data-lucide="chevron-right"></i>
+            </button>
           {% endif %}
           {% if link_url %}
             <a class="mv-type mv-type-link" href="{{ link_url }}" onclick="event.stopPropagation();">
@@ -167,7 +175,7 @@
           {% endif %}
         </td>
       </tr>
-      {% if r.linked_order %}
+      {% if r.linked_order or inv and inv.type == 'purchase' and not r.is_cancel_row %}
       <tr class="st-lines" id="lines-{{ r.mv.pk }}" hidden><td colspan="8"></td></tr>
       {% endif %}
         {% endwith %}
@@ -270,7 +278,7 @@
     });
   });
 
-  // An order row's chevron: its lines, fetched once, then shown and hidden.
+  // An order or purchase row's chevron: its lines, fetched once, then shown and hidden.
   document.querySelectorAll('.st-chev[data-lines-url]').forEach(function (btn) {
     if (btn.__bound) return;
     btn.__bound = true;
@@ -290,7 +298,7 @@
         .then(function (html) { cell.innerHTML = html; })
         .catch(function () {
           row.__loaded = false;
-          cell.innerHTML = '<div class="st-lines-box muted">{{ _("The order lines could not be loaded.")|escapejs }}</div>';
+          cell.innerHTML = '<div class="st-lines-box muted">{{ _("The lines could not be loaded.")|escapejs }}</div>';
         });
     });
   });
@@ -299,6 +307,10 @@
     tr.__bound = true;
     tr.addEventListener('click', function (e) {
       if (e.target.closest('a, button')) return;
+      // A row with lines opens them; its type and number still link to
+      // the document.
+      var chev = tr.querySelector('.st-chev[data-lines-url]');
+      if (chev) { chev.click(); return; }
       window.location.href = tr.dataset.href;
     });
   });

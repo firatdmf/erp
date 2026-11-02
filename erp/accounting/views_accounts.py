@@ -1113,6 +1113,15 @@ def _attach_links(rows):
     return rows
 
 
+def _statement_line(name, sku, variant, variant_sku, quantity, unit, price, amount):
+    """One line under a statement row, the same shape whichever document
+    it came from, so the page and the PDF print a sale's lines and a
+    purchase's with one template."""
+    return {"name": name, "sku": sku or "", "variant": variant or "",
+            "variant_sku": variant_sku or "", "quantity": quantity or 0,
+            "unit": unit, "price": price or 0, "amount": amount}
+
+
 def statement_order_lines(order):
     """What an order row of a statement opens to: its lines and the
     delivery or discount added on top, as the order sheet prints them
@@ -1121,11 +1130,51 @@ def statement_order_lines(order):
     from operating.views import build_order_print_rows
     items, total, _qty, _packs = build_order_print_rows(order)
     return {
-        "order": order,
-        "items": items,
-        "adjustments": list(order.adjustments.order_by("position", "pk")),
+        "items": [
+            _statement_line(it.product.title or str(it.product), it.product.sku,
+                            it.variant_label,
+                            it.product_variant.variant_sku if it.product_variant_id else "",
+                            it.quantity, it.unit_short, it.price, it.line_total_calc)
+            for it in items],
+        "adjustments": [{"label": a.label, "amount": a.amount}
+                        for a in order.adjustments.order_by("position", "pk")],
         "total": total,
         "symbol": order.currency_symbol,
+        "url": reverse("operating:order_detail", args=[order.pk]),
+        "open_label": _("Open the order"),
+    }
+
+
+def statement_purchase_lines(invoice):
+    """What a purchase row of a statement opens to: the lines bought, as
+    the purchase stores them. A line tied to the catalogue is named by
+    its product and variant like an order line; a free-text line by what
+    was typed. Discount and VAT, where the purchase has any, follow the
+    lines the way an order's delivery does, so the lines add up to the
+    row's amount."""
+    from operating.views import _variant_label
+    from marketing import units
+    items = []
+    for it in invoice.items.select_related("product", "variant"):
+        variant = _variant_label(it.variant) if it.variant_id else "-"
+        items.append(_statement_line(
+            it.product.title if it.product_id else it.description,
+            it.product.sku if it.product_id else "",
+            None if variant == "-" else variant,
+            it.variant.variant_sku if it.variant_id else "",
+            it.quantity, units.unit_short(it.unit), it.unit_price, it.subtotal))
+    adjustments = []
+    if invoice.discount_amount:
+        adjustments.append({"label": _("Discount"), "amount": -invoice.discount_amount})
+    if invoice.tax_amount:
+        adjustments.append({"label": _("VAT"), "amount": invoice.tax_amount})
+    return {
+        "items": items,
+        "adjustments": adjustments,
+        "total": invoice.total,
+        "symbol": invoice.currency.symbol,
+        "url": reverse("accounts:purchase_order_detail", args=[invoice.pk]),
+        "open_label": _("Open the purchase"),
     }
 
 
@@ -1149,8 +1198,20 @@ class CurrentAccountStatementOrderLines(View):
         if not on_this_account:
             raise Http404("No such order on this account.")
         order = get_object_or_404(Order, pk=order_pk)
-        return render(request, "accounts/_statement_order_lines.html",
+        return render(request, "accounts/_statement_lines.html",
                       {"lines": statement_order_lines(order)})
+
+
+class CurrentAccountStatementPurchaseLines(View):
+    """A purchase row's lines, fetched when its chevron is opened — only a
+    purchase posted to THIS account, for the reason the order view gives."""
+
+    def get(self, request, pk, invoice_pk):
+        current_account = get_object_or_404(CurrentAccount, pk=pk)
+        invoice = get_object_or_404(Invoice, pk=invoice_pk, type="purchase",
+                                    current_account=current_account)
+        return render(request, "accounts/_statement_lines.html",
+                      {"lines": statement_purchase_lines(invoice)})
 
 
 # ---------------------------------------------------------------------------
@@ -2076,12 +2137,16 @@ class CurrentAccountStatementPrintCombined(View):
         # document behind it — the same text the single-account statement
         # prints, so the two cannot describe one movement differently.
         _attach_links(rows)
-        # Each order's lines under its sale. Not under a reversal: those
-        # are the same goods taken back, and printing them twice would
-        # read as two lots.
+        # Each order's lines under its sale, each purchase's under the
+        # purchase. Not under a reversal or a cancellation: those are the
+        # same goods taken back, and printing them twice would read as
+        # two lots.
         for r in rows:
             if r["linked_order"] is not None and r["mv"].movement_type == "order_sale":
-                r["order_lines"] = statement_order_lines(r["linked_order"])
+                r["lines"] = statement_order_lines(r["linked_order"])
+            elif (r["linked_invoice"] is not None and not r["is_cancel_row"]
+                  and r["linked_invoice"].type == "purchase"):
+                r["lines"] = statement_purchase_lines(r["linked_invoice"])
 
         primary = accounts[0]
         from erp.pdf_render import document_response

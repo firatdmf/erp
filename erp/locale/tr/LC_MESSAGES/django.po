@@ -15438,8 +15438,14 @@ msgstr "Cari hesap ekstresi"
 msgid "Show the order lines"
 msgstr "Sipariş satırlarını göster"
 
-msgid "The order lines could not be loaded."
-msgstr "Sipariş satırları yüklenemedi."
+msgid "The lines could not be loaded."
+msgstr "Satırlar yüklenemedi."
 
 msgid "Open the order"
 msgstr "Siparişi aç"
+
+msgid "Show the purchased lines"
+msgstr "Alınan satırları göster"
+
+msgid "Open the purchase"
+msgstr "Alımı aç"

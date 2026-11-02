@@ -1,8 +1,9 @@
 {% load i18n humanize %}
 {% comment %}
-  What an order row of the statement page opens to — see
-  views_accounts.statement_order_lines. The PDF prints the same lines
-  with the order sheet's styles (current_account_statement_print_combined).
+  What an order or purchase row of the statement page opens to — see
+  views_accounts.statement_order_lines / statement_purchase_lines. The PDF
+  prints the same lines with the order sheet's styles
+  (current_account_statement_print_combined).
 {% endcomment %}
 <div class="st-lines-box">
   <table class="st-lines-tbl">
@@ -18,11 +19,11 @@
     <tbody>
       {% for item in lines.items %}
       <tr>
-        <td>{{ item.product.title|default:item.product }}<span class="st-lines-sku">{{ item.product.sku }}</span></td>
-        <td>{{ item.variant_label|default:"—" }}{% if item.product_variant.variant_sku %}<span class="st-lines-sku">{{ item.product_variant.variant_sku }}</span>{% endif %}</td>
-        <td class="num">{{ item.quantity|default:0|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit_short }}</td>
-        <td class="num">{{ lines.symbol }}{{ item.price|default:0|floatformat:"2u"|intcomma:False }}</td>
-        <td class="num">{{ lines.symbol }}{{ item.line_total_calc|floatformat:"2u"|intcomma:False }}</td>
+        <td>{{ item.name }}{% if item.sku %}<span class="st-lines-sku">{{ item.sku }}</span>{% endif %}</td>
+        <td>{{ item.variant|default:"—" }}{% if item.variant_sku %}<span class="st-lines-sku">{{ item.variant_sku }}</span>{% endif %}</td>
+        <td class="num">{{ item.quantity|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit }}</td>
+        <td class="num">{{ lines.symbol }}{{ item.price|floatformat:"2u"|intcomma:False }}</td>
+        <td class="num">{{ lines.symbol }}{{ item.amount|floatformat:"2u"|intcomma:False }}</td>
       </tr>
       {% empty %}
       <tr><td colspan="5" class="muted">{% trans "No items." %}</td></tr>
@@ -36,7 +37,7 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="4"><a href="{% url 'operating:order_detail' lines.order.pk %}">{% trans "Open the order" %}</a></td>
+        <td colspan="4"><a href="{{ lines.url }}" target="_blank" rel="noopener">{{ lines.open_label }}</a></td>
         <td class="num">{{ lines.symbol }}{{ lines.total|floatformat:"2u"|intcomma:False }}</td>
       </tr>
     </tfoot>

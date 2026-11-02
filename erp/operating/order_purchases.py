@@ -69,12 +69,9 @@ class CustomerOrderError(Exception):
 
 
 def packing_state(order):
-    """Whether the packing floor has started on `order`, and how far.
-
-    Started means it has left "Open" or rolls are already held for it —
-    the one rule every order↔purchase path uses to decide the order is no
-    longer theirs to rewrite, and what both cancel confirmations say out
-    loud before anyone confirms."""
+    """Whether the packing floor has started on `order`, and how far —
+    what the order's cancel confirmation says out loud before anyone
+    confirms. Started means it has left "Open" or rolls are held for it."""
     status = order.order_status or "pending"
     rolls = order.stock_reservations.filter(consumed=False).count()
     return {
@@ -85,34 +82,46 @@ def packing_state(order):
     }
 
 
-def packing_started(order):
-    return packing_state(order)["started"]
+def held_line_ids(order):
+    """The lines rolls are held for. Those stay as they are; every other
+    line a purchase feeds follows the purchase until the order ships,
+    packaging included — a shelf roll held for one line must not freeze
+    the lines a purchase brings in (order 351 kept 3009 ecru 320 after its
+    purchase turned 330, so the roll that came in matched nothing)."""
+    return set(order.stock_reservations.filter(consumed=False)
+               .values_list("order_item_id", flat=True))
+
+
+def _line_skus(items):
+    return ", ".join(sorted(it.product_variant.variant_sku or str(it.pk) for it in items))
 
 
 def purchase_cancel_warning(invoice):
     """What cancelling `invoice` will do to the customer order it was
-    bought for, said before the cancel is confirmed: whether packing has
-    started, and so whether the order is rewritten or left alone. Empty
-    when there is no open order to speak of."""
+    bought for, said before the cancel is confirmed: which of its lines
+    come off, which stay because rolls are held for them, and whether the
+    order is cancelled too. Empty when there is no open order to speak of."""
     order = invoice.for_order
     if order is None or invoice.status == "cancelled" or not order_is_open(order):
         return ""
     number = order.order_number or order.pk
-    state = packing_state(order)
-    if state["started"]:
-        return (_("Order %(number)s: packing HAS started (%(status)s, %(rolls)s roll(s) "
-                  "held). The order is left as it is — check it after cancelling.")
-                % {"number": number, "status": state["status_label"], "rolls": state["rolls"]})
     skus = plan_variant_skus(invoice.intake_plan)
     items = list(order.items.select_related("product_variant"))
+    held = held_line_ids(order)
     ours = [it for it in items
             if it.product_variant_id and (it.product_variant.variant_sku or "").lower() in skus]
-    if items and len(ours) == len(items):
-        return (_("Order %(number)s: packing has not started. All its lines come from "
-                  "this purchase, so the order is cancelled too.") % {"number": number})
-    return (_("Order %(number)s: packing has not started. Its %(count)s line(s) from this "
-              "purchase are removed; the order stays open with the rest.")
-            % {"number": number, "count": len(ours)})
+    going = [it for it in ours if it.pk not in held]
+    staying = [it for it in ours if it.pk in held]
+    if items and len(going) == len(items):
+        return (_("Order %(number)s: all its lines come from this purchase, so the order "
+                  "is cancelled too.") % {"number": number})
+    warning = (_("Order %(number)s: its %(count)s line(s) from this purchase are removed; "
+                 "the order stays open with the rest.")
+               % {"number": number, "count": len(going)})
+    if staying:
+        warning += " " + (_("Rolls are already held for %(skus)s, so those lines stay.")
+                          % {"skus": _line_skus(staying)})
+    return warning
 
 
 def order_is_open(order):
@@ -293,10 +302,11 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
 
     Lines are matched by variant. A line is only removed when this purchase
     put it there (`previous_skus`, from the plan as last saved) — anything
-    added on the order itself is the order's business. An order that has
-    left "Open", or that already holds rolls, belongs to the packing floor
-    now: it is left as it is and the purchase says so rather than rewriting
-    it under them.
+    added on the order itself is the order's business. The lines follow
+    until the order ships, packaging included; a shipped order is left as
+    it is. So, for now, is a line rolls are already held for — the other
+    lines still follow — and the purchase names it rather than rewriting
+    it under the packers.
     """
     from accounting.services_accounts import (
         get_or_create_current_account_for_order, post_order_movement,
@@ -324,9 +334,9 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
         created = True
     else:
         created = False
-        if packing_started(order):
-            return (_("Order %(number)s is already being packed, so its lines were not "
-                      "changed — edit them on the order.")
+        if not order_is_open(order):
+            return (_("Order %(number)s has already shipped, so its lines were not "
+                      "changed — reopen it to change them.")
                     % {"number": order.order_number or order.pk})
 
     from .audit import log_change
@@ -334,6 +344,8 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     existing = {it.product_variant_id: it
                 for it in order.items.select_related("product_variant")}
     previous = {s.lower() for s in previous_skus}
+    held = set() if created else held_line_ids(order)
+    kept = []   # lines this save would have changed, left for their held rolls
     wanted = set()
     changed = 0
     with syncing():
@@ -349,12 +361,18 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
                                          quantity=qty, price=price)
                 changed += 1
             elif item.quantity != qty or item.price != price:
+                if item.pk in held:
+                    kept.append(item)
+                    continue
                 item.quantity, item.price = qty, price
                 item.save(update_fields=["quantity", "price"])
                 changed += 1
         for variant_id, item in existing.items():
             sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
             if variant_id not in wanted and sku in previous:
+                if item.pk in held:
+                    kept.append(item)
+                    continue
                 item.delete()
                 changed += 1
     if changed and not created:
@@ -380,6 +398,10 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
             # page can still be printed without it.
             pass
     post_order_movement(order, member=member)
+    if kept:
+        return (_("Order %(number)s: rolls are already held for %(skus)s, so those lines "
+                  "were not changed — edit them on the order.")
+                % {"number": order.order_number or order.pk, "skus": _line_skus(kept)})
     return None
 
 
@@ -656,25 +678,30 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
     if order is None or not order_is_open(order):
         return None
     number = order.order_number or order.pk
-    if packing_started(order):
-        # The packing floor owns it now. Same rule as sync_customer_order.
-        return (_("Order %(number)s is already being packed, so its lines were left "
-                  "as they are — check it.") % {"number": number})
     skus = plan_variant_skus(invoice.intake_plan)
+    held = held_line_ids(order)
     removed = 0
+    kept = []
     with syncing():
         for item in order.items.select_related("product_variant"):
             sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
             if sku in skus:
+                if item.pk in held:
+                    kept.append(item)
+                    continue
                 item.delete()
                 removed += 1
         log_change(order, "field", field="purchase",
                    new=_("%(number)s cancelled — %(count)s line(s) removed")
                    % {"number": invoice.number, "count": removed})
         if order.items.exists():
-            return (_("Its %(count)s line(s) were removed from order %(number)s, which "
+            said = (_("Its %(count)s line(s) were removed from order %(number)s, which "
                       "stays open with what else is on it.")
                     % {"count": removed, "number": number})
+            if kept:
+                said += " " + (_("Rolls are already held for %(skus)s, so those lines stay.")
+                               % {"skus": _line_skus(kept)})
+            return said
         # A half of a split order emptied while another half still has goods
         # on it: only this half is called off. The status funnel moves every
         # half together, so it would cancel the goods the customer still

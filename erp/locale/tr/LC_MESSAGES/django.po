@@ -13251,6 +13251,21 @@ msgstr "%(number)s siparişi: paketleme başlamadı. Tüm satırları bu alımda
 msgid "Order %(number)s: packing has not started. Its %(count)s line(s) from this purchase are removed; the order stays open with the rest."
 msgstr "%(number)s siparişi: paketleme başlamadı. Bu alımdan gelen %(count)s satırı çıkarılır; sipariş kalanlarla açık kalır."
 
+msgid "Order %(number)s: all its lines come from this purchase, so the order is cancelled too."
+msgstr "%(number)s siparişi: tüm satırları bu alımdan geldiği için sipariş de iptal edilir."
+
+msgid "Order %(number)s: its %(count)s line(s) from this purchase are removed; the order stays open with the rest."
+msgstr "%(number)s siparişi: bu alımdan gelen %(count)s satırı çıkarılır; sipariş kalanlarla açık kalır."
+
+msgid "Rolls are already held for %(skus)s, so those lines stay."
+msgstr "%(skus)s için toplar zaten rezerve edildi, bu yüzden o satırlar kalır."
+
+msgid "Order %(number)s: rolls are already held for %(skus)s, so those lines were not changed — edit them on the order."
+msgstr "%(number)s siparişi: %(skus)s için toplar zaten rezerve edildi, bu yüzden o satırlar değiştirilmedi — siparişte düzenleyin."
+
+msgid "Order %(number)s has already shipped, so its lines were not changed — reopen it to change them."
+msgstr "%(number)s siparişi zaten gönderildi, bu yüzden satırları değiştirilmedi — değiştirmek için siparişi yeniden açın."
+
 #: accounting/templates/accounting/book_detail.html
 msgid "See the ledger in detail"
 msgstr "Defteri ayrıntılı gör"

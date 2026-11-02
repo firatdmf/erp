@@ -221,15 +221,102 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(lines["K24644.G07"].price, Decimal("6.00"))
         self.assertEqual(lines["K24644.G99"].pk, by_hand.pk)
 
-    def test_an_order_being_packed_is_left_alone(self):
+    def test_an_order_being_packed_still_follows_the_purchase(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         Order.objects.update(order_status="packaging")
         r = self._save(self._plan(variants=[self._variant(tops=(5,))], customer=False,
                                   product=Product.objects.get()), pk=inv_id)
         self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual(OrderItem.objects.get().quantity, Decimal("5.00"))
+
+    def test_a_shipped_order_is_left_alone(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        Order.objects.update(order_status="shipped")
+        r = self._save(self._plan(variants=[self._variant(tops=(5,))], customer=False,
+                                  product=Product.objects.get()), pk=inv_id)
+        self.assertTrue(r.json()["success"], r.json())
         self.assertEqual(OrderItem.objects.get().quantity, Decimal("55.00"))
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
-        self.assertContains(page, "already being packed")
+        self.assertContains(page, "has already shipped")
+
+    def _hold_shelf_roll(self, item, meters=Decimal("50")):
+        """A roll off the shelf held for `item`, as the order form does."""
+        wp = WarehouseProduct.objects.create(warehouse=self.wh, name="Shelf", sku="SHELF",
+                                             quantity=meters)
+        roll = WarehouseProductItem.objects.create(
+            product=wp, quantity=meters, quantity_remaining=meters, status="in_stock")
+        OrderStockReservation.objects.create(order=item.order, order_item=item,
+                                             stock_item=roll, warehouse_product=wp,
+                                             quantity=meters)
+
+    def _stock_line(self, order):
+        stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
+        return OrderItem.objects.create(order=order, product=stock, quantity=Decimal("50"),
+                                        price=Decimal("2"),
+                                        product_variant=ProductVariant.objects.create(
+                                            product=stock, variant_sku="STK0001.1"))
+
+    def test_a_roll_held_for_another_line_does_not_freeze_the_purchases_lines(self):
+        """Order 351: shelf rolls held for its other lines kept the line
+        of 3009 ecru 320 when the purchase turned it to 330 — the arriving
+        roll then matched nothing and sat on the shelf."""
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self._hold_shelf_roll(self._stock_line(order))
+
+        r = self._save(self._plan(variants=[self._variant(name="G08", sku="K24644.G08")],
+                                  customer=False, product=Product.objects.get(sku="K24644")),
+                       pk=inv_id)
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual(sorted(order.items.values_list("product_variant__variant_sku", flat=True)),
+                         ["K24644.G08", "STK0001.1"])
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertNotContains(page, "rolls are already held for")
+
+        # And the roll that comes in lands on the line.
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        self.assertEqual(
+            sorted(OrderStockReservation.objects.filter(order=order)
+                   .values_list("order_item__product_variant__variant_sku", flat=True)),
+            ["K24644.G08", "K24644.G08", "STK0001.1"])
+
+    def test_a_line_with_rolls_held_is_named_not_rewritten(self):
+        inv_id = self._save(self._plan(variants=[
+            self._variant(), self._variant(name="G08", sku="K24644.G08", tops=(10,)),
+        ])).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        g07 = order.items.get(product_variant__variant_sku="K24644.G07")
+        self._hold_shelf_roll(g07)
+
+        r = self._save(self._plan(variants=[
+            self._variant(tops=(5,)), self._variant(name="G08", sku="K24644.G08", tops=(20,)),
+        ], customer=False, product=Product.objects.get()), pk=inv_id)
+        self.assertTrue(r.json()["success"], r.json())
+        lines = dict(order.items.values_list("product_variant__variant_sku", "quantity"))
+        self.assertEqual(lines, {"K24644.G07": Decimal("55.00"), "K24644.G08": Decimal("20.00")})
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, "Order %s: rolls are already held for K24644.G07, so those "
+                                  "lines were not changed" % order.order_number)
+
+    def test_cancelling_the_purchase_leaves_a_line_with_rolls_held(self):
+        inv_id = self._save(self._plan(variants=[
+            self._variant(), self._variant(name="G08", sku="K24644.G08", tops=(10,)),
+        ])).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self._hold_shelf_roll(order.items.get(product_variant__variant_sku="K24644.G07"))
+        self.assertEqual(
+            self._cancel_warning(inv_id),
+            "Order %s: its 1 line(s) from this purchase are removed; "
+            "the order stays open with the rest. Rolls are already held for K24644.G07, so "
+            "those lines stay." % order.order_number)
+
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]),
+                             {"reason": "Supplier ran out"})
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual(list(order.items.values_list("product_variant__variant_sku", flat=True)),
+                         ["K24644.G07"])
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, "Rolls are already held for K24644.G07, so those lines stay.")
 
     def test_moving_the_draft_to_another_books_warehouse_is_refused(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
@@ -429,22 +516,20 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(r.context["intake_plan"]["products"][0]["variants"][0]["sale_price"],
                          "5.00")
 
-    def test_cancelling_the_draft_leaves_an_order_being_packed_alone(self):
+    def test_cancelling_the_draft_takes_its_lines_off_an_order_being_packed(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
-        # Being packed from stock: the packing floor owns it now.
+        self._stock_line(order)
         Order.objects.update(order_status="packaging")
         r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]), {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         order.refresh_from_db()
         self.assertEqual(order.order_status, "packaging")
-        self.assertEqual(order.items.count(), 1)
-        page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
-        self.assertContains(page, "is already being packed")
+        self.assertEqual(list(order.items.values_list("product_variant__variant_sku", flat=True)),
+                         ["STK0001.1"])
 
-    # ── Both cancel confirmations say how far packing has got ────────
-    # Cancelling either document reaches the other, and what happens
-    # there turns on whether packing has started — so it is said before
+    # ── The cancel confirmation says what happens to the order ───────
+    # Cancelling the purchase reaches the order — so it is said before
     # anyone confirms, not after.
 
     def _cancel_warning(self, inv_id):
@@ -456,28 +541,25 @@ class PurchaseForCustomerTest(TestCase):
             self.assertContains(page, '<p class="po-dlg-warn">%s</p>' % escape(warning))
         return warning
 
-    def test_the_purchase_cancel_says_packing_has_not_started(self):
+    def test_the_purchase_cancel_says_what_happens_to_the_order(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
         self.assertEqual(
             self._cancel_warning(inv_id),
-            "Order %s: packing has not started. All its lines come from this purchase, "
-            "so the order is cancelled too." % order.order_number)
+            "Order %s: all its lines come from this purchase, so the order is "
+            "cancelled too." % order.order_number)
         # With a line of its own the order outlives the purchase.
-        stock = Product.objects.create(title="Stock cloth", sku="STK0001", price=1)
-        OrderItem.objects.create(order=order, product=stock, quantity=Decimal("10"), price=Decimal("2"),
-                                 product_variant=ProductVariant.objects.create(
-                                     product=stock, variant_sku="STK0001.1"))
-        self.assertIn("Its 1 line(s) from this purchase are removed", self._cancel_warning(inv_id))
+        self._stock_line(order)
+        self.assertIn("its 1 line(s) from this purchase are removed", self._cancel_warning(inv_id))
 
-    def test_the_purchase_cancel_says_packing_has_started(self):
+    def test_the_purchase_cancel_says_the_same_while_packing(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order
         Order.objects.update(order_status="packaging")
         self.assertEqual(
             self._cancel_warning(inv_id),
-            "Order %s: packing HAS started (Packaging, 0 roll(s) held). The order is left "
-            "as it is — check it after cancelling." % order.order_number)
+            "Order %s: all its lines come from this purchase, so the order is "
+            "cancelled too." % order.order_number)
 
     def test_a_cancelled_purchase_warns_about_no_order(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]

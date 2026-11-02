@@ -12,6 +12,11 @@
 {% include "accounting/partials/pf_entry_form_css.html" %}
 <style>
   .ey-meta { font:500 12px var(--font-sans); color:var(--gray-500); line-height:1.5; }
+  .ey-how summary { list-style:none; }
+  .ey-how summary::-webkit-details-marker { display:none; }
+  .ey-how p, .ey-how li { font-size:13px; margin:0 0 8px; }
+  .ey-how ul { margin:0 0 8px; padding-left:18px; }
+  .ey-how b { color:var(--ink); }
   .ey-ok { color:#1B7A4B; font-weight:700; }
   .ey-warn { color:#B23B12; font-weight:700; }
   .ey-table { width:100%; border-collapse:collapse; font:500 12.5px var(--font-sans); }
@@ -71,6 +76,28 @@
         {% else %}
           <p class="ey-warn">{% trans "The Etsy app's keystring and shared secret are not set on this install." %}</p>
         {% endif %}
+      </div></div>
+
+      <div class="pf-card"><div class="pf-sect">
+        <details class="ey-how"{% if not connection.is_connected %} open{% endif %}>
+          <summary class="pf-sect-h" style="cursor:pointer;margin-bottom:0;">
+            <span class="ico"><i class="fa fa-info"></i></span>
+            <h3>{% trans "How it works" %}</h3>
+          </summary>
+          <div class="ey-meta" style="margin-top:12px;">
+            <p><b>{% trans "What it reads." %}</b> {% trans "The shop's orders, Etsy's fees and the payouts Etsy sends to the bank. Nothing more: it never changes anything on Etsy — no listings, no stock, no messages to buyers." %}</p>
+            <p><b>{% trans "Etsy is a customer." %}</b> {% trans "Buyers pay Etsy, and Etsy owes the money to this book until it pays out. So everything is recorded on Etsy's account, chosen on the right:" %}</p>
+            <ul>
+              <li>{% trans "Each Etsy order becomes an order to Etsy from the chosen warehouse, at the price without tax — Etsy collects sales tax and pays it on itself. As with any order, the sale is recorded when the order is completed." %}</li>
+              <li>{% trans "Each Etsy fee is an expense in the chosen category, paid by Etsy's account." %}</li>
+              <li>{% trans "Each deposit to the bank is a dividend to the chosen person, paid by Etsy's account." %}</li>
+            </ul>
+            <p>{% trans "Etsy's account therefore shows what Etsy holds for this book. It differs from Etsy's own balance only by the Etsy orders not completed here yet." %}</p>
+            <p><b>{% trans "Buyers' privacy." %}</b> {% trans "Etsy's rules allow keeping only what the books need: an order keeps the buyer's name and the Etsy order number. No address, no customer record and no emails to buyers." %}</p>
+            <p><b>{% trans "Right now: preview only." %}</b> {% trans "The preview shows, for the days you choose, what would be recorded — it writes nothing. The automatic sync (Etsy orders arriving as drafts for a person to complete, fees and payouts recorded by themselves) is switched on once the preview agrees with a month already recorded by hand. Until then, record Etsy sales, fees and payouts by hand on Etsy's account, the same way." %}</p>
+            <p>{% trans "Disconnecting only forgets the sign-in; the settings stay for when the shop is connected again." %}</p>
+          </div>
+        </details>
       </div></div>
 
       {% if connection.is_connected %}

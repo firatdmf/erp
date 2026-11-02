@@ -15643,3 +15643,47 @@ msgstr "Etsy bağlantısı kesildi. Ayarları yeniden bağlandığında kullanı
 
 msgid "Reads a book's Etsy shop: its orders, Etsy's fees and the payouts to the bank."
 msgstr "Bir defterin Etsy mağazasını okur: siparişlerini, Etsy ücretlerini ve bankaya yapılan ödemeleri."
+
+# Etsy integration: How it works
+
+msgid "How it works"
+msgstr "Nasıl çalışır"
+
+msgid "What it reads."
+msgstr "Neyi okur."
+
+msgid "The shop's orders, Etsy's fees and the payouts Etsy sends to the bank. Nothing more: it never changes anything on Etsy — no listings, no stock, no messages to buyers."
+msgstr "Mağazanın siparişlerini, Etsy ücretlerini ve Etsy'nin bankaya gönderdiği ödemeleri. Fazlasını değil: Etsy'de hiçbir şeyi değiştirmez — ilanlara, stoğa dokunmaz, alıcılara mesaj göndermez."
+
+msgid "Etsy is a customer."
+msgstr "Etsy bir müşteridir."
+
+msgid "Buyers pay Etsy, and Etsy owes the money to this book until it pays out. So everything is recorded on Etsy's account, chosen on the right:"
+msgstr "Alıcılar Etsy'ye öder ve Etsy ödeme yapana kadar bu parayı bu deftere borçludur. Bu yüzden her şey sağda seçilen Etsy hesabına kaydedilir:"
+
+msgid "Each Etsy order becomes an order to Etsy from the chosen warehouse, at the price without tax — Etsy collects sales tax and pays it on itself. As with any order, the sale is recorded when the order is completed."
+msgstr "Her Etsy siparişi, seçilen depodan Etsy'ye vergisiz fiyatla bir sipariş olur — satış vergisini Etsy tahsil eder ve kendisi öder. Her siparişte olduğu gibi satış, sipariş tamamlandığında kaydedilir."
+
+msgid "Each Etsy fee is an expense in the chosen category, paid by Etsy's account."
+msgstr "Her Etsy ücreti, seçilen kategoride, Etsy hesabından ödenen bir giderdir."
+
+msgid "Each deposit to the bank is a dividend to the chosen person, paid by Etsy's account."
+msgstr "Bankaya yapılan her ödeme, Etsy hesabından seçilen kişiye ödenen bir kâr payıdır."
+
+msgid "Etsy's account therefore shows what Etsy holds for this book. It differs from Etsy's own balance only by the Etsy orders not completed here yet."
+msgstr "Böylece Etsy hesabı, Etsy'nin bu defter adına tuttuğu parayı gösterir. Etsy'nin kendi bakiyesinden yalnızca burada henüz tamamlanmamış Etsy siparişleri kadar farklıdır."
+
+msgid "Buyers' privacy."
+msgstr "Alıcıların gizliliği."
+
+msgid "Etsy's rules allow keeping only what the books need: an order keeps the buyer's name and the Etsy order number. No address, no customer record and no emails to buyers."
+msgstr "Etsy kuralları yalnızca defterin ihtiyaç duyduğunun saklanmasına izin verir: sipariş, alıcının adını ve Etsy sipariş numarasını tutar. Adres, müşteri kaydı ve alıcılara e-posta yoktur."
+
+msgid "Right now: preview only."
+msgstr "Şu an: yalnızca önizleme."
+
+msgid "The preview shows, for the days you choose, what would be recorded — it writes nothing. The automatic sync (Etsy orders arriving as drafts for a person to complete, fees and payouts recorded by themselves) is switched on once the preview agrees with a month already recorded by hand. Until then, record Etsy sales, fees and payouts by hand on Etsy's account, the same way."
+msgstr "Önizleme, seçtiğiniz günler için nelerin kaydedileceğini gösterir — hiçbir şey yazmaz. Otomatik eşitleme (Etsy siparişlerinin bir kişinin tamamlayacağı taslaklar olarak gelmesi, ücretlerin ve ödemelerin kendiliğinden kaydedilmesi), önizleme elle kaydedilmiş bir ayla örtüştüğünde açılır. O zamana kadar Etsy satışlarını, ücretlerini ve ödemelerini Etsy hesabına aynı şekilde elle kaydedin."
+
+msgid "Disconnecting only forgets the sign-in; the settings stay for when the shop is connected again."
+msgstr "Bağlantıyı kesmek yalnızca oturum bilgisini siler; ayarlar mağaza yeniden bağlandığında kullanılmak üzere kalır."

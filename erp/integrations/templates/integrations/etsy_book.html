@@ -78,6 +78,76 @@
         {% endif %}
       </div></div>
 
+      {% if connection.is_connected %}
+      <div class="pf-card"><div class="pf-sect">
+        <div class="pf-sect-h">
+          <span class="ico"><i class="fa fa-sync"></i></span>
+          <h3>{% trans "Sync" %}</h3>
+          <span class="sub">{% if connection.is_syncing %}{% trans "On — about once an hour while the ERP is in use" %}{% else %}{% trans "Off" %}{% endif %}</span>
+        </div>
+        {% if connection.is_syncing %}
+          <p class="ey-meta">
+            {% blocktrans with since=connection.sync_from|date:"d.m.Y H:i" %}Recording what Etsy shows since {{ since }}.{% endblocktrans %}
+            {% if connection.last_synced_at %}{% blocktrans with last=connection.last_synced_at|date:"d.m.Y H:i" %}Last run {{ last }}.{% endblocktrans %}{% else %}{% trans "Not run yet." %}{% endif %}
+          </p>
+          {% if connection.last_sync_error %}<div class="pf-err" style="margin-top:10px;"><div>{{ connection.last_sync_error }}</div></div>{% endif %}
+          {% if sync.etsy_balance is not None %}
+          <div class="ey-sum" style="margin-top:12px;">
+            <div>{% trans "Etsy's own balance" %}<b>{{ sync.etsy_balance|floatformat:2 }}</b></div>
+            <div>{% trans "Etsy's account in the books" %}<b>{{ sync.erp_balance|floatformat:2 }}</b></div>
+            <div>{% trans "Etsy orders not completed yet" %}<b>{{ sync.open_total|floatformat:2 }}</b></div>
+            <div>{% trans "Unexplained difference" %}<b class="{% if sync.gap %}ey-warn{% else %}ey-ok{% endif %}">{{ sync.gap|floatformat:2 }}</b></div>
+          </div>
+          {% endif %}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+            <form method="post" action="{% url 'integrations:etsy_sync_now' book_pk=book.pk %}">{% csrf_token %}<button class="pf-btn primary" type="submit">{% trans "Sync now" %}</button></form>
+            <form method="post" action="{% url 'integrations:etsy_sync_stop' book_pk=book.pk %}">{% csrf_token %}<button class="pf-btn ghost" type="submit">{% trans "Stop syncing" %}</button></form>
+          </div>
+        {% else %}
+          <p class="ey-meta">{% trans "When switched on, everything Etsy shows from that moment is recorded — earlier days are not. Choose all four settings first." %}</p>
+          {% if connection.missing_settings %}<p class="ey-warn">{% blocktrans with what=connection.missing_settings|join:", " %}Still to choose: {{ what }}.{% endblocktrans %}</p>{% endif %}
+          <form method="post" action="{% url 'integrations:etsy_sync_start' book_pk=book.pk %}" style="margin-top:12px;">
+            {% csrf_token %}<button class="pf-btn primary" type="submit" {% if connection.missing_settings %}disabled{% endif %}>{% trans "Start syncing from now" %}</button>
+          </form>
+        {% endif %}
+      </div>
+
+      {% if sync.waiting_receipts or sync.waiting_entries %}
+      <div class="pf-sect">
+        <div class="pf-sect-h"><h3 class="ey-warn">{% trans "Waiting for a person" %}</h3><span class="sub">{% trans "Record these by hand, then mark them handled" %}</span></div>
+        <table class="ey-table"><tbody>
+          {% for r in sync.waiting_receipts %}
+          <tr><td>{% blocktrans with id=r.receipt_id %}Etsy order #{{ id }}{% endblocktrans %}<div class="ey-meta">{{ r.created|date:"d.m.Y H:i" }}</div></td><td>{{ r.problem }}</td>
+              <td><form method="post" action="{% url 'integrations:etsy_mark_handled' book_pk=book.pk kind='receipt' item_pk=r.pk %}">{% csrf_token %}<button class="pf-btn ghost" type="submit">{% trans "Handled" %}</button></form></td></tr>
+          {% endfor %}
+          {% for e in sync.waiting_entries %}
+          <tr><td>{{ e.ledger_type }} · {{ e.reference_type }} {{ e.reference_id }}<div class="ey-meta">{{ e.created|date:"d.m.Y H:i" }} · {{ e.amount|floatformat:2 }} {{ e.currency }}</div></td><td>{{ e.problem }}</td>
+              <td><form method="post" action="{% url 'integrations:etsy_mark_handled' book_pk=book.pk kind='entry' item_pk=e.pk %}">{% csrf_token %}<button class="pf-btn ghost" type="submit">{% trans "Handled" %}</button></form></td></tr>
+          {% endfor %}
+        </tbody></table>
+      </div>
+      {% endif %}
+
+      {% if sync.recent_receipts or sync.recent_entries %}
+      <div class="pf-sect">
+        <div class="pf-sect-h"><h3>{% trans "Recently recorded" %}</h3></div>
+        <table class="ey-table"><tbody>
+          {% for r in sync.recent_receipts %}
+          <tr><td>{% blocktrans with id=r.receipt_id %}Etsy order #{{ id }}{% endblocktrans %}<div class="ey-meta">{{ r.created|date:"d.m.Y H:i" }}</div></td>
+              <td>{% if r.order %}<a href="{% url 'operating:order_detail' pk=r.order_id %}">{% blocktrans with no=r.order.order_number|default:r.order_id %}Order {{ no }}{% endblocktrans %}</a> · {{ r.order.get_order_status_display }}{% else %}{{ r.get_state_display }}{% endif %}
+                {% if r.problem %}<div class="ey-warn">{{ r.problem }}</div>{% endif %}</td></tr>
+          {% endfor %}
+          {% for e in sync.recent_entries %}
+          <tr><td>{{ e.ledger_type }}<div class="ey-meta">{{ e.created|date:"d.m.Y H:i" }} · {{ e.reference_type }} {{ e.reference_id }}</div></td>
+              <td class="n">{{ e.amount|floatformat:2 }}</td>
+              <td>{% if e.expense_id %}<a href="{% url 'accounting:equity_expense_detail' pk=book.pk expense_pk=e.expense_id %}">{% trans "Expense" %}</a>{% elif e.dividend_id %}<a href="{% url 'accounting:equity_dividend_detail' pk=book.pk source_pk=e.dividend_id %}">{% trans "Dividend" %}</a>{% else %}{{ e.get_state_display }}{% endif %}</td></tr>
+          {% endfor %}
+        </tbody></table>
+      </div>
+      {% endif %}
+      </div>
+      {% endif %}
+
       <div class="pf-card"><div class="pf-sect">
         <details class="ey-how"{% if not connection.is_connected %} open{% endif %}>
           <summary class="pf-sect-h" style="cursor:pointer;margin-bottom:0;">
@@ -94,7 +164,9 @@
             </ul>
             <p>{% trans "Etsy's account therefore shows what Etsy holds for this book. It differs from Etsy's own balance only by the Etsy orders not completed here yet." %}</p>
             <p><b>{% trans "Buyers' privacy." %}</b> {% trans "Etsy's rules allow keeping only what the books need: an order keeps the buyer's name and the Etsy order number. No address, no customer record and no emails to buyers." %}</p>
-            <p><b>{% trans "Right now: preview only." %}</b> {% trans "The preview shows, for the days you choose, what would be recorded — it writes nothing. The automatic sync (Etsy orders arriving as drafts for a person to complete, fees and payouts recorded by themselves) is switched on once the preview agrees with a month already recorded by hand. Until then, record Etsy sales, fees and payouts by hand on Etsy's account, the same way." %}</p>
+            <p><b>{% trans "The sync." %}</b> {% trans "Once switched on, it runs about once an hour while the ERP is in use, or at once with Sync now. Etsy orders arrive as draft orders: a person picks the boxes and completes them. Fees and payouts are recorded by themselves. Each Etsy order and entry is recorded once, however often it runs." %}</p>
+            <p><b>{% trans "Waiting for a person." %}</b> {% trans "Whatever it cannot be sure of is not guessed: an order whose SKU is not on the shelf, a refund (did the goods come back?), money coming in that is not a buyer's payment. Record those by hand, then mark them handled." %}</p>
+            <p><b>{% trans "The preview." %}</b> {% trans "For the days you choose, it shows what would be recorded, and writes nothing." %}</p>
             <p>{% trans "Disconnecting only forgets the sign-in; the settings stay for when the shop is connected again." %}</p>
           </div>
         </details>

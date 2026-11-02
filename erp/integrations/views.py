@@ -93,8 +93,40 @@ def etsy_book(request, book_pk):
         "book": book, "connection": connection, "app_configured": etsy_api.app_configured(),
         "callback_uri": _callback_uri(request), "contact_email": brand("BRAND_EMAIL"),
         "start": start, "end": end, "result": result, "problem": problem,
+        "sync": _sync_state(connection) if connection else None,
         **_choices(book),
     })
+
+
+def _sync_state(connection):
+    """What the page says about the sync: what waits, what it did, and
+    whether Etsy's account agrees with Etsy's own balance."""
+    from decimal import Decimal
+    from accounting.services_accounts import SOLD_STATUSES
+    from .models import NEEDS_PERSON
+
+    latest = connection.ledger_entries.order_by("-created", "-entry_id").first()
+    account = connection.current_account
+    # Drafts a person has not completed yet: Etsy has the buyer's money,
+    # the books do not have the sale. They are the one expected gap.
+    open_orders = [r.order for r in connection.receipts.select_related("order")
+                   if r.order_id and r.order.order_status not in SOLD_STATUSES
+                   and r.order.order_status != "cancelled"]
+    open_total = sum((o.billable_value() for o in open_orders), Decimal("0"))
+    erp_balance = account.recompute_balance(save=False) if account else None
+    etsy_balance = latest.balance if latest else None
+    return {
+        "waiting_receipts": connection.receipts.filter(state=NEEDS_PERSON),
+        "waiting_entries": connection.ledger_entries.filter(state=NEEDS_PERSON),
+        "recent_receipts": connection.receipts.exclude(state=NEEDS_PERSON)[:10],
+        "recent_entries": connection.ledger_entries.exclude(state=NEEDS_PERSON)[:15],
+        "etsy_balance": etsy_balance,
+        "erp_balance": erp_balance,
+        "open_orders": open_orders,
+        "open_total": open_total,
+        "gap": (etsy_balance - erp_balance - open_total)
+               if etsy_balance is not None and erp_balance is not None else None,
+    }
 
 
 @require_POST
@@ -174,4 +206,62 @@ def etsy_disconnect(request, book_pk):
     connection.shop_name = connection.scopes = ""
     connection.save()
     messages.success(request, _("Etsy disconnected. Its settings are kept for when it is connected again."))
+    return redirect("integrations:etsy_book", book_pk=book_pk)
+
+
+@require_POST
+@_admin_only
+def etsy_sync_start(request, book_pk):
+    connection = get_object_or_404(EtsyConnection, book_id=book_pk)
+    missing = connection.missing_settings()
+    if not connection.is_connected or missing:
+        messages.error(request, _("Connect the shop and choose %(what)s first.") % {
+            "what": ", ".join(missing) or _("a shop")})
+        return redirect("integrations:etsy_book", book_pk=book_pk)
+    # From this moment on: what came before is recorded by hand.
+    connection.sync_from = timezone.now()
+    connection.last_sync_error = ""
+    connection.save(update_fields=["sync_from", "last_sync_error", "updated_at"])
+    messages.success(request, _("The sync is on. Etsy orders, fees and payouts from now on will be recorded."))
+    return redirect("integrations:etsy_book", book_pk=book_pk)
+
+
+@require_POST
+@_admin_only
+def etsy_sync_stop(request, book_pk):
+    connection = get_object_or_404(EtsyConnection, book_id=book_pk)
+    connection.sync_from = None
+    connection.save(update_fields=["sync_from", "updated_at"])
+    messages.success(request, _("The sync is off. Nothing it recorded is undone."))
+    return redirect("integrations:etsy_book", book_pk=book_pk)
+
+
+@require_POST
+@_admin_only
+def etsy_sync_now(request, book_pk):
+    from .etsy_sync import sync
+    connection = get_object_or_404(EtsyConnection, book_id=book_pk)
+    try:
+        recorded, waiting = sync(connection)
+    except etsy_api.EtsyError as exc:
+        connection.last_sync_error = str(exc)
+        connection.save(update_fields=["last_sync_error", "updated_at"])
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, _("Synced: %(recorded)s recorded, %(waiting)s waiting for a person.") % {
+            "recorded": recorded, "waiting": waiting})
+    return redirect("integrations:etsy_book", book_pk=book_pk)
+
+
+@require_POST
+@_admin_only
+def etsy_mark_handled(request, book_pk, kind, item_pk):
+    from .models import HANDLED, NEEDS_PERSON, EtsyLedgerEntry, EtsyReceipt
+    model = {"receipt": EtsyReceipt, "entry": EtsyLedgerEntry}.get(kind)
+    if model is None:
+        return HttpResponseForbidden()
+    item = get_object_or_404(model, pk=item_pk, connection__book_id=book_pk, state=NEEDS_PERSON)
+    item.state = HANDLED
+    item.save(update_fields=["state"])
+    messages.success(request, _("Marked as handled."))
     return redirect("integrations:etsy_book", book_pk=book_pk)

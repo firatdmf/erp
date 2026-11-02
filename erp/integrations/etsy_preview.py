@@ -36,17 +36,31 @@ KIND_LABELS = {
 
 
 def classify(entry):
-    """The proposed meaning of one ledger entry, from what it says of itself."""
+    """The meaning of one ledger entry, from what it says of itself.
+
+    Read off the labels Etsy put on October 2026's entries, checked there
+    against the month recorded by hand: PAYMENT_GROSS / shop_payment is a
+    buyer's payment, sales_tax the tax taken back off it, DISBURSE2 a
+    payout, and the fee labels (transaction, PAYMENT_PROCESSING_FEE,
+    offsite_ads_fee, the listing renewals) all charges. Anything about a
+    refund, and anything that comes in rather than goes out without being
+    a buyer's payment (billing_payment: the owner's card settling Etsy's
+    bill), is left to a person.
+    """
     amount = entry.get("amount") or 0
-    text = " ".join(str(entry.get(k) or "") for k in
-                    ("ledger_type", "description", "reference_type")).lower()
-    if amount < 0 and "disburse" in text:
-        return PAYOUT
+    ledger_type = str(entry.get("ledger_type") or "")
+    reference_type = str(entry.get("reference_type") or "")
+    text = " ".join((ledger_type, str(entry.get("description") or ""), reference_type)).lower()
+    if "refund" in text or "reversal" in text:
+        return OTHER
+    if "disburse" in text:
+        return PAYOUT if amount < 0 else OTHER
     # VAT Etsy charges on its own services is part of the fee, not a tax we owe.
     if "tax" in text and "seller_services" not in text and "vat_seller" not in text:
-        return TAX
-    if amount > 0 and "payment" in text:
-        return SALE
+        return TAX if amount < 0 else OTHER
+    if amount > 0:
+        is_payment = ledger_type.upper() == "PAYMENT_GROSS" or reference_type == "shop_payment"
+        return SALE if is_payment else OTHER
     if amount < 0:
         return FEE
     return OTHER

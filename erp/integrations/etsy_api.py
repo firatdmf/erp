@@ -193,5 +193,6 @@ def money(value):
     """An Etsy money object ({amount, divisor, currency_code}) as a Decimal."""
     from decimal import Decimal
     if not value:
-        return Decimal("0")
-    return Decimal(value.get("amount") or 0) / Decimal(value.get("divisor") or 100)
+        return Decimal("0.00")
+    return (Decimal(value.get("amount") or 0)
+            / Decimal(value.get("divisor") or 100)).quantize(Decimal("0.01"))

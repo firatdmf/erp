@@ -244,6 +244,8 @@ MIDDLEWARE = [
     # view runs, so a blocked write never reaches a model.
     "erp.middleware.ReadOnlyRoleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # Now and then, after a signed-in request: the Etsy sync (integrations).
+    "integrations.middleware.EtsySyncMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     # "erp.middleware.PerformanceLoggingMiddleware",  # Performance monitoring

@@ -48,11 +48,89 @@ class EtsyConnection(models.Model):
                                       null=True, blank=True, related_name="+",
                                       help_text="Who the payouts to the bank are paid to, as dividends.")
 
+    # The sync. Off until someone switches it on, and then it records only
+    # what Etsy shows from that moment: earlier months are recorded by hand.
+    sync_from = models.DateTimeField(null=True, blank=True,
+                                     help_text="Etsy orders and ledger entries from this moment on are recorded.")
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    last_sync_error = models.TextField(blank=True, default="")
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.book} · Etsy {self.shop_name or self.shop_id or '(not connected)'}"
 
     @property
+    def is_syncing(self):
+        return bool(self.is_connected and self.sync_from)
+
+    def missing_settings(self):
+        """The settings the sync cannot record without, by their labels."""
+        return [label for field, label in (
+            ("warehouse_id", "warehouse"), ("current_account_id", "Etsy's account"),
+            ("fee_category_id", "fee category"), ("payout_member_id", "payouts go to"),
+        ) if not getattr(self, field)]
+
+    @property
     def is_connected(self):
         return bool(self.shop_id and self.refresh_token)
+
+
+# What the sync did with each thing Etsy showed it, so nothing is recorded
+# twice and whatever it could not record waits for a person. Only ids,
+# amounts and labels are kept here — nothing about the buyer (Etsy's API
+# terms): the buyer's name lives on the order's notes, as on any order.
+RECORDED, COVERED, NEEDS_PERSON, HANDLED, SKIPPED = (
+    "recorded", "covered", "needs_person", "handled", "skipped")
+SYNC_STATES = [
+    (RECORDED, "Recorded"),
+    (COVERED, "Covered by an order"),
+    (NEEDS_PERSON, "Needs a person"),
+    (HANDLED, "Handled by a person"),
+    (SKIPPED, "Skipped"),
+]
+
+
+class EtsyReceipt(models.Model):
+    """One Etsy order, and the draft order it became."""
+
+    connection = models.ForeignKey(EtsyConnection, on_delete=models.CASCADE, related_name="receipts")
+    receipt_id = models.BigIntegerField()
+    created = models.DateTimeField()
+    state = models.CharField(max_length=16, choices=SYNC_STATES)
+    order = models.ForeignKey("operating.Order", on_delete=models.SET_NULL,
+                              null=True, blank=True, related_name="+")
+    problem = models.TextField(blank=True, default="")
+    synced_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["connection", "receipt_id"],
+                                               name="etsy_receipt_once")]
+        ordering = ["-created"]
+
+
+class EtsyLedgerEntry(models.Model):
+    """One entry of the shop's payment account, and what it became."""
+
+    connection = models.ForeignKey(EtsyConnection, on_delete=models.CASCADE, related_name="ledger_entries")
+    entry_id = models.BigIntegerField()
+    created = models.DateTimeField()
+    ledger_type = models.CharField(max_length=64, blank=True, default="")
+    reference_type = models.CharField(max_length=64, blank=True, default="")
+    reference_id = models.CharField(max_length=64, blank=True, default="")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    balance = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, blank=True, default="")
+    kind = models.CharField(max_length=16)
+    state = models.CharField(max_length=16, choices=SYNC_STATES)
+    expense = models.ForeignKey("accounting.EquityExpense", on_delete=models.SET_NULL,
+                                null=True, blank=True, related_name="+")
+    dividend = models.ForeignKey("accounting.EquityDivident", on_delete=models.SET_NULL,
+                                 null=True, blank=True, related_name="+")
+    problem = models.TextField(blank=True, default="")
+    synced_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["connection", "entry_id"],
+                                               name="etsy_ledger_entry_once")]
+        ordering = ["-created", "-entry_id"]

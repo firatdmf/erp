@@ -15687,3 +15687,108 @@ msgstr "Önizleme, seçtiğiniz günler için nelerin kaydedileceğini gösterir
 
 msgid "Disconnecting only forgets the sign-in; the settings stay for when the shop is connected again."
 msgstr "Bağlantıyı kesmek yalnızca oturum bilgisini siler; ayarlar mağaza yeniden bağlandığında kullanılmak üzere kalır."
+
+# Etsy integration: the sync
+
+msgid "Sync"
+msgstr "Eşitleme"
+
+msgid "On — about once an hour while the ERP is in use"
+msgstr "Açık — ERP kullanıldığı sürece yaklaşık saatte bir"
+
+msgid "Not run yet."
+msgstr "Henüz çalışmadı."
+
+msgid "Etsy's own balance"
+msgstr "Etsy'nin kendi bakiyesi"
+
+msgid "Etsy's account in the books"
+msgstr "Defterdeki Etsy hesabı"
+
+msgid "Etsy orders not completed yet"
+msgstr "Henüz tamamlanmamış Etsy siparişleri"
+
+msgid "Unexplained difference"
+msgstr "Açıklanamayan fark"
+
+msgid "Sync now"
+msgstr "Şimdi eşitle"
+
+msgid "Stop syncing"
+msgstr "Eşitlemeyi durdur"
+
+msgid "When switched on, everything Etsy shows from that moment is recorded — earlier days are not. Choose all four settings first."
+msgstr "Açıldığında Etsy'nin o andan itibaren gösterdiği her şey kaydedilir — önceki günler kaydedilmez. Önce dört ayarın hepsini seçin."
+
+msgid "Start syncing from now"
+msgstr "Şu andan itibaren eşitlemeye başla"
+
+msgid "Waiting for a person"
+msgstr "Bir kişiyi bekliyor"
+
+msgid "Record these by hand, then mark them handled"
+msgstr "Bunları elle kaydedin, sonra halledildi olarak işaretleyin"
+
+msgid "Handled"
+msgstr "Halledildi"
+
+msgid "Recently recorded"
+msgstr "Son kaydedilenler"
+
+msgid "The sync."
+msgstr "Eşitleme."
+
+msgid "Once switched on, it runs about once an hour while the ERP is in use, or at once with Sync now. Etsy orders arrive as draft orders: a person picks the boxes and completes them. Fees and payouts are recorded by themselves. Each Etsy order and entry is recorded once, however often it runs."
+msgstr "Açıldığında ERP kullanıldığı sürece yaklaşık saatte bir, ya da \"Şimdi eşitle\" ile hemen çalışır. Etsy siparişleri taslak sipariş olarak gelir: bir kişi kutuları seçip tamamlar. Ücretler ve ödemeler kendiliğinden kaydedilir. Ne kadar sık çalışırsa çalışsın her Etsy siparişi ve hareketi bir kez kaydedilir."
+
+msgid "Waiting for a person."
+msgstr "Bir kişiyi bekleyenler."
+
+msgid "Whatever it cannot be sure of is not guessed: an order whose SKU is not on the shelf, a refund (did the goods come back?), money coming in that is not a buyer's payment. Record those by hand, then mark them handled."
+msgstr "Emin olamadığı hiçbir şey tahmin edilmez: SKU'su rafta olmayan bir sipariş, bir iade (mal geri geldi mi?), alıcı ödemesi olmayan gelen para. Bunları elle kaydedin, sonra halledildi olarak işaretleyin."
+
+msgid "The preview."
+msgstr "Önizleme."
+
+msgid "For the days you choose, it shows what would be recorded, and writes nothing."
+msgstr "Seçtiğiniz günler için nelerin kaydedileceğini gösterir ve hiçbir şey yazmaz."
+
+#, python-format
+msgid "Recording what Etsy shows since %(since)s."
+msgstr "Etsy'nin %(since)s tarihinden beri gösterdikleri kaydediliyor."
+
+#, python-format
+msgid "Last run %(last)s."
+msgstr "Son çalışma %(last)s."
+
+#, python-format
+msgid "Still to choose: %(what)s."
+msgstr "Seçilmesi gerekenler: %(what)s."
+
+#, python-format
+msgid "Etsy order #%(id)s"
+msgstr "Etsy siparişi #%(id)s"
+
+#, python-format
+msgid "Order %(no)s"
+msgstr "Sipariş %(no)s"
+
+#, python-format
+msgid "Connect the shop and choose %(what)s first."
+msgstr "Önce mağazayı bağlayın ve %(what)s seçin."
+
+msgid "a shop"
+msgstr "bir mağaza"
+
+msgid "The sync is on. Etsy orders, fees and payouts from now on will be recorded."
+msgstr "Eşitleme açık. Bundan sonraki Etsy siparişleri, ücretleri ve ödemeleri kaydedilecek."
+
+msgid "The sync is off. Nothing it recorded is undone."
+msgstr "Eşitleme kapalı. Kaydettiği hiçbir şey geri alınmaz."
+
+#, python-format
+msgid "Synced: %(recorded)s recorded, %(waiting)s waiting for a person."
+msgstr "Eşitlendi: %(recorded)s kaydedildi, %(waiting)s bir kişiyi bekliyor."
+
+msgid "Marked as handled."
+msgstr "Halledildi olarak işaretlendi."

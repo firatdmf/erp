@@ -103,6 +103,20 @@ class UnitCostIsTheWeightedAverage(TestCase):
         self._top("300", "4.00", "a")
         self.assertEqual(_cell(self._list(), "Unit cost"), "₺4.00")
 
+    def test_the_most_valuable_stock_comes_first_by_default(self):
+        """Quantity x cost, not name: 10 m at $50 outranks 300 m at $1."""
+        self._top("300", "1.00", "a")
+        dear = WarehouseProduct.objects.create(
+            warehouse=self.wh, name="zzz silk", sku="ZSILK-1",
+            quantity=Decimal("10"))
+        WarehouseProductItem.objects.create(
+            product=dear, quantity=Decimal("10"),
+            quantity_remaining=Decimal("10"), barcode="BC-silk",
+            status="in_stock", unit_cost_base=Decimal("50.00"))
+        self.assertEqual(_cell(self._list(), "Total"), "$500.00")
+        # The grouped header's first Total is its quantity: the silk's 10 m.
+        self.assertIn("10.00 m", _cell(self._list(view="grouped"), "Total"))
+
     def test_the_grouped_view_agrees_with_the_flat_one(self):
         self._top("295", "4.00", "a")
         self._top("5", "20.00", "b")
@@ -382,16 +396,64 @@ class CombinedWarehouseMergesTheSameSku(TestCase):
         self._stock(self.factory, "K24614.G47", "300", "80.00")
         self.assertEqual(len(self._rows(self._list())), 2)
 
+    def _lira_factory(self, usd_per_lira="0.025"):
+        """Ergene costs in lira, at a rate the books already hold for today
+        — so the test never asks a rate source."""
+        from datetime import date
+        from accounting import services
+        from accounting.models import CurrencyExchangeRate
+        try_ = CurrencyCategory.objects.create(code="TRY", name="Lira", symbol="₺")
+        self.ergene_book.base_currency = try_
+        self.ergene_book.save()
+        CurrencyExchangeRate.objects.create(
+            from_currency="TRY", to_currency="USD",
+            rate=Decimal(usd_per_lira), date=date.today())
+        services._RATE_MEMO.clear()
+
+    def test_money_sorts_compare_lira_and_dollars_in_dollars(self):
+        """₺10,000 at 0.025 is $250, so the $500 of silk leads — on the
+        bare numbers the lira row came first."""
+        self._lira_factory()
+        self._stock(self.store, "SILK", "10", "50.00", name="SILK")
+        self._stock(self.factory, "SETA", "100", "100.00", name="SETA")
+        for view in ("variants", "grouped"):
+            with self.subTest(view=view):
+                html = self._list(view=view)
+                self.assertLess(html.index("SILK"), html.index("SETA"))
+        # Unit cost: $50 a meter beats ₺100 ($2.50) a meter.
+        html = self._list(sort="price_desc")
+        self.assertLess(html.index("SILK"), html.index("SETA"))
+        html = self._list(sort="price_asc")
+        self.assertLess(html.index("SETA"), html.index("SILK"))
+
+    def test_rows_still_print_in_their_own_currency(self):
+        self._lira_factory()
+        self._stock(self.factory, "SETA", "100", "100.00", name="SETA")
+        self.assertEqual(_cell(self._rows(self._list())[0], "Total"), "₺10,000.00")
+
+    def test_the_export_sorts_the_same_way(self):
+        from operating.warehouse_excel import _filtered_products
+        self._lira_factory()
+        self._stock(self.store, "SILK", "10", "50.00", name="SILK")
+        self._stock(self.factory, "SETA", "100", "100.00", name="SETA")
+        self.assertEqual(
+            [p.sku for p in _filtered_products(self.combined, "", "value_desc")],
+            ["SILK", "SETA"])
+
     def test_every_sort_still_pages_by_sku(self):
         self._stock(self.store, "A", "100", "4.00")
         self._stock(self.factory, "A", "300", "2.00")
         self._stock(self.factory, "B", "50", "9.00")
-        for sort in ("name_asc", "name_desc", "qty_desc", "qty_asc",
+        for sort in ("value_desc", "name_asc", "name_desc", "qty_desc", "qty_asc",
                      "price_desc", "price_asc", "recent"):
             with self.subTest(sort=sort):
                 self.assertEqual(len(self._rows(self._list(sort=sort))), 2)
         rows = self._rows(self._list(sort="price_desc"))
         self.assertIn("$9.00", _cell(rows[0], "Unit cost"))
+        # By default the SKU holding the most money leads: A's 400 + 600
+        # across both members beats B's 450.
+        rows = self._rows(self._list())
+        self.assertIn("$1,000.00", _cell(rows[0], "Total"))
 
     def test_the_rolls_come_per_member(self):
         a = self._stock(self.store, "K24614.G47", "100", "4.00")

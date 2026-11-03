@@ -27,7 +27,7 @@ from erp.xlsx_utils import (
 )
 
 from .models import Warehouse, WarehouseProduct
-from .views_warehouse import (reserved_meters_subquery,
+from .views_warehouse import (_to_usd_rate, reserved_meters_subquery,
                               warehouse_search_mode, warehouse_search_q)
 
 NCOLS = 9  # A..I — plus a Location column on a combined (ortak) warehouse
@@ -98,10 +98,19 @@ def _filtered_products(warehouse, search, sort, search_by="text",
         "qty_desc": "-quantity", "qty_asc": "quantity",
         "recent": "-updated_at",
     }
-    # A sold-out SKU sorts by its last cost, as on the page.
-    if sort in ("price_desc", "price_asc"):
-        qs = qs.annotate(_price=Coalesce("avg_cost", "last_cost"))
-    if sort == "price_desc":
+    # A sold-out SKU sorts by its last cost, as on the page. The money
+    # sorts compare in dollars, as the members of a combined warehouse can
+    # cost in different currencies (see _to_usd_rate).
+    if sort in ("price_desc", "price_asc", "value_desc"):
+        rate = _to_usd_rate(scope_ids)
+        qs = qs.annotate(
+            _price=ExpressionWrapper(Coalesce("avg_cost", "last_cost") * rate,
+                                     output_field=_money),
+            _value=ExpressionWrapper(F("stock_value") * rate,
+                                     output_field=_money))
+    if sort == "value_desc":
+        qs = qs.order_by(F("_value").desc(nulls_last=True), "name", "id")
+    elif sort == "price_desc":
         qs = qs.order_by(F("_price").desc(nulls_last=True), "name", "id")
     elif sort == "price_asc":
         qs = qs.order_by(F("_price").asc(nulls_last=True), "name", "id")
@@ -110,7 +119,7 @@ def _filtered_products(warehouse, search, sort, search_by="text",
     return qs
 
 
-def build_warehouse_workbook(warehouse, search="", sort="name_asc",
+def build_warehouse_workbook(warehouse, search="", sort="value_desc",
                              search_by="text", for_sales_rep=False,
                              show_empty=False, reserved_only=False):
     from openpyxl import Workbook
@@ -236,7 +245,7 @@ def warehouse_excel(request, pk):
     the on-screen list is currently filtered by."""
     warehouse = get_object_or_404(Warehouse, pk=pk)
     search = (request.GET.get('search') or '').strip()
-    sort = (request.GET.get('sort') or 'name_asc').strip()
+    sort = (request.GET.get('sort') or 'value_desc').strip()
     on = ('1', 'true', 'on')
     wb = build_warehouse_workbook(
         warehouse, search=search, sort=sort,

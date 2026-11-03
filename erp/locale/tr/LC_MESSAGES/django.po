@@ -7185,6 +7185,9 @@ msgstr "Model"
 msgid "Most expensive"
 msgstr "En pahalı"
 
+msgid "Most value"
+msgstr "En değerli"
+
 msgid "Most valuable (TRY)"
 msgstr "En değerli (TRY)"
 

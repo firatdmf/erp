@@ -1625,7 +1625,7 @@
           <input type="hidden" id="whViewInput" name="view" value="{{ view_mode|default:'variants' }}">
           <input type="hidden" id="whShowEmptyInput" name="show_empty" value="{% if show_empty %}1{% endif %}">
           <input type="hidden" id="whReservedOnlyInput" name="reserved_only" value="{% if reserved_only %}1{% endif %}">
-          <input type="hidden" id="whSortInput" name="sort" value="{{ sort|default:'name_asc' }}">
+          <input type="hidden" id="whSortInput" name="sort" value="{{ sort|default:'value_desc' }}">
 
 
           {% comment %}display:contents on wide screens — these groups fall
@@ -1689,6 +1689,9 @@
             <div class="wh-filters-grp wh-filters-sort">
               <span class="wh-filters-lbl">{% trans "Sort" %}</span>
               <div class="od-chip-row" id="whChips">
+                <button type="button" class="od-fchip {% if sort == 'value_desc' %}active{% endif %}" data-sort="value_desc" onclick="setWhSort('value_desc')">
+                  <i class="fa fa-sack-dollar"></i>{% trans "Most value" %}
+                </button>
                 <button type="button" class="od-fchip {% if sort == 'name_asc' %}active{% endif %}" data-sort="name_asc" onclick="setWhSort('name_asc')">
                   <i class="fa fa-arrow-down-a-z"></i>A &rarr; Z
                 </button>
@@ -2527,7 +2530,7 @@
     if (val('whShowEmptyInput')) n++;
     if (val('whReservedOnlyInput')) n++;
     if (val('whViewInput') === 'grouped') n++;
-    if (val('whSortInput') && val('whSortInput') !== 'name_asc') n++;
+    if (val('whSortInput') && val('whSortInput') !== 'value_desc') n++;
     return n;
   }
 
@@ -2582,7 +2585,7 @@
     if (re) re.checked = false;
     setWhSearchBy('text');
     setWhView('variants');
-    setWhSort('name_asc');
+    setWhSort('value_desc');
     whFiltersDirty = true;
     whSyncFilterCount();
   }
@@ -2782,7 +2785,7 @@
   const whExcelUrl = "{% url 'operating:warehouse_excel' warehouse.pk %}";
   function downloadWarehouseExcel() {
     const search = (document.getElementById('whSearchInput') || {}).value || '';
-    const sort = (document.getElementById('whSortInput') || {}).value || 'name_asc';
+    const sort = (document.getElementById('whSortInput') || {}).value || 'value_desc';
     const searchBy = (document.getElementById('whSearchByInput') || {}).value || 'text';
     const showEmpty = (document.getElementById('whShowEmptyInput') || {}).value || '';
     const reservedOnly = (document.getElementById('whReservedOnlyInput') || {}).value || '';

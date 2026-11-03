@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings as _dj_settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Sum, F, DecimalField, Q
+from django.db.models import Count, Sum, F, DecimalField, ExpressionWrapper, Q
 from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
@@ -1759,8 +1759,12 @@ class WarehouseEdit(View):
 
 from django.utils.translation import gettext_lazy as _lz
 # The sort options offered on the warehouse product list. Kept simple:
-# alphabetical by name, by stock item (roll) quantity, and most-recently-updated.
+# stock value, alphabetical by name, by stock item (roll) quantity, and
+# most-recently-updated. Stock value (quantity × unit cost) is the default:
+# what the warehouse holds the most money in comes first.
+DEFAULT_SORT = 'value_desc'
 SORT_OPTIONS = {
+    'value_desc': ('-stock_value', _lz('Most value')),
     'name_asc':   ('name', _lz('A → Z')),
     'name_desc':  ('-name', _lz('Z → A')),
     'qty_desc':   ('-quantity', _lz('Stock item quantity')),
@@ -1886,7 +1890,7 @@ class WarehouseDetail(View):
         # Name/SKU by default; barcode matching is its own mode (see
         # warehouse_search_q) the user turns on from the toolbar.
         search_by = warehouse_search_mode(request)
-        sort = (request.GET.get('sort') or 'name_asc').strip()
+        sort = (request.GET.get('sort') or DEFAULT_SORT).strip()
         page_num = request.GET.get('page', '1')
         # Hide zero-quantity WPs by default (empty variants clutter the list
         # after transfers/sales). Opt in via the "show empty" checkbox.
@@ -1955,7 +1959,9 @@ class WarehouseDetail(View):
             # A sold-out SKU sorts by its last cost, the figure its row shows.
             if sort in ("price_desc", "price_asc"):
                 flat = flat.annotate(_price=Coalesce("avg_cost", "last_cost"))
-            if sort == "price_desc":
+            if sort == "value_desc":
+                flat = flat.order_by(F("stock_value").desc(nulls_last=True), "name", "id")
+            elif sort == "price_desc":
                 flat = flat.order_by(F("_price").desc(nulls_last=True), "name", "id")
             elif sort == "price_asc":
                 flat = flat.order_by(F("_price").asc(nulls_last=True), "name", "id")
@@ -1965,7 +1971,8 @@ class WarehouseDetail(View):
             # member holding it, so it paginates the SKUs and fetches the
             # members' rows for the page it shows.
             paginator = Paginator(
-                _same_sku_keys(base_qs, sort) if warehouse.is_combined else flat,
+                _same_sku_keys(base_qs, sort, _to_usd_rate(scope_ids))
+                if warehouse.is_combined else flat,
                 PAGE_SIZE)
             try:
                 page = paginator.page(int(page_num))
@@ -1986,6 +1993,11 @@ class WarehouseDetail(View):
             #    expands to its variants (stock / SKU / stock_items=stock items/coupons). ──
             from django.db.models import Avg, Case, Max, When
             _tv, _tm = WarehouseProduct._stock_cost_exprs()
+            _dec = DecimalField(max_digits=20, decimal_places=4)
+            # What the money sorts compare: the group's value and unit cost
+            # in dollars, since a combined group can span a lira member and
+            # a dollar one (see _to_usd_rate). The columns keep their own.
+            rate = _to_usd_rate(scope_ids)
             grouped = (base_qs.annotate(base=base_expr,
                                         stock_value=_tv, stock_quantity=_tm,
                                         last_cost=WarehouseProduct._last_cost_expr())
@@ -2012,14 +2024,23 @@ class WarehouseDetail(View):
                 # last costs instead. A plain mean — there is no quantity
                 # left to weight them by.
                 group_last_cost=Avg("last_cost"),
+                _usd_value=Sum(ExpressionWrapper(F("stock_value") * rate,
+                                                 output_field=_dec)),
+                _usd_last=Avg(ExpressionWrapper(F("last_cost") * rate,
+                                                output_field=_dec)),
             ).annotate(
                 avg_cost=Case(
                     When(total_quantity__gt=0,
                          then=F("total_usd") / F("total_quantity")),
                     default=None,
                     output_field=DecimalField(max_digits=20, decimal_places=4)),
-            ).annotate(_price=Coalesce("avg_cost", "group_last_cost")))
+            ).annotate(_price=Coalesce(
+                Case(When(total_quantity__gt=0,
+                          then=F("_usd_value") / F("total_quantity")),
+                     default=None, output_field=_dec),
+                "_usd_last")))
             _sort_map = {
+                "value_desc": F("_usd_value").desc(nulls_last=True),
                 "name_asc": "base", "name_desc": "-base",
                 "qty_desc": "-total_qty", "qty_asc": "total_qty",
                 "recent": "-updated",
@@ -2208,18 +2229,65 @@ def _same_sku_key():
         output_field=CharField())
 
 
-def _same_sku_keys(base_qs, sort):
+def _to_usd_rate(scope_ids):
+    """What one unit of each row's own currency is worth in dollars, as a
+    per-row expression — for ORDERING a list whose rows are costed in
+    different currencies.
+
+    A combined (ortak) page can hold a lira member and a dollar member, and
+    ₺10,000 is not more than $500. Sorting on the bare figures put it first.
+    The rows still print in their own currency; only the order is converted.
+
+    One currency across the scope (every plain warehouse) needs no rate and
+    gets a plain 1. The rate is today's, or the newest the books hold when
+    no source answers; a currency with neither is left unconverted rather
+    than given a made-up rate.
+    """
+    from django.db.models import Case, Value, When
+    from accounting.services import last_known_rate
+
+    _rate = DecimalField(max_digits=20, decimal_places=8)
+    one = Value(Decimal("1"), output_field=_rate)
+    if len(scope_ids) < 2:
+        return one
+    codes = {c.upper() for c in (Warehouse.objects.filter(id__in=scope_ids)
+                                 .values_list("accounting_book__base_currency__code",
+                                              flat=True)) if c}
+    if len(codes) < 2:
+        return one
+    whens = []
+    for code in sorted(codes - {"USD"}):
+        rate = last_known_rate(code, "USD")
+        if rate:
+            whens.append(When(warehouse__accounting_book__base_currency__code__iexact=code,
+                              then=Value(rate, output_field=_rate)))
+    return Case(*whens, default=one, output_field=_rate)
+
+
+def _same_sku_keys(base_qs, sort, rate):
     """One row per merge key, ordered the way the flat list is sorted —
     what the combined page paginates. The cost sums are only worked out
-    for a price sort: over every product of every member they are the
-    expensive part, and no other sort reads them."""
+    for a price or value sort: over every product of every member they are
+    the expensive part, and no other sort reads them. They are compared in
+    dollars (`rate`, from _to_usd_rate), as members may cost in different
+    currencies."""
     from django.db.models import Case, Max, Min, When
+    _dec = DecimalField(max_digits=20, decimal_places=4)
     keys = base_qs.annotate(mkey=_same_sku_key()).values("mkey")
+    if sort == "value_desc":
+        value, _meters = WarehouseProduct._stock_cost_exprs()
+        keys = (base_qs.annotate(mkey=_same_sku_key(),
+                                 _v=ExpressionWrapper(value * rate, output_field=_dec))
+                .values("mkey").annotate(_value=Sum("_v")))
+        return keys.order_by(F("_value").desc(nulls_last=True), "mkey")
     if sort in ("price_desc", "price_asc"):
-        _dec = DecimalField(max_digits=20, decimal_places=4)
         value, meters = WarehouseProduct._stock_cost_exprs()
-        keys = (base_qs.annotate(mkey=_same_sku_key(), _v=value, _m=meters,
-                                 _l=WarehouseProduct._last_cost_expr())
+        keys = (base_qs.annotate(mkey=_same_sku_key(),
+                                 _v=ExpressionWrapper(value * rate, output_field=_dec),
+                                 _m=meters,
+                                 _l=ExpressionWrapper(
+                                     WarehouseProduct._last_cost_expr() * rate,
+                                     output_field=_dec))
                 .values("mkey")
                 .annotate(_value=Sum("_v"), _meters=Sum("_m"), _last=Max("_l"))
                 .annotate(_price=Coalesce(

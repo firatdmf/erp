@@ -186,6 +186,9 @@ def _tr_case_variants(q):
     return {q, tr_upper, tr_lower}
 
 
+DEFAULT_ACCOUNT_SORT = "-balance"
+
+
 def _filter_current_accounts(request, apply_type=True):
     """Filtered account queryset.
 
@@ -253,7 +256,9 @@ def _filter_current_accounts(request, apply_type=True):
     elif active == "0":
         qs = qs.filter(is_active=False)
 
-    sort = request.GET.get("sort") or "name"
+    # Default: who owes us the most first, down to whom we owe the most —
+    # the list is mostly opened to chase what is due.
+    sort = request.GET.get("sort") or DEFAULT_ACCOUNT_SORT
     sort_map = {
         "name":      "name",
         "-name":     "-name",
@@ -268,7 +273,7 @@ def _filter_current_accounts(request, apply_type=True):
     # NULL last_movement_at, equal balances), and without a total order
     # Postgres may return the SAME row on two different pages while
     # another never appears at all.
-    qs = qs.order_by(sort_map.get(sort, "name"), "id")
+    qs = qs.order_by(sort_map.get(sort, "-cached_balance"), "id")
     return qs
 
 
@@ -363,7 +368,7 @@ class CurrentAccountList(View):
             "filter_balance": request.GET.get("balance", ""),
             "filter_crm":     request.GET.get("crm", ""),
             "filter_active":  request.GET.get("active", "1"),
-            "sort":           request.GET.get("sort", "name"),
+            "sort":           request.GET.get("sort") or DEFAULT_ACCOUNT_SORT,
         }
         # Dynamic search/filter: the page JS fetches with this header and
         # swaps ONLY the results block — no full page reload per keystroke.

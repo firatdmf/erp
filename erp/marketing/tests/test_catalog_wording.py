@@ -154,8 +154,6 @@ class WordingPageTest(TestCase):
                        "": {"yes": {"tr": "Evet"}}},
             "groups": {"ready-made curtain": {"tr": "Hazır Perde"}},
         })
-        # A storefront still on the old address gets the same answer.
-        self.assertEqual(self.client.get("/marketing/api/attribute_translations/").json(), answer)
 
     def test_the_variant_list_prints_the_wording(self):
         self._post("color", text_0_tr="Beyaz")

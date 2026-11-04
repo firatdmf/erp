@@ -33,9 +33,6 @@ urlpatterns = [
     path("catalog-wording/", views_catalog_wording.catalog_wording, name="catalog_wording"),
     path("attribute-wording/", RedirectView.as_view(pattern_name="marketing:catalog_wording", query_string=True)),
     path("api/catalog_wording/", views_catalog_wording.catalog_wording_api, name="catalog_wording_api"),
-    # The storefront's old address for the same answer — drop it once every
-    # deployed storefront asks api/catalog_wording/.
-    path("api/attribute_translations/", views_catalog_wording.catalog_wording_api),
     path("product-groups/", views_product_groups.ProductGroupList.as_view(), name="product_group_list"),
     path("product-groups/new/", views_product_groups.ProductGroupCreate.as_view(), name="product_group_create"),
     path("product-groups/<int:pk>/", views_product_groups.ProductGroupDetail.as_view(), name="product_group_detail"),

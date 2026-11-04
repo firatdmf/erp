@@ -15913,3 +15913,6 @@ msgstr "Öner"
 
 msgid "No suggestion this time"
 msgstr "Bu sefer öneri yok"
+
+msgid "What the warehouses hold. Stock changes in the warehouse, not here."
+msgstr "Depolardaki miktar. Stok burada değil, depoda değişir."

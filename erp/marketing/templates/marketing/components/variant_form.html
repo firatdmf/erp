@@ -1,7 +1,7 @@
 {% load i18n %}
 {% load static %}
 {% block css %}
-<link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}?v=9" />
+<link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}?v=15" />
 {% endblock css %}
 
 <div class="loading" id="loading">{% trans "Loading…" %}</div>
@@ -49,7 +49,7 @@
   <!-- Scrollable Table Wrapper for Mobile -->
   <div id="variant_table_wrapper"
     style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;">
-    <table id="variant_table" style="width: max-content; min-width: 100%; border-collapse: collapse;"></table>
+    <table id="variant_table" style="width: 100%; border-collapse: collapse;"></table>
   </div>
 
   <!-- The table lists the variants there are; new ones are added here. -->
@@ -76,7 +76,6 @@
       price:           '{% trans "PRICE"|escapejs %}',
       stock:           '{% trans "STOCK"|escapejs %}',
       featured:        '{% trans "FEATURED"|escapejs %}',
-      attributes:      '{% trans "ATTRIBUTES"|escapejs %}',
       // option editor
       option_name:     '{% trans "Option name"|escapejs %}',
       option_values:   '{% trans "Option values"|escapejs %}',
@@ -96,19 +95,9 @@
       no_rows_single:  '{% trans "Every product has at least one variant, and every variant a value. Add an option above (color, width…), then the variant."|escapejs %}',
       needs_option:    '{% trans "Every variant needs at least one value. Add an option above (color, width…) and give it one."|escapejs %}',
       price_from_cost: '{% trans "Worked out from the cost: cost times the price multiplier, rounded up to 0.05."|escapejs %}',
+      stock_from_warehouses: '{% trans "What the warehouses hold. Stock changes in the warehouse, not here."|escapejs %}',
       rows_alike:      '{% trans "Two variants have the same values: %(values)s — change one, or delete it."|escapejs %}',
       rows_title:      '{% trans "Check the variants"|escapejs %}',
-      // variant attributes modal
-      m_title:         '{% trans "Variant Attributes"|escapejs %}',
-      m_help:          '{% trans "Customize attributes for this specific variant. Leave empty to use product-level defaults."|escapejs %}',
-      m_variant_label: '{% trans "Variant"|escapejs %}',
-      m_attribute:     '{% trans "Attribute"|escapejs %}',
-      m_default:       '{% trans "Default"|escapejs %}',
-      m_variant_value: '{% trans "Variant value"|escapejs %}',
-      m_empty:         '{% trans "No product-level attributes defined. Add attributes in the Product Attributes section above."|escapejs %}',
-      m_cancel:        '{% trans "Cancel"|escapejs %}',
-      m_save:          '{% trans "Save"|escapejs %}',
-      m_saved:         '{% trans "Attributes saved for variant"|escapejs %}',
       // common option-name translations (lowercase keys, uppercased on render)
       opt_labels: {
         'color':   '{% trans "COLOR"|escapejs %}',
@@ -135,14 +124,12 @@
     window.product_variant_list_data = '{{ product_variant_list }}';
     window.product_variant_options_data = '{{ product_variant_options }}';
     window.variant_files_json_data = '{{ variant_files_json }}';
-    window.product_attributes_data = '{{ product_attributes }}';
     window.attribute_value_images_data = '{{ attribute_value_images }}';
 
     // Debug logs
     console.log('Variant form loaded');
     console.log('product_variant_list_data:', window.product_variant_list_data);
     console.log('product_variant_options_data:', window.product_variant_options_data);
-    console.log('product_attributes_data:', window.product_attributes_data);
 
     // Every product has at least one variant, so the section is always
     // open: a new product starts at "Add variant" (a single item) or
@@ -164,6 +151,5 @@
       uploadNote: '{% filter escapejs %}{% filter force_escape %}{% trans "Several photos upload in the order your computer shows them sorted by name, with numbers counted properly (-2 before -10), and are picked for this variant in that order. They are renamed on upload, so name your files however you like. A photo meant for several variants: upload it in the product's media." %}{% endfilter %}{% endfilter %}'
     };
   </script>
-  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=17" defer></script>
-  <script src="{% static 'marketing/js/variant_attributes_modal.js' %}?v=2" defer></script>
+  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=20" defer></script>
 </div>

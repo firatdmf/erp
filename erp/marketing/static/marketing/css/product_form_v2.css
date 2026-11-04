@@ -84,6 +84,16 @@
 }
 .form-main-column, .form-sidebar-column { gap: 22px !important; }
 .form-sidebar-column { top: 100px !important; }
+/* The variants run across both columns, between the page's two halves.
+   A pinned sidebar would slide down over them: it is pinned within the
+   whole form, not its own half. So the sidebars scroll with the page. */
+.form-wide-row { grid-column: 1 / -1; min-width: 0; }
+/* The page takes the screen's width, so the variant table fits without
+   scrolling sideways. */
+#Product_Form_Page { max-width: none; }
+main:has(#Product_Form_Page) { max-width: none !important; padding-left: 16px !important; padding-right: 16px !important; }
+#Product_Form_Page { padding-left: 16px !important; padding-right: 16px !important; }
+.form-sidebar-column { position: static !important; }
 
 /* ───────── CARDS ───────── */
 .form-card {

@@ -6,7 +6,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}">
-<link rel="stylesheet" href="{% static 'marketing/css/product_form_v2.css' %}?v=5">
+<link rel="stylesheet" href="{% static 'marketing/css/product_form_v2.css' %}?v=12">
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
 <style>
   .quill-wrap { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: #fff; }
@@ -373,123 +373,10 @@
         </div>
         {% endif %}
       </div>
-
-
-
-
-
-      <!-- 6. Variants (PRESERVED) -->
-      <div class="form-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="layers"></i></span>{% trans "Variants" %}</div>
-        <div class="form-description">{% trans "Add options like size or color to create variants for this product." %}</div>
-        {% variant_form current_url=request.path product=product variants=variants %}
-      </div>
-
-      <!-- 7. Manufacturing Recipe (BOM) -->
-      <div class="form-card" id="manufacturing_section">
-        <div class="form-card-header">
-          <div class="form-card-title">
-            <span class="form-card-ico"><i data-lucide="factory"></i></span>Manufacturing Recipe (BOM)
-          </div>
-          <div class="toggle-item" style="margin: 0; gap: 10px;">
-            <span class="toggle-label" style="font-size: 0.9rem; font-weight: 500;">{% trans "Track Manufacturing" %}</span>
-            <label class="switch-container">
-              <input type="checkbox" id="track_manufacturing_toggle" name="track_manufacturing" {% if product and product.bill_of_materials and product.bill_of_materials.track_manufacturing %}checked{% endif %}>
-              <span class="switch-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <div id="bom_content" style="display: none; margin-top: 1rem;">
-          <!-- Material Search -->
-          <div class="bom-search-container" style="position: relative; margin-bottom: 1rem;">
-            <div class="input-icon-wrapper">
-              <i class="fa fa-search input-icon"
-                style="left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; position: absolute;"></i>
-              <input type="text" id="bom_material_search" class="form-input"
-                placeholder="{% trans 'Search raw materials to add...' %}" style="padding-left: 2.5rem;">
-            </div>
-            <div id="bom_search_results" class="dropdown-menu"
-              style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; border: 1px solid #e5e7eb; border-radius: 6px; background: white; margin-top: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-            </div>
-          </div>
-
-          <!-- Materials Table -->
-          <div class="table-responsive">
-            <table class="modern-table" id="bom_table">
-              <thead>
-                <tr>
-                  <th style="width: 40%;">{% trans "Raw Material" %}</th>
-                  <th style="width: 20%;">{% trans "Qty Used" %}</th>
-                  <th style="width: 20%;">{% trans "Unit Cost" %}</th>
-                  <th style="width: 15%;">{% trans "Total Cost" %}</th>
-                  <th style="width: 5%;"></th>
-                </tr>
-              </thead>
-              <tbody id="bom_table_body">
-                <!-- Rows will be added here via JS -->
-                {% if product and product.bill_of_materials %}
-                {% for item in product.bill_of_materials.items.all %}
-                <tr data-material-id="{{ item.raw_material.id }}">
-                  <td>
-                    <div class="bom-item-name">{{ item.raw_material.name }}</div>
-                    <div class="bom-item-sku text-muted" style="font-size: 0.8rem;">{{ item.raw_material.sku }}</div>
-                    <input type="hidden" name="bom_material_id[]" value="{{ item.raw_material.id }}">
-                  </td>
-                  <td>
-                    <div class="input-group" style="display: flex; align-items: center; gap: 5px;">
-                      <input type="number" step="0.0001" class="form-input bom-qty-input" name="bom_quantity[]"
-                        value="{{ item.quantity }}" style="width: 80px; padding: 4px 8px;">
-                      <span class="unit-badge">{{ item.raw_material.unit_of_measurement }}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="cost-display" data-unit-cost="{{ item.raw_material.unit_cost|default:0 }}">
-                      ${{ item.raw_material.unit_cost|default:0|floatformat:"2g" }}
-                    </div>
-                  </td>
-                  <td>
-                    <div class="total-cost-display fw-bold">
-                      <!-- Calc via JS -->
-                    </div>
-                  </td>
-                  <td>
-                    <button type="button" class="btn-icon text-danger remove-bom-row">
-                      <i class="fa fa-times"></i>
-                    </button>
-                  </td>
-                </tr>
-                {% endfor %}
-                {% endif %}
-              </tbody>
-              <tfoot>
-                <tr style="background-color: #f9fafb;">
-                  <td colspan="3" class="text-right" style="text-align: right; padding-right: 1rem; font-weight: 600;">
-                    {% trans "Total Material Cost per Unit:" %}</td>
-                  <td colspan="2" style="font-size: 1.1rem; font-weight: 700; color: #111827;" id="bom_grand_total">
-                    $0.00</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- Empty State -->
-          <div id="bom_empty_state" style="text-align: center; padding: 2rem; color: #6b7280; display: none;">
-            <i class="fa fa-flask" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
-            <p>{% trans "No materials added. Search above to create a recipe." %}</p>
-          </div>
-        </div>
-      </div>
-
-
-
     </div>
 
-    <!-- RIGHT COLUMN (SIDEBAR) -->
+    <!-- RIGHT COLUMN, top half: beside General information and Media -->
     <div class="form-sidebar-column">
-
-
-
       <!-- Sales Channels -->
       <div class="form-card sidebar-card">
         <div class="form-card-title"><span class="form-card-ico"><i data-lucide="radio-tower"></i></span>{% trans "Sales Channels" %}</div>
@@ -533,7 +420,8 @@
         <div id="variants_summary">
         <div class="form-row">
           <div class="form-group">
-            <label>{% trans "Price" %}</label>            <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">
+            <label>{% trans "Price" %}</label>
+            <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">
               {% if form.variants_price_low is None %}<span style="color:#9AA5B1;">—</span>
               {% elif form.variants_price_low == form.variants_price_high %}${{ form.variants_price_low|floatformat:"2g" }}
               {% else %}${{ form.variants_price_low|floatformat:"2g" }} – ${{ form.variants_price_high|floatformat:"2g" }}{% endif %}
@@ -673,7 +561,123 @@
         </script>
         {% endif %}
       </div>
+    </div>
 
+    <!-- Variants take the page's whole width, between the two halves. -->
+    <div class="form-wide-row">
+      <!-- 6. Variants (PRESERVED) -->
+      <div class="form-card">
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="layers"></i></span>{% trans "Variants" %}</div>
+        <div class="form-description">{% trans "Add options like size or color to create variants for this product." %}</div>
+        {% variant_form current_url=request.path product=product variants=variants %}
+      </div>
+    </div>
+
+    <!-- LEFT COLUMN, bottom half -->
+    <div class="form-main-column">
+
+      <!-- 7. Manufacturing Recipe (BOM) -->
+      <div class="form-card" id="manufacturing_section">
+        <div class="form-card-header">
+          <div class="form-card-title">
+            <span class="form-card-ico"><i data-lucide="factory"></i></span>Manufacturing Recipe (BOM)
+          </div>
+          <div class="toggle-item" style="margin: 0; gap: 10px;">
+            <span class="toggle-label" style="font-size: 0.9rem; font-weight: 500;">{% trans "Track Manufacturing" %}</span>
+            <label class="switch-container">
+              <input type="checkbox" id="track_manufacturing_toggle" name="track_manufacturing" {% if product and product.bill_of_materials and product.bill_of_materials.track_manufacturing %}checked{% endif %}>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div id="bom_content" style="display: none; margin-top: 1rem;">
+          <!-- Material Search -->
+          <div class="bom-search-container" style="position: relative; margin-bottom: 1rem;">
+            <div class="input-icon-wrapper">
+              <i class="fa fa-search input-icon"
+                style="left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; position: absolute;"></i>
+              <input type="text" id="bom_material_search" class="form-input"
+                placeholder="{% trans 'Search raw materials to add...' %}" style="padding-left: 2.5rem;">
+            </div>
+            <div id="bom_search_results" class="dropdown-menu"
+              style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; border: 1px solid #e5e7eb; border-radius: 6px; background: white; margin-top: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            </div>
+          </div>
+
+          <!-- Materials Table -->
+          <div class="table-responsive">
+            <table class="modern-table" id="bom_table">
+              <thead>
+                <tr>
+                  <th style="width: 40%;">{% trans "Raw Material" %}</th>
+                  <th style="width: 20%;">{% trans "Qty Used" %}</th>
+                  <th style="width: 20%;">{% trans "Unit Cost" %}</th>
+                  <th style="width: 15%;">{% trans "Total Cost" %}</th>
+                  <th style="width: 5%;"></th>
+                </tr>
+              </thead>
+              <tbody id="bom_table_body">
+                <!-- Rows will be added here via JS -->
+                {% if product and product.bill_of_materials %}
+                {% for item in product.bill_of_materials.items.all %}
+                <tr data-material-id="{{ item.raw_material.id }}">
+                  <td>
+                    <div class="bom-item-name">{{ item.raw_material.name }}</div>
+                    <div class="bom-item-sku text-muted" style="font-size: 0.8rem;">{{ item.raw_material.sku }}</div>
+                    <input type="hidden" name="bom_material_id[]" value="{{ item.raw_material.id }}">
+                  </td>
+                  <td>
+                    <div class="input-group" style="display: flex; align-items: center; gap: 5px;">
+                      <input type="number" step="0.0001" class="form-input bom-qty-input" name="bom_quantity[]"
+                        value="{{ item.quantity }}" style="width: 80px; padding: 4px 8px;">
+                      <span class="unit-badge">{{ item.raw_material.unit_of_measurement }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cost-display" data-unit-cost="{{ item.raw_material.unit_cost|default:0 }}">
+                      ${{ item.raw_material.unit_cost|default:0|floatformat:"2g" }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="total-cost-display fw-bold">
+                      <!-- Calc via JS -->
+                    </div>
+                  </td>
+                  <td>
+                    <button type="button" class="btn-icon text-danger remove-bom-row">
+                      <i class="fa fa-times"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+              </tbody>
+              <tfoot>
+                <tr style="background-color: #f9fafb;">
+                  <td colspan="3" class="text-right" style="text-align: right; padding-right: 1rem; font-weight: 600;">
+                    {% trans "Total Material Cost per Unit:" %}</td>
+                  <td colspan="2" style="font-size: 1.1rem; font-weight: 700; color: #111827;" id="bom_grand_total">
+                    $0.00</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Empty State -->
+          <div id="bom_empty_state" style="text-align: center; padding: 2rem; color: #6b7280; display: none;">
+            <i class="fa fa-flask" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+            <p>{% trans "No materials added. Search above to create a recipe." %}</p>
+          </div>
+        </div>
+      </div>
+
+
+
+    </div>
+
+    <!-- RIGHT COLUMN, bottom half: beside the recipe -->
+    <div class="form-sidebar-column">
       <!-- Packaging (B2B wholesale) -->
       <div class="form-card sidebar-card">
         <div class="form-card-title"><span class="form-card-ico"><i data-lucide="package"></i></span>{% trans "Packaging" %}</div>
@@ -1113,8 +1117,6 @@
   function scheduleAttributeSave() {
     if (!PRODUCT_ID) {
       console.log('⏭️ Skipping auto-save (new product)');
-      // For new products, update productAttributes global for variant modal
-      updateLocalProductAttributes();
       return;
     }
 
@@ -1153,18 +1155,6 @@
     return attributes;
   }
 
-  // Update local productAttributes variable for variant modal
-  function updateLocalProductAttributes() {
-    const attrs = collectAttributesFromDOM();
-    // Update the global productAttributes variable used by variant_form_modern.js
-    if (typeof window.productAttributes !== 'undefined') {
-      window.productAttributes = attrs;
-    }
-    // Also update the window data
-    window.product_attributes_data = JSON.stringify(attrs);
-    console.log('📝 Updated local productAttributes:', attrs);
-  }
-
   // Save product attributes via AJAX
   async function saveProductAttributes() {
     if (!PRODUCT_ID) return;
@@ -1188,11 +1178,6 @@
 
       if (data.success) {
         showAttributeSaveStatus('saved');
-        // Update local data for variant modal
-        if (typeof window.productAttributes !== 'undefined') {
-          window.productAttributes = data.attributes;
-        }
-        window.product_attributes_data = JSON.stringify(data.attributes);
         console.log('✅ Attributes saved:', data.attributes);
       } else {
         showAttributeSaveStatus('error');

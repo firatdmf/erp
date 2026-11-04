@@ -14,7 +14,6 @@ let optionCounter = 0;
 let variantData = {};
 let variantImages = {}; // Store images for each variant: { variantIndex: { images: [], primaryIndex: 0 } }
 let currentEditingVariantIndex = null;
-let productAttributes = []; // Product-level attributes to show in variant table
 
 // ── SKU rule for NEW products: PARENT.VALUE-VALUE (K24644.BEYAZ-140) ──
 // The product SKU, a dot, then the variant's option values in capitals
@@ -77,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (next === lastParent) return;
         document.querySelectorAll('input[name^="variant_sku_"]').forEach(inp => {
             const suffix = skuSuffixOf(inp.value, lastParent);
-            if (suffix !== null) inp.value = skuJoin(next, suffix);
+            if (suffix !== null) { inp.value = skuJoin(next, suffix); showVariantSku(inp); }
         });
         lastParent = next;
     });
@@ -86,31 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('variant_component')) {
-        // Load product attributes
-        loadProductAttributes();
         // Load existing variants if in edit mode
         loadExistingVariants();
         updateVariantRowsBar();
     }
 });
-
-// Load product attributes from backend data
-function loadProductAttributes() {
-    const productAttributesData = window.product_attributes_data;
-
-    if (!productAttributesData || productAttributesData === '[]' || productAttributesData === '') {
-        productAttributes = [];
-        return;
-    }
-
-    try {
-        productAttributes = JSON.parse(productAttributesData);
-        console.log('Loaded product attributes:', productAttributes);
-    } catch (e) {
-        console.error('Error loading product attributes:', e);
-        productAttributes = [];
-    }
-}
 
 // Load existing variants from backend data
 function loadExistingVariants() {
@@ -269,14 +248,8 @@ function loadExistingVariantImages() {
                 sku: variant.variant_sku,
                 barcode: variant.variant_barcode,
                 featured: variant.variant_featured,
-                product_attributes: variant.product_attributes || [],
                 images: []
             };
-
-            if (variant.product_attributes && variant.product_attributes.length > 0
-                    && typeof variantAttributesData !== 'undefined') {
-                variantAttributesData[index] = variant.product_attributes;
-            }
         });
 
         // Load variant images if available
@@ -939,8 +912,6 @@ function updateVariantTable() {
             barcode: barcode ? barcode.value : kept.barcode,
             featured: featured ? featured.checked : kept.featured,
             is_active: active ? active.value === 'true' : kept.is_active,
-            product_attributes: (typeof variantAttributesData !== 'undefined' && variantAttributesData[index])
-                ? variantAttributesData[index] : (kept.product_attributes || []),
         };
     });
 
@@ -1110,13 +1081,18 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         const k = (name || '').toLowerCase().trim();
         return (VT.opt_labels && VT.opt_labels[k]) || (name || '').toUpperCase();
     };
-    let tableHTML = `<thead><tr><th style="width: 50px;"></th><th style="width: 60px;">${VT.photo}</th>`;
+    // The table fills its card and never scrolls sideways: the columns
+    // around the options keep set widths (variant_form.css) and the option
+    // columns share what is left equally, a long value cut short in its box
+    // and read in full on hover or in the open list.
+    let tableHTML = `<thead><tr><th class="vt_del"></th><th class="vt_photo">${VT.photo}</th>`;
+    // Typed by hand with no options; shown, built from the values, with them.
+    tableHTML += `<th class="vt_sku">SKU</th>`;
     displayOptions.forEach(name => {
-        tableHTML += `<th>${labelOf(name)}</th>`;
+        tableHTML += `<th class="variant_opt_col" title="${vfEsc(labelOf(name))}">${labelOf(name)}</th>`;
     });
-    // With no options there is nothing else to tell the row by.
-    if (!displayOptions.length) tableHTML += `<th>SKU</th>`;
-    tableHTML += `<th>${VT.price}</th><th>${VT.stock}</th><th>${VT.featured}</th><th style="text-align: center;">${VT.attributes}</th></tr></thead><tbody>`;
+    tableHTML += `<th class="vt_num">${VT.price}</th><th class="vt_num">${VT.stock}</th>`;
+    tableHTML += `<th class="vt_flag" title="${vfEsc(VT.featured)}">${VT.featured}</th></tr></thead><tbody>`;
 
     // Helper to generate row HTML (avoids duplication between grouped/ungrouped)
     const generateRowHTML = (combo, originalIndex, displayOptions, groupId = '') => {
@@ -1125,7 +1101,6 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
         const existingData = existingVariantData[originalIndex] || {};
         const variantId = existingData.variant_id || '';
-        const variantProductAttrs = existingData.product_attributes || [];
 
         // Load images if not already loaded
         if (existingData.images && existingData.images.length > 0 && !variantImages[originalIndex]) {
@@ -1215,37 +1190,40 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                 </div>
             </td>`;
 
+        if (!displayOptions.length) {
+            rowHTML += `<td>
+            <input type="text" name="variant_sku_${originalIndex + 1}" value="${vfEsc(sku)}" data-auto-sku="" data-saved-sku="${vfEsc(existingData.sku || '')}" placeholder="SKU" style="min-width: 180px;" onclick="event.stopPropagation()" oninput="updateVariantRowsBar()">
+        </td>`;
+        } else {
+            // Changed in the row's editor, not here (see showVariantSku).
+            rowHTML += `<td><span class="variant_row_sku" data-sku-of="${originalIndex + 1}">${vfEsc(sku)}</span></td>`;
+        }
+
         // Option values: each picked from its option's values. A variant
         // may have no value for an option, shown as "—".
         displayOptions.forEach((optionName, optIdx) => {
             const value = combo[optionName] || '';
             const choices = optionValuesFor(optionName).map(v =>
                 `<option value="${vfEsc(v)}"${v === value ? ' selected' : ''}>${vfEsc(v)}</option>`).join('');
-            const picker = `<select class="variant_row_value${value ? '' : ' blank'}" data-option="${vfEsc(optionName)}"
+            const picker = `<select class="variant_row_value${value ? '' : ' blank'}" data-option="${vfEsc(optionName)}" title="${vfEsc(value)}"
                 onclick="event.stopPropagation()"
                 onchange="setVariantRowValue(${originalIndex}, this.dataset.option, this.value)">
                 <option value="">—</option>${choices}</select>`;
             if (optIdx === 0) {
-                rowHTML += `<td>${picker}<br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> ${(window.VARIANT_T && window.VARIANT_T.edit_hint) || 'Edit'}</span></td>`;
+                rowHTML += `<td class="variant_opt_col">${picker}<br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> ${(window.VARIANT_T && window.VARIANT_T.edit_hint) || 'Edit'}</span></td>`;
             } else {
-                rowHTML += `<td>${picker}</td>`;
+                rowHTML += `<td class="variant_opt_col">${picker}</td>`;
             }
         });
-
-        if (!displayOptions.length) {
-            rowHTML += `<td>
-            <input type="text" name="variant_sku_${originalIndex + 1}" value="${vfEsc(sku)}" data-auto-sku="" data-saved-sku="${vfEsc(existingData.sku || '')}" placeholder="SKU" style="min-width: 180px;" onclick="event.stopPropagation()" oninput="updateVariantRowsBar()">
-        </td>`;
-        }
 
         // Price Input
         rowHTML += `<td>
             <input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="—" value="${price}" readonly tabindex="-1" title="${vfEsc((window.VARIANT_T && window.VARIANT_T.price_from_cost) || 'Worked out from the cost')}" style="min-width: 120px; background:#F3F4F6; cursor:not-allowed;" onclick="event.stopPropagation()">
         </td>`;
 
-        // Stock Input
+        // Stock: what the warehouses hold, never typed here.
         rowHTML += `<td>
-            <input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 120px;" onclick="event.stopPropagation()">
+            <input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="—" value="${quantity}" readonly tabindex="-1" title="${vfEsc((window.VARIANT_T && window.VARIANT_T.stock_from_warehouses) || 'What the warehouses hold')}" style="min-width: 120px; background:#F3F4F6; cursor:not-allowed;" onclick="event.stopPropagation()">
         </td>`;
 
         // Featured Checkbox - using toggle switch
@@ -1254,17 +1232,6 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                 <input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}>
                 <span class="checkmark"></span>
             </label>
-        </td>`;
-
-        // Attributes Button
-        rowHTML += `<td style="text-align: center;">
-            <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${originalIndex}, ''); event.stopPropagation();" 
-                    style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;"
-                    onmouseover="this.style.borderColor='#667eea'; this.style.color='#667eea';"
-                    onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#374151';">
-                <i class="fa fa-tags"></i>
-                <span class="attr-count" id="attr_count_${originalIndex}">${variantProductAttrs.length}</span>
-            </button>
         </td>`;
 
         // HIDDEN INPUTS for Modal Fields (wrapped in td to avoid browser foster-parenting)
@@ -1321,8 +1288,8 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
             // Group header row (collapsible)
             const groupId = `group_${groupValue.replace(/\s+/g, '_')}`;
-            const extraColsCount = 3; // stock, featured, attributes
-            // Colspan logic: 1 (Action) + 1 (Photo) + Options + 1 (Price) + 3 (Extra)
+            const extraColsCount = 2; // stock, featured
+            // Colspan logic: 1 (Action) + 1 (Photo) + 1 (SKU) + Options + 1 (Price) + 2 (Extra)
 
             tableHTML += `
                 <tr class="group_header_row" style="font-weight: 600; cursor: pointer;" onclick="toggleGroupCollapse('${groupId}')">
@@ -1330,7 +1297,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                         <i class="fa fa-chevron-down group_toggle_icon" id="icon_${groupId}" style="transition: transform 0.2s;"></i>
                     </td>
                     <td></td>
-                    <td colspan="${displayOptions.length}">
+                    <td colspan="${displayOptions.length + 1}">
                         <div style="display: flex; flex-direction: column;">
                             <span style="font-weight: 600; color: #111827;">${groupValue}</span>
                             <span style="font-weight: 400; color: #6b7280; font-size: 12px; margin-top: 2px;">Expand all</span>
@@ -2362,6 +2329,14 @@ async function handleImageUpload(event) {
 } // End of handleImageUpload function
 
 
+// A row with options shows its SKU as text beside the hidden field the save
+// reads; whatever rewrites the field calls this so the two never disagree.
+function showVariantSku(input) {
+    const index = (input.name || '').replace('variant_sku_', '');
+    const shown = document.querySelector(`.variant_row_sku[data-sku-of="${index}"]`);
+    if (shown) shown.textContent = input.value;
+}
+
 // Get variant ID from table row
 function getVariantId(variantIndex) {
     const row = document.querySelector(`tr[data-variant-index="${variantIndex}"]`);
@@ -2791,20 +2766,6 @@ function prepareVariantsForSubmission() {
             variant_barcode: barcodeInput ? barcodeInput.value : '',
             variant_featured: featuredInput ? featuredInput.checked : true,
         };
-
-        // Add product attributes for this variant from variantAttributesData
-        // variantAttributesData is populated by the variant attributes modal (variant_attributes_modal.js)
-        if (typeof variantAttributesData !== 'undefined' && variantAttributesData[index] && variantAttributesData[index].length > 0) {
-            variantData.product_attributes = variantAttributesData[index];
-            console.log(`  ✅ Added ${variantAttributesData[index].length} product attributes to variant ${index}`);
-        } else {
-            // Also check existingVariantData for attributes that were loaded from backend
-            const existingData = existingVariantData[index] || {};
-            if (existingData.product_attributes && existingData.product_attributes.length > 0) {
-                variantData.product_attributes = existingData.product_attributes;
-                console.log(`  ✅ Added ${existingData.product_attributes.length} existing product attributes to variant ${index}`);
-            }
-        }
 
         // Add image information
         if (hasImages) {
@@ -3727,7 +3688,7 @@ function saveVariantDetailModal() {
     if (priceInput) priceInput.value = price;
     // A computed cost was only shown, never typed: the stored one stays.
     if (costInput && !document.getElementById('modal_variant_cost').readOnly) costInput.value = cost;
-    if (skuInput) skuInput.value = sku;
+    if (skuInput) { skuInput.value = sku; showVariantSku(skuInput); }
     if (barcodeInput) barcodeInput.value = barcode;
     if (activeInput) activeInput.value = isActive;
 

@@ -1206,7 +1206,9 @@ class ProductAttribute(models.Model):
         help_text=_lz("E.g. 150cm, tulle, bridal")
     )
     
-    # Attached to a product or a variant (one of the two is required)
+    # A product's: what tells its variants apart are their option values
+    # (ProductVariantAttributeValue). Variants once carried attributes of
+    # their own too; C120 retired them (marketing 0119).
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
@@ -1215,15 +1217,6 @@ class ProductAttribute(models.Model):
         blank=True,
         db_index=True
     )
-    product_variant = models.ForeignKey(
-        "ProductVariant",
-        on_delete=models.CASCADE,
-        related_name="attributes",
-        null=True,
-        blank=True,
-        db_index=True
-    )
-    
     # For ordering
     sequence = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1234,19 +1227,9 @@ class ProductAttribute(models.Model):
         verbose_name_plural = "Product Attributes"
         indexes = [
             models.Index(fields=['product', 'name']),
-            models.Index(fields=['product_variant', 'name']),
         ]
     
-    def clean(self):
-        from django.core.exceptions import ValidationError
-        # One of product or variant is required (never both)
-        if not self.product and not self.product_variant:
-            raise ValidationError(_lz("Pick a product or a product variant."))
-        if self.product and self.product_variant:
-            raise ValidationError(_lz("A product and a variant can't both be picked."))
-    
     def __str__(self):
-        parent = self.product or self.product_variant
         return f"{self.name}: {self.value}"
 
 

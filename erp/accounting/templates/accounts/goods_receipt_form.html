@@ -972,8 +972,14 @@
   };
   window.npRowAttrInput = function (input) {
     const vEl = input.closest('.np-variant');
-    // The SKU is read from the values, so a saved row's follows them too.
-    delete vEl.querySelector('.np-v-sku').dataset.touched;
+    // The SKU is read from the values, so a saved row's follows them too —
+    // and so does one an earlier match filled in: that variant's SKU was
+    // the answer for the old values, and sent with the new ones it would
+    // match that variant again and stay. The match below re-locks it if
+    // the new values are an existing variant's.
+    const skuI = vEl.querySelector('.np-v-sku');
+    delete skuI.dataset.touched;
+    delete skuI.dataset.matchLocked;
     npSuggestVariantSku(vEl);
     npQueueVariantMatch(vEl);
   };

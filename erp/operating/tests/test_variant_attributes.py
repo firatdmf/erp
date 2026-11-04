@@ -25,8 +25,8 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from marketing.attributes import normalize_attribute_name, normalize_attribute_value
-from marketing.models import (CategoryVariantAttribute, Product, ProductCategory,
-                              ProductVariant, ProductVariantAttribute,
+from marketing.models import (CatalogWording, CategoryVariantAttribute, Product,
+                              ProductCategory, ProductVariant, ProductVariantAttribute,
                               ProductVariantAttributeValue)
 from operating.catalog_sync import (LookAlikeVariant, sync_roll_to_catalog,
                                     variant_attributes)
@@ -117,6 +117,12 @@ class CatalogSyncTest(TestCase):
 @patch("marketing.utils.bunny_storage.upload_to_bunny", return_value="https://cdn/qr.png")
 class GoodsReceiptAttributesTest(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.addCleanup(cache.clear)
+        for key, text in (("cream", "Krem"), ("white", "Beyaz")):
+            CatalogWording.objects.create(kind="value", scope="color", key=key,
+                                          language="tr", text=text)
         self.user = get_user_model().objects.create_superuser("attr_tester", "a@t.t", "pw")
         self.client.force_login(self.user)
         usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
@@ -148,10 +154,10 @@ class GoodsReceiptAttributesTest(TestCase):
         r = self._receive([self._row("K24644.V106", ("color", "KREM"), ("model", "V-106"))])
         self.assertEqual(r.status_code, 200, r.content)
         variant = ProductVariant.objects.get(variant_sku="K24644.V106")
-        # KREM is a colour and is stored by its English key; the code is kept.
+        # KREM is worded as cream and is stored by that key; the code is kept.
         self.assertEqual(_attrs(variant), [("color", "cream"), ("model", "v-106")])
-        # The warehouse row reads as typed.
-        self.assertEqual(WarehouseProduct.objects.get().name, "K24644 KREM V-106")
+        # The warehouse row reads in English too, like the catalog.
+        self.assertEqual(WarehouseProduct.objects.get().name, "K24644 Cream V-106")
 
     def test_a_row_from_before_the_fields_still_saves(self, _up):
         r = self._receive([{"name": "V-107", "sku": "K24644.V107", "price": "3",

@@ -22,7 +22,7 @@ from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET
 
 from .attributes import (CATALOG_LANGUAGES, WORDING_GROUP, WORDING_NAME,
-                         WORDING_VALUE, term_key)
+                         WORDING_VALUE, english_value, term_key, value_suggestions)
 from .models import (CatalogWording, ProductAttribute, ProductCategory,
                      ProductVariantAttribute, ProductVariantAttributeValue)
 
@@ -167,3 +167,69 @@ def catalog_wording_api(request):
         else:
             values.setdefault(scope, {}).setdefault(key, {})[language] = text
     return JsonResponse({"names": names, "values": values, "groups": groups})
+
+
+@login_required
+@require_GET
+def attribute_value_suggest(request):
+    """What a part-typed value could be, for the field it is typed in:
+    {"results": [{"value": "cream", "label": "Krem"}], "exact": "cream"}.
+    The stored values of the attribute and their wordings in every
+    language are searched, so "kre" offers cream to a Turkish reader and
+    the English key is what gets stored. `exact` is the value the whole
+    text names, if any; null means the text would be a new value."""
+    attribute = term_key(request.GET.get("attribute"))
+    text = (request.GET.get("q") or "").strip()
+    if not attribute or not text:
+        return JsonResponse({"results": [], "exact": None, "language": _reader()})
+    stored = (ProductVariantAttributeValue.objects
+              .filter(product_variant_attribute__name=attribute,
+                      product_variant_attribute_value__icontains=text)
+              .values_list("product_variant_attribute_value", flat=True)[:200])
+    exact = english_value(attribute, text)
+    if exact is None and ProductVariantAttributeValue.objects.filter(
+            product_variant_attribute__name=attribute,
+            product_variant_attribute_value__iexact=text).exists():
+        exact = term_key(text)
+    return JsonResponse({"results": value_suggestions(attribute, text, stored),
+                         "exact": exact, "language": _reader()})
+
+
+def _reader():
+    from django.utils.translation import get_language
+    return (get_language() or "en").lower().split("-")[0]
+
+
+@login_required
+def attribute_value_translate(request):
+    """Gemini's guess at a value in other languages, for a person to check:
+    POST attribute, text, source ("tr"), targets ("en" or "tr,ru") →
+    {"suggested": {"en": "ivory"}}. Empty when there is no guess."""
+    if request.method != "POST":
+        return JsonResponse({"suggested": {}}, status=405)
+    from .wording_suggest import suggest_wordings
+    targets = [t for t in (request.POST.get("targets") or "").split(",") if t]
+    return JsonResponse({"suggested": suggest_wordings(
+        request.POST.get("attribute") or "", request.POST.get("text") or "",
+        (request.POST.get("source") or "").lower(), targets)})
+
+
+@login_required
+def attribute_value_word(request):
+    """Remember what a new value was typed as: POST attribute, value (the
+    English key the person confirmed), language, text. The next person to
+    type that word is offered the value. A wording already written for
+    the value in that language is left as it is."""
+    if request.method != "POST":
+        return JsonResponse({"saved": False}, status=405)
+    attribute = term_key(request.POST.get("attribute"))
+    key = term_key(request.POST.get("value"))
+    language = (request.POST.get("language") or "").lower()
+    text = " ".join((request.POST.get("text") or "").split())[:255]
+    if (not attribute or not key or not text or language not in CATALOG_LANGUAGES
+            or language == "en" or term_key(text) == key):
+        return JsonResponse({"saved": False})
+    _held, created = CatalogWording.objects.get_or_create(
+        kind=WORDING_VALUE, scope=attribute, key=key, language=language,
+        defaults={"text": text})
+    return JsonResponse({"saved": created})

@@ -58,54 +58,15 @@ class UndescribedVariant(CatalogSyncConflict):
             % {"sku": sku})
 
 
-# ---------------------------------------------------------------------------
-# Turkish → English colour dictionary.
-# EDIT HERE: keys are the label tokens (any case), values the English colour
-# stored on the catalog. A token NOT in this map is treated as a *model*
-# attribute instead of a colour. This is the single place to curate colours.
-# ---------------------------------------------------------------------------
-TR_EN_COLORS = {
-    "BEYAZ": "WHITE",
-    "SIYAH": "BLACK",
-    "GRI": "GRAY",          # American spelling, as the catalog stores it
-    "GUMUS": "SILVER",
-    "KREM": "CREAM",
-    "EKRU": "ECRU",
-    "BEJ": "BEIGE",
-    "KAHVE": "BROWN",
-    "KAHVERENGI": "BROWN",
-    "VIZON": "MINK",
-    "LACIVERT": "NAVY",
-    "MAVI": "BLUE",
-    "TURKUAZ": "TURQUOISE",
-    "YESIL": "GREEN",
-    "KIRMIZI": "RED",
-    "BORDO": "BURGUNDY",
-    "PEMBE": "PINK",
-    "PUDRA": "POWDER",
-    "MOR": "PURPLE",
-    "LILA": "LILAC",
-    "SARI": "YELLOW",
-    "HARDAL": "MUSTARD",
-    "TURUNCU": "ORANGE",
-    "ALTIN": "GOLD",
-    "BAKIR": "COPPER",
-    "ANTRASIT": "ANTHRACITE",
-    "FUME": "SMOKE",
-    "TABA": "TAN",
-}
-
-
 def _fold(token: str) -> str:
-    """Upper-case a token for colour-dictionary lookup, handling Turkish
-    dotted/dotless i correctly (str.upper() alone mangles them) and
-    stripping accents so 'GÜMÜŞ' matches the ASCII key 'GUMUS'."""
+    """Upper-case a token for comparison, handling Turkish dotted/dotless i
+    correctly (str.upper() alone mangles them) and stripping accents so
+    'GÜMÜŞ' matches 'GUMUS'."""
     if not token:
         return ""
     t = token.strip()
     # Turkish-aware upper: i→İ then upper; ı already upper-maps to I.
     t = t.replace("i", "İ").replace("ı", "I").upper()
-    # Fold accented Turkish letters to ASCII so dictionary keys stay simple.
     table = str.maketrans({
         "İ": "I", "Ş": "S", "Ğ": "G", "Ü": "U", "Ö": "O", "Ç": "C", "Â": "A",
     })
@@ -124,28 +85,6 @@ def _norm_value(value: str, attribute_name: str = "") -> str:
     return normalize_attribute_value(attribute_name, value)
 
 
-
-# Modifiers that precede a colour, e.g. "AÇIK KREM" (light cream).
-_COLOR_MODIFIERS = {"ACIK": "LIGHT", "KOYU": "DARK", "ORTA": "MEDIUM"}
-
-
-def translate_color(token):
-    """Return the English colour for a Turkish colour phrase, or None if it
-    isn't a colour. Handles single words ("GÜMÜŞ"→"SILVER") and modifier +
-    colour ("AÇIK KREM"→"LIGHT CREAM", "KOYU MAVİ"→"DARK BLUE")."""
-    folded = _fold(token)
-    if not folded:
-        return None
-    if folded in TR_EN_COLORS:
-        return TR_EN_COLORS[folded]
-    words = folded.split()
-    if len(words) >= 2 and words[0] in _COLOR_MODIFIERS and words[-1] in TR_EN_COLORS:
-        return _COLOR_MODIFIERS[words[0]] + " " + TR_EN_COLORS[words[-1]]
-    if len(words) >= 2 and words[-1] in TR_EN_COLORS:
-        return TR_EN_COLORS[words[-1]]
-    return None
-
-
 def parse_label_name(name: str) -> dict:
     """Split a scanned product NAME into base product + variant token.
 
@@ -157,8 +96,8 @@ def parse_label_name(name: str) -> dict:
          "1072/V-356"   -> base="1072", token="V-356"
 
     The token is the variant's colour (see _color_token): the English
-    colour when it folds to a key in TR_EN_COLORS, else the colourway code
-    as printed ("V-356"). No space and no special char -> base only, no
+    colour when a wording names it, else the colourway code as printed
+    ("V-356"). No space and no special char -> base only, no
     variant.
 
     Returns: {base_name, attribute_name, attribute_value, original_token, is_color}
@@ -191,13 +130,15 @@ def parse_label_name(name: str) -> dict:
 def _color_token(base, token):
     """The variant part of a label, as the variant's colour.
 
-    A colour word is stored by its English key; anything else is the mill's
-    colourway code ("V-356", "G93"), which is what tells the variants of one
-    design apart, and is kept as printed. There is no separate "model"
-    attribute: it only ever held these same codes and colour words, under a
+    A colour word is stored by the English key its wording points at
+    (GÜMÜŞ → silver, see marketing.attributes.english_value); anything else
+    is the mill's colourway code ("V-356", "G93"), which is what tells the
+    variants of one design apart, and is kept as printed. There is no
+    separate "model" attribute: it only ever held these same codes and colour words, under a
     name the storefront could not filter on. `is_color` says the token was
     translated, for the scan screen's "translated from" hint."""
-    english = translate_color(token)
+    from marketing.attributes import english_value
+    english = english_value("color", token)
     return {"base_name": base, "attribute_name": "color",
             "attribute_value": english or token, "original_token": token,
             "is_color": bool(english)}

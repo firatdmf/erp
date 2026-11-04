@@ -3875,18 +3875,18 @@ def _take_purchase_price(wp, price, currency, cost_usd, cost_try):
 
 def _row_attributes(v):
     """[(name, value)] one variant row describes its variant with, in the
-    stored spelling: the row's own attribute fields, a colour typed in
-    Turkish (KREM) stored by its English key (cream). A row saved before
-    rows had fields carries one free-text `name`, read as its colour: the
-    English key for a colour word, the colourway code otherwise."""
-    from marketing.attributes import normalize_attribute_name, normalize_attribute_value
-    from .catalog_sync import translate_color
+    stored spelling: the row's own attribute fields, a value typed in
+    another language (KREM) stored by the English key its wording points
+    at (cream). A row saved before rows had fields carries one free-text
+    `name`, read as its colour: the English key for a worded colour, the
+    colourway code otherwise."""
+    from marketing.attributes import (english_value, normalize_attribute_name,
+                                      normalize_attribute_value)
 
     def pair(name, value):
         name = normalize_attribute_name(name)
         value = (value or "").strip()
-        if name == "color":
-            value = translate_color(value) or value
+        value = english_value(name, value) or value
         value = normalize_attribute_value(name, value)
         return (name, value) if name and value else None
 
@@ -3906,14 +3906,13 @@ def _row_attributes(v):
 
 
 def _row_label(v):
-    """What a row calls its variant, as typed: the values in order."""
-    rows = v.get("attributes")
-    if isinstance(rows, list) and rows:
-        typed = [str(a.get("value") or "").strip() for a in rows if isinstance(a, dict)]
-        label = " ".join(t for t in typed if t)
-        if label:
-            return label
-    return (v.get("name") or "").strip()
+    """What a row calls its variant: its values in order, as stored — in
+    English, whatever language they were typed in ("KREM" → "Cream"), so
+    the warehouse row and the purchase line read like the catalog. Other
+    languages read it through the wordings (warehouse_tags.in_reader_language)."""
+    from marketing.attributes import value_label
+    label = " ".join(value_label(value) for _name, value in _row_attributes(v))
+    return label or (v.get("name") or "").strip()
 
 
 def _intake_check_lookalikes(resolved):

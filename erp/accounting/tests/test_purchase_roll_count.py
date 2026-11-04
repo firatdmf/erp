@@ -190,7 +190,8 @@ class DraftPurchaseExpectedRollsTest(TestCase):
         # As it was stored before plan_lines() read the title.
         self.invoice.items.filter(line_no=1).update(description="ecru")
         ecru = self._html().split('class="po-item"')[1]
-        self.assertIn('<span class="po-item-name">MT-5019 ecru</span>', ecru)
+        # Named from the stored value, as the catalog shows it.
+        self.assertIn('<span class="po-item-name">MT-5019 Ecru</span>', ecru)
         self.assertRegex(ecru, r'Product SKU</dt>\s*<dd class="sku">MT-5019</dd>')
         self.assertRegex(ecru, r'<dt>SKU</dt>\s*<dd class="sku">MRK0013</dd>')
         self.assertRegex(ecru, r'<dt>Color</dt>\s*<dd>ecru</dd>')
@@ -202,4 +203,4 @@ class DraftPurchaseExpectedRollsTest(TestCase):
                                                "title": "MT-5019", "sku": "MT-5019"},
                               "variants": [{"sku": "MRK0013", "name": "ecru",
                                             "tops": [{"qty": 30}]}]}]}
-        self.assertEqual(plan_lines(plan)[0]["description"], "MT-5019 ecru")
+        self.assertEqual(plan_lines(plan)[0]["description"], "MT-5019 Ecru")

@@ -117,6 +117,94 @@ def wording(attribute_name, value="", language=None):
             or held.get((WORDING_VALUE, "", key, language)) or None)
 
 
+def fold_term(text):
+    """A term as it is compared across languages and keyboards: lower case,
+    accents off, the Turkish dotless ı as i — "GÜMÜŞ", "Gümüş" and "gumus"
+    are one word, and so are "KIRMIZI" and "Kırmızı"."""
+    import unicodedata
+    text = unicodedata.normalize("NFKD", term_key(text).replace("ı", "i"))
+    return "".join(c for c in text if not unicodedata.combining(c))
+
+
+_names_held = (None, {})
+
+
+def _value_names():
+    """{(scope, folded text): key} — every value wording, read backwards:
+    what each language calls a value, pointing at its stored English key.
+    The key's own spelling points at itself."""
+    global _names_held
+    held = _wordings()
+    if _names_held[0] is held:
+        return _names_held[1]
+    names = {}
+    for (kind, scope, key, _language), text in held.items():
+        if kind == WORDING_VALUE:
+            names.setdefault((scope, fold_term(key)), key)
+            names.setdefault((scope, fold_term(text)), key)
+    _names_held = (held, names)
+    return names
+
+
+def english_value(attribute_name, text):
+    """The stored value `text` names under `attribute_name`, in whichever
+    language it was typed: "krem" → "cream" when a wording says Krem is
+    cream. A phrase nobody worded whole is read word by word when every
+    word is worded ("açık krem" → "light cream"). None when nothing says
+    what it is — the text is then a new value, or a code like "V-356"."""
+    if "+" in str(text or ""):
+        # A combination is read part by part: "krem+gümüş" → "cream+silver".
+        parts = [p for p in str(text).split("+") if p.strip()]
+        read = [english_value(attribute_name, p) for p in parts]
+        return "+".join(r or p.strip() for r, p in zip(read, parts)) if any(read) else None
+    folded = fold_term(text)
+    if not folded:
+        return None
+    names, scope = _value_names(), term_key(attribute_name)
+
+    def one(term):
+        return names.get((scope, term)) or names.get(("", term))
+
+    found = one(folded)
+    if found:
+        return found
+    words = folded.split()
+    if len(words) > 1:
+        parts = [one(w) for w in words]
+        if all(parts):
+            return " ".join(parts)
+    return None
+
+
+def value_suggestions(attribute_name, text, stored=(), language=None, limit=8):
+    """What `text`, part-typed, could be under `attribute_name`: the stored
+    values and wordings it starts (or, failing that, appears in), in any
+    language. [{"value": English key, "label": how the reader reads it}] —
+    the value someone picks is the one stored, so "kre" offers
+    cream · Krem and a Turkish word is never what is kept."""
+    folded = fold_term(text)
+    if not folded:
+        return []
+    scope = term_key(attribute_name)
+    candidates = {}
+    for (held_scope, name), key in _value_names().items():
+        if held_scope in (scope, ""):
+            candidates.setdefault(name, key)
+    for value in stored:
+        candidates.setdefault(fold_term(value), term_key(value))
+    starts = [k for n, k in candidates.items() if n.startswith(folded)]
+    within = [k for n, k in candidates.items() if folded in n and not n.startswith(folded)]
+    out, seen = [], set()
+    for key in sorted(starts, key=len) + sorted(within, key=len):
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"value": key, "label": display_value(attribute_name, key, language)})
+        if len(out) >= limit:
+            break
+    return out
+
+
 def group_label(name, language=None):
     """A product group's name for the reader, else as stored."""
     worded = _wordings().get((WORDING_GROUP, "", term_key(name), _reader_language(language)))

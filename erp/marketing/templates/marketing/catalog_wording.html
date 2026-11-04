@@ -26,6 +26,10 @@
 .at-key { font: 600 13px var(--font-mono, ui-monospace, monospace); }
 .at-name td { background: var(--nejum-teal-50, #F0FAF9); }
 .at-n { font: 500 12px var(--font-sans, sans-serif); color: var(--fg-muted, #6B7280); white-space: nowrap; }
+.at-suggest { margin-left: 8px; padding: 2px 8px; border: 1px solid var(--border-default, #D5DDE3); border-radius: 6px;
+  background: #fff; font: 600 11px var(--font-sans, sans-serif); color: var(--nejum-teal-600, #00696A); cursor: pointer; }
+.at-suggest[disabled] { opacity: .5; cursor: default; }
+.at input.at-guess { background: #FDF9EF; border-color: #F2E2BC; }
 .at-foot { position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(180deg, transparent, var(--bg-page, #F6F8FA) 40%); display: flex; justify-content: flex-end; }
 </style>
 {% endblock %}
@@ -48,7 +52,13 @@
           {% endfor %}
         </optgroup>
       </select>
-      <input type="search" id="atSearch" placeholder="{% trans 'Find a term…' %}" oninput="atFilter(this.value)">
+      <select id="atMissing" onchange="atFilter()" aria-label="{% trans 'Missing a wording' %}">
+        <option value="">{% trans "All terms" %}</option>
+        {% for language in languages %}{% if language != "en" %}
+        <option value="{{ language }}">{% blocktrans with language=language|upper %}Missing {{ language }}{% endblocktrans %}</option>
+        {% endif %}{% endfor %}
+      </select>
+      <input type="search" id="atSearch" placeholder="{% trans 'Find a term…' %}" oninput="atFilter()">
     </div>
   </div>
 
@@ -70,10 +80,11 @@
           <td>
             <input type="hidden" name="key_{{ forloop.counter0 }}" value="{{ row.key }}">
             <span class="at-key">{{ row.key }}</span>
+            {% if is_attribute or section == "any" %}<button type="button" class="at-suggest" onclick="atSuggest(this)" title="{% trans 'Fill the empty languages with a suggestion to check' %}">{% trans "Suggest" %}</button>{% endif %}
           </td>
           <td class="at-n">{% if row.carried != None %}{{ row.carried }}{% endif %}</td>
           {% for language, text in row.texts %}
-          <td><input type="text" name="text_{{ forloop.parentloop.counter0 }}_{{ language }}" value="{{ text }}" maxlength="255" aria-label="{{ language|upper }}"></td>
+          <td><input type="text" name="text_{{ forloop.parentloop.counter0 }}_{{ language }}" value="{{ text }}" maxlength="255" aria-label="{{ language|upper }}" data-language="{{ language }}" oninput="this.classList.remove('at-guess')"></td>
           {% endfor %}
         </tr>
         {% endfor %}
@@ -90,12 +101,38 @@
   </form>
 </div>
 <script>
-function atFilter(text) {
-  const wanted = text.trim().toLowerCase();
+function atFilter() {
+  const wanted = document.getElementById('atSearch').value.trim().toLowerCase();
+  const missing = document.getElementById('atMissing').value;
   document.querySelectorAll('.at-table tbody tr').forEach(row => {
+    if (row.classList.contains('at-name')) return;
     const words = row.getAttribute('data-key') + ' ' + Array.from(row.querySelectorAll('input[type=text]')).map(i => i.value.toLowerCase()).join(' ');
-    row.style.display = (!wanted || row.classList.contains('at-name') || words.includes(wanted)) ? '' : 'none';
+    const empty = !missing || !(row.querySelector('input[data-language="' + missing + '"]') || {}).value;
+    row.style.display = ((!wanted || words.includes(wanted)) && empty) ? '' : 'none';
   });
+}
+// Gemini's guess for the row's empty languages, shown tinted until a person
+// edits or saves it; nothing is kept unless the page is saved.
+function atSuggest(btn) {
+  const row = btn.closest('tr');
+  const empty = Array.from(row.querySelectorAll('input[data-language]'))
+    .filter(i => i.dataset.language !== 'en' && !i.value.trim());
+  if (!empty.length) return;
+  btn.disabled = true;
+  const body = new URLSearchParams({
+    attribute: '{% if is_attribute %}{{ section|escapejs }}{% endif %}', text: row.dataset.key, source: 'en',
+    targets: empty.map(i => i.dataset.language).join(',') });
+  fetch("{% url 'marketing:attribute_value_translate' %}", {
+    method: 'POST', credentials: 'same-origin', body: body,
+    headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+    .then(r => r.json())
+    .then(d => {
+      const got = (d && d.suggested) || {};
+      empty.forEach(i => { if (got[i.dataset.language] && !i.value) { i.value = got[i.dataset.language]; i.classList.add('at-guess'); } });
+      if (!Object.keys(got).length) btn.title = '{% filter escapejs %}{% trans "No suggestion this time" %}{% endfilter %}';
+    })
+    .catch(() => {})
+    .then(() => { btn.disabled = false; });
 }
 </script>
 {% endblock %}

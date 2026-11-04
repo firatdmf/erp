@@ -15876,3 +15876,36 @@ msgstr "Ana ürünü listeden seçin ya da orada oluşturun."
 
 msgid "Product %(n)s: the SKU “%(sku)s” is already used by “%(product)s” — pick that product from the list or type another SKU."
 msgstr "Ürün %(n)s: “%(sku)s” SKU'su zaten “%(product)s” ürününde kullanılıyor — o ürünü listeden seçin ya da başka bir SKU yazın."
+
+msgid "New value. Stored in English — what is it in English?"
+msgstr "Yeni değer. İngilizce kaydedilir — İngilizcesi ne?"
+
+msgid "Asking for a suggestion…"
+msgstr "Öneri isteniyor…"
+
+msgid "Suggested — check it"
+msgstr "Öneri — kontrol edin"
+
+msgid "English word"
+msgstr "İngilizce kelime"
+
+msgid "Typed:"
+msgstr "Yazılan:"
+
+msgid "Missing a wording"
+msgstr "Çevirisi eksik"
+
+msgid "All terms"
+msgstr "Tüm terimler"
+
+msgid "Missing %(language)s"
+msgstr "%(language)s eksik"
+
+msgid "Fill the empty languages with a suggestion to check"
+msgstr "Boş dilleri kontrol edilecek bir öneriyle doldur"
+
+msgid "Suggest"
+msgstr "Öner"
+
+msgid "No suggestion this time"
+msgstr "Bu sefer öneri yok"

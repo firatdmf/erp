@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n static accounts_tags erp_tags %}
+{% load i18n static accounts_tags erp_tags catalog_wording %}
 
 {% block title %}{{ product.sku|default:product.name }} · {{ warehouse.name }} | Nejum ERP{% endblock %}
 
@@ -43,6 +43,7 @@
     border-bottom: 1px solid #E2E8EE; flex-wrap: wrap;
   }
   .od-title { font: 800 28px var(--font-sans); letter-spacing: -0.01em; color: #0F1419; margin: 0 0 8px; }
+  .od-worded { font: 500 14px var(--font-sans); color: var(--gray-500); margin: -4px 0 8px; }
   .od-meta {
     display: flex; align-items: center; gap: 10px;
     font: 500 12.5px var(--font-sans); color: var(--gray-600);
@@ -649,6 +650,8 @@
   <div class="od-head">
     <div>
       <h1 class="od-title">{{ product.name }}</h1>
+      {% if product.catalog_variant_id %}{% comment %}The variant's values in the reader's language, as the
+      warehouse list prints them under the name.{% endcomment %}<div class="od-worded">{% for a in product.catalog_variant.product_variant_attribute_values.all %}{{ a|worded_value }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
       <div class="od-meta">
         {% if product.sku %}<span class="od-chip">{{ product.sku }}</span>{% endif %}
         {% if product.barcode %}

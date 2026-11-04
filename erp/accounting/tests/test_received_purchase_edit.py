@@ -246,8 +246,9 @@ class ReceivedPurchaseEditTest(TestCase):
         self._variant(form)["attributes"] = [{"name": "model", "value": "G07 Krem"}]
         self.assertEqual(self._save(form).status_code, 200)
         wp = WarehouseProduct.objects.get()
-        self.assertEqual(wp.name, "K24644 G07 Krem")
-        self.assertEqual(self._invoice().items.get().description, "K24644 G07 Krem")
+        # Named from the stored value, as the catalog shows it.
+        self.assertEqual(wp.name, "K24644 G07 krem")
+        self.assertEqual(self._invoice().items.get().description, "K24644 G07 krem")
         self.assertEqual(WarehouseProductItem.objects.filter(product=wp).count(), 2)
 
     def test_a_variant_of_this_purchase_alone_is_renamed_with_its_values(self):

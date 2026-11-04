@@ -243,7 +243,17 @@
                font-size: 14px; line-height: 1; padding: 0 0 0 2px; }
   .np-attr-add { width: auto; min-width: 140px; height: 30px; font-size: 12px; }
   .np-v-attrs { flex: 2; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
-  .np-v-attrs .np-col { flex: 1 1 110px; }
+  .np-v-attrs .np-col { flex: 1 1 110px; position: relative; }
+  /* A value is stored in English: typing offers the values and wordings it
+     could be, and a word nothing knows asks for its English first. */
+  .np-val-new { margin-top: 6px; padding: 8px; border: 1px solid #F2E2BC; background: #FDF9EF;
+                border-radius: 8px; font: 500 11.5px var(--font-sans); color: #6B5420; }
+  .np-val-new[hidden], .np-v-attr-was[hidden] { display: none; }
+  .np-val-new-row { display: flex; gap: 6px; margin-top: 6px; }
+  .np-val-new-row .np-input { flex: 1; min-width: 0; height: 32px; font-size: 12.5px; }
+  .np-val-new-row button { flex: none; height: 32px; padding: 0 12px; border: 0; border-radius: 7px;
+                           background: var(--nejum-teal-500, #147F74); color: #fff; font: 700 12px var(--font-sans); cursor: pointer; }
+  .np-v-attr-was { font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 4px; }
   .np-main-sku, .np-v-sku, .np-v-supplier-sku { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
   /* Built from the row's values, never typed. */
   .np-v-sku[readonly] { background: #F5F7F9; color: var(--gray-600, #4B5563); cursor: default; }
@@ -945,12 +955,145 @@
     const typed = {};
     box.querySelectorAll('.np-v-attr').forEach(function (i) { typed[i.dataset.attr] = i.value; });
     box.innerHTML = (card._npAttrs || []).map(function (n) {
-      return '<div class="np-col">' +
+      return '<div class="np-col np-sup">' +
         '<label>' + npEsc(npAttrLabel(n)) + '</label>' +
         '<input class="np-input np-v-attr" data-attr="' + npEsc(n) + '" value="' + npEsc(typed[n] || '') + '"' +
-        ' placeholder="' + npEsc(NP_ATTR_HINTS[n] || '') + '" oninput="npRowAttrInput(this)">' +
+        ' placeholder="' + npEsc(NP_ATTR_HINTS[n] || '') + '" autocomplete="off"' +
+        ' oninput="npRowAttrInput(this); npValueTyped(this)" onkeydown="npValueKey(event, this)"' +
+        ' onblur="npValueLeft(this)">' +
+        '<div class="np-sup-results np-val-results" hidden></div>' +
+        '<div class="np-v-attr-was" hidden></div>' +
+        '<div class="np-val-new" hidden></div>' +
         '</div>';
     }).join('');
+  };
+
+  // ── A value is stored in English ─────────────────────────────────
+  // Typing searches the attribute's values and their wordings in every
+  // language, so "kre" offers "Krem · cream" and picking it stores cream.
+  // A whole word a wording knows becomes its English value on leaving the
+  // field. A word nothing knows, typed by a reader of another language,
+  // asks for its English — Gemini's guess filled in to check — and the
+  // typed word is kept as that value's wording for the next person.
+  const NP_VAL_SUGGEST = "{% url 'marketing:attribute_value_suggest' %}";
+  const NP_VAL_TRANSLATE = "{% url 'marketing:attribute_value_translate' %}";
+  const NP_VAL_WORD = "{% url 'marketing:attribute_value_word' %}";
+  const NP_READER_LANG = "{% get_current_language as np_lang %}{{ np_lang|default:'en'|slice:':2' }}";
+  function npValueFetch(input, onDone) {
+    const q = (input.value || '').trim();
+    if (!q) { onDone(null); return; }
+    const url = NP_VAL_SUGGEST + '?attribute=' + encodeURIComponent(input.dataset.attr) +
+      '&q=' + encodeURIComponent(q);
+    fetch(url, { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(function (d) { if ((input.value || '').trim() === q) onDone(d); })
+      .catch(function () { onDone(null); });
+  }
+  function npValueBox(input, cls) { return input.parentNode.querySelector('.' + cls); }
+  function npValueHideList(input) {
+    const list = npValueBox(input, 'np-val-results');
+    list.hidden = true; list.innerHTML = '';
+  }
+  window.npValueTyped = function (input) {
+    npValueBox(input, 'np-v-attr-was').hidden = true;
+    npValueBox(input, 'np-val-new').hidden = true;
+    clearTimeout(input._npValTimer);
+    input._npValTimer = setTimeout(function () {
+      npValueFetch(input, function (d) {
+        const list = npValueBox(input, 'np-val-results');
+        const results = (d && d.results) || [];
+        if (!results.length || document.activeElement !== input) { npValueHideList(input); return; }
+        list.innerHTML = results.map(function (r, i) {
+          const both = r.label.toLowerCase() !== r.value.toLowerCase();
+          return '<div class="np-sup-opt' + (i ? '' : ' active') + '" data-value="' + npEsc(r.value) + '"' +
+            ' onmousedown="event.preventDefault(); npValuePick(this)">' +
+            '<span>' + npEsc(r.label) + '</span>' +
+            (both ? '<span class="pfx">' + npEsc(r.value) + '</span>' : '') + '</div>';
+        }).join('');
+        list.hidden = false;
+      });
+    }, 180);
+  };
+  function npValueSet(input, value, typed) {
+    input.value = value;
+    const was = npValueBox(input, 'np-v-attr-was');
+    const shown = typed && typed.trim().toLowerCase() !== value.toLowerCase();
+    was.textContent = shown ? '{% filter escapejs %}{% trans "Typed:" %}{% endfilter %} ' + typed.trim() : '';
+    was.hidden = !shown;
+    npValueBox(input, 'np-val-new').hidden = true;
+    npRowAttrInput(input);
+  }
+  window.npValuePick = function (opt) {
+    const input = opt.closest('.np-col').querySelector('.np-v-attr');
+    // "Typed: Krem" only when the whole word was typed, not part of it.
+    const typed = input.value.trim();
+    const whole = typed.toLowerCase() === opt.firstChild.textContent.toLowerCase();
+    npValueHideList(input);
+    npValueSet(input, opt.dataset.value, whole ? typed : '');
+  };
+  window.npValueKey = function (e, input) {
+    const list = npValueBox(input, 'np-val-results');
+    if (list.hidden) return;
+    const opts = Array.prototype.slice.call(list.querySelectorAll('.np-sup-opt'));
+    const at = opts.findIndex(function (o) { return o.classList.contains('active'); });
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const next = (at + (e.key === 'ArrowDown' ? 1 : opts.length - 1)) % opts.length;
+      opts.forEach(function (o, i) { o.classList.toggle('active', i === next); });
+    } else if (e.key === 'Enter' && at >= 0) {
+      e.preventDefault(); npValuePick(opts[at]);
+    } else if (e.key === 'Escape') {
+      npValueHideList(input);
+    }
+  };
+  window.npValueLeft = function (input) {
+    npValueHideList(input);
+    const typed = (input.value || '').trim();
+    if (!typed) return;
+    npValueFetch(input, function (d) {
+      if (!d) return;
+      if (d.exact) {
+        if (d.exact.toLowerCase() !== typed.toLowerCase()) npValueSet(input, d.exact, typed);
+        return;
+      }
+      // A number or a code is the same in every language; only words ask.
+      if (NP_READER_LANG === 'en' || !/\p{L}{2,}/u.test(typed) || /\d/.test(typed)) return;
+      npValueAskEnglish(input, typed);
+    });
+  };
+  function npValueAskEnglish(input, typed) {
+    const box = npValueBox(input, 'np-val-new');
+    box.innerHTML =
+      '{% filter escapejs %}{% trans "New value. Stored in English — what is it in English?" %}{% endfilter %}' +
+      '<div class="np-val-new-row">' +
+        '<input class="np-input np-val-en" placeholder="{% filter escapejs %}{% trans "Asking for a suggestion…" %}{% endfilter %}"' +
+        ' onkeydown="if (event.key === \'Enter\') { event.preventDefault(); npValueUseEnglish(this); }">' +
+        '<button type="button" onclick="npValueUseEnglish(this)">{% filter escapejs %}{% trans "Use" %}{% endfilter %}</button>' +
+      '</div>';
+    box.dataset.typed = typed;
+    box.hidden = false;
+    const en = box.querySelector('.np-val-en');
+    const body = new URLSearchParams({ attribute: input.dataset.attr, text: typed,
+                                       source: NP_READER_LANG, targets: 'en' });
+    fetch(NP_VAL_TRANSLATE, { method: 'POST', credentials: 'same-origin', body: body,
+                              headers: { 'X-CSRFToken': NP_CSRF } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        const guess = d && d.suggested && d.suggested.en;
+        if (guess && !en.value) { en.value = guess; en.title = '{% filter escapejs %}{% trans "Suggested — check it" %}{% endfilter %}'; }
+      })
+      .catch(function () {})
+      .then(function () { en.placeholder = '{% filter escapejs %}{% trans "English word" %}{% endfilter %}'; });
+  }
+  window.npValueUseEnglish = function (el) {
+    const box = el.closest('.np-val-new');
+    const input = box.closest('.np-col').querySelector('.np-v-attr');
+    const english = (box.querySelector('.np-val-en').value || '').trim();
+    if (!english) { box.querySelector('.np-val-en').focus(); return; }
+    const typed = box.dataset.typed || '';
+    npValueSet(input, english, typed);
+    fetch(NP_VAL_WORD, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': NP_CSRF },
+      body: new URLSearchParams({ attribute: input.dataset.attr, value: english,
+                                  language: NP_READER_LANG, text: typed }) }).catch(function () {});
   };
   window.npRowAttrInput = function (input) {
     const vEl = input.closest('.np-variant');

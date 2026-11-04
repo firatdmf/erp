@@ -836,9 +836,10 @@
   /* The name with its SKU under it, beside the photo. */
   .od-prod-text { display: flex; flex-direction: column; min-width: 0; }
   .od-prod-title { font: 600 13px var(--font-sans); color: #0F1419; }
-  /* As wide as the photo and name, not the whole cell, so a click
-     past the end of the name doesn't open the product. */
+  /* Only the photo and the name open the product: each link is as wide
+     as what it holds, not the cell or the SKU under the name. */
   .od-prod-link { display: block; width: fit-content; max-width: 100%; color: inherit; text-decoration: none; }
+  .od-prod > .od-prod-link { display: flex; }  /* the photo, without a baseline gap under it */
   .od-prod-link:hover .od-prod-title { color: var(--nejum-teal-700); }
   .od-totals { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #E2E8EE; }
   /* An order split across books: the combined name, the note saying which
@@ -1637,8 +1638,9 @@
                   {% endif %}
                   <div style="min-width:0;">
                     {% if item.product %}
-                    <a href="{% url 'marketing:product_detail' item.product.pk %}" class="od-prod-link">
-                      <div class="od-prod">
+                    {% url 'marketing:product_detail' item.product.pk as product_url %}
+                    <div class="od-prod">
+                      <a href="{{ product_url }}" class="od-prod-link">
                         {% with first_file=item.product.files.all|first %}
                           {% if first_file and first_file.file_url %}
                             <img class="od-prod-img" src="{{ first_file.file_url }}" alt="">
@@ -1646,9 +1648,9 @@
                             <span class="od-prod-img"></span>
                           {% endif %}
                         {% endwith %}
-                        <div class="od-prod-text"><span class="od-prod-title">{{ item.product.title }}</span>{% include "operating/partials/od_line_sku.html" %}</div>
-                      </div>
-                    </a>
+                      </a>
+                      <div class="od-prod-text"><a href="{{ product_url }}" class="od-prod-link"><span class="od-prod-title">{{ item.product.title }}</span></a>{% include "operating/partials/od_line_sku.html" %}</div>
+                    </div>
                     {% else %}
                     <div class="od-prod"><span class="od-prod-img"></span><div class="od-prod-text"><span class="od-prod-title od-empty-mute">{% trans "(deleted product)" %}</span>{% include "operating/partials/od_line_sku.html" %}</div></div>
                     {% endif %}
@@ -3890,10 +3892,9 @@
         tr.setAttribute('data-item-row', tempId);
         tr.setAttribute('data-sku', sku);
         tr.setAttribute('data-is-variant', addIsV.value);
-        const prodLink = it.product_url
-          ? `<a href="${it.product_url}" class="od-prod-link">`
-          : '';
-        const prodLinkEnd = it.product_url ? '</a>' : '';
+        const linked = (html) => it.product_url
+          ? `<a href="${it.product_url}" class="od-prod-link">${html}</a>`
+          : html;
         const img = it.image_url
           ? `<img class="od-prod-img" src="${it.image_url}" alt="">`
           : '<span class="od-prod-img"></span>';
@@ -3916,13 +3917,13 @@
                      '<span class="od-stock-pill ' + cls + '">{% trans "Stock" %}: <b>' + s + '</b></span></div>';
         }
         tr.innerHTML =
-          '<td>' + prodLink +
-            '<div class="od-prod">' + img + '<div class="od-prod-text"><span class="od-prod-title">' + esc(it.product_title) + '</span>' +
+          '<td>' +
+            '<div class="od-prod">' + linked(img) + '<div class="od-prod-text">' +
+            linked('<span class="od-prod-title">' + esc(it.product_title) + '</span>') +
             ((it.variant_sku || it.product_sku)
               ? '<div class="mono od-line-sku">' + esc(it.variant_sku || it.product_sku) + '</div>'
               : '') +
             '</div></div>' +
-            prodLinkEnd +
           '</td>' +
           '<td><span class="od-empty-mute">—</span></td>' +
           '<td class="num"><input type="number" class="od-inline-input" step="0.01" min="0"' +

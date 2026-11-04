@@ -12,6 +12,13 @@ cash account's entries from zero should land exactly on the account's own
 balance. If it does not, something is still moving cash without writing here,
 and the difference is reported rather than papered over.
 
+The rows are the record; the balance is a running total kept beside them.
+When the two disagree because something moved the balance without a row —
+deleting an expense whose posting never landed used to hand back money that
+had never left — --match-balances sets the balance back to what the rows
+add up to. Find what caused the gap first: matching only says the rows are
+right, and a row that is missing is still missing afterwards.
+
 Running balances are no longer stored, so there is nothing to recompute —
 the transactions page derives them from the rows every time it renders them
 (views.running_cash_balances). This command's job is only to make sure the
@@ -45,6 +52,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Write the changes. Without it the command only reports.",
         )
+        parser.add_argument(
+            "--match-balances",
+            action="store_true",
+            help="Set each mismatched balance to the sum of its entries.",
+        )
 
     def handle(self, *args, **options):
         apply_changes = options["apply"]
@@ -67,7 +79,7 @@ class Command(BaseCommand):
             book = Book.objects.get(pk=book_id)
             self.stdout.write(self.style.MIGRATE_HEADING(f"\nBook {book_id} ({book})"))
             pending = self._backfill(book, apply_changes)
-            self._verify(book, pending)
+            self._verify(book, pending, options["match_balances"] and apply_changes)
 
         if not apply_changes:
             self.stdout.write(
@@ -123,7 +135,7 @@ class Command(BaseCommand):
         return []
 
     # ------------------------------------------------------------------
-    def _verify(self, book, pending):
+    def _verify(self, book, pending, match=False):
         """Does each account equal the sum of its own entries?
 
         `pending` are rows a dry run would have written but did not, so their
@@ -159,6 +171,15 @@ class Command(BaseCommand):
                         f"this account without writing a cash entry."
                     )
                 )
+                if match and summed >= 0:
+                    CashAccount.objects.filter(pk=account.pk).update(balance=summed)
+                    self.stdout.write(f"  matched: {account.name} balance set to {summed}.")
+                elif match:
+                    # A till cannot hold less than nothing; entries that sum
+                    # below zero are missing a row, and no balance fixes that.
+                    self.stdout.write(self.style.ERROR(
+                        f"  not matched: {account.name} entries sum below zero."
+                    ))
         if ok:
             self.stdout.write(
                 self.style.SUCCESS(

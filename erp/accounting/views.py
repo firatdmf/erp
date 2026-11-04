@@ -1014,12 +1014,7 @@ def unpost_expense(expense):
         # expenses out of one account must not overwrite each other's
         # balance. Giving money back cannot go negative, so nothing here
         # needs the validation CashAccount.save() would run.
-        CashAccount.objects.filter(pk=expense.cash_account_id).update(
-            balance=F("balance") + expense.amount
-        )
-        CashTransactionEntry.objects.filter(
-            content_type=content_type, content_pk=expense.pk
-        ).delete()
+        _reverse_cash_rows(expense)
     else:
         # post_delete recomputes the account's balance — see
         # signals_accounts.recompute_after_delete.
@@ -1273,6 +1268,24 @@ def _delete_cash_rows(obj):
     ).delete()
 
 
+def _reverse_cash_rows(obj):
+    """Take back what obj's cash rows moved, then delete the rows.
+
+    Read off the rows, not off obj.amount: the rows are what actually
+    moved the balance. An entry whose posting never landed has no row, and
+    reversing its typed amount anyway handed the drawer money that had
+    never left it.
+    """
+    rows = CashTransactionEntry.objects.filter(
+        content_type=ContentType.objects.get_for_model(obj), content_pk=obj.pk,
+    )
+    for row in rows:
+        CashAccount.objects.filter(pk=row.cash_account_id).update(
+            balance=F("balance") + (-row.amount if row.is_amount_positive else row.amount)
+        )
+    _delete_cash_rows(obj)
+
+
 def unpost_cash_inflow(obj):
     """Undo what handle_equity_transaction did for a revenue or a deposit.
 
@@ -1282,10 +1295,7 @@ def unpost_cash_inflow(obj):
     and only the end state matters — the caller runs assert_not_overdrawn
     once everything is done.
     """
-    CashAccount.objects.filter(pk=obj.cash_account_id).update(
-        balance=F("balance") - obj.amount
-    )
-    _delete_cash_rows(obj)
+    _reverse_cash_rows(obj)
 
 
 def post_cash_inflow(book, obj):
@@ -1306,10 +1316,7 @@ def unpost_cash_outflow(obj):
             source_type=ContentType.objects.get_for_model(obj), source_id=obj.pk,
         ).delete()
         return
-    CashAccount.objects.filter(pk=obj.cash_account_id).update(
-        balance=F("balance") + obj.amount
-    )
-    _delete_cash_rows(obj)
+    _reverse_cash_rows(obj)
 
 
 def post_cash_outflow(book, obj, member=None):
@@ -2184,22 +2191,27 @@ class AddEquityExpense(EquityExpensePage, generic.edit.CreateView):
         # Set the initial value of the book field to the book in the URL
         return {"book": self.get_book()}
 
-    @transaction.atomic
     def form_valid(self, form):
         book = self.get_book()
         # Exactly one funding source is set — the form's clean() and the
         # model's check constraint both say so, so post_expense is choosing
         # between two funded expenses, never checking for an unfunded one.
-        self.object = form.save(commit=False)
-        self.object.currency = form.cleaned_data.get("currency")
-        self.object.save()
         try:
-            post_expense(book, self.object,
-                         getattr(self.request.user, "member", None))
+            # The expense and its posting stand or fall together. Saved on
+            # its own, a refused expense stayed in the list with no cash
+            # row behind it, and deleting it later handed the drawer money
+            # that had never left it.
+            with transaction.atomic():
+                self.object = form.save(commit=False)
+                self.object.currency = form.cleaned_data.get("currency")
+                self.object.save()
+                post_expense(book, self.object,
+                             getattr(self.request.user, "member", None))
         except ValidationError as exc:
             # The one that reaches here is CashAccount's "balance cannot be
             # less than zero" — a real answer, and better shown on the form
             # than as a 500.
+            self.object = None
             form.add_error("cash_account", _g("That account does not hold enough: %s") % exc.messages[0])
             return self.form_invalid(form)
         return self._respond(form)
@@ -2255,22 +2267,26 @@ class EditEquityExpense(EquityExpensePage, generic.edit.UpdateView):
         # wrong book's URL is a 404, not somebody else's row to edit.
         return EquityExpense.objects.filter(book_id=self.kwargs.get("pk"))
 
-    @transaction.atomic
     def form_valid(self, form):
         book = self.get_book()
-        # The row AS STORED — it is the old cash account that gets the
-        # money back and the old movement that goes. form.save(commit=False)
-        # mutates self.object in place, so this has to be read first, and
-        # from the database rather than from the instance being edited.
-        stored = EquityExpense.objects.get(pk=self.object.pk)
-        unpost_expense(stored)
-
-        self.object = form.save(commit=False)
-        self.object.currency = form.cleaned_data.get("currency")
-        self.object.save()
         try:
-            post_expense(book, self.object,
-                         getattr(self.request.user, "member", None))
+            # Unposting, saving and posting again are one change: a refused
+            # edit leaves the expense exactly as it was, not reversed with
+            # nothing posted in its place.
+            with transaction.atomic():
+                # The row AS STORED — it is the old cash account that gets
+                # the money back and the old movement that goes.
+                # form.save(commit=False) mutates self.object in place, so
+                # this has to be read first, and from the database rather
+                # than from the instance being edited.
+                stored = EquityExpense.objects.get(pk=self.object.pk)
+                unpost_expense(stored)
+
+                self.object = form.save(commit=False)
+                self.object.currency = form.cleaned_data.get("currency")
+                self.object.save()
+                post_expense(book, self.object,
+                             getattr(self.request.user, "member", None))
         except ValidationError as exc:
             form.add_error("cash_account", _g("That account does not hold enough: %s") % exc.messages[0])
             return self.form_invalid(form)

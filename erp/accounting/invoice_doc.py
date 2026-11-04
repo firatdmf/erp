@@ -181,7 +181,7 @@ def build_order_doc(order):
         product = it.product
         lines.append(Line(
             sku=(variant.variant_sku if variant else "") or (product.sku if product else "") or "",
-            group=(product.category.name if product and product.category_id else ""),
+            group=(product.category.label if product and product.category_id else ""),
             description=_invoice_line_desc(it),
             quantity=qty,
             unit="m",
@@ -217,7 +217,7 @@ def build_purchase_doc(purchase):
         Line(
             sku=(it.variant.variant_sku if it.variant_id else "")
                 or (it.product.sku if it.product_id else "") or "",
-            group=(it.product.category.name
+            group=(it.product.category.label
                    if it.product_id and it.product.category_id else ""),
             description=it.description or "",
             quantity=it.quantity or Decimal("0"),

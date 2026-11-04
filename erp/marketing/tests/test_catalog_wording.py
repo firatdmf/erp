@@ -69,7 +69,7 @@ class WordingTest(TestCase):
     def test_a_product_group_is_worded(self):
         word("group", "", "ready-made_curtain", "tr", "Hazır Perde")
         self.assertEqual(group_label("ready-made_curtain", "tr"), "Hazır Perde")
-        self.assertEqual(group_label("fabric", "tr"), "fabric")
+        self.assertEqual(group_label("fabric", "tr"), "Fabric")
 
     def test_a_new_wording_is_read_at_once(self):
         with translation.override("ru"):

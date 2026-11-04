@@ -217,9 +217,13 @@ def value_suggestions(attribute_name, text, stored=(), language=None, limit=8):
 
 
 def group_label(name, language=None):
-    """A product group's name for the reader, else as stored."""
+    """A product group's name for the reader, else its stored name in words
+    ("ready-made_curtain" → "Ready-made curtain")."""
     worded = _wordings().get((WORDING_GROUP, "", term_key(name), _reader_language(language)))
-    return worded or str(name or "")
+    if worded:
+        return worded
+    plain = " ".join(str(name or "").replace("_", " ").split())
+    return plain[:1].upper() + plain[1:]
 
 
 def attribute_label(name, language=None):

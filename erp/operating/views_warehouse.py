@@ -1007,14 +1007,6 @@ def warehouse_account_create(request):
 # DB category slugs → display labels for the manual-add "Product Group"
 # select (unknown slugs fall back to the raw name). Translated per request,
 # so the select follows the viewer's language like the rest of the page.
-_CATEGORY_LABELS = {
-    "fabric": pgettext_lazy("product group", "Fabric"),
-    "ready-made_curtain": pgettext_lazy("product group", "Ready-made curtain"),
-    "throw": pgettext_lazy("product group", "Throw / Shawl"),
-    "bed": pgettext_lazy("product group", "Bed textile"),
-}
-
-
 def _product_category_choices():
     """ProductCategories for the manual-add "Product Group" select, fabric first
     (it's the default for warehouse-minted products — this is a fabric mill)."""
@@ -1031,7 +1023,7 @@ def _product_category_choices():
                   .order_by("category_id", "-n", "unit")):
             unit_of.setdefault(r["category_id"], r["unit"])
         return [{"id": c.id, "name": c.name,
-                 "label": str(_CATEGORY_LABELS.get(c.name, c.name)),
+                 "label": c.label,
                  # What a new product of the group is asked per variant.
                  "attribute_names": c.variant_attribute_names(),
                  "unit": unit_of.get(c.id, "piece"),
@@ -1083,8 +1075,7 @@ def _product_facts(product, invoice=None):
     change the last three (`unit_locked` — see _product_stock_elsewhere)."""
     category = product.category if product.category_id else None
     return {
-        "category_label": (str(_CATEGORY_LABELS.get(category.name, category.name))
-                           if category else ""),
+        "category_label": category.label if category else "",
         "unit": product.unit,
         "unit_label": str(dict(units.UNIT_CHOICES).get(product.unit, product.unit)),
         "pack_type": product.pack_type,

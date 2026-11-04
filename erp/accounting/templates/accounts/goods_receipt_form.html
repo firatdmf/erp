@@ -1511,7 +1511,7 @@
       '</div>' +
       '<div class="np-variants-wrap">' +
         '<div class="np-variants"></div>' +
-        '<button type="button" class="np-add-variant" onclick="npAddVariant(this.closest(\'.np-product-card\'))"><i class="fa fa-plus"></i> {% trans "Add variant" %}</button>' +
+        '<button type="button" class="np-add-variant" onclick="npAddVariant(this.closest(\'.np-product-card\'), true)"><i class="fa fa-plus"></i> {% trans "Add variant" %}</button>' +
       '</div>';
     el.querySelector('.np-main-unit').value = npGroupUnit(el);
     el.querySelector('.np-main-pack').value = npUnitPack(el);
@@ -2054,7 +2054,9 @@
       });
   };
 
-  window.npAddVariant = function (cardEl) {
+  // focus: true when a person clicked "Add variant" — the cursor lands in
+  // the new row's first field, as "Add roll" puts it in the roll's quantity.
+  window.npAddVariant = function (cardEl, focus) {
     npVid += 1;
     const el = document.createElement('div');
     el.className = 'np-variant';
@@ -2103,6 +2105,10 @@
     npAddTop(el);
     npRenumberVariants(cardEl);
     npSummaryUpdate();
+    if (focus) {
+      const first = el.querySelector('.np-v-attr') || el.querySelector('.np-top-qty');
+      if (first) first.focus();
+    }
   };
   // Renumber the variant labels. EVERY variant carries a remove icon, the
   // first one included — it is the row a mis-clicked chip lands in, and a row
@@ -3453,23 +3459,26 @@
       const catSel = card.querySelector('.np-main-cat');
       if (catSel && p.category_id) catSel.value = String(p.category_id);
       if (mp.mode === 'existing' && p.unit_locked !== undefined) npApplyProductFacts(card, p);
+      // A saved value counts as picked by hand only where it differs from
+      // the one the card would start on by itself — otherwise a reopened
+      // draft stops following its group and unit, as a new card does.
       // A plan saved before products had their own unit has one for all.
       const unitSel = card.querySelector('.np-main-unit');
       if (unitSel && (p.unit || plan.unit)) {
         unitSel.value = p.unit || plan.unit;
-        unitSel.dataset.touched = '1';
+        if (unitSel.value !== npGroupUnit(card)) unitSel.dataset.touched = '1';
         npRelabelUnits(card);
       }
       const packSel = card.querySelector('.np-main-pack');
       if (packSel && p.pack_type) {
         packSel.value = p.pack_type;
-        packSel.dataset.touched = '1';
+        if (packSel.value !== npUnitPack(card)) packSel.dataset.touched = '1';
         npRelabelPack(card);
       }
       const trackSel = card.querySelector('.np-main-tracking');
       if (trackSel && p.tracking) {
         trackSel.value = p.tracking;
-        trackSel.dataset.touched = '1';
+        if (trackSel.value !== npUnitTracking(card)) trackSel.dataset.touched = '1';
         npApplyTracking(card);
       }
 

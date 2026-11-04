@@ -247,6 +247,13 @@ class ProductCategory(models.Model):
     def __str__(self):
         return f"{self.name}"
 
+    @property
+    def label(self):
+        """The group's name for the reader: its catalog wording in their
+        language ("Bedding"), else the stored name in words."""
+        from .attributes import group_label
+        return group_label(self.name)
+
     def variant_attribute_names(self):
         """The attributes this group's variants are described by, in order —
         what a new product in the group is asked (see CategoryVariantAttribute)."""

@@ -69,7 +69,7 @@ class PackingListColumns(TestCase):
     def test_rows_carry_the_product_group(self):
         pack = self.order.packs.get(pack_number=1)
         groups = [r["product_group"] for r in _pack_roll_rows(pack)]
-        self.assertEqual(groups, ["Fabric", "Bed Linen"])
+        self.assertEqual(groups, ["Fabric", "Bed linen"])
 
     def test_an_ungrouped_product_falls_back_to_a_dash(self):
         Product.objects.update(category=None)
@@ -426,7 +426,7 @@ class OrderPrintProductType(TestCase):
             name="ready-made_curtain")
         self.product.save()
         self.assertEqual(self._items()[0].product_group_label,
-                         "Ready-Made Curtain")
+                         "Ready-made curtain")
 
     def test_an_unclassified_product_leaves_its_column_empty(self):
         """Both documents have a Group column to fill now. The helper

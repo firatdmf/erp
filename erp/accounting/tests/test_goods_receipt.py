@@ -174,10 +174,14 @@ class GoodsReceiptTranslationTest(TestCase):
     """The page is used in Turkish — its own strings must be in the catalog."""
 
     def test_product_groups_follow_the_language(self):
-        from marketing.models import ProductCategory
+        from marketing.attributes import WORDING_GROUP, forget_wordings
+        from marketing.models import CatalogWording, ProductCategory
         from operating.views_warehouse import _product_category_choices
 
         ProductCategory.objects.get_or_create(name="fabric")
+        CatalogWording.objects.create(kind=WORDING_GROUP, key="fabric", language="tr", text="Kumaş")
+        forget_wordings()
+        self.addCleanup(forget_wordings)
         for lang, label in (("en", "Fabric"), ("tr", "Kumaş")):
             with self.subTest(lang=lang), translation.override(lang):
                 fabric = _product_category_choices()[0]

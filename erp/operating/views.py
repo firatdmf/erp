@@ -5443,14 +5443,11 @@ class MachineStatusUpdate(View):
 def _product_group_label(product):
     """Which product group a packed roll belongs to — "Fabric", "Curtain",
     … The invoice print shows the same group, so a customer reading both
-    documents sees the same word. Group names are stored slugged and
-    lowercase (`bed_linen`), so un-slug them for print."""
-    if product is None:
+    documents sees the same word: the group's catalog wording, else its
+    stored name in words (ProductCategory.label)."""
+    if product is None or not product.category_id or not product.category.name:
         return "-"
-    name = product.category.name if product.category_id else None
-    if not name:
-        return "-"
-    return name.replace("_", " ").strip().title()
+    return product.category.label
 
 
 def _variant_label(variant):

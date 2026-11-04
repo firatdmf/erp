@@ -76,12 +76,13 @@ def cost_in_base(value, order):
 
 @register.filter
 def photos_json(files):
-    """A variant's photos as JSON for the warehouse photo viewer:
-    [{"src": …, "alt": …}], in the order given. Autoescape makes it safe
-    inside an attribute."""
+    """Photos as JSON for the photo viewer (partials/_photo_viewer.html):
+    [{"src": …, "alt": …}], in the order given, videos and files without
+    an address left out. Autoescape makes it safe inside an attribute."""
     import json
     return json.dumps([{"src": f.file_url, "alt": f.alt_text or ""}
-                       for f in files or ()])
+                       for f in files or ()
+                       if f.file_type == "image" and f.file_url])
 
 
 @register.filter

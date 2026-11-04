@@ -27,7 +27,7 @@ from erp.xlsx_utils import (
 )
 
 from .models import Warehouse, WarehouseProduct
-from .views_warehouse import (_to_usd_rate, reserved_meters_subquery,
+from .views_warehouse import (_to_base_rate, reserved_meters_subquery,
                               warehouse_search_mode, warehouse_search_q)
 
 NCOLS = 9  # A..I — plus a Location column on a combined (ortak) warehouse
@@ -99,10 +99,10 @@ def _filtered_products(warehouse, search, sort, search_by="text",
         "recent": "-updated_at",
     }
     # A sold-out SKU sorts by its last cost, as on the page. The money
-    # sorts compare in dollars, as the members of a combined warehouse can
-    # cost in different currencies (see _to_usd_rate).
+    # sorts compare in the base currency, as the members of a combined warehouse can
+    # cost in different currencies (see _to_base_rate).
     if sort in ("price_desc", "price_asc", "value_desc"):
-        rate = _to_usd_rate(scope_ids)
+        rate = _to_base_rate(scope_ids)
         qs = qs.annotate(
             _price=ExpressionWrapper(Coalesce("avg_cost", "last_cost") * rate,
                                      output_field=_money),

@@ -1971,7 +1971,7 @@ class WarehouseDetail(View):
             # member holding it, so it paginates the SKUs and fetches the
             # members' rows for the page it shows.
             paginator = Paginator(
-                _same_sku_keys(base_qs, sort, _to_usd_rate(scope_ids))
+                _same_sku_keys(base_qs, sort, _to_base_rate(scope_ids))
                 if warehouse.is_combined else flat,
                 PAGE_SIZE)
             try:
@@ -1994,20 +1994,20 @@ class WarehouseDetail(View):
             from django.db.models import Avg, Case, Max, When
             _tv, _tm = WarehouseProduct._stock_cost_exprs()
             _dec = DecimalField(max_digits=20, decimal_places=4)
-            # What the money sorts compare: the group's value and unit cost
-            # in dollars, since a combined group can span a lira member and
-            # a dollar one (see _to_usd_rate). The columns keep their own.
-            rate = _to_usd_rate(scope_ids)
-            # A group is one main product IN ONE CURRENCY: a combined page
-            # can hold the product in a lira member and a dollar member, and
-            # its totals would otherwise add the two. Same rule as the flat
-            # list's one-row-per-SKU (_same_sku_key). A plain warehouse has
-            # one currency, so its groups are unchanged.
-            cur_expr = _book_currency_expr()
-            grouped = (base_qs.annotate(base=base_expr, cur=cur_expr,
+            # A combined page can hold one product in a lira member and a
+            # dollar member. Its group is still one row, so its value and
+            # unit cost are said in the base currency (approximate, at
+            # today's rate, see _to_base_rate) rather than adding lira to
+            # dollars; the money sorts compare those. Expanding the group
+            # shows each variant in its own book's currency. A plain
+            # warehouse has one currency and prints its figures exactly.
+            codes = _scope_currency_codes(scope_ids)
+            mixed = len(codes) > 1
+            rate = _to_base_rate(scope_ids, codes)
+            grouped = (base_qs.annotate(base=base_expr,
                                         stock_value=_tv, stock_quantity=_tm,
                                         last_cost=WarehouseProduct._last_cost_expr())
-                       .values("base", "cur").annotate(
+                       .values("base").annotate(
                 variant_count=Count("id"),
                 linked=Count("catalog_variant"),
                 # The unit the group is counted in: its main product's.
@@ -2030,9 +2030,9 @@ class WarehouseDetail(View):
                 # last costs instead. A plain mean — there is no quantity
                 # left to weight them by.
                 group_last_cost=Avg("last_cost"),
-                _usd_value=Sum(ExpressionWrapper(F("stock_value") * rate,
+                _base_value=Sum(ExpressionWrapper(F("stock_value") * rate,
                                                  output_field=_dec)),
-                _usd_last=Avg(ExpressionWrapper(F("last_cost") * rate,
+                _base_last=Avg(ExpressionWrapper(F("last_cost") * rate,
                                                 output_field=_dec)),
             ).annotate(
                 avg_cost=Case(
@@ -2040,24 +2040,24 @@ class WarehouseDetail(View):
                          then=F("total_usd") / F("total_quantity")),
                     default=None,
                     output_field=DecimalField(max_digits=20, decimal_places=4)),
-            ).annotate(_price=Coalesce(
-                Case(When(total_quantity__gt=0,
-                          then=F("_usd_value") / F("total_quantity")),
-                     default=None, output_field=_dec),
-                "_usd_last")))
+                _base_avg=Case(
+                    When(total_quantity__gt=0,
+                         then=F("_base_value") / F("total_quantity")),
+                    default=None, output_field=_dec),
+            ).annotate(_price=Coalesce("_base_avg", "_base_last")))
             _sort_map = {
-                "value_desc": F("_usd_value").desc(nulls_last=True),
+                "value_desc": F("_base_value").desc(nulls_last=True),
                 "name_asc": "base", "name_desc": "-base",
                 "qty_desc": "-total_qty", "qty_asc": "total_qty",
                 "recent": "-updated",
             }
             # Price sorts by the group's average USD unit cost, NULLs last.
             if sort == "price_desc":
-                grouped = grouped.order_by(F("_price").desc(nulls_last=True), "base", "cur")
+                grouped = grouped.order_by(F("_price").desc(nulls_last=True), "base")
             elif sort == "price_asc":
-                grouped = grouped.order_by(F("_price").asc(nulls_last=True), "base", "cur")
+                grouped = grouped.order_by(F("_price").asc(nulls_last=True), "base")
             else:
-                grouped = grouped.order_by(_sort_map.get(sort, "base"), "base", "cur")
+                grouped = grouped.order_by(_sort_map.get(sort, "base"), "base")
 
             # Paginate the GROUPS (main products), not the variant rows.
             paginator = Paginator(grouped, PAGE_SIZE)
@@ -2076,16 +2076,16 @@ class WarehouseDetail(View):
             _reserved_by_base = {}
             _locations_by_base = {}
             if _bases:
-                _rc = (base_qs.annotate(base=base_expr, cur=cur_expr)
-                       .filter(base__in=_bases).values("base", "cur")
+                _rc = (base_qs.annotate(base=base_expr)
+                       .filter(base__in=_bases).values("base")
                        .annotate(rc=Count("stock_items", filter=~Q(stock_items__status='consumed'))))
-                _roll_counts = {(r["base"], r["cur"]): r["rc"] for r in _rc}
+                _roll_counts = {r["base"]: r["rc"] for r in _rc}
 
                 # Active reserved meters per group — computed separately
                 # (product-id keyed) so it doesn't multiply the Sum()s.
-                _prod_rows = (base_qs.annotate(base=base_expr, cur=cur_expr)
-                              .filter(base__in=_bases).values("id", "base", "cur"))
-                _pid_to_base = {row["id"]: (row["base"], row["cur"]) for row in _prod_rows}
+                _prod_rows = (base_qs.annotate(base=base_expr)
+                              .filter(base__in=_bases).values("id", "base"))
+                _pid_to_base = {row["id"]: row["base"] for row in _prod_rows}
                 _res_by_pid = reserved_meters_for_products(list(_pid_to_base.keys()))
                 for _pid, _m in _res_by_pid.items():
                     _b = _pid_to_base.get(_pid)
@@ -2097,12 +2097,12 @@ class WarehouseDetail(View):
                 # cheap DISTINCT query, for the same reason as the counts
                 # above: joining it into the aggregate would multiply them.
                 if warehouse.is_combined:
-                    for _row in (base_qs.annotate(base=base_expr, cur=cur_expr)
+                    for _row in (base_qs.annotate(base=base_expr)
                                  .filter(base__in=_bases)
-                                 .values("base", "cur", "warehouse__name")
+                                 .values("base", "warehouse__name")
                                  .distinct().order_by("warehouse__name")):
                         _locations_by_base.setdefault(
-                            (_row["base"], _row["cur"]), []).append(_row["warehouse__name"])
+                            _row["base"], []).append(_row["warehouse__name"])
 
             # Only the group HEADERS render up-front — variants load lazily on
             # expand (a single base can hold thousands of variants, so rendering
@@ -2110,21 +2110,24 @@ class WarehouseDetail(View):
             from .templatetags.operating_tags import currency_sign
             groups_render = [{
                 "base": g["base"] or "",
-                "currency": g["cur"],
-                "sign": currency_sign(g["cur"]),
+                # The members' one currency — a combined warehouse has no
+                # book of its own to take a sign from — or, across several,
+                # the base currency the figures were converted to.
+                "sign": currency_sign(_base_code() if mixed else next(iter(codes), "")),
+                "approx": mixed,
                 "title": g["base"] or "—",
                 "variant_count": g["variant_count"],
-                "roll_total": _roll_counts.get((g["base"], g["cur"]), 0),
+                "roll_total": _roll_counts.get(g["base"], 0),
                 "total_qty": g["total_qty"],
                 "unit_short": units.unit_short(g.get("unit") or units.DEFAULT_UNIT),
                 "item_noun": units.pack_nouns(g.get("pack_type") or units.DEFAULT_PACK)[0],
                 "item_noun_plural": units.pack_nouns(g.get("pack_type") or units.DEFAULT_PACK)[1],
                 "counts_packs": units.counts_packs(g.get("pack_type") or units.DEFAULT_PACK),
-                "reserved_total": _reserved_by_base.get((g["base"], g["cur"]), Decimal("0")),
-                "total_usd": g["total_usd"],
-                "avg_cost_usd": g["avg_cost"],
-                "last_cost_usd": g["group_last_cost"],
-                "locations": _locations_by_base.get((g["base"], g["cur"]), []),
+                "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
+                "total_usd": g["_base_value"] if mixed else g["total_usd"],
+                "avg_cost_usd": g["_base_avg"] if mixed else g["avg_cost"],
+                "last_cost_usd": g["_base_last"] if mixed else g["group_last_cost"],
+                "locations": _locations_by_base.get(g["base"], []),
                 "is_catalog": (g.get("linked") or 0) > 0,
             } for g in page.object_list]
 
@@ -2238,22 +2241,29 @@ def _same_sku_key():
         output_field=CharField())
 
 
-def _book_currency_expr():
-    """The currency a row is costed in: its owning book's base currency
-    code, "" when the book has none. What the grouped list keeps apart."""
-    from django.db.models import CharField, Value
-    return Coalesce(F("warehouse__accounting_book__base_currency__code"),
-                    Value(""), output_field=CharField())
+def _scope_currency_codes(scope_ids):
+    """The currencies the warehouses in scope cost their stock in: each
+    owning book's base currency code. More than one only on a combined
+    (ortak) page whose members sit in books of different currencies."""
+    return {c.upper() for c in (Warehouse.objects.filter(id__in=scope_ids)
+                                .values_list("accounting_book__base_currency__code",
+                                             flat=True)) if c}
 
 
-def _to_usd_rate(scope_ids):
-    """What one unit of each row's own currency is worth in dollars, as a
-    per-row expression — for ORDERING a list whose rows are costed in
-    different currencies.
+def _base_code():
+    """The ERP's base currency code: what a figure spanning books of
+    different currencies is said in."""
+    return (getattr(_dj_settings, "BASE_CURRENCY_CODE", "USD") or "USD").upper()
+
+
+def _to_base_rate(scope_ids, codes=None):
+    """What one unit of each row's own currency is worth in the base
+    currency, as a per-row expression — for a list whose rows are costed
+    in different currencies.
 
     A combined (ortak) page can hold a lira member and a dollar member, and
-    ₺10,000 is not more than $500. Sorting on the bare figures put it first.
-    The rows still print in their own currency; only the order is converted.
+    ₺10,000 is not more than $500. Sorting on the bare figures put it first,
+    and a group adding the two printed a sum of neither.
 
     One currency across the scope (every plain warehouse) needs no rate and
     gets a plain 1. The rate is today's, or the newest the books hold when
@@ -2267,14 +2277,14 @@ def _to_usd_rate(scope_ids):
     one = Value(Decimal("1"), output_field=_rate)
     if len(scope_ids) < 2:
         return one
-    codes = {c.upper() for c in (Warehouse.objects.filter(id__in=scope_ids)
-                                 .values_list("accounting_book__base_currency__code",
-                                              flat=True)) if c}
+    if codes is None:
+        codes = _scope_currency_codes(scope_ids)
     if len(codes) < 2:
         return one
+    base = _base_code()
     whens = []
-    for code in sorted(codes - {"USD"}):
-        rate = last_known_rate(code, "USD")
+    for code in sorted(codes - {base}):
+        rate = last_known_rate(code, base)
         if rate:
             whens.append(When(warehouse__accounting_book__base_currency__code__iexact=code,
                               then=Value(rate, output_field=_rate)))
@@ -2286,8 +2296,8 @@ def _same_sku_keys(base_qs, sort, rate):
     what the combined page paginates. The cost sums are only worked out
     for a price or value sort: over every product of every member they are
     the expensive part, and no other sort reads them. They are compared in
-    dollars (`rate`, from _to_usd_rate), as members may cost in different
-    currencies."""
+    the base currency (`rate`, from _to_base_rate), as members may cost in
+    different currencies."""
     from django.db.models import Case, Max, Min, When
     _dec = DecimalField(max_digits=20, decimal_places=4)
     keys = base_qs.annotate(mkey=_same_sku_key()).values("mkey")
@@ -2436,9 +2446,6 @@ def warehouse_group_variants(request, pk):
     from django.db.models import Count, F
     warehouse = get_object_or_404(Warehouse, pk=pk)
     base = request.GET.get("base", "")
-    # A group is one product in one currency (see WarehouseDetail); a link
-    # without one, from a page opened before that, lists them all.
-    currency = request.GET.get("currency")
 
     base_expr = _warehouse_base_expr()
     CAP = 400
@@ -2453,8 +2460,6 @@ def warehouse_group_variants(request, pk):
                     line_usd=F("stock_value"),
                     reserved=reserved_meters_subquery())
           .filter(base=base).order_by("name", "id"))
-    if currency is not None:
-        qs = qs.annotate(cur=_book_currency_expr()).filter(cur=currency)
     total = qs.count()
     if warehouse.is_combined:
         # Same SKU in two members → one row, as on the flat list.

@@ -7188,6 +7188,9 @@ msgstr "En pahalı"
 msgid "Most value"
 msgstr "En değerli"
 
+msgid "Converted to the base currency at the current rate. Expand to see each variant in its own currency."
+msgstr "Güncel kurla ana para birimine çevrildi. Her varyantı kendi para biriminde görmek için açın."
+
 msgid "Most valuable (TRY)"
 msgstr "En değerli (TRY)"
 

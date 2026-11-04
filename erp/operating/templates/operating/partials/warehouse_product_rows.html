@@ -124,7 +124,7 @@ links so that keeps working.{% endcomment %}
 {% for g in groups %}
 {% with gid=forloop.counter %}
 <tr class="wh-grp" style="cursor:pointer; background:#FBFCFE;"
-    onclick="toggleWhGroup(this, {{ gid }}, '{% url 'operating:warehouse_group_variants' warehouse.pk %}?base={{ g.base|urlencode }}&currency={{ g.currency|urlencode }}')">
+    onclick="toggleWhGroup(this, {{ gid }}, '{% url 'operating:warehouse_group_variants' warehouse.pk %}?base={{ g.base|urlencode }}')">
   <td class="wh-grp-head" colspan="2">
     <div style="display:flex; align-items:center; gap:9px;">
       <i class="fa fa-chevron-right wh-grp-chev" style="color:#94A3B8; transition:transform .15s; width:10px;"></i>
@@ -160,7 +160,7 @@ links so that keeps working.{% endcomment %}
   <td class="num" data-label="{% trans 'Unit cost' %}" title="{% trans 'Weighted-average unit cost across the variants of this product' %}">
     {% if g.avg_cost_usd %}<span class="mono">~{{ g.sign }}{{ g.avg_cost_usd|floatformat:"2g" }}</span>{% elif g.last_cost_usd %}<span class="mono" style="color:#9AA5B1;" title="{% trans "Last cost — none in stock" %}">~{{ g.sign }}{{ g.last_cost_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
-  <td class="num" data-label="{% trans 'Total' %}">{% if g.total_usd %}<span class="cost-usd">{{ g.sign }}{{ g.total_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num" data-label="{% trans 'Total' %}">{% if g.total_usd %}<span class="cost-usd"{% if g.approx %} title="{% trans "Converted to the base currency at the current rate. Expand to see each variant in its own currency." %}"{% endif %}>{% if g.approx %}~{% endif %}{{ g.sign }}{{ g.total_usd|floatformat:"2g" }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
   {% endif %}
 </tr>
 {% endwith %}

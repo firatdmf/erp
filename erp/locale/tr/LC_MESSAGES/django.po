@@ -15893,8 +15893,8 @@ msgstr "Öneri — kontrol edin"
 msgid "English word"
 msgstr "İngilizce kelime"
 
-msgid "Typed:"
-msgstr "Yazılan:"
+msgid "You typed “{typed}”. Values are saved in English, so this is “{value}”."
+msgstr "“{typed}” yazdınız. Değerler İngilizce kaydedilir, bu yüzden “{value}” oldu."
 
 msgid "Missing a wording"
 msgstr "Çevirisi eksik"

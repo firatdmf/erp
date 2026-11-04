@@ -1037,7 +1037,13 @@
     input.value = value;
     const was = npValueBox(input, 'np-v-attr-was');
     const shown = typed && typed.trim().toLowerCase() !== value.toLowerCase();
-    was.textContent = shown ? '{% filter escapejs %}{% trans "Typed:" %}{% endfilter %} ' + typed.trim() : '';
+    // Says why the field no longer reads what was typed, in the reader's
+    // language: values are kept in English, other languages read them
+    // through the wordings.
+    was.textContent = shown
+      ? '{% filter escapejs %}{% trans "You typed “{typed}”. Values are saved in English, so this is “{value}”." %}{% endfilter %}'
+          .replace('{typed}', typed.trim()).replace('{value}', value)
+      : '';
     was.hidden = !shown;
     npValueBox(input, 'np-val-new').hidden = true;
     npRowAttrInput(input);

@@ -141,6 +141,16 @@ class EndpointsTest(TestCase):
         self.assertIn("gemini-3.5-flash-lite:generateContent", post.call_args[0][0])
         self.assertEqual(post.call_args[1]["headers"], {"x-goog-api-key": "key"})
 
+    def test_gemini_meets_the_wordings_that_share_a_word(self):
+        # "Mat Sedef" is written for a yarn; typed as a colour, Gemini still
+        # sees it first, so it answers nacre, not pearl.
+        from marketing.wording_suggest import LANGUAGE_NAMES, _examples
+        _word("750 matte nacre", "750 Mat Sedef", scope="yarn")
+        self.assertEqual(_examples("color", set(LANGUAGE_NAMES), "mat sedef")[0],
+                         "750 matte nacre = 750 Mat Sedef (Turkish)")
+        self.assertNotIn("750 matte nacre = 750 Mat Sedef (Turkish)",
+                         _examples("color", set(LANGUAGE_NAMES), "krem"))
+
     def test_no_key_means_no_suggestion(self):
         with patch("marketing.gemini.env", return_value=None):
             d = self.client.post(reverse("marketing:attribute_value_translate"),
@@ -166,6 +176,18 @@ class GoodsReceiptOffersValuesTest(TestCase):
         r = client.get(reverse("accounts:goods_receipt", kwargs={"book_id": book.pk}))
         self.assertContains(r, reverse("marketing:attribute_value_suggest"))
         self.assertContains(r, "npValueAskEnglish")
+
+    def test_a_changed_value_says_why_in_the_readers_language(self):
+        from django.test import Client
+        from accounting.models import Book
+        from operating.models import Warehouse
+        book = Book.objects.create(name="Laleli Fabric")
+        Warehouse.objects.create(name="Fabrika", accounting_book=book)
+        client = Client()
+        client.force_login(get_user_model().objects.create_superuser("t", "t@t.t", "pw"))
+        client.cookies["django_language"] = "tr"
+        r = client.get(reverse("accounts:goods_receipt", kwargs={"book_id": book.pk}))
+        self.assertContains(r, "Değerler İngilizce kaydedilir")
 
 
 class GeminiCallTest(TestCase):

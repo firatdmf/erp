@@ -19,17 +19,27 @@ LANGUAGE_NAMES = {"en": "English", "tr": "Turkish", "ru": "Russian", "pl": "Poli
 _EXAMPLES = 60
 
 
-def _examples(attribute_name, languages):
-    """The wordings already written for this attribute in `languages`, as
-    "english key = wording" lines."""
+def _examples(attribute_name, languages, text=""):
+    """Wordings already written, as "english key = wording" lines: first
+    the ones sharing a word with `text`, in the wording or its key, under
+    any attribute — so "mat sedef" typed as a colour meets the yarns'
+    "matte nacre = Mat Sedef" —
+    then the attribute's own, then those for any attribute."""
+    from .attributes import fold_term
+
     scope = term_key(attribute_name)
-    lines = []
-    for (kind, held_scope, key, language), text in _wordings().items():
-        if kind == WORDING_VALUE and held_scope in (scope, "") and language in languages:
-            lines.append(f"{key} = {text} ({LANGUAGE_NAMES.get(language, language)})")
-        if len(lines) >= _EXAMPLES:
-            break
-    return lines
+    words = set(fold_term(text).replace("+", " ").split())
+    ranked = []
+    for (kind, held_scope, key, language), wording in _wordings().items():
+        if kind != WORDING_VALUE or language not in languages:
+            continue
+        said = f"{fold_term(wording)} {fold_term(key)}".replace("+", " ")
+        shared = len(words & set(said.split()))
+        if not shared and held_scope not in (scope, ""):
+            continue
+        ranked.append((-shared, held_scope != scope, len(key),
+                       f"{key} = {wording} ({LANGUAGE_NAMES.get(language, language)})"))
+    return [line for *_rank, line in sorted(ranked)[:_EXAMPLES]]
 
 
 def _ask(prompt):
@@ -57,7 +67,8 @@ def suggest_wordings(attribute_name, text, source, targets):
     if not text or (source not in LANGUAGE_NAMES and source != "auto") or not targets:
         return {}, None
     examples = _examples(attribute_name,
-                         set(LANGUAGE_NAMES) if source == "auto" else {source, *targets, "en"})
+                         set(LANGUAGE_NAMES) if source == "auto" else {source, *targets, "en"},
+                         text)
     wanted = ", ".join(f'"{t}": {LANGUAGE_NAMES[t]}' for t in targets)
     written = ("in a language to work out (one of "
                + ", ".join(f'"{c}" {n}' for c, n in LANGUAGE_NAMES.items()) + ")"

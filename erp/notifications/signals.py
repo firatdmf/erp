@@ -4,34 +4,37 @@ from django.urls import reverse
 from .models import Notification, NotificationPreference
 
 
-def get_notification_recipients(notification_type):
+def get_notification_recipients(notification_type, book=None):
     """
     Get list of members who should receive this notification type.
     Only returns members with receive_notifications=True and the specific type enabled.
+
+    With a book, only the members who may work in it (member_books): an
+    order in a book is nobody else's business. Superusers have every book.
     """
+    from django.db.models import Q
     from authentication.models import Member
-    
+
     # Get all members with notification preferences that allow this type
     preferences = NotificationPreference.objects.filter(
         receive_notifications=True
     )
-    
+
     if notification_type == 'new_order':
         preferences = preferences.filter(receive_order_notifications=True)
     elif notification_type in ['task_assigned', 'task_updated']:
         preferences = preferences.filter(receive_task_notifications=True)
-    
+
     member_ids = preferences.values_list('member_id', flat=True)
-    
-    # Also include members who don't have a preference record yet (default behavior)
+
+    # Members without a preference record yet are included by default
     members_with_prefs = NotificationPreference.objects.values_list('member_id', flat=True)
-    all_members = Member.objects.all()
-    
-    # Members without preferences are included by default
-    members_without_prefs = all_members.exclude(id__in=members_with_prefs)
-    
-    # Combine members with explicit permission and those without preferences
-    return list(Member.objects.filter(id__in=member_ids)) + list(members_without_prefs)
+    members = Member.objects.filter(Q(id__in=member_ids) | ~Q(id__in=members_with_prefs))
+
+    if book is not None:
+        members = members.filter(Q(books=book) | Q(user__is_superuser=True))
+
+    return list(members.distinct())
 
 
 # ============================================================
@@ -70,8 +73,14 @@ def create_order_notification_handler(sender, instance, created, **kwargs):
     # Only notify for web orders or orders with explicit order numbers
     order_number = instance.order_number or f"#{instance.pk}"
     
-    # Get recipients
-    recipients = get_notification_recipients('new_order')
+    # Only the members of the order's book. A web cart off two books'
+    # shelves is two orders (create_web_order), so each book hears of its
+    # own half. An order with no book yet goes to superusers only.
+    from operating.split_orders import order_book
+    book = order_book(instance)
+    recipients = get_notification_recipients('new_order', book=book)
+    if book is None:
+        recipients = [m for m in recipients if m.user and m.user.is_superuser]
     
     for member in recipients:
         Notification.create_notification(

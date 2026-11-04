@@ -461,12 +461,15 @@ class OrderPrintProductType(TestCase):
         job, and suppressing it would leave a hole in the table."""
         self.assertIn("MT-3016", self._page())
 
-    def test_a_sku_that_says_something_the_title_does_not_still_shows(self):
+    def test_a_named_product_prints_its_name_and_the_variants_code(self):
+        """Under the name goes the variant's SKU, the code the customer
+        reorders by — not the parent's, which on most of the catalog
+        only repeats the title (see order_print.html)."""
         self.product.title = "Bergamo"
         self.product.save()
         page = self._page()
         self.assertIn("Bergamo", page)
-        self.assertIn("MT-3016", page)
+        self.assertIn("MRK00061", page)
 
     def _query_count(self):
         from django.db import connection

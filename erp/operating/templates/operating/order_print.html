@@ -150,7 +150,10 @@
       <tr>
         <td>
           <div class="pname">{{ item.product.title|default:item.product }}</div>
-          <div class="sku">{{ item.product.sku|default:"—" }}</div>
+          {% comment %}The variant's SKU, the code a customer quotes back to
+             reorder; it starts with the parent's, so the parent's would
+             only repeat it. A variant with no SKU shows the parent's.{% endcomment %}
+          <div class="sku">{% if item.product_variant.variant_sku %}{{ item.product_variant.variant_sku }}{% else %}{{ item.product.sku|default:"—" }}{% endif %}</div>
           {% if item.is_custom_curtain %}
             <div class="pdesc">
               {% trans "Custom curtain" %}
@@ -162,7 +165,6 @@
         </td>
         <td>
           <div class="vname">{{ item.variant_label|default:"—" }}</div>
-          <div class="sku">{{ item.product_variant.variant_sku|default:"—" }}</div>
         </td>
         <td><span class="tname">{{ item.product_group_label|default:"—" }}</span></td>
         {% comment %} "2u" keeps the decimal point a point and intcomma:False

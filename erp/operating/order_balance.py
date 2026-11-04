@@ -32,9 +32,11 @@ in what they are billed in. An order priced in another currency is
 converted into it; where no rate can be had the block is left out
 rather than printed with a wrong figure in it.
 
-Nothing prints for a balance that comes to zero, nor for an order with
-no customer on it: a walk-in sale posts to the shared retail account,
-whose balance is the shop's, not the person holding the sheet.
+Nothing prints when nothing was owed before (the block would only
+repeat the total above it), nor for a balance that comes to zero, nor
+for an order with no customer on it: a walk-in sale posts to the shared
+retail account, whose balance is the shop's, not the person holding the
+sheet.
 """
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -171,7 +173,7 @@ def order_balances(orders, totals, member=None):
             continue
         previous = sum((b["previous"] for b in books), Decimal("0.00"))
         after = previous + this_orders
-        if after.quantize(CENT) == 0:
+        if previous.quantize(CENT) == 0 or after.quantize(CENT) == 0:
             continue
         # What the sum is made of: only accounts holding something, and
         # none at all when a single one does — it is the sum.

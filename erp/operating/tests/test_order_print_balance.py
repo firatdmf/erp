@@ -123,6 +123,13 @@ class OrderPrintBalance(OlegsAccount, TestCase):
         self.assertEqual(resp.context["order_balances"], [])
         self.assertNotContains(resp, "Previous balance")
 
+    def test_nothing_prints_when_nothing_was_owed_before(self):
+        """"Previous balance $0.00" and a Balance due equal to the total
+        would only repeat the line above them."""
+        resp = self._sheet()
+        self.assertEqual(resp.context["order_balances"], [])
+        self.assertNotContains(resp, "Previous balance")
+
     def test_an_order_with_no_customer_prints_no_balance(self):
         """A walk-in sale posts to the shared retail account — the shop's
         balance, not the customer's."""
@@ -219,6 +226,20 @@ class OrderPrintBalance(OlegsAccount, TestCase):
         self.assertIn(["Balance due", 7.75], values)
 
 
+class OrderPrintSku(OlegsAccount, TestCase):
+    """The product cell carries the variant's SKU — the code a customer
+    reorders by — and the parent's only where the variant has none."""
+
+    def test_the_variant_sku_is_printed_once(self):
+        resp = self._sheet()
+        self.assertContains(resp, "KZL000315.BLACK", count=1)
+        self.assertNotContains(resp, '<div class="sku">KZL000315</div>')
+
+    def test_a_variant_with_no_sku_shows_the_parents(self):
+        ProductVariant.objects.filter(pk=self.black.pk).update(variant_sku="")
+        self.assertContains(self._sheet(), '<div class="sku">KZL000315</div>')
+
+
 class PrintMenuChoices(OlegsAccount, TestCase):
     """The chevron on the order page's Print and Excel: ?balance=0 leaves
     the balance off, ?white_label=1 leaves the business's name off."""
@@ -231,6 +252,7 @@ class PrintMenuChoices(OlegsAccount, TestCase):
         self.assertNotContains(resp, "Previous balance")
 
     def test_white_label_prints_no_name(self):
+        self._move("100.00")
         resp = self.client.get(reverse("operating:order_print", args=[self.order.pk]),
                                {"html": "1", "white_label": "1"})
         self.assertNotContains(resp, 'class="brand"')
@@ -239,6 +261,7 @@ class PrintMenuChoices(OlegsAccount, TestCase):
         self.assertContains(resp, 'class="balance"')
 
     def test_a_plain_click_still_prints_both(self):
+        self._move("100.00")
         resp = self._sheet()
         self.assertContains(resp, 'class="brand"')
         self.assertContains(resp, 'class="balance"')

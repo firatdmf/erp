@@ -875,8 +875,6 @@ def cancel_purchase_invoice(invoice_pk, user, *, reason, origin="purchase", mirr
     PurchaseCancel (the dedicated purchase-page endpoint) and InvoiceCancel
     (the generic invoice page, when reached for a type="purchase" invoice).
     """
-    from operating.views_warehouse import _resync_wp_catalog
-
     reason = (reason or "").strip()
     if not reason:
         raise ValueError(_gettext("Say why this purchase is cancelled."))
@@ -914,29 +912,7 @@ def cancel_purchase_invoice(invoice_pk, user, *, reason, origin="purchase", mirr
                 blockers,
             )
 
-        touched_wp_ids = set()
-        for roll in rolls:
-            wp = roll.product
-            touched_wp_ids.add(wp.pk)
-            StockMovement.objects.create(
-                product=wp, stock_item=None, movement_type="adjustment",
-                quantity=-(roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity),
-                reason="Purchase cancelled",
-                reference=roll.barcode, created_by=user,
-            )
-            roll.delete()
-
-        for wp_id in touched_wp_ids:
-            wp = WarehouseProduct.objects.filter(pk=wp_id).first()
-            if wp is None:
-                continue
-            total = Decimal("0")
-            for r in wp.stock_items.all():
-                rem = r.quantity_remaining if r.quantity_remaining is not None else (r.quantity or Decimal("0"))
-                total += rem or Decimal("0")
-            wp.quantity = total
-            wp.save(update_fields=["quantity", "updated_at"])
-            _resync_wp_catalog(wp)
+        _remove_purchase_rolls(rolls, reason="Purchase cancelled", user=user)
 
         was = invoice.status
         invoice.cancel(user=user)
@@ -964,6 +940,200 @@ def cancel_purchase_invoice(invoice_pk, user, *, reason, origin="purchase", mirr
             post_order_movement(invoice.for_order,
                                 member=getattr(user, "member", None))
         return invoice
+
+
+def _remove_purchase_rolls(rolls, *, reason, user=None):
+    """Take a purchase's rolls off the shelf: an adjustment for what each
+    still holds, the roll deleted (its holds with it), and every warehouse
+    row they were on recounted and mirrored onto the catalog."""
+    from operating.views_warehouse import _resync_wp_catalog
+
+    touched_wp_ids = set()
+    for roll in rolls:
+        wp = roll.product
+        touched_wp_ids.add(wp.pk)
+        StockMovement.objects.create(
+            product=wp, stock_item=None, movement_type="adjustment",
+            quantity=-(roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity),
+            reason=reason,
+            reference=roll.barcode, created_by=user,
+        )
+        roll.delete()
+
+    for wp_id in touched_wp_ids:
+        wp = WarehouseProduct.objects.filter(pk=wp_id).first()
+        if wp is None:
+            continue
+        total = Decimal("0")
+        for r in wp.stock_items.all():
+            rem = r.quantity_remaining if r.quantity_remaining is not None else (r.quantity or Decimal("0"))
+            total += rem or Decimal("0")
+        wp.quantity = total
+        wp.save(update_fields=["quantity", "updated_at"])
+        _resync_wp_catalog(wp)
+
+
+class PurchaseUndoBlocked(Exception):
+    """Raised by undo_purchase_receipt when some of the purchase's stock has
+    been used since it came in. Carries `.blockers` — one line per roll,
+    saying what became of it."""
+    def __init__(self, message, blockers=None):
+        super().__init__(message)
+        self.blockers = blockers or []
+
+
+def _roll_in_use(roll, own_order_id):
+    """Why `roll` can't be taken back off the shelf, or None. Free to go:
+    whole, and held by nothing but an unpacked hold of the order the
+    purchase was bought for — that hold goes with it."""
+    from operating.views_warehouse import _roll_meters_out
+
+    out = _roll_meters_out(roll)
+    if out > 0 or roll.status == "consumed":
+        return _gettext("%(qty)s has come off it.") % {"qty": _plain(out)}
+    for hold in roll.reservations.select_related("order"):
+        if hold.consumed:
+            return _gettext("it went out on order %(order)s.") % {"order": hold.order}
+        if hold.pack_id:
+            return _gettext("it is packed for order %(order)s.") % {"order": hold.order}
+        if hold.order_id != own_order_id:
+            return _gettext("it is held for order %(order)s.") % {"order": hold.order}
+    if roll.quote_links.exists():
+        return _gettext("it is on a quote.")
+    if roll.transfer_lines.exists():
+        return _gettext("it was moved to another book.")
+    return None
+
+
+def _plain(value):
+    return format(value.normalize(), "f") if isinstance(value, Decimal) else str(value)
+
+
+def undo_purchase_receipt(invoice_pk, user, *, origin="purchase"):
+    """Received → ordered: undo a purchase received by mistake, or too soon.
+
+    The goods are taken back off the shelf (each roll deleted, with an
+    adjustment saying so), the supplier debt the receipt posted is deleted,
+    and the purchase is an order again — its plan rebuilt from what was
+    received, the same products, values, prices and rolls, barcodes
+    included so labels already stuck on keep working when it is received
+    again. A purchase bought for a customer keeps its order: the order's
+    holds on these rolls go with them, and its bill waits for the goods
+    again.
+
+    Refused, nothing changed, when any roll has been used since — cut,
+    shipped, packed, held for another order, quoted or moved to another
+    book (PurchaseUndoBlocked) — or when the purchase is not a received
+    one, or is a stock transfer (ValueError). Returns the Invoice.
+    """
+    from operating.views_warehouse import received_purchase_products
+
+    with transaction.atomic():
+        invoice = (Invoice.objects.select_for_update(of=("self",))
+                   .select_related("current_account", "currency", "for_order")
+                   .get(pk=invoice_pk, type="purchase"))
+        if invoice.status != "received":
+            raise ValueError(_gettext("Only a received purchase can have its receipt undone."))
+        from .services_stock_transfer import live_transfer_of
+        transfer = live_transfer_of(invoice)
+        if transfer is not None:
+            raise ValueError(
+                _gettext("This purchase is stock transfer %(number)s from %(book)s — undo the "
+                         "transfer instead.")
+                % {"number": transfer.number, "book": transfer.from_book.name})
+        rolls = list(
+            WarehouseProductItem.objects
+            .filter(purchase_invoice_item__invoice=invoice)
+            .select_for_update(of=("self",))
+            .select_related("product", "product__warehouse")
+        )
+        if not rolls:
+            raise ValueError(_gettext("This purchase's stock links are missing, so its receipt "
+                                      "can't be undone — cancel it instead."))
+        blockers = []
+        for roll in rolls:
+            why = _roll_in_use(roll, invoice.for_order_id)
+            if why:
+                blockers.append(f"{roll.barcode}: {why}")
+        if blockers:
+            raise PurchaseUndoBlocked(
+                _gettext("Some of this purchase's stock has been used since it came in, so "
+                         "its receipt can't be undone:"), blockers)
+
+        # What was received, read before it goes: the order's plan.
+        products, unit = received_purchase_products(invoice)
+        warehouse = invoice.intake_warehouse or rolls[0].product.warehouse
+        plan = dict(invoice.intake_plan or {})
+        plan.update({
+            "warehouse_id": str(warehouse.pk),
+            "current_account_id": str(invoice.current_account_id),
+            "date": invoice.date.isoformat(),
+            "delivery_date": invoice.delivery_date.isoformat() if invoice.delivery_date else "",
+            "notes": invoice.notes or "",
+            "unit": unit,
+            "products": [_plan_product(p) for p in products],
+        })
+
+        _remove_purchase_rolls(rolls, reason="Purchase receipt undone", user=user)
+        invoice.unreceive(user=user)
+        invoice.intake_warehouse = warehouse
+        invoice.save(update_fields=["intake_warehouse", "updated_at"])
+        rewrite_draft_plan(invoice, plan)
+        log_purchase(invoice, "status", field="status", old="received", new="ordered",
+                     origin=origin, user=user)
+        if invoice.for_order_id:
+            from .services_accounts import post_order_movement
+            post_order_movement(invoice.for_order, member=getattr(user, "member", None))
+    return invoice
+
+
+def _plan_product(card):
+    """One card of the edit form's payload as a draft plan carries it: no
+    line or roll ids, holds or meters out — an order has none of those."""
+    main = dict(card["main_product"])
+    main.setdefault("name", main.get("title") or "")
+    return {
+        "main_product": main,
+        "category_id": card.get("category_id"),
+        "unit": card.get("unit"),
+        "pack_type": card.get("pack_type"),
+        "has_variants": card.get("has_variants", True),
+        "variants": [{
+            "sku": v.get("sku") or "",
+            "name": v.get("name") or "",
+            "attributes": v.get("attributes") or [],
+            "supplier_sku": v.get("supplier_sku") or "",
+            "price": v.get("price") or "",
+            "sale_price": v.get("sale_price") or "",
+            "currency": v.get("currency") or "",
+            "sku_choice": "", "rename_from": "",
+            "tops": [{"qty": t.get("qty"), "barcode": t.get("barcode") or "",
+                      "weight_kg": t.get("weight_kg")} for t in (v.get("tops") or [])],
+        } for v in card.get("variants") or []],
+    }
+
+
+@method_decorator(login_required, name="dispatch")
+class PurchaseUndoReceipt(View):
+    """Undo a purchase's receipt (undo_purchase_receipt) — the same
+    permission as receiving one, since it is the receipt taken back."""
+
+    def post(self, request, pk):
+        if not can_confirm_purchase(request.user):
+            return JsonResponse(
+                {"success": False,
+                 "error": _gettext("You don't have permission to confirm purchases — ask your manager.")},
+                status=403)
+        try:
+            invoice = undo_purchase_receipt(pk, request.user)
+        except Invoice.DoesNotExist:
+            return JsonResponse({"success": False, "error": _gettext("Purchase not found.")}, status=404)
+        except ValueError as exc:
+            return JsonResponse({"success": False, "error": str(exc)}, status=400)
+        except PurchaseUndoBlocked as exc:
+            return JsonResponse({"success": False, "error": str(exc), "blocked": exc.blockers},
+                                status=422)
+        return JsonResponse({"success": True, "invoice_id": invoice.pk})
 
 
 @method_decorator(login_required, name="dispatch")

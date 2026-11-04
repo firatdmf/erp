@@ -15814,3 +15814,43 @@ msgstr "Bir varyantın değerleri yok — değerleri seçin ya da satırı silin
 
 msgid "Every product has at least one variant, and every variant a value. Add an option above (color, width…), then the variant."
 msgstr "Her ürünün en az bir varyantı, her varyantın da bir değeri vardır. Yukarıdan bir seçenek ekleyin (renk, en…), ardından varyantı."
+
+# Undo a purchase's receipt
+msgid "Undo receipt"
+msgstr "Mal kabulü geri al"
+
+msgid "Undo this receipt? Its stock is taken off the shelf and the supplier debt is removed. The purchase becomes an order again, with the same rolls and barcodes, to be received when the goods really arrive."
+msgstr "Bu mal kabulü geri alınsın mı? Stoğu raftan düşülür ve tedarikçi borcu silinir. Alım, aynı toplar ve barkodlarla yeniden sipariş olur; mallar gerçekten geldiğinde kabul edilir."
+
+msgid "Could not undo the receipt."
+msgstr "Mal kabulü geri alınamadı."
+
+msgid "Only a received purchase can have its receipt undone."
+msgstr "Yalnızca mal kabulü yapılmış bir alımın kabulü geri alınabilir."
+
+msgid "This purchase's stock links are missing, so its receipt can't be undone — cancel it instead."
+msgstr "Bu alımın stok bağlantıları eksik, bu yüzden mal kabulü geri alınamaz — bunun yerine iptal edin."
+
+msgid "Some of this purchase's stock has been used since it came in, so its receipt can't be undone:"
+msgstr "Bu alımın stoğunun bir kısmı geldiğinden beri kullanıldı, bu yüzden mal kabulü geri alınamaz:"
+
+msgid "%(qty)s has come off it."
+msgstr "üzerinden %(qty)s çıktı."
+
+msgid "it went out on order %(order)s."
+msgstr "%(order)s siparişiyle gönderildi."
+
+msgid "it is packed for order %(order)s."
+msgstr "%(order)s siparişi için paketlendi."
+
+msgid "it is held for order %(order)s."
+msgstr "%(order)s siparişi için ayrıldı."
+
+msgid "it is on a quote."
+msgstr "bir teklifte."
+
+msgid "it was moved to another book."
+msgstr "başka bir deftere taşındı."
+
+msgid "Add at least one variant, with an option (color, width…) and its value."
+msgstr "Bir seçenek (renk, en…) ve değeriyle en az bir varyant ekleyin."

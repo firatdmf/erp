@@ -1488,15 +1488,37 @@ class Invoice(models.Model):
             # Atomic so a failure between the delete and the status flip
             # can't leave a 'received' purchase with no ledger row (which a
             # later edit would silently re-post via resync_posted_movement).
-            if self.posted_movement_id:
-                mv = self.posted_movement
-                current_account = mv.current_account
-                mv.delete()   # OneToOne is SET_NULL → self.posted_movement clears
-                self.posted_movement = None
-                if current_account:
-                    current_account.recompute_balance(save=True)
+            self._delete_posted_movement()
             self.status = "cancelled"
             self.save(update_fields=["status", "posted_movement", "updated_at"])
+
+    def unreceive(self, user=None):
+        """Received → ordered: the receipt taken back, as if the goods had
+        not come in yet. Its ledger row is deleted the way cancel() deletes
+        it — the debt never existed, rather than a counter-pair saying it
+        was owed and then not — and the received date goes with it. The
+        stock it brought in is the caller's to remove first
+        (accounting.views_purchase.undo_purchase_receipt)."""
+        if self.status != "received":
+            raise ValidationError(_gettext("Only a received purchase can have its receipt undone."))
+        from django.db import transaction as _tx
+        with _tx.atomic():
+            self._delete_posted_movement()
+            self.status = "ordered"
+            self.received_on = None
+            self.save(update_fields=["status", "received_on", "posted_movement", "updated_at"])
+
+    def _delete_posted_movement(self):
+        """Delete the ledger row this purchase posted, if any, and bring its
+        account's balance back in step."""
+        if not self.posted_movement_id:
+            return
+        mv = self.posted_movement
+        current_account = mv.current_account
+        mv.delete()   # OneToOne is SET_NULL → self.posted_movement clears
+        self.posted_movement = None
+        if current_account:
+            current_account.recompute_balance(save=True)
 
     def restore(self, user=None, reason=""):
         """

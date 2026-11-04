@@ -90,8 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadProductAttributes();
         // Load existing variants if in edit mode
         loadExistingVariants();
-        // A new product starts as a single item.
-        refreshSingleItem();
         updateVariantRowsBar();
     }
 });
@@ -124,9 +122,8 @@ function loadExistingVariants() {
     console.log('Variant options:', variantOptionsData);
 
     if (!variantOptionsData || variantOptionsData === '[]' || variantOptionsData === '') {
-        // A product sold as one item has one variant and no options. Draw
-        // it all the same: its price, cost and SKU live on it, and nowhere
-        // else on the page.
+        // A product saved before every variant needed a value: draw its
+        // variants all the same, so the page can say what they lack.
         if (variantListData && variantListData !== '[]' && variantListData !== '') {
             loadExistingVariantImages();
             updateVariantTable();
@@ -888,49 +885,10 @@ function everyCombination() {
     return combine(validOptions);
 }
 
-// Whether any option has a name and a value. Without one, the product is a
-// single item: one variant, told apart by nothing but its SKU.
+// Whether any option has a name and a value. Without one, no variant can
+// be saved: every variant says what it is (see variantRowProblems).
 function hasOptionValues() {
     return Object.values(variantData).some(d => d.name && (d.values || []).some(v => v && v.trim()));
-}
-
-// A single item: no option has a value, and there is at most one variant —
-// the saved one. It has no table: its SKU, price and cost are boxes on the
-// Pricing card (#single_item_fields), saved to that variant on the server
-// (ProductForm.save_single_item). Adding an option turns them into a table
-// row, carrying what was typed.
-function liveRowIndices() {
-    return variantRows.map((_, index) => index).filter(index => !deletedVariantIndices.has(index));
-}
-function singleItemMode() {
-    if (!document.getElementById('single_item') || hasOptionValues()) return false;
-    const live = liveRowIndices();
-    return live.length <= 1 && live.every(index => (existingVariantData[index] || {}).variant_id);
-}
-let wasSingleItem = null;
-function refreshSingleItem() {
-    const flag = document.getElementById('single_item');
-    if (!flag) return;
-    const single = singleItemMode();
-    if (wasSingleItem === true && !single) carrySingleItemIntoRow();
-    flag.value = single ? '1' : '';
-    const fields = document.getElementById('single_item_fields');
-    const summary = document.getElementById('variants_summary');
-    if (fields) fields.hidden = !single;
-    if (summary) summary.hidden = single;
-    wasSingleItem = single;
-}
-function carrySingleItemIntoRow() {
-    const live = liveRowIndices();
-    if (live.length !== 1) return;
-    const kept = existingVariantData[live[0]] || {};
-    const typed = id => (document.getElementById(id)?.value || '').trim();
-    existingVariantData[live[0]] = {
-        ...kept,
-        sku: typed('id_item_sku') || kept.sku,
-        price: typed('id_item_price') || kept.price,
-        cost: typed('id_item_cost') || kept.cost,
-    };
 }
 
 // The rows as last drawn (generateCombinations())
@@ -959,17 +917,6 @@ let pendingValueRenames = {};
 
 // Update variant table with combinations
 function updateVariantTable() {
-    refreshSingleItem();
-    if (singleItemMode()) {
-        const table = document.getElementById('variant_table');
-        if (table) { table.innerHTML = ''; table.style.display = 'none'; }
-        const _grp = document.getElementById('grp_container');
-        if (_grp) _grp.style.display = 'none';
-        allCombinations = [];
-        toggleProductImagesSection();
-        updateVariantRowsBar();
-        return;
-    }
     // Keep what each row's inputs hold before the rows are drawn again.
     allCombinations.forEach((combo, index) => {
         if (deletedVariantIndices.has(index)) return;
@@ -1098,7 +1045,7 @@ function variantRowProblems() {
     const T = window.VARIANT_T || {};
     const seen = {};
     const problems = [];
-    if (singleItemMode() || !hasOptionValues()) {
+    if (!hasOptionValues()) {
         problems.push(T.needs_option || 'Every variant needs at least one value. Add an option above (color, width…) and give it one.');
         return problems;
     }
@@ -1122,11 +1069,10 @@ function variantRowProblems() {
 function updateVariantRowsBar() {
     const bar = document.getElementById('variant_rows_actions');
     if (!bar) return;
-    if (singleItemMode()) { bar.style.display = 'none'; return; }
     const hasValues = hasOptionValues();
     const live = variantRows.filter((_, index) => !deletedVariantIndices.has(index)).length;
-    // Without options: "Add variant" until the one variant is there.
-    bar.style.display = (hasValues || !live) ? 'flex' : 'none';
+    // Shown with or without options: without, its note says to add one.
+    bar.style.display = 'flex';
     const every = document.getElementById('variant_rows_every');
     if (every) every.style.display = hasValues ? '' : 'none';
     const note = document.getElementById('variant_rows_note');
@@ -2771,15 +2717,6 @@ let unlinkedVariantFiles = new Set();
 
 // Prepare variants data for form submission
 function prepareVariantsForSubmission() {
-    if (singleItemMode()) {
-        // Its variant is written from the Pricing card's boxes. A saved one
-        // is left to that; a new product still takes the "no variants" pass
-        // for its images, which the server keeps from deleting anything.
-        const saved = liveRowIndices().length > 0;
-        return saved
-            ? { product_variant_list: [], deleted_variant_ids: [], deleted_files: Array.from(unlinkedVariantFiles) }
-            : { delete_all_variants: true, deleted_files: Array.from(unlinkedVariantFiles) };
-    }
     const combinations = generateCombinations();
     // Saved variants the page never drew (a product whose variants have no
     // option values at all) are not ones anybody deleted: "delete all"

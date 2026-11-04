@@ -685,10 +685,7 @@ class BaseProductView(ModelFormMixin):
         # ---------------------------- this runs when we have no variants. --------------------------------------------
         delete_all_variants = variants_json.get("delete_all_variants", False)
         if delete_all_variants:
-            # A single item's one variant is kept: the page has no table
-            # for it, and save_single_item writes it after this.
-            if self.request.POST.get("single_item") != "1":
-                product.variants.all().delete()
+            product.variants.all().delete()
             # delete the files that marked as deleted by user and were not linked to any variant
             deleted_files_pks = variants_json.get("deleted_files", [])
             if len(deleted_files_pks) > 0:
@@ -1567,7 +1564,6 @@ class ProductCreate(BaseProductView, generic.CreateView):
                 variants_json = self.request.POST.get("variants_json", "[]")
                 if variants_json and variants_json != "[]":
                     self.handle_variants(self.object, variants_json)
-                form.save_single_item(self.object)
                 
                 return JsonResponse({
                     'success': True,
@@ -1585,8 +1581,6 @@ class ProductCreate(BaseProductView, generic.CreateView):
             if not variants_json_str:
                 variants_json_str = self.request.POST.get("variants_json", "[]")
             self.handle_variants(self.object, variants_json_str)
-            # A single item's one variant, from its boxes on the Pricing card.
-            form.save_single_item(self.object)
 
             # Save color/attribute swatch images per attribute value
             self.handle_attribute_value_images(self.object)
@@ -1770,8 +1764,6 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             # Always process variants (needed for image changes)
             if has_variants:
                 self.handle_variants(self.object, variants_json)
-            # A single item's one variant, from its boxes on the Pricing card.
-            form.save_single_item(self.object)
 
             # Save color/attribute swatch images per attribute value
             self.handle_attribute_value_images(self.object)

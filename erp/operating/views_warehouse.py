@@ -5189,6 +5189,108 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
     return {"invoice": invoice, "warnings": warnings, "reservations_trimmed": trimmed}
 
 
+def received_purchase_products(invoice):
+    """A received purchase as the goods-receipt form's products: one card per
+    main product, one row per line, each row's rolls with their ids, holds
+    and what has gone out of them. Returns (products, unit). What the edit
+    form loads, and what undoing the receipt turns back into its plan."""
+    from django.db.models import Exists, OuterRef, Prefetch
+    from .catalog_sync import variant_attributes
+    from .models import OrderStockReservation
+
+    rolls_qs = (WarehouseProductItem.objects
+                .select_related("product", "product__catalog_variant__product")
+                .annotate(is_locked=Exists(
+                    OrderStockReservation.objects.filter(stock_item=OuterRef("pk"))))
+                # Oldest first, the order a shorter length trims them in
+                # (_clamp_reservations_to_roll), so the page can name who
+                # loses meters before the save rather than after.
+                .prefetch_related(Prefetch(
+                    "reservations", to_attr="live_holds",
+                    queryset=(OrderStockReservation.objects.filter(consumed=False)
+                              .select_related("order").order_by("created_at", "id"))))
+                .order_by("id"))
+    items = list(
+        invoice.items.select_related("product")
+        .prefetch_related(Prefetch("warehouse_stock_items", queryset=rolls_qs))
+        .order_by("line_no")
+    )
+
+    from marketing.models import SupplierItem
+    supplier_skus = dict(
+        SupplierItem.objects.filter(current_account_id=invoice.current_account_id)
+        .values_list("variant_id", "supplier_sku"))
+    from .order_purchases import order_sale_prices
+    sale_prices = order_sale_prices(invoice)
+
+    groups = {}
+    order = []
+    for it in items:
+        rolls = list(it.warehouse_stock_items.all())
+        wp = rolls[0].product if rolls else None
+        # A line saved before it had a product still has a variant that
+        # does — without it the card would come back as a NEW product,
+        # and saving would mint one.
+        product = it.product or (wp.catalog_variant.product
+                                 if wp is not None and wp.catalog_variant_id else None)
+        key = product.pk if product else f"item{it.pk}"
+        if key not in groups:
+            groups[key] = {
+                "main_product": ({"mode": "existing", "id": product.pk,
+                                  "title": product.title, "sku": product.sku or ""}
+                                 if product else
+                                 {"mode": "new", "name": it.description, "sku": ""}),
+                "category_id": product.category_id if product else None,
+                "unit": it.unit,
+                **(_product_facts(product, invoice) if product else {}),
+                "has_variants": True,
+                "variants": [],
+            }
+            order.append(key)
+        title = product.title if product else it.description
+        uses = (_variant_uses(wp.catalog_variant, it)
+                if wp is not None and wp.catalog_variant_id else [])
+        groups[key]["variants"].append({
+            "invoice_item_id": it.pk,
+            "name": _purchase_variant_label(wp, title) if wp is not None else it.description,
+            "attributes": [{"name": n, "value": val} for n, val in variant_attributes(
+                wp.catalog_variant if wp is not None and wp.catalog_variant_id else None)],
+            "sku": (wp.sku or "") if wp is not None else "",
+            # The variant is this line's alone, so a change to its
+            # values may rename it (see _rename_own_variants).
+            "sku_follows": (wp is not None and wp.catalog_variant_id is not None
+                            and len({r.product_id for r in rolls}) == 1 and not uses),
+            # What else carries it, for the row to list when its values
+            # change and it asks whether to rename it for all of them.
+            "sku_uses": uses,
+            "supplier_sku": supplier_skus.get(
+                wp.catalog_variant_id if wp is not None else None, ""),
+            "price": _plain_decimal(it.unit_price),
+            "sale_price": (_plain_decimal(sale_prices[wp.catalog_variant_id])
+                           if wp is not None and wp.catalog_variant_id in sale_prices else ""),
+            "currency": invoice.currency.code,
+            "tops": [
+                {"stock_item_id": r.pk, "qty": _plain_decimal(r.quantity),
+                 "weight_kg": (_plain_decimal(r.weight_kg)
+                               if r.weight_kg is not None else None),
+                 "barcode": r.barcode or "", "locked": bool(r.is_locked),
+                 "out": float(_roll_meters_out(r)),
+                 "holds": [{"label": str(h.order) if h.order_id else "",
+                            "qty": float(h.quantity or 0)} for h in r.live_holds]}
+                for r in rolls
+            ],
+        })
+
+    for group in groups.values():
+        # A simple product is ONE variant that is the product itself.
+        variants, main = group["variants"], group["main_product"]
+        if (len(variants) == 1 and main.get("sku") and not variants[0]["name"]
+                and variants[0]["sku"].upper() == main["sku"].upper()):
+            group["has_variants"] = False
+
+    return [groups[k] for k in order], (items[0].unit if items else "m")
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehousePurchaseEdit(View):
     """Edit a RECEIVED purchase (Invoice(type="purchase")) from the same
@@ -5201,10 +5303,7 @@ class WarehousePurchaseEdit(View):
     """
 
     def get(self, request, pk, invoice_id):
-        from django.db.models import Exists, OuterRef, Prefetch
         from accounting.models import Invoice
-        from .catalog_sync import variant_attributes
-        from .models import OrderStockReservation
 
         get_object_or_404(Warehouse, pk=pk)
         invoice = get_object_or_404(
@@ -5219,96 +5318,7 @@ class WarehousePurchaseEdit(View):
         if invoice.status == "cancelled":
             return JsonResponse({"success": False, "error": _gettext("A cancelled purchase can't be edited.")}, status=400)
 
-        rolls_qs = (WarehouseProductItem.objects
-                    .select_related("product", "product__catalog_variant__product")
-                    .annotate(is_locked=Exists(
-                        OrderStockReservation.objects.filter(stock_item=OuterRef("pk"))))
-                    # Oldest first, the order a shorter length trims them in
-                    # (_clamp_reservations_to_roll), so the page can name who
-                    # loses meters before the save rather than after.
-                    .prefetch_related(Prefetch(
-                        "reservations", to_attr="live_holds",
-                        queryset=(OrderStockReservation.objects.filter(consumed=False)
-                                  .select_related("order").order_by("created_at", "id"))))
-                    .order_by("id"))
-        items = list(
-            invoice.items.select_related("product")
-            .prefetch_related(Prefetch("warehouse_stock_items", queryset=rolls_qs))
-            .order_by("line_no")
-        )
-
-        from marketing.models import SupplierItem
-        supplier_skus = dict(
-            SupplierItem.objects.filter(current_account_id=invoice.current_account_id)
-            .values_list("variant_id", "supplier_sku"))
-        from .order_purchases import order_sale_prices
-        sale_prices = order_sale_prices(invoice)
-
-        groups = {}
-        order = []
-        for it in items:
-            rolls = list(it.warehouse_stock_items.all())
-            wp = rolls[0].product if rolls else None
-            # A line saved before it had a product still has a variant that
-            # does — without it the card would come back as a NEW product,
-            # and saving would mint one.
-            product = it.product or (wp.catalog_variant.product
-                                     if wp is not None and wp.catalog_variant_id else None)
-            key = product.pk if product else f"item{it.pk}"
-            if key not in groups:
-                groups[key] = {
-                    "main_product": ({"mode": "existing", "id": product.pk,
-                                      "title": product.title, "sku": product.sku or ""}
-                                     if product else
-                                     {"mode": "new", "name": it.description, "sku": ""}),
-                    "category_id": product.category_id if product else None,
-                    "unit": it.unit,
-                    **(_product_facts(product, invoice) if product else {}),
-                    "has_variants": True,
-                    "variants": [],
-                }
-                order.append(key)
-            title = product.title if product else it.description
-            uses = (_variant_uses(wp.catalog_variant, it)
-                    if wp is not None and wp.catalog_variant_id else [])
-            groups[key]["variants"].append({
-                "invoice_item_id": it.pk,
-                "name": _purchase_variant_label(wp, title) if wp is not None else it.description,
-                "attributes": [{"name": n, "value": val} for n, val in variant_attributes(
-                    wp.catalog_variant if wp is not None and wp.catalog_variant_id else None)],
-                "sku": (wp.sku or "") if wp is not None else "",
-                # The variant is this line's alone, so a change to its
-                # values may rename it (see _rename_own_variants).
-                "sku_follows": (wp is not None and wp.catalog_variant_id is not None
-                                and len({r.product_id for r in rolls}) == 1 and not uses),
-                # What else carries it, for the row to list when its values
-                # change and it asks whether to rename it for all of them.
-                "sku_uses": uses,
-                "supplier_sku": supplier_skus.get(
-                    wp.catalog_variant_id if wp is not None else None, ""),
-                "price": _plain_decimal(it.unit_price),
-                "sale_price": (_plain_decimal(sale_prices[wp.catalog_variant_id])
-                               if wp is not None and wp.catalog_variant_id in sale_prices else ""),
-                "currency": invoice.currency.code,
-                "tops": [
-                    {"stock_item_id": r.pk, "qty": _plain_decimal(r.quantity),
-                     "weight_kg": (_plain_decimal(r.weight_kg)
-                                   if r.weight_kg is not None else None),
-                     "barcode": r.barcode or "", "locked": bool(r.is_locked),
-                     "out": float(_roll_meters_out(r)),
-                     "holds": [{"label": str(h.order) if h.order_id else "",
-                                "qty": float(h.quantity or 0)} for h in r.live_holds]}
-                    for r in rolls
-                ],
-            })
-
-        for group in groups.values():
-            # A simple product is ONE variant that is the product itself.
-            variants, main = group["variants"], group["main_product"]
-            if (len(variants) == 1 and main.get("sku") and not variants[0]["name"]
-                    and variants[0]["sku"].upper() == main["sku"].upper()):
-                group["has_variants"] = False
-
+        products, unit = received_purchase_products(invoice)
         return JsonResponse({
             "success": True,
             "invoice_id": invoice.pk,
@@ -5320,8 +5330,8 @@ class WarehousePurchaseEdit(View):
             "current_account_name": invoice.current_account.name,
             "current_account_prefix": _consonant_prefix(invoice.current_account.name),
             "currency": invoice.currency.code,
-            "unit": items[0].unit if items else "m",
-            "products": [groups[k] for k in order],
+            "unit": unit,
+            "products": products,
         })
 
     def post(self, request, pk, invoice_id):

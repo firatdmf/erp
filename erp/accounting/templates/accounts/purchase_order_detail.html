@@ -146,6 +146,11 @@
             </span>
           {% endif %}
         {% endif %}
+        {% if invoice.status == 'received' and warehouse_id and can_confirm %}
+          <button type="button" class="po-back" id="poUndoBtn" onclick="poUndoReceipt(this)" style="cursor:pointer;">
+            <i class="fa fa-rotate-left"></i> {% trans "Undo receipt" %}
+          </button>
+        {% endif %}
         <button type="button" class="po-back" style="color:#B91C1C; border-color:#FCA5A5; cursor:pointer;"
                 onclick="document.getElementById('poCancelDlg').showModal()">
           <i class="fa fa-ban"></i>
@@ -391,9 +396,29 @@
   };
 </script>
 <script>
+  // The receipt taken back: its stock leaves, the debt goes, and the
+  // purchase is an order again with the same rolls planned.
+  window.poUndoReceipt = function (btn) {
+    if (!confirm("{% filter escapejs %}{% trans 'Undo this receipt? Its stock is taken off the shelf and the supplier debt is removed. The purchase becomes an order again, with the same rolls and barcodes, to be received when the goods really arrive.' %}{% endfilter %}")) return;
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% filter escapejs %}{% trans "Saving…" %}{% endfilter %}';
+    fetch("{% url 'accounts:purchase_undo_receipt' invoice.pk %}", {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.success) { window.location.reload(); return; }
+        alert([(d && d.error) || '{% filter escapejs %}{% trans "Could not undo the receipt." %}{% endfilter %}']
+              .concat((d && d.blocked) || []).join('\n'));
+        btn.disabled = false; btn.innerHTML = orig;
+      }).catch(function () { alert('{% filter escapejs %}{% trans "Network error." %}{% endfilter %}'); btn.disabled = false; btn.innerHTML = orig; });
+  };
+</script>
+<script>
   // Confirm turns this order into stock; it is deliberately a POST with an
-  // explicit "are you sure", since there is no undo short of cancelling the
-  // whole purchase (which deletes the stock items it created).
+  // explicit "are you sure". Undo receipt takes it back while none of the
+  // stock has been used.
   window.poConfirm = function (btn) {
     if (!confirm("{% trans 'Receive this order into the warehouse? The stock is added and the supplier debt is posted now.' %}")) return;
     const orig = btn.innerHTML;

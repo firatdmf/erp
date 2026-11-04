@@ -528,45 +528,12 @@
       <!-- Pricing (Moved to Sidebar) -->
       <div class="form-card sidebar-card">
         <div class="form-card-title"><span class="form-card-ico"><i data-lucide="tag"></i></span>{% trans "Pricing" %}</div>
-        {% comment %}A single item (no options) is typed here, and saved to its
-        one variant (ProductForm.save_single_item). Once it has options, price
-        and cost are typed on each variant and this shows what they come to.
-        variant_form_modern.js switches between the two and sets single_item.{% endcomment %}
-        <input type="hidden" name="single_item" id="single_item" value="{% if form.single_item %}1{% endif %}">
-        <div id="single_item_fields"{% if not form.single_item %} hidden{% endif %}>
-          <div class="form-row">
-            <div class="form-group" style="flex: 1;">
-              <label for="id_item_sku">{% trans "Item SKU" %}</label>
-              {{ form.item_sku }}
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>{% trans "Price" %}</label>
-              {# Cost times the multiplier, rounded up to 0.05 (marketing/pricing.py). #}
-              <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">{% if form.item_price_live is not None %}${{ form.item_price_live|floatformat:"2g" }}{% else %}<span style="color:#9AA5B1;">—</span>{% endif %}</div>
-            </div>
-            <div class="form-group">
-              <label for="id_item_cost">{% trans "Cost per item" %}</label>
-              {% if form.item_cost_computed is not None %}
-              {# Priced stock on hand says what it cost; nobody types that. #}
-              <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">~${{ form.item_cost_computed|floatformat:"2g" }}</div>
-              {% else %}
-              {{ form.item_cost }}
-              {% endif %}
-            </div>
-          </div>
-          <div style="margin:-4px 0 10px; font-size:12px; color:#5B6470;">
-            {% trans "Stock, barcodes and orders use the item SKU." %}
-            {% trans "Price is the cost times the multiplier below, rounded up to 0.05." %}
-            {% if form.item_cost_computed is not None %}{% trans "Cost is the average of the stock on hand." %}{% endif %}
-          </div>
-        </div>
-        <div id="variants_summary"{% if form.single_item %} hidden{% endif %}>
+        {% comment %}Price and cost are typed on each variant; this shows what
+        they come to.{% endcomment %}
+        <div id="variants_summary">
         <div class="form-row">
           <div class="form-group">
-            <label>{% trans "Price" %}</label>
-            <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">
+            <label>{% trans "Price" %}</label>            <div style="padding:8px 0; font-weight:600; font-variant-numeric:tabular-nums;">
               {% if form.variants_price_low is None %}<span style="color:#9AA5B1;">—</span>
               {% elif form.variants_price_low == form.variants_price_high %}${{ form.variants_price_low|floatformat:"2g" }}
               {% else %}${{ form.variants_price_low|floatformat:"2g" }} – ${{ form.variants_price_high|floatformat:"2g" }}{% endif %}

@@ -431,6 +431,31 @@ class CombinedWarehouseMergesTheSameSku(TestCase):
         self._stock(self.factory, "SETA", "100", "100.00", name="SETA")
         self.assertEqual(_cell(self._rows(self._list())[0], "Total"), "₺10,000.00")
 
+    def test_a_group_never_adds_lira_to_dollars(self):
+        """One product in a lira member and a dollar member is two groups,
+        each totalled and signed in its own currency — as the flat list
+        keeps the same SKU apart across currencies."""
+        self._lira_factory()
+        self._stock(self.store, "K24614.G47", "10", "50.00")
+        self._stock(self.factory, "K24614.G48", "100", "100.00")
+        html = self._list(view="grouped")
+        totals = re.findall(r'<span class="cost-usd">([^<]+)</span>', html)
+        # The dollar group first: $500 outweighs ₺10,000 ($250).
+        self.assertEqual(totals, ["$500.00", "₺10,000.00"])
+
+    def test_expanding_a_group_lists_its_own_currency_only(self):
+        self._lira_factory()
+        self._stock(self.store, "K24614.G47", "10", "50.00")
+        self._stock(self.factory, "K24614.G48", "100", "100.00")
+        url = reverse("operating:warehouse_group_variants", args=[self.combined.pk])
+        lira = self.client.get(url, {"base": "K24614", "currency": "TRY"}).content.decode()
+        self.assertIn("K24614.G48", lira)
+        self.assertNotIn("K24614.G47", lira)
+        # A link from before the split still lists the whole product.
+        both = self.client.get(url, {"base": "K24614"}).content.decode()
+        self.assertIn("K24614.G47", both)
+        self.assertIn("K24614.G48", both)
+
     def test_the_export_sorts_the_same_way(self):
         from operating.warehouse_excel import _filtered_products
         self._lira_factory()

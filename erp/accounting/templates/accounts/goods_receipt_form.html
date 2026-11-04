@@ -186,23 +186,6 @@
   .np-row { display: flex; gap: 10px; }
   .np-row > * { flex: 1; min-width: 0; }
 
-  .np-seg { display: inline-flex; background: #ECF1F5; border-radius: 9px; padding: 3px; margin-bottom: 10px; }
-  .np-seg-btn {
-    border: 0; background: transparent; cursor: pointer;
-    padding: 6px 16px; border-radius: 7px; font: 600 12.5px var(--font-sans); color: var(--gray-600);
-  }
-  .np-seg-btn.active { background: white; color: var(--nejum-teal-700); box-shadow: 0 1px 2px rgba(15,23,31,0.08); }
-
-  .np-ac-wrap { position: relative; }
-  .np-ac-drop {
-    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5;
-    background: white; border: 1px solid #E2E8EE; border-radius: 10px;
-    box-shadow: 0 12px 28px rgba(15,23,31,0.12); overflow: hidden; display: none;
-  }
-  .np-ac-drop.show { display: block; }
-  .np-ac-item { padding: 9px 12px; cursor: pointer; font: 500 13px var(--font-sans); color: #0F1419; }
-  .np-ac-item:hover { background: #F1F7F6; }
-  .np-ac-item small { color: var(--gray-500); margin-left: 6px; }
 
   /* Existing-variants chip row (shown under the search box once a main
      product is selected, so the user sees what's already on it). */
@@ -443,10 +426,9 @@
     .gr .np-attr-add { height: 40px; font-size: 15px; }
     .gr .np-sup-chip { height: 44px; }
     /* Tap targets: search hits, variant chips and the icon buttons. */
-    .gr .np-sup-opt, .gr .np-ac-item { padding: 12px 10px; font-size: 14px; }
+    .gr .np-sup-opt { padding: 12px 10px; font-size: 14px; }
     .gr .np-existing-variants .np-ev-chip { padding: 6px 10px; font-size: 13px; }
     .gr .np-mini-x, .gr .np-top-lock { width: 36px; height: 36px; }
-    .gr .np-seg-btn { padding: 10px 16px; font-size: 13.5px; }
     .gr .np-add-top { padding: 11px; font-size: 13px; }
     .gr .np-add-variant, .gr .np-add-product { padding: 13px; font-size: 13.5px; }
     .gr .np-fx-pub { height: 40px; }
@@ -1249,7 +1231,8 @@
     if (!wrap) return;
     const el = document.createElement('div');
     el.className = 'np-product-card';
-    el._npMode = 'new';
+    // '' while nothing is picked yet; 'existing' or 'new' once it is.
+    el._npMode = '';
     el._npPreviewSku = '';
     el._npNextSkuTimer = null;
     el._npSearchTimer = null;
@@ -1261,11 +1244,20 @@
       '</div>' +
       '<div class="np-field">' +
         '<label>{% trans "Main product" %}</label>' +
-        '<div class="np-seg">' +
-          '<button type="button" class="np-seg-btn active" data-mode="new" onclick="npSetMode(this, \'new\')">{% trans "New" %}</button>' +
-          '<button type="button" class="np-seg-btn" data-mode="existing" onclick="npSetMode(this, \'existing\')">{% trans "Existing" %}</button>' +
+        // One box: typing finds a product we have; what it doesn't find
+        // can be created from the same list (npSearchMain).
+        '<div class="np-sup np-main-box">' +
+          '<input class="np-input np-main-search" placeholder="{% trans "Search by name or SKU, or type a new product…" %}" autocomplete="off"' +
+            ' oninput="npSearchMain(this)" onfocus="npSearchMain(this)" onkeydown="npMainKey(event, this)">' +
+          '<div class="np-sup-results np-main-drop" hidden></div>' +
         '</div>' +
-        '<div class="np-new-main">' +
+        '<div class="np-sup-chip np-main-chip" hidden>' +
+          '<i class="fa fa-box"></i><span class="np-main-chip-name"></span>' +
+          '<button type="button" class="np-sup-clear" onclick="npMainClear(this)" title="{% trans "Change product" %}">&times;</button>' +
+        '</div>' +
+        '<input type="hidden" class="np-main-id">' +
+        '<input type="hidden" class="np-main-existing-sku">' +
+        '<div class="np-new-main" hidden style="margin-top:10px;">' +
           '<div class="np-main-row">' +
             '<div class="np-col np-col-name">' +
               '<label>{% trans "Name" %}</label>' +
@@ -1280,16 +1272,7 @@
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="np-existing-main np-ac-wrap" style="display:none;">' +
-          '<div class="np-col">' +
-            '<label>{% trans "Existing main product" %}</label>' +
-            '<input class="np-input np-main-search" placeholder="{% trans "Search by name or SKU…" %}" autocomplete="off" oninput="npSearchMain(this)">' +
-          '</div>' +
-          '<input type="hidden" class="np-main-id">' +
-          '<input type="hidden" class="np-main-existing-sku">' +
-          '<div class="np-main-drop np-ac-drop"></div>' +
-          '<div class="np-existing-variants" style="display:none;"></div>' +
-        '</div>' +
+        '<div class="np-existing-variants" style="display:none;"></div>' +
       '</div>' +
       // What the product is, what it's counted in and how it's packed —
       // one row. A new product is asked all three; an existing one states
@@ -1339,9 +1322,9 @@
     npFetchNextSku(el);
     npRenumberProducts();
     npSummaryUpdate();
-    const nameInput = el.querySelector('.np-main-name');
+    const searchInput = el.querySelector('.np-main-search');
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    if (nameInput) nameInput.focus();
+    if (searchInput) searchInput.focus();
   };
   // Renumber product cards AND hide the remove icon when only one is left
   // (there must always be at least one product in the batch).
@@ -1361,28 +1344,69 @@
     npSummaryUpdate();
   };
 
-  window.npSetMode = function (btnEl, mode) {
-    const card = btnEl.closest('.np-product-card');
+  // What the card's main product is: '' (still being looked for),
+  // 'existing' (picked from the list) or 'new' (created from it). The box
+  // shows while it is '', the chip once it is either.
+  window.npSetMode = function (card, mode) {
     card._npMode = mode;
-    card.querySelectorAll('.np-seg-btn[data-mode]').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-mode') === mode);
-    });
-    card.querySelector('.np-new-main').style.display = (mode === 'new') ? '' : 'none';
-    card.querySelector('.np-existing-main').style.display = (mode === 'existing') ? '' : 'none';
+    card.querySelector('.np-main-box').hidden = !!mode;
+    card.querySelector('.np-main-chip').hidden = !mode;
+    card.querySelector('.np-new-main').hidden = mode !== 'new';
+    const drop = card.querySelector('.np-main-drop');
+    drop.hidden = true; drop.innerHTML = '';
     npApplyProductFacts(card, null);
-    if (mode === 'new') {
-      // Leaving "existing" — drop its search + selection state so a fresh
-      // "New" entry never inherits the previous product's variant badges.
-      card.querySelector('.np-main-search').value = '';
+    if (mode !== 'existing') {
+      // Not (or no longer) a product we have: drop its selection state so
+      // the rows never keep the previous product's variant badges.
       card.querySelector('.np-main-id').value = '';
-      const exReset = card.querySelector('.np-main-existing-sku'); if (exReset) exReset.value = '';
-      const dropReset = card.querySelector('.np-main-drop'); if (dropReset) { dropReset.classList.remove('show'); dropReset.innerHTML = ''; }
+      card.querySelector('.np-main-existing-sku').value = '';
       npResetExistingVariants(card);
       card.querySelectorAll('.np-variants .np-v-sku').forEach(function (s) { delete s.dataset.matchLocked; });
     }
+    npMainChipText(card);
     npFetchNextSku(card);
     npRefreshVariantSkus(card);
     npRefreshVariantMatches(card);
+  };
+  function npMainChipText(card) {
+    const name = card.querySelector('.np-main-chip-name');
+    if (card._npMode === 'existing') {
+      const sku = card.querySelector('.np-main-existing-sku').value || '';
+      const title = card.querySelector('.np-main-search').value || '';
+      name.textContent = sku && title && sku.toUpperCase() !== title.toUpperCase()
+        ? sku + ' · ' + title : (sku || title);
+    } else if (card._npMode === 'new') {
+      name.textContent = '{% filter escapejs %}{% trans "New product" %}{% endfilter %}';
+    }
+    card.querySelector('.np-main-chip i').className =
+      card._npMode === 'new' ? 'fa fa-plus' : 'fa fa-box';
+  }
+  window.npMainPickExisting = function (card, id, title, sku) {
+    card.querySelector('.np-main-search').value = title || '';
+    npSetMode(card, 'existing');
+    card.querySelector('.np-main-id').value = id || '';
+    card.querySelector('.np-main-existing-sku').value = sku || '';
+    npMainChipText(card);
+    if (id) npLoadExistingVariants(card, id);
+    npRefreshVariantSkus(card);
+    npRefreshVariantMatches(card);
+  };
+  window.npMainCreate = function (card, name) {
+    npSetMode(card, 'new');
+    const nameEl = card.querySelector('.np-main-name');
+    nameEl.value = (name || '').trim();
+    npOnNameInput(nameEl);
+    nameEl.focus();
+  };
+  window.npMainClear = function (btn) {
+    const card = btn.closest('.np-product-card');
+    const search = card.querySelector('.np-main-search');
+    search.value = '';
+    card.querySelector('.np-main-name').value = '';
+    const skuEl = card.querySelector('.np-main-sku');
+    if (skuEl) { skuEl.value = ''; delete skuEl.dataset.touched; }
+    npSetMode(card, '');
+    search.focus();
   };
 
   // Called by every path that settles the account — the picker, the clear
@@ -2636,43 +2660,69 @@
 
   window.npSearchMain = function (inputEl) {
     const card = inputEl.closest('.np-product-card');
-    card.querySelector('.np-main-id').value = '';
-    const exReset = card.querySelector('.np-main-existing-sku'); if (exReset) exReset.value = '';
-    npResetExistingVariants(card);
     const drop = card.querySelector('.np-main-drop');
     clearTimeout(card._npSearchTimer);
     const q = (inputEl.value || '').trim();
-    if (q.length < 2) { drop.classList.remove('show'); drop.innerHTML = ''; return; }
+    card._npMainActive = -1;
+    if (q.length < 2) { drop.hidden = true; drop.innerHTML = ''; return; }
     card._npSearchTimer = setTimeout(function () {
       fetch(npWhUrl(NP_SEARCH) + '?q=' + encodeURIComponent(q) + '&account=' + encodeURIComponent(npAccountId()), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function (d) {
+          if ((inputEl.value || '').trim() !== q) return;   // typed on since
           const items = d.results || [];
-          if (!items.length) { drop.innerHTML = '<div class="np-ac-item" style="color:#94A3B8;">{% trans "No match" %}</div>'; drop.classList.add('show'); return; }
-          drop.innerHTML = items.map(function (it) {
+          const fold = function (x) { return (x || '').trim().toUpperCase(); };
+          // A name or SKU we already have is that product, not a new one.
+          const exact = items.some(function (it) { return fold(it.title) === fold(q) || fold(it.sku) === fold(q); });
+          let html = items.map(function (it) {
             const sku = it.sku || '', title = it.title || '';
-            const skuTag = sku ? '<b style="color:#A9852F;">' + sku + '</b> ' : '';
             // Mill-coded products are titled with their own code, so the row
             // would otherwise read "N1464T N1464T".
             const name = (title.toUpperCase() === sku.toUpperCase()) ? '' : title;
-            return '<div class="np-ac-item" data-id="' + it.id + '" data-title="' + title.replace(/"/g, '&quot;') + '" data-sku="' + sku.replace(/"/g, '&quot;') + '">' +
-              '<div>' + skuTag + name + '</div>' +
-              '<small>' + (it.variants || 0) + ' {% trans "variants" %}</small></div>';
+            return '<div class="np-sup-opt" data-id="' + it.id + '" data-title="' + npEsc(title) + '" data-sku="' + npEsc(sku) + '">' +
+              '<span>' + (sku ? '<b style="color:#A9852F;">' + npEsc(sku) + '</b> ' : '') + npEsc(name) + '</span>' +
+              '<small style="color:var(--gray-500);">' + (it.variants || 0) + ' {% trans "variants" %}</small></div>';
           }).join('');
-          drop.classList.add('show');
-          drop.querySelectorAll('.np-ac-item[data-id]').forEach(function (row) {
-            row.addEventListener('click', function () {
-              card.querySelector('.np-main-id').value = row.getAttribute('data-id');
-              card.querySelector('.np-main-search').value = row.getAttribute('data-title');
-              card.querySelector('.np-main-existing-sku').value = row.getAttribute('data-sku') || '';
-              drop.classList.remove('show');
-              npLoadExistingVariants(card, row.getAttribute('data-id'));
-              npRefreshVariantSkus(card);
-              npRefreshVariantMatches(card);
+          if (!items.length) html += '<div class="np-sup-empty">{% trans "No product matches" %}</div>';
+          if (!exact) {
+            html += '<div class="np-sup-opt create" data-create="1">' +
+                    '<span><i class="fa fa-plus"></i> ' +
+                    '{% filter escapejs %}{% trans "Create “{name}” as a new product" %}{% endfilter %}'.replace('{name}', npEsc(q)) +
+                    '</span></div>';
+          }
+          drop.innerHTML = html;
+          drop.hidden = false;
+          drop.querySelectorAll('.np-sup-opt').forEach(function (row) {
+            row.addEventListener('mousedown', function (e) {
+              e.preventDefault();   // keep focus so the click lands
+              npMainChoose(card, row);
             });
           });
-        }).catch(function () { drop.classList.remove('show'); });
+        }).catch(function () { drop.hidden = true; });
     }, 250);
+  };
+  function npMainChoose(card, row) {
+    if (row.dataset.create) npMainCreate(card, card.querySelector('.np-main-search').value);
+    else npMainPickExisting(card, row.dataset.id, row.dataset.title, row.dataset.sku);
+  }
+  window.npMainKey = function (e, inputEl) {
+    const card = inputEl.closest('.np-product-card');
+    const drop = card.querySelector('.np-main-drop');
+    const rows = !drop.hidden ? drop.querySelectorAll('.np-sup-opt') : [];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!rows.length) return;
+      e.preventDefault();
+      card._npMainActive = ((card._npMainActive == null ? -1 : card._npMainActive) +
+                            (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length;
+      Array.prototype.forEach.call(rows, function (r, i) { r.classList.toggle('active', i === card._npMainActive); });
+      rows[card._npMainActive].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const row = rows[card._npMainActive] || rows[0];
+      if (row) npMainChoose(card, row);
+    } else if (e.key === 'Escape') {
+      drop.hidden = true;
+    }
   };
 
   // ── Editing a received purchase ───────────────────────────────────
@@ -2923,6 +2973,7 @@
         : { mode: 'new', name: (card.querySelector('.np-main-name').value || '').trim(),
             sku: (((card.querySelector('.np-main-sku') || {}).value || '').trim().toUpperCase()
                   || card._npPreviewSku || '') };
+      if (!card._npMode) { alert(label + ': {% filter escapejs %}{% trans "Pick the main product from the list, or create it there." %}{% endfilter %}'); return; }
       if (card._npMode === 'existing' && !main.id) { alert(label + ': {% trans "Select an existing main product." %}'); return; }
       if (card._npMode === 'new' && !main.name) { alert(label + ': {% trans "Enter a main product name." %}'); return; }
 
@@ -3143,8 +3194,8 @@
   };
 
   document.addEventListener('click', function (e) {
-    document.querySelectorAll('#npProducts .np-main-drop.show').forEach(function (drop) {
-      if (!e.target.closest('.np-existing-main')) { drop.classList.remove('show'); }
+    document.querySelectorAll('#npProducts .np-main-drop').forEach(function (drop) {
+      if (!e.target.closest('.np-main-box')) { drop.hidden = true; }
     });
   });
 
@@ -3169,12 +3220,9 @@
       const mp = p.main_product || {};
 
       if (mp.mode === 'existing') {
-        npSetMode(card.querySelector('.np-seg-btn[data-mode="existing"]'), 'existing');
-        card.querySelector('.np-main-id').value = mp.id || '';
-        card.querySelector('.np-main-search').value = mp.title || '';
-        card.querySelector('.np-main-existing-sku').value = mp.sku || '';
-        if (mp.id) npLoadExistingVariants(card, mp.id);
+        npMainPickExisting(card, mp.id, mp.title, mp.sku);
       } else {
+        npSetMode(card, 'new');
         card.querySelector('.np-main-name').value = mp.name || '';
         const skuEl = card.querySelector('.np-main-sku');
         if (skuEl && mp.sku) { skuEl.value = mp.sku; skuEl.dataset.touched = '1'; }

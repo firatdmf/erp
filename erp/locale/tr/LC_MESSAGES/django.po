@@ -15857,3 +15857,19 @@ msgstr "Bir seçenek (renk, en…) ve değeriyle en az bir varyant ekleyin."
 
 msgid "Add an attribute (color, width…): every variant needs at least one value."
 msgstr "Bir özellik ekleyin (renk, en…): her varyantın en az bir değeri olmalı."
+
+# Goods receipt: one main-product box, search or create
+msgid "Search by name or SKU, or type a new product…"
+msgstr "Ad ya da SKU ile arayın veya yeni bir ürün yazın…"
+
+msgid "No product matches"
+msgstr "Eşleşen ürün yok"
+
+msgid "Create “{name}” as a new product"
+msgstr "“{name}” yeni ürün olarak oluştur"
+
+msgid "Pick the main product from the list, or create it there."
+msgstr "Ana ürünü listeden seçin ya da orada oluşturun."
+
+msgid "Product %(n)s: the SKU “%(sku)s” is already used by “%(product)s” — pick that product from the list or type another SKU."
+msgstr "Ürün %(n)s: “%(sku)s” SKU'su zaten “%(product)s” ürününde kullanılıyor — o ürünü listeden seçin ya da başka bir SKU yazın."

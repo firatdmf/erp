@@ -3614,8 +3614,8 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
                 raise IntakeError(
                     {"success": False,
                      "error": _gettext("Product %(n)s: the SKU “%(sku)s” is already used by "
-                                       "“%(product)s” — pick the main product from "
-                                       "“Existing” or type another SKU.")
+                                       "“%(product)s” — pick that product from the list "
+                                       "or type another SKU.")
                               % {"n": i, "sku": desired_sku, "product": clash.title}},
                     status=400)
             first = typed_skus.get(desired_sku.upper())

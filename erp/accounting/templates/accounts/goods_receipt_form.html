@@ -131,8 +131,17 @@
     background: white; font: 500 13.5px var(--font-sans); color: #0F1419; outline: none;
     transition: border-color 140ms, box-shadow 140ms;
   }
+  /* The browser's own arrow sits on the border; this one sits inside the
+     field like the product form's, with room kept for it. */
+  .np-select {
+    -webkit-appearance: none; appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 11px center;
+  }
   .np-input:focus, .np-select:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
-  .np-select[disabled], .np-input[disabled] { background: #F5F7FA; color: var(--gray-600); cursor: not-allowed; }
+  .np-select[disabled], .np-input[disabled] { background-color: #F5F7FA; color: var(--gray-600); cursor: not-allowed; }
   .np-hint { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-top: 6px; }
   .np-hint b { color: #A9852F; font: 700 12px var(--font-mono); letter-spacing: .5px; }
 
@@ -249,7 +258,7 @@
                   font: 600 12px var(--font-sans); color: var(--gray-700, #334155); }
   .np-attr-x { border: 0; background: transparent; color: var(--gray-500); cursor: pointer;
                font-size: 14px; line-height: 1; padding: 0 0 0 2px; }
-  .np-attr-add { width: auto; min-width: 140px; height: 30px; font-size: 12px; }
+  .np-attr-add { width: auto; min-width: 140px; height: 30px; font-size: 12px; padding: 0 28px 0 10px; background-position: right 9px center; }
   .np-v-attrs { flex: 2; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
   .np-v-attrs .np-col { flex: 1 1 110px; position: relative; }
   /* A value is stored in English: typing offers the values and wordings it
@@ -350,7 +359,7 @@
   #grDoc.gr-for-customer .np-notes-field, .np-notes-field.has-note { display: block; }
   .np-price-pair { display: flex; align-items: center; gap: 8px; }
   .np-price-pair .np-input { height: 36px; flex: 1; min-width: 0; }
-  .np-price-pair .np-select { height: 36px; width: 84px; flex: 0 0 84px; padding: 0 6px; }
+  .np-price-pair .np-select { height: 36px; width: 84px; flex: 0 0 84px; padding: 0 26px 0 10px; background-position: right 9px center; }
   .np-add-top, .np-add-variant, .np-add-product {
     margin-top: 9px; width: 100%; border: 1px dashed #BFD6D2; background: #F2F8F7;
     color: var(--nejum-teal-700); border-radius: 9px; padding: 9px; cursor: pointer;

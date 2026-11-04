@@ -15854,3 +15854,6 @@ msgstr "başka bir deftere taşındı."
 
 msgid "Add at least one variant, with an option (color, width…) and its value."
 msgstr "Bir seçenek (renk, en…) ve değeriyle en az bir varyant ekleyin."
+
+msgid "Add an attribute (color, width…): every variant needs at least one value."
+msgstr "Bir özellik ekleyin (renk, en…): her varyantın en az bir değeri olmalı."

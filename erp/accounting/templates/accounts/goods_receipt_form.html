@@ -921,7 +921,10 @@
         '<option value="__new">{% trans "New attribute…" %}</option>';
     }
     card.querySelectorAll('.np-variants .np-variant').forEach(function (v) { npRenderRowAttrs(v, card); });
-    npShowVariantRows(card);
+    // Every variant says what it is: a card with no attribute can't save.
+    const needed = card.querySelector('.np-attr-needed');
+    if (needed) needed.hidden = list.length > 0;
+    npSummaryUpdate();
   };
   window.npAddCardAttr = function (sel) {
     const card = sel.closest('.np-product-card');
@@ -1241,7 +1244,6 @@
     const el = document.createElement('div');
     el.className = 'np-product-card';
     el._npMode = 'new';
-    el._npHasVariants = true;
     el._npPreviewSku = '';
     el._npNextSkuTimer = null;
     el._npSearchTimer = null;
@@ -1312,27 +1314,8 @@
         '<label>{% trans "Variant attributes" %}</label>' +
         '<div class="np-attr-bar"><span class="np-attr-chips"></span>' +
           '<select class="np-select np-attr-add" onchange="npAddCardAttr(this)"></select></div>' +
+        '<div class="np-hint np-attr-needed" hidden style="color:#B91C1C;">{% trans "Add an attribute (color, width…): every variant needs at least one value."|escapejs %}</div>' +
         '<div class="np-hint">{% trans "Write each value in words. To combine colours, put + between them: gold+ecru, silver+off white."|escapejs %} {% trans "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320."|escapejs %}</div>' +
-      '</div>' +
-      '<div class="np-no-variant" style="display:none;">' +
-        '<div class="np-variant">' +
-          '<div class="np-variant-row">' + NP_SUPPLIER_SKU + '</div>' +
-          '<div class="np-v-clash"></div>' +
-      '<div class="np-v-suppliers"></div>' +
-          '<div class="np-price-row">' +
-            '<div class="np-col">' +
-              '<label>{% trans "Purchase price" %}</label>' +
-              '<div class="np-price-pair">' +
-                '<input class="np-input np-nv-price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
-                NP_CUR +
-              '</div>' +
-            '</div>' +
-            NP_SALE +
-          '</div>' +
-          NP_TOPS_HEAD +
-          '<div class="np-tops np-nv-tops"></div>' +
-          '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-no-variant\').querySelector(\'.np-variant\'), true)"><i class="fa fa-plus"></i> <span class="np-add-top-label"></span></button>' +
-        '</div>' +
       '</div>' +
       '<div class="np-variants-wrap">' +
         '<div class="np-variants"></div>' +
@@ -1395,19 +1378,6 @@
     npRefreshVariantSkus(card);
     npRefreshVariantMatches(card);
   };
-
-  // A card with no attributes is a product of one variant: its SKU is the
-  // product's, so it is asked only quantities and a price. Rows typed
-  // under attributes stay put, hidden, until one is added back.
-  function npShowVariantRows(card) {
-    card._npHasVariants = (card._npAttrs || []).length > 0;
-    card.querySelector('.np-variants-wrap').style.display = card._npHasVariants ? '' : 'none';
-    card.querySelector('.np-no-variant').style.display = card._npHasVariants ? 'none' : '';
-    if (!card._npHasVariants && !card.querySelector('.np-nv-tops .np-top')) {
-      npAddTop(card.querySelector('.np-no-variant .np-variant'));
-    }
-    npSummaryUpdate();
-  }
 
   // Called by every path that settles the account — the picker, the clear
   // button, an edit load, a plan load — which makes it the one place the
@@ -2183,18 +2153,12 @@
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
       pcount++;
       unit = npUnitOf(card);
-      if (card._npHasVariants) {
-        card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
-          vcount++;
-          v.querySelectorAll('.np-top-qty').forEach(addQ);
-          addMoney(npMoney(v, '.np-v-price'));
-          sale += npSaleMoney(v);
-        });
-      } else {
-        card.querySelectorAll('.np-nv-tops .np-top-qty').forEach(addQ);
-        const block = card.querySelector('.np-no-variant');
-        if (block) { addMoney(npMoney(block, '.np-nv-price')); sale += npSaleMoney(block); }
-      }
+      card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
+        vcount++;
+        v.querySelectorAll('.np-top-qty').forEach(addQ);
+        addMoney(npMoney(v, '.np-v-price'));
+        sale += npSaleMoney(v);
+      });
     });
     const el = document.getElementById('npSummary');
     if (el) {
@@ -2535,10 +2499,9 @@
     if (!card || !box) return;
     const skuI = vEl.querySelector('.np-v-sku');
     const existing = card._npExistingVariants || [];
-    // A simple product is its one variant, and has no SKU box of its own.
     const variant = skuI
       ? existing.find(function (x) { return npSkuKey(x.variant_sku) === npSkuKey(skuI.value); })
-      : (card._npMode === 'existing' && !card._npHasVariants && existing.length === 1 ? existing[0] : null);
+      : null;
     const suppliers = (variant && variant.suppliers) || [];
     const mine = suppliers.find(function (x) { return String(x.account_id) === npAccountId(); });
     if (input && !input.dataset.touched) input.value = (mine && mine.supplier_sku) || '';
@@ -2957,42 +2920,33 @@
       if (card._npMode === 'existing' && !main.id) { alert(label + ': {% trans "Select an existing main product." %}'); return; }
       if (card._npMode === 'new' && !main.name) { alert(label + ': {% trans "Enter a main product name." %}'); return; }
 
-      const variants = [];
-      if (card._npHasVariants) {
-        card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
-          const attrs = npRowAttrs(v);
-          const sku = (v.querySelector('.np-v-sku').value || '').trim();
-          const priceEl = v.querySelector('.np-v-price');
-          const curEl = v.querySelector('.np-v-cur');
-          const tops = npCollectTops(v);
-          npNeedsSale(v, tops);
-          if (attrs.length || sku || tops.length) variants.push({
-            name: npRowLabel(v), attributes: attrs, sku: sku, tops: tops,
-            supplier_sku: npSupplierSku(v),
-            price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
-            sale_price: (v.querySelector('.np-v-sale') || {}).value || '',
-            invoice_item_id: npIdOf(v, 'itemId'),
-            sku_choice: v.dataset.skuChoice || '',
-            rename_from: v.dataset.renameFrom || ''
-          });
-        });
-        if (!variants.length) { alert(label + ': {% trans "Add at least one variant with an item." %}'); return; }
-      } else {
-        const block = card.querySelector('.np-no-variant');
-        const tops = npCollectTops(block);
-        if (!tops.length) { alert(label + ': {% trans "Enter at least one quantity." %}'); return; }
-        npNeedsSale(block, tops);
-        const priceEl = block.querySelector('.np-nv-price');
-        const curEl = block.querySelector('.np-v-cur');
-        variants.push({ name: '', sku: '', tops: tops, price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
-                        supplier_sku: npSupplierSku(block),
-                        sale_price: (block.querySelector('.np-v-sale') || {}).value || '',
-                        invoice_item_id: npIdOf(block.querySelector('.np-variant'), 'itemId') });
+      if (!(card._npAttrs || []).length) {
+        alert(label + ': {% filter escapejs %}{% trans "Add an attribute (color, width…): every variant needs at least one value." %}{% endfilter %}');
+        return;
       }
+      const variants = [];
+      card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
+        const attrs = npRowAttrs(v);
+        const sku = (v.querySelector('.np-v-sku').value || '').trim();
+        const priceEl = v.querySelector('.np-v-price');
+        const curEl = v.querySelector('.np-v-cur');
+        const tops = npCollectTops(v);
+        npNeedsSale(v, tops);
+        if (attrs.length || sku || tops.length) variants.push({
+          name: npRowLabel(v), attributes: attrs, sku: sku, tops: tops,
+          supplier_sku: npSupplierSku(v),
+          price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
+          sale_price: (v.querySelector('.np-v-sale') || {}).value || '',
+          invoice_item_id: npIdOf(v, 'itemId'),
+          sku_choice: v.dataset.skuChoice || '',
+          rename_from: v.dataset.renameFrom || ''
+        });
+      });
+      if (!variants.length) { alert(label + ': {% trans "Add at least one variant with an item." %}'); return; }
 
       const catSel = card.querySelector('.np-main-cat');
       const gsmI = card.querySelector('.np-main-gsm');
-      products.push({ main_product: main, has_variants: card._npHasVariants, variants: variants,
+      products.push({ main_product: main, has_variants: true, variants: variants,
                       category_id: (catSel && catSel.value) || null,
                       gsm: (gsmI && !gsmI.closest('.np-col-gsm').hidden && gsmI.value) || null,
                       unit: npUnitOf(card),
@@ -3236,26 +3190,21 @@
         npRelabelPack(card);
       }
 
-      const hasV = p.has_variants !== false;
-      if (!hasV) npSetCardAttrs(card, []);
-
-      const variants = p.variants || [];
-      if (hasV) {
-        variants.forEach(function (v, i) {
-          if (i > 0) npAddVariant(card);
-          const all = card.querySelectorAll('.np-variants .np-variant');
-          npFillVariant(all[all.length - 1], v);
-        });
-      } else if (variants.length) {
-        npFillVariant(card.querySelector('.np-no-variant .np-variant'), variants[0], true);
-      }
+      // A card saved as one variant with no attributes (before every
+      // variant needed a value) opens as a row like any other, to be
+      // given one before it saves.
+      (p.variants || []).forEach(function (v, i) {
+        if (i > 0) npAddVariant(card);
+        const all = card.querySelectorAll('.np-variants .np-variant');
+        npFillVariant(all[all.length - 1], v);
+      });
     });
 
     npLoading = false;
     npSummaryUpdate();
   }
 
-  function npFillVariant(vEl, v, noVariant) {
+  function npFillVariant(vEl, v) {
     if (!vEl) return;
     // Set only when rebuilding a received purchase — it is what tells the
     // save this row is a line the purchase already has.
@@ -3263,38 +3212,36 @@
       vEl.dataset.itemId = v.invoice_item_id;
       vEl.dataset.origSku = v.sku || '';
     }
-    if (!noVariant) {
-      const card = vEl.closest('.np-product-card');
-      const skuI = vEl.querySelector('.np-v-sku');
-      if (v.attributes && v.attributes.length) {
-        npFillRowAttrs(vEl, card, v.attributes);
-      } else if (v.name) {
-        // Saved before rows had attribute fields: the old free text goes
-        // in the first field, to be checked before saving.
-        const first = vEl.querySelector('.np-v-attr');
-        if (first) first.value = v.name;
-      }
-      if (skuI && v.sku) { skuI.value = v.sku; skuI.dataset.touched = '1'; }
-      if (v.sku) { vEl.dataset.baseSku = v.sku; vEl.dataset.baseKey = npAttrsKey(npRowAttrs(vEl)); }
-      if (v.sku_follows) vEl.dataset.skuFollows = '1';
-      if (v.sku_uses) vEl.dataset.skuUses = JSON.stringify(v.sku_uses);
-      if (v.sku_choice) {
-        // A saved draft remembers what was chosen for its values.
-        vEl.dataset.skuChoice = v.sku_choice;
-        vEl.dataset.renameFrom = v.rename_from || '';
-        vEl.dataset.choiceKey = npAttrsKey(npRowAttrs(vEl));
-      }
+    const card = vEl.closest('.np-product-card');
+    const skuI = vEl.querySelector('.np-v-sku');
+    if (v.attributes && v.attributes.length) {
+      npFillRowAttrs(vEl, card, v.attributes);
+    } else if (v.name) {
+      // Saved before rows had attribute fields: the old free text goes
+      // in the first field, to be checked before saving.
+      const first = vEl.querySelector('.np-v-attr');
+      if (first) first.value = v.name;
+    }
+    if (skuI && v.sku) { skuI.value = v.sku; skuI.dataset.touched = '1'; }
+    if (v.sku) { vEl.dataset.baseSku = v.sku; vEl.dataset.baseKey = npAttrsKey(npRowAttrs(vEl)); }
+    if (v.sku_follows) vEl.dataset.skuFollows = '1';
+    if (v.sku_uses) vEl.dataset.skuUses = JSON.stringify(v.sku_uses);
+    if (v.sku_choice) {
+      // A saved draft remembers what was chosen for its values.
+      vEl.dataset.skuChoice = v.sku_choice;
+      vEl.dataset.renameFrom = v.rename_from || '';
+      vEl.dataset.choiceKey = npAttrsKey(npRowAttrs(vEl));
     }
     const supI = vEl.querySelector('.np-v-supplier-sku');
     if (supI && v.supplier_sku) { supI.value = v.supplier_sku; supI.dataset.touched = '1'; }
-    const priceI = vEl.querySelector(noVariant ? '.np-nv-price' : '.np-v-price');
+    const priceI = vEl.querySelector('.np-v-price');
     if (priceI && v.price) priceI.value = v.price;
     const curI = vEl.querySelector('.np-v-cur');
     if (curI && v.currency) { curI.value = v.currency; curI.dataset.touched = '1'; }
     const saleI = vEl.querySelector('.np-v-sale');
     if (saleI && v.sale_price) saleI.value = v.sale_price;
 
-    // One roll row already exists from npAddVariant/npShowVariantRows.
+    // One roll row already exists from npAddVariant.
     const tops = (v.tops || []);
     tops.forEach(function (t, i) {
       if (i > 0) npAddTop(vEl);
@@ -3313,7 +3260,7 @@
       if (t.holds && t.holds.length) row._npHolds = t.holds;
       if (bc && t.barcode) { bc.value = t.barcode; npBarcodeInput(bc); }
     });
-    if (!noVariant) npQueueVariantMatch(vEl);
+    npQueueVariantMatch(vEl);
   }
 
   // A roll a customer order has reserved: its length and label can still be

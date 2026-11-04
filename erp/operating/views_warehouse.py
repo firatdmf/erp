@@ -5281,13 +5281,8 @@ def received_purchase_products(invoice):
             ],
         })
 
-    for group in groups.values():
-        # A simple product is ONE variant that is the product itself.
-        variants, main = group["variants"], group["main_product"]
-        if (len(variants) == 1 and main.get("sku") and not variants[0]["name"]
-                and variants[0]["sku"].upper() == main["sku"].upper()):
-            group["has_variants"] = False
-
+    # Every card is rows of variants: one received as "the product itself",
+    # before every variant needed a value, comes back as its one row.
     return [groups[k] for k in order], (items[0].unit if items else "m")
 
 

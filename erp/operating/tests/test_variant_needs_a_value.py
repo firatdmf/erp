@@ -110,6 +110,25 @@ class GoodsReceiptRefusesTest(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
 
 
+    def test_the_form_has_no_layout_for_a_card_without_attributes(self, _up):
+        book = self.warehouse.accounting_book
+        r = self.client.get(reverse("accounts:goods_receipt", kwargs={"book_id": book.pk}))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "np-no-variant")
+        self.assertContains(r, "np-attr-needed")
+
+    def test_every_card_reloads_as_rows_of_variants(self, _up):
+        # The edit form never sends a card back as "the product itself":
+        # every card is rows, each to carry a value.
+        r = self._receive([self._row("", ("color", "ecru"))])
+        self.assertEqual(r.status_code, 200, r.content)
+        invoice_id = r.json()["purchase"]["invoice_id"]
+        loaded = self.client.get(
+            reverse("operating:warehouse_purchase_edit", args=[self.warehouse.pk, invoice_id]),
+            headers={"x-requested-with": "XMLHttpRequest"}).json()
+        self.assertTrue(all(card["has_variants"] for card in loaded["products"]))
+
+
 class ProductPageRefusesTest(TestCase):
     def test_a_posted_variant_with_no_value_is_named(self):
         posted = json.dumps([

@@ -591,6 +591,11 @@ class GoodsNotCapital(ValidationError):
 def goods_capital_value(book, warehouse):
     """What `warehouse` holds that could be booked as capital paid in goods.
 
+    Only the part not yet in Inventory (1300) counts: a second shipment
+    into shelves whose first one is already capital is worth the second
+    shipment, not the whole warehouse. That part is the book's shelves
+    less what its ledger holds, and never more than this warehouse has.
+
     Raises GoodsNotCapital, with the reason, where it cannot: the shelves
     are empty or unvalued, or their stock is already in Inventory (1300)
     — bought through a purchase, or counted by an earlier entry — and
@@ -611,32 +616,36 @@ def goods_capital_value(book, warehouse):
     rows = JournalLine.objects.filter(entry__book=book, account__code="1300")
     totals = rows.aggregate(d=Sum("debit"), c=Sum("credit"))
     ledger = (totals["d"] or ZERO) - (totals["c"] or ZERO)
-    if ledger + value > shelves:
+    unbooked = shelves - ledger
+    if unbooked <= ZERO:
         raise GoodsNotCapital(
             _g("The stock in %(warehouse)s is already in the ledger's Inventory "
                "— it was bought through a purchase or booked before — so it "
                "cannot be booked again as capital.")
             % {"warehouse": warehouse.name})
-    return value
+    return min(value, unbooked)
 
 
 @transaction.atomic
 def post_capital_in_goods(capital):
     """Dr Inventory (1300) / Cr Share Capital (3000) for capital paid in
-    goods: the stock standing in the contribution's warehouse.
+    goods: the stock standing in the contribution's warehouse that is not
+    in Inventory yet (goods_capital_value).
 
-    The entry carries the shelves' exact value and names the contribution
-    as its source, so deleting the contribution takes the entry with it
+    The entry carries that exact value and names the contribution as its
+    source, so deleting the contribution takes the entry with it
     (unpost). `capital.amount` is that value to the cent, for display.
     """
     value = goods_capital_value(capital.book, capital.warehouse)
-    entry, _n, _q = post_opening_inventory(
-        capital.book, date=capital.date_invested, warehouse=capital.warehouse,
-        contra="3000", source=capital,
+    memo = "Goods contributed as capital"
+    return post_entry(
+        book=capital.book, date=capital.date_invested,
         description=f"Capital paid in goods — {capital.warehouse.name}",
-        memo="Goods contributed as capital",
-        reference=f"CAPITAL-GOODS-{capital.pk}")
-    return entry
+        lines=[debit("1300", value, memo=memo, exact=True),
+               credit("3000", value, memo=memo, exact=True)],
+        source=capital,
+        reference=f"CAPITAL-GOODS-{capital.pk}",
+    )
 
 
 @transaction.atomic

@@ -80,6 +80,21 @@ class CapitalPaidInGoods(TestCase):
         self.assertEqual(EquityCapital.objects.count(), 1)
         self.assertEqual(self.ledger("1300"), Decimal("1100"))
 
+    def test_a_second_shipment_onto_the_same_shelves_is_worth_the_shipment(self):
+        self.add()
+        product = WarehouseProduct.objects.create(
+            warehouse=self.shelves, name="Quilt", sku="Q-1", quantity=Decimal("4"))
+        WarehouseProductItem.objects.create(
+            product=product, quantity=Decimal("4"), quantity_remaining=Decimal("4"),
+            status="in_stock", unit_cost_base=Decimal("50.00"))
+        response = self.add(date_invested="2026-10-04")
+        self.assertEqual(response.status_code, 200, response.content)
+        second = EquityCapital.objects.get(date_invested="2026-10-04")
+        # The quilts only, 4 x 50: the duvet sets are capital already.
+        self.assertEqual(second.amount, Decimal("200.00"))
+        self.assertEqual(self.ledger("1300"), Decimal("1300"))
+        self.assertEqual(self.ledger("3000"), Decimal("-1300"))
+
     def test_an_empty_warehouse_is_nothing_to_contribute(self):
         self.item.delete()
         response = self.add()

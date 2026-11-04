@@ -755,7 +755,8 @@ class EquityCapital(models.Model):
         CashAccount, on_delete=models.CASCADE, blank=True, null=True
     )
     # For capital paid in goods: the warehouse the goods are standing in.
-    # The contribution IS that warehouse's stock that nobody bought — its
+    # The contribution IS that warehouse's stock that is not in Inventory
+    # yet — nobody bought it and no earlier contribution booked it. Its
     # value is read off the shelves, not typed, so the ledger's Inventory
     # and the shelves cannot be made to disagree by a figure entered here
     # (services_posting.post_capital_in_goods).

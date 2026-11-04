@@ -127,7 +127,8 @@ class ACodeIsOneProductsOnTheWholeInstall(TwoCatalogues):
     def test_receiving_goods_under_its_own_code_still_works(self):
         with acting_as(self.burak):
             product, variant, _pm, made = sync_roll_to_catalog(
-                base_name="Duvet set", variant_sku="8681910572999")
+                base_name="Duvet set", variant_sku="8681910572999",
+                attributes=[("color", "white")])
         self.assertTrue(made)
         self.assertEqual(product.directory, self.almaty.directory)
 

@@ -1092,34 +1092,21 @@ function createEveryCombination() {
     updateGroupingOptions();
 }
 
-// Rows the save can't take: two with the same values, or a new one with none.
+// Rows the save can't take: two with the same values, or one with none.
+// Every variant says what it is, a single item's too.
 function variantRowProblems() {
     const T = window.VARIANT_T || {};
     const seen = {};
     const problems = [];
-    if (singleItemMode()) return problems;   // the server checks its boxes
-    if (!hasOptionValues()) {
-        const live = variantRows.map((_, index) => index).filter(index => !deletedVariantIndices.has(index));
-        // Saved ones are left as they are (some products already have
-        // several); a new one beside another is what can't be told apart.
-        const isNew = index => !(existingVariantData[index] || {}).variant_id;
-        if (live.length > 1 && live.some(isNew)) {
-            problems.push(T.rows_need_option || 'Without options a product has one variant. Add an option to tell more of them apart.');
-        }
-        live.forEach(index => {
-            const sku = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
-            const typed = sku ? sku.value : (existingVariantData[index] || {}).sku;
-            if (!(typed || '').trim()) problems.push(T.row_without_sku || 'Type a SKU for the variant.');
-        });
+    if (singleItemMode() || !hasOptionValues()) {
+        problems.push(T.needs_option || 'Every variant needs at least one value. Add an option above (color, width…) and give it one.');
         return problems;
     }
     variantRows.forEach((row, index) => {
         if (deletedVariantIndices.has(index)) return;
         const signature = createVariantSignature(row);
         if (!signature) {
-            if (!(existingVariantData[index] || {}).variant_id) {
-                problems.push(T.row_without_values || 'A new variant has no values — pick them, or delete the row.');
-            }
+            problems.push(T.row_without_values || 'A variant has no values — pick them, or delete the row.');
             return;
         }
         if (signature in seen) {
@@ -1152,7 +1139,7 @@ function updateVariantRowsBar() {
     } else if (!live) {
         note.textContent = hasValues
             ? (T.no_rows_yet || 'No variants yet — add one, or create every combination of the values above.')
-            : (T.no_rows_single || 'Every product has at least one variant. Add one for a single item, or add an option above.');
+            : (T.no_rows_single || 'Every product has at least one variant, and every variant a value. Add an option above (color, width…), then the variant.');
         note.className = 'variant_rows_note';
     } else {
         note.textContent = '';

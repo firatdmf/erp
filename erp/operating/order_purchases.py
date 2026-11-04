@@ -224,7 +224,8 @@ def put_plan_in_catalog(plan):
     from .catalog_sync import CatalogSyncConflict, sync_roll_to_catalog
     from .views_warehouse import (
         IntakeError, _apply_sku_choices, _intake_account, _intake_main_product,
-        _intake_check_lookalikes, _intake_prefix, _intake_resolve_products,
+        _intake_check_described, _intake_check_lookalikes, _intake_prefix,
+        _intake_resolve_products,
         _intake_variant_identity, _row_label,
         _intake_variants,
     )
@@ -236,6 +237,7 @@ def put_plan_in_catalog(plan):
     prefix = _intake_prefix(plan, account.name)
     resolved = _intake_resolve_products(products_in, prefix,
                                         default_unit=plan.get("unit"))
+    _intake_check_described(products_in)
     _intake_check_lookalikes(resolved)
 
     lines = []

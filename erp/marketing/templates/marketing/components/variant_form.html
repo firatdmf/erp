@@ -92,10 +92,9 @@
       no_rows_yet:     '{% trans "No variants yet — add one, or create every combination of the values above."|escapejs %}',
       every_combination_exists: '{% trans "Every combination is already a variant."|escapejs %}',
       confirm_combinations: '{% trans "This adds %(count)s variants. Continue?"|escapejs %}',
-      row_without_values: '{% trans "A new variant has no values — pick them, or delete the row."|escapejs %}',
-      no_rows_single:  '{% trans "Every product has at least one variant. Add one for a single item, or add an option above."|escapejs %}',
-      rows_need_option: '{% trans "Without options a product has one variant. Add an option to tell more of them apart."|escapejs %}',
-      row_without_sku: '{% trans "Type a SKU for the variant."|escapejs %}',
+      row_without_values: '{% trans "A variant has no values — pick them, or delete the row."|escapejs %}',
+      no_rows_single:  '{% trans "Every product has at least one variant, and every variant a value. Add an option above (color, width…), then the variant."|escapejs %}',
+      needs_option:    '{% trans "Every variant needs at least one value. Add an option above (color, width…) and give it one."|escapejs %}',
       price_from_cost: '{% trans "Worked out from the cost: cost times the price multiplier, rounded up to 0.05."|escapejs %}',
       rows_alike:      '{% trans "Two variants have the same values: %(values)s — change one, or delete it."|escapejs %}',
       rows_title:      '{% trans "Check the variants"|escapejs %}',
@@ -165,6 +164,6 @@
       uploadNote: '{% filter escapejs %}{% filter force_escape %}{% trans "Several photos upload in the order your computer shows them sorted by name, with numbers counted properly (-2 before -10), and are picked for this variant in that order. They are renamed on upload, so name your files however you like. A photo meant for several variants: upload it in the product's media." %}{% endfilter %}{% endfilter %}'
     };
   </script>
-  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=14" defer></script>
+  <script src="{% static 'marketing/js/variant_form_modern.js' %}?v=16" defer></script>
   <script src="{% static 'marketing/js/variant_attributes_modal.js' %}?v=2" defer></script>
 </div>

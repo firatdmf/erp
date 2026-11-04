@@ -46,6 +46,18 @@ class LookAlikeVariant(CatalogSyncConflict):
             f"add the stock to it, or give this variant a value that tells it apart.")
 
 
+class UndescribedVariant(CatalogSyncConflict):
+    """A variant with no attribute value. Every variant says what it is —
+    a colour, a width, a model — single items included, so one is never
+    made, or left, with nothing but a SKU."""
+
+    def __init__(self, sku):
+        self.sku = sku
+        super().__init__(
+            _gettext("%(sku)s has no attribute value — say what it is (color, width…).")
+            % {"sku": sku})
+
+
 # ---------------------------------------------------------------------------
 # Turkish → English colour dictionary.
 # EDIT HERE: keys are the label tokens (any case), values the English colour
@@ -323,9 +335,12 @@ def find_partial(product, attributes):
 def set_variant_attributes(variant, attributes, *, replace):
     """Link `variant` to each (name, value). `replace`: drop every value it
     had before (a variant being created, or described in full); otherwise
-    only the named attributes change and the rest stay."""
+    only the named attributes change and the rest stay. Describing a variant
+    in full with nothing is refused (UndescribedVariant)."""
     from marketing.models import (ProductVariant, ProductVariantAttribute,
                                   ProductVariantAttributeValue)
+    if replace and not attributes:
+        raise UndescribedVariant(variant.variant_sku)
     Through = ProductVariant.product_variant_attribute_values.through
     links = Through.objects.filter(productvariant_id=variant.id)
     if replace:
@@ -423,6 +438,7 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
       The older single `attribute_name`/`attribute_value` still works.
     - `refuse_lookalike`: raise LookAlikeVariant rather than create a variant
       whose values equal an existing one's.
+    - Raises UndescribedVariant rather than create a variant with no value.
     - Raises CatalogSyncConflict if variant_sku already belongs to another product.
     """
     from marketing.models import Product, ProductVariant
@@ -431,6 +447,10 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
     if not variant_sku:
         raise CatalogSyncConflict("variant_sku is required")
     pairs = _attribute_pairs(attributes, attribute_name, attribute_value)
+    # Before a main product is made for it: a new variant with nothing to
+    # say what it is is refused, and leaves nothing behind.
+    if not pairs and not ProductVariant.everywhere.filter(variant_sku=variant_sku).exists():
+        raise UndescribedVariant(variant_sku)
 
     base_name = (base_name or "").strip() or variant_sku
     cost_dec = _to_decimal(cost)

@@ -274,8 +274,14 @@ class ProductForm(forms.ModelForm):
                 _("Enter a cost for these featured variants — they have no stock to "
                   "take one from: %(skus)s") % {"skus": ", ".join(uncosted)}
             )
-        if self._posted_single_item():
-            self._clean_single_item(cleaned_data)
+        # Every variant says what it is — a colour, a width, a model — and
+        # a single item is a product of one variant, so it is no exception.
+        undescribed = sorted(_skus_without_values(self.data.get("variants_json")))
+        if self._posted_single_item() or undescribed:
+            raise forms.ValidationError(
+                _("Every variant needs at least one value. Add an option (color, width…) "
+                  "and give it one: %(skus)s")
+                % {"skus": ", ".join(undescribed) or (cleaned_data.get("item_sku") or "?")})
         # What is sold is always a variant — a single item is a product with
         # one — so its SKU, price and cost have somewhere to live.
         elif not self._has_variants(cleaned_data):
@@ -305,24 +311,6 @@ class ProductForm(forms.ModelForm):
 
     def _posted_single_item(self):
         return self.data.get("single_item") == "1"
-
-    def _clean_single_item(self, cleaned_data):
-        """The single item's SKU is needed, and is its own; a featured one
-        with nothing in stock needs a cost, as any featured variant does."""
-        sku = (cleaned_data.get("item_sku") or "").strip()
-        if not sku:
-            self.add_error("item_sku", _("Enter the item's SKU — stock, barcodes and orders use it."))
-            return
-        taken = ProductVariant.objects.filter(variant_sku=sku)
-        if self.single_variant is not None:
-            taken = taken.exclude(pk=self.single_variant.pk)
-        if taken.exists():
-            self.add_error("item_sku", _("Another variant already has this SKU."))
-        cleaned_data["item_sku"] = sku
-        if (self.item_cost_computed is None and cleaned_data.get("item_cost") is None
-                and "item_cost" not in self.errors
-                and (self.single_variant is None or self.single_variant.variant_featured)):
-            self.add_error("item_cost", _("Enter the cost — nothing is in stock to take one from."))
 
     def save_single_item(self, product):
         """Write the single item's boxes to its one variant, creating it
@@ -398,6 +386,17 @@ def _skus_off_the_parent(variants_json, parent):
         suffix = sku[len(prefix):] if sku.upper().startswith(prefix) else ""
         if not suffix.strip() or suffix != suffix.upper():
             found.add(sku or "?")
+    return found
+
+
+def _skus_without_values(variants_json):
+    """The SKUs in a product form's variants_json whose variant has no
+    option value. See ProductForm.clean."""
+    found = set()
+    for variant in _variant_dicts(variants_json):
+        values = variant.get("variant_attribute_values")
+        if not isinstance(values, dict) or not any(str(v or "").strip() for v in values.values()):
+            found.add(str(variant.get("variant_sku") or "?"))
     return found
 
 

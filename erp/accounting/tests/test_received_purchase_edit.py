@@ -569,6 +569,7 @@ class ReceivedPurchaseEditTest(TestCase):
             "main_product": {"mode": "new", "name": "N1464T", "sku": "N1464T"},
             "has_variants": False,
             "variants": [{"name": "", "sku": "", "price": "2", "currency": "USD",
+                          "attributes": [{"name": "color", "value": "white"}],
                           "tops": [{"qty": 40, "barcode": "N-1"}]}],
         })
         r = self._save(form)
@@ -584,9 +585,10 @@ class ReceivedPurchaseEditTest(TestCase):
         self.assertEqual(WarehouseProductItem.objects.filter(
             purchase_invoice_item__invoice_id=self.invoice_id).count(), 4)
 
-        # ...and the simple product reloads as one.
+        # ...and reloads as a product of one variant with its value, which
+        # saves again as it is.
         again = self._form()
-        self.assertFalse(again["products"][1]["has_variants"])
+        self.assertTrue(again["products"][1]["has_variants"])
         self.assertEqual(self._save(again).status_code, 200)
         self.assertEqual(self._invoice().total, Decimal("297.00"))
 

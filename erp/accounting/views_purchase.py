@@ -610,11 +610,13 @@ class PurchaseOrderSave(View):
             put_plan_in_catalog, sync_customer_order,
         )
         from operating.views_warehouse import (
-            IntakeError, _intake_check_book, _intake_check_supplier_skus,
+            IntakeError, _intake_check_book, _intake_check_described,
+            _intake_check_supplier_skus,
         )
         try:
             _intake_check_book(warehouse, current_account)
             _intake_check_supplier_skus(data.get("products"), current_account)
+            _intake_check_described(data.get("products"))
         except IntakeError as exc:
             return JsonResponse(exc.payload, status=exc.status)
         try:

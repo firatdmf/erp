@@ -216,22 +216,20 @@ class ProductCostFieldTest(TestCase):
         form = self._form(self.product, {**self._required(), "variants_json": "[]"})
         self.assertTrue(form.is_valid(), form.errors)
 
-    def test_a_single_item_is_one_variant_with_a_typed_sku(self):
-        """No options: the SKU is typed, not PARENT.SUFFIX."""
+    def test_a_variant_with_no_options_is_refused(self):
+        """Every variant says what it is, a single item's one too."""
         from marketing.forms import ProductForm
-        new = lambda sku: ProductForm({"title": "Sheet", "sku": "SHEET1", "variants_json":
-            '[{"variant_sku": "%s", "variant_attribute_values": {}}]' % sku})
-        form = new("C00000016")
+        form = ProductForm({"title": "Sheet", "sku": "SHEET1", "variants_json":
+                            '[{"variant_sku": "C00000016", "variant_attribute_values": {}}]'})
         form.is_valid()
-        self.assertEqual(form.non_field_errors(), [])
-        form = new("")
-        form.is_valid()
-        self.assertTrue(form.non_field_errors())
+        self.assertIn("C00000016", " ".join(form.non_field_errors()))
 
     def _post_variants(self, *variants):
         import json
+        # Each with a value: every variant has one, and these are about cost.
+        variants = [{"variant_attribute_values": {"color": "white"}, **v} for v in variants]
         form = self._form(self.product, {"title": "N1522", "sku": "N1522",
-                                         "variants_json": json.dumps(list(variants))})
+                                         "variants_json": json.dumps(variants)})
         form.is_valid()
         return " ".join(form.non_field_errors())
 
@@ -256,9 +254,9 @@ class ProductCostFieldTest(TestCase):
 
 
 class SingleItemTest(TestCase):
-    """A product with no options is a single item: no variant table, just
-    SKU, price and cost boxes on the Pricing card, saved to its one hidden
-    variant — created for a new product, kept when options are added."""
+    """A product with no options shows as a single item: no variant table,
+    just SKU, price and cost boxes on the Pricing card. It is not saved that
+    way any more — every variant needs a value — but an old one still opens."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -296,51 +294,19 @@ class SingleItemTest(TestCase):
                 product_variant_attribute=color, product_variant_attribute_value="white"))
         self.assertFalse(self._form().single_item)
 
-    def test_the_boxes_are_saved_to_the_variant(self):
+    def test_saving_it_is_refused_until_it_has_a_value(self):
+        """Every variant says what it is: a single item is given an option
+        and a value like any other product, and is saved as one then."""
         form = self._form(self._data(item_sku="C00000016", item_cost="12.00"))
-        self.assertTrue(form.is_valid(), form.errors)
-        product = form.save()
-        form.save_single_item(product)
-        self.variant.refresh_from_db()
-        self.assertEqual(self.variant.variant_cost, Decimal("12.00"))
-        self.assertEqual(product.variants.count(), 1)
-
-    def test_a_new_product_gets_its_variant(self):
+        self.assertFalse(form.is_valid())
+        self.assertIn("at least one value", " ".join(form.non_field_errors()))
         new = Product(title="Pillow")
         form = self._form({"title": "Pillow", "sku": "PILLOW", "unit": new.unit,
                            "pack_type": new.pack_type, "tracking": new.tracking,
-                           "single_item": "1",
-                           "category": self.product.category_id,
+                           "single_item": "1", "category": self.product.category_id,
                            "item_sku": "PLW-01", "item_cost": "3"}, product=new)
-        self.assertTrue(form.is_valid(), form.errors)
-        product = form.save()
-        form.save_single_item(product)
-        self.assertEqual(list(product.variants.values_list("variant_sku", "variant_cost")),
-                         [("PLW-01", Decimal("3.00"))])
-        # Its price is worked out from that cost: 3 + a third.
-        self.assertEqual(product.variants.get().live_price, Decimal("4.00"))
-
-    def test_its_sku_is_needed_and_its_own(self):
-        form = self._form(self._data(item_sku="", item_cost="1"))
-        self.assertIn("item_sku", form.errors)
-        ProductVariant.objects.create(product=Product.objects.create(title="X", sku="X"),
-                                      variant_sku="TAKEN")
-        form = self._form(self._data(item_sku="TAKEN", item_cost="1"))
-        self.assertIn("item_sku", form.errors)
-
-    def test_a_featured_item_with_no_stock_needs_a_cost(self):
-        form = self._form(self._data(item_sku="C00000016"))
-        self.assertIn("item_cost", form.errors)
-
-    def test_the_edit_page_saves_it(self):
-        import json
-        r = self.client.post(reverse("marketing:product_edit", args=[self.product.pk]), self._data(
-            item_sku="C00000016", item_cost="12.00",
-            variants_json=json.dumps({"product_variant_list": [], "deleted_variant_ids": [],
-                                      "deleted_files": []})))
-        self.assertIn(r.status_code, (200, 302))
-        self.variant.refresh_from_db()
-        self.assertEqual(self.variant.variant_cost, Decimal("12.00"))
+        self.assertFalse(form.is_valid())
+        self.assertFalse(Product.objects.filter(sku="PILLOW").exists())
 
     def test_the_no_variants_pass_does_not_remove_it(self):
         r = self.client.post(reverse("marketing:product_edit", args=[self.product.pk]), self._data(

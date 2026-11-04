@@ -37,7 +37,7 @@ Ambiguities are REPORTED in the summary's `conflicts`, never guessed.
 """
 from contextlib import nullcontext as _nullcontext
 
-from .catalog_sync import _fold, _norm_attr, _norm_value, derive_catalog
+from .catalog_sync import UndescribedVariant, _fold, _norm_attr, _norm_value, derive_catalog
 from marketing.models import SKU_MAX_LENGTH, ProductCategory
 from django.utils.translation import gettext as _gettext
 
@@ -135,6 +135,11 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
         if v_how == "ambiguous":
             summary["conflicts"].append(
                 {"sku": sku, "error": _gettext("more than one variant matches once folded — check by hand")})
+            continue
+        # A variant nothing in its code describes is not made: every
+        # variant says what it is, and here nobody is there to say it.
+        if variant is None and not (cat["attribute_name"] and cat["attribute_value"]):
+            summary["conflicts"].append({"sku": sku, "error": str(UndescribedVariant(sku))})
             continue
         parent = find_parent(base)
 

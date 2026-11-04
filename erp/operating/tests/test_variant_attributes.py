@@ -294,7 +294,8 @@ class AGuessNeverOverrulesADescriptionTest(TestCase):
         self.assertIn(("color", "cream"), _attrs(self.variant))
 
     def test_a_guess_still_describes_a_bare_variant(self):
-        _p, bare, _pc, _vc = sync_roll_to_catalog(base_name="K24614", variant_sku="K24614.G93")
+        # One saved before every variant needed a value; the sync makes none.
+        bare = ProductVariant.objects.create(product=self.product, variant_sku="K24614.G93")
         sync_roll_to_catalog(base_name="K24614", variant_sku="K24614.G93",
                              attribute_name="model", attribute_value="G93")
         self.assertEqual(_attrs(bare), [("model", "g93")])

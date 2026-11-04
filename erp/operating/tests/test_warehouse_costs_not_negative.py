@@ -196,7 +196,8 @@ class TheExcelImportSkipsANegativeRowAndSaysSo(TestCase):
         wb = Workbook()
         ws = wb.active
         ws.append(["Name", "Code", "Quantity", "Purchase Price", "Currency"])
-        ws.append(["Good", "GOOD1", 10, 4.25, "USD"])
+        # A colour in the name, so the new variant has a value to be made with.
+        ws.append(["Good KREM", "GOOD1", 10, 4.25, "USD"])
         ws.append(["Bad", "BAD1", 10, -4.25, "USD"])
         upload = io.BytesIO()
         wb.save(upload)

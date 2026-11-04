@@ -17,7 +17,9 @@ from marketing.models import Product, ProductVariant
 
 
 def _variants(*skus):
-    return json.dumps({"product_variant_list": [{"variant_sku": s} for s in skus]})
+    # Every variant has a value (ProductForm.clean); this file is about SKUs.
+    return json.dumps({"product_variant_list": [
+        {"variant_sku": s, "variant_attribute_values": {"color": "white"}} for s in skus]})
 
 
 class TheVariantSkusMustHangOffTheParent(TestCase):

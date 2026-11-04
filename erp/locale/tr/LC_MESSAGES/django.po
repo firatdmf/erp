@@ -15795,3 +15795,22 @@ msgstr "Eşitlendi: %(recorded)s kaydedildi, %(waiting)s bir kişiyi bekliyor."
 
 msgid "Marked as handled."
 msgstr "Halledildi olarak işaretlendi."
+
+# Every variant has at least one attribute value
+msgid "%(sku)s has no attribute value — say what it is (color, width…)."
+msgstr "%(sku)s için özellik değeri yok — ne olduğunu belirtin (renk, en…)."
+
+msgid "%(label)s has no attribute value — add an attribute (color, width…) and give it a value."
+msgstr "%(label)s için özellik değeri yok — bir özellik ekleyin (renk, en…) ve ona bir değer verin."
+
+msgid "Every variant needs at least one value. Add an option (color, width…) and give it one: %(skus)s"
+msgstr "Her varyantın en az bir değeri olmalı. Bir seçenek ekleyin (renk, en…) ve ona bir değer verin: %(skus)s"
+
+msgid "Every variant needs at least one value. Add an option above (color, width…) and give it one."
+msgstr "Her varyantın en az bir değeri olmalı. Yukarıdan bir seçenek ekleyin (renk, en…) ve ona bir değer verin."
+
+msgid "A variant has no values — pick them, or delete the row."
+msgstr "Bir varyantın değerleri yok — değerleri seçin ya da satırı silin."
+
+msgid "Every product has at least one variant, and every variant a value. Add an option above (color, width…), then the variant."
+msgstr "Her ürünün en az bir varyantı, her varyantın da bir değeri vardır. Yukarıdan bir seçenek ekleyin (renk, en…), ardından varyantı."

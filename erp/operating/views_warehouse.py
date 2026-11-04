@@ -3953,6 +3953,47 @@ def _intake_check_lookalikes(resolved):
                            "lookalikes": problems}, status=400)
 
 
+def _intake_check_described(products_in):
+    """Refuse, before anything is written, a row that leaves its variant
+    with no attribute value: every variant says what it is, a product of
+    one variant too. A row naming none is fine only for an existing variant
+    that already has values, which it keeps. Reads the products as posted,
+    so a draft purchase is told the same as a receipt."""
+    from django.utils.translation import gettext as _t
+    from marketing.models import Product, ProductVariant
+    from .catalog_sync import variant_attributes
+
+    problems = []
+    for p_in in products_in or []:
+        if not isinstance(p_in, dict):
+            continue
+        mp = p_in.get("main_product") or {}
+        product = (Product.objects.filter(pk=int(mp["id"])).first()
+                   if mp.get("mode") == "existing" and str(mp.get("id") or "").isdigit()
+                   else None)
+        has_variants = p_in.get("has_variants") is not False
+        rows = [v for v in (p_in.get("variants") or []) if isinstance(v, dict)]
+        for v in (rows if has_variants else rows[:1]):
+            if has_variants and not (
+                    _row_label(v) or (v.get("sku") or "").strip() or v.get("tops")):
+                continue
+            if _row_attributes(v):
+                continue
+            sku = ((v.get("sku") or "").strip() if has_variants
+                   else ((product.sku or "") if product is not None else ""))
+            existing = (ProductVariant.objects.filter(variant_sku__iexact=sku).first()
+                        if sku else None)
+            if existing is not None and variant_attributes(existing):
+                continue
+            problems.append(_t("%(label)s has no attribute value — add an attribute "
+                               "(color, width…) and give it a value.")
+                            % {"label": sku or (mp.get("name") or mp.get("title") or "").strip()
+                               or (product.title if product is not None else "")})
+    if problems:
+        raise IntakeError({"success": False, "error": " ".join(problems),
+                           "undescribed": problems}, status=400)
+
+
 def _intake_variants_raw(item):
     """The rows a card carries, as sent (no-variant mode: its one row)."""
     rows = item["variants_in"]
@@ -4187,6 +4228,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     _intake_check_supplier_skus(products_in, current_account_obj)
     resolved = _intake_resolve_products(products_in, prefix,
                                         default_unit=data.get("unit"))
+    _intake_check_described(products_in)
     _intake_check_lookalikes(resolved)
     manual_codes = _intake_typed_barcodes(products_in)
     # The customer order this stock is bought for. Only a confirmed draft
@@ -4783,6 +4825,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             products_in, prefix,
             own_product_ids={it.product_id for it in items.values() if it.product_id},
             default_unit=data.get("unit"))
+        _intake_check_described(products_in)
         _intake_check_lookalikes(resolved)
         manual_codes = _intake_typed_barcodes(
             products_in, current_barcodes={pk: r.barcode for pk, r in rolls.items()})

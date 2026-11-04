@@ -66,6 +66,9 @@ DOCUMENT = Profile("document", "JPEG", max_edge=2400, quality=82,
 # 1200 leaves headroom for bigger frames without bloating the PDF.
 PRINT = Profile("print", "JPEG", max_edge=1200, quality=85,
                 transparency="png")
+# A line's photo on a printed order is under 1 cm square: 240 px is
+# sharp at 300 dpi and a few KB, so a long order stays a light PDF.
+PRINT_THUMB = Profile("print_thumb", "JPEG", max_edge=240, quality=82)
 
 EXTENSIONS = {"AVIF": ".avif", "JPEG": ".jpg", "PNG": ".png"}
 CONTENT_TYPES = {"AVIF": "image/avif", "JPEG": "image/jpeg", "PNG": "image/png"}

@@ -527,7 +527,7 @@ class CombinedWarehouseMergesTheSameSku(TestCase):
 
 class RowsShowTheVariantsOwnPhoto(TestCase):
     """A row's thumbnail is its catalog variant's first photo in the
-    storefront's order, which goes by sequence, not by "primary". A variant
+    storefront's order, by sequence. A variant
     with no photo of its own shows an empty frame, not its product's."""
 
     def setUp(self):
@@ -537,13 +537,12 @@ class RowsShowTheVariantsOwnPhoto(TestCase):
         book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
         self.wh = Warehouse.objects.create(name="Ergene Fabrika", accounting_book=book)
         product = Product.objects.create(title="GREK", sku="GREK")
-        ProductFile.objects.create(product=product, file_url="https://cdn.test/parent.avif",
-                                   is_primary=True)
+        ProductFile.objects.create(product=product, file_url="https://cdn.test/parent.avif")
         shown = ProductVariant.objects.create(product=product, variant_sku="GREK.WHITE")
         ProductFile.objects.create(product_variant=shown, file_url="https://cdn.test/second.avif",
                                    sequence=0)
         ProductFile.objects.create(product_variant=shown, file_url="https://cdn.test/white.avif",
-                                   is_primary=True, sequence=1)
+                                   sequence=1)
         bare = ProductVariant.objects.create(product=product, variant_sku="GREK.ECRU")
         for v in (shown, bare):
             WarehouseProduct.objects.create(

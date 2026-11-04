@@ -21,6 +21,11 @@
     /* The total's figure at 13.33pt: "$999,999.99" needs 17%; at 13% a
        five-figure total broke onto a second line. */
     table.items col.c-amount  { width: 18%; }
+    /* A line's photo beside its name, as tall as the name and SKU under
+       it, so a row with one is no taller than a row without. */
+    table.items .pphoto { float: left; width: 24pt; height: 24pt; object-fit: cover;
+                          border-radius: 3pt; }
+    table.items .ptext.has-photo { margin-left: 29pt; }
     table.items .vname { color: #374151; }
     table.items .tname { color: #4B5563; }
     /* Totals: the quantity beneath Qty and the money beneath Amount, the
@@ -149,6 +154,10 @@
       {% with item=row.item %}
       <tr>
         <td>
+          {% comment %}The line's first photo, as its row on the order page
+             shows it (line_gallery): a variant's own, never its product's.{% endcomment %}
+          {% with photo=item|line_gallery|first|thumb_src %}{% if photo %}<img class="pphoto" src="{{ photo }}" alt="">{% endif %}
+          <div class="ptext{% if photo %} has-photo{% endif %}">
           <div class="pname">{{ item.product.title|default:item.product }}</div>
           {% comment %}The variant's SKU, the code a customer quotes back to
              reorder; it starts with the parent's, so the parent's would
@@ -162,6 +171,8 @@
             </div>
           {% endif %}
           {% if item.description %}<div class="pdesc">{{ item.description|truncatechars:80 }}</div>{% endif %}
+          </div>
+          {% endwith %}
         </td>
         <td>
           <div class="vname">{{ item.variant_label|default:"—" }}</div>

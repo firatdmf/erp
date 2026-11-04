@@ -2,8 +2,8 @@
 # python manage.py test operating.tests.test_order_photo_viewer
 
 """On an order line the photo opens the photo viewer the warehouse uses,
-with the photos and videos the storefront shows for the line's variant, in
-the storefront's order; only the name opens the product.
+with the line's variant's own photos and videos in the storefront's order;
+only the name opens the product.
 
 The photo and the name were one link, as wide as the cell, so a click
 anywhere beside the name — or on the photo, to see it bigger — left the
@@ -68,9 +68,10 @@ class OrderPhotoViewerTest(TestCase):
             file_url=url, file_type=kind, sequence=sequence, video_thumbnail=poster)
 
     def test_the_viewer_follows_the_storefront_first_photo_then_videos_then_the_rest(self):
-        self._file("https://cdn.test/b.avif", 2)
-        self._file("https://cdn.test/clip.mp4", 3, kind="video", poster="https://cdn.test/clip.jpg")
-        self._file("https://cdn.test/a.avif", 1)
+        self._file("https://cdn.test/b.avif", 2, variant=True)
+        self._file("https://cdn.test/clip.mp4", 3, kind="video", variant=True,
+                   poster="https://cdn.test/clip.jpg")
+        self._file("https://cdn.test/a.avif", 1, variant=True)
         page = self._page()
         self.assertIn('id="whPhotos"', page)
         self.assertIn('<img class="od-prod-img" src="https://cdn.test/a.avif"', page)
@@ -88,15 +89,30 @@ class OrderPhotoViewerTest(TestCase):
         self.assertEqual([p["src"] for p in self._viewer(self._page())],
                          ["https://cdn.test/green-1.avif", "https://cdn.test/green-2.avif"])
 
-    def test_a_variant_with_no_photo_of_its_own_shows_the_products(self):
+    def test_a_variant_with_no_photo_of_its_own_shows_an_empty_frame(self):
+        """Never the product's photo or video: it would show a colour the
+        line does not hold."""
         self._file("https://cdn.test/product.avif", 0)
-        self.assertEqual([p["src"] for p in self._viewer(self._page())],
-                         ["https://cdn.test/product.avif"])
+        self._file("https://cdn.test/product.mp4", 1, kind="video")
+        page = self._page()
+        self.assertNotIn('class="od-prod-zoom"', page)
+        self.assertNotIn("cdn.test/product", page)
 
     def test_only_the_name_links_to_the_product(self):
-        ProductFile.objects.create(product=self.product, file_url="https://cdn.test/a.avif")
+        self._file("https://cdn.test/a.avif", 0, variant=True)
         page = self._page()
         product_url = reverse("marketing:product_detail", kwargs={"pk": self.product.pk})
         link = f'<a href="{product_url}" class="od-prod-link"><span class="od-prod-title">Ready Made Curtain</span></a>'
         self.assertIn(link, page)
         self.assertEqual(page.count(f'href="{product_url}" class="od-prod-link"'), 1)
+
+    def test_the_printed_order_shows_the_lines_first_photo_beside_its_name(self):
+        self._file("https://cdn.test/product.avif", 0)
+        self._file("https://cdn.test/green-2.avif", 2, variant=True)
+        self._file("https://cdn.test/green-1.avif", 1, variant=True)
+        resp = self.client.get(reverse("operating:order_print", kwargs={"pk": self.order.pk}),
+                               {"html": 1})
+        page = resp.content.decode()
+        self.assertIn('<img class="pphoto" src="https://cdn.test/green-1.avif"', page)
+        self.assertNotIn("green-2.avif", page)
+        self.assertNotIn("product.avif", page)

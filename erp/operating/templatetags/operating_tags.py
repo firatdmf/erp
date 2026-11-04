@@ -117,19 +117,16 @@ def variant_gallery(variant):
 
 @register.filter
 def line_gallery(item):
-    """An order line's photos and videos, in the storefront's order: what
-    the product page shows with the line's variant chosen, or — when that
-    variant has no photo of its own — what it shows with none chosen."""
-    from marketing.product_images import is_video, storefront_gallery
+    """An order line's photos and videos: its variant's own, in the
+    storefront's order. A variant with none shows none — never its
+    product's, which would show a colour the line does not hold. A line
+    with no variant shows what the product page shows with none chosen."""
+    from marketing.product_images import storefront_gallery
     if not item.product_id:
         return []
-    product_files = list(item.product.files.all())
-    if item.product_variant_id:
-        gallery = storefront_gallery(product_files + list(item.product_variant.files.all()),
-                                     item.product_variant_id)
-        if any(not is_video(f) for f in gallery):
-            return gallery
-    return storefront_gallery(product_files)
+    if not item.product_variant_id:
+        return storefront_gallery(item.product.files.all())
+    return variant_gallery(item.product_variant)
 
 
 @register.filter

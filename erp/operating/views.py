@@ -3484,11 +3484,13 @@ def build_order_print_rows(order):
     total_qty = Decimal("0")
     # The variant's attributes are a M2M, so they are prefetched
     # rather than joined — one extra query for the order, not one per
-    # line. Same shape _pack_roll_rows uses.
+    # line. Same shape _pack_roll_rows uses. So are the photos each line
+    # prints (line_gallery).
     attr_values = "product_variant_attribute_values__product_variant_attribute"
     for it in (order.items.all()
                .select_related("product", "product__category", "product_variant")
-               .prefetch_related(f"product_variant__{attr_values}")):
+               .prefetch_related(f"product_variant__{attr_values}",
+                                 "product__files", "product_variant__files")):
         qty = it.quantity or Decimal("0")
         price = it.price or Decimal("0")
         # Half up, matching InvoiceItem.compute — an order line and
@@ -3696,13 +3698,14 @@ class OrderPrint(DetailView):
         return ctx
 
     def render_to_response(self, context, **response_kwargs):
-        from erp.pdf_render import document_response
+        from erp.pdf_render import document_response, thumbnail_hook
 
         order = self.object
         return document_response(
             self.request, self.template_name,
             apply_print_choices(self.request, dict(context)),
-            f"order_{order.order_number or order.pk}.pdf")
+            f"order_{order.order_number or order.pk}.pdf",
+            image_hook=thumbnail_hook)
 
 
 def print_choices(request):
@@ -3799,14 +3802,15 @@ class OrderPrintCombined(LoginRequiredMixin, View):
     """
 
     def get(self, request):
-        from erp.pdf_render import document_response
+        from erp.pdf_render import document_response, thumbnail_hook
 
         orders, refusal = select_combined_orders(request)
         if refusal is not None:
             return refusal
         ctx = apply_print_choices(request, combined_print_context(orders, request))
         return document_response(request, "operating/order_print.html", ctx,
-                                 f"orders_{ctx['order'].order_number or ctx['order'].pk}.pdf")
+                                 f"orders_{ctx['order'].order_number or ctx['order'].pk}.pdf",
+                                 image_hook=thumbnail_hook)
 
 
 def combined_print_context(orders, request=None):

@@ -1448,6 +1448,10 @@ class ProductFile(models.Model):
     objects = ProductPartManager("product", "product_variant__product")
     everywhere = models.Manager()
 
+    # Unused: the first photo by sequence is the first one shown, as on
+    # the storefront, and Product.primary_image is the product's card
+    # photo. Dropped in its own migration once the release that stopped
+    # reading and writing it is live.
     is_primary = models.BooleanField(default=False)
     sequence = models.PositiveIntegerField(default=0)
     

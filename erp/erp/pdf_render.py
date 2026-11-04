@@ -140,7 +140,8 @@ def render_pdf(html: str, base=None, image_hook=None) -> bytes:
     ).write_pdf()
 
 
-def document_response(request, template, context, filename, download=False):
+def document_response(request, template, context, filename, download=False,
+                      image_hook=None):
     """Serve a printable template as a PDF, or as HTML if we cannot.
 
     `is_pdf` is set for the PDF pass, which is what keeps the template's
@@ -150,6 +151,8 @@ def document_response(request, template, context, filename, download=False):
     Served inline: it opens in a tab, which is how a document meant for
     reading (and then handing on) should arrive. `download=True` for the
     few that are only ever saved.
+
+    `image_hook` is render_pdf's: what to embed for each photo fetched.
 
     Add ?html=1 to any of these addresses to get the page itself. That is
     how you iterate on the design — the same template, no render step —
@@ -170,7 +173,7 @@ def document_response(request, template, context, filename, download=False):
     try:
         html = render_to_string(template, {**context, "is_pdf": True},
                                 request=request)
-        pdf = render_pdf(html)
+        pdf = render_pdf(html, image_hook=image_hook)
     except Exception:
         # A host without Pango, or a template that WeasyPrint chokes on.
         # Logged loudly — this is meant to be the rare path — and the
@@ -182,6 +185,19 @@ def document_response(request, template, context, filename, download=False):
     disposition = "attachment" if download else "inline"
     response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
     return response
+
+
+def thumbnail_hook(raw: bytes, content_type: str | None):
+    """An image_hook for documents that show photos small (a line's photo
+    on a printed order): each shrunk to PRINT_THUMB before embedding, so
+    the PDF carries a few KB a photo, not the CDN's full resolution. A
+    photo it cannot process is embedded as it came."""
+    from erp.image_optimizer import PRINT_THUMB, OptimizedImage, optimize_image
+
+    out = optimize_image(raw, PRINT_THUMB)
+    if isinstance(out, OptimizedImage):
+        return {"string": out.getvalue(), "mime_type": out.content_type}
+    return {"string": raw, "mime_type": content_type}
 
 
 ensure_dyld_path()

@@ -246,7 +246,7 @@ def product_variants(request, pk):
     
     product = get_object_or_404(Product, pk=pk)
     variants = product.variants.select_related('product').prefetch_related(
-        Prefetch('files', queryset=ProductFile.objects.order_by('-is_primary', 'sequence')),
+        Prefetch('files', queryset=ProductFile.objects.order_by('sequence', 'pk')),
         'product_variant_attribute_values__product_variant_attribute'
     ).all()
     # Prices are worked out from cost: every variant's in one query.
@@ -704,7 +704,6 @@ class BaseProductView(ModelFormMixin):
                         product_file = ProductFile.objects.create(
                             product=product,
                             file_url=url,
-                            is_primary=False,  # Will be set below based on order
                             sequence=index,
                         )
                         uploaded_files.append(product_file)
@@ -714,7 +713,7 @@ class BaseProductView(ModelFormMixin):
                     )
                     continue
             
-            # Handle image ordering - first image is primary (skip if user manually picked via picker)
+            # Handle image ordering - the first image is the product's primary_image (skip if user manually picked via picker)
             manual_primary = self.request.POST.get('manual_primary_image', '').strip()
             if not manual_primary:
                 image_order = self.request.POST.get('image_order')
@@ -722,11 +721,8 @@ class BaseProductView(ModelFormMixin):
                     try:
                         order_list = json.loads(image_order)
                         if order_list:
-                            ProductFile.objects.filter(product=product, product_variant__isnull=True).update(is_primary=False)
                             first_image_id = order_list[0]
                             primary_file = ProductFile.objects.get(pk=first_image_id, product=product, product_variant__isnull=True)
-                            primary_file.is_primary = True
-                            primary_file.save()
                             product.primary_image = primary_file
                             product.save()
                             print(f"Set primary image to {first_image_id} (main product image) based on order")
@@ -735,9 +731,6 @@ class BaseProductView(ModelFormMixin):
                 else:
                     first_file = ProductFile.objects.filter(product=product, product_variant__isnull=True).order_by('sequence', 'pk').first()
                     if first_file:
-                        ProductFile.objects.filter(product=product, product_variant__isnull=True).update(is_primary=False)
-                        first_file.is_primary = True
-                        first_file.save()
                         product.primary_image = first_file
                         product.save()
                         print(f"Set first available main product image {first_file.pk} as primary")
@@ -1216,7 +1209,6 @@ class BaseProductView(ModelFormMixin):
                                 print(f"🔓 Unlinking file {f_to_unlink.pk} back to shared pool")
                                 f_to_unlink.product_variant = None
                                 f_to_unlink.sequence = 0
-                                f_to_unlink.is_primary = False
                                 all_images_to_update.append(f_to_unlink)
                         else:
                             print(f"   ℹ️ File {file_id} already has no variant link (fresh upload or shared pool)")
@@ -1266,7 +1258,6 @@ class BaseProductView(ModelFormMixin):
                             # 1. Image is already linked to THIS variant -> Just update sequence
                             if source_file.product_variant_id == variant.id:
                                 source_file.sequence = img_sequence
-                                source_file.is_primary = (img_sequence == 0)
                                 if source_file not in all_images_to_update:
                                     all_images_to_update.append(source_file)
                                 print(f"✅ Updated existing file {img_id} for variant {variant_sku} (seq={img_sequence})")
@@ -1275,7 +1266,6 @@ class BaseProductView(ModelFormMixin):
                             elif source_file.product_variant_id is None:
                                 source_file.product_variant = variant
                                 source_file.sequence = img_sequence
-                                source_file.is_primary = (img_sequence == 0)
                                 if source_file not in all_images_to_update:
                                     all_images_to_update.append(source_file)
                                 print(f"🔗 Linked FREE file {img_id} to variant {variant_sku}")
@@ -1292,7 +1282,6 @@ class BaseProductView(ModelFormMixin):
 
                                 if existing_clone:
                                     existing_clone.sequence = img_sequence
-                                    existing_clone.is_primary = (img_sequence == 0)
                                     if existing_clone not in all_images_to_update:
                                         all_images_to_update.append(existing_clone)
                                     print(f"✅ Updated existing clone {existing_clone.pk} for variant {variant_sku}")
@@ -1305,7 +1294,6 @@ class BaseProductView(ModelFormMixin):
                                         file_path=source_file.file_path,
                                         file_type=source_file.file_type,
                                         sequence=img_sequence,
-                                        is_primary=(img_sequence == 0)
                                     )
                                     files_to_clone.append(cloned_file)
                                     print(f"👯 Cloning file {img_id} (URL: {source_file.file_url[-15:]}) for variant {variant_sku}")
@@ -1323,7 +1311,7 @@ class BaseProductView(ModelFormMixin):
 
         # Bulk update existing files
         if all_images_to_update:
-            ProductFile.objects.bulk_update(all_images_to_update, ['product_variant', 'sequence', 'is_primary'])
+            ProductFile.objects.bulk_update(all_images_to_update, ['product_variant', 'sequence'])
         
         variant_loop_time = time.time() - variant_loop_start
         print(f"  ✓ Processed variant images: {variant_loop_time:.3f}s (updated {len(all_images_to_update)} files)")
@@ -1341,9 +1329,6 @@ class BaseProductView(ModelFormMixin):
                         primary_variant = ProductVariant.objects.get(variant_sku=primary_variant_sku, product=self.object)
                         primary_file = ProductFile.objects.filter(product_variant=primary_variant).first()
                         if primary_file:
-                            ProductFile.objects.filter(product=self.object).update(is_primary=False)
-                            primary_file.is_primary = True
-                            primary_file.save()
                             self.object.primary_image = primary_file
                             self.object.save()
                             print(f"Set primary image to variant {primary_variant_sku}")
@@ -1378,7 +1363,6 @@ class BaseProductView(ModelFormMixin):
                     product_file = ProductFile.objects.create(
                         product=self.object,
                         file_url=url,
-                        is_primary=False,  # Will be set below
                         sequence=index,
                     )
                     uploaded_main_files.append(product_file)
@@ -1404,11 +1388,8 @@ class BaseProductView(ModelFormMixin):
                 try:
                     order_list = json.loads(image_order)
                     if order_list:
-                        ProductFile.objects.filter(product=self.object).update(is_primary=False)
                         first_image_id = order_list[0]
                         primary_file = ProductFile.objects.get(pk=first_image_id, product=self.object)
-                        primary_file.is_primary = True
-                        primary_file.save()
                         self.object.primary_image = primary_file
                         self.object.save()
                         print(f"Set primary image to {first_image_id} based on order")
@@ -1474,7 +1455,6 @@ class ProductCreate(BaseProductView, generic.CreateView):
                         product=self.object,
                         file_url=file_data['url'],
                         sequence=file_data['sequence'],
-                        is_primary=(file_data['sequence'] == 0)
                     )
                     # Map temp public_id to real DB ID (for variant references)
                     temp_variant_files_map[file_data['public_id']] = product_file.pk
@@ -1490,7 +1470,6 @@ class ProductCreate(BaseProductView, generic.CreateView):
                             product=self.object,
                             file_url=file_data['url'],
                             sequence=file_data['sequence'],
-                            is_primary=False  # Will be set by handle_variants
                         )
                         # Map temp public_id to real DB ID
                         temp_variant_files_map[file_data['public_id']] = product_file.pk
@@ -1559,7 +1538,6 @@ class ProductCreate(BaseProductView, generic.CreateView):
                             product_file = ProductFile.objects.create(
                                 product=self.object,
                                 file_url=url,
-                                is_primary=True
                             )
                             self.object.primary_image = product_file
                             self.object.save()
@@ -1806,10 +1784,6 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             if chosen_file:
                 self.object.primary_image = chosen_file
                 self.object.save(update_fields=['primary_image'])
-                # Sync the is_primary boolean flag on ProductFile records
-                ProductFile.objects.filter(product=self.object, is_primary=True).update(is_primary=False)
-                chosen_file.is_primary = True
-                chosen_file.save(update_fields=['is_primary'])
 
             print(f"⏱️  Primary image update: {time.time() - primary_update_start:.3f}s")
 
@@ -1970,7 +1944,6 @@ def instant_upload_file(request):
             product_variant=variant,
             file_url=file_url,
             sequence=max_seq + 1,
-            is_primary=False,
             file_type=file_type,  # 'image' or 'video'
             video_thumbnail=video_thumb_url,
         )
@@ -2000,7 +1973,6 @@ def instant_upload_file(request):
                 'url': file_url,
                 'file_url': file_url,
                 'sequence': product_file.sequence,
-                'is_primary': product_file.is_primary,
                 'file_type': file_type
             }
         })
@@ -2194,7 +2166,6 @@ def get_product_files(request):
                 'file_url': f.file_url,
                 'optimized_url': f.optimized_url,
                 'name': f.file_url.split('/')[-1],
-                'is_primary': f.is_primary,
                 'sequence': f.sequence,
                 'file_type': f.file_type,  # 'image' or 'video'
                 'video_thumbnail_url': f.video_thumbnail if f.file_type == 'video' else None,
@@ -2241,7 +2212,6 @@ def get_variant_files(request):
                 'id': f.pk,
                 'url': f.optimized_url,
                 'name': f.file_url.split('/')[-1],
-                'is_primary': f.is_primary,
                 'sequence': f.sequence
             })
         
@@ -2585,13 +2555,12 @@ def update_variant_image_order(request):
                 try:
                     img = ProductFile.objects.get(pk=img_id, product_variant=variant)
                     img.sequence = sequence
-                    img.is_primary = (sequence == 0)
                     images_to_update.append(img)
                 except ProductFile.DoesNotExist:
                     pass
         
         if images_to_update:
-            ProductFile.objects.bulk_update(images_to_update, ['sequence', 'is_primary'])
+            ProductFile.objects.bulk_update(images_to_update, ['sequence'])
         
         elapsed = time.time() - start
         return JsonResponse({
@@ -2911,7 +2880,7 @@ def get_products(request):
             ),
             pfiles AS (
                 SELECT json_agg(sub ORDER BY sub.sequence) as data FROM (
-                    SELECT id, product_id, product_variant_id, file_url, file_type, is_primary, sequence, alt_text
+                    SELECT id, product_id, product_variant_id, file_url, file_type, sequence, alt_text
                     FROM marketing_productfile
                     WHERE product_id IN (SELECT id FROM pids)
                       AND file_url IS NOT NULL
@@ -2988,7 +2957,6 @@ def get_products(request):
             "product_id": f["product_id"],
             "product_variant_id": f["product_variant_id"],
             "sequence": f["sequence"],
-            "is_primary": f["is_primary"],
             "alt_text": f.get("alt_text", ""),
             "alt_texts": alt_by_row[f["id"]],
         })
@@ -3216,7 +3184,7 @@ def get_product(request):
             ),
             files AS (
                 SELECT json_agg(sub ORDER BY sub.sequence, sub.id) as data FROM (
-                    SELECT id, file_url, file_type, product_id, product_variant_id, sequence, is_primary, alt_text
+                    SELECT id, file_url, file_type, product_id, product_variant_id, sequence, alt_text
                     FROM marketing_productfile
                     WHERE product_id = %(pid)s OR product_variant_id IN (SELECT id FROM variant_ids)
                 ) sub
@@ -3363,7 +3331,7 @@ def get_product(request):
         {
             "id": f["id"], "file": f["file_url"], "file_type": f["file_type"],
             "product_id": f["product_id"], "product_variant_id": f["product_variant_id"],
-            "sequence": f["sequence"], "is_primary": f["is_primary"],
+            "sequence": f["sequence"],
             "alt_text": f.get("alt_text", ""),
             "alt_texts": alt_by_row[f["id"]],
         }

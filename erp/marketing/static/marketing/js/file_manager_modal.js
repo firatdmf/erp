@@ -1461,7 +1461,6 @@ async function uploadSingleFile(file, productId, placeholder, variantId = null) 
         return {
           pk: data.file_data.public_id,  // Use public_id as temporary ID
           file_url: data.file_data.url,
-          is_primary: false,
           temp_file: true  // Mark as temporary
         };
       }

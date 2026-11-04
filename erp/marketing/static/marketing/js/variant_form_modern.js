@@ -3658,6 +3658,11 @@ function openVariantDetailModal(variantIndex) {
     }
     if (skuEl) skuEl.value = sku;
     if (barcodeEl) barcodeEl.value = barcode;
+    // A product tracked item by item has a barcode on each item, not one
+    // for the variant; the form asks for it only when the variant has one.
+    const barcodeGroup = document.getElementById('modal_variant_barcode_group');
+    const tracking = document.getElementById('id_tracking');
+    if (barcodeGroup) barcodeGroup.style.display = (tracking && tracking.value !== 'variant') ? 'none' : '';
     if (activeEl) activeEl.checked = isActive;
 
     // The product SKU is a fixed prefix; only the part after the dot is

@@ -1002,6 +1002,12 @@ class BaseProductView(ModelFormMixin):
                         if value is None:
                             continue
                         value = bool(value)
+                    # Only a product sold by count has a code printed on
+                    # every piece; one tracked item by item labels each item.
+                    if key == "variant_barcode":
+                        value = (value or "").strip() or None
+                        if not product.sold_by_count:
+                            value = None
                     if old_value != value:
                         setattr(variant, key, value)
                         changed_fields.add(key)

@@ -2036,7 +2036,8 @@
           <p class="sku-hint" id="modal_variant_sku_hint" hidden>{% trans "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320." %}</p>
         </div>
 
-        <div class="form-group">
+        {# Shown while the product is tracked by variant: then this code is on every piece. #}
+        <div class="form-group" id="modal_variant_barcode_group">
           <label for="modal_variant_barcode">{% trans "Barcode (ISBN, UPC, GTIN, etc.)" %}</label>
           <input type="text" id="modal_variant_barcode" class="form-input">
         </div>

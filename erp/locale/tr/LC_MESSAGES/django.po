@@ -11742,6 +11742,10 @@ msgstr "Ürün %(n)s: “%(sku)s” SKU'su zaten “%(product)s” ürününde k
 msgid "The barcode “%(code)s” is already in use."
 msgstr "“%(code)s” barkodu zaten kullanılıyor."
 
+#, python-format
+msgid "The barcode “%(code)s” is longer than %(n)d characters."
+msgstr "“%(code)s” barkodu %(n)d karakterden uzun."
+
 #: hardcoded Turkish moved to the catalogue as written
 #, python-format
 msgid "Save error: %(error)s"

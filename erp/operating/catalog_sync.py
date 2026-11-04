@@ -402,6 +402,11 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
         cost_dec = None
 
     product, product_created = _base_product(base_name, existing_base_product)
+    # A variant barcode is the code printed on every piece of it, which only
+    # a product sold by count has. One tracked item by item has a label on
+    # each item instead, and what callers pass here is one of those labels.
+    if not product.sold_by_count:
+        variant_barcode = None
     if not product_created:
         # Lock the product row for the rest of this transaction, so two
         # concurrent syncs of new look-alike variants can't both pass the

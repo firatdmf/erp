@@ -774,6 +774,18 @@ def _barcode_taken(code, *, exclude_roll_ids=()):
             or WarehouseProduct.objects.filter(barcode__iexact=code).exists())
 
 
+def _unlabelled():
+    """The minter for goods sold by count: their stock items carry no
+    barcode of their own (see Product.sold_by_count)."""
+    return None
+
+
+def _item_minter(product, mint):
+    """`mint` for a product whose items are labelled one by one, else
+    _unlabelled."""
+    return _unlabelled if product.sold_by_count else mint
+
+
 def _barcode_minter(prefix, reserved=()):
     """Return a closure that mints fresh, GLOBALLY-UNIQUE barcodes of the form
     PREFIX + 6 digits (e.g. KZL000123). Uniqueness is checked against every
@@ -1031,7 +1043,8 @@ def _product_category_choices():
 def _pack_type_choices():
     """What one stock item can be, for the intake form's "Packed as" select:
     the title-case label, the singular and plural nouns the form words its
-    rows with, and which pack each unit starts on."""
+    rows with, and which pack each unit starts on. Likewise the tracking a
+    new product is asked for, and the one each unit starts on."""
     return {
         "choices": [
             {"value": value, "label": str(label),
@@ -1040,6 +1053,9 @@ def _pack_type_choices():
             for value, label in WarehouseProduct.PACK_CHOICES
         ],
         "for_unit": WarehouseProduct.PACK_FOR_UNIT,
+        "tracking": [{"value": value, "label": str(label)}
+                     for value, label in units.TRACKING_CHOICES],
+        "tracking_for_unit": units.TRACKING_FOR_UNIT,
     }
 
 
@@ -1063,8 +1079,8 @@ def product_attribute_names(product=None, category=None):
 
 def _product_facts(product, invoice=None):
     """What the goods-receipt form states about an existing main product:
-    its type, unit and pack, and whether this purchase may still change
-    the unit and pack (`unit_locked` — see _product_stock_elsewhere)."""
+    its type, unit, pack and tracking, and whether this purchase may still
+    change the last three (`unit_locked` — see _product_stock_elsewhere)."""
     category = product.category if product.category_id else None
     return {
         "category_label": (str(_CATEGORY_LABELS.get(category.name, category.name))
@@ -1073,6 +1089,8 @@ def _product_facts(product, invoice=None):
         "unit_label": str(dict(units.UNIT_CHOICES).get(product.unit, product.unit)),
         "pack_type": product.pack_type,
         "pack_label": str(dict(units.PACK_CHOICES).get(product.pack_type, product.pack_type)),
+        "tracking": product.tracking,
+        "tracking_label": str(dict(units.TRACKING_CHOICES).get(product.tracking, product.tracking)),
         "unit_locked": _product_stock_elsewhere(product, invoice),
         "attribute_names": product_attribute_names(product),
     }
@@ -1187,6 +1205,8 @@ def _add_stock_to_variant(wp, stock_items, mint, user, *, notes_supplier=None,
         # the supplier's own label is the whole point, and re-labelling it
         # would leave the physical roll and our record disagreeing. Callers
         # validate the code for uniqueness BEFORE any writing starts.
+        # `mint` gives None for goods sold by count (_unlabelled): their
+        # barcode names the variant, so a box gets no code of its own.
         code = (t.get("barcode") or "").strip() or mint()
         if first_barcode is None:
             first_barcode = code
@@ -1200,7 +1220,7 @@ def _add_stock_to_variant(wp, stock_items, mint, user, *, notes_supplier=None,
         StockMovement.objects.create(
             product=wp, stock_item=roll, movement_type="in",
             quantity=qty, reason="Manual add",
-            reference=code, created_by=user,
+            reference=roll.pick_key, created_by=user,
         )
         added_qty += qty
         new_roll_ids.append(roll.pk)
@@ -3577,6 +3597,11 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
         pack_type = str(p_in.get("pack_type") or "").strip()
         if pack_type not in dict(WarehouseProduct.PACK_CHOICES):
             pack_type = None
+        # Whether each item gets a label of its own or the barcode names
+        # the variant. Missing/unknown is None: the unit's usual one.
+        tracking = str(p_in.get("tracking") or "").strip()
+        if tracking not in dict(units.TRACKING_CHOICES):
+            tracking = None
         variants_in = p_in.get("variants") or []
         if not isinstance(variants_in, list) or not variants_in:
             raise IntakeError({"success": False, "error": _gettext("Product %(n)s: add at least one variant.") % {"n": i}}, status=400)
@@ -3646,6 +3671,7 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
             "has_variants": has_variants,
             "variants_in": variants_in, "category": category,
             "pack_type": pack_type,
+            "tracking": tracking,
             "unit": _intake_unit(p_in.get("unit") or default_unit),
             "gsm": gsm.quantize(Decimal("0.1")) if gsm is not None else None,
         })
@@ -3722,6 +3748,7 @@ def _intake_main_product(item, prefix, *, invoice=None):
     category = item["category"]
     unit = item["unit"]
     pack_type = item["pack_type"]
+    tracking = item.get("tracking")
     if unit and not pack_type and (main_product is None or unit != main_product.unit):
         # A unit with no pack named starts on that unit's usual pack.
         pack_type = units.PACK_FOR_UNIT[unit]
@@ -3739,7 +3766,7 @@ def _intake_main_product(item, prefix, *, invoice=None):
                 title=base_name, sku=sku, featured=False,
                 unit=unit or units.DEFAULT_UNIT,
                 pack_type=pack_type or units.PACK_FOR_UNIT[unit or units.DEFAULT_UNIT],
-                tracking=units.TRACKING_FOR_UNIT[unit or units.DEFAULT_UNIT],
+                tracking=tracking or units.TRACKING_FOR_UNIT[unit or units.DEFAULT_UNIT],
                 category=category, gsm=item.get("gsm"),
             )
         if desired_sku and not item["sku_is_auto"]:
@@ -3783,12 +3810,13 @@ def _intake_main_product(item, prefix, *, invoice=None):
             main_product.category = category
             main_product.save(update_fields=["category"])
         if ((unit and unit != main_product.unit
-             or pack_type and pack_type != main_product.pack_type)
+             or pack_type and pack_type != main_product.pack_type
+             or tracking and tracking != main_product.tracking)
                 and not _product_stock_elsewhere(main_product, invoice)):
             # A new unit starts on that unit's usual tracking too, as a
-            # brand-new product would.
-            tracking = (units.TRACKING_FOR_UNIT[unit]
-                        if unit and unit != main_product.unit else None)
+            # brand-new product would, unless the card named one.
+            if not tracking and unit and unit != main_product.unit:
+                tracking = units.TRACKING_FOR_UNIT[unit]
             main_product.set_unit(unit, pack_type, tracking)
     return main_product
 
@@ -3903,6 +3931,47 @@ def _row_attributes(v):
         found = pair("color", legacy)
         pairs = [found] if found else []
     return pairs
+
+
+def _row_barcode(v):
+    """The barcode a row typed for its variant — goods sold by count, whose
+    every piece carries it. None when the row typed none."""
+    return (v.get("barcode") or "").strip() or None
+
+
+def _intake_variant_barcodes(products_in):
+    """Refuse, before anything is written, a variant barcode a scan could
+    not tell apart: one already on a stock item or on another variant, or
+    typed on two rows of this batch. A variant keeps its own code."""
+    from marketing.models import ProductVariant
+    max_len = ProductVariant._meta.get_field("variant_barcode").max_length
+    seen = {}
+    for p_in in products_in:
+        for v_in in (p_in.get("variants") or []):
+            code = _row_barcode(v_in)
+            if not code:
+                continue
+            sku = (v_in.get("sku") or "").strip()
+            if len(code) > max_len:
+                raise IntakeError(
+                    {"success": False,
+                     "error": _gettext("The barcode “%(code)s” is longer than %(n)d characters.")
+                              % {"code": code, "n": max_len}},
+                    status=400)
+            key = code.upper()
+            if key in seen and seen[key] != sku.upper():
+                raise IntakeError(
+                    {"success": False,
+                     "error": _gettext("The barcode “%(code)s” was entered more than once in this list.") % {"code": code}},
+                    status=400)
+            seen[key] = sku.upper()
+            other = (ProductVariant.objects.filter(variant_barcode__iexact=code)
+                     .exclude(variant_sku__iexact=sku).first())
+            if other is not None or WarehouseProductItem.objects.filter(barcode__iexact=code).exists():
+                raise IntakeError(
+                    {"success": False,
+                     "error": _gettext("The barcode “%(code)s” is already in use.") % {"code": code}},
+                    status=400)
 
 
 def _row_label(v):
@@ -4103,15 +4172,27 @@ def _intake_variant_wp(warehouse, main_product, base_name, v, idx, seen_skus, *,
     }
 
 
-def _intake_catalog_link(wp, target, main_product, base_name, first_barcode, warnings):
+def _set_variant_barcode(variant, product, code):
+    """Give a variant of goods sold by count the barcode a receipt typed for
+    it. Nothing typed leaves the variant's own; items labelled one by one
+    have no variant barcode to set."""
+    if code and product.sold_by_count and code != variant.variant_barcode:
+        variant.variant_barcode = code
+        variant.save(update_fields=["variant_barcode"])
+
+
+def _intake_catalog_link(wp, target, main_product, base_name, variant_barcode, warnings):
     """Mirror a variant row onto the catalog and link its WarehouseProduct
-    to the variant. A clash is a warning, never a failed receipt."""
+    to the variant. A clash is a warning, never a failed receipt.
+
+    `variant_barcode` — what the row typed for the variant of goods sold by
+    count (_row_barcode); it replaces the one the variant had."""
     from .catalog_sync import sync_roll_to_catalog, CatalogSyncConflict, LookAlikeVariant
     try:
         _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
             base_name=base_name,
             attributes=target["attributes"],
-            variant_sku=target["sku"], variant_barcode=first_barcode,
+            variant_sku=target["sku"], variant_barcode=variant_barcode,
             cost=target["cost_usd"],
             existing_base_product=main_product,
             refuse_lookalike=True,
@@ -4123,6 +4204,7 @@ def _intake_catalog_link(wp, target, main_product, base_name, first_barcode, war
     except CatalogSyncConflict as exc:
         warnings.append(f"{target['sku']}: {exc}")
         return None
+    _set_variant_barcode(cat_variant, main_product, variant_barcode)
     wp.catalog_variant = cat_variant
     wp.save(update_fields=["catalog_variant"])
     # Linked now, so the rolls just received count towards its cost.
@@ -4235,6 +4317,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     _intake_check_described(products_in)
     _intake_check_lookalikes(resolved)
     manual_codes = _intake_typed_barcodes(products_in)
+    _intake_variant_barcodes(products_in)
     # The customer order this stock is bought for. Only a confirmed draft
     # can have one: a purchase for a customer is always saved first, since
     # saving it is what creates the customer's order.
@@ -4276,22 +4359,20 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                     wp = target["wp"]
 
                     added_qty, new_roll_ids = _add_stock_to_variant(
-                        wp, stock_items, mint, user, notes_supplier=account_name,
+                        wp, stock_items, _item_minter(main_product, mint), user,
+                        notes_supplier=account_name,
                     )
-                    first_barcode = None
                     if new_roll_ids:
-                        new_barcodes = list(
+                        created["barcodes"].extend(
                             WarehouseProductItem.objects
-                            .filter(pk__in=new_roll_ids)
+                            .filter(pk__in=new_roll_ids, barcode__isnull=False)
                             .order_by("id")
                             .values_list("barcode", flat=True)
                         )
-                        first_barcode = new_barcodes[0] if new_barcodes else None
-                        created["barcodes"].extend(new_barcodes)
                     created["tops"] += len(new_roll_ids)
 
                     cat_variant_obj = _intake_catalog_link(
-                        wp, target, main_product, base_name, first_barcode, warnings)
+                        wp, target, main_product, base_name, _row_barcode(v), warnings)
                     _intake_note_supplier(
                         current_account_obj, cat_variant_obj, v, target,
                         invoice.date if invoice is not None else timezone.localdate())
@@ -4833,6 +4914,7 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         _intake_check_lookalikes(resolved)
         manual_codes = _intake_typed_barcodes(
             products_in, current_barcodes={pk: r.barcode for pk, r in rolls.items()})
+        _intake_variant_barcodes(products_in)
 
         # ── Every id the form names must be this purchase's own, once. ──
         named_items, named_rolls = set(), set()
@@ -5074,15 +5156,15 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                     mint = _barcode_minter(_barcode_prefix_from_existing(wp, prefix),
                                            reserved=manual_codes)
                     _added, new_roll_ids = _add_stock_to_variant(
-                        wp, new_tops, mint, user, notes_supplier=account.name,
-                        unit_cost=target["cost_usd"],
+                        wp, new_tops, _item_minter(main_product, mint), user,
+                        notes_supplier=account.name, unit_cost=target["cost_usd"],
                     )
                     line_roll_ids += new_roll_ids
 
                 if landed_here:
-                    first_barcode = (WarehouseProductItem.objects.filter(pk__in=line_roll_ids)
-                                     .order_by("id").values_list("barcode", flat=True).first())
-                    _intake_catalog_link(wp, target, main_product, base_name, first_barcode, warnings)
+                    _intake_catalog_link(wp, target, main_product, base_name, _row_barcode(v), warnings)
+                elif wp.catalog_variant_id:
+                    _set_variant_barcode(wp.catalog_variant, main_product, _row_barcode(v))
                 _intake_note_supplier(
                     account, wp.catalog_variant if wp.catalog_variant_id else None,
                     v, target, invoice.date)
@@ -5269,6 +5351,10 @@ def received_purchase_products(invoice):
             "sku_uses": uses,
             "supplier_sku": supplier_skus.get(
                 wp.catalog_variant_id if wp is not None else None, ""),
+            # Goods sold by count: the code on every piece of the variant.
+            "barcode": ((wp.catalog_variant.variant_barcode or "")
+                        if wp is not None and wp.catalog_variant_id
+                        and product is not None and product.sold_by_count else ""),
             "price": _plain_decimal(it.unit_price),
             "sale_price": (_plain_decimal(sale_prices[wp.catalog_variant_id])
                            if wp is not None and wp.catalog_variant_id in sale_prices else ""),

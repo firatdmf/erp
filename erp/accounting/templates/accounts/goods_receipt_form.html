@@ -235,6 +235,14 @@
   }
   .np-kind-hint { margin: -10px 0 14px; }
   .np-kind-row [hidden], .np-kind-hint[hidden] { display: none !important; }
+  /* Tracked by variant: one barcode per variant, none per item. Otherwise
+     each item takes its own and the variant has none. */
+  .np-product-card:not(.np-by-variant) .np-col-vbc,
+  .np-product-card.np-by-variant .np-th-bc,
+  .np-product-card.np-by-variant .np-cap-bc,
+  .np-product-card.np-by-variant .np-top-bc,
+  .np-product-card.np-by-variant .np-top-bc-state { display: none !important; }
+  .np-v-barcode { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
   .np-attr-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .np-attr-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
                   border: 1px solid #D5DDE3; border-radius: 999px; background: #F4F7F9;
@@ -1194,6 +1202,28 @@
     npRelabelPack(sel.closest('.np-product-card'));
     npSummaryUpdate();
   };
+  // Whether each item gets a barcode of its own (rolls) or one barcode
+  // names the variant and its items are counted (boxes of curtains). Like
+  // the pack, a card follows its unit's usual one until someone picks.
+  const NP_TRACK_SEL = '<select class="np-select np-main-tracking" onchange="npTrackingPicked(this)">' +
+    (NP_PACKS.tracking || []).map(function (c) { return '<option value="' + c.value + '">' + c.label + '</option>'; }).join('') +
+    '</select>';
+  function npUnitTracking(card) {
+    return (NP_PACKS.tracking_for_unit || {})[npUnitOf(card)] || 'item';
+  }
+  function npByVariant(card) {
+    const sel = card && card.querySelector('.np-main-tracking');
+    return !!sel && sel.value === 'variant';
+  }
+  // The card asks for a barcode per item, or one per variant.
+  window.npApplyTracking = function (card) {
+    card.classList.toggle('np-by-variant', npByVariant(card));
+    npApplyBarcodePlaceholders();
+  };
+  window.npTrackingPicked = function (sel) {
+    sel.dataset.touched = '1';
+    npApplyTracking(sel.closest('.np-product-card'));
+  };
   // The customer's price for a variant, in the customer's account currency.
   // Stated, not chosen: the customer's order is billed in their account's
   // currency, so that is what this price is in (npSetSaleCurrency).
@@ -1444,6 +1474,10 @@
           '<label>{% trans "Packed as" %}</label>' +
           NP_PACK_SEL + '<div class="np-fact" hidden></div>' +
         '</div>' +
+        '<div class="np-col np-col-tracking">' +
+          '<label>{% trans "Tracking" %}</label>' +
+          NP_TRACK_SEL + '<div class="np-fact" hidden></div>' +
+        '</div>' +
         // A new fabric's weight per square meter, which the packing list
         // turns into kilos for export papers. Optional.
         '<div class="np-col np-col-gsm">' +
@@ -1466,6 +1500,8 @@
       '</div>';
     el.querySelector('.np-main-unit').value = npGroupUnit(el);
     el.querySelector('.np-main-pack').value = npUnitPack(el);
+    el.querySelector('.np-main-tracking').value = npUnitTracking(el);
+    npApplyTracking(el);
     npShowGsm(el);
     npRelabelPack(el);
     npDefaultCurrencies(el);
@@ -2020,6 +2056,12 @@
           '<input class="np-input np-v-sku" maxlength="' + GR_VARIANT_SKU_MAX + '" placeholder="{% trans "auto" %}" readonly tabindex="-1">' +
         '</div>' +
         NP_SUPPLIER_SKU +
+        // Goods tracked by variant: the one code on every piece. Items
+        // labelled one by one take theirs in the rows below instead.
+        '<div class="np-col np-col-vbc">' +
+          '<label>{% trans "Barcode" %}</label>' +
+          '<input class="np-input np-v-barcode" maxlength="14" spellcheck="false" autocomplete="off" placeholder="{% trans "optional" %}">' +
+        '</div>' +
       '</div>' +
       '<div class="np-v-match"></div>' +
       '<div class="np-v-clash"></div>' +
@@ -2154,8 +2196,11 @@
     });
   };
 
+  // Only items labelled one by one: goods tracked by variant are not minted
+  // a code per item.
   function npBcRows() {
-    return Array.prototype.slice.call(document.querySelectorAll('#npProducts .np-top-bc'));
+    return Array.prototype.slice.call(
+      document.querySelectorAll('#npProducts .np-product-card:not(.np-by-variant) .np-top-bc'));
   }
 
   function npBcMark(el, state, title) {
@@ -2263,6 +2308,8 @@
     card.querySelectorAll('.np-top-unit').forEach(function (s) { s.textContent = u; });
     const sel = card.querySelector('.np-main-pack');
     if (sel && !sel.dataset.touched) { sel.value = npUnitPack(card); npRelabelPack(card); }
+    const track = card.querySelector('.np-main-tracking');
+    if (track && !track.dataset.touched) { track.value = npUnitTracking(card); npApplyTracking(card); }
   };
   window.npUnitPicked = function (sel) {
     sel.dataset.touched = '1';
@@ -2564,7 +2611,8 @@
 
     const locked = !!(facts && facts.unit_locked);
     [['.np-col-unit', '.np-main-unit', 'unit', 'unit_label'],
-     ['.np-col-pack', '.np-main-pack', 'pack_type', 'pack_label']].forEach(function (f) {
+     ['.np-col-pack', '.np-main-pack', 'pack_type', 'pack_label'],
+     ['.np-col-tracking', '.np-main-tracking', 'tracking', 'tracking_label']].forEach(function (f) {
       const col = card.querySelector(f[0]);
       const sel = col.querySelector(f[1]);
       const text = col.querySelector('.np-fact');
@@ -2585,6 +2633,7 @@
     const u = unitShort(card);
     card.querySelectorAll('.np-top-unit').forEach(function (s) { s.textContent = u; });
     npRelabelPack(card);
+    npApplyTracking(card);
     npSummaryUpdate();
   };
 
@@ -3023,9 +3072,12 @@
     }
     function npCollectTops(scope) {
       const tops = [];
+      const byVariant = npByVariant(scope.closest('.np-product-card'));
       scope.querySelectorAll('.np-top').forEach(function (row) {
         const q = row.querySelector('.np-top-qty');
-        const b = row.querySelector('.np-top-bc');
+        // Tracked by variant, an item's hidden box is not sent — except an
+        // item the purchase already has, which keeps whatever it carries.
+        const b = (byVariant && !row.dataset.stockItemId) ? null : row.querySelector('.np-top-bc');
         const k = row.querySelector('.np-top-kg');
         const val = parseFloat(((q && q.value) || '').replace(',', '.'));
         const kg = parseFloat(((k && k.value) || '').replace(',', '.'));
@@ -3146,6 +3198,7 @@
         if (attrs.length || sku || tops.length) variants.push({
           name: npRowLabel(v), attributes: attrs, sku: sku, tops: tops,
           supplier_sku: npSupplierSku(v),
+          barcode: npByVariant(card) ? ((v.querySelector('.np-v-barcode') || {}).value || '').trim() : '',
           price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD',
           sale_price: (v.querySelector('.np-v-sale') || {}).value || '',
           invoice_item_id: npIdOf(v, 'itemId'),
@@ -3161,7 +3214,8 @@
                       category_id: (catSel && catSel.value) || null,
                       gsm: (gsmI && !gsmI.closest('.np-col-gsm').hidden && gsmI.value) || null,
                       unit: npUnitOf(card),
-                      pack_type: npPackOf(card).value || null });
+                      pack_type: npPackOf(card).value || null,
+                      tracking: (card.querySelector('.np-main-tracking') || {}).value || null });
     }
 
     if (missingSale.length) {
@@ -3397,6 +3451,12 @@
         packSel.dataset.touched = '1';
         npRelabelPack(card);
       }
+      const trackSel = card.querySelector('.np-main-tracking');
+      if (trackSel && p.tracking) {
+        trackSel.value = p.tracking;
+        trackSel.dataset.touched = '1';
+        npApplyTracking(card);
+      }
 
       // A card saved as one variant with no attributes (before every
       // variant needed a value) opens as a row like any other, to be
@@ -3442,6 +3502,8 @@
     }
     const supI = vEl.querySelector('.np-v-supplier-sku');
     if (supI && v.supplier_sku) { supI.value = v.supplier_sku; supI.dataset.touched = '1'; }
+    const vbcI = vEl.querySelector('.np-v-barcode');
+    if (vbcI && v.barcode) vbcI.value = v.barcode;
     const priceI = vEl.querySelector('.np-v-price');
     if (priceI && v.price) priceI.value = v.price;
     const curI = vEl.querySelector('.np-v-cur');

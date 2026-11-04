@@ -972,9 +972,12 @@
   // Typing searches the attribute's values and their wordings in every
   // language, so "kre" offers "Krem · cream" and picking it stores cream.
   // A whole word a wording knows becomes its English value on leaving the
-  // field. A word nothing knows, typed by a reader of another language,
-  // asks for its English — Gemini's guess filled in to check — and the
-  // typed word is kept as that value's wording for the next person.
+  // field ("Fil Dişi" too: spaces don't count). A word nothing knows asks
+  // for its English — whatever language the screen is in, since a Turkish
+  // word is often typed on an English screen. Gemini fills in its guess to
+  // check and says which language the word is; a word that is already
+  // English stops asking, and any other is kept as that value's wording,
+  // in its language, for the next person.
   const NP_VAL_SUGGEST = "{% url 'marketing:attribute_value_suggest' %}";
   const NP_VAL_TRANSLATE = "{% url 'marketing:attribute_value_translate' %}";
   const NP_VAL_WORD = "{% url 'marketing:attribute_value_word' %}";
@@ -1056,7 +1059,7 @@
         return;
       }
       // A number or a code is the same in every language; only words ask.
-      if (NP_READER_LANG === 'en' || !/\p{L}{2,}/u.test(typed) || /\d/.test(typed)) return;
+      if (!/\p{L}{2,}/u.test(typed) || /\d/.test(typed)) return;
       npValueAskEnglish(input, typed);
     });
   };
@@ -1070,15 +1073,21 @@
         '<button type="button" onclick="npValueUseEnglish(this)">{% filter escapejs %}{% trans "Use" %}{% endfilter %}</button>' +
       '</div>';
     box.dataset.typed = typed;
+    delete box.dataset.lang;
     box.hidden = false;
     const en = box.querySelector('.np-val-en');
     const body = new URLSearchParams({ attribute: input.dataset.attr, text: typed,
-                                       source: NP_READER_LANG, targets: 'en' });
+                                       source: 'auto', targets: 'en' });
     fetch(NP_VAL_TRANSLATE, { method: 'POST', credentials: 'same-origin', body: body,
                               headers: { 'X-CSRFToken': NP_CSRF } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         const guess = d && d.suggested && d.suggested.en;
+        if (d && d.language) box.dataset.lang = d.language;
+        // Already English: nothing to ask.
+        if (d && d.language === 'en' && guess && guess.toLowerCase() === typed.toLowerCase()) {
+          box.hidden = true; return;
+        }
         if (guess && !en.value) { en.value = guess; en.title = '{% filter escapejs %}{% trans "Suggested — check it" %}{% endfilter %}'; }
       })
       .catch(function () {})
@@ -1090,10 +1099,12 @@
     const english = (box.querySelector('.np-val-en').value || '').trim();
     if (!english) { box.querySelector('.np-val-en').focus(); return; }
     const typed = box.dataset.typed || '';
+    const language = box.dataset.lang || NP_READER_LANG;
     npValueSet(input, english, typed);
+    if (language === 'en') return;
     fetch(NP_VAL_WORD, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': NP_CSRF },
       body: new URLSearchParams({ attribute: input.dataset.attr, value: english,
-                                  language: NP_READER_LANG, text: typed }) }).catch(function () {});
+                                  language: language, text: typed }) }).catch(function () {});
   };
   window.npRowAttrInput = function (input) {
     const vEl = input.closest('.np-variant');

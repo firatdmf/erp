@@ -47,6 +47,11 @@ class EnglishValueTest(TestCase):
         self.assertEqual(english_value("color", "КРЕМОВЫЙ"), "cream")
         self.assertEqual(english_value("color", "cream"), "cream")
 
+    def test_spaces_do_not_count(self):
+        _word("ivory", "Fildişi")
+        self.assertEqual(english_value("color", "Fil Dişi"), "ivory")
+        self.assertEqual(value_suggestions("color", "fil d", language="tr")[0]["value"], "ivory")
+
     def test_a_wording_holds_under_its_own_attribute_only(self):
         self.assertIsNone(english_value("header", "krem"))
 
@@ -100,10 +105,38 @@ class EndpointsTest(TestCase):
         with patch("marketing.wording_suggest._ask", return_value={"en": "ivory"}) as ask:
             d = self.client.post(url, {"attribute": "color", "text": "fildişi",
                                        "source": "tr", "targets": "en"}).json()
-        self.assertEqual(d["suggested"], {"en": "ivory"})
+        self.assertEqual((d["suggested"], d["language"]), ({"en": "ivory"}, "tr"))
         # The catalog's own wordings go with the question.
         self.assertIn("cream = Krem", ask.call_args[0][0])
         self.assertFalse(CatalogWording.objects.filter(key="ivory").exists())
+
+    def test_the_language_of_a_word_is_worked_out(self):
+        # Typed on an English screen, "Fil Dişi" is still Turkish.
+        with patch("marketing.wording_suggest._ask",
+                   return_value={"en": "ivory", "language": "tr"}) as ask:
+            d = self.client.post(reverse("marketing:attribute_value_translate"),
+                                 {"attribute": "color", "text": "Fil Dişi",
+                                  "source": "auto", "targets": "en"}).json()
+        self.assertEqual((d["suggested"], d["language"]), ({"en": "ivory"}, "tr"))
+        self.assertIn('"language"', ask.call_args[0][0])
+
+    def test_gemini_is_asked_over_its_rest_api(self):
+        from marketing.wording_suggest import suggest_wordings
+
+        class Answer:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"candidates": [{"content": {"parts": [{"text": '{"en": "ivory", "language": "tr"}'}]}}]}
+
+        with patch("marketing.wording_suggest._env",
+                   side_effect=lambda k: "key" if k == "GOOGLE_AI_API_KEY" else None), \
+                patch("requests.post", return_value=Answer()) as post:
+            self.assertEqual(suggest_wordings("color", "fildişi", "auto", ["en"]),
+                             ({"en": "ivory"}, "tr"))
+        self.assertIn("gemini-2.5-flash:generateContent", post.call_args[0][0])
+        self.assertEqual(post.call_args[1]["headers"], {"x-goog-api-key": "key"})
 
     def test_no_key_means_no_suggestion(self):
         with patch("marketing.wording_suggest._env", return_value=None):

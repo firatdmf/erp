@@ -129,10 +129,17 @@ def fold_term(text):
 _names_held = (None, {})
 
 
+def _squash(folded):
+    """A folded term without its spaces: "fil disi" and "fildisi" are one
+    word typed two ways."""
+    return folded.replace(" ", "")
+
+
 def _value_names():
     """{(scope, folded text): key} — every value wording, read backwards:
     what each language calls a value, pointing at its stored English key.
-    The key's own spelling points at itself."""
+    The key's own spelling points at itself. Each is also held without its
+    spaces, so "Fil Dişi" finds the wording "Fildişi"."""
     global _names_held
     held = _wordings()
     if _names_held[0] is held:
@@ -140,8 +147,9 @@ def _value_names():
     names = {}
     for (kind, scope, key, _language), text in held.items():
         if kind == WORDING_VALUE:
-            names.setdefault((scope, fold_term(key)), key)
-            names.setdefault((scope, fold_term(text)), key)
+            for name in (fold_term(key), fold_term(text)):
+                names.setdefault((scope, name), key)
+                names.setdefault((scope, _squash(name)), key)
     _names_held = (held, names)
     return names
 
@@ -163,7 +171,8 @@ def english_value(attribute_name, text):
     names, scope = _value_names(), term_key(attribute_name)
 
     def one(term):
-        return names.get((scope, term)) or names.get(("", term))
+        return (names.get((scope, term)) or names.get(("", term))
+                or names.get((scope, _squash(term))) or names.get(("", _squash(term))))
 
     found = one(folded)
     if found:
@@ -192,6 +201,8 @@ def value_suggestions(attribute_name, text, stored=(), language=None, limit=8):
             candidates.setdefault(name, key)
     for value in stored:
         candidates.setdefault(fold_term(value), term_key(value))
+    folded = _squash(folded)
+    candidates = {_squash(n): k for n, k in candidates.items()}
     starts = [k for n, k in candidates.items() if n.startswith(folded)]
     within = [k for n, k in candidates.items() if folded in n and not n.startswith(folded)]
     out, seen = [], set()

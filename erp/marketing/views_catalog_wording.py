@@ -203,15 +203,17 @@ def _reader():
 @login_required
 def attribute_value_translate(request):
     """Gemini's guess at a value in other languages, for a person to check:
-    POST attribute, text, source ("tr"), targets ("en" or "tr,ru") →
-    {"suggested": {"en": "ivory"}}. Empty when there is no guess."""
+    POST attribute, text, source ("tr", or "auto" to have it worked out),
+    targets ("en" or "tr,ru") → {"suggested": {"en": "ivory"}, "language":
+    "tr"}. Empty when there is no guess."""
     if request.method != "POST":
         return JsonResponse({"suggested": {}}, status=405)
     from .wording_suggest import suggest_wordings
     targets = [t for t in (request.POST.get("targets") or "").split(",") if t]
-    return JsonResponse({"suggested": suggest_wordings(
+    suggested, language = suggest_wordings(
         request.POST.get("attribute") or "", request.POST.get("text") or "",
-        (request.POST.get("source") or "").lower(), targets)})
+        (request.POST.get("source") or "").lower(), targets)
+    return JsonResponse({"suggested": suggested, "language": language})
 
 
 @login_required

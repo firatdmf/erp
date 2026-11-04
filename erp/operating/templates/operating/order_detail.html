@@ -836,7 +836,9 @@
   /* The name with its SKU under it, beside the photo. */
   .od-prod-text { display: flex; flex-direction: column; min-width: 0; }
   .od-prod-title { font: 600 13px var(--font-sans); color: #0F1419; }
-  .od-prod-link { color: inherit; text-decoration: none; }
+  /* As wide as the photo and name, not the whole cell, so a click
+     past the end of the name doesn't open the product. */
+  .od-prod-link { display: block; width: fit-content; max-width: 100%; color: inherit; text-decoration: none; }
   .od-prod-link:hover .od-prod-title { color: var(--nejum-teal-700); }
   .od-totals { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #E2E8EE; }
   /* An order split across books: the combined name, the note saying which

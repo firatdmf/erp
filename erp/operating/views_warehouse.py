@@ -5933,18 +5933,14 @@ def _ocr_label_gemini(image_file):
     """Send the label image to Gemini Vision and ask it to extract
     {sku, name, meters} as structured JSON. Cheap + fast option.
 
-    Requires GOOGLE_AI_API_KEY env var (the name the storefront uses too).
+    Requires GOOGLE_AI_API_KEY env var (the name the storefront uses too);
+    asked through marketing.gemini's REST call.
     """
     import json as _json
 
-    try:
-        from google import genai
-        from google.genai import types as genai_types
-    except ImportError:
-        return "", {"error": "google-genai SDK not installed (pip install google-genai)"}
+    from marketing.gemini import GeminiUnavailable, ask_gemini
 
-    api_key = _env("GOOGLE_AI_API_KEY")
-    if not api_key:
+    if not _env("GOOGLE_AI_API_KEY"):
         return "", {"error": "GOOGLE_AI_API_KEY env var not set"}
 
     try:
@@ -6003,46 +5999,13 @@ def _ocr_label_gemini(image_file):
         "null. Do not invent values."
     )
 
-    # Allow overriding the model from env. Flash is the sweet spot.
-    model_name = _env("GEMINI_MODEL") or "gemini-2.5-flash"
-
-    # Build the config. Disable thinking mode for Gemini 2.5 — without
-    # this the model burns most of max_output_tokens on internal
-    # reasoning and the real JSON comes back truncated (we saw
-    # responses like '{"sku' or 'Here is the JSON requested:\n```').
-    cfg_kwargs = dict(
-        response_mime_type="application/json",
-        temperature=0,
-        # Output JSON is short (~120 chars). Keep this small to cut
-        # latency — Gemini 2.5 returns faster with a tight budget.
-        max_output_tokens=400,
-    )
+    # The model is marketing.gemini's to pick (GEMINI_MODEL, then its
+    # list); a JSON answer is short, but newer models think first and
+    # that counts against the output budget.
     try:
-        cfg_kwargs["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=0)
-    except Exception:
-        # Older SDKs without ThinkingConfig — leave it off.
-        pass
-
-    try:
-        client = genai.Client(api_key=api_key)
-        resp = client.models.generate_content(
-            model=model_name,
-            contents=[
-                genai_types.Part.from_bytes(data=raw_bytes, mime_type=media_type),
-                prompt,
-            ],
-            config=genai_types.GenerateContentConfig(**cfg_kwargs),
-        )
-    except Exception as e:
+        text_out = ask_gemini([(raw_bytes, media_type), prompt], max_output_tokens=2000, timeout=40)
+    except GeminiUnavailable as e:
         return "", {"error": f"Gemini call failed: {e}"}
-
-    text_out = (getattr(resp, "text", None) or "").strip()
-    if not text_out:
-        # Fallback: dig through candidates
-        try:
-            text_out = resp.candidates[0].content.parts[0].text or ""
-        except Exception:
-            text_out = ""
 
     json_str = text_out.strip()
     if "```" in json_str:

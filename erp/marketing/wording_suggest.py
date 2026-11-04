@@ -8,30 +8,15 @@ person leaves there. Gemini is told the wordings already written for the
 attribute, so it follows the catalog's own vocabulary ("sedef" is nacre
 here, not pearl) rather than a dictionary's.
 
-Uses GOOGLE_AI_API_KEY, the key label reading uses. With no key, no
+Asked through marketing.gemini, as label reading is. With no key, no
 network or no answer, there is simply no suggestion.
 """
 import json
-import logging
 
 from .attributes import WORDING_VALUE, _wordings, term_key
 
-logger = logging.getLogger(__name__)
-
 LANGUAGE_NAMES = {"en": "English", "tr": "Turkish", "ru": "Russian", "pl": "Polish"}
 _EXAMPLES = 60
-
-
-def _env(key):
-    import os
-    value = os.environ.get(key)
-    if value:
-        return value
-    try:
-        from decouple import config
-        return config(key, default=None)
-    except Exception:
-        return None
 
 
 def _examples(attribute_name, languages):
@@ -48,30 +33,16 @@ def _examples(attribute_name, languages):
 
 
 def _ask(prompt):
-    """Gemini's JSON answer to `prompt`, or None. A plain call to its REST
-    API: the google-genai SDK wants a newer google-auth than the Gmail and
-    Drive clients are pinned to."""
-    import requests
-
-    api_key = _env("GOOGLE_AI_API_KEY")
-    if not api_key:
-        return None
-    model = _env("GEMINI_MODEL") or "gemini-2.5-flash"
+    """Gemini's JSON answer to `prompt`, or None."""
+    from .gemini import GeminiUnavailable, ask_gemini
     try:
-        resp = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-            headers={"x-goog-api-key": api_key},
-            json={"contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"responseMimeType": "application/json", "temperature": 0,
-                                       "maxOutputTokens": 200,
-                                       "thinkingConfig": {"thinkingBudget": 0}}},
-            timeout=10)
-        resp.raise_for_status()
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        start, end = text.find("{"), text.rfind("}")
+        text = ask_gemini([prompt], timeout=25)
+    except GeminiUnavailable:
+        return None
+    start, end = text.find("{"), text.rfind("}")
+    try:
         return json.loads(text[start:end + 1]) if start != -1 and end > start else None
-    except Exception:
-        logger.warning("wording suggestion failed", exc_info=True)
+    except ValueError:
         return None
 
 

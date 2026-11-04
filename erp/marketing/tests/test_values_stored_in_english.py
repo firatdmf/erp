@@ -22,6 +22,17 @@ from marketing.attributes import english_value, fold_term, value_suggestions
 from marketing.models import CatalogWording
 
 
+class _Reply:
+    """What requests.post returns, as far as marketing.gemini reads it."""
+    def __init__(self, status, text="", message=""):
+        self.status_code, self.text, self.message = status, text, message
+
+    def json(self):
+        if self.status_code != 200:
+            return {"error": {"message": self.message}}
+        return {"candidates": [{"content": {"parts": [{"text": self.text}]}}]}
+
+
 def _word(key, text, scope="color", language="tr"):
     CatalogWording.objects.create(kind="value", scope=scope, key=key, language=language, text=text)
 
@@ -122,24 +133,16 @@ class EndpointsTest(TestCase):
 
     def test_gemini_is_asked_over_its_rest_api(self):
         from marketing.wording_suggest import suggest_wordings
-
-        class Answer:
-            def raise_for_status(self):
-                pass
-
-            def json(self):
-                return {"candidates": [{"content": {"parts": [{"text": '{"en": "ivory", "language": "tr"}'}]}}]}
-
-        with patch("marketing.wording_suggest._env",
-                   side_effect=lambda k: "key" if k == "GOOGLE_AI_API_KEY" else None), \
-                patch("requests.post", return_value=Answer()) as post:
+        answer = '{"en": "ivory", "language": "tr"}'
+        with patch("marketing.gemini.env", side_effect=lambda k: "key" if k == "GOOGLE_AI_API_KEY" else None), \
+                patch("requests.post", return_value=_Reply(200, answer)) as post:
             self.assertEqual(suggest_wordings("color", "fildişi", "auto", ["en"]),
                              ({"en": "ivory"}, "tr"))
-        self.assertIn("gemini-2.5-flash:generateContent", post.call_args[0][0])
+        self.assertIn("gemini-3.5-flash-lite:generateContent", post.call_args[0][0])
         self.assertEqual(post.call_args[1]["headers"], {"x-goog-api-key": "key"})
 
     def test_no_key_means_no_suggestion(self):
-        with patch("marketing.wording_suggest._env", return_value=None):
+        with patch("marketing.gemini.env", return_value=None):
             d = self.client.post(reverse("marketing:attribute_value_translate"),
                                  {"attribute": "color", "text": "fildişi",
                                   "source": "tr", "targets": "en"}).json()
@@ -163,3 +166,38 @@ class GoodsReceiptOffersValuesTest(TestCase):
         r = client.get(reverse("accounts:goods_receipt", kwargs={"book_id": book.pk}))
         self.assertContains(r, reverse("marketing:attribute_value_suggest"))
         self.assertContains(r, "npValueAskEnglish")
+
+
+class GeminiCallTest(TestCase):
+    """Models come and go: a gone or busy one is passed over, a refused key
+    is not retried."""
+
+    def _ask(self, *replies, model=None):
+        from marketing.gemini import ask_gemini
+        keys = {"GOOGLE_AI_API_KEY": "key", "GEMINI_MODEL": model}
+        with patch("marketing.gemini.env", side_effect=keys.get), \
+                patch("requests.post", side_effect=list(replies)) as post:
+            try:
+                return ask_gemini(["hi"]), [c[0][0].split("/")[-1] for c in post.call_args_list]
+            except Exception as e:
+                return e, [c[0][0].split("/")[-1] for c in post.call_args_list]
+
+    def test_a_retired_model_is_passed_over(self):
+        text, asked = self._ask(_Reply(404, message="no longer available"), _Reply(200, "{}"),
+                                model="gemini-2.5-flash")
+        self.assertEqual(text, "{}")
+        self.assertEqual(asked, ["gemini-2.5-flash:generateContent",
+                                 "gemini-3.5-flash-lite:generateContent"])
+
+    def test_a_refused_key_stops_at_once(self):
+        from marketing.gemini import GeminiUnavailable
+        error, asked = self._ask(_Reply(403))
+        self.assertIsInstance(error, GeminiUnavailable)
+        self.assertEqual(len(asked), 1)
+
+    def test_every_model_failing_is_no_answer(self):
+        import requests
+        from marketing.gemini import GeminiUnavailable
+        error, asked = self._ask(_Reply(503, message="high demand"), requests.Timeout())
+        self.assertIsInstance(error, GeminiUnavailable)
+        self.assertIn("high demand", str(error))

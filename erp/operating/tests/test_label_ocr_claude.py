@@ -103,3 +103,27 @@ class LabelDispatcherTest(SimpleTestCase):
                 mock.patch.object(vw, "_ocr_label_claude", return_value=("{}", {"sku": "A", "quantity": 2.0})):
             _, parsed = vw._ocr_label(io.BytesIO(b"x"))
         self.assertEqual(parsed["_backend"], "claude")
+
+
+class GeminiLabelTest(SimpleTestCase):
+    """Gemini reads a label over its REST call (marketing.gemini): the
+    google-genai SDK it used was never installed on the server."""
+
+    def test_the_image_goes_with_the_prompt_and_the_answer_is_read(self):
+        answer = '{"sku": "k24644", "name": "KADİFE KREM", "quantity": "25.5", "barcode": "KL-055555"}'
+        png = b"\x89PNG\r\n\x1a\n" + b"0" * 20
+        with mock.patch.object(vw, "_env", lambda k: "g" if k == "GOOGLE_AI_API_KEY" else ""), \
+                mock.patch("marketing.gemini.ask_gemini", return_value=answer) as ask:
+            _, parsed = vw._ocr_label_gemini(io.BytesIO(png))
+        image, prompt = ask.call_args[0][0]
+        self.assertEqual(image, (png, "image/png"))
+        self.assertIn("sku", prompt)
+        self.assertEqual((parsed["sku"], parsed["quantity"], parsed["barcode"]),
+                         ("K24644", 25.5, "KL055555"))
+
+    def test_no_answer_is_an_error_the_dispatcher_moves_past(self):
+        from marketing.gemini import GeminiUnavailable
+        with mock.patch.object(vw, "_env", lambda k: "g" if k == "GOOGLE_AI_API_KEY" else ""), \
+                mock.patch("marketing.gemini.ask_gemini", side_effect=GeminiUnavailable("busy")):
+            _, parsed = vw._ocr_label_gemini(io.BytesIO(b"x" * 10))
+        self.assertIn("busy", parsed["error"])

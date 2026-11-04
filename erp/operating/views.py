@@ -3663,7 +3663,7 @@ class OrderPrint(DetailView):
         from .split_orders import split_halves
         halves = split_halves(order)
         if len(halves) > 1:
-            ctx.update(combined_print_context(halves))
+            ctx.update(combined_print_context(halves, self.request))
             ctx["is_pdf"] = True
             return ctx
         # Who the document signs as: the order's own print header, else
@@ -3688,7 +3688,8 @@ class OrderPrint(DetailView):
         ctx["has_customer_info"] = bool(order.contact_id or order.company_id or order.web_client_id)
         ctx["has_delivery_info"] = order_has_delivery_info(order)
         from .order_balance import order_balances
-        ctx["order_balances"] = order_balances([order], {order.pk: total})
+        ctx["order_balances"] = order_balances(
+            [order], {order.pk: total}, getattr(self.request.user, "member", None))
         return ctx
 
     def render_to_response(self, context, **response_kwargs):
@@ -3800,16 +3801,17 @@ class OrderPrintCombined(LoginRequiredMixin, View):
         orders, refusal = select_combined_orders(request)
         if refusal is not None:
             return refusal
-        ctx = apply_print_choices(request, combined_print_context(orders))
+        ctx = apply_print_choices(request, combined_print_context(orders, request))
         return document_response(request, "operating/order_print.html", ctx,
                                  f"orders_{ctx['order'].order_number or ctx['order'].pk}.pdf")
 
 
-def combined_print_context(orders):
+def combined_print_context(orders, request=None):
     """What the combined sheet prints for `orders`: their lines under a
     heading each and one grand total. OrderPrintCombined's, and also a
     split order's own print — the halves are one order, so either half
-    prints all of it (see split_orders)."""
+    prints all of it (see split_orders). `request` is whose books the
+    balance counts (operating.order_balance)."""
     from decimal import Decimal
     from accounting.services_accounts import brand_name_for
 
@@ -3875,7 +3877,8 @@ def combined_print_context(orders):
         "has_customer_info": bool(primary.contact_id or primary.company_id
                                   or primary.web_client_id),
         "has_delivery_info": order_has_delivery_info(primary),
-        "order_balances": order_balances(orders, totals),
+        "order_balances": order_balances(
+            orders, totals, getattr(getattr(request, "user", None), "member", None)),
     }
 
 

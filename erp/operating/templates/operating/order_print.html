@@ -217,15 +217,14 @@
   </table>
 
   {% comment %}The customer's account under the total: what they owed
-     before these goods, the goods, and where that leaves them. One block
-     per account billed — a sheet across books owes in each. See
-     operating.order_balance for what "previous" leaves out, and why
-     nothing prints when the balance comes to zero.{% endcomment %}
+     before these goods, summed across the books the printer may see,
+     the goods, and where that leaves them. No book is named: the
+     customer owes one business, and a white-label sheet would say who
+     sent it. One block per currency. See operating.order_balance for
+     what "previous" leaves out, and why nothing prints when the balance
+     comes to zero.{% endcomment %}
   {% for bal in order_balances %}
   <table class="balance" cellspacing="0" cellpadding="0">
-    {% if order_balances|length > 1 %}
-    <tr><td class="book" colspan="2">{{ bal.account.book.name }}</td></tr>
-    {% endif %}
     <tr>
       <td class="lbl">{% trans "Previous balance" %}</td>
       <td class="val">{{ bal.symbol }}{{ bal.previous|floatformat:"2u"|intcomma:False|cut:"-" }}{% if bal.previous < 0 %} {% trans "in credit" %}{% endif %}</td>

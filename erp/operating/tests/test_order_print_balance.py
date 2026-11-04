@@ -132,16 +132,67 @@ class OrderPrintBalance(OlegsAccount, TestCase):
         self._move("100.00")
         self.assertEqual(self._sheet(walk_in).context["order_balances"], [])
 
-    def test_a_sheet_across_books_shows_each_account(self):
+    def test_a_sheet_across_books_adds_the_books_up(self):
         self._move("100.00")
         other = self._order(self.ergene, self.oleg, "DK-291", Decimal("19.50"), Decimal("4.50"))
         self._move("50.00", account=other.current_account)
         resp = self.client.get(reverse("operating:order_print_combined"),
                                {"ids": f"{self.order.pk},{other.pk}", "html": "1"})
-        after = {b["account"].book.name: b["after"] for b in resp.context["order_balances"]}
-        self.assertEqual(after, {"Laleli Fabric": Decimal("490.00"),
-                                 "Ergene Fabric": Decimal("137.75")})
+        bal = self._only_balance(resp)
+        self.assertEqual((bal["previous"], bal["this_orders"], bal["after"]),
+                         (Decimal("150.00"), Decimal("477.75"), Decimal("627.75")))
+        self.assertEqual({b["account"].book.name: b["previous"] for b in bal["books"]},
+                         {"Laleli Fabric": Decimal("100.00"), "Ergene Fabric": Decimal("50.00")})
         self.assertContains(resp, "These orders")
+
+    def test_one_order_counts_the_customers_other_books(self):
+        """İnsar's Laleli order: what they owe in Ergene is owed too."""
+        self._move("100.00")
+        ergene_account = CurrentAccount.objects.create(
+            book=self.ergene, contact=self.oleg, code="C-E", name=self.oleg.name,
+            type="customer", default_currency=self.usd)
+        self._move("922.75", account=ergene_account)
+        resp = self._sheet()
+        bal = self._only_balance(resp)
+        self.assertEqual((bal["previous"], bal["after"]), (Decimal("1022.75"), Decimal("1412.75")))
+        self.assertEqual([b["account"].book.name for b in bal["books"]],
+                         ["Laleli Fabric", "Ergene Fabric"])
+        self.assertContains(resp, "$1,022.75")
+        self.assertContains(resp, "$1,412.75")
+
+    def test_the_sheet_names_no_book(self):
+        """The customer owes one business; a white-label sheet especially
+        must not say which of ours the money sits in."""
+        self._move("100.00")
+        ergene_account = CurrentAccount.objects.create(
+            book=self.ergene, contact=self.oleg, code="C-E", name=self.oleg.name,
+            type="customer", default_currency=self.usd)
+        self._move("922.75", account=ergene_account)
+        resp = self._sheet()
+        self.assertNotContains(resp, "Ergene Fabric")
+        self.assertNotContains(resp, "$922.75")
+
+    def test_a_book_the_printer_cannot_see_is_left_out(self):
+        from authentication.models import Member
+        self._move("100.00")
+        ergene_account = CurrentAccount.objects.create(
+            book=self.ergene, contact=self.oleg, code="C-E", name=self.oleg.name,
+            type="customer", default_currency=self.usd)
+        self._move("922.75", account=ergene_account)
+        clerk = User.objects.create_user("clerk", "c@t.com", "pw")
+        member, _ = Member.objects.get_or_create(user=clerk)
+        member.books.add(self.laleli)
+        from operating.order_balance import order_balances
+        bal, = order_balances([self.order], {self.order.pk: Decimal("390.00")}, member)
+        self.assertEqual((bal["previous"], bal["books"]), (Decimal("100.00"), []))
+
+    def test_a_single_book_holding_a_balance_is_not_listed(self):
+        self._move("100.00")
+        CurrentAccount.objects.create(
+            book=self.ergene, contact=self.oleg, code="C-E", name=self.oleg.name,
+            type="customer", default_currency=self.usd)
+        bal = self._only_balance(self._sheet())
+        self.assertEqual(bal["books"], [])
 
     def test_the_excel_carries_the_same_figures(self):
         from openpyxl import load_workbook
@@ -153,17 +204,19 @@ class OrderPrintBalance(OlegsAccount, TestCase):
         self.assertIn(["This order", 390.0], values)
         self.assertIn(["Balance due", 490.0], values)
 
-    def test_the_combined_excel_carries_each_account(self):
+    def test_the_combined_excel_sums_the_books(self):
         from openpyxl import load_workbook
         self._move("-500.00", "collection")
         other = self._order(self.ergene, self.oleg, "DK-291", Decimal("19.50"), Decimal("4.50"))
+        self._move("30.00", account=other.current_account)
         resp = self.client.get(reverse("operating:order_excel_combined"),
                                {"ids": f"{self.order.pk},{other.pk}"})
         ws = load_workbook(BytesIO(resp.content)).active
         values = [[c for c in row if c is not None] for row in ws.iter_rows(values_only=True)]
-        self.assertIn(["Previous balance (in credit)", 500.0], values)
-        self.assertIn(["In credit", 110.0], values)
-        self.assertIn(["Balance due", 87.75], values)
+        cells = {str(v) for row in values for v in row}
+        self.assertFalse(cells & {"Laleli Fabric", "Ergene Fabric", "Laleli Fabric (in credit)"})
+        self.assertIn(["Previous balance (in credit)", 470.0], values)
+        self.assertIn(["Balance due", 7.75], values)
 
 
 class PrintMenuChoices(OlegsAccount, TestCase):

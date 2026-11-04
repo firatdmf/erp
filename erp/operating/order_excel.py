@@ -242,10 +242,6 @@ def _write_balances(ws, r, balances, label_from, value_col, combined=False):
     for bal in balances:
         money = _money_format(bal["currency_code"])
         r += 1
-        if len(balances) > 1:
-            cell(ws, r, label_from, bal["account"].book.name, font=F_VALB, align=RIGHT)
-            merge(ws, r, label_from, value_col)
-            r += 1
         previous, after = bal["previous"], bal["after"]
         rows = [
             ("Previous balance (in credit)" if previous < 0 else "Previous balance",
@@ -263,9 +259,10 @@ def _write_balances(ws, r, balances, label_from, value_col, combined=False):
     return r
 
 
-def build_order_workbook(order, white_label=False, balance=True):
+def build_order_workbook(order, white_label=False, balance=True, member=None):
     """`white_label` and `balance` are the Print button menu's choices —
-    see operating.views.print_choices."""
+    see operating.views.print_choices. `member` is who is downloading:
+    their books are the ones the balance counts (operating.order_balance)."""
     from openpyxl import Workbook
 
     # The order's own print header wins, then the ledger book's brand
@@ -447,7 +444,7 @@ def build_order_workbook(order, white_label=False, balance=True):
     # ── The customer's balance ──
     if balance:
         from .order_balance import order_balances
-        r = _write_balances(ws, r, order_balances([order], {order.pk: Decimal(str(grand))}), 4, NCOLS)
+        r = _write_balances(ws, r, order_balances([order], {order.pk: Decimal(str(grand))}, member), 4, NCOLS)
 
     # ── Notes ──
     if order.notes:
@@ -475,7 +472,7 @@ CNCOLS = len(COMBINED_HEADS)
 C_QTY, C_PACKS, C_PRICE, C_AMOUNT = 6, 7, 8, 9
 
 
-def build_combined_workbook(orders, white_label=False, balance=True):
+def build_combined_workbook(orders, white_label=False, balance=True, member=None):
     """One customer's orders as a single sheet of line items.
 
     The lines come from build_order_print_rows — the same builder the
@@ -624,7 +621,7 @@ def build_combined_workbook(orders, white_label=False, balance=True):
     # ── The customer's balance ── under the money columns, after the
     # table is measured: its labels are wider than any Price figure.
     from .order_balance import order_balances
-    balances = order_balances(orders, totals) if balance else []
+    balances = order_balances(orders, totals, member) if balance else []
 
     # The item rows get a filter, which is the first thing anyone who
     # exported this will want — by order, by product, by colour.
@@ -682,7 +679,8 @@ def combined_order_excel(request):
     if refusal is not None:
         return refusal
     white_label, balance = print_choices(request)
-    wb = build_combined_workbook(orders, white_label=white_label, balance=balance)
+    wb = build_combined_workbook(orders, white_label=white_label, balance=balance,
+                                 member=getattr(request.user, "member", None))
     buf = BytesIO()
     wb.save(buf)
     who = orders[-1].contact or orders[-1].company or orders[-1].web_client
@@ -705,9 +703,10 @@ def order_excel(request, pk):
     halves = split_halves(order)
     from .views import print_choices
     white_label, balance = print_choices(request)
-    wb = (build_combined_workbook(halves, white_label=white_label, balance=balance)
+    member = getattr(request.user, "member", None)
+    wb = (build_combined_workbook(halves, white_label=white_label, balance=balance, member=member)
           if len(halves) > 1 else
-          build_order_workbook(order, white_label=white_label, balance=balance))
+          build_order_workbook(order, white_label=white_label, balance=balance, member=member))
     buf = BytesIO()
     wb.save(buf)
     label = order.order_number or f"order-{order.pk}"

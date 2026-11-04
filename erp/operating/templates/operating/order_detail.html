@@ -839,6 +839,8 @@
   /* Only the name opens the product, and only as far as it reaches — not
      the cell or the SKU under it. The photo opens the photo viewer. */
   .od-prod-link { display: block; width: fit-content; max-width: 100%; color: inherit; text-decoration: none; }
+  .od-prod-play { display: flex; align-items: center; justify-content: center;
+                  color: #fff; font-size: 12px; }
   /* base.css pads every <button>; this one is just the photo. */
   .od-prod-zoom { display: flex; flex-shrink: 0; padding: 0; margin: 0; border: 0;
                   background: none; border-radius: 7px; cursor: zoom-in; }
@@ -1642,16 +1644,7 @@
                     {% if item.product %}
                     {% url 'marketing:product_detail' item.product.pk as product_url %}
                     <div class="od-prod">
-                      {% with first_file=item.product.files.all|first %}
-                        {% if first_file and first_file.file_url %}
-                          <button type="button" class="od-prod-zoom" data-photos="{{ item.product.files.all|photos_json }}"
-                                  onclick="event.stopPropagation(); whPhotoOpen(this);">
-                            <img class="od-prod-img" src="{{ first_file.file_url }}" alt="">
-                          </button>
-                        {% else %}
-                          <span class="od-prod-img"></span>
-                        {% endif %}
-                      {% endwith %}
+                      {% include "operating/partials/od_line_photo.html" %}
                       <div class="od-prod-text"><a href="{{ product_url }}" class="od-prod-link"><span class="od-prod-title">{{ item.product.title }}</span></a>{% include "operating/partials/od_line_sku.html" %}</div>
                     </div>
                     {% else %}
@@ -1749,13 +1742,7 @@
                   <div style="min-width:0;">
                     {% if item.product %}
                     <div class="od-prod">
-                      {% with first_file=item.product.files.all|first %}
-                        {% if first_file and first_file.file_url %}
-                          <img class="od-prod-img" src="{{ first_file.file_url }}" alt="">
-                        {% else %}
-                          <span class="od-prod-img"></span>
-                        {% endif %}
-                      {% endwith %}
+                      {% include "operating/partials/od_line_photo.html" %}
                       <div class="od-prod-text"><span class="od-prod-title">{{ item.product.title }}</span>{% include "operating/partials/od_line_sku.html" %}</div>
                     </div>
                     {% else %}
@@ -3899,10 +3886,7 @@
           ? `<a href="${it.product_url}" class="od-prod-link">${html}</a>`
           : html;
         const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        const img = it.image_url
-          ? '<button type="button" class="od-prod-zoom" data-photos="' + esc(JSON.stringify([{ src: it.image_url, alt: '' }])) + '"' +
-            ' onclick="event.stopPropagation(); whPhotoOpen(this);"><img class="od-prod-img" src="' + esc(it.image_url) + '" alt=""></button>'
-          : '<span class="od-prod-img"></span>';
+        const img = it.photo_html;
         const q = Number(it.quantity).toString();
         const p = Number(it.price).toString();
         const maxAttr = (it.max_qty !== null && it.max_qty !== undefined && !it.allow_oversell)

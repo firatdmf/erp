@@ -2,7 +2,8 @@
 # python manage.py test operating.tests.test_order_photo_viewer
 
 """On an order line the photo opens the photo viewer the warehouse uses,
-and only the name opens the product.
+with the photos and videos the storefront shows for the line's variant, in
+the storefront's order; only the name opens the product.
 
 The photo and the name were one link, as wide as the cell, so a click
 anywhere beside the name — or on the photo, to see it bigger — left the
@@ -29,7 +30,8 @@ class OrderPhotoViewerTest(TestCase):
     def setUp(self):
         self.product = Product.objects.create(
             title="Ready Made Curtain", sku="RMC", featured=False)
-        variant = ProductVariant.objects.create(product=self.product, variant_sku="RMC-CGR")
+        self.variant = variant = ProductVariant.objects.create(
+            product=self.product, variant_sku="RMC-CGR")
         variant.product_variant_attribute_values.add(
             ProductVariantAttributeValue.objects.create(
                 product_variant_attribute=ProductVariantAttribute.objects.create(name="color"),
@@ -54,17 +56,42 @@ class OrderPhotoViewerTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         return resp.content.decode()
 
-    def test_the_photo_opens_every_photo_of_the_product_in_the_viewer(self):
-        for url, kind in (("https://cdn.test/a.avif", "image"),
-                          ("https://cdn.test/clip.mp4", "video"),
-                          ("https://cdn.test/b.avif", "image")):
-            ProductFile.objects.create(product=self.product, file_url=url, file_type=kind)
+    def _viewer(self, page):
+        marker = 'class="od-prod-zoom" data-photos="'
+        start = page.index(marker) + len(marker)
+        return json.loads(html_lib.unescape(page[start:page.index('"', start)]))
+
+    def _file(self, url, sequence, kind="image", variant=False, poster=None):
+        return ProductFile.objects.create(
+            product=None if variant else self.product,
+            product_variant=self.variant if variant else None,
+            file_url=url, file_type=kind, sequence=sequence, video_thumbnail=poster)
+
+    def test_the_viewer_follows_the_storefront_first_photo_then_videos_then_the_rest(self):
+        self._file("https://cdn.test/b.avif", 2)
+        self._file("https://cdn.test/clip.mp4", 3, kind="video", poster="https://cdn.test/clip.jpg")
+        self._file("https://cdn.test/a.avif", 1)
         page = self._page()
         self.assertIn('id="whPhotos"', page)
-        start = page.index('class="od-prod-zoom" data-photos="') + len('class="od-prod-zoom" data-photos="')
-        photos = json.loads(html_lib.unescape(page[start:page.index('"', start)]))
-        self.assertEqual([p["src"] for p in photos],
-                         ["https://cdn.test/a.avif", "https://cdn.test/b.avif"])
+        self.assertIn('<img class="od-prod-img" src="https://cdn.test/a.avif"', page)
+        self.assertEqual(self._viewer(page), [
+            {"src": "https://cdn.test/a.avif", "alt": ""},
+            {"src": "https://cdn.test/clip.mp4", "alt": "", "video": True,
+             "poster": "https://cdn.test/clip.jpg"},
+            {"src": "https://cdn.test/b.avif", "alt": ""},
+        ])
+
+    def test_the_lines_variant_shows_its_own_photos_as_on_the_storefront(self):
+        self._file("https://cdn.test/product.avif", 0)
+        self._file("https://cdn.test/green-2.avif", 2, variant=True)
+        self._file("https://cdn.test/green-1.avif", 1, variant=True)
+        self.assertEqual([p["src"] for p in self._viewer(self._page())],
+                         ["https://cdn.test/green-1.avif", "https://cdn.test/green-2.avif"])
+
+    def test_a_variant_with_no_photo_of_its_own_shows_the_products(self):
+        self._file("https://cdn.test/product.avif", 0)
+        self.assertEqual([p["src"] for p in self._viewer(self._page())],
+                         ["https://cdn.test/product.avif"])
 
     def test_only_the_name_links_to_the_product(self):
         ProductFile.objects.create(product=self.product, file_url="https://cdn.test/a.avif")

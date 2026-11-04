@@ -399,3 +399,51 @@ def alt_texts_by_row(rows, title, description, group, variant_pairs):
             by_users[variants] = alt_texts(title, description, group, shared or ())
         texts[row["id"]] = by_users[variants]
     return texts
+
+
+# What the storefront takes for a video besides file_type "video": an
+# older row typed as an image whose address ends like a video.
+_VIDEO_ADDRESS = re.compile(r"\.(mp4|webm|mov|avi|mkv)(\?.*)?$")
+
+
+def is_video(f):
+    return f.file_type == "video" or bool(_VIDEO_ADDRESS.search((f.file_url or "").lower()))
+
+
+def _same_file(url):
+    """The address two rows of one file share: without its query string or
+    a Cloudinary version folder, as the storefront compares them."""
+    return re.sub(r"/v\d+/", "/", (url or "").split("?")[0])
+
+
+def storefront_gallery(files, variant_id=None):
+    """`files` in the order the storefront's product page shows them, with
+    `variant_id` chosen there or none (ProductDetailCard.tsx, mediaItems):
+    the first photo, then the videos, then the other photos, by sequence.
+
+    With a variant chosen: its own photos, and its own videos or, if it has
+    none, the product's. With none chosen: the product's own photos (all of
+    them when it has none of its own) and the product's videos. One file
+    shared by several rows is shown once."""
+    def once(rows):
+        seen, kept = set(), []
+        for f in rows:
+            key = _same_file(f.file_url)
+            if key not in seen:
+                seen.add(key)
+                kept.append(f)
+        return kept
+
+    files = sorted({f.pk: f for f in files if f.file_url}.values(),
+                   key=lambda f: (f.sequence, f.pk))
+    photos = [f for f in files if not is_video(f)]
+    videos = [f for f in files if is_video(f)]
+    if variant_id:
+        photos = [f for f in photos if f.product_variant_id == variant_id]
+        own = [f for f in videos if f.product_variant_id == variant_id]
+        videos = own or [f for f in videos if not f.product_variant_id]
+    else:
+        photos = [f for f in photos if not f.product_variant_id] or photos
+        videos = [f for f in videos if not f.product_variant_id]
+    photos, videos = once(photos), once(videos)
+    return photos[:1] + videos + photos[1:]

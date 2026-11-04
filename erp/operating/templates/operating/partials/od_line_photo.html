@@ -1,0 +1,14 @@
+{% load operating_tags %}
+{% comment %}An order line's first photo, as the storefront shows it (line_gallery);
+a click opens all its photos and videos in the photo viewer
+(partials/_photo_viewer.html) and does not expand the row.{% endcomment %}
+{% with gallery=item|line_gallery %}
+  {% if gallery %}
+    <button type="button" class="od-prod-zoom" data-photos="{{ gallery|photos_json }}"
+            onclick="event.stopPropagation(); whPhotoOpen(this);">
+      {% with src=gallery.0|thumb_src %}{% if src %}<img class="od-prod-img" src="{{ src }}" alt="">{% else %}<span class="od-prod-img od-prod-play"><i class="fa fa-play"></i></span>{% endif %}{% endwith %}
+    </button>
+  {% else %}
+    <span class="od-prod-img"></span>
+  {% endif %}
+{% endwith %}

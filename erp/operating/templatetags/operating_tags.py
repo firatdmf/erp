@@ -76,13 +76,60 @@ def cost_in_base(value, order):
 
 @register.filter
 def photos_json(files):
-    """Photos as JSON for the photo viewer (partials/_photo_viewer.html):
-    [{"src": …, "alt": …}], in the order given, videos and files without
-    an address left out. Autoescape makes it safe inside an attribute."""
+    """Photos and videos as JSON for the photo viewer
+    (partials/_photo_viewer.html), in the order given:
+    [{"src": …, "alt": …}], a video with "video": true and its "poster".
+    Autoescape makes it safe inside an attribute."""
     import json
-    return json.dumps([{"src": f.file_url, "alt": f.alt_text or ""}
-                       for f in files or ()
-                       if f.file_type == "image" and f.file_url])
+    from marketing.product_images import is_video
+    out = []
+    for f in files or ():
+        if not f.file_url:
+            continue
+        one = {"src": f.file_url, "alt": f.alt_text or ""}
+        if is_video(f):
+            one.update(video=True, poster=f.video_thumbnail or "")
+        out.append(one)
+    return json.dumps(out)
+
+
+@register.filter
+def thumb_src(f):
+    """What a small picture of `f` shows: the photo, or a video's first
+    frame ("" when it has none yet)."""
+    from marketing.product_images import is_video
+    if not f:
+        return ""
+    return (f.video_thumbnail or "") if is_video(f) else (f.file_url or "")
+
+
+@register.filter
+def variant_gallery(variant):
+    """A catalog variant's own photos and videos, in the storefront's order
+    (from variant_photos_prefetch). Never its product's: they would show
+    a colour the row does not hold."""
+    from marketing.product_images import storefront_gallery
+    if not variant:
+        return []
+    files = getattr(variant, "own_files", None)
+    return storefront_gallery(variant.files.all() if files is None else files, variant.pk)
+
+
+@register.filter
+def line_gallery(item):
+    """An order line's photos and videos, in the storefront's order: what
+    the product page shows with the line's variant chosen, or — when that
+    variant has no photo of its own — what it shows with none chosen."""
+    from marketing.product_images import is_video, storefront_gallery
+    if not item.product_id:
+        return []
+    product_files = list(item.product.files.all())
+    if item.product_variant_id:
+        gallery = storefront_gallery(product_files + list(item.product_variant.files.all()),
+                                     item.product_variant_id)
+        if any(not is_video(f) for f in gallery):
+            return gallery
+    return storefront_gallery(product_files)
 
 
 @register.filter

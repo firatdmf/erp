@@ -6476,17 +6476,16 @@ def reserved_meters_subquery():
 
 
 def variant_photos_prefetch():
-    """Each row's catalog variant's own photos as `photos`, primary first —
-    the order the catalog shows them in. The row's thumbnail is
-    `photos.0`; a variant without a photo of its own shows none, never
-    its parent product's."""
+    """Each row's catalog variant's own photos and videos as `own_files`.
+    The variant_gallery filter puts them in the storefront's order; the
+    row's thumbnail is the first. A variant without one of its own shows
+    none, never its parent product's."""
     from django.db.models import Prefetch
     from marketing.models import ProductFile
     return Prefetch(
         "catalog_variant__files",
-        queryset=ProductFile.objects.filter(file_type="image")
-        .order_by("-is_primary", "sequence", "id"),
-        to_attr="photos")
+        queryset=ProductFile.objects.order_by("sequence", "id"),
+        to_attr="own_files")
 
 
 def stock_item_count_subquery():

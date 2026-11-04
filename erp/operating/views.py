@@ -847,6 +847,7 @@ class OrderDetail(DetailView):
             # Cost lives on the variant; a product has none of its own.
             unit_cost = variant.live_cost
 
+            from django.template.loader import render_to_string
             return JsonResponse({
                 "ok": True,
                 "item": {
@@ -854,8 +855,10 @@ class OrderDetail(DetailView):
                     "product_url": reverse("marketing:product_detail", args=[product.pk]),
                     "product_sku": product.sku or "",
                     "variant_sku": variant.variant_sku if variant else "",
-                    "image_url": (product.files.first().file_url
-                                  if product.files.exists() and product.files.first().file_url else ""),
+                    # The photo as a saved line shows it, viewer and all.
+                    "photo_html": render_to_string(
+                        "operating/partials/od_line_photo.html",
+                        {"item": OrderItem(product=product, product_variant=variant)}),
                     "quantity": float(qty),
                     "price": float(price),
                     "subtotal": float(qty * price),

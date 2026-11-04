@@ -1,9 +1,10 @@
 {% load i18n %}
 {% comment %}The photo viewer: a button with data-photos (the photos_json
-filter) and onclick="whPhotoOpen(this)" opens every photo in it, swiped or
-arrowed through. Used by the warehouse and order pages.{% endcomment %}
+filter) and onclick="whPhotoOpen(this)" opens every photo and video in it,
+swiped or arrowed through. A video waits to be played and stops when it is
+swiped past or the viewer closes. Used by the warehouse and order pages.{% endcomment %}
 <style>
-  /* Photo viewer: every photo of one variant, swiped or arrowed through. */
+  /* Photo viewer: every photo and video, swiped or arrowed through. */
   .wh-ph { position: fixed; inset: 0; z-index: 3000; display: none;
            background: rgba(10, 14, 20, .92); }
   .wh-ph.show { display: block; }
@@ -17,7 +18,7 @@ arrowed through. Used by the warehouse and order pages.{% endcomment %}
     flex: 0 0 100%; box-sizing: border-box; min-width: 0; scroll-snap-align: center;
     display: flex; align-items: center; justify-content: center; padding: 56px 64px;
   }
-  .wh-ph-slide img { max-width: 100%; max-height: 100%; min-width: 0; object-fit: contain;
+  .wh-ph-slide img, .wh-ph-slide video { max-width: 100%; max-height: 100%; min-width: 0; object-fit: contain;
                      border-radius: 6px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
   /* base.css makes every <button> a padded, bordered inline-flex with
      `transition: all` — undone here, or the icons sit off-centre and the
@@ -57,7 +58,7 @@ arrowed through. Used by the warehouse and order pages.{% endcomment %}
 </div>
 
 <script>
-  // ── Photo viewer ── one variant's photos side by side in a snap-scrolling
+  // ── Photo viewer ── photos and videos side by side in a snap-scrolling
   // track: swipe or trackpad-scroll on its own, arrows and keys step it.
   const whPh = document.getElementById('whPhotos');
   const whPhTrack = document.getElementById('whPhotosTrack');
@@ -69,15 +70,32 @@ arrowed through. Used by the warehouse and order pages.{% endcomment %}
     document.getElementById('whPhotosCount').textContent = n > 1 ? (i + 1) + ' / ' + n : '';
     whPh.querySelector('.wh-ph-prev').hidden = i <= 0;
     whPh.querySelector('.wh-ph-next').hidden = i >= n - 1;
+    // A video swiped past stops, so two never play at once.
+    Array.from(whPhTrack.children).forEach(function (slide, k) {
+      const v = slide.querySelector('video');
+      if (v && k !== i && !v.paused) v.pause();
+    });
   }
   function whPhotoOpen(btn) {
     const photos = JSON.parse(btn.dataset.photos || '[]');
     whPhTrack.replaceChildren(...photos.map(function (ph) {
       const slide = document.createElement('div');
       slide.className = 'wh-ph-slide';
-      const img = document.createElement('img');
-      img.src = ph.src; img.alt = ph.alt;
-      slide.appendChild(img);
+      let el;
+      if (ph.video) {
+        // Nothing is fetched until it is played but its first frame — or,
+        // with no stored frame, just enough to draw one.
+        el = document.createElement('video');
+        el.controls = true; el.playsInline = true;
+        el.preload = ph.poster ? 'none' : 'metadata';
+        if (ph.poster) el.poster = ph.poster;
+        el.src = ph.src;
+        el.setAttribute('aria-label', ph.alt);
+      } else {
+        el = document.createElement('img');
+        el.src = ph.src; el.alt = ph.alt;
+      }
+      slide.appendChild(el);
       return slide;
     }));
     whPh.classList.add('show');
@@ -88,16 +106,17 @@ arrowed through. Used by the warehouse and order pages.{% endcomment %}
   function whPhotoClose() {
     whPh.classList.remove('show');
     document.body.style.overflow = '';
+    whPhTrack.querySelectorAll('video').forEach(function (v) { v.pause(); });
     whPhTrack.replaceChildren();
   }
   function whPhotoStep(d) {
     whPhTrack.scrollTo({ left: (whPhotoIndex() + d) * whPhTrack.clientWidth, behavior: 'smooth' });
   }
   whPhTrack.addEventListener('scroll', whPhotoSync, { passive: true });
-  // A click on the dark around the photo closes, as on the photo itself
-  // it does not.
+  // A click on the dark around the photo closes, as on the photo or video
+  // itself it does not.
   whPhTrack.addEventListener('click', function (e) {
-    if (e.target.tagName !== 'IMG') whPhotoClose();
+    if (e.target.tagName !== 'IMG' && e.target.tagName !== 'VIDEO') whPhotoClose();
   });
   document.addEventListener('keydown', function (e) {
     if (!whPh.classList.contains('show')) return;

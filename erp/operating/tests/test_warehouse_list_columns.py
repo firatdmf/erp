@@ -526,7 +526,8 @@ class CombinedWarehouseMergesTheSameSku(TestCase):
 
 
 class RowsShowTheVariantsOwnPhoto(TestCase):
-    """A row's thumbnail is its catalog variant's primary photo. A variant
+    """A row's thumbnail is its catalog variant's first photo in the
+    storefront's order, which goes by sequence, not by "primary". A variant
     with no photo of its own shows an empty frame, not its product's."""
 
     def setUp(self):
@@ -556,14 +557,15 @@ class RowsShowTheVariantsOwnPhoto(TestCase):
         self.client.force_login(user)
 
     def _check(self, html):
-        # The thumbnail is the primary photo; the viewer holds every photo
-        # of the variant, primary first; the product's own photo is nowhere.
-        self.assertIn('src="https://cdn.test/white.avif"', html)
-        self.assertLess(html.index("white.avif"), html.index("second.avif"))
+        # The thumbnail is the first photo by sequence; the viewer holds
+        # every photo of the variant in that order; the product's own photo
+        # is nowhere.
+        self.assertIn('src="https://cdn.test/second.avif"', html)
+        self.assertLess(html.index("second.avif"), html.index("white.avif"))
         self.assertNotIn("parent.avif", html)
         self.assertEqual(html.count("wh-thumb is-empty"), 1)
 
-    def test_primary_photo_shown_and_parent_photo_never(self):
+    def test_first_photo_shown_and_parent_photo_never(self):
         self._check(self.client.get(
             reverse("operating:warehouse_detail", args=[self.wh.pk])).content.decode())
 

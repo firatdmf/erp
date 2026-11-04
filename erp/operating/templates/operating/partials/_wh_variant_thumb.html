@@ -1,18 +1,18 @@
 {% load i18n %}
 {% load operating_tags %}
-{% comment %}The catalog variant's own primary photo, in the row's first
-column (photos come from variant_photos_prefetch). A row not linked to the
+{% comment %}The catalog variant's own first photo, in the row's first
+column (variant_gallery: the storefront's order). A row not linked to the
 catalog shows nothing; a linked variant with no photo of its own shows an
 empty frame. Never the parent product's photo: it would show a colour the
-row does not hold. A click opens every photo of the variant in the viewer
-(whPhotoOpen); it does not expand the row.{% endcomment %}
+row does not hold. A click opens every photo and video of the variant in
+the viewer (whPhotoOpen); it does not expand the row.{% endcomment %}
 {% if p.catalog_variant_id %}
-{% with photos=p.catalog_variant.photos %}
+{% with photos=p.catalog_variant|variant_gallery %}
 {% if photos %}
 <button type="button" class="wh-thumb" data-photos="{{ photos|photos_json }}"
         onclick="event.stopPropagation(); whPhotoOpen(this);"
         title="{% blocktrans count n=photos|length %}{{ n }} photo{% plural %}{{ n }} photos{% endblocktrans %}">
-  <img src="{{ photos.0.thumbnail_url }}" alt="{{ photos.0.alt_text|default:p.name }}" loading="lazy">
+  {% with src=photos.0|thumb_src %}{% if src %}<img src="{{ src }}" alt="{{ photos.0.alt_text|default:p.name }}" loading="lazy">{% else %}<i class="fa fa-play"></i>{% endif %}{% endwith %}
   {% if photos|length > 1 %}<span class="wh-thumb-n">{{ photos|length }}</span>{% endif %}
 </button>
 {% else %}

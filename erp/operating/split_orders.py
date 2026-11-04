@@ -49,6 +49,7 @@ def page_line_prefetches():
     return [
         "items__product", "items__product_variant",
         Prefetch("items__product__files", queryset=ProductFile.objects.order_by("pk")),
+        Prefetch("items__product_variant__files", queryset=ProductFile.objects.order_by("pk")),
         "items__product_variant__warehouse_products",
         "items__product_variant__product_variant_attribute_values"
         "__product_variant_attribute",

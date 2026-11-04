@@ -5113,16 +5113,19 @@ class OrderList(ListView):
 
         # Open orders lead, the longest-waiting first: they are the work
         # still to do. Everything finished follows, newest first as the
-        # queryset has it.
+        # queryset has it, and the cancelled ones — never completed —
+        # come last under their own heading.
         def _day(order):
             return order.order_date or order.created_at.date()
         for order in all_orders:
             order.list_group = ("open" if order.order_status in ORDER_LIST_OPEN_STATUSES
+                                else "cancelled" if order.order_status == "cancelled"
                                 else "done")
         all_orders = (
             sorted((o for o in all_orders if o.list_group == "open"),
                    key=lambda o: (_day(o), o.created_at))
-            + [o for o in all_orders if o.list_group == "done"])
+            + [o for o in all_orders if o.list_group == "done"]
+            + [o for o in all_orders if o.list_group == "cancelled"])
         context['orders'] = all_orders
 
         # Every line's cost in one query: the gross profit column reads a

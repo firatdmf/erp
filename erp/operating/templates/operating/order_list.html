@@ -222,6 +222,10 @@
   .ord-row:hover { background: #FAFBFD; }
   .ord-row.selected { background: #F0FDFA; }
   .ord-row.selected:hover { background: #E5F8F4; }
+  /* A cancelled order stays listed, struck through and grayed out. */
+  .ord-row.is-cancelled { color: #9CA3AF; text-decoration: line-through; }
+  .ord-row.is-cancelled * { color: inherit !important; text-decoration: line-through; }
+  .ord-row.is-cancelled img { filter: grayscale(1); opacity: .5; }
 
   /* Row selection checkbox. The cell is a <label> so clicking anywhere
      in the 28px column toggles the checkbox. We stop both default and
@@ -501,8 +505,8 @@
         <span></span>
       </div>
       {% for order in orders %}
-      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% elif order.list_group == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -617,8 +621,8 @@
         <span></span>
       </div>
       {% for order in b2b_orders %}
-      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% elif order.list_group == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -693,8 +697,8 @@
         <span></span>
       </div>
       {% for order in b2c_orders %}
-      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% elif order.list_group == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -767,8 +771,8 @@
         <span></span>
       </div>
       {% for order in retail_orders %}
-      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% elif order.list_group == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>

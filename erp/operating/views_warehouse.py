@@ -5007,7 +5007,10 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             invoice.notes = (data.get("notes") or "")[:2000]
         invoice.currency = _currency_by_code(billing)
         invoice.intake_warehouse = warehouse
-        # Still the record of what was received — now as corrected.
+        # Still the record of what was received — now as corrected. Its
+        # sale prices are the order's (one per item, set on the order).
+        from .order_purchases import align_plan_sale_prices, order_bought_for
+        align_plan_sale_prices(data, order_bought_for(invoice))
         invoice.intake_plan = data
         invoice.save()
 
@@ -5017,7 +5020,6 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
         # Rolls whose cost this edit changes, for the re-posting at the end.
         repriced_roll_ids = set()
         line_wps = {}
-        sale_prices = {}  # variant id → what the customer pays, as the form says
         for card in resolved:
             main_product = _intake_main_product(card, prefix, invoice=invoice)
             base_name = card["base_name"]
@@ -5213,14 +5215,8 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                     update["description"] = target["wp_name"] + billed["description"]
                 line_updates.append(update)
                 line_wps[wp.pk] = wp
-                if wp.catalog_variant_id:
-                    sale_prices[wp.catalog_variant_id] = _safe_decimal(v.get("sale_price"))
 
         sync_purchase_invoice_items(invoice, line_updates, member=member)
-        from .order_purchases import mirror_sale_prices_on_order
-        warning = mirror_sale_prices_on_order(invoice, sale_prices, member=member)
-        if warning:
-            warnings.append(warning)
         # A line the form dropped altogether: its rolls went above.
         kept_items = {u["invoice_item_id"] for u in line_updates if u["invoice_item_id"]}
         for it in items.values():

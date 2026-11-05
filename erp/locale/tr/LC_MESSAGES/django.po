@@ -15916,3 +15916,45 @@ msgstr "Bu sefer öneri yok"
 
 msgid "What the warehouses hold. Stock changes in the warehouse, not here."
 msgstr "Depolardaki miktar. Stok burada değil, depoda değişir."
+
+msgid "Link a purchase"
+msgstr "Alım bağla"
+
+msgid "The order this purchase is for was not found."
+msgstr "Bu alımın yapıldığı sipariş bulunamadı."
+
+msgid "Order %(number)s has already shipped or was cancelled, so a purchase can't be linked to it."
+msgstr "%(number)s siparişi zaten gönderildi ya da iptal edildi, bu yüzden ona alım bağlanamaz."
+
+msgid "Order %(number)s has no current account yet, so a purchase can't be linked to it."
+msgstr "%(number)s siparişinin henüz cari hesabı yok, bu yüzden ona alım bağlanamaz."
+
+msgid "Order %(number)s is in another book — link the purchase from that book."
+msgstr "%(number)s siparişi başka bir defterde — alımı o defterden bağlayın."
+
+msgid "This purchase is already for an order — it can't also name a customer."
+msgstr "Bu alım zaten bir sipariş için — ayrıca bir müşteri seçilemez."
+
+msgid "purchase %(number)s linked"
+msgstr "%(number)s alımı bağlandı"
+
+msgid "%(sku)s comes from purchase %(numbers)s — remove it there."
+msgstr "%(sku)s, %(numbers)s alımından geliyor — orada kaldırın."
+
+msgid "%(sku)s comes from purchase %(numbers)s — change its quantity there."
+msgstr "%(sku)s, %(numbers)s alımından geliyor — miktarını orada değiştirin."
+
+msgid "%(skus)s stay at what the other purchases bring."
+msgstr "%(skus)s, diğer alımların getirdiği miktarda kalıyor."
+
+msgid "From purchase"
+msgstr "Alımdan:"
+
+msgid "change or remove it there"
+msgstr "orada değiştirin ya da kaldırın"
+
+msgid "The sale price of %(skus)s is the order's — change it on order %(number)s."
+msgstr "%(skus)s satış fiyatı siparişinki — %(number)s siparişinde değiştirin."
+
+msgid "The order’s price — change it on the order"
+msgstr "Siparişin fiyatı — siparişte değiştirin"

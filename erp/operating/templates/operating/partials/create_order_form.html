@@ -815,6 +815,9 @@
           quantity: qty || 1,
           description: it.description || '',
           counted: it.counted === true,
+          // Owned by these purchases still on their way in: quantity and
+          // removal happen on the purchase, the card shows them read-only.
+          lockedBy: (it.purchases || []).slice(),
           categoryName: '',
           is_custom_curtain: false,
           custom_width: '', custom_height: '',
@@ -1994,14 +1997,14 @@
       return `<div class="co-product-card${justAdded}">
         <div class="co-product-head">
           <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${item.counted ? coStockLineHtml(item) : ''}${coCardBooksHtml(item, bookRun)}</div>
-          <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
+          ${coLocked(item) ? '' : `<button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>`}
         </div>
-        <div class="co-row${item.counted ? ' co-row-counted' : ''}">
-          ${item.counted ? coCountedQtyHtml(item, i) : ''}
+        <div class="co-row${(item.counted || coLocked(item)) ? ' co-row-counted' : ''}">
+          ${coLocked(item) ? coLockedQtyHtml(item) : (item.counted ? coCountedQtyHtml(item, i) : '')}
           <div class="form-group"><label>{% trans "Unit Price" %}${coPriceFromHtml(item)}${(item.is_cost_price && !item.counted) ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input${(item.is_cost_price && item.counted) ? ' co-price-is-cost' : ''}" id="co-pricefield-${i}" value="${item.price}" min="0" step="0.01"${(item.is_cost_price && item.counted) ? ` title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}"` : ''} onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${fmtNum(item.quantity*item.price)}</div></div>
         </div>
-        ${item.counted ? '' : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i)}
+        ${(item.counted || coLocked(item)) ? '' : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i)}
         ${coNoteHtml(item, i)}
       </div>`;
     }).join('');
@@ -2248,6 +2251,18 @@
   // The quantity field of a product sold by count — the first field of
   // its card's one row. There is nothing else to choose: the pieces are
   // alike and come off the oldest stock, so the card shows no list.
+  // A line a purchase still on its way in owns: its quantity is the
+  // purchase's (several purchases: their sum), changed and removed there.
+  function coLocked(item) { return !!(item && item.lockedBy && item.lockedBy.length); }
+  function coLockedQtyHtml(item) {
+    return '<div class="form-group"><label>{% trans "Quantity" %}</label>' +
+      '<input type="number" class="form-input" value="' + (item.quantity || 0) + '" disabled>' +
+      '<div style="font-size:11px;color:#6D28D9;margin-top:4px;"><i class="fas fa-file-invoice"></i> ' +
+        esc('{% filter escapejs %}{% trans "From purchase" %}{% endfilter %} ' + item.lockedBy.join(', ') + ' — ' +
+            '{% filter escapejs %}{% trans "change or remove it there" %}{% endfilter %}') +
+      '</div></div>';
+  }
+
   function coCountedQtyHtml(item, i) {
     var free = coCountedFree(item);
     // Nothing on the shelf: the quantity is still wanted, it is just not
@@ -2296,6 +2311,11 @@
   window.coTakeMore = function (i, by, tries) {
     var item = orderItems[i];
     if (!item) return Promise.resolve(false);
+    if (coLocked(item)) {
+      showToast('{% filter escapejs %}{% trans "From purchase" %}{% endfilter %} ' + item.lockedBy.join(', ') + ' — ' +
+                '{% filter escapejs %}{% trans "change or remove it there" %}{% endfilter %}', 'error');
+      return Promise.resolve(false);
+    }
     if (item.rollsLoading || item.availableRolls === undefined) {
       if ((tries || 0) > 40) return Promise.resolve(false);
       var stable = item.index;
@@ -2544,6 +2564,11 @@
   window.coAddRoll = function (i, barcodeOverride, fromCard) {
     var item = orderItems[i];
     if (!item) return Promise.resolve(false);
+    if (coLocked(item)) {
+      showToast('{% filter escapejs %}{% trans "From purchase" %}{% endfilter %} ' + item.lockedBy.join(', ') + ' — ' +
+                '{% filter escapejs %}{% trans "change or remove it there" %}{% endfilter %}', 'error');
+      return Promise.resolve(false);
+    }
     var inputEl = document.getElementById('co-roll-bc-' + i);
     var barcode = (barcodeOverride != null ? barcodeOverride : (inputEl ? inputEl.value : '') || '').trim();
     if (!barcode) return Promise.resolve(false);

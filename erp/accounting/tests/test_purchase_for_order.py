@@ -185,15 +185,18 @@ class PurchaseForCustomerTest(TestCase):
         r = self._save(self._plan(customer=False, variants=[self._variant(sale="")]))
         self.assertEqual(r.status_code, 200, r.content)
 
-    def test_an_edit_that_blanks_the_price_leaves_the_order_as_it_was(self):
+    def test_an_edit_that_blanks_the_price_keeps_the_orders(self):
+        """The order prices a line it already has; the purchase follows."""
         inv_id = self._save(self._plan()).json()["invoice_id"]
         r = self._save(self._plan(variants=[self._variant(tops=(40,), sale="")],
                                   customer=False, product=Product.objects.get()),
                        pk=inv_id)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 200, r.content)
         line = Order.objects.get().items.get()
-        self.assertEqual(line.quantity, Decimal("55.00"))
+        self.assertEqual(line.quantity, Decimal("40.00"))
         self.assertEqual(line.price, Decimal("5.00"))
+        plan = Invoice.objects.get(pk=inv_id).intake_plan
+        self.assertEqual(plan["products"][0]["variants"][0]["sale_price"], "5.00")
 
     # ── Editing the draft keeps the order in step ───────────────────
     def test_editing_the_draft_updates_the_order(self):
@@ -218,7 +221,8 @@ class PurchaseForCustomerTest(TestCase):
                  for it in Order.objects.get().items.select_related("product_variant")}
         self.assertEqual(set(lines), {"K24644.G07", "K24644.G99"})  # G08 dropped, hand line kept
         self.assertEqual(lines["K24644.G07"].quantity, Decimal("40.00"))
-        self.assertEqual(lines["K24644.G07"].price, Decimal("6.00"))
+        # The sale price is the order's: the purchase's 6.00 doesn't move it.
+        self.assertEqual(lines["K24644.G07"].price, Decimal("5.00"))
         self.assertEqual(lines["K24644.G99"].pk, by_hand.pk)
 
     def test_an_order_being_packed_still_follows_the_purchase(self):
@@ -1041,7 +1045,8 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         log = self._purchase_log(inv_id)
         self.assertIn(("item_updated", "quantity", "purchase", "55", "40"), log)
-        self.assertIn(("item_updated", "sale_price", "purchase", "5", "5.5"), log)
+        # The typed 5.50 gave way to the order's price, so no price change.
+        self.assertFalse([c for c in log if c[:2] == ("item_updated", "sale_price")])
         self.assertIn(("field", "purchase", "1 line(s) changed from purchase %s"
                        % Invoice.objects.get(pk=inv_id).number), self._order_log(order))
         # The order's own item log has the quantity row too.

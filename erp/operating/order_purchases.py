@@ -96,6 +96,70 @@ def _line_skus(items):
     return ", ".join(sorted(it.product_variant.variant_sku or str(it.pk) for it in items))
 
 
+def plan_quantities(plan):
+    """{variant SKU, lowercased: quantity} a purchase plan brings in, its
+    rows for one variant summed."""
+    out = {}
+    for p in ((plan or {}).get("products") or []):
+        for v in (p.get("variants") or []):
+            sku = (v.get("sku") or "").strip().lower()
+            if sku:
+                out[sku] = out.get(sku, Decimal("0")) + _row_quantity(v)
+    return out
+
+
+def other_purchase_quantities(order, invoice):
+    """{variant SKU: quantity} the purchases bought for `order` other than
+    `invoice` bring in, cancelled ones left out. A line fed by several
+    purchases is the sum of them, so this is what a line comes to without
+    `invoice`'s share."""
+    total = {}
+    for other in (order.supplier_purchases.exclude(status="cancelled")
+                  .exclude(pk=invoice.pk).only("pk", "intake_plan")):
+        for sku, qty in plan_quantities(other.intake_plan).items():
+            total[sku] = total.get(sku, Decimal("0")) + qty
+    return total
+
+
+def purchase_locked_lines(order):
+    """{order line pk: [draft purchases]} — the lines a purchase still on
+    its way in feeds. The purchase owns them: their quantity is changed,
+    and they are removed, on the purchase, and the order shows them
+    read-only. Their price stays editable on either side (it is mirrored).
+
+    A line rolls are held for is the order's again (held_line_ids — the
+    purchase no longer rewrites it), and so is one whose purchases have
+    all arrived: the received goods are what the order packs."""
+    if not order_is_open(order):
+        return {}
+    drafts = list(order.supplier_purchases.filter(status="ordered")
+                  .only("pk", "number", "intake_plan").order_by("pk"))
+    if not drafts:
+        return {}
+    by_sku = {}
+    for invoice in drafts:
+        for sku in plan_variant_skus(invoice.intake_plan):
+            by_sku.setdefault(sku, []).append(invoice)
+    held = held_line_ids(order)
+    locked = {}
+    for item in order.items.select_related("product_variant"):
+        if item.pk in held or not item.product_variant_id:
+            continue
+        invoices = by_sku.get((item.product_variant.variant_sku or "").lower())
+        if invoices:
+            locked[item.pk] = invoices
+    return locked
+
+
+def locked_line_error(item, invoices, *, removing=False):
+    """What the order says when a line a purchase owns is changed on it."""
+    what = {"sku": item.product_variant.variant_sku if item.product_variant_id else item.pk,
+            "numbers": ", ".join(p.number for p in invoices)}
+    if removing:
+        return _("%(sku)s comes from purchase %(numbers)s — remove it there.") % what
+    return _("%(sku)s comes from purchase %(numbers)s — change its quantity there.") % what
+
+
 def purchase_cancel_warning(invoice):
     """What cancelling `invoice` will do to the customer order it was
     bought for, said before the cancel is confirmed: which of its lines
@@ -108,9 +172,13 @@ def purchase_cancel_warning(invoice):
     skus = plan_variant_skus(invoice.intake_plan)
     items = list(order.items.select_related("product_variant"))
     held = held_line_ids(order)
+    others = other_purchase_quantities(order, invoice)
     ours = [it for it in items
             if it.product_variant_id and (it.product_variant.variant_sku or "").lower() in skus]
-    going = [it for it in ours if it.pk not in held]
+    # A line another purchase also brings stays, at that purchase's share.
+    shared = [it for it in ours if it.pk not in held
+              and others.get((it.product_variant.variant_sku or "").lower(), 0) > 0]
+    going = [it for it in ours if it.pk not in held and it not in shared]
     staying = [it for it in ours if it.pk in held]
     if items and len(going) == len(items):
         return (_("Order %(number)s: all its lines come from this purchase, so the order "
@@ -118,6 +186,9 @@ def purchase_cancel_warning(invoice):
     warning = (_("Order %(number)s: its %(count)s line(s) from this purchase are removed; "
                  "the order stays open with the rest.")
                % {"number": number, "count": len(going)})
+    if shared:
+        warning += " " + (_("%(skus)s stay at what the other purchases bring.")
+                          % {"skus": _line_skus(shared)})
     if staying:
         warning += " " + (_("Rolls are already held for %(skus)s, so those lines stay.")
                           % {"skus": _line_skus(staying)})
@@ -183,7 +254,37 @@ def _plan_row_label(p_in, v_in, idx):
         _("Row %(n)d") % {"n": idx}
 
 
-def check_sale_prices(plan):
+def order_line_prices(order):
+    """{variant SKU, lowercased: sale price} of `order`'s lines — the one
+    sale price per item every purchase bought for the order follows."""
+    if order is None:
+        return {}
+    return {(it.product_variant.variant_sku or "").lower(): it.price
+            for it in order.items.select_related("product_variant")
+            if it.product_variant_id and it.product_variant.variant_sku}
+
+
+def align_plan_sale_prices(plan, order):
+    """Put `order`'s sale price on every row of `plan` naming a variant the
+    order already has a line for. The order owns the price: a purchase only
+    sets it for a line it creates. Returns the SKUs whose typed price was
+    replaced, so the save can say so."""
+    prices = order_line_prices(order)
+    replaced = []
+    for p_in in ((plan or {}).get("products") or []):
+        for v_in in (p_in.get("variants") or []):
+            sku = (v_in.get("sku") or "").strip()
+            price = prices.get(sku.lower())
+            if price is None:
+                continue
+            if _decimal(v_in.get("sale_price")) != price:
+                if _decimal(v_in.get("sale_price")) > 0:
+                    replaced.append(sku)
+                v_in["sale_price"] = str(price)
+    return replaced
+
+
+def check_sale_prices(plan, known=()):
     """Refuse a purchase bought for a customer that doesn't say what the
     customer pays for one of its rows.
 
@@ -193,13 +294,16 @@ def check_sale_prices(plan):
     purchase price can't stand in for it, being the supplier's and usually
     in another currency.
 
-    Rows with no quantity are not on the order, so they are not asked for.
+    Rows with no quantity are not on the order, so they are not asked for;
+    nor are rows of a variant the order already prices (`known`, lowercased
+    SKUs) — those take the order's price.
     """
     missing = [
         _plan_row_label(p_in, v_in, idx)
         for p_in in (plan.get("products") or [])
         for idx, v_in in enumerate(p_in.get("variants") or [], start=1)
         if _row_quantity(v_in) > 0 and _decimal(v_in.get("sale_price")) <= 0
+        and (v_in.get("sku") or "").strip().lower() not in known
     ]
     if missing:
         raise CustomerOrderError(
@@ -208,7 +312,7 @@ def check_sale_prices(plan):
             % {"rows": ", ".join(missing)})
 
 
-def put_plan_in_catalog(plan):
+def put_plan_in_catalog(plan, order=None):
     """Create the catalog products and variants a draft purchase names, and
     rewrite `plan` in place to point at them — each card as an existing
     product, each variant row with the SKU it was given — so confirming the
@@ -230,7 +334,7 @@ def put_plan_in_catalog(plan):
         _intake_variants,
     )
 
-    check_sale_prices(plan)
+    check_sale_prices(plan, known=set(order_line_prices(order)))
     products_in = plan.get("products") or []
     _apply_sku_choices(products_in)
     account = _intake_account(plan)
@@ -302,13 +406,16 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     lines in step with the purchase. Returns a user-facing warning when the
     order could not be changed, else None.
 
-    Lines are matched by variant. A line is only removed when this purchase
-    put it there (`previous_skus`, from the plan as last saved) — anything
-    added on the order itself is the order's business. The lines follow
-    until the order ships, packaging included; a shipped order is left as
-    it is. So, for now, is a line rolls are already held for — the other
-    lines still follow — and the purchase names it rather than rewriting
-    it under the packers.
+    Lines are matched by variant. A line fed by several purchases comes to
+    their sum: this purchase's rows plus what the order's other purchases
+    bring of that variant. A line is only removed when this purchase put it
+    there (`previous_skus`, from the plan as last saved) and no other
+    purchase still brings it — then it falls back to what the others bring;
+    anything added on the order itself is the order's business. The lines
+    follow until the order ships, packaging included; a shipped order is
+    left as it is. So, for now, is a line rolls are already held for — the
+    other lines still follow — and the purchase names it rather than
+    rewriting it under the packers.
     """
     from accounting.services_accounts import (
         get_or_create_current_account_for_order, post_order_movement,
@@ -347,35 +454,54 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
                 for it in order.items.select_related("product_variant")}
     previous = {s.lower() for s in previous_skus}
     held = set() if created else held_line_ids(order)
+    others = {} if created else other_purchase_quantities(order, invoice)
     kept = []   # lines this save would have changed, left for their held rolls
+    # One entry per variant: two rows of one variant on this purchase are
+    # one line on the order, their quantities summed.
+    merged = {}
+    for line in lines:
+        entry = merged.setdefault(line["variant"].pk, dict(line, quantity=Decimal("0")))
+        entry["quantity"] += _decimal(line["quantity"])
+        entry["sale_price"] = line["sale_price"]
     wanted = set()
     changed = 0
     with syncing():
-        for line in lines:
+        for line in merged.values():
             variant = line["variant"]
             wanted.add(variant.pk)
             item = existing.get(variant.pk)
-            qty = _as_line_decimal(line["quantity"])
+            sku = (variant.variant_sku or "").lower()
+            qty = _as_line_decimal(line["quantity"] + others.get(sku, Decimal("0")))
             price = _as_line_decimal(line["sale_price"])
             if item is None:
                 OrderItem.objects.create(order=order, product=line["product"],
                                          product_variant=variant,
                                          quantity=qty, price=price)
                 changed += 1
-            elif item.quantity != qty or item.price != price:
+            elif item.quantity != qty:
+                # Only the quantity: the sale price is the order's, one per
+                # line, and the purchase follows it (align_plan_sale_prices).
                 if item.pk in held:
                     kept.append(item)
                     continue
-                item.quantity, item.price = qty, price
-                item.save(update_fields=["quantity", "price"])
+                item.quantity = qty
+                item.save(update_fields=["quantity"])
                 changed += 1
         for variant_id, item in existing.items():
             sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
             if variant_id not in wanted and sku in previous:
+                rest = _as_line_decimal(others.get(sku, Decimal("0")))
+                if rest > 0 and item.quantity == rest:
+                    continue
                 if item.pk in held:
                     kept.append(item)
                     continue
-                item.delete()
+                if rest > 0:
+                    # Another purchase still brings it: the line is theirs.
+                    item.quantity = rest
+                    item.save(update_fields=["quantity"])
+                else:
+                    item.delete()
                 changed += 1
     if changed and not created:
         # The item rows above are logged by operating.audit as they
@@ -517,6 +643,15 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
     sku = (variant.variant_sku if variant is not None else "").strip().lower()
     if not sku:
         return
+    # A line fed by several purchases is their sum, so an order-side
+    # quantity can't be split back among them: it reaches a purchase only
+    # when that purchase is the line's one source. (The order refuses
+    # quantity edits on such lines anyway — purchase_locked_lines; this
+    # covers the system writes, like a held roll re-measured.)
+    sources = [inv for inv in order.supplier_purchases.exclude(status="cancelled")
+               .only("pk", "intake_plan")
+               if sku in plan_variant_skus(inv.intake_plan)]
+    one_source = len(sources) <= 1
     for invoice in (order.supplier_purchases.filter(status="ordered")
                     .select_related("current_account")):
         before = copy.deepcopy(invoice.intake_plan or {})
@@ -532,7 +667,8 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
                 if removed:
                     continue
                 v_in["sale_price"] = str(item.price)
-                _retops(v_in, _decimal(item.quantity))
+                if one_source:
+                    _retops(v_in, _decimal(item.quantity))
                 kept.append(v_in)
             p_in["variants"] = kept
         if not hit:
@@ -592,48 +728,6 @@ def order_sale_prices(invoice):
             for it in order.items.all() if it.product_variant_id}
 
 
-def mirror_sale_prices_on_order(invoice, prices, *, member=None):
-    """A received purchase was saved with these sale prices ({variant_id:
-    price}): put each changed one on its line of the order the purchase is
-    bought for. An empty price leaves the line be.
-
-    Not sync_customer_order's packing rule: receiving holds the rolls for
-    the order, which counts as packing, so it would refuse every received
-    purchase — and a price moves nothing the packers handle. What a price
-    can't change is a sale already posted, so a shipped order is left alone
-    and a warning says so. Returns that warning, else None."""
-    from accounting.services_accounts import post_order_movement
-    from .audit import log_change
-    from .views import _as_line_decimal
-
-    order = order_bought_for(invoice)
-    if order is None:
-        return None
-    changed = []
-    for item in order.items.all():
-        price = prices.get(item.product_variant_id)
-        if price is None or price <= 0:
-            continue
-        price = _as_line_decimal(price)
-        if price != item.price:
-            changed.append((item, price))
-    if not changed:
-        return None
-    if not order_is_open(order):
-        return (_("Order %(number)s has already shipped, so its sale prices were not "
-                  "changed — edit them on the order.")
-                % {"number": order.order_number or order.pk})
-    with syncing():
-        for item, price in changed:
-            item.price = price
-            item.save(update_fields=["price"])
-    log_change(order, "field", field="purchase",
-               new=_("%(count)s line(s) changed from purchase %(number)s")
-               % {"count": len(changed), "number": invoice.number})
-    post_order_movement(order, member=member)
-    return None
-
-
 def cancel_purchases_for_cancelled_order(order, *, user=None, deleted=False):
     """The order is being cancelled (or deleted — `deleted`): stock
     ordered in for it is no longer wanted, so its draft purchases are
@@ -674,6 +768,7 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
     when there is nothing to say."""
     from .audit import log_change
     from .models import Order, OrderChange
+    from .views import _as_line_decimal
     from .views_warehouse import apply_order_status_change
 
     order = invoice.for_order
@@ -682,14 +777,23 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
     number = order.order_number or order.pk
     skus = plan_variant_skus(invoice.intake_plan)
     held = held_line_ids(order)
+    others = other_purchase_quantities(order, invoice)
     removed = 0
     kept = []
+    lowered = []    # lines other purchases still bring: down to their share
     with syncing():
         for item in order.items.select_related("product_variant"):
             sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
             if sku in skus:
                 if item.pk in held:
                     kept.append(item)
+                    continue
+                rest = _as_line_decimal(others.get(sku, Decimal("0")))
+                if rest > 0:
+                    if item.quantity != rest:
+                        item.quantity = rest
+                        item.save(update_fields=["quantity"])
+                    lowered.append(item)
                     continue
                 item.delete()
                 removed += 1
@@ -700,6 +804,9 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
             said = (_("Its %(count)s line(s) were removed from order %(number)s, which "
                       "stays open with what else is on it.")
                     % {"count": removed, "number": number})
+            if lowered:
+                said += " " + (_("%(skus)s stay at what the other purchases bring.")
+                               % {"skus": _line_skus(lowered)})
             if kept:
                 said += " " + (_("Rolls are already held for %(skus)s, so those lines stay.")
                                % {"skus": _line_skus(kept)})

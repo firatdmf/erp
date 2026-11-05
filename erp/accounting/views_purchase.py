@@ -388,6 +388,16 @@ class GoodsReceipt(View):
                 if w:
                     warehouses.append(w)
         else:
+            # Opened from an existing customer order ("Link a purchase"):
+            # the new purchase is bought for that order, not a new one.
+            asked_order = (request.GET.get("order") or "").strip()
+            if asked_order.isdigit():
+                try:
+                    for_order = order_to_link(int(asked_order), getattr(request, "book", None))
+                except _SaveRefused as exc:
+                    messages.warning(request, str(exc))
+                    return redirect("operating:order_detail", pk=int(asked_order))
+                back_url = reverse("operating:order_detail", args=[for_order.pk])
             asked = (request.GET.get("warehouse") or "").strip()
             if asked.isdigit() and any(w.pk == int(asked) for w in warehouses):
                 selected_id = int(asked)
@@ -404,6 +414,10 @@ class GoodsReceipt(View):
             "order_invoice": order,
             "intake_plan": (order.intake_plan or {}) if order else None,
             "for_order": for_order,
+            # The order's sale price per variant SKU: the rows naming one
+            # show it read-only — it is changed on the order.
+            "order_line_prices": {sku: str(price) for sku, price in
+                                  order_line_prices(for_order).items()},
             "cancelled_order": cancelled_order,
             # What an existing customer order's prices are billed in.
             "for_order_currency": (
@@ -566,9 +580,39 @@ def rewrite_draft_plan(invoice, plan):
     rebuild_draft_items(invoice, lines)
 
 
+def order_line_prices(order):
+    from operating.order_purchases import order_line_prices as prices
+    return prices(order)
+
+
 class _SaveRefused(Exception):
     """Aborts a purchase save — and rolls back what it wrote — with a
     user-facing message."""
+
+
+def order_to_link(order_pk, book):
+    """The existing customer order a new purchase is to be bought for, or
+    _SaveRefused saying why it can't be: it must exist, still be open, and
+    keep its account in `book` — a purchase lands in its own book's
+    warehouse, so it can only feed an order of that book."""
+    from operating.models import Order
+    from operating.order_purchases import order_is_open
+
+    order = (Order.objects.select_related("current_account__default_currency")
+             .filter(pk=order_pk).first())
+    if order is None:
+        raise _SaveRefused(_("The order this purchase is for was not found."))
+    number = order.order_number or order.pk
+    if not order_is_open(order):
+        raise _SaveRefused(_("Order %(number)s has already shipped or was cancelled, "
+                             "so a purchase can't be linked to it.") % {"number": number})
+    if order.current_account_id is None:
+        raise _SaveRefused(_("Order %(number)s has no current account yet, so a "
+                             "purchase can't be linked to it.") % {"number": number})
+    if book is not None and order.current_account.book_id != book.pk:
+        raise _SaveRefused(_("Order %(number)s is in another book — link the purchase "
+                             "from that book.") % {"number": number})
+    return order
 
 
 @method_decorator(login_required, name="dispatch")
@@ -606,8 +650,8 @@ class PurchaseOrderSave(View):
                 status=400)
 
         from operating.order_purchases import (
-            CustomerOrderError, order_bought_for, parse_customer, plan_variant_skus,
-            put_plan_in_catalog, sync_customer_order,
+            CustomerOrderError, align_plan_sale_prices, order_bought_for, parse_customer,
+            plan_variant_skus, put_plan_in_catalog, sync_customer_order,
         )
         from operating.views_warehouse import (
             IntakeError, _intake_check_book, _intake_check_described,
@@ -632,6 +676,7 @@ class PurchaseOrderSave(View):
         order_date = _parse_date(data.get("date")) or date.today()
         delivery = _parse_date(data.get("delivery_date"))
         order_warning = None
+        price_note = None
         try:
             with transaction.atomic():
                 if pk is not None:
@@ -643,6 +688,15 @@ class PurchaseOrderSave(View):
                              "error": _gettext("This purchase is confirmed — it can't be edited as an order.")}, status=400)
                 else:
                     invoice = Invoice(type="purchase", status="ordered")
+                    # A new purchase opened from an existing customer
+                    # order feeds that order rather than creating one.
+                    if str(data.get("for_order_id") or "").isdigit():
+                        if customer is not None:
+                            raise _SaveRefused(_(
+                                "This purchase is already for an order — it can't "
+                                "also name a customer."))
+                        invoice.for_order = order_to_link(
+                            int(data["for_order_id"]), warehouse.accounting_book)
                 # What the purchase said before this save — the log is the
                 # difference (purchase_audit).
                 before_plan = copy.deepcopy(invoice.intake_plan) if invoice.pk else None
@@ -686,13 +740,22 @@ class PurchaseOrderSave(View):
                         raise _SaveRefused(_(
                             "This purchase is for an order in another book — "
                             "receive it into a warehouse of that book."))
-                    order_lines = put_plan_in_catalog(data)
+                    order_lines = put_plan_in_catalog(data, order=order_bought_for(invoice))
                     order_warning = sync_customer_order(
                         invoice, customer, order_lines,
                         book=warehouse.accounting_book,
                         member=getattr(request.user, "member", None),
                         previous_skus=previous_skus,
                     )
+                    # One sale price per item, the order's: the purchase's
+                    # rows for lines the order has follow it.
+                    replaced = align_plan_sale_prices(data, invoice.for_order)
+                    if replaced:
+                        price_note = (_("The sale price of %(skus)s is the order's — change "
+                                        "it on order %(number)s.")
+                                      % {"skus": ", ".join(replaced),
+                                         "number": invoice.for_order.order_number
+                                         or invoice.for_order.pk})
                 invoice.intake_plan = data
                 invoice.save(update_fields=["intake_plan", "updated_at"])
 
@@ -710,6 +773,12 @@ class PurchaseOrderSave(View):
                                       % {"number": invoice.for_order.order_number or invoice.for_order.pk}
                                       if invoice.for_order_id else None))
                     diff_plans(invoice, {}, data, user=request.user)
+                    if customer is None and invoice.for_order_id:
+                        # Linked to an order that already existed: its
+                        # history says where the purchase came from.
+                        from operating.audit import log_change
+                        log_change(invoice.for_order, "field", field="purchase",
+                                   new=_("purchase %(number)s linked") % {"number": invoice.number})
                 else:
                     diff_fields(invoice, before_fields, user=request.user)
                     diff_plans(invoice, before_plan, data, user=request.user)
@@ -721,6 +790,8 @@ class PurchaseOrderSave(View):
             return JsonResponse(exc.payload, status=exc.status)
         if order_warning:
             messages.warning(request, order_warning)
+        if price_note:
+            messages.info(request, price_note)
 
         return JsonResponse({
             "success": True,

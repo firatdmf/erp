@@ -694,13 +694,18 @@ class ReceivedPurchaseForAnOrderTest(TestCase):
         # The order's own line is not "elsewhere": the variant still follows.
         self.assertTrue(v["sku_follows"])
 
-    def test_a_new_sale_price_goes_onto_the_order(self):
+    def test_the_sale_price_stays_the_orders(self):
+        """One sale price per item, set on the order: a price typed on the
+        received purchase changes neither the order nor what the purchase
+        records."""
         form = self._form()
         form["products"][0]["variants"][0]["sale_price"] = "3.10"
         r = self.client.post(self._edit_url(), data=json.dumps(form),
                              content_type="application/json")
         self.assertEqual(r.status_code, 200, r.content)
-        self.assertEqual(self.order.items.get().price, Decimal("3.10"))
+        self.assertEqual(self.order.items.get().price, Decimal("2.80"))
+        plan = Invoice.objects.get(pk=self.invoice_id).intake_plan
+        self.assertEqual(plan["products"][0]["variants"][0]["sale_price"], "2.80")
 
 
 class OrderPriceOnReceivedPurchaseTest(ReceivedPurchaseForAnOrderTest):

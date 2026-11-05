@@ -2091,8 +2091,15 @@
            saved for a customer creates the order). Receiving one reserves
            its rolls for this order. -->
       <section class="od-card" id="od-supplier-purchases">
-        <div class="od-card-h">
+        <div class="od-card-h" style="justify-content:space-between;">
           <h3>{% trans "Supplier purchases" %}</h3>
+          {% if can_link_purchase %}
+          {% comment %}A new purchase draft bought for this order. Saving it is open to anyone; receiving it still needs the purchase-confirm permission.{% endcomment %}
+          <a href="{% url 'accounts:goods_receipt' order.current_account.book_id %}?order={{ order.pk }}"
+             class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
+            <i class="fa fa-plus"></i> <span>{% trans "Link a purchase" %}</span>
+          </a>
+          {% endif %}
         </div>
         {% if supplier_purchases %}
           <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;">

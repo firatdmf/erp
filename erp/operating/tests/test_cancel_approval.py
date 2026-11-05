@@ -162,16 +162,16 @@ class CancelApprovalTest(TestCase):
         self.purchase.refresh_from_db()
         self.assertEqual(self.purchase.status, "cancelled")
 
-    def test_removing_the_last_line_of_a_purchase_waits(self):
+    def test_removing_a_line_of_a_purchase_on_its_way_is_refused(self):
+        """The purchase owns the lines it feeds: they are removed on the
+        purchase (whose cancel needs a manager), not asked about here."""
         item = self.order.items.get()
         self.client.force_login(self.clerk)
         r = self.client.post(self.detail, {"action": "remove_item", "item_id": item.pk},
                              HTTP_X_REQUESTED_WITH="XMLHttpRequest")
-        self.assertTrue(r.json()["approval_requested"])
+        self.assertEqual(r.status_code, 400)
+        self.assertIn(self.purchase.number, r.json()["error"])
         self.assertTrue(OrderItem.objects.filter(pk=item.pk).exists())
-        req = OrderCancelRequest.objects.get()
-        self.assertEqual((req.action, req.item_ids), ("remove_lines", [item.pk]))
-        self._decide(self.book_admin, "approve")
-        self.assertFalse(OrderItem.objects.filter(pk=item.pk).exists())
+        self.assertFalse(OrderCancelRequest.objects.exists())
         self.purchase.refresh_from_db()
-        self.assertEqual(self.purchase.status, "cancelled")
+        self.assertEqual(self.purchase.status, "ordered")

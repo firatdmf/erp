@@ -811,6 +811,7 @@
 {{ pack_types|json_script:"np-packs-data" }}
 {{ variant_attribute_names|json_script:"np-attrs-data" }}
 {% if intake_plan %}{{ intake_plan|json_script:"gr-plan-data" }}{% endif %}
+{{ order_line_prices|json_script:"gr-order-prices" }}
 <script>
 (function () {
   if (!document.getElementById('grDoc')) return;   // no warehouse to receive into
@@ -1272,10 +1273,37 @@
   const GR_VARIANT_SKU_MAX = {{ variant_sku_max_length }};  // ProductVariant.variant_sku max_length
   const GR_EDIT_ID = {% if edit_invoice %}{{ edit_invoice.pk }}{% else %}null{% endif %};
   const GR_ORDER_ID = {% if order_invoice %}{{ order_invoice.pk }}{% else %}null{% endif %};
+  // A new purchase opened from an existing customer order ("Link a
+  // purchase"): saving it feeds that order instead of creating one.
+  const GR_FOR_ORDER_ID = {% if for_order and not order_invoice and not edit_invoice %}{{ for_order.pk }}{% else %}null{% endif %};
   const GR_ORDER_URL = "{% url 'accounts:purchase_order_save' current_book.pk %}";
   const GR_ORDER_UPDATE_TPL = "{% url 'accounts:purchase_order_update' 0 %}";
   const GR_CONFIRM_TPL = "{% url 'accounts:purchase_order_confirm' 0 %}";
   const GR_PLAN = JSON.parse((document.getElementById('gr-plan-data') || {}).textContent || 'null');
+  // The order's sale price per variant SKU (lowercased). One price per
+  // item, set on the order: a row naming one of these shows it, read-only.
+  const GR_ORDER_PRICES = JSON.parse((document.getElementById('gr-order-prices') || {}).textContent || '{}');
+  function npApplyOrderPrice(v) {
+    const saleI = v && v.querySelector('.np-v-sale');
+    const skuI = v && v.querySelector('.np-v-sku');
+    if (!saleI) return;
+    const price = GR_ORDER_PRICES[((skuI && skuI.value) || '').trim().toLowerCase()];
+    if (price !== undefined) {
+      saleI.value = price;
+      saleI.readOnly = true;
+      saleI.dataset.orderPrice = '1';
+      saleI.title = '{% filter escapejs %}{% trans "The order’s price — change it on the order" %}{% endfilter %}';
+    } else if (saleI.dataset.orderPrice) {
+      saleI.readOnly = false;
+      delete saleI.dataset.orderPrice;
+      saleI.title = '';
+    }
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target.classList && e.target.classList.contains('np-v-sku')) {
+      npApplyOrderPrice(e.target.closest('.np-variant'));
+    }
+  });
   // The house's own code, from the brand profile — the same value
   // views_warehouse._fallback_prefix() mints with, so the SKU previewed
   // here is the SKU the save writes.
@@ -1870,6 +1898,7 @@
     // A received purchase's own line: npCheckVariantMatch decides its SKU.
     if (vEl.dataset.itemId) return;
     skuI.value = npAutoSku(vEl);
+    npApplyOrderPrice(vEl);
   };
   function npAutoSku(vEl) {
     const root = npBaseSku(vEl.closest('.np-product-card'));
@@ -1947,6 +1976,7 @@
     // Once they change, the SKU is read from them like any other row's.
     if (vEl.dataset.baseSku) {
       skuI.value = key === vEl.dataset.baseKey ? vEl.dataset.baseSku : npAutoSku(vEl);
+      npApplyOrderPrice(vEl);
     }
     const ownChanged = !!vEl.dataset.itemId && key !== vEl.dataset.baseKey;
     // A choice answers the values it was made for, not the next ones.
@@ -1998,6 +2028,7 @@
               npEsc(d.ignored_attributes.map(npAttrLabel).join(', '));
           }
           skuI.value = d.variant_sku || skuI.value;
+          npApplyOrderPrice(vEl);
           skuI.dataset.matchLocked = '1';
         } else if (d.conflict) {
           // The save refuses this outright, so the page does too — see
@@ -2390,6 +2421,9 @@
   }
 
   window.npSummaryUpdate = function () {
+    // A row's SKU follows its values, so which rows carry the order's
+    // price is re-read whenever the page re-counts.
+    document.querySelectorAll('#npProducts .np-variant').forEach(npApplyOrderPrice);
     let pcount = 0, vcount = 0, tcount = 0;
     const totals = {};   // unit → quantity; units can't be added together
     let unit = 'm';
@@ -3215,6 +3249,7 @@
         const priceEl = v.querySelector('.np-v-price');
         const curEl = v.querySelector('.np-v-cur');
         const tops = npCollectTops(v);
+        npApplyOrderPrice(v);
         npNeedsSale(v, tops);
         if (attrs.length || sku || tops.length) variants.push({
           name: npRowLabel(v), attributes: attrs, sku: sku, tops: tops,
@@ -3286,6 +3321,7 @@
     const receivedOn = document.getElementById('npReceivedOn');
     if (receivedOn) payload.received_on = receivedOn.value || '';
     payload.notes = (document.getElementById('npNotes') || {}).value || '';
+    if (GR_FOR_ORDER_ID) payload.for_order_id = GR_FOR_ORDER_ID;
     return payload;
   }
 
@@ -3338,9 +3374,10 @@
   // Receive: for a saved order, store any edits first and then confirm it,
   // so what lands in the warehouse is exactly what is on screen.
   // A new purchase bought for a customer takes the same road: saving it
-  // is what creates the customer's order the rolls are then reserved for.
+  // is what creates the customer's order the rolls are then reserved for
+  // (or, opened from an existing order, links it to that one).
   window.npReceiveNow = function () {
-    if (!GR_ORDER_ID && !npCustomer) { npSave(); return; }
+    if (!GR_ORDER_ID && !npCustomer && !GR_FOR_ORDER_ID) { npSave(); return; }
     const btn = document.getElementById('npSaveBtn');
     const payload = npOrderPayload();
     if (!payload) return;
@@ -3534,6 +3571,7 @@
     if (curI && v.currency) { curI.value = v.currency; curI.dataset.touched = '1'; }
     const saleI = vEl.querySelector('.np-v-sale');
     if (saleI && v.sale_price) saleI.value = v.sale_price;
+    npApplyOrderPrice(vEl);
 
     // One roll row already exists from npAddVariant.
     const tops = (v.tops || []);

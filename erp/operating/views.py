@@ -480,6 +480,11 @@ class OrderDetail(DetailView):
         ctx["cancel_needs_approval"] = (
             ctx["cancel_request"] is None
             and cancel_approval.needs_approval(self.request.user, self.object))
+        # "Link a purchase" opens a new purchase draft bought for this
+        # order — while it is open, has an account (whose book the purchase
+        # lands in), and isn't frozen by a cancel request.
+        ctx["can_link_purchase"] = (ctx["billed_on_completion"]
+                                    and ctx["cancel_request"] is None)
         # Each line names the supplier purchases that bring it in — the
         # ones whose plans list its SKU — so which lines are bought for
         # the order, and from where, reads off the line itself. Until its
@@ -759,6 +764,12 @@ class OrderDetail(DetailView):
                 return JsonResponse({"ok": False, "error": "Must be ≥ 0"}, status=400)
 
             item = get_object_or_404(OrderItem, pk=item_id, order=order)
+            if field == "quantity" and _as_line_decimal(dec) != _as_line_decimal(item.quantity):
+                from .order_purchases import locked_line_error, purchase_locked_lines
+                owners = purchase_locked_lines(order).get(item.pk)
+                if owners:
+                    return JsonResponse({"ok": False, "error": locked_line_error(item, owners)},
+                                        status=400)
 
             # Stock cap intentionally not enforced here — qty changes
             # while the order is in a pre-fulfilment state don't touch
@@ -941,6 +952,12 @@ class OrderDetail(DetailView):
             except (TypeError, ValueError):
                 return JsonResponse({"ok": False, "error": "Bad item_id"}, status=400)
             item = get_object_or_404(OrderItem, pk=item_id, order=order)
+            from .order_purchases import locked_line_error, purchase_locked_lines
+            owners = purchase_locked_lines(order).get(item.pk)
+            if owners:
+                return JsonResponse(
+                    {"ok": False, "error": locked_line_error(item, owners, removing=True)},
+                    status=400)
             # The last line of a purchase still on its way in: removing it
             # cancels that purchase, which a book admin decides.
             from .cancel_approval import (ApprovalError, is_book_admin,
@@ -2186,6 +2203,51 @@ def order_create_barcode_check(request):
         "book_id": (wh.accounting_book_id if wh else None),
         "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
     })
+
+
+def _locked_edit_error(orders, product_json_raw, deleted_raw):
+    """Why the edit form's save would change a line a purchase still on
+    its way in owns (order_purchases.purchase_locked_lines), or None. Those
+    lines are changed on the purchase: the order may resend one as it was
+    — its price may change — but not with another quantity, new stock
+    picked onto it, or removed. Checked before anything is written; an
+    unreadable payload is left for the save itself to refuse."""
+    from .order_purchases import locked_line_error, purchase_locked_lines
+
+    locked = {}
+    for o in orders:
+        locked.update(purchase_locked_lines(o))
+    if not locked:
+        return None
+    items = {it.pk: it for it in OrderItem.objects.filter(pk__in=locked)
+             .select_related("product_variant")}
+    try:
+        deleted = json.loads(deleted_raw) if deleted_raw else []
+    except json.JSONDecodeError:
+        deleted = []
+    for pk in deleted or []:
+        try:
+            pk = int(pk)
+        except (TypeError, ValueError):
+            continue
+        if pk in items:
+            return locked_line_error(items[pk], locked[pk], removing=True)
+    try:
+        rows = json.loads(product_json_raw) if product_json_raw else []
+    except json.JSONDecodeError:
+        rows = []
+    for row in rows or []:
+        try:
+            pk = int(row.get("item_id"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        item = items.get(pk)
+        if item is None:
+            continue
+        if (_as_line_decimal(row.get("quantity", 1)) != _as_line_decimal(item.quantity)
+                or row.get("rolls")):
+            return locked_line_error(item, locked[pk])
+    return None
 
 
 def _editable_halves(order, user):
@@ -4610,6 +4672,12 @@ class OrderEdit(UpdateView):
                      "__product_variant_attribute",
                  ))
         context["order_items"] = items
+        # Lines a purchase still on its way in owns: shown read-only on
+        # their cards, changed on the purchase (_locked_edit_error).
+        from .order_purchases import purchase_locked_lines
+        locked = {}
+        for o in {it.order for it in items}:
+            locked.update(purchase_locked_lines(o))
         # JSON-safe payload for the JS to hydrate order_data with.
         # Using a dedicated list keeps it parser-tolerant of any title
         # containing apostrophes, quotes, or newlines.
@@ -4650,6 +4718,8 @@ class OrderEdit(UpdateView):
                 # Sold by count: the edit form draws this line's card in
                 # its own shape from the start.
                 "counted": bool(it.product and it.product.sold_by_count),
+                # The draft purchases that own this line, if any.
+                "purchases": [p.number for p in locked.get(it.pk, [])],
                 # Stock items already reserved for this line — shown read-only in
                 # the product card. "available" excludes this reservation's
                 # OWN hold from the other-reservations subtraction (same
@@ -4707,6 +4777,17 @@ class OrderEdit(UpdateView):
             return self.form_invalid(form)
 
     def form_valid(self, form):
+        # Lines a purchase still on its way in owns are changed there:
+        # refused before anything is saved, so nothing half-applies.
+        locked_error = _locked_edit_error(
+            [self.object, *_editable_halves(self.object, self.request.user)],
+            self.request.POST.get("product_json_input"),
+            self.request.POST.get("deleted_items"))
+        if locked_error:
+            if self._is_ajax():
+                return JsonResponse({"ok": False, "error": locked_error}, status=400)
+            messages.error(self.request, locked_error)
+            return redirect("operating:edit_order", pk=self.object.pk)
         try:
             with transaction.atomic():
                 # Save the order

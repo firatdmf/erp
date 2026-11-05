@@ -96,7 +96,11 @@ class InvoiceDoc:
 
     @property
     def filename(self):
-        return f"invoice-{self.number}".replace("/", "-")
+        """Without an extension — the PDF and the .xlsx add their own.
+        The customer's name (a purchase's: the supplier's) in front."""
+        from erp.download_names import client_filename
+        return client_filename(self.party.name,
+                               f"invoice-{self.number}".replace("/", "-"))
 
 
 def _s(name):

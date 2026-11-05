@@ -709,10 +709,12 @@ def order_excel(request, pk):
           build_order_workbook(order, white_label=white_label, balance=balance, member=member))
     buf = BytesIO()
     wb.save(buf)
+    from erp.download_names import client_filename, disposition
     label = order.order_number or f"order-{order.pk}"
     resp = HttpResponse(
         buf.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    resp["Content-Disposition"] = f'attachment; filename="{label}.xlsx"'
+    resp["Content-Disposition"] = disposition(
+        client_filename(order.client_name(), f"{label}.xlsx"), attachment=True)
     return resp

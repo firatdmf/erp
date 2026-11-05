@@ -21,8 +21,6 @@
     table.items col.c-credit  { width: 15%; }
     table.items col.c-balance { width: 15%; }
     table.items td.acct { white-space: nowrap; color: #4B5563; font-size: 0.9em; }
-    table.items tbody td.val { text-align: right; color: #0F1419; }
-    table.items tbody td.lbl-left { text-align: left; color: #374151; }
     /* An order's lines, under its sale: a table of their own across
        Date, Account and Entry — Entry alone is too narrow for
        "318.60 m × $5.27 = $1,679.02", which printed over itself. Never
@@ -42,12 +40,21 @@
     table.lines col.l-eq { width: 4%; }
     table.lines td.eq { text-align: center; padding-left: 0; padding-right: 0; }
     table.items table.lines td.num { text-align: right; white-space: nowrap; font-weight: normal; }
-    /* The total of the ledger's columns, at the ledger's size: the
-       figure the reader wants is the balance block under it, which is
-       why the Balance cell here is left empty rather than said twice. */
-    table.items tbody tr.grand td { font-size: 10.67pt; }
-    /* Under Debit, Credit and Balance — the columns it closes. */
-    table.balance { width: 45%; }
+    /* The table closes on what is owed, on the order sheet's Total line
+       (tr.grand: the full-width black rule). Not Debit and Credit totals:
+       their difference is that same figure, and the reader wants what is
+       owed, not two sums to subtract. The figure spans Credit and
+       Balance, so a six-figure amount in this type has room. */
+    table.items tbody tr.grand td.lbl-left { text-align: left; }
+    table.items tbody tr.grand td.val { text-align: right; white-space: nowrap; }
+    /* Nothing on the page may look like a blank to fill in: an iPhone
+       reads a PDF's LAYOUT for forms — it has no fields — and covered
+       this statement with "AutoFill can help fill this form", which in
+       WhatsApp never went away. A name alone in a bordered box under a
+       caps label is a text field to it, and so is an empty amount cell.
+       So the name is plain type, and an empty cell carries a dash. */
+    .customer { font-size: 13.33pt; font-weight: bold; color: #0F1419; margin: 0 0 10pt; }
+    table.items td.none { color: #C4CBD4; font-weight: normal; }
   </style>
 </head>
 <body>
@@ -59,18 +66,10 @@
   {% trans "STATEMENT" as kind %}
   {% include "print/_document_header.html" with brand_line=brand_name number=statement_number kind=kind date=printed_at %}
 
-  {% comment %}The book the account is kept in, beside the heading; the
-  card under it is the customer's name alone.{% endcomment %}
+  {% comment %}The book the account is kept in, beside the heading; under
+  it the customer's name, as plain type — not in a card (see .customer).{% endcomment %}
   <h3>{% trans "Customer" %} - {% for a in accounts %}{{ a.book.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</h3>
-  <table class="twocol" cellspacing="0" cellpadding="0">
-    <tr>
-      <td class="full">
-        <div class="card">
-          <div class="name">{{ customer_name|capfirst }}</div>
-        </div>
-      </td>
-    </tr>
-  </table>
+  <div class="customer">{{ customer_name|capfirst }}</div>
 
   {% with many=accounts|length|add:"-1" %}
   <h3>{% trans "Entries" %} ({{ rows|length }})</h3>
@@ -101,8 +100,8 @@
         </td>
         {% comment %}r.amount is the statement's currency — the accounts'
         own when they all keep one, else base (combined_statement).{% endcomment %}
-        <td class="num">{% if r.amount > 0 %}{{ currency_symbol }}{{ r.amount|floatformat:"2u"|intcomma:False }}{% endif %}</td>
-        <td class="num">{% if r.amount < 0 %}{{ currency_symbol }}{{ r.amount|floatformat:"2u"|intcomma:False|cut:"-" }}{% endif %}</td>
+        {% if r.amount > 0 %}<td class="num">{{ currency_symbol }}{{ r.amount|floatformat:"2u"|intcomma:False }}</td>{% else %}<td class="num none">–</td>{% endif %}
+        {% if r.amount < 0 %}<td class="num">{{ currency_symbol }}{{ r.amount|floatformat:"2u"|intcomma:False|cut:"-" }}</td>{% else %}<td class="num none">–</td>{% endif %}
         <td class="num">{% if r.balance_after < 0 %}−{% endif %}{{ currency_symbol }}{{ r.balance_after|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
       </tr>
       {% if r.lines %}{% with lines=r.lines %}
@@ -134,25 +133,14 @@
       {% empty %}
       <tr><td colspan="{% if many %}6{% else %}5{% endif %}" style="text-align: center; color: #6B7280; padding: 18pt;">{% trans "No movements on this account." %}</td></tr>
       {% endfor %}
-      {% if rows %}
+      {% comment %}Where that leaves them, in the order sheet's words.{% endcomment %}
       <tr class="grand">
-        <td class="lbl-left" colspan="{% if many %}3{% else %}2{% endif %}">{% trans "Total" %}</td>
-        <td class="val">{{ currency_symbol }}{{ debit_total|floatformat:"2u"|intcomma:False }}</td>
-        <td class="val">{{ currency_symbol }}{{ credit_total|floatformat:"2u"|intcomma:False }}</td>
-        <td></td>
+        <td class="lbl-left" colspan="{% if many %}4{% else %}3{% endif %}">{% if closing > 0 %}{% trans "Balance due" %}{% elif closing < 0 %}{% trans "In credit" %}{% else %}{% trans "Account closed" %}{% endif %}</td>
+        <td class="val" colspan="2">{{ currency_symbol }}{{ closing|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
       </tr>
-      {% endif %}
     </tbody>
   </table>
   {% endwith %}
-
-  {% comment %}Where that leaves them, in the order sheet's words.{% endcomment %}
-  <table class="balance" cellspacing="0" cellpadding="0">
-    <tr class="after">
-      <td class="lbl">{% if closing > 0 %}{% trans "Balance due" %}{% elif closing < 0 %}{% trans "In credit" %}{% else %}{% trans "Account closed" %}{% endif %}</td>
-      <td class="val">{{ currency_symbol }}{{ closing|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
-    </tr>
-  </table>
 
   <table class="foot" cellspacing="0" cellpadding="0">
     <tr>

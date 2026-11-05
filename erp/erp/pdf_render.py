@@ -181,9 +181,10 @@ def document_response(request, template, context, filename, download=False,
         logger.exception("PDF render failed for %s; serving HTML", template)
         return html_fallback()
 
+    from erp.download_names import disposition
+
     response = HttpResponse(pdf, content_type="application/pdf")
-    disposition = "attachment" if download else "inline"
-    response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
+    response["Content-Disposition"] = disposition(filename, attachment=download)
     return response
 
 

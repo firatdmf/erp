@@ -868,6 +868,7 @@ class PurchaseOrderPrint(View):
 
     def get(self, request, pk):
         from .services_accounts import brand_name_for
+        from erp.download_names import client_filename
         from erp.pdf_render import document_response
 
         invoice = get_object_or_404(
@@ -915,7 +916,8 @@ class PurchaseOrderPrint(View):
             "brand_line": brand_name_for(invoice.book),
             "is_order": invoice.status == "ordered",
             "show_supplier_sku": any(it.supplier_sku for it in items),
-        }, f"purchase_{invoice.display_number}.pdf")
+        }, client_filename(getattr(invoice.current_account, "name", ""),
+                           f"purchase_{invoice.display_number}.pdf"))
 
 
 class PurchaseCancelBlocked(Exception):

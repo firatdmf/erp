@@ -2179,19 +2179,19 @@ class CurrentAccountStatementPrintCombined(View):
                 r["lines"] = statement_purchase_lines(r["linked_invoice"])
 
         primary = accounts[0]
+        customer_name = (getattr(primary.crm_link, "name", None)
+                         or getattr(primary.crm_link, "company_name", None)
+                         or primary.name)
+        from erp.download_names import client_filename
         from erp.pdf_render import document_response
         return document_response(request, self.template_name, {
             "accounts": accounts,
             "statement_number": " & ".join(a.code for a in accounts),
             "customer": primary.crm_link or primary,
-            "customer_name": (getattr(primary.crm_link, "name", None)
-                              or getattr(primary.crm_link, "company_name", None)
-                              or primary.name),
+            "customer_name": customer_name,
             "brand_name": brand_name_for(),
             "rows": rows,
-            "debit_total": data["debit_total"],
-            "credit_total": data["credit_total"],
             "closing": data["closing"],
             "currency_symbol": data["currency_symbol"],
             "printed_at": timezone.now(),
-        }, f"statement_{primary.code}.pdf")
+        }, client_filename(customer_name, f"statement_{primary.code}.pdf"))

@@ -155,5 +155,6 @@ def workbook_response(doc):
         buf.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    resp["Content-Disposition"] = f'attachment; filename="{doc.filename}.xlsx"'
+    from erp.download_names import disposition
+    resp["Content-Disposition"] = disposition(f"{doc.filename}.xlsx", attachment=True)
     return resp

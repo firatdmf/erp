@@ -1293,6 +1293,21 @@ class Order(models.Model):
             return self.web_client
         return "Unknown Client"
 
+    def client_name(self):
+        """Who the order is for, by name alone: the contact's or the
+        company's, a web client's, else the guest it was placed by. ""
+        when it names nobody — never get_client's "Unknown Client", and
+        not a contact's str(), which adds their company after a bar."""
+        if self.contact_id:
+            return self.contact.name or ""
+        if self.company_id:
+            return self.company.name or ""
+        if self.web_client_id:
+            return self.web_client.name or self.web_client.username or ""
+        first = (getattr(self, "guest_first_name", "") or "").strip()
+        last = (getattr(self, "guest_last_name", "") or "").strip()
+        return f"{first} {last}".strip()
+
     # below function is used in signals.py
     def update_status_from_items(self):
         item_statuses = list(self.items.values_list("status", flat=True))

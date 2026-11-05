@@ -519,9 +519,14 @@ def quote_print(request, pk):
     # under a name of its own.
     context["brand_color"] = brand_color()
     context["nejum_credit_html"] = credit_html(context["quote"].book)
+    from erp.download_names import client_filename
     from erp.pdf_render import document_response
+    quote = context["quote"]
+    # get_client's "—" for a quote with no customer names nobody.
+    client = quote.get_client()
     return document_response(request, "marketing/quote_print.html", context,
-                             f"quote_{context['quote'].number}.pdf")
+                             client_filename("" if client == "—" else client,
+                                             f"quote_{quote.number}.pdf"))
 
 
 # ── Status / conversion ──────────────────────────────────────────────

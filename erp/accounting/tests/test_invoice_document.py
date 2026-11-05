@@ -110,7 +110,7 @@ class TheOrderInvoice(InvoiceDocBase):
         import openpyxl
         resp = self.client.get(reverse("operating:order_invoice_excel", args=[self.order.pk]))
         self.assertEqual(resp.status_code, 200)
-        self.assertIn('filename="invoice-DK0000501.xlsx"', resp["Content-Disposition"])
+        self.assertIn('filename="Oleg Textiles - invoice-DK0000501.xlsx"', resp["Content-Disposition"])
         wb = openpyxl.load_workbook(BytesIO(resp.content))
         values = [c.value for row in wb.active.iter_rows() for c in row if c.value is not None]
         self.assertIn("No: DK0000501", values)

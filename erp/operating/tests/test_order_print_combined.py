@@ -530,12 +530,13 @@ class OrderPrintIsAPdf(TestCase):
         self.assertEqual(resp["Content-Type"], "application/pdf")
         self.assertTrue(resp.content.startswith(b"%PDF-"))
 
-    def test_it_opens_in_a_tab_under_the_order_number(self):
+    def test_it_opens_in_a_tab_under_the_customer_and_order_number(self):
         """Inline, not an attachment: a document to read, and to hand on
-        from there — the Excel export is the one you download."""
+        from there — the Excel export is the one you download. The
+        customer first, so a saved copy says whose it is."""
         resp = self.client.get(self.url)
         self.assertEqual(resp["Content-Disposition"],
-                         'inline; filename="order_DK-284.pdf"')
+                         'inline; filename="OLEG - order_DK-284.pdf"')
 
     def test_the_page_itself_is_still_reachable(self):
         """?html=1 — how the design is worked on, and the way back if a

@@ -140,11 +140,13 @@ def combined_statement_excel(request):
     buf = BytesIO()
     wb.save(buf)
 
-    label = "".join(ch if ch.isalnum() or ch in " -_" else "-"
-                    for ch in customer_name).strip()
+    from erp.download_names import client_filename, disposition
     resp = HttpResponse(
         buf.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    resp["Content-Disposition"] = f'attachment; filename="{label or "statement"}.xlsx"'
+    # The PDF's name, so the two copies of one statement sort together.
+    resp["Content-Disposition"] = disposition(
+        client_filename(customer_name, f"statement_{primary.code}.xlsx"),
+        attachment=True)
     return resp

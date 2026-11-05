@@ -3760,13 +3760,15 @@ class OrderPrint(DetailView):
         return ctx
 
     def render_to_response(self, context, **response_kwargs):
+        from erp.download_names import client_filename
         from erp.pdf_render import document_response, thumbnail_hook
 
         order = self.object
         return document_response(
             self.request, self.template_name,
             apply_print_choices(self.request, dict(context)),
-            f"order_{order.order_number or order.pk}.pdf",
+            client_filename(order.client_name(),
+                            f"order_{order.order_number or order.pk}.pdf"),
             image_hook=thumbnail_hook)
 
 
@@ -3864,14 +3866,17 @@ class OrderPrintCombined(LoginRequiredMixin, View):
     """
 
     def get(self, request):
+        from erp.download_names import client_filename
         from erp.pdf_render import document_response, thumbnail_hook
 
         orders, refusal = select_combined_orders(request)
         if refusal is not None:
             return refusal
         ctx = apply_print_choices(request, combined_print_context(orders, request))
+        order = ctx["order"]
         return document_response(request, "operating/order_print.html", ctx,
-                                 f"orders_{ctx['order'].order_number or ctx['order'].pk}.pdf",
+                                 client_filename(order.client_name(),
+                                                 f"orders_{order.order_number or order.pk}.pdf"),
                                  image_hook=thumbnail_hook)
 
 
@@ -6023,8 +6028,10 @@ def export_packing_list_excel(request, pk):
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    filename = f"packing_list_{order.order_number or order.pk}.xlsx"
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    from erp.download_names import client_filename, disposition
+    filename = client_filename(order.client_name(),
+                               f"packing_list_{order.order_number or order.pk}.xlsx")
+    response["Content-Disposition"] = disposition(filename, attachment=True)
     wb.save(response)
     return response
 
@@ -7154,8 +7161,9 @@ def order_packing_list_pdf(request, pk):
     response = HttpResponse(buffer, content_type='application/pdf')
     # inline, not attachment: this one is for reading in a browser tab.
     # Downloading-and-editing is what the Excel export is for.
-    response['Content-Disposition'] = (
-        f'inline; filename="packing_list_{order.order_number or order.pk}.pdf"')
+    from erp.download_names import client_filename, disposition
+    response['Content-Disposition'] = disposition(client_filename(
+        order.client_name(), f"packing_list_{order.order_number or order.pk}.pdf"))
     return response
 
 

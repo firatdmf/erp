@@ -256,7 +256,8 @@ class TheExcel(CombinedStatementBase):
         self.contact.save(update_fields=["name"])
         self._both()
         r = self._excel(self.laleli_account)
-        self.assertIn("Tatyana Warsaw", r["Content-Disposition"])
+        self.assertIn(f'filename="Tatyana Warsaw - statement_{self.laleli_account.code}.xlsx"',
+                      r["Content-Disposition"])
 
     def test_it_foots_to_the_same_balance_the_sheet_prints(self):
         """One document in two formats. A total that lived in only one of

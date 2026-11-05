@@ -99,8 +99,10 @@
           {% if r.mv.reference %}<div class="sku">{{ r.mv.reference }}</div>{% endif %}
           {% with text=r.description %}{% if text and text != r.mv.reference %}<div class="pdesc">{{ text|truncatechars:90 }}</div>{% endif %}{% endwith %}
         </td>
-        <td class="num">{% if r.mv.amount_base > 0 %}{{ currency_symbol }}{{ r.mv.amount_base|floatformat:"2u"|intcomma:False }}{% endif %}</td>
-        <td class="num">{% if r.mv.amount_base < 0 %}{{ currency_symbol }}{{ r.mv.amount_base|floatformat:"2u"|intcomma:False|cut:"-" }}{% endif %}</td>
+        {% comment %}r.amount is the statement's currency — the accounts'
+        own when they all keep one, else base (combined_statement).{% endcomment %}
+        <td class="num">{% if r.amount > 0 %}{{ currency_symbol }}{{ r.amount|floatformat:"2u"|intcomma:False }}{% endif %}</td>
+        <td class="num">{% if r.amount < 0 %}{{ currency_symbol }}{{ r.amount|floatformat:"2u"|intcomma:False|cut:"-" }}{% endif %}</td>
         <td class="num">{% if r.balance_after < 0 %}−{% endif %}{{ currency_symbol }}{{ r.balance_after|floatformat:"2u"|intcomma:False|cut:"-" }}</td>
       </tr>
       {% if r.lines %}{% with lines=r.lines %}

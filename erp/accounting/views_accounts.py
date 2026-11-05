@@ -1494,13 +1494,35 @@ class CurrentAccountStatement(View):
             prior_qs = prior_qs.none()
         if status_f != "cancelled":
             prior_qs = prior_qs.live()
-        # Base currency throughout — see CurrentAccount.recompute_balance.
-        opening = prior_qs.aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00")
+
+        # The account's own currency when it keeps one — the figure its
+        # page and its printed statement give — else base throughout (see
+        # CurrentAccount.recompute_balance). One answer for the whole page:
+        # a row with no rate drops it all back to base, never half.
+        from accounting.services_accounts import (
+            statement_currency_symbol, statement_in_own_currency)
+        prior = list(prior_qs)
+        movements = list(qs)
+        currency, own = statement_in_own_currency([current_account], prior + movements)
+        if own is None:
+            currency = None
+
+        def figure(mv):
+            """(amount in the statement's currency, rate toward it)."""
+            if own is None:
+                return mv.amount_base, None
+            # An FX revaluation counts for nothing in the account's own
+            # currency, as in own_currency_balance; its row still shows.
+            return own.get(mv.pk, (Decimal("0.00"), None))
+
+        opening = sum((figure(mv)[0] for mv in prior), Decimal("0.00"))
         running = opening
 
-        for mv in qs:
-            running += mv.amount_base
-            rows.append({"mv": mv, "balance_after": running})
+        for mv in movements:
+            amount, rate = figure(mv)
+            running += amount
+            rows.append({"mv": mv, "amount": amount, "own_rate": rate,
+                         "balance_after": running})
         _attach_links(rows)
 
         # Reading order is a DISPLAY choice, made after the walk. The
@@ -1513,14 +1535,15 @@ class CurrentAccountStatement(View):
         # Totals match the filtered rows. For cancelled-only view this
         # naturally shows the cancelled amount (debit/credit both sum
         # since each cancellation has +X and -X) and closing = 0.
+        # In the statement's currency, like the balance they close on —
+        # summing each row's entered amount added euros to dollars.
         debit_total = Decimal("0.00")
         credit_total = Decimal("0.00")
         for r in rows:
-            mv = r["mv"]
-            if mv.amount > 0:
-                debit_total += mv.amount
+            if r["amount"] > 0:
+                debit_total += r["amount"]
             else:
-                credit_total += abs(mv.amount)
+                credit_total += abs(r["amount"])
 
         if sort == "desc":
             rows = list(reversed(rows))
@@ -1537,6 +1560,8 @@ class CurrentAccountStatement(View):
             "closing":      running,
             "debit_total":  debit_total,
             "credit_total": credit_total,
+            "statement_currency": currency,
+            "currency_symbol": statement_currency_symbol(currency),
             "date_from":    date_from,
             "date_to":      date_to,
             "filter_direction": direction,

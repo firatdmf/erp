@@ -76,8 +76,10 @@ def build_statement_workbook(accounts, data, *, customer_name, brand_name):
 
     for row in data["rows"]:
         mv = row["mv"]
-        debit = mv.amount_base if mv.amount_base > 0 else None
-        credit = -mv.amount_base if mv.amount_base < 0 else None
+        # The statement's currency, as on the printed sheet.
+        amount = row["amount"]
+        debit = amount if amount > 0 else None
+        credit = -amount if amount < 0 else None
         cell(ws, r, 1, mv.date.strftime("%d.%m.%Y") if mv.date else "—",
              font=F_VAL, border=GRID)
         cell(ws, r, 2, mv.current_account.code, font=F_VAL, border=GRID)

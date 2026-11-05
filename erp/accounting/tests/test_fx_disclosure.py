@@ -148,12 +148,20 @@ class StatementRowTest(FxDisclosureBase):
     """The debit/credit figure is in the movement's own currency while the
     running balance beside it is a base-currency sum. Without the
     conversion stated, a lira row reads 200.00 against a balance that
-    moved by 4.16 and nothing on the page connects them."""
+    moved by 4.16 and nothing on the page connects them.
+
+    On an account kept in dollars: one kept in lira reads its statement in
+    lira (test_statement_own_currency), where a lira row converted nothing."""
+
+    def kept_in_dollars(self):
+        self.current_account.default_currency = self.usd
+        self.current_account.save()
 
     def url(self):
         return reverse("accounts:statement", kwargs={"pk": self.current_account.pk})
 
     def test_a_foreign_row_states_what_it_came_to(self):
+        self.kept_in_dollars()
         self.payment(self.try_)
         response = self.client.get(self.url())
         self.assertEqual(response.status_code, 200)
@@ -163,6 +171,7 @@ class StatementRowTest(FxDisclosureBase):
         self.assertContains(response, "@ 0.0208")
 
     def test_a_base_currency_row_says_nothing(self):
+        self.kept_in_dollars()
         self.payment(self.usd)
         response = self.client.get(self.url())
         self.assertEqual(response.status_code, 200)

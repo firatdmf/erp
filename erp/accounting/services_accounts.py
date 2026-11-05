@@ -1207,28 +1207,37 @@ def combined_statement(accounts):
     construction rather than by argument.
     """
     accounts = list(accounts)
-    movements = (
+    movements = list(
         CurrentAccountMovement.objects.live()
         .filter(current_account__in=accounts)
         .select_related("currency", "current_account")
         .order_by("date", "id")
     )
+    currency, own = statement_in_own_currency(accounts, movements)
 
     rows = []
     running = Decimal("0.00")
     debit = Decimal("0.00")
     credit = Decimal("0.00")
     for mv in movements:
-        running += mv.amount_base
-        rows.append({"mv": mv, "balance_after": running})
-        # Debit and credit are the BASE figures, like the balance beside
-        # them: a statement that added a TRY debit to a USD one would
-        # foot to a number that is not money. The row still prints the
-        # amount it was entered in.
-        if mv.amount_base > 0:
-            debit += mv.amount_base
+        if own is None:
+            amount, rate = mv.amount_base, None
+        elif mv.pk in own:
+            amount, rate = own[mv.pk]
         else:
-            credit += abs(mv.amount_base)
+            # An FX revaluation: what the balance is worth to the book,
+            # not what the customer owes — nothing to print to them.
+            continue
+        running += amount
+        rows.append({"mv": mv, "amount": amount, "own_rate": rate,
+                     "balance_after": running})
+        # Debit and credit are the statement's own figures, like the
+        # balance beside them: a statement that added a TRY debit to a
+        # USD one would foot to a number that is not money.
+        if amount > 0:
+            debit += amount
+        else:
+            credit += abs(amount)
 
     return {
         "accounts": accounts,
@@ -1236,5 +1245,43 @@ def combined_statement(accounts):
         "debit_total": debit,
         "credit_total": credit,
         "closing": running,
-        "currency_symbol": _base_currency_symbol(),
+        "currency": currency,
+        "currency_symbol": statement_currency_symbol(currency),
     }
+
+
+def statement_in_own_currency(accounts, movements):
+    """`movements` in the one currency every account in `accounts` keeps.
+
+    Returns (currency, {movement pk: (amount, rate)}) — each figure from
+    CurrentAccount.in_own_currency, the rule the account page already
+    reads its balance by — or (None, None) when the statement has to stay
+    in the base currency: an account kept in base, accounts kept in
+    different currencies (nothing to add a lira row to a euro one in), or
+    a row whose rate cannot be had, since a total with a row missing from
+    it would be wrong.
+
+    FX revaluations get no figure, as in own_currency_balance: they are a
+    base-side entry and the customer owes nothing by them.
+    """
+    accounts = list(accounts)
+    currencies = {a.own_currency for a in accounts}
+    if len(currencies) != 1 or None in currencies:
+        return None, None
+    by_pk = {a.pk: a for a in accounts}
+    amounts = {}
+    for mv in movements:
+        if mv.movement_type == "fx_adjustment":
+            continue
+        amount, rate = by_pk[mv.current_account_id].in_own_currency(mv)
+        if amount is None:
+            return None, None
+        amounts[mv.pk] = (amount, rate)
+    return currencies.pop(), amounts
+
+
+def statement_currency_symbol(currency):
+    """The symbol a statement's figures print with: `currency`'s, else base."""
+    if currency is None:
+        return _base_currency_symbol()
+    return currency.symbol or currency.code

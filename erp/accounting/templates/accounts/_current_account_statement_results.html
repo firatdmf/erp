@@ -4,19 +4,19 @@
 <div class="st-summary">
   <div class="st-stat">
     <div class="lbl">{% trans "Opening Balance" %}</div>
-    <div class="val {% if opening > 0 %}pos{% elif opening < 0 %}neg{% endif %}">{{ opening|money }}</div>
+    <div class="val {% if opening > 0 %}pos{% elif opening < 0 %}neg{% endif %}">{{ currency_symbol }}{{ opening|money }}</div>
   </div>
   <div class="st-stat">
     <div class="lbl">{% trans "Total Debit" %}</div>
-    <div class="val pos">+{{ debit_total|money }}</div>
+    <div class="val pos">+{{ currency_symbol }}{{ debit_total|money }}</div>
   </div>
   <div class="st-stat">
     <div class="lbl">{% trans "Total Credit" %}</div>
-    <div class="val neg">−{{ credit_total|money }}</div>
+    <div class="val neg">−{{ currency_symbol }}{{ credit_total|money }}</div>
   </div>
   <div class="st-stat">
     <div class="lbl">{% trans "Closing Balance" %}</div>
-    <div class="val {% if closing > 0 %}pos{% elif closing < 0 %}neg{% endif %}">{{ closing|money }}</div>
+    <div class="val {% if closing > 0 %}pos{% elif closing < 0 %}neg{% endif %}">{{ currency_symbol }}{{ closing|money }}</div>
   </div>
 </div>
 
@@ -54,7 +54,7 @@
       {% if sort != 'desc' %}
       <tr class="opening">
         <td colspan="6">{% trans "Opening Balance" %}</td>
-        <td class="num">{{ opening|money }}</td>
+        <td class="num">{{ currency_symbol }}{{ opening|money }}</td>
         <td class="no-print"></td>
       </tr>
       {% endif %}
@@ -127,20 +127,27 @@
           with nothing on the page to connect them. Stated only when a
           conversion actually happened — see conversion_facts.
         {% endcomment %}
+        {% comment %}
+          On an account kept in its own currency the balance is in that
+          currency, so a row says what it counted for there, and only when
+          it was converted (r.own_rate) — the account page's rule.
+        {% endcomment %}
         {% conversion_facts r.mv as fx %}
         <td class="num {% if r.mv.amount > 0 %}pos{% else %}muted{% endif %}">
           {% if r.mv.amount > 0 %}
             {{ r.mv.amount|money }}
-            {% if fx %}<span class="st-fx">{{ fx.currency.code }} · {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
+            {% if statement_currency %}{% if r.own_rate %}<span class="st-fx">{{ r.mv.currency.code }} · {{ currency_symbol }}{{ r.amount|absval|format_money }} @ {{ r.own_rate|format_rate }}</span>{% endif %}
+            {% elif fx %}<span class="st-fx">{{ fx.currency.code }} · {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
           {% else %}—{% endif %}
         </td>
         <td class="num {% if r.mv.amount < 0 %}neg{% else %}muted{% endif %}">
           {% if r.mv.amount < 0 %}
             {{ r.mv.amount|money|cut:'-' }}
-            {% if fx %}<span class="st-fx">{{ fx.currency.code }} · {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
+            {% if statement_currency %}{% if r.own_rate %}<span class="st-fx">{{ r.mv.currency.code }} · {{ currency_symbol }}{{ r.amount|absval|format_money }} @ {{ r.own_rate|format_rate }}</span>{% endif %}
+            {% elif fx %}<span class="st-fx">{{ fx.currency.code }} · {{ fx.base_symbol }}{{ fx.base_amount|absval|format_money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
           {% else %}—{% endif %}
         </td>
-        <td class="num">{{ r.balance_after|money }}</td>
+        <td class="num">{{ currency_symbol }}{{ r.balance_after|money }}</td>
         <td class="st-actions no-print">
           {% if r.editable %}
             <span class="st-act-group">
@@ -183,7 +190,7 @@
       {% if sort == 'desc' %}
       <tr class="opening">
         <td colspan="6">{% trans "Opening Balance" %}</td>
-        <td class="num">{{ opening|money }}</td>
+        <td class="num">{{ currency_symbol }}{{ opening|money }}</td>
         <td class="no-print"></td>
       </tr>
       {% endif %}
@@ -191,9 +198,9 @@
     <tfoot>
       <tr>
         <td colspan="4">{% trans "Total" %}</td>
-        <td class="num pos">+{{ debit_total|money }}</td>
-        <td class="num neg">−{{ credit_total|money }}</td>
-        <td class="num">{{ closing|money }}</td>
+        <td class="num pos">+{{ currency_symbol }}{{ debit_total|money }}</td>
+        <td class="num neg">−{{ currency_symbol }}{{ credit_total|money }}</td>
+        <td class="num">{{ currency_symbol }}{{ closing|money }}</td>
         <td class="no-print"></td>
       </tr>
     </tfoot>

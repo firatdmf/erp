@@ -35,14 +35,18 @@
        one account's narrower table (no Account column above it) ran
        "100.00 m × €2.47" into its "=". The SKU gives up the room. */
     table.lines col.l-qty { width: 36%; }
-    table.lines col.l-amount { width: 19%; }
+    table.lines col.l-amount { width: 17%; }
     table.lines td { padding: 1.5pt 4pt; border-bottom: 0.5pt solid #EEF2F6; vertical-align: top; }
     table.lines tr:last-child td { border-bottom: none; }
     /* Under table.items' own td.num rule, which is bold. */
     /* The equals signs in a column of their own: one straight line,
-       whatever the amount's width. */
-    table.lines col.l-eq { width: 4%; }
+       whatever the amount's width. Narrow, and the cells either side
+       give up their inner padding, so it sits a space from each side
+       rather than in a gap. */
+    table.lines col.l-eq { width: 3%; }
     table.lines td.eq { text-align: center; padding-left: 0; padding-right: 0; }
+    table.items table.lines td.qty { padding-right: 3pt; }
+    table.items table.lines td.eq + td.num { padding-left: 2pt; padding-right: 0; }
     table.items table.lines td.num { text-align: right; white-space: nowrap; font-weight: normal; }
     /* And should a quantity and price still not fit, they take two lines,
        broken before the "×" — never printed over the "=". */

@@ -7,8 +7,9 @@
     /* Printed by the BROWSER (Save as PDF), like the sales order — the
        layout survives that and doesn't survive xhtml2pdf. */
     @page { size: a4 portrait; margin: 0; }
+{% include "print/_document_fonts.html" %}
     body {
-      font-family: Helvetica, Arial, sans-serif; font-size: 11pt; color: #0F1419;
+      font-family: "DejaVu Sans", sans-serif; font-size: 11pt; color: #0F1419;
       line-height: 1.35; padding: 14mm 14mm 16mm 14mm; margin: 0;
     }
     @media print { html, body { margin: 0 !important; } .noprint { display: none !important; } }

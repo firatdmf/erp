@@ -8,6 +8,7 @@ drifting apart one copy at a time.
 Needs `is_pdf` from erp.pdf_render.document_response: the PDF and the HTML
 fallback lay their margins out differently (see the end).
 {% endcomment %}
+{% include "print/_document_fonts.html" %}
     @page {
       size: letter portrait;
       /* No margin at the sides or the top, so a browser printing the HTML
@@ -20,7 +21,7 @@ fallback lay their margins out differently (see the end).
       @bottom-center { content: element(nejum); }
     }
     body {
-      font-family: Helvetica, Arial, sans-serif;
+      font-family: "DejaVu Sans", sans-serif;
       font-size: 12.0pt;
       color: #0F1419;
       line-height: 1.3;
@@ -116,7 +117,7 @@ fallback lay their margins out differently (see the end).
     table.items .pdesc { color: #4B5563; font-size: 8.67pt; margin-top: 1pt; }
     /* A code under the name it belongs to, sized against it so it follows
        the table's size; mono, so a digit cannot be misread for a letter. */
-    table.items .sku { font-family: "Courier", monospace; font-size: 0.8em; font-weight: normal; color: #4B5563; }
+    table.items .sku { font-family: "DejaVu Sans Mono", monospace; font-size: 0.8em; font-weight: normal; color: #4B5563; }
     /* How many rolls, under the quantity — never which: barcodes are for
        picking, and belong on the packing list. */
     table.items .packs { font-size: 0.85em; font-weight: normal; color: #6B7280; margin-top: 1pt; }

@@ -1,0 +1,23 @@
+{% load static %}{% comment %}
+The printed documents' fonts, carried with them: DejaVu Sans and DejaVu
+Sans Mono, from erp/static/erp/fonts.
+
+Before, the documents asked for Helvetica or Arial and took whatever the
+machine had. The Railway server has neither, so prod printed in its own
+DejaVu, while a Mac printed in Helvetica, about a tenth narrower: one
+document, two layouts, and a line that fit locally ran over on prod.
+Now every machine prints the same file. DejaVu because that is the look
+prod's documents already had, and the one we kept.
+
+Included inside a <style>. WeasyPrint reads the /static/ URLs off disk
+(erp.pdf_render.static_path); a browser printing the HTML fallback loads
+them like any static file.
+{% endcomment %}
+    @font-face { font-family: "DejaVu Sans"; font-weight: normal; font-style: normal;
+                 src: url("{% static 'erp/fonts/DejaVuSans.ttf' %}"); }
+    @font-face { font-family: "DejaVu Sans"; font-weight: bold; font-style: normal;
+                 src: url("{% static 'erp/fonts/DejaVuSans-Bold.ttf' %}"); }
+    @font-face { font-family: "DejaVu Sans Mono"; font-weight: normal; font-style: normal;
+                 src: url("{% static 'erp/fonts/DejaVuSansMono.ttf' %}"); }
+    @font-face { font-family: "DejaVu Sans Mono"; font-weight: bold; font-style: normal;
+                 src: url("{% static 'erp/fonts/DejaVuSansMono-Bold.ttf' %}"); }

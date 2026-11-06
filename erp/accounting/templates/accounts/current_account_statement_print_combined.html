@@ -30,8 +30,12 @@
     /* Fixed columns, so every order's lines line up with the next's. */
     table.lines { width: 100%; border-collapse: collapse; table-layout: fixed;
                   font-size: 8.2pt; color: #6B7280; }
-    table.lines col.l-qty { width: 32%; }
-    table.lines col.l-amount { width: 16%; }
+    /* Sized in the font prod prints in — DejaVu Sans, the server having
+       no Helvetica or Arial — about a tenth wider than a Mac's. At 32%,
+       one account's narrower table (no Account column above it) ran
+       "100.00 m × €2.47" into its "=". The SKU gives up the room. */
+    table.lines col.l-qty { width: 36%; }
+    table.lines col.l-amount { width: 19%; }
     table.lines td { padding: 1.5pt 4pt; border-bottom: 0.5pt solid #EEF2F6; vertical-align: top; }
     table.lines tr:last-child td { border-bottom: none; }
     /* Under table.items' own td.num rule, which is bold. */
@@ -40,6 +44,9 @@
     table.lines col.l-eq { width: 4%; }
     table.lines td.eq { text-align: center; padding-left: 0; padding-right: 0; }
     table.items table.lines td.num { text-align: right; white-space: nowrap; font-weight: normal; }
+    /* And should a quantity and price still not fit, they take two lines,
+       broken before the "×" — never printed over the "=". */
+    table.items table.lines td.num.qty { white-space: normal; }
     /* The table closes on what is owed, on the order sheet's Total line
        (tr.grand: the full-width black rule). Not Debit and Credit totals:
        their difference is that same figure, and the reader wants what is
@@ -114,7 +121,7 @@
               {% comment %}The variant's SKU alone; the product's SKU, then its
               name (a purchase's typed text), for a line that has none.{% endcomment %}
               <td>{{ item.variant_sku|default:item.sku|default:item.name }}</td>
-              <td class="num">{{ item.quantity|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit }} × {{ lines.symbol }}{{ item.price|floatformat:"2u"|intcomma:False }}</td>
+              <td class="num qty">{{ item.quantity|floatformat:"2u"|intcomma:False }}&nbsp;{{ item.unit }} ×&nbsp;{{ lines.symbol }}{{ item.price|floatformat:"2u"|intcomma:False }}</td>
               <td class="eq">=</td>
               <td class="num">{{ lines.symbol }}{{ item.amount|floatformat:"2u"|intcomma:False }}</td>
             </tr>

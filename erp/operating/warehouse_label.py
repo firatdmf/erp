@@ -74,7 +74,7 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
     from .order_notifications import _ensure_pdf_fonts
 
     reg = _ensure_pdf_fonts() or "Helvetica"
-    bold = "DejaVuSans-Bold" if reg == "DejaVuSans" else "Helvetica-Bold"
+    bold = "Helvetica-Bold" if reg == "Helvetica" else f"{reg}-Bold"
     names = {}  # warehouse id → its business's name
 
     W, H = 76 * mm, 58 * mm

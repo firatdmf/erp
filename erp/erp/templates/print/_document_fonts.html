@@ -1,18 +1,34 @@
 {% load static %}{% comment %}
-The printed documents' fonts, carried with them: DejaVu Sans and DejaVu
-Sans Mono, from erp/static/erp/fonts.
+The printed documents' fonts, carried with them from erp/static/erp/fonts,
+so every machine prints the same file and nothing is fetched to print it.
+
+  Plus Jakarta Sans  the text, every document (400–800, the weights used)
+  DejaVu Sans        the fallback for what Jakarta has no letter for —
+                     Cyrillic, say: a Russian name prints, not as boxes
+  DejaVu Sans Mono   codes: order numbers, SKUs, barcodes
+
+Use them as  font-family: "Plus Jakarta Sans", "DejaVu Sans", sans-serif
+and          font-family: "DejaVu Sans Mono", monospace.
 
 Before, the documents asked for Helvetica or Arial and took whatever the
-machine had. The Railway server has neither, so prod printed in its own
-DejaVu, while a Mac printed in Helvetica, about a tenth narrower: one
-document, two layouts, and a line that fit locally ran over on prod.
-Now every machine prints the same file. DejaVu because that is the look
-prod's documents already had, and the one we kept.
+machine had (the server printed in its own DejaVu, a Mac in Helvetica:
+two layouts of one document), and the invoice fetched Jakarta from Google
+Fonts each time it was made.
 
 Included inside a <style>. WeasyPrint reads the /static/ URLs off disk
 (erp.pdf_render.static_path); a browser printing the HTML fallback loads
 them like any static file.
 {% endcomment %}
+    @font-face { font-family: "Plus Jakarta Sans"; font-weight: 400; font-style: normal;
+                 src: url("{% static 'erp/fonts/PlusJakartaSans-Regular.ttf' %}"); }
+    @font-face { font-family: "Plus Jakarta Sans"; font-weight: 500; font-style: normal;
+                 src: url("{% static 'erp/fonts/PlusJakartaSans-Medium.ttf' %}"); }
+    @font-face { font-family: "Plus Jakarta Sans"; font-weight: 600; font-style: normal;
+                 src: url("{% static 'erp/fonts/PlusJakartaSans-SemiBold.ttf' %}"); }
+    @font-face { font-family: "Plus Jakarta Sans"; font-weight: 700; font-style: normal;
+                 src: url("{% static 'erp/fonts/PlusJakartaSans-Bold.ttf' %}"); }
+    @font-face { font-family: "Plus Jakarta Sans"; font-weight: 800; font-style: normal;
+                 src: url("{% static 'erp/fonts/PlusJakartaSans-ExtraBold.ttf' %}"); }
     @font-face { font-family: "DejaVu Sans"; font-weight: normal; font-style: normal;
                  src: url("{% static 'erp/fonts/DejaVuSans.ttf' %}"); }
     @font-face { font-family: "DejaVu Sans"; font-weight: bold; font-style: normal;

@@ -10,9 +10,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% trans "Invoice" %} {{ doc.number }}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 {% include "print/_document_fonts.html" %}
   :root {
@@ -25,10 +22,10 @@
     --gray-600: #4B5563;
     --gray-700: #374151;
     --gray-900: #111827;
-    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
-    /* The bundled mono (print/_document_fonts.html), not the machine's:
-       Menlo on a Mac, DejaVu on the server, and the number printed
-       differently on each. */
+    /* Both bundled (print/_document_fonts.html), not fetched from Google
+       Fonts or taken from the machine: the same file prints everywhere,
+       and printing needs no connection. */
+    --font-sans: "Plus Jakarta Sans", "DejaVu Sans", sans-serif;
     --font-mono: "DejaVu Sans Mono", monospace;
     --ink: #0F1419;
     --rule: #111827;

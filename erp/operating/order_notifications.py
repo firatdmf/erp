@@ -44,33 +44,41 @@ def _currency_symbol(order):
 _PDF_FONTS_READY = False
 
 
+PDF_FONT = "PlusJakartaSans"
+
+
 def _ensure_pdf_fonts():
-    """Register DejaVu Sans (a Unicode TTF bundled at operating/fonts/) with
-    reportlab so xhtml2pdf can render Turkish characters (ş İ ğ ı Ş Ğ). The
-    engine's built-in Helvetica is Latin-1 only and prints those glyphs as
-    empty boxes — which is exactly the bug in the Turkish PDF. Returns the
-    font-family name to use, or None if the fonts are unavailable (caller
-    then falls back to Helvetica)."""
+    """Register Plus Jakarta Sans with reportlab — the font every printed
+    document shares (erp/static/erp/fonts; the HTML documents declare it in
+    print/_document_fonts.html). Returns the regular face's name; its bold
+    is that name + "-Bold". None if the files are missing, and the caller
+    falls back to Helvetica.
+
+    Never reportlab's built-in Helvetica by choice: it is Latin-1 only and
+    prints ş İ ğ ı as empty boxes. Jakarta has the Turkish letters; it has
+    no Cyrillic, which the HTML documents fall back to DejaVu for and
+    reportlab cannot (it has no per-letter fallback)."""
     global _PDF_FONTS_READY
     if _PDF_FONTS_READY:
-        return "DejaVuSans"
+        return PDF_FONT
     try:
         import os
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
-        base = os.path.join(os.path.dirname(__file__), "fonts")
-        reg = os.path.join(base, "DejaVuSans.ttf")
-        bold = os.path.join(base, "DejaVuSans-Bold.ttf")
+        base = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            "erp", "static", "erp", "fonts")
+        reg = os.path.join(base, "PlusJakartaSans-Regular.ttf")
+        bold = os.path.join(base, "PlusJakartaSans-Bold.ttf")
         if not (os.path.exists(reg) and os.path.exists(bold)):
             return None
-        if "DejaVuSans" not in pdfmetrics.getRegisteredFontNames():
-            pdfmetrics.registerFont(TTFont("DejaVuSans", reg))
-            pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", bold))
+        if PDF_FONT not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(PDF_FONT, reg))
+            pdfmetrics.registerFont(TTFont(f"{PDF_FONT}-Bold", bold))
             pdfmetrics.registerFontFamily(
-                "DejaVuSans", normal="DejaVuSans", bold="DejaVuSans-Bold",
+                PDF_FONT, normal=PDF_FONT, bold=f"{PDF_FONT}-Bold",
             )
         _PDF_FONTS_READY = True
-        return "DejaVuSans"
+        return PDF_FONT
     except Exception:
         traceback.print_exc()
         return None
@@ -209,8 +217,8 @@ def _render_order_pdf(order):
 
     Built with reportlab/platypus — NOT xhtml2pdf. xhtml2pdf does not route
     non-Latin-1 text to embedded TTF fonts, so Turkish characters (ş İ ğ ı)
-    came out as empty boxes. reportlab embeds DejaVu Sans and renders full
-    Unicode correctly. Clean one-page black-and-white order document.
+    came out as empty boxes. reportlab embeds Plus Jakarta Sans, which has
+    them. Clean one-page black-and-white order document.
     """
     font = _ensure_pdf_fonts()
     if not font:
@@ -231,7 +239,7 @@ def _render_order_pdf(order):
 
         subtitle = _("Order Confirmation")
 
-        REG, BOLD = "DejaVuSans", "DejaVuSans-Bold"
+        REG, BOLD = font, f"{font}-Bold"
         INK = colors.HexColor("#111111")
         MUT = colors.HexColor("#555555")
         HAIR = colors.HexColor("#BBBBBB")

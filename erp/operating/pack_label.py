@@ -92,7 +92,7 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
     from .order_notifications import _ensure_pdf_fonts
 
     reg = _ensure_pdf_fonts() or "Helvetica"
-    bold = "DejaVuSans-Bold" if reg == "DejaVuSans" else "Helvetica-Bold"
+    bold = "Helvetica-Bold" if reg == "Helvetica" else f"{reg}-Bold"
 
     W, H, M = 100 * mm, 100 * mm, 5 * mm
     qsize = 24 * mm

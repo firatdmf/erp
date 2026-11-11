@@ -219,3 +219,15 @@ class PurchaseRecordsTheSupplierSkuTest(TestCase):
             sorted((s["account"], s["supplier_sku"], s["last_price"], s["currency"])
                    for s in suppliers),
             [("Karven", "3002", 1.6, "USD"), ("Lazik", "LZK0000120", 1.75, "USD")])
+
+    def test_the_purchase_page_lists_a_variant_no_warehouse_carries_yet(self):
+        # An order's variant exists before anything is received for it; the
+        # row check finds it, so the list above the rows shows it too.
+        self._first(supplier_sku="3002")
+        stocked = ProductVariant.objects.get()
+        ProductVariant.objects.create(product=stocked.product, variant_sku="ZZ-ON-ORDER")
+        r = self.client.get(reverse("operating:catalog_product_variants",
+                                    args=[self.warehouse.pk, stocked.product_id]))
+        self.assertEqual(
+            [(v["variant_sku"], v["in_warehouse"]) for v in r.json()["results"]],
+            [(stocked.variant_sku, True), ("ZZ-ON-ORDER", False)])

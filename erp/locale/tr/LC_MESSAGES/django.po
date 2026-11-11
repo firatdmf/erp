@@ -15958,3 +15958,7 @@ msgstr "%(skus)s satış fiyatı siparişinki — %(number)s siparişinde deği�
 
 msgid "The order’s price — change it on the order"
 msgstr "Siparişin fiyatı — siparişte değiştirin"
+
+#: accounting/templates/accounts/goods_receipt_form.html
+msgid "no stock yet"
+msgstr "henüz stok yok"

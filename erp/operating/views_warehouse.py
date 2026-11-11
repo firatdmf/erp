@@ -3084,11 +3084,11 @@ def catalog_product_variants(request, pk, product_id):
 
     Each is labelled with its values, the words the row's fields take.
 
-    Only variants with a REAL WarehouseProduct link are shown. Some
-    catalog variants have none — leftover duplicates or test rows from
-    earlier syncs that never got (or lost) their warehouse row — and
-    showing those here is actively misleading: staff see "2 variants"
-    for a product that only has 1 in the actual warehouse."""
+    Every variant of the product is listed, the same set the row check
+    (catalog_variant_match) answers from — otherwise a row could say
+    "exists" for a variant the list never showed. One with no warehouse
+    row yet (an order's variant nothing has been received for) says so
+    through `in_warehouse`."""
     # Scoped like catalog_base_search (see _receivable_products) so this
     # intake endpoint can't be used to read out a storefront-only product's
     # SKU/barcode/quantity by guessing its id.
@@ -3098,9 +3098,8 @@ def catalog_product_variants(request, pk, product_id):
     from marketing.models import with_live_quantity
     variants = with_live_quantity(
         product.variants
-        .filter(warehouse_products__isnull=False)
         .prefetch_related("product_variant_attribute_values__product_variant_attribute")
-        .distinct().order_by("variant_sku"))
+        .order_by("variant_sku"))
     from marketing.supplier_items import suppliers_of
     variants = list(variants)
     suppliers = suppliers_of(v.id for v in variants)
@@ -3122,6 +3121,7 @@ def catalog_product_variants(request, pk, product_id):
             # Live, not the stored mirror: a variant whose only roll was
             # deleted read "33.66" here long after its stock hit zero.
             "variant_quantity": float(v.live_quantity or 0),
+            "in_warehouse": v.stock_tracked,
             # Who sells it and what each of them calls it — the row fills
             # in the chosen account's code and lists the others.
             "suppliers": suppliers.get(v.id, []),

@@ -2714,11 +2714,16 @@
           cardEl._npExistingVariants.map(function (v) {
             // SKU first because that is what identifies the variant, then
             // its values.
+            // A variant no warehouse carries yet (made by an order) has no
+            // stock to count, so it says that instead of a 0.
             const label = v.label
               ? ' <span class="np-ev-name">' + npEsc(v.label) + '</span>' : '';
+            const qty = v.in_warehouse
+              ? (Math.round((v.variant_quantity || 0) * 100) / 100)
+              : '{% trans "no stock yet" %}';
             return '<button type="button" class="np-ev-chip" data-sku="' + npEsc(v.variant_sku) + '" onclick="npPickExistingVariant(this.closest(\'.np-product-card\'), \'' + npEsc(v.variant_sku).replace(/'/g, "\\'") + '\', this)" title="{% trans "Click to fill a variant row with this — click again to remove that row" %}">' +
               '<b class="np-ev-sku">' + npEsc(v.variant_sku) + '</b>' + label + ' (' +
-              (Math.round((v.variant_quantity || 0) * 100) / 100) + ')</button>';
+              qty + ')</button>';
           }).join('');
         npSyncVariantChips(cardEl);
         npShowAllSuppliers(cardEl);

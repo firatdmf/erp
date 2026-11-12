@@ -159,26 +159,32 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
                 name += "…"
             draw_brand(c, M, brand_y, name, bold, size, LABEL_BRAND_TRACKING)
 
+        # ── One baseline for the rows: the SKU row sits just above the
+        #    barcode, the fields stack upward from it, and QUANTITY stands
+        #    on the SKU row — caption beside caption, value beside value.
+        #    Placed from the QR down and the brand down, the two columns'
+        #    lines never met. ──
+        row = 7.2 * mm                 # caption to the next caption
+        sku_y = 18 * mm                # the SKU row's caption baseline
+
         # ── "2nd" badge — a factory second says so under the QR, right-
-        #    aligned over the quantity, which steps down to make room.
-        #    Beside the brand it cut the business's name short. ──
-        below_qr = H - M - qsize
+        #    aligned over the quantity. Beside the brand it cut the
+        #    business's name short. ──
         if second:
             c.setFont(bold, 5.5)
             tw = c.stringWidth(tag, bold, 5.5)
-            bx, by = W - M - tw - 2 * pad, below_qr - 3.6 * mm
+            bx, by = W - M - tw - 2 * pad, sku_y + 4 * mm
             c.roundRect(bx, by - 1 * mm, tw + 2 * pad, 3.2 * mm, 0.8 * mm, stroke=1, fill=0)
             c.drawString(bx + pad, by, tag)
-            below_qr -= 3.6 * mm
 
-        # ── QUANTITY (right, under the QR) — the stack beside it stops
+        # ── QUANTITY (right, on the SKU row) — the stack beside it stops
         #    short of it ──
         amount = f"{float(quantity):.2f} {unit}".strip()
         amount_w = c.stringWidth(amount, bold, 11)
         c.setFont(bold, 5.5)
-        c.drawRightString(W - M, below_qr - 3.6 * mm, "QUANTITY")
+        c.drawRightString(W - M, sku_y, "QUANTITY")
         c.setFont(bold, 11)
-        c.drawRightString(W - M, below_qr - 8 * mm, amount)
+        c.drawRightString(W - M, sku_y - 3.6 * mm, amount)
 
         # ── Field stack (left): a small caption over its value. Captions
         #    bold, not regular: Jakarta's regular strokes at this size are
@@ -191,13 +197,10 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
             text, size = fit(value, bold, 9, value_room, 6.5)
             c.setFont(bold, size)
             c.drawString(M, y - 3.6 * mm, text)
-            return y - 7.2 * mm
 
-        y = H - M - 8.6 * mm
-        y = field("PRODUCT", base, y)
-        if token:
-            y = field("VARIANT", token, y)
-        y = field("SKU", sku or "—", y)
+        rows = [("PRODUCT", base)] + ([("VARIANT", token)] if token else []) + [("SKU", sku or "—")]
+        for i, (label, value) in enumerate(rows):
+            field(label, value, sku_y + (len(rows) - 1 - i) * row)
 
         # ── Code128 barcode (bottom, auto-shrunk to fit). Three dots a bar
         #    (0.375 mm) when it fits, so every bar is whole dots wide. ──

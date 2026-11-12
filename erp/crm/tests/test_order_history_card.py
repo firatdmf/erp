@@ -69,6 +69,23 @@ class OrderHistoryCard(TestCase):
         # Ticking it prints both halves.
         self.assertIn(f'value="{ergene_half.pk},{laleli_half.pk}"', html)
 
+    def test_halves_at_different_stages_still_add_up(self):
+        group = uuid.uuid4()
+        laleli_half = self._order(self.laleli, "ORD-2026-000023", "2.50", group)
+        self._order(self.ergene, "ORD-2026-000024", "7.25", group)
+        Order.objects.filter(pk=laleli_half.pk).update(order_status="packaging")
+        _page, html = self._card()
+        self.assertIn("$97.50", html)
+
+    def test_a_half_cancelled_on_its_own_is_left_out(self):
+        group = uuid.uuid4()
+        self._order(self.laleli, "ORD-2026-000023", "2.50", group)
+        ergene_half = self._order(self.ergene, "ORD-2026-000024", "7.25", group)
+        Order.objects.filter(pk=ergene_half.pk).update(order_status="cancelled")
+        _page, html = self._card()
+        self.assertIn("$25.00", html)
+        self.assertNotIn("$97.50", html)
+
     def test_one_who_holds_one_book_still_sees_the_whole_order_but_prints_their_half(self):
         group = uuid.uuid4()
         laleli_half = self._order(self.laleli, "ORD-2026-000023", "2.50", group)

@@ -210,9 +210,9 @@ def order_rows(orders):
             first_of[o.split_group] = o
             o.row_numbers = [half_number(h) for h in halves]
             # Not a half cancelled on its own: it is no part of what the
-            # order comes to.
-            o.row_totals = combined_totals(
-                [h for h in halves if h.order_status == o.order_status or h.pk == o.pk])
+            # order comes to. A half merely a stage ahead of the other is.
+            standing = [h for h in halves if h.order_status != "cancelled"]
+            o.row_totals = combined_totals(standing or halves)
         else:
             o.row_numbers = [half_number(o)]
             o.row_totals = [(o.currency_symbol, o.total_value() or 0)]

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Ship part of the order" %} · {{ number }} | Nejum ERP{% endblock %}
+{% block css %}
+<style>
+  .sp { max-width: 980px; margin: 0 auto; padding: 22px 16px 90px; font: 400 13.5px 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif; color: #0F1419; }
+  .sp, .sp * { box-sizing: border-box; }
+  .sp-back { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#FFF; border:1px solid #E0E6EE; border-radius:8px; font-weight:600; font-size:12.5px; color:#374151; text-decoration:none; }
+  .sp-back:hover { border-color:#147F74; color:#005354; }
+  .sp-eyebrow { font-weight:700; font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:#00696A; margin:16px 0 4px; }
+  .sp-title { font-weight:800; font-size:26px; letter-spacing:-.02em; margin:0; }
+  .sp-sub { color:#4B5563; margin:6px 0 18px; max-width:620px; line-height:1.5; }
+  .sp-card { background:#FFF; border:1px solid #E2E8EE; border-radius:12px; padding:16px; margin-bottom:14px; }
+  .sp-card h3 { font-weight:700; font-size:14px; margin:0 0 4px; }
+  .sp-card .sp-hint { color:#6B7280; font-size:12.5px; margin:0 0 12px; }
+  .sp-packs { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; }
+  .sp-pack { display:flex; gap:10px; align-items:flex-start; border:1px solid #E2E8EE; border-radius:10px; padding:10px 12px; cursor:pointer; }
+  .sp-pack:has(input:checked) { border-color:#147F74; background:#E5F1F0; }
+  .sp-pack input { margin-top:3px; }
+  .sp-pack b { display:block; font-size:13.5px; }
+  .sp-pack small { color:#6B7280; display:block; line-height:1.45; word-break:break-word; }
+  .sp-lines { width:100%; border-collapse:collapse; }
+  .sp-lines th { text-align:left; font-weight:600; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#6B7280; padding:6px 8px; border-bottom:1px solid #E2E8EE; }
+  .sp-lines td { padding:7px 8px; border-bottom:1px solid #F1F4F7; vertical-align:middle; }
+  .sp-lines .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .sp-lines input[type=number] { width:96px; text-align:right; padding:5px 7px; border:1px solid #D5DCE3; border-radius:7px; font:inherit; }
+  .sp-lines input[readonly] { background:#F3F5F7; color:#6B7280; }
+  .sp-sku { font-family:ui-monospace, Menlo, monospace; font-size:12.5px; word-break:break-all; }
+  .sp-book td { background:#F8FAFC; font-weight:600; font-size:12px; color:#374151; }
+  .sp-note { font-size:11.5px; color:#92400E; }
+  .sp-stays.moves { color:#005354; font-weight:700; }
+  .sp-adj { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; padding:8px 0; border-bottom:1px solid #F1F4F7; }
+  .sp-adj span { flex:1; min-width:160px; }
+  .sp-foot { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; align-items:center; }
+  .sp-foot p { flex:1; min-width:220px; margin:0; color:#4B5563; font-size:12.5px; }
+  .sp-btn { padding:9px 16px; border-radius:9px; font-weight:700; font-size:13px; border:1px solid #147F74; background:#147F74; color:#FFF; cursor:pointer; }
+  .sp-btn[disabled] { opacity:.5; cursor:not-allowed; }
+  @media (max-width: 600px) {
+    .sp-lines thead { display:none; }
+    .sp-lines tr.sp-line { display:grid; grid-template-columns:1fr auto; gap:4px 10px; padding:8px 0; border-bottom:1px solid #F1F4F7; }
+    .sp-lines tr.sp-line td { border:0; padding:0; }
+    .sp-lines tr.sp-line td.num::before { content: attr(data-label) " "; color:#6B7280; font-size:11.5px; }
+    .sp-lines tr.sp-book { display:block; }
+    .sp-lines tr.sp-book td { display:block; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sp">
+  <a class="sp-back" href="{% url 'operating:order_detail' order.pk %}"><i class="fa fa-arrow-left"></i> {{ number }}</a>
+  <div class="sp-eyebrow">{% trans "Partial shipment" %}</div>
+  <h1 class="sp-title">{% trans "Ship part of the order" %}</h1>
+  <p class="sp-sub">{% blocktrans %}Tick the packages leaving now. This order keeps them; everything else moves to a new follow-up order with its own number, still open. Then complete this order as usual.{% endblocktrans %}</p>
+
+  <form method="post" id="sp-form">
+    {% csrf_token %}
+
+    <section class="sp-card">
+      <h3>{% trans "Packages going now" %}</h3>
+      {% if pack_rows %}
+      <p class="sp-hint">{% trans "Packages left unticked move to the follow-up with what is in them." %}</p>
+      <div class="sp-packs">
+        {% for r in pack_rows %}
+        <label class="sp-pack">
+          <input type="checkbox" name="pack" value="{{ r.pack.pk }}" data-pack-tick>
+          <span>
+            <b>{% blocktrans with n=r.pack.pack_number %}Package {{ n }}{% endblocktrans %}</b>
+            <small>
+              {% if r.rolls %}
+                {% blocktrans count counter=r.rolls with amount=r.amount|floatformat:"-2" %}{{ counter }} item, {{ amount }}{% plural %}{{ counter }} items, {{ amount }}{% endblocktrans %}
+                · {{ r.skus|join:", " }}
+              {% else %}{% trans "Empty" %}{% endif %}
+            </small>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="sp-hint">{% trans "This order has no packages. Enter below how much of each line ships now." %}</p>
+      {% endif %}
+    </section>
+
+    <section class="sp-card">
+      <h3>{% trans "What ships now" %}</h3>
+      <p class="sp-hint">{% trans "Filled in from the ticked packages. A line without rolls can be changed by hand." %}</p>
+      <table class="sp-lines">
+        <thead><tr>
+          <th>{% trans "Product" %}</th>
+          <th class="num">{% trans "Ordered" %}</th>
+          <th class="num">{% trans "Ships now" %}</th>
+          <th class="num">{% trans "To follow-up" %}</th>
+        </tr></thead>
+        <tbody>
+          {% for row in rows %}
+          {% if split %}{% ifchanged row.half.pk %}
+          <tr class="sp-book"><td colspan="4">{{ row.half.current_account.book.name }} · {{ row.half.order_number|default:row.half.pk }}</td></tr>
+          {% endifchanged %}{% endif %}
+          <tr class="sp-line" data-ordered="{{ row.ordered|stringformat:'s' }}" data-rolls="{{ row.rolls_json }}"
+              data-pack="{{ row.pack_id|default:'' }}" {% if row.locked %}data-locked{% endif %}>
+            <td>
+              <div class="sp-sku">{{ row.item.product_variant.variant_sku }}</div>
+              {% if row.locked %}<div class="sp-note">{% trans "Its purchase hasn't been received — it moves with the rest." %}</div>{% endif %}
+            </td>
+            <td class="num" data-label="{% trans 'Ordered' %}">{{ row.ordered|floatformat:"-2" }}</td>
+            <td class="num" data-label="{% trans 'Ships now' %}">
+              <input type="number" step="0.01" min="0" name="ship_{{ row.item.pk }}" value="0"
+                     {% if row.locked or row.rolls %}readonly{% endif %}>
+            </td>
+            <td class="num sp-stays" data-label="{% trans 'To follow-up' %}">{{ row.ordered|floatformat:"-2" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {% if adjustments %}
+    <section class="sp-card">
+      <h3>{% trans "Extra lines" %}</h3>
+      <p class="sp-hint">{% trans "They stay on this order unless ticked to move." %}</p>
+      {% for a in adjustments %}
+      <div class="sp-adj">
+        <span>{{ a.label }} · <b>{{ a.amount|floatformat:"2" }}</b></span>
+        <label><input type="checkbox" name="move_adjustment" value="{{ a.pk }}"> {% trans "Move to the follow-up" %}</label>
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    <div class="sp-foot">
+      <p id="sp-summary" data-nothing="{% trans "Nothing ships yet — tick the packages going now." %}"
+         data-everything="{% trans "Everything ships — complete the order as usual." %}"></p>
+      <a class="sp-back" href="{% url 'operating:order_detail' order.pk %}">{% trans "Cancel" %}</a>
+      <button type="submit" class="sp-btn" id="sp-submit" disabled>{% trans "Move the rest to a follow-up order" %}</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  const form = document.getElementById('sp-form');
+  const rows = Array.from(form.querySelectorAll('tr.sp-line'));
+  const submit = document.getElementById('sp-submit');
+  const summary = document.getElementById('sp-summary');
+  const round = (n) => Math.round(n * 100) / 100;
+
+  function ticked() {
+    return new Set(Array.from(form.querySelectorAll('[data-pack-tick]:checked')).map(i => i.value));
+  }
+
+  // The same rule as partial_shipment.LineRow.suggested.
+  function suggest(tr, set) {
+    if (tr.hasAttribute('data-locked')) return 0;
+    const ordered = parseFloat(tr.dataset.ordered) || 0;
+    const rolls = JSON.parse(tr.dataset.rolls || '[]');
+    if (rolls.length) {
+      let going = 0, staying = 0;
+      rolls.forEach(([p, q]) => { if (set.has(String(p))) going += parseFloat(q); else staying += parseFloat(q); });
+      if (going && !staying) return ordered;
+      return round(Math.min(going, ordered));
+    }
+    return set.has(tr.dataset.pack) ? ordered : 0;
+  }
+
+  function refresh() {
+    let ships = 0, stays = 0;
+    rows.forEach(tr => {
+      const ordered = parseFloat(tr.dataset.ordered) || 0;
+      const input = tr.querySelector('input');
+      const q = parseFloat(input.value) || 0;
+      const left = round(ordered - q);
+      const cell = tr.querySelector('.sp-stays');
+      cell.textContent = left.toLocaleString(undefined, {maximumFractionDigits: 2});
+      cell.classList.toggle('moves', left > 0);
+      if (q > 0) ships++;
+      if (left > 0) stays++;
+    });
+    submit.disabled = !(ships && stays);
+    summary.textContent = !ships ? summary.dataset.nothing : (!stays ? summary.dataset.everything : '');
+  }
+
+  function fill() {
+    const set = ticked();
+    rows.forEach(tr => {
+      const input = tr.querySelector('input');
+      // A line with no rolls and no package keeps what was typed.
+      const byHand = !tr.hasAttribute('data-locked') && tr.dataset.rolls === '[]' && !tr.dataset.pack;
+      if (!byHand) input.value = suggest(tr, set);
+    });
+    refresh();
+  }
+
+  form.querySelectorAll('[data-pack-tick]').forEach(i => i.addEventListener('change', fill));
+  rows.forEach(tr => tr.querySelector('input').addEventListener('input', refresh));
+  fill();
+})();
+</script>
+{% endblock %}

@@ -15962,3 +15962,126 @@ msgstr "Siparişin fiyatı — siparişte değiştirin"
 #: accounting/templates/accounts/goods_receipt_form.html
 msgid "no stock yet"
 msgstr "henüz stok yok"
+
+# Partial shipment (operating.partial_shipment)
+msgid "A retail order goes out at the counter in one piece."
+msgstr "Perakende sipariş tezgâhta tek seferde teslim edilir."
+
+msgid "Only an open order can ship in part."
+msgstr "Yalnızca açık bir sipariş kısmen gönderilebilir."
+
+#, python-format
+msgid "%(sku)s: the quantity to ship is not a number."
+msgstr "%(sku)s: gönderilecek miktar bir sayı değil."
+
+#, python-format
+msgid "%(sku)s comes from a purchase that hasn't been received — none of it can ship yet."
+msgstr "%(sku)s henüz teslim alınmamış bir satın almadan geliyor — henüz hiçbiri gönderilemez."
+
+#, python-format
+msgid "%(sku)s: the ticked packages hold %(qty)s of it, so at least that ships."
+msgstr "%(sku)s: işaretli paketlerde bundan %(qty)s var, en az bu kadarı gönderilir."
+
+#, python-format
+msgid "%(sku)s: at most %(qty)s can ship — its other rolls stay behind."
+msgstr "%(sku)s: en fazla %(qty)s gönderilebilir — diğer topları geride kalıyor."
+
+msgid "Nothing would ship. Tick the packages going now."
+msgstr "Hiçbir şey gönderilmeyecek. Şimdi gidecek paketleri işaretleyin."
+
+msgid "Everything ships — complete the order as usual."
+msgstr "Her şey gönderiliyor — siparişi her zamanki gibi tamamlayın."
+
+#, python-format
+msgid "moved to %(n)s"
+msgstr "%(n)s siparişine taşındı"
+
+#, python-format
+msgid "%(q)s ships; %(left)s moved to %(n)s"
+msgstr "%(q)s gönderiliyor; %(left)s %(n)s siparişine taşındı"
+
+#, python-format
+msgid "%(numbers)s now bought for %(n)s"
+msgstr "%(numbers)s artık %(n)s için alınıyor"
+
+#, python-format
+msgid "Shipped in part; the rest continues on %(n)s"
+msgstr "Kısmen gönderildi; kalanı %(n)s siparişinde devam ediyor"
+
+#, python-format
+msgid "The rest of %(n)s after part of it shipped"
+msgstr "%(n)s siparişinin bir kısmı gönderildikten sonra kalanı"
+
+#, python-format
+msgid "The rest continues on %(numbers)s. Complete this order when its packages leave."
+msgstr "Kalanı %(numbers)s siparişinde devam ediyor. Paketleri çıkınca bu siparişi tamamlayın."
+
+msgid "Ship part of the order"
+msgstr "Siparişin bir kısmını gönder"
+
+msgid "Partial shipment"
+msgstr "Kısmi gönderim"
+
+msgid "Tick the packages leaving now. This order keeps them; everything else moves to a new follow-up order with its own number, still open. Then complete this order as usual."
+msgstr "Şimdi çıkan paketleri işaretleyin. Bu sipariş onları tutar; geri kalan her şey kendi numarası olan, açık yeni bir devam siparişine taşınır. Ardından bu siparişi her zamanki gibi tamamlayın."
+
+msgid "Packages going now"
+msgstr "Şimdi giden paketler"
+
+msgid "Packages left unticked move to the follow-up with what is in them."
+msgstr "İşaretlenmeyen paketler içindekilerle birlikte devam siparişine taşınır."
+
+#, python-format
+msgid "Package %(n)s"
+msgstr "Paket %(n)s"
+
+msgid "This order has no packages. Enter below how much of each line ships now."
+msgstr "Bu siparişin paketi yok. Her satırdan şimdi ne kadar gideceğini aşağıya girin."
+
+msgid "What ships now"
+msgstr "Şimdi gidenler"
+
+msgid "Filled in from the ticked packages. A line without rolls can be changed by hand."
+msgstr "İşaretli paketlerden doldurulur. Topu olmayan bir satır elle değiştirilebilir."
+
+msgid "Ships now"
+msgstr "Şimdi gidiyor"
+
+msgid "To follow-up"
+msgstr "Devam siparişine"
+
+msgid "Its purchase hasn't been received — it moves with the rest."
+msgstr "Satın alması henüz teslim alınmadı — kalanla birlikte taşınır."
+
+msgid "Extra lines"
+msgstr "Ek satırlar"
+
+msgid "They stay on this order unless ticked to move."
+msgstr "Taşınmak üzere işaretlenmedikçe bu siparişte kalırlar."
+
+msgid "Move to the follow-up"
+msgstr "Devam siparişine taşı"
+
+msgid "Move the rest to a follow-up order"
+msgstr "Kalanı bir devam siparişine taşı"
+
+msgid "Nothing ships yet — tick the packages going now."
+msgstr "Henüz hiçbir şey gitmiyor — şimdi gidecek paketleri işaretleyin."
+
+msgid "The rest of an order that shipped in part:"
+msgstr "Kısmen gönderilmiş bir siparişin kalanı:"
+
+msgid "Shipped in part — the rest continues on"
+msgstr "Kısmen gönderildi — kalanı şurada devam ediyor:"
+
+msgid "Ship some packages now; the rest moves to a follow-up order"
+msgstr "Bazı paketleri şimdi gönderin; kalanı bir devam siparişine taşınır"
+
+msgid "Ship part"
+msgstr "Kısmen gönder"
+
+#, python-format
+msgid "%(counter)s item, %(amount)s"
+msgid_plural "%(counter)s items, %(amount)s"
+msgstr[0] "%(counter)s ürün, %(amount)s"
+msgstr[1] "%(counter)s ürün, %(amount)s"

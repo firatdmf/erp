@@ -1302,6 +1302,23 @@
           {% endfor %}
         </div>
       {% endif %}
+      {% comment %}Part of the request shipped and the rest went on to a
+      follow-up order (operating.partial_shipment): each side links the other.{% endcomment %}
+      {% with continued=order.continuations.all %}
+      {% if order.continued_from or continued %}
+        <div class="od-split-note">
+          <i class="fa fa-truck-ramp-box"></i>
+          {% if order.continued_from %}
+            <span>{% trans "The rest of an order that shipped in part:" %}</span>
+            <a href="{% url 'operating:order_detail' order.continued_from.pk %}">{{ order.continued_from.order_number|default:order.continued_from.pk }}</a>
+          {% endif %}
+          {% if continued %}
+            <span>{% trans "Shipped in part — the rest continues on" %}</span>
+            {% for f in continued %}<a href="{% url 'operating:order_detail' f.pk %}">{{ f.order_number|default:f.pk }}</a>{% endfor %}
+          {% endif %}
+        </div>
+      {% endif %}
+      {% endwith %}
       <div class="od-meta">
         <span><i class="fa fa-calendar"></i>{{ order.order_date|date:"d M Y" }}</span>
         <span class="od-dot"></span>
@@ -1526,6 +1543,13 @@
                 </button>
                 {% if order.order_status == 'cancelled' %}
                 {% elif order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
+                {% if not is_sales_rep and not order.is_retail_order and not needs_all_books %}
+                {% comment %}Some packages go now, the rest moves to a follow-up order (operating.partial_shipment).{% endcomment %}
+                <a href="{% url 'operating:order_ship_part' order.pk %}" class="ord-btn ghost"
+                   title="{% trans "Ship some packages now; the rest moves to a follow-up order" %}">
+                  <i class="fa fa-boxes-stacked"></i> {% trans "Ship part" %}
+                </a>
+                {% endif %}
                 {% comment %}Goods bought for the order still on their way in: the funnel refuses 'shipped' (goods_not_received), so the button says why instead of failing.{% endcomment %}
                 <button type="button" id="od-complete-btn" class="ord-btn primary" data-status="shipped"
                         {% if billing_waits_for %}disabled title="{% trans "Goods bought for this order haven't been received yet" %}"{% elif needs_all_books %}disabled title="{{ needs_all_books }}"{% endif %}>

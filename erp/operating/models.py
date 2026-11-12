@@ -692,6 +692,17 @@ class Order(models.Model):
     # NULL on the ordinary single-book order, which is nearly all of them.
     split_group = models.UUIDField(null=True, blank=True, db_index=True)
 
+    # Part of the order shipped and the rest stayed behind: the rest is
+    # this order, a follow-up with its own number, and this points at the
+    # order that shipped (operating.partial_shipment). Each order still
+    # ships once, so the sale, the stock cut and the customer's notice
+    # work as they do for any order. NULL on an order that is no one's rest.
+    continued_from = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="continuations",
+        help_text="The order that shipped part of this request; this one holds the rest.",
+    )
+
     # Current-account link — auto-populated on save() for manual orders
     # so current account pages can list this order's movements and so we don't
     # double-create a current account for the same customer. Web orders skip this.

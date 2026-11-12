@@ -1,0 +1,42 @@
+/* Carrier combobox (_carrier_picker.html) — drawn like the order form's
+   customer picker. Used by the order page and the Ship part page. */
+.od-cbx { position: relative; }
+.od-cbx-box[hidden], .od-cbx-chip[hidden], .od-cbx-list[hidden] { display: none; }
+.od-cbx-box input { width: 100%; box-sizing: border-box; }
+.od-cbx-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40;
+  list-style: none; margin: 0; padding: 4px;
+  background: white; border: 1px solid #DDE3EA; border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(15,20,25,.13); max-height: 236px; overflow-y: auto;
+}
+.od-cbx-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 7px; cursor: pointer;
+  font: 600 13px var(--font-sans); color: #0F1419;
+}
+.od-cbx-list li i { color: #147F74; font-size: 12px; }
+.od-cbx-list li.active, .od-cbx-list li:hover { background: #EFF6F5; }
+.od-cbx-list li.add { color: #0B5F60; border-top: 1px solid #EEF1F5; }
+.od-cbx-list li.add:first-child { border-top: 0; }
+.od-cbx-chip {
+  display: flex; align-items: center; gap: 8px; height: 38px; box-sizing: border-box;
+  padding: 0 6px 0 11px; border: 1px solid #BFE0DB; background: #EFF6F5; border-radius: 7px;
+  font: 700 13px var(--font-sans); color: #0B5F60;
+}
+.od-cbx-chip i { color: #147F74; }
+.od-cbx-chip > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.od-cbx-clear {
+  flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 6px; cursor: pointer;
+  background: transparent; color: #0B5F60; padding: 0; position: relative;
+}
+.od-cbx-clear::before, .od-cbx-clear::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 11px; height: 1.8px;
+  background: currentColor; border-radius: 2px;
+}
+.od-cbx-clear::before { transform: translate(-50%,-50%) rotate(45deg); }
+.od-cbx-clear::after { transform: translate(-50%,-50%) rotate(-45deg); }
+.od-cbx-clear:hover { background: #DCEBE9; }
+[data-theme="dark"] .od-cbx-list { background: #1A2228; border-color: #2A353D; }
+[data-theme="dark"] .od-cbx-list li { color: #E6ECEF; }
+[data-theme="dark"] .od-cbx-list li.active, [data-theme="dark"] .od-cbx-list li:hover { background: rgba(102,194,194,.12); }
+[data-theme="dark"] .od-cbx-chip { background: rgba(102,194,194,.10); border-color: rgba(102,194,194,.35); color: #66C2C2; }

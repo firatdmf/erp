@@ -173,11 +173,17 @@ class PlainOrder(PartialShipmentBase):
         # by the same picker as on the order page.
         self.assertContains(page, "operating/js/cargo_receipts.js")
         self.assertContains(page, "paste it here")
-        r = self.client.post(url, {"pack": [self.p1.pk], "tracking_number": "TRK-1"})
+        # The carrier is the order page's type-to-search field; a name not
+        # on the list is added, as there.
+        self.assertContains(page, '<select name="carrier" id="sp-carrier-select" hidden>', html=False)
+        self.assertContains(page, "operating/js/carrier_picker.js")
+        r = self.client.post(url, {"pack": [self.p1.pk], "tracking_number": "TRK-1",
+                                   "carrier": "Sürat Kargo"})
         self.assertRedirects(r, reverse("operating:order_detail", args=[self.o.pk]),
                              fetch_redirect_response=False)
         self.o.refresh_from_db()
         self.assertEqual((self.o.order_status, self.o.tracking_number), ("shipped", "TRK-1"))
+        self.assertEqual(self.o.get_carrier_display(), "Sürat Kargo")
         # Only the rolls that went are cut.
         self.assertEqual(set(self.o.stock_reservations.values_list("consumed", flat=True)), {True})
         f = Order.objects.get(continued_from=self.o)

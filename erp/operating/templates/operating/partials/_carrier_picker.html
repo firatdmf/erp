@@ -1,0 +1,22 @@
+{% load i18n %}
+{% comment %}The carrier field: a combobox over the carrier list — type to filter, pick, and the pick shows as a chip whose × gives the field back; a name not on the list is offered as "Add" and the server adds it on save. The <select> stays underneath as the value the form posts. Wired by operating/js/carrier_picker.js, styled by operating/css/carrier_picker.css.
+Takes: cid (id prefix), carrier (the code chosen now), carrier_label, carrier_choices.{% endcomment %}
+<select name="carrier" id="{{ cid }}-select" hidden>
+  <option value="">{% trans "— Select —" %}</option>
+  {% for code, label in carrier_choices %}
+  <option value="{{ code }}" {% if carrier == code %}selected{% endif %}>{{ label }}</option>
+  {% endfor %}
+</select>
+<div class="od-cbx" id="{{ cid }}-cbx" data-select="{{ cid }}-select" data-add-label="{% trans 'Add' %}">
+  <div class="od-cbx-box" {% if carrier %}hidden{% endif %}>
+    <input type="text" id="{{ cid }}-search" autocomplete="off"
+           placeholder="{% trans 'Search carrier...' %}"
+           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{{ cid }}-list">
+    <ul class="od-cbx-list" id="{{ cid }}-list" role="listbox" hidden></ul>
+  </div>
+  <div class="od-cbx-chip" {% if not carrier %}hidden{% endif %}>
+    <i class="fa fa-truck"></i>
+    <span>{{ carrier_label }}</span>
+    <button type="button" class="od-cbx-clear" title="{% trans 'Change carrier' %}" aria-label="{% trans 'Change carrier' %}"></button>
+  </div>
+</div>

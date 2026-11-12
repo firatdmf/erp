@@ -235,7 +235,18 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
             # ── Contents: a product a line, its code left and its amount
             #    right on the same baseline (laid out above) ──
             y = rule - 3.2 * mm
-            for row in page:
+            for n, row in enumerate(page):
+                if n:
+                    # A dotted line between products, so a long code's
+                    # amount on the line under it reads as its own. Leader
+                    # dots joining code to amount were tried: the gap is
+                    # mostly too short, and they came out one dot or none.
+                    c.saveState()
+                    c.setLineWidth(0.5)
+                    c.setLineCap(1)          # round: each dash a dot
+                    c.setDash(0.01, 1.4)
+                    c.line(M, y + ROW - 1.1 * mm, PW - M, y + ROW - 1.1 * mm)
+                    c.restoreState()
                 c.setFont(bold, row["size"])
                 if row["single"]:
                     c.drawString(M, y, row["sku"])

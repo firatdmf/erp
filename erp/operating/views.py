@@ -6954,8 +6954,11 @@ def order_packing_list_pdf(request, pk):
     brand_line = brand_name_for()
     _order_dt = order.order_date or order.created_at.date()
 
+    from .order_notifications import brand_flowable
     head_left = [
-        Paragraph(brand_line, brand_style),
+        brand_flowable(brand_line, brand_style.fontName, brand_style.fontSize,
+                       brand_style.textColor, leading=brand_style.leading,
+                       space_after=brand_style.spaceAfter),
         # The list is numbered by the order's own id — the same 270 that
         # is in the URL of the packing screen this PDF prints.
         Paragraph(f"{labels['title']} {order.pk}", title_style),

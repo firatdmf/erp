@@ -84,6 +84,49 @@ def _ensure_pdf_fonts():
         return None
 
 
+# The business's name is set a little open, in every print: Jakarta's F
+# leaves no room on its right and its I leaves room on both sides, so in
+# DEMFIRAT the I sat against the F with a gap after it. 4% of the size
+# between letters evens that out. The HTML documents say the same in CSS
+# (letter-spacing: 0.04em, print/_document_styles.html); these are
+# reportlab's, which has no letter-spacing in a Paragraph.
+BRAND_TRACKING = 0.04
+
+
+def brand_width(text, font, size):
+    """How wide draw_brand sets `text`."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    return stringWidth(text, font, size) + size * BRAND_TRACKING * max(len(text) - 1, 0)
+
+
+def draw_brand(c, x, y, text, font, size):
+    """`text` on canvas `c` with its baseline at (x, y), letters set open."""
+    c.setFont(font, size)
+    c.drawString(x, y, text, charSpace=size * BRAND_TRACKING)
+
+
+def brand_flowable(text, font, size, color, leading=None, space_after=0):
+    """draw_brand as a platypus flowable, standing where a one-line
+    Paragraph of the same size would."""
+    from reportlab.platypus import Flowable
+
+    line = leading or size * 1.3
+
+    class BrandLine(Flowable):
+        def wrap(self, avail_width, avail_height):
+            return min(avail_width, brand_width(text, font, size)), line
+
+        def getSpaceAfter(self):
+            return space_after
+
+        def draw(self):
+            self.canv.setFillColor(color)
+            # A Paragraph's first baseline sits one font size below its top.
+            draw_brand(self.canv, 0, line - size, text, font, size)
+
+    return BrandLine()
+
+
 def _order_lines_and_total(order):
     """Return (items_with_line_total, adjustments, subtotal, total)
     computed safely (quantity is nullable, so guard the multiply).
@@ -273,7 +316,7 @@ def _render_order_pdf(order):
         # ---- Header (brand left, order # right, bottom rule) ----
         num = order_ref(order)
         header = Table([[
-            [par(brand.upper(), 18, bold=True),
+            [brand_flowable(brand.upper(), BOLD, 18, INK),
              par(subtitle, 8, color=MUT, upper=True)],
             [par(f"{_('ORDER')} {num}", 14, bold=True, align=2),
              par(datef(order.order_date or order.created_at, "d M Y"), 8.5, color=MUT, align=2)],

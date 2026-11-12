@@ -71,7 +71,7 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
     from accounting.services_accounts import brand_name_for
 
     from .catalog_sync import derive_catalog
-    from .order_notifications import _ensure_pdf_fonts
+    from .order_notifications import _ensure_pdf_fonts, brand_width, draw_brand
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "Helvetica-Bold" if reg == "Helvetica" else f"{reg}-Bold"
@@ -135,13 +135,12 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
         brand_w = 0
         if name:
             size = 12
-            while size > 7 and c.stringWidth(name, bold, size) > room:
+            while size > 7 and brand_width(name, bold, size) > room:
                 size -= 0.5
-            while len(name) > 1 and c.stringWidth(name, bold, size) > room:
+            while len(name) > 1 and brand_width(name, bold, size) > room:
                 name = name[:-1]
-            c.setFont(bold, size)
-            brand_w = c.stringWidth(name, bold, size)
-            c.drawString(4 * mm, H - 9 * mm, name)
+            brand_w = brand_width(name, bold, size)
+            draw_brand(c, 4 * mm, H - 9 * mm, name, bold, size)
 
         # ── "2nd" badge (right after the brand, only when factory second) ──
         if second:

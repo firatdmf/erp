@@ -89,7 +89,7 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
 
     from accounting.services_accounts import brand_name_for
 
-    from .order_notifications import _ensure_pdf_fonts
+    from .order_notifications import _ensure_pdf_fonts, brand_width, draw_brand
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "Helvetica-Bold" if reg == "Helvetica" else f"{reg}-Bold"
@@ -133,10 +133,14 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
             top = H - M
             if name:
                 size = 14
-                while size > 8 and c.stringWidth(name, bold, size) > W - 2 * M:
+                while size > 8 and brand_width(name, bold, size) > W - 2 * M:
                     size -= 0.5
-                c.setFont(bold, size)
-                c.drawString(M, H - M - 4.5 * mm, fit(name, bold, size, W - 2 * M))
+                shown = name
+                if brand_width(shown, bold, size) > W - 2 * M:
+                    while shown and brand_width(shown + "…", bold, size) > W - 2 * M:
+                        shown = shown[:-1]
+                    shown += "…"
+                draw_brand(c, M, H - M - 4.5 * mm, shown, bold, size)
                 top -= 8 * mm
 
             # ── Header: QR, then the order number over "3 / 12" ──

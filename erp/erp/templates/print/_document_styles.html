@@ -44,7 +44,9 @@ fallback lay their margins out differently (see the end).
        erp.nejum_credit.brand_color; this is that function's default. On
        one line: the right-hand cell needs only the date and the chip, and
        a 105mm cap once broke a long house name in two. */
-    .hdr .brand { font-size: 16.0pt; font-weight: bold; color: #944F05; line-height: 1.25; white-space: nowrap; }
+    .hdr .brand { font-size: 16.0pt; font-weight: bold; color: #944F05; line-height: 1.25; white-space: nowrap;
+                  /* Set a little open: see BRAND_TRACKING, operating/order_notifications. */
+                  letter-spacing: 0.04em; }
     /* The document's number, alone: the chip says what kind it is. */
     .hdr .doc-type { font-size: 10.67pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
     .hdr .date { font-size: 10.67pt; color: #4B5563; }

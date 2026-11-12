@@ -62,8 +62,10 @@ class NejumCreditBase(TestCase):
         clear_cache()
 
     def pdf_strings(self, url):
-        """Every string drawn straight onto the PDF canvas (the footer
-        hook draws there; the table content goes through Paragraphs)."""
+        """Every string drawn straight onto the PDF canvas, run together
+        (the footer hook draws there, and so does the brand line,
+        letter-spaced; the table content goes through Paragraphs). Read
+        with assertIn/assertNotIn: the credit is a stretch of it."""
         from reportlab.pdfgen.canvas import Canvas
         drawn = []
         real = Canvas.drawString
@@ -76,7 +78,7 @@ class NejumCreditBase(TestCase):
             resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
         # Each coloured run is drawn separately; the line is their sum.
-        return drawn + ["".join(drawn)]
+        return "".join(drawn)
 
     def xlsx_values(self, url):
         """Every cell value, plus the printed page footer."""

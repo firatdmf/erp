@@ -152,3 +152,43 @@ def wrap_at_plus(value):
     from django.utils.html import escape
     from django.utils.safestring import mark_safe
     return mark_safe(escape(value or "").replace("+", "+<wbr>"))
+
+
+@register.simple_tag
+def line_roll_groups(item):
+    """A line's rolls for the order page, grouped so each group says once
+    what its chips share: the rolls held from stock (their warehouse when
+    they all stand in one), then the rolls each supplier purchase is
+    bringing (the purchase, its depot, how many and about how much). A
+    chip then only carries what is its own — barcode, length, markers."""
+    from decimal import Decimal
+    from django.template.defaultfilters import floatformat
+    from marketing import units
+
+    def only(values):
+        values = {v for v in values}
+        return values.pop() if len(values) == 1 else None
+
+    held = None
+    rolls = list(getattr(item, "item_reservations", None) or []) if getattr(item, "is_tracked", False) else []
+    if rolls:
+        held = {
+            "rolls": rolls,
+            "label": getattr(item, "scanned_label", ""),
+            "warehouse": only(getattr(r.warehouse_product, "warehouse", None) for r in rolls),
+        }
+    coming = []
+    by_purchase = {}
+    for e in getattr(item, "expected_rolls", None) or []:
+        group = by_purchase.get(e["purchase"].pk)
+        if group is None:
+            group = by_purchase[e["purchase"].pk] = {"purchase": e["purchase"], "rolls": []}
+            coming.append(group)
+        group["rolls"].append(e)
+    pack = getattr(getattr(item, "product", None), "pack_type", None) or units.DEFAULT_PACK
+    for group in coming:
+        n = len(group["rolls"])
+        amount = sum((e["qty"] for e in group["rolls"]), Decimal("0"))
+        group["label"] = f"{n} {units.pack_noun(pack, n)} · ≈ {floatformat(amount, '-2g')} {group['rolls'][0]['unit']}"
+        group["warehouse"] = only(e["warehouse"] for e in group["rolls"])
+    return {"held": held, "coming": coming}

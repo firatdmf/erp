@@ -615,6 +615,17 @@
   /* Where the roll stands: a name, not a state, so quiet and in its own case. */
   .od-top-pill .tag.wh { color: #64748B; background: #F4F7FB; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 10.5px; }
   .od-tops-none { font: 500 11px var(--font-sans); color: #94A3B8; }
+  /* A line's rolls in groups (od_line_rolls.html): the head says once what
+     the chips share — warehouse, purchase, count and amount. */
+  .od-roll-group + .od-roll-group { margin-top: 10px; }
+  .od-roll-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 6px;
+    font: 600 11.5px var(--font-sans); color: #64748B; }
+  .od-roll-head > span > i { margin-right: 4px; }
+  .od-roll-head b { color: #005354; font-weight: 700; }
+  .od-roll-head .od-po-chip { margin-top: 0; }
+  .od-roll-head .tag.wh { font: 600 10.5px var(--font-sans); color: #64748B; background: #F4F7FB;
+    padding: 2px 7px; border-radius: 5px; }
+  .od-roll-group.expected .od-roll-head, .od-roll-group.expected .od-roll-head b { color: #6D28D9; }
   /* Variant labels come from free text staff type — warehouse product
      names or attribute values — and are routinely joined with + and _
      rather than spaces ("mirle_gümüş+lale+gülkurusu"). CSS sees one
@@ -1610,10 +1621,7 @@
             <tr class="od-tops-row" data-tops-for="{{ item.pk }}" style="display:none;">
               <td colspan="6">
                 <div class="od-tops-wrap">
-                  <div class="od-tops-list">
-                    {% if item.is_tracked %}{% for r in item.item_reservations %}{% include "operating/partials/od_top_row.html" %}{% endfor %}{% endif %}
-                    {% for e in item.expected_rolls %}{% include "operating/partials/od_expected_top_row.html" %}{% endfor %}
-                  </div>
+                  {% include "operating/partials/od_line_rolls.html" %}
                 </div>
               </td>
             </tr>
@@ -1689,10 +1697,7 @@
             <tr class="od-tops-row" data-tops-for="{{ item.pk }}" style="display:none;">
               <td colspan="6">
                 <div class="od-tops-wrap">
-                  <div class="od-tops-list">
-                    {% if item.is_tracked %}{% for r in item.item_reservations %}{% include "operating/partials/od_top_row.html" %}{% endfor %}{% endif %}
-                    {% for e in item.expected_rolls %}{% include "operating/partials/od_expected_top_row.html" %}{% endfor %}
-                  </div>
+                  {% include "operating/partials/od_line_rolls.html" %}
                 </div>
               </td>
             </tr>

@@ -456,9 +456,10 @@ class PurchaseForCustomerTest(TestCase):
         named = {it.pk: [p.pk for p in it.purchases] for it in r.context["order_items_sorted"]}
         self.assertEqual(named.pop(extra.pk), [])
         self.assertEqual(list(named.values()), [[inv_id]])
-        # Its goods not in yet, each roll coming names it, the line doesn't.
+        # Its goods not in yet, the rolls coming name it once, over them;
+        # the line doesn't.
         self.assertContains(r, 'class="od-po-chip" href="%s" target="_blank"'
-                            % reverse("accounts:purchase_order_detail", args=[inv_id]), count=2)
+                            % reverse("accounts:purchase_order_detail", args=[inv_id]), count=1)
         self.assertEqual([it.line_purchases for it in r.context["order_items_sorted"]], [[], []])
         self.assertNotContains(r, "not on the purchase")
 

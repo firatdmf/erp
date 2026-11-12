@@ -1,0 +1,29 @@
+{% load i18n operating_tags %}{% comment %}
+A line's rolls on the order page, in groups: the rolls held from stock,
+then the rolls each supplier purchase is bringing. Each group's head says
+once what its chips share (warehouse, purchase, count and amount), so a
+chip carries only its own barcode, length and markers.
+{% endcomment %}{% line_roll_groups item as groups %}
+{% if groups.held %}
+<div class="od-roll-group">
+  <div class="od-roll-head">
+    <span><i class="fa fa-cubes"></i> {% trans "From stock" %} · <b>{{ groups.held.label }}</b></span>
+    {% if groups.held.warehouse %}<span class="tag wh"><i class="fa fa-warehouse"></i> {{ groups.held.warehouse.name }}</span>{% endif %}
+  </div>
+  <div class="od-tops-list">
+    {% for r in groups.held.rolls %}{% include "operating/partials/od_top_row.html" with hide_wh=groups.held.warehouse %}{% endfor %}
+  </div>
+</div>
+{% endif %}
+{% for g in groups.coming %}
+<div class="od-roll-group expected">
+  <div class="od-roll-head" title="{% trans 'On the supplier purchase, not arrived yet — its rolls are a guess until the goods are received' %}">
+    <span><i class="fa fa-truck"></i> {% trans "Coming" %} · <b>{{ g.label }}</b></span>
+    <a class="od-po-chip" href="{% url 'accounts:purchase_order_detail' g.purchase.pk %}" target="_blank" rel="noopener"><i class="fa fa-file-invoice"></i> <b>{{ g.purchase.number }}</b></a>
+    {% if g.warehouse %}<span class="tag wh"><i class="fa fa-warehouse"></i> {{ g.warehouse.name }}</span>{% endif %}
+  </div>
+  <div class="od-tops-list">
+    {% for e in g.rolls %}{% include "operating/partials/od_expected_top_row.html" with hide_wh=g.warehouse in_group=True %}{% endfor %}
+  </div>
+</div>
+{% endfor %}

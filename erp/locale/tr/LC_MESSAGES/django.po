@@ -16119,3 +16119,6 @@ msgstr "Tedarikçiden al"
 
 msgid "Purchase saved — the order lines are updated."
 msgstr "Alım kaydedildi — sipariş satırları güncellendi."
+
+msgid "Coming"
+msgstr "Yolda"

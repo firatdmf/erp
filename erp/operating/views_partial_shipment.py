@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
@@ -12,6 +13,29 @@ from .models import Order
 from .partial_shipment import (
     PartialShipError, group_packs, open_halves, order_lines, refusal, split_off,
 )
+from .views import carrier_choices_for, discard_cargo_receipts, save_cargo_receipts
+from .views_warehouse import apply_order_status_change
+
+
+class _Refused(Exception):
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
+
+
+def _refusal_message(code):
+    """What the person is told when the shipment itself was refused —
+    the order page's wording for the same codes."""
+    from . import views_warehouse as vw
+    known = {
+        "goods_not_received": vw.GOODS_NOT_RECEIVED_MSG,
+        "needs_all_books": vw.SPLIT_NEEDS_ALL_BOOKS_MSG,
+        "cancel_pending": vw.CANCEL_PENDING_MSG,
+    }
+    if code in known:
+        return str(known[code])
+    return _("The order could not be updated: %(error)s") % {
+        "error": (code or "").replace("error:", "")}
 
 
 def _allowed(request, halves):
@@ -48,18 +72,36 @@ def order_ship_part(request, pk):
             if key.startswith("ship_") and key[5:].isdigit() and value.strip() != "":
                 quantities[int(key[5:])] = value
         moving = [int(x) for x in request.POST.getlist("move_adjustment") if x.isdigit()]
+        files = request.FILES.getlist("cargo_receipts")
+        receipts = []
         try:
-            follow_ups = split_off(order, ticked, quantities, moving, user=request.user)
+            # The split and the shipment are one step: a shipment refused
+            # leaves the order as it was, not split and still open.
+            with transaction.atomic():
+                follow_ups = split_off(order, ticked, quantities, moving, user=request.user)
+                kept = Order.objects.get(pk=order.pk)
+                if kept in follow_ups:
+                    # This half waits with the rest; the one that ships
+                    # is the order it continues.
+                    kept = kept.continued_from
+                # Stored before the status change, which emails the
+                # customer with the receipt attached (as on the order page).
+                if files:
+                    receipts, _rejected = save_cargo_receipts(kept, files, request.user)
+                ok, code = apply_order_status_change(
+                    kept, "shipped", carrier=request.POST.get("carrier"),
+                    tracking=request.POST.get("tracking_number"), user=request.user)
+                if not ok:
+                    raise _Refused(code)
         except PartialShipError as exc:
             messages.error(request, str(exc))
             return redirect("operating:order_ship_part", pk=order.pk)
-        kept = Order.objects.get(pk=order.pk)
-        if kept in follow_ups:
-            # This half waits with the rest; the page to complete is the
-            # one that ships.
-            kept = kept.continued_from
+        except _Refused as refused:
+            discard_cargo_receipts(receipts)
+            messages.error(request, _refusal_message(refused.code))
+            return redirect("operating:order_ship_part", pk=order.pk)
         messages.success(request, _(
-            "The rest continues on %(numbers)s. Complete this order when its packages leave."
+            "Shipped. The remaining items were carried to a new order, %(numbers)s."
         ) % {"numbers": combined_number(follow_ups)})
         return redirect("operating:order_detail", pk=kept.pk)
 
@@ -92,4 +134,5 @@ def order_ship_part(request, pk):
         "pack_rows": pack_rows,
         "rows": rows,
         "adjustments": adjustments,
+        "carrier_choices": carrier_choices_for(order),
     })

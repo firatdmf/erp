@@ -36,6 +36,18 @@
   .sp-foot p { flex:1; min-width:220px; margin:0; color:#4B5563; font-size:12.5px; }
   .sp-btn { padding:9px 16px; border-radius:9px; font-weight:700; font-size:13px; border:1px solid #147F74; background:#147F74; color:#FFF; cursor:pointer; }
   .sp-btn[disabled] { opacity:.5; cursor:not-allowed; }
+  .sp-overlay { position:fixed; inset:0; background:rgba(15,20,25,.45); display:flex; align-items:center; justify-content:center; padding:16px; z-index:1000; }
+  .sp-overlay[hidden] { display:none; }
+  .sp-modal { background:#FFF; border-radius:14px; padding:18px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(15,20,25,.25); }
+  .sp-modal h3 { margin:0 0 10px; font-weight:800; font-size:17px; }
+  .sp-warn { background:#E5F1F0; color:#005354; border-radius:9px; padding:9px 11px; margin:0 0 12px; line-height:1.45; }
+  .sp-lbl { font-weight:600; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#6B7280; margin-bottom:4px; }
+  .sp-moving { margin:0 0 14px; padding-left:18px; line-height:1.6; }
+  .sp-moving .sp-sku { font-size:12px; }
+  .sp-cargo { display:grid; gap:10px; margin-bottom:14px; }
+  .sp-cargo label { display:grid; gap:4px; font-weight:600; font-size:12px; color:#374151; }
+  .sp-cargo select, .sp-cargo input[type=text] { padding:7px 9px; border:1px solid #D5DCE3; border-radius:8px; font:inherit; font-weight:400; }
+  .sp-cargo input[type=file] { font:inherit; font-weight:400; font-size:12px; max-width:100%; }
   @media (max-width: 600px) {
     .sp-lines thead { display:none; }
     .sp-lines tr.sp-line { display:grid; grid-template-columns:1fr auto; gap:4px 10px; padding:8px 0; border-bottom:1px solid #F1F4F7; }
@@ -52,15 +64,15 @@
   <a class="sp-back" href="{% url 'operating:order_detail' order.pk %}"><i class="fa fa-arrow-left"></i> {{ number }}</a>
   <div class="sp-eyebrow">{% trans "Partial shipment" %}</div>
   <h1 class="sp-title">{% trans "Ship part of the order" %}</h1>
-  <p class="sp-sub">{% blocktrans %}Tick the packages leaving now. This order keeps them; everything else moves to a new follow-up order with its own number, still open. Then complete this order as usual.{% endblocktrans %}</p>
+  <p class="sp-sub">{% blocktrans %}Tick the packages leaving now and press Ship. The remaining items are carried to a new order with its own number.{% endblocktrans %}</p>
 
-  <form method="post" id="sp-form">
+  <form method="post" id="sp-form" enctype="multipart/form-data">
     {% csrf_token %}
 
     <section class="sp-card">
       <h3>{% trans "Packages going now" %}</h3>
       {% if pack_rows %}
-      <p class="sp-hint">{% trans "Packages left unticked move to the follow-up with what is in them." %}</p>
+      <p class="sp-hint">{% trans "Packages left unticked are carried to the new order with what is in them." %}</p>
       <div class="sp-packs">
         {% for r in pack_rows %}
         <label class="sp-pack">
@@ -90,7 +102,7 @@
           <th>{% trans "Product" %}</th>
           <th class="num">{% trans "Ordered" %}</th>
           <th class="num">{% trans "Ships now" %}</th>
-          <th class="num">{% trans "To follow-up" %}</th>
+          <th class="num">{% trans "To the new order" %}</th>
         </tr></thead>
         <tbody>
           {% for row in rows %}
@@ -108,7 +120,7 @@
               <input type="number" step="0.01" min="0" name="ship_{{ row.item.pk }}" value="0"
                      {% if row.locked or row.rolls %}readonly{% endif %}>
             </td>
-            <td class="num sp-stays" data-label="{% trans 'To follow-up' %}">{{ row.ordered|floatformat:"-2" }}</td>
+            <td class="num sp-stays" data-label="{% trans 'To the new order' %}">{{ row.ordered|floatformat:"-2" }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -118,11 +130,11 @@
     {% if adjustments %}
     <section class="sp-card">
       <h3>{% trans "Extra lines" %}</h3>
-      <p class="sp-hint">{% trans "They stay on this order unless ticked to move." %}</p>
+      <p class="sp-hint">{% trans "They stay on this order unless ticked to carry." %}</p>
       {% for a in adjustments %}
       <div class="sp-adj">
         <span>{{ a.label }} · <b>{{ a.amount|floatformat:"2" }}</b></span>
-        <label><input type="checkbox" name="move_adjustment" value="{{ a.pk }}"> {% trans "Move to the follow-up" %}</label>
+        <label><input type="checkbox" name="move_adjustment" value="{{ a.pk }}"> {% trans "Carry to the new order" %}</label>
       </div>
       {% endfor %}
     </section>
@@ -132,7 +144,37 @@
       <p id="sp-summary" data-nothing="{% trans "Nothing ships yet — tick the packages going now." %}"
          data-everything="{% trans "Everything ships — complete the order as usual." %}"></p>
       <a class="sp-back" href="{% url 'operating:order_detail' order.pk %}">{% trans "Cancel" %}</a>
-      <button type="submit" class="sp-btn" id="sp-submit" disabled>{% trans "Move the rest to a follow-up order" %}</button>
+      <button type="button" class="sp-btn" id="sp-submit" disabled><i class="fa fa-truck-fast"></i> {% trans "Ship" %}</button>
+    </div>
+
+    {% comment %}The last look before anything moves: what ships, what is carried to a new order, and the cargo it goes out in (optional, as on the order page).{% endcomment %}
+    <div class="sp-overlay" id="sp-modal" hidden>
+      <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="sp-modal-title">
+        <h3 id="sp-modal-title">{% trans "Ship the ticked packages" %}</h3>
+        <p class="sp-warn"><i class="fa fa-circle-info"></i> {% trans "The remaining items will be carried to a new order. It gets its own number and stays open until they ship." %}</p>
+        <div class="sp-lbl">{% trans "Carried to the new order" %}</div>
+        <ul class="sp-moving" id="sp-moving"></ul>
+        <div class="sp-cargo">
+          <label>{% trans "Carrier" %}
+            <select name="carrier">
+              <option value="">{% trans "— Select —" %}</option>
+              {% for code, label in carrier_choices %}
+              <option value="{{ code }}" {% if order.carrier == code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>{% trans "Tracking or receipt number" %}
+            <input type="text" name="tracking_number" value="{{ order.tracking_number|default:'' }}">
+          </label>
+          <label>{% trans "Cargo receipt" %}
+            <input type="file" name="cargo_receipts" multiple accept="image/*,application/pdf">
+          </label>
+        </div>
+        <div class="sp-foot">
+          <button type="button" class="sp-back" id="sp-modal-cancel">{% trans "Cancel" %}</button>
+          <button type="submit" class="sp-btn"><i class="fa fa-check"></i> {% trans "Ship" %}</button>
+        </div>
+      </div>
     </div>
   </form>
 </div>
@@ -190,6 +232,42 @@
     });
     refresh();
   }
+
+  const modal = document.getElementById('sp-modal');
+  const moving = document.getElementById('sp-moving');
+  const fmt = (n) => n.toLocaleString(undefined, {maximumFractionDigits: 2});
+  submit.addEventListener('click', () => {
+    moving.innerHTML = '';
+    rows.forEach(tr => {
+      const left = round((parseFloat(tr.dataset.ordered) || 0) - (parseFloat(tr.querySelector('input').value) || 0));
+      if (left <= 0) return;
+      const li = document.createElement('li');
+      const sku = document.createElement('span');
+      sku.className = 'sp-sku';
+      sku.textContent = tr.querySelector('.sp-sku').textContent;
+      li.append(sku, ' · ' + fmt(left));
+      moving.appendChild(li);
+    });
+    const set = ticked();
+    form.querySelectorAll('[data-pack-tick]').forEach(i => {
+      if (set.has(i.value)) return;
+      const li = document.createElement('li');
+      li.textContent = i.closest('label').querySelector('b').textContent;
+      moving.appendChild(li);
+    });
+    form.querySelectorAll('[name=move_adjustment]:checked').forEach(i => {
+      const li = document.createElement('li');
+      li.textContent = i.closest('.sp-adj').querySelector('span').textContent.trim();
+      moving.appendChild(li);
+    });
+    modal.hidden = false;
+  });
+  document.getElementById('sp-modal-cancel').addEventListener('click', () => { modal.hidden = true; });
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.hidden = true; });
+  form.addEventListener('submit', () => {
+    form.querySelectorAll('button[type=submit]').forEach(b => { b.disabled = true; });
+  });
 
   form.querySelectorAll('[data-pack-tick]').forEach(i => i.addEventListener('change', fill));
   rows.forEach(tr => tr.querySelector('input').addEventListener('input', refresh));

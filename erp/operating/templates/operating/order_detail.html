@@ -1546,7 +1546,7 @@
                 {% if not is_sales_rep and not order.is_retail_order and not needs_all_books %}
                 {% comment %}Some packages go now, the rest moves to a follow-up order (operating.partial_shipment).{% endcomment %}
                 <a href="{% url 'operating:order_ship_part' order.pk %}" class="ord-btn ghost"
-                   title="{% trans "Ship some packages now; the rest moves to a follow-up order" %}">
+                   title="{% trans "Ship some packages now; the rest is carried to a new order" %}">
                   <i class="fa fa-boxes-stacked"></i> {% trans "Ship part" %}
                 </a>
                 {% endif %}

@@ -162,7 +162,7 @@ class TheLabelSaysWhatItIsCounting(TestCase):
             product=self.wp, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), barcode="BOX-12")
         drawn = self._drawn_strings(roll)
-        self.assertIn("20.00 pack", drawn)
+        self.assertIn("20 pack", drawn)  # a count prints whole
         self.assertNotIn("20.00 m", drawn)
 
 

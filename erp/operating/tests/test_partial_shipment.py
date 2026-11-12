@@ -160,17 +160,36 @@ class PlainOrder(PartialShipmentBase):
         self.assertEqual(d.quantity, Decimal("3"))
         self.assertEqual(f.items.get().quantity, Decimal("5"))
 
-    def test_the_page_splits_and_returns_to_the_order(self):
+    def test_ship_ships_the_ticked_packages_and_carries_the_rest(self):
         url = reverse("operating:order_ship_part", args=[self.o.pk])
         page = self.client.get(url)
         self.assertEqual(page.status_code, 200)
         self.assertEqual(len(page.context["pack_rows"]), 2)
-        r = self.client.post(url, {"pack": [self.p1.pk]})
+        r = self.client.post(url, {"pack": [self.p1.pk], "tracking_number": "TRK-1"})
         self.assertRedirects(r, reverse("operating:order_detail", args=[self.o.pk]),
                              fetch_redirect_response=False)
+        self.o.refresh_from_db()
+        self.assertEqual((self.o.order_status, self.o.tracking_number), ("shipped", "TRK-1"))
+        # Only the rolls that went are cut.
+        self.assertEqual(set(self.o.stock_reservations.values_list("consumed", flat=True)), {True})
         f = Order.objects.get(continued_from=self.o)
+        self.assertEqual(f.order_status, "pending")
+        self.assertIsNone(f.tracking_number)
+        self.assertFalse(f.stock_reservations.filter(consumed=True).exists())
         detail = self.client.get(reverse("operating:order_detail", args=[f.pk]))
         self.assertContains(detail, self.o.order_number)
+
+    def test_a_refused_shipment_leaves_the_order_unsplit(self):
+        url = reverse("operating:order_ship_part", args=[self.o.pk])
+        with patch("operating.views_partial_shipment.apply_order_status_change",
+                   return_value=(False, "goods_not_received")):
+            r = self.client.post(url, {"pack": [self.p1.pk]})
+        self.assertRedirects(r, url, fetch_redirect_response=False)
+        self.assertEqual(Order.objects.count(), 1)
+        self.b.refresh_from_db()
+        self.assertEqual(self.b.quantity, Decimal("25"))
+        self.p2.refresh_from_db()
+        self.assertEqual(self.p2.order_id, self.o.pk)
 
     def test_someone_without_the_book_cannot_open_it(self):
         other = User.objects.create_user("ruzana", password="pw")

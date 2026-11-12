@@ -22,7 +22,8 @@ from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET
 
 from .attributes import (CATALOG_LANGUAGES, WORDING_GROUP, WORDING_NAME,
-                         WORDING_VALUE, english_value, term_key, value_suggestions)
+                         WORDING_VALUE, display_value, english_value, term_key,
+                         value_suggestions)
 from .models import (CatalogWording, ProductAttribute, ProductCategory,
                      ProductVariantAttribute, ProductVariantAttributeValue)
 
@@ -193,6 +194,24 @@ def attribute_value_suggest(request):
         exact = term_key(text)
     return JsonResponse({"results": value_suggestions(attribute, text, stored),
                          "exact": exact, "language": _reader()})
+
+
+@login_required
+@require_GET
+def variant_name(request):
+    """A variant's name as its values read, in every catalog language:
+    ?attrs=[["color","gold+ecru"],["width","320"]] →
+    {"names": {"en": "Gold + ecru 320 cm", "tr": "Altın + Ekru 320 cm", …}}.
+    The goods-receipt card shows the reader's and offers the rest on hover."""
+    import json
+    try:
+        pairs = [(str(n), str(v)) for n, v in json.loads(request.GET.get("attrs") or "[]")
+                 if str(v).strip()]
+    except (ValueError, TypeError):
+        pairs = []
+    return JsonResponse({"names": {
+        language: " ".join(display_value(n, v, language) for n, v in pairs)
+        for language in CATALOG_LANGUAGES}})
 
 
 def _reader():

@@ -261,6 +261,41 @@ site's menus and the page's own way back are left out.{% endcomment %}
   .np-product-card.np-by-variant .np-top-bc,
   .np-product-card.np-by-variant .np-top-bc-state { display: none !important; }
   .np-v-barcode { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
+  .np-new-main [hidden] { display: none !important; }
+  .np-main-sku-state.bad { color: #B91C1C; }
+  /* A quiet text button. base.css pads every <button>, so padding is reset. */
+  .np-link {
+    margin-top: 8px; padding: 0; border: 0; background: none; cursor: pointer;
+    font: 600 12px var(--font-sans); color: var(--nejum-teal-600, #006B6B);
+  }
+  .np-link i { font-size: 10px; margin-right: 3px; }
+
+  /* (i) beside a label: the explanation shows on hover, and on a tap for
+     phones, which have no hover (npInfo toggles .open). */
+  .np-info {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; padding: 0; margin-left: 4px; vertical-align: -3px;
+    border: 1px solid currentColor; border-radius: 50%; background: none; cursor: help;
+    font: 700 9px/1 var(--font-sans); color: var(--gray-500); text-transform: none; letter-spacing: 0;
+  }
+  .np-info::after {
+    content: attr(data-tip);
+    position: absolute; z-index: 30; top: calc(100% + 8px); left: -10px;
+    width: max-content; max-width: min(280px, calc(100vw - 48px)); padding: 9px 11px; border-radius: 8px;
+    background: #0F1419; color: #fff; text-align: left; white-space: pre-line;
+    font: 500 12px/1.45 var(--font-sans); text-transform: none; letter-spacing: 0;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    opacity: 0; visibility: hidden; transition: opacity 120ms; pointer-events: none;
+  }
+  .np-info[hidden] { display: none; }
+  .np-info:hover::after, .np-info.open::after { opacity: 1; visibility: visible; }
+  .np-info:empty::before { content: "i"; }
+  /* The variant's name, read from its values. */
+  .np-v-name { display: flex; align-items: center; gap: 6px; margin: -4px 0 10px;
+               font: 500 12.5px var(--font-sans); color: var(--gray-600, #4B5563); }
+  .np-v-name[hidden] { display: none; }
+  .np-v-name-label { font: 700 10px var(--font-sans); letter-spacing: 0.05em; text-transform: uppercase; color: var(--gray-500); }
+  .np-v-name-text { color: var(--gray-800, #1F2937); font-weight: 600; }
   .np-attr-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .np-attr-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
                   border: 1px solid #D5DDE3; border-radius: 999px; background: #F4F7F9;
@@ -833,7 +868,6 @@ site's menus and the page's own way back are left out.{% endcomment %}
   // page picks the warehouse rather than being opened from one.
   const NP_URL_TPL = "{% url 'operating:warehouse_manual_add' 0 %}";
   const NP_SEARCH = "{% url 'operating:catalog_base_search' 0 %}";
-  const NP_NEXTSKU = "{% url 'operating:warehouse_next_sku' 0 %}";
   const NP_NEXTBC = "{% url 'operating:warehouse_next_barcode' 0 %}";
   // What a barcode box says before it can name the code it will be given.
   const NP_BC_AUTO = "{% filter escapejs %}{% trans "Barcode (auto)" %}{% endfilter %}";
@@ -1418,47 +1452,45 @@ site's menus and the page's own way back are left out.{% endcomment %}
     const opt = sel && sel.options[sel.selectedIndex];
     return ((opt && opt.getAttribute('data-prefix')) || GR_CODE_PREFIX) || GR_CODE_PREFIX;
   }
-  // Fetch the next auto product SKU for ONE product card so the page shows
-  // it (and roots that card's variant SKUs on it) up-front, not only after
-  // saving. Indicative only — if several cards are in "new" mode at once
-  // they may briefly preview the same number; the backend mints the real,
-  // unique SKUs sequentially at save time regardless.
-  // A main-product name that IS a code — letters AND digits, no spaces, like
-  // "K24644" — is what the mill files the product under, so it becomes the
-  // SKU. A plain name ("GREK") keeps the auto PREFIX### code. Either way the
-  // SKU sits in a field the user can see and overwrite: the one thing this
-  // must never do is quietly file "K24644" under "KRV002".
-  function npNameLooksLikeCode(v) {
-    v = (v || '').trim();
-    return v.length >= 3 && !/\s/.test(v) && /[0-9]/.test(v) && /[^\W\d_]/.test(v);
-  }
-  // Write the auto code into the SKU field unless the user has taken it over
-  // (typed in it, or named the product with a code).
+  // A new product's SKU is what was typed for it, spelled as a code:
+  // "Duvet cover" → DUVETCOVER, "2086" → 2086. The field shows it and can
+  // be overwritten (with the mill's code, say); left empty it fills again.
   function npApplyAutoSku(cardEl) {
     const skuEl = cardEl.querySelector('.np-main-sku');
-    const nameEl = cardEl.querySelector('.np-main-name');
-    if (!skuEl || skuEl.dataset.touched) return;
-    if (npNameLooksLikeCode(nameEl && nameEl.value)) return;
-    skuEl.value = cardEl._npPreviewSku || '';
+    if (!skuEl || (skuEl.value || '').trim()) return;
+    skuEl.value = slug((cardEl.querySelector('.np-main-name') || {}).value || '');
+    npCheckMainSku(cardEl);
   }
+  // Kept for its callers (a new account, a new mode): nothing to fetch any
+  // more, the SKU comes from the card itself.
   function npFetchNextSku(cardEl) {
+    if (cardEl._npMode !== 'new') return;
+    npApplyAutoSku(cardEl);
+    npRefreshVariantSkus(cardEl);
+  }
+  // A SKU names one product, while a name may repeat — so the field says at
+  // once when another product holds the code. The save checks again.
+  const NP_PRODUCT_SKU_CHECK = "{% url 'operating:warehouse_product_sku_available' %}";
+  const NP_SKU_HINT = "{% filter escapejs %}{% trans "Change it to the mill’s code if it has one. A name can repeat; a SKU can’t." %}{% endfilter %}";
+  function npCheckMainSku(cardEl) {
     const skuEl = cardEl.querySelector('.np-main-sku');
-    if (cardEl._npMode !== 'new') { cardEl._npPreviewSku = ''; return; }
-    const prefix = npCurPrefix();
-    if (skuEl) skuEl.placeholder = prefix + '…';
-    clearTimeout(cardEl._npNextSkuTimer);
-    cardEl._npNextSkuTimer = setTimeout(function () {
-      function done(sku) {
-        cardEl._npPreviewSku = sku;
-        if (skuEl) skuEl.placeholder = sku;
-        npApplyAutoSku(cardEl);
-        npRefreshVariantSkus(cardEl);
-      }
-      fetch(npWhUrl(NP_NEXTSKU) + '?prefix=' + encodeURIComponent(prefix), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    const state = cardEl.querySelector('.np-main-sku-state');
+    if (!skuEl || !state) return;
+    clearTimeout(cardEl._npSkuTimer);
+    const sku = (skuEl.value || '').trim();
+    state.classList.remove('bad');
+    state.textContent = NP_SKU_HINT;
+    if (cardEl._npMode !== 'new' || !sku) return;
+    cardEl._npSkuTimer = setTimeout(function () {
+      fetch(NP_PRODUCT_SKU_CHECK + '?sku=' + encodeURIComponent(sku), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
-        .then(function (d) { done((d && d.sku) || (prefix + '001')); })
-        .catch(function () { done(prefix + '001'); });
-    }, 120);
+        .then(function (d) {
+          if ((skuEl.value || '').trim() !== sku || !d || d.available) return;
+          state.classList.add('bad');
+          state.textContent = '{% filter escapejs %}{% trans "“{sku}” is already the SKU of “{product}”. Pick that product from the list, or give this one another SKU." %}{% endfilter %}'
+            .replace('{sku}', sku).replace('{product}', d.used_by || '');
+        }).catch(function () {});
+    }, 250);
   }
 
   function unitShort(card) {
@@ -1477,10 +1509,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
       if (ex) return ex.toUpperCase();
       return slug((cardEl.querySelector('.np-main-search') || {}).value || '');
     }
-    // NEW mode: root variant SKUs on the main SKU as it stands in the field
-    // (the typed code if there is one, else the previewed auto code).
+    // NEW mode: root variant SKUs on the main SKU as it stands in the field,
+    // else on what the product was called.
     const typed = ((cardEl.querySelector('.np-main-sku') || {}).value || '').trim();
-    return (typed || cardEl._npPreviewSku || '').toUpperCase();
+    return (typed || slug((cardEl.querySelector('.np-main-name') || {}).value || '')).toUpperCase();
   }
 
   // One card = one main product (new or existing) + its variants & stock items.
@@ -1494,8 +1526,6 @@ site's menus and the page's own way back are left out.{% endcomment %}
     el.className = 'np-product-card';
     // '' while nothing is picked yet; 'existing' or 'new' once it is.
     el._npMode = '';
-    el._npPreviewSku = '';
-    el._npNextSkuTimer = null;
     el._npSearchTimer = null;
     el._npExistingVariants = [];
     el.innerHTML =
@@ -1518,20 +1548,23 @@ site's menus and the page's own way back are left out.{% endcomment %}
         '</div>' +
         '<input type="hidden" class="np-main-id">' +
         '<input type="hidden" class="np-main-existing-sku">' +
+        // What was typed is the product's SKU, spelled as a code ("Duvet
+        // cover" → DUVETCOVER), and its title. A name of its own is asked
+        // only when wanted; with none, the title is the SKU.
         '<div class="np-new-main" hidden style="margin-top:10px;">' +
           '<div class="np-main-row">' +
-            '<div class="np-col np-col-name">' +
-              '<label>{% trans "Name" %}</label>' +
-              '<input class="np-input np-main-name" placeholder="{% trans "e.g. GREK" %}" oninput="npOnNameInput(this)">' +
-            '</div>' +
             '<div class="np-col np-col-sku">' +
               '<label>{% trans "Product SKU" %}</label>' +
-              '<input class="np-input np-main-sku" maxlength="' + GR_SKU_MAX + '" placeholder="' + npCurPrefix() + '###" spellcheck="false"' +
+              '<input class="np-input np-main-sku" maxlength="' + GR_SKU_MAX + '" placeholder="{% trans "e.g. 2086" %}" spellcheck="false"' +
                 ' oninput="npMainSkuInput(this)" onblur="npMainSkuBlur(this)">' +
-              // Sits under the field it describes, not under the name beside it.
-              '<div class="np-hint">{% trans "auto and unique — overwrite it with the code the mill uses." %}</div>' +
+              '<div class="np-hint np-main-sku-state">{% trans "Change it to the mill’s code if it has one. A name can repeat; a SKU can’t." %}</div>' +
+            '</div>' +
+            '<div class="np-col np-col-name" hidden>' +
+              '<label>{% trans "Product name" %}</label>' +
+              '<input class="np-input np-main-name" placeholder="{% trans "e.g. Star Blackout" %}" oninput="npOnNameInput(this)">' +
             '</div>' +
           '</div>' +
+          '<button type="button" class="np-link np-add-name" onclick="npShowName(this)"><i class="fa fa-plus"></i> {% trans "Add product name" %}</button>' +
         '</div>' +
         '<div class="np-existing-variants" style="display:none;"></div>' +
       '</div>' +
@@ -1552,7 +1585,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
           NP_PACK_SEL + '<div class="np-fact" hidden></div>' +
         '</div>' +
         '<div class="np-col np-col-tracking">' +
-          '<label>{% trans "Tracking" %}</label>' +
+          '<label>{% trans "Tracking" %}' +
+            '<button type="button" class="np-info" onclick="npInfo(event, this)" aria-label="{% trans "What is tracking?" %}"' +
+            ' data-tip="{% filter escapejs %}{% trans "Each item: every roll or bale has a barcode of its own, and stock is picked item by item." %}{% endfilter %}\n\n{% filter escapejs %}{% trans "By variant: every piece of a variant is alike, so one barcode names the variant and its stock is counted, not labelled one by one." %}{% endfilter %}"></button>' +
+          '</label>' +
           NP_TRACK_SEL + '<div class="np-fact" hidden></div>' +
         '</div>' +
         // A new fabric's weight per square meter, which the packing list
@@ -1643,7 +1679,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
       name.textContent = sku && title && sku.toUpperCase() !== title.toUpperCase()
         ? sku + ' · ' + title : (sku || title);
     } else if (card._npMode === 'new') {
-      name.textContent = '{% filter escapejs %}{% trans "New product" %}{% endfilter %}';
+      // What it was called; "New product" only until something is.
+      name.textContent = ((card.querySelector('.np-main-name') || {}).value || '').trim()
+        || '{% filter escapejs %}{% trans "New product" %}{% endfilter %}';
     }
     card.querySelector('.np-main-chip i').className =
       card._npMode === 'new' ? 'fa fa-plus' : 'fa fa-box';
@@ -1658,12 +1696,18 @@ site's menus and the page's own way back are left out.{% endcomment %}
     npRefreshVariantSkus(card);
     npRefreshVariantMatches(card);
   };
+  // "Add new": what was typed is the product's title and, spelled as a
+  // code, its SKU. The cursor waits in the SKU, selected, to be replaced by
+  // the mill's code if it has one.
   window.npMainCreate = function (card, name) {
-    npSetMode(card, 'new');
     const nameEl = card.querySelector('.np-main-name');
     nameEl.value = (name || '').trim();
-    npOnNameInput(nameEl);
-    nameEl.focus();
+    const skuEl = card.querySelector('.np-main-sku');
+    skuEl.value = '';
+    npSetMode(card, 'new');   // fills the SKU from the name (npFetchNextSku)
+    npMainChipText(card);
+    skuEl.focus();
+    skuEl.select();
   };
   window.npMainClear = function (btn) {
     const card = btn.closest('.np-product-card');
@@ -1672,6 +1716,8 @@ site's menus and the page's own way back are left out.{% endcomment %}
     card.querySelector('.np-main-name').value = '';
     const skuEl = card.querySelector('.np-main-sku');
     if (skuEl) { skuEl.value = ''; delete skuEl.dataset.touched; }
+    card.querySelector('.np-col-name').hidden = true;
+    card.querySelector('.np-add-name').hidden = false;
     npSetMode(card, '');
     search.focus();
   };
@@ -1897,27 +1943,21 @@ site's menus and the page's own way back are left out.{% endcomment %}
     });
   })();
 
+  // The name is the product's title; the SKU was settled when the product
+  // was created and does not follow it ("2086" named "Star Blackout" stays
+  // 2086).
   window.npOnNameInput = function (inputEl) {
-    const card = inputEl.closest('.np-product-card');
-    const skuEl = card.querySelector('.np-main-sku');
-    if (skuEl && !skuEl.dataset.touched) {
-      skuEl.value = npNameLooksLikeCode(inputEl.value)
-        ? inputEl.value.trim().toUpperCase()
-        : (card._npPreviewSku || '');
-    }
-    npRefreshVariantSkus(card);
+    npMainChipText(inputEl.closest('.np-product-card'));
   };
   window.npMainSkuInput = function (skuEl) {
-    // Emptying the field hands it back to the auto code (on blur) rather
-    // than locking the product out of having a SKU at all.
-    if ((skuEl.value || '').trim()) skuEl.dataset.touched = '1';
-    else delete skuEl.dataset.touched;
-    npRefreshVariantSkus(skuEl.closest('.np-product-card'));
+    const card = skuEl.closest('.np-product-card');
+    npCheckMainSku(card);
+    npRefreshVariantSkus(card);
   };
   window.npMainSkuBlur = function (skuEl) {
     const card = skuEl.closest('.np-product-card');
     skuEl.value = (skuEl.value || '').trim().toUpperCase();
-    if (!skuEl.value) { delete skuEl.dataset.touched; npApplyAutoSku(card); }
+    npApplyAutoSku(card);   // emptied: back to the one the name spells
     npRefreshVariantSkus(card);
   };
   window.npRefreshVariantSkus = function (cardEl) {
@@ -1996,6 +2036,62 @@ site's menus and the page's own way back are left out.{% endcomment %}
   window.npQueueVariantMatch = function (vEl) {
     clearTimeout(vEl._npMatchTimer);
     vEl._npMatchTimer = setTimeout(function () { npCheckVariantMatch(vEl); }, 250);
+    npQueueVariantName(vEl);
+  };
+
+  // ── The variant's name, read from its values ─────────────────────
+  // Asked of the server, which words values the way every other page does
+  // (marketing.attributes.display_value). The reader's language is shown;
+  // the languages that read differently are under the (i).
+  const NP_VARIANT_NAME = "{% url 'marketing:variant_name' %}";
+  window.npQueueVariantName = function (vEl) {
+    clearTimeout(vEl._npNameTimer);
+    vEl._npNameTimer = setTimeout(function () { npShowVariantName(vEl); }, 250);
+  };
+  function npShowVariantName(vEl) {
+    const line = vEl.querySelector('.np-v-name');
+    if (!line) return;
+    const pairs = npRowAttrs(vEl).map(function (a) { return [a.name, a.value]; });
+    if (!pairs.length) { line.hidden = true; return; }
+    const asked = JSON.stringify(pairs);
+    fetch(NP_VARIANT_NAME + '?attrs=' + encodeURIComponent(asked), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (JSON.stringify(npRowAttrs(vEl).map(function (a) { return [a.name, a.value]; })) !== asked) return;
+        const names = (d && d.names) || {};
+        const own = names[NP_READER_LANG] || names.en || '';
+        line.querySelector('.np-v-name-text').textContent = own;
+        const others = Object.keys(names).filter(function (l) {
+          return l !== NP_READER_LANG && names[l] && names[l] !== own;
+        });
+        const info = line.querySelector('.np-v-name-langs');
+        info.hidden = !others.length;
+        info.dataset.tip = others.map(function (l) { return l.toUpperCase() + '  ' + names[l]; }).join('\n');
+        line.hidden = !own;
+      }).catch(function () {});
+  }
+
+  // (i) buttons: hover shows the text; a tap or click pins it open, which
+  // is the only way on a phone. A tap anywhere else closes it.
+  window.npInfo = function (e, btn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const open = !btn.classList.contains('open');
+    document.querySelectorAll('.np-info.open').forEach(function (b) { b.classList.remove('open'); });
+    btn.classList.toggle('open', open);
+  };
+  document.addEventListener('click', function () {
+    document.querySelectorAll('.np-info.open').forEach(function (b) { b.classList.remove('open'); });
+  });
+
+  // A name of the product's own, when the SKU isn't one.
+  window.npShowName = function (btn) {
+    const card = btn.closest('.np-product-card');
+    card.querySelector('.np-col-name').hidden = false;
+    btn.hidden = true;
+    const nameEl = card.querySelector('.np-main-name');
+    nameEl.focus();
+    nameEl.select();
   };
   window.npCheckVariantMatch = function (vEl) {
     const badge = vEl.querySelector('.np-v-match');
@@ -2144,6 +2240,12 @@ site's menus and the page's own way back are left out.{% endcomment %}
           '<label>{% trans "Barcode" %}</label>' +
           '<input class="np-input np-v-barcode" maxlength="14" spellcheck="false" autocomplete="off" placeholder="{% trans "optional" %}">' +
         '</div>' +
+      '</div>' +
+      // Read from the values, never typed; the other languages on hover.
+      '<div class="np-v-name" hidden>' +
+        '<span class="np-v-name-label">{% trans "Name" %}</span>' +
+        '<span class="np-v-name-text"></span>' +
+        '<button type="button" class="np-info np-v-name-langs" onclick="npInfo(event, this)" aria-label="{% trans "In other languages" %}" hidden></button>' +
       '</div>' +
       '<div class="np-v-match"></div>' +
       '<div class="np-v-clash"></div>' +
@@ -3276,10 +3378,16 @@ site's menus and the page's own way back are left out.{% endcomment %}
             sku: (card.querySelector('.np-main-existing-sku').value || '').trim() }
         : { mode: 'new', name: (card.querySelector('.np-main-name').value || '').trim(),
             sku: (((card.querySelector('.np-main-sku') || {}).value || '').trim().toUpperCase()
-                  || card._npPreviewSku || '') };
+                  || slug(card.querySelector('.np-main-name').value || '')) };
       if (!card._npMode) { alert(label + ': {% filter escapejs %}{% trans "Pick the main product from the list, or create it there." %}{% endfilter %}'); return; }
       if (card._npMode === 'existing' && !main.id) { alert(label + ': {% trans "Select an existing main product." %}'); return; }
-      if (card._npMode === 'new' && !main.name) { alert(label + ': {% trans "Enter a main product name." %}'); return; }
+      if (card._npMode === 'new' && !main.name && !main.sku) { alert(label + ': {% trans "Enter a main product name." %}'); return; }
+      const skuState = card.querySelector('.np-main-sku-state');
+      if (card._npMode === 'new' && skuState && skuState.classList.contains('bad')) {
+        alert(label + ': ' + skuState.textContent);
+        card.querySelector('.np-main-sku').focus();
+        return;
+      }
 
       if (!(card._npAttrs || []).length) {
         alert(label + ': {% filter escapejs %}{% trans "Add an attribute (color, width…): every variant needs at least one value." %}{% endfilter %}');
@@ -3536,7 +3644,15 @@ site's menus and the page's own way back are left out.{% endcomment %}
         npSetMode(card, 'new');
         card.querySelector('.np-main-name').value = mp.name || '';
         const skuEl = card.querySelector('.np-main-sku');
-        if (skuEl && mp.sku) { skuEl.value = mp.sku; skuEl.dataset.touched = '1'; }
+        if (skuEl && mp.sku) skuEl.value = mp.sku;
+        npApplyAutoSku(card);
+        npCheckMainSku(card);
+        // A name that is more than its SKU spelled out shows as the name.
+        if (mp.name && slug(mp.name) !== (skuEl.value || '').toUpperCase()) {
+          card.querySelector('.np-col-name').hidden = false;
+          card.querySelector('.np-add-name').hidden = true;
+        }
+        npMainChipText(card);
       }
       const catSel = card.querySelector('.np-main-cat');
       if (catSel && p.category_id) catSel.value = String(p.category_id);

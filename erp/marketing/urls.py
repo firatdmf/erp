@@ -34,6 +34,7 @@ urlpatterns = [
     path("attribute-wording/", RedirectView.as_view(pattern_name="marketing:catalog_wording", query_string=True)),
     path("api/catalog_wording/", views_catalog_wording.catalog_wording_api, name="catalog_wording_api"),
     path("api/attribute-values/", views_catalog_wording.attribute_value_suggest, name="attribute_value_suggest"),
+    path("api/variant-name/", views_catalog_wording.variant_name, name="variant_name"),
     path("api/attribute-values/translate/", views_catalog_wording.attribute_value_translate,
          name="attribute_value_translate"),
     path("api/attribute-values/word/", views_catalog_wording.attribute_value_word, name="attribute_value_word"),

@@ -922,6 +922,22 @@ def warehouse_barcode_available(request):
 
 
 @login_required
+def warehouse_product_sku_available(request):
+    """Is this SKU free for a NEW main product? The goods-receipt card asks
+    while it is typed, so a clash shows at once instead of bouncing the
+    batch at save — which re-checks the same way (_intake_resolve_products).
+    A product's name may repeat; its SKU may not."""
+    from marketing.models import Product
+    sku = (request.GET.get("sku") or "").strip()
+    if not sku:
+        return JsonResponse({"available": False, "reason": "empty"})
+    clash = Product.objects.filter(sku__iexact=sku).first()
+    if clash is not None:
+        return JsonResponse({"available": False, "used_by": clash.title or clash.sku})
+    return JsonResponse({"available": True})
+
+
+@login_required
 def warehouse_account_create(request):
     """Create (or reuse) a current account account straight from the manual-add
     panel's account box, so a delivery from a new supplier doesn't force
@@ -3604,7 +3620,8 @@ def _intake_resolve_products(products_in, prefix, *, own_product_ids=(),
                             .filter(Q(pk__in=_receivable_products().values("pk"))
                                     | Q(pk__in=list(own_product_ids)))
                             .filter(pk=int(mp["id"])).first())
-        base_name = (mp.get("name") or "").strip()
+        # A new product with no name of its own is titled by its SKU.
+        base_name = (mp.get("name") or "").strip() or (mp.get("sku") or "").strip()
         if main_product is not None:
             base_name = main_product.title
         elif not base_name:

@@ -56,6 +56,7 @@ urlpatterns = [
     path("warehouses/create/partial/", views_warehouse.WarehouseCreatePartial.as_view(), name="create_warehouse_partial"),
     path("warehouses/account-create/", views_warehouse.warehouse_account_create, name="warehouse_account_create"),
     path("warehouses/barcode-available/", views_warehouse.warehouse_barcode_available, name="warehouse_barcode_available"),
+    path("warehouses/product-sku-available/", views_warehouse.warehouse_product_sku_available, name="warehouse_product_sku_available"),
     path("warehouses/<int:pk>/", views_warehouse.warehouse_guarded(views_warehouse.WarehouseDetail.as_view()), name="warehouse_detail"),
     path("warehouses/<int:pk>/excel/", in_reach(warehouse_excel.warehouse_excel), name="warehouse_excel"),
     path("warehouses/<int:pk>/group-variants/", in_reach(views_warehouse.warehouse_group_variants), name="warehouse_group_variants"),

@@ -16131,3 +16131,30 @@ msgstr "elde olanı şimdi gönderin. Kalanı, yoldaki alımla birlikte yeni bir
 
 msgid "receive it once the goods arrive, or cancel it if they won't come."
 msgstr "mallar gelince teslim alın veya gelmeyecekse iptal edin."
+
+msgid "e.g. 2086"
+msgstr "örn. 2086"
+
+msgid "Change it to the mill’s code if it has one. A name can repeat; a SKU can’t."
+msgstr "Fabrikanın kodu varsa onunla değiştirin. Bir ad tekrar edebilir; SKU edemez."
+
+msgid "e.g. Star Blackout"
+msgstr "örn. Star Blackout"
+
+msgid "Add product name"
+msgstr "Ürün adı ekle"
+
+msgid "What is tracking?"
+msgstr "Takip nedir?"
+
+msgid "Each item: every roll or bale has a barcode of its own, and stock is picked item by item."
+msgstr "Her biri ayrı: her top veya balyanın kendi barkodu vardır ve stok tek tek seçilir."
+
+msgid "By variant: every piece of a variant is alike, so one barcode names the variant and its stock is counted, not labelled one by one."
+msgstr "Varyant bazında: bir varyantın her parçası aynıdır; tek bir barkod varyantı belirtir ve stok tek tek etiketlenmez, sayılır."
+
+msgid "In other languages"
+msgstr "Diğer dillerde"
+
+msgid "“{sku}” is already the SKU of “{product}”. Pick that product from the list, or give this one another SKU."
+msgstr "“{sku}” zaten “{product}” ürününün SKU'su. O ürünü listeden seçin ya da bu ürüne başka bir SKU verin."

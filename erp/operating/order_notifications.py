@@ -51,8 +51,8 @@ def _ensure_pdf_fonts():
     """Register Plus Jakarta Sans with reportlab — the font every printed
     document shares (erp/static/erp/fonts; the HTML documents declare it in
     print/_document_fonts.html). Returns the regular face's name; its bold
-    is that name + "-Bold". None if the files are missing, and the caller
-    falls back to Helvetica.
+    is that name + "-Bold", its medium + "-Medium". None if the files are
+    missing, and the caller falls back to Helvetica.
 
     Never reportlab's built-in Helvetica by choice: it is Latin-1 only and
     prints ş İ ğ ı as empty boxes. Jakarta has the Turkish letters; it has
@@ -69,11 +69,16 @@ def _ensure_pdf_fonts():
                             "erp", "static", "erp", "fonts")
         reg = os.path.join(base, "PlusJakartaSans-Regular.ttf")
         bold = os.path.join(base, "PlusJakartaSans-Bold.ttf")
-        if not (os.path.exists(reg) and os.path.exists(bold)):
+        medium = os.path.join(base, "PlusJakartaSans-Medium.ttf")
+        if not (os.path.exists(reg) and os.path.exists(bold) and os.path.exists(medium)):
             return None
         if PDF_FONT not in pdfmetrics.getRegisteredFontNames():
             pdfmetrics.registerFont(TTFont(PDF_FONT, reg))
             pdfmetrics.registerFont(TTFont(f"{PDF_FONT}-Bold", bold))
+            # The labels' captions: lighter than the bold values under
+            # them, but not regular, whose strokes are a dot wide on the
+            # thermal printer and break up (warehouse_label, pack_label).
+            pdfmetrics.registerFont(TTFont(f"{PDF_FONT}-Medium", medium))
             pdfmetrics.registerFontFamily(
                 PDF_FONT, normal=PDF_FONT, bold=f"{PDF_FONT}-Bold",
             )

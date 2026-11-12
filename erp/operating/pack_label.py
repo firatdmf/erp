@@ -96,6 +96,9 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "Helvetica-Bold" if reg == "Helvetica" else f"{reg}-Bold"
+    # Captions in Medium: lighter than the bold values, so the two read
+    # apart, yet solid on the printer's dots, where regular broke up.
+    caption = "Helvetica" if reg == "Helvetica" else f"{reg}-Medium"
 
     # The printer takes the 66 × 44 mm roll, so that is the page — any
     # other size and the print dialog scales it. The label stands up in it,
@@ -194,13 +197,12 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
                 draw_brand(c, M, top - 3.2 * mm, shown, bold, size, LABEL_BRAND_TRACKING)
                 top -= BRAND_BAND
 
-            # ── Header: QR, then the order number over "3 / 12". Captions
-            #    bold: a regular stroke this small is a dot wide on the
-            #    printer and breaks up. ──
+            # ── Header: QR, then the order number over "3 / 12"; captions
+            #    in Medium, the values bold. ──
             c.drawInlineImage(qr, M, top - qsize, qsize, qsize)
             x = M + qsize + 2.5 * mm
             room = PW - M - x
-            c.setFont(bold, 5)
+            c.setFont(caption, 5)
             c.drawString(x, top - 1.8 * mm, _("ORDER").upper())
             package = _("PACKAGE").upper()
             if len(pages) > 1:

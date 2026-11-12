@@ -76,6 +76,9 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "Helvetica-Bold" if reg == "Helvetica" else f"{reg}-Bold"
+    # Captions in Medium: lighter than the bold values, so the two read
+    # apart, yet solid on the printer's dots, where regular broke up.
+    caption = "Helvetica" if reg == "Helvetica" else f"{reg}-Medium"
     names = {}  # warehouse id → its business's name
 
     # The sticker's own size, 66 × 44 mm, in Ergene and Laleli alike. Drawn
@@ -181,18 +184,17 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
         #    short of it ──
         amount = f"{float(quantity):.2f} {unit}".strip()
         amount_w = c.stringWidth(amount, bold, 11)
-        c.setFont(bold, 5.5)
+        c.setFont(caption, 5.5)
         c.drawRightString(W - M, sku_y, "QUANTITY")
         c.setFont(bold, 11)
         c.drawRightString(W - M, sku_y - 3.6 * mm, amount)
 
-        # ── Field stack (left): a small caption over its value. Captions
-        #    bold, not regular: Jakarta's regular strokes at this size are
-        #    a dot wide on the printer and came out broken. ──
+        # ── Field stack (left): a small caption over its value — the
+        #    caption in Medium, the value bold. ──
         value_room = W - 2 * M - max(amount_w, qsize) - 3 * mm
 
         def field(label, value, y):
-            c.setFont(bold, 5.5)
+            c.setFont(caption, 5.5)
             c.drawString(M, y, label)
             text, size = fit(value, bold, 9, value_room, 6.5)
             c.setFont(bold, size)

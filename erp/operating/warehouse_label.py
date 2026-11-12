@@ -16,6 +16,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 
 from erp.branding import brand as brand_value
+from marketing import units
 
 from .models import Warehouse, WarehouseProduct
 
@@ -123,7 +124,6 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
         else:
             quantity = product.quantity
         quantity = quantity or 0
-        unit = product.unit_short
 
         # ── QR (top-right) — encodes the ROLL barcode so a QR scan flows
         #    through the same warehouse-lookup pipeline as a 1D scan. QRs
@@ -182,7 +182,8 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
 
         # ── QUANTITY (right, on the SKU row) — the stack beside it stops
         #    short of it ──
-        amount = f"{float(quantity):.2f} {unit}".strip()
+        # "80 pcs" for a count, "19.70 m" for cloth — as the pack label.
+        amount = units.format_amount(quantity, product.unit)
         amount_w = c.stringWidth(amount, bold, 11)
         c.setFont(caption, 5.5)
         c.drawRightString(W - M, sku_y, "QUANTITY")

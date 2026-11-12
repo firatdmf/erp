@@ -41,19 +41,10 @@ def _pack_lines(pack):
     return list(lines.values())
 
 
-def _amount(quantity, unit):
-    """"212.50 m", or "22 pcs" for a count."""
-    if unit in units.WHOLE_UNITS and quantity == int(quantity):
-        number = f"{int(quantity):,}"
-    else:
-        number = f"{quantity:,.2f}"
-    return f"{number} {units.unit_short(unit)}"
-
-
 def _describe(items, quantity, unit, pack_type, tracking):
     """"4 rolls · 212.50 m". Goods tracked by variant are just their count:
     the stock entries behind "22 pcs" are batches, not boxes anyone can find."""
-    amount = _amount(quantity, unit)
+    amount = units.format_amount(quantity, unit)
     if units.by_variant(tracking) or not units.counts_packs(pack_type):
         return amount
     return f"{items} {units.pack_noun(pack_type, items)} · {amount}"
@@ -73,7 +64,7 @@ def _total(lines):
     parts = []
     for (unit, tracking), t in by_unit.items():
         if t["pack_type"] is None and not units.by_variant(tracking):
-            parts.append(_amount(t["quantity"], unit))
+            parts.append(units.format_amount(t["quantity"], unit))
         else:
             parts.append(_describe(t["items"], t["quantity"], unit, t["pack_type"], tracking))
     return " · ".join(parts)

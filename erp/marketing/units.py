@@ -118,6 +118,17 @@ def by_variant(tracking):
 WHOLE_UNITS = frozenset({"piece", "pack"})
 
 
+def format_amount(quantity, unit):
+    """A quantity with its unit as a label prints it: "212.50 m", or
+    "22 pcs" for a count — whole units lose the ".00" a meter keeps."""
+    quantity = quantity or 0
+    if unit in WHOLE_UNITS and quantity == int(quantity):
+        number = f"{int(quantity):,}"
+    else:
+        number = f"{quantity:,.2f}"
+    return f"{number} {unit_short(unit)}".strip()
+
+
 def counts_packs(pack_type):
     """Whether a product packed this way has packs worth counting. False
     for loose stock — see UNCOUNTED_PACKS."""

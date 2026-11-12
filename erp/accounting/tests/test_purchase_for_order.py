@@ -677,7 +677,11 @@ class PurchaseForCustomerTest(TestCase):
         order = Invoice.objects.get(pk=inv_id).for_order
         url = reverse("operating:order_detail", args=[order.pk])
         page = self.client.get(url)
-        self.assertContains(page, 'id="od-complete-btn" class="ord-btn primary" data-status="shipped"\n                        disabled')
+        # The button answers with a dialog saying why and what to do
+        # instead — ship part, or open the purchase — not a dead press.
+        self.assertContains(page, 'id="od-complete-btn" class="ord-btn primary" data-status="shipped"\n                        data-waits')
+        self.assertContains(page, 'id="odWaitsModal"')
+        self.assertContains(page, reverse("operating:order_ship_part", args=[order.pk]))
         self.assertContains(page, "can be completed once the goods")
         r = self.client.post(url, {"action": "update_status", "order_status": "shipped"}, follow=True)
         self.assertContains(r, "Receive the purchase first, or cancel it.")

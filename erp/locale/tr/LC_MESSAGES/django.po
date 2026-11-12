@@ -16122,3 +16122,12 @@ msgstr "Alım kaydedildi — sipariş satırları güncellendi."
 
 msgid "Coming"
 msgstr "Yolda"
+
+msgid "The goods aren't all in yet"
+msgstr "Mallar henüz tamamen gelmedi"
+
+msgid "ship what is here now. The rest, with the purchase still on its way, is carried to a new order."
+msgstr "elde olanı şimdi gönderin. Kalanı, yoldaki alımla birlikte yeni bir siparişe aktarılır."
+
+msgid "receive it once the goods arrive, or cancel it if they won't come."
+msgstr "mallar gelince teslim alın veya gelmeyecekse iptal edin."

@@ -1116,6 +1116,9 @@
   .odc-nm { font: 600 13px var(--font-sans); color: var(--ink); }
   .odc-sku { display: block; margin-top: 2px; font: 500 11px var(--font-mono); color: var(--gray-500); }
   .odc-qty { white-space: nowrap; text-align: right; font: 500 12.5px var(--font-sans); color: var(--gray-600); padding-left: 14px !important; }
+  .odw-ways { margin: 0 0 14px; padding-left: 18px; font: 500 13px var(--font-sans); color: var(--gray-600); line-height: 1.5; }
+  .odw-ways li + li { margin-top: 6px; }
+  .odw-ways b { color: var(--ink); }
   .odc-sub-cell { white-space: nowrap; text-align: right; font: 700 13px var(--font-sans); color: var(--ink); padding-left: 14px !important; font-variant-numeric: tabular-nums; }
   .odc-empty { padding: 14px 0; font: 500 12.5px var(--font-sans); color: var(--gray-500); }
   .odc-foot { padding: 14px 18px 16px; border-top: 1px solid #EEF2F7; background: #FBFCFE; }
@@ -1451,9 +1454,9 @@
                   <i class="fa fa-boxes-stacked"></i> {% trans "Ship part" %}
                 </a>
                 {% endif %}
-                {% comment %}Goods bought for the order still on their way in: the funnel refuses 'shipped' (goods_not_received), so the button says why instead of failing.{% endcomment %}
+                {% comment %}Goods bought for the order still on their way in: the funnel refuses 'shipped' (goods_not_received), so the button opens a dialog saying why and what to do instead (#odWaitsModal) rather than doing nothing.{% endcomment %}
                 <button type="button" id="od-complete-btn" class="ord-btn primary" data-status="shipped"
-                        {% if billing_waits_for %}disabled title="{% trans "Goods bought for this order haven't been received yet" %}"{% elif needs_all_books %}disabled title="{{ needs_all_books }}"{% endif %}>
+                        {% if needs_all_books %}disabled title="{{ needs_all_books }}"{% elif billing_waits_for %}data-waits{% endif %}>
                   <i class="fa fa-truck-fast"></i> {% trans "Complete order" %}
                 </button>
                 {% else %}
@@ -2309,6 +2312,42 @@
   </div>
 </div>
 
+{% if billing_waits_for %}
+{% comment %}Complete order pressed while goods bought for the order are still on their way: why it can't complete, and the two ways on — ship what is here (the rest and the purchase move to a new order), or receive / cancel the purchase.{% endcomment %}
+<div class="odc-overlay" id="odWaitsModal" aria-hidden="true">
+  <div class="odc-shell" role="dialog" aria-modal="true" aria-labelledby="odwTitle">
+    <div class="odc-head">
+      <div class="odc-ic"><i class="fa fa-clock"></i></div>
+      <div style="min-width:0;">
+        <h3 id="odwTitle">{% trans "The goods aren't all in yet" %}</h3>
+        <p class="odc-sub">{% trans "The order can be completed once the goods bought for it are received:" %}
+          {% for p in billing_waits_for %}<b>{{ p.number }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+      </div>
+      <button type="button" class="odc-x" data-odw-close aria-label="{% trans 'Close' %}"><i class="fa fa-xmark"></i></button>
+    </div>
+    <div class="odc-body">
+      <ul class="odw-ways">
+        {% if not is_sales_rep and not order.is_retail_order and not needs_all_books %}
+        <li><b>{% trans "Ship part" %}</b> — {% trans "ship what is here now. The rest, with the purchase still on its way, is carried to a new order." %}</li>
+        {% endif %}
+        <li><b>{% trans "Open the purchase" %}</b> — {% trans "receive it once the goods arrive, or cancel it if they won't come." %}</li>
+      </ul>
+    </div>
+    <div class="odc-foot">
+      <div class="odc-actions" style="flex-wrap:wrap;">
+        <button type="button" class="ord-btn ghost" data-odw-close>{% trans "Close" %}</button>
+        {% for p in billing_waits_for %}
+        <a class="ord-btn ghost" href="{% url 'accounts:purchase_order_detail' p.pk %}"><i class="fa fa-file-invoice"></i> {% trans "Open" %} {{ p.number }}</a>
+        {% endfor %}
+        {% if not is_sales_rep and not order.is_retail_order and not needs_all_books %}
+        <a class="ord-btn primary" href="{% url 'operating:order_ship_part' order.pk %}"><i class="fa fa-boxes-stacked"></i> {% trans "Ship part" %}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if not shipped and not is_terminal and not is_sales_rep %}
 <!-- CANCEL-ORDER CONFIRM — cancelling is terminal, so the dialog spells
      out what happens and won't submit without a reason (logged to the
@@ -2841,9 +2880,25 @@
       statusForm.addEventListener('od-ship-reset', () => receipts.clear());
     }
 
+    // Complete order on an order still waiting for its goods: the dialog
+    // saying why, instead of a press that does nothing.
+    const odwModal = document.getElementById('odWaitsModal');
+    function odwShow(on) {
+      if (!odwModal) return;
+      odwModal.classList.toggle('show', on);
+      odwModal.setAttribute('aria-hidden', on ? 'false' : 'true');
+      document.body.style.overflow = on ? 'hidden' : '';
+    }
+    if (odwModal) {
+      odwModal.querySelectorAll('[data-odw-close]').forEach(b => b.addEventListener('click', () => odwShow(false)));
+      odwModal.addEventListener('click', (e) => { if (e.target === odwModal) odwShow(false); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && odwModal.classList.contains('show')) odwShow(false); });
+    }
+
     document.querySelectorAll('.od-stage[data-status], .od-stage-mini[data-status], .od-spk-btn[data-status], #od-complete-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
+        if (btn.hasAttribute('data-waits') && odwModal) { odwShow(true); return; }
         const s = btn.dataset.status;
         if (!s) return;
         submitStatus(s);

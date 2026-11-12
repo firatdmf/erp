@@ -438,9 +438,16 @@
      data-shipped="{{ shipped|yesno:'1,0' }}">
 
   <div class="pk-top">
+    {% comment %}Opened from Ship part to change the packages: back goes there.{% endcomment %}
+    {% if request.GET.back == "ship" %}
+    <a class="pk-back" href="{% url 'operating:order_ship_part' order.pk %}">
+      <i class="fa fa-arrow-left"></i>{% trans "Back to shipping" %}
+    </a>
+    {% else %}
     <a class="pk-back" href="{% url 'operating:order_detail' order.pk %}">
       <i class="fa fa-arrow-left"></i>{% trans "Back to order" %}
     </a>
+    {% endif %}
     <h1 class="pk-title">
       {% trans "Packing — Scan rolls" %}
       <small>{{ number }}</small>

@@ -165,6 +165,10 @@ class PlainOrder(PartialShipmentBase):
         page = self.client.get(url)
         self.assertEqual(page.status_code, 200)
         self.assertEqual(len(page.context["pack_rows"]), 2)
+        # Packages are changed on the packing screen, which leads back here.
+        pack_url = reverse("operating:order_pack_scan", args=[self.o.pk]) + "?back=ship"
+        self.assertContains(page, pack_url)
+        self.assertContains(self.client.get(pack_url), f'href="{url}"')
         r = self.client.post(url, {"pack": [self.p1.pk], "tracking_number": "TRK-1"})
         self.assertRedirects(r, reverse("operating:order_detail", args=[self.o.pk]),
                              fetch_redirect_response=False)

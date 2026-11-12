@@ -13,6 +13,8 @@
   .sp-sub { color:#4B5563; margin:6px 0 18px; max-width:620px; line-height:1.5; }
   .sp-card { background:#FFF; border:1px solid #E2E8EE; border-radius:12px; padding:16px; margin-bottom:14px; }
   .sp-card h3 { font-weight:700; font-size:14px; margin:0 0 4px; }
+  .sp-card-h { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .sp-card-h h3 { margin:0; }
   .sp-card .sp-hint { color:#6B7280; font-size:12.5px; margin:0 0 12px; }
   .sp-packs { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; }
   .sp-pack { display:flex; gap:10px; align-items:flex-start; border:1px solid #E2E8EE; border-radius:10px; padding:10px 12px; cursor:pointer; }
@@ -70,7 +72,12 @@
     {% csrf_token %}
 
     <section class="sp-card">
-      <h3>{% trans "Packages going now" %}</h3>
+      <div class="sp-card-h">
+        <h3>{% trans "Packages going now" %}</h3>
+        <a class="sp-back" href="{% url 'operating:order_pack_scan' order.pk %}?back=ship">
+          <i class="fa fa-box-open"></i> {% trans "Change packages" %}
+        </a>
+      </div>
       {% if pack_rows %}
       <p class="sp-hint">{% trans "Packages left unticked are carried to the new order with what is in them." %}</p>
       <div class="sp-packs">

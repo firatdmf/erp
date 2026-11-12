@@ -169,6 +169,10 @@ class PlainOrder(PartialShipmentBase):
         pack_url = reverse("operating:order_pack_scan", args=[self.o.pk]) + "?back=ship"
         self.assertContains(page, pack_url)
         self.assertContains(self.client.get(pack_url), f'href="{url}"')
+        # The cargo receipt is picked, photographed or pasted (and shrunk)
+        # by the same picker as on the order page.
+        self.assertContains(page, "operating/js/cargo_receipts.js")
+        self.assertContains(page, "paste it here")
         r = self.client.post(url, {"pack": [self.p1.pk], "tracking_number": "TRK-1"})
         self.assertRedirects(r, reverse("operating:order_detail", args=[self.o.pk]),
                              fetch_redirect_response=False)

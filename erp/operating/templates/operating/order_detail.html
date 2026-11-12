@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'operating/css/cargo_receipts.css' %}">
 <style>
   :root {
     --nejum-teal-50:  #E5F1F0;
@@ -357,64 +358,6 @@
   [data-theme="dark"] .od-cbx-list li.active, [data-theme="dark"] .od-cbx-list li:hover { background: rgba(102,194,194,.12); }
   [data-theme="dark"] .od-cbx-chip { background: rgba(102,194,194,.10); border-color: rgba(102,194,194,.35); color: #66C2C2; }
   .od-rcpt { grid-column: 1 / -1; }
-  .od-rcpt-list { display: flex; flex-wrap: wrap; gap: 8px; }
-  .od-rcpt-item {
-    display: flex; align-items: center; gap: 4px;
-    padding: 4px 4px 4px 4px; background: white;
-    border: 1px solid #DDE3E7; border-radius: 8px; max-width: 100%;
-  }
-  .od-rcpt-open {
-    display: flex; align-items: center; gap: 8px; min-width: 0;
-    color: #0F1419; text-decoration: none; font: 500 12.5px var(--font-sans);
-  }
-  .od-rcpt-open:hover .od-rcpt-name { text-decoration: underline; }
-  .od-rcpt-thumb {
-    width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
-    background: #F3F4F6;
-  }
-  .od-rcpt-thumb.pdf {
-    display: flex; align-items: center; justify-content: center;
-    background: #FEE2E2; color: #B91C1C; font-size: 16px;
-  }
-  .od-rcpt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .od-rcpt-del {
-    border: 0; background: none; color: var(--gray-500); cursor: pointer;
-    width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
-  }
-  .od-rcpt-del:hover { background: #FEE2E2; color: #B91C1C; }
-  .od-rcpt-pick {
-    display: flex; align-items: center; gap: 8px; cursor: pointer;
-    padding: 9px 11px; border: 1px dashed #C9D2D8; border-radius: 7px;
-    background: white; font: 500 13px var(--font-sans); color: var(--gray-600);
-  }
-  .od-rcpt-pick:hover { border-color: var(--nejum-teal-500, #147F74); color: var(--nejum-teal-600, #0F766E); }
-  .od-ship .od-rcpt-pick input { display: none; }
-  .od-rcpt-picks { display: flex; gap: 8px; }
-  .od-rcpt-file { flex: 1; min-width: 0; }
-  .od-rcpt-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .od-rcpt-cam { display: none; flex-shrink: 0; font-weight: 600; color: var(--nejum-teal-600, #0F766E); }
-  @media (pointer: coarse) { .od-rcpt-cam { display: flex; } }
-  .od-rcpt-shots[hidden] { display: none; }
-  .od-rcpt-shots { display: flex; flex-direction: column; gap: 6px; }
-  .od-rcpt-pending-l { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
-  .od-rcpt-pending { display: flex; flex-wrap: wrap; gap: 8px; }
-  .od-rcpt-item.pending { border-style: dashed; border-color: #9FCFC8; }
-  .od-rcpt-item.pending .od-rcpt-name { max-width: 180px; font: 500 12.5px var(--font-sans); color: #0F1419; }
-  .od-rcpt-item.pending span.od-rcpt-thumb:not(.pdf) {
-    display: flex; align-items: center; justify-content: center; color: var(--gray-500);
-  }
-  /* A receipt on its way up after Save: its preview, dimmed under a spinner. */
-  .od-rcpt-up { position: relative; display: inline-flex; flex-shrink: 0; }
-  .od-rcpt-up .od-rcpt-thumb { opacity: .45; }
-  .od-rcpt-up > .fa-spinner {
-    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    color: var(--nejum-teal-600, #0F766E); font-size: 13px;
-  }
-  .od-rcpt-hint { display: none; font: 500 11.5px var(--font-sans); color: var(--gray-500); }
-  .od-rcpt-hint i { margin-right: 5px; }
-  /* Paste is a keyboard thing — say so where there is one. */
-  @media (pointer: fine) { .od-rcpt-hint { display: block; } }
-  .od-rcpt-picks.pasted .od-rcpt-file { border-color: var(--nejum-teal-500, #147F74); background: #EFF6F5; transition: background .2s; }
   .od-ship-meta i { margin-right: 4px; color: var(--nejum-teal-600); }
 
   /* Collapsible "more statuses" */
@@ -1499,25 +1442,8 @@
                 <span class="od-ship-l">{% trans "Cargo receipt" %}</span>
                 <div id="od-rcpt-saved">{% include "operating/partials/_cargo_receipts.html" %}</div>
                 {% if not is_sales_rep %}
-                <div class="od-rcpt-picks">
-                  {% comment %}Phones only: a PDF-or-image picker can't open the camera on Android, so a second input asks for the rear camera outright. Each shot moves into its own hidden input (see the JS) so a second photo doesn't replace the first.{% endcomment %}
-                  <label class="od-rcpt-pick od-rcpt-cam">
-                    <input type="file" name="cargo_receipts" id="od-rcpt-cam" accept="image/*" capture="environment">
-                    <i class="fa fa-camera"></i>
-                    <span>{% trans "Take photo" %}</span>
-                  </label>
-                  <label class="od-rcpt-pick od-rcpt-file">
-                    <input type="file" name="cargo_receipts" id="od-rcpt-input" multiple
-                           accept="image/*,application/pdf,.pdf,.heic,.heif">
-                    <i class="fa fa-paperclip"></i>
-                    <span>{% trans "Attach a photo or PDF of the receipt" %}</span>
-                  </label>
-                </div>
-                <div class="od-rcpt-shots" id="od-rcpt-shots" hidden>
-                  <div class="od-rcpt-pending-l">{% trans "Uploaded when you save or complete the order:" %}</div>
-                  <div class="od-rcpt-pending" id="od-rcpt-pending"></div>
-                </div>
-                <div class="od-rcpt-hint"><i class="fa fa-paste"></i>{% trans "Or copy an image and paste it here (⌘V / Ctrl+V)." %}</div>
+                {% trans "Uploaded when you save or complete the order:" as pending_label %}
+                {% include "operating/partials/_cargo_receipt_picker.html" with pending_label=pending_label %}
                 {% endif %}
               </div>
             </div>
@@ -2404,6 +2330,7 @@
   </div>
 </div>
 
+<script src="{% static 'operating/js/cargo_receipts.js' %}"></script>
 <script>
   // What this order is priced in — the customer's own currency.
   // Every figure the scripts below rewrite is in it, so the symbol
@@ -2952,199 +2879,32 @@
       });
     })();
 
-    // Cargo receipts waiting to upload. Three ways in — the picker, the
-    // phone camera, a paste — and every file ends up in a hidden input of
-    // its own inside the form, posting as cargo_receipts. The picker and
-    // camera inputs are emptied after each use (their files copied out),
-    // so a second pick adds to the first instead of replacing it, and any
-    // one file can be taken off again. The previews are drawn from the
-    // parked inputs. Without DataTransfer (a very old browser) none of this
-    // runs, and the picker and camera post their files as they are.
-    const rcptField = document.querySelector('.od-rcpt');
-    const rcptShots = document.getElementById('od-rcpt-shots');
-    if (rcptField && rcptShots && window.DataTransfer) {
-      const pending = document.getElementById('od-rcpt-pending');
-      const REMOVE = '{% trans "Remove" %}';
-      let previewUrls = [];
-
-      // A phone photo is 3–5 MB and the server keeps a 2400 px JPEG of it
-      // (DOCUMENT in erp/image_optimizer.py — the same edge and quality here), so
-      // it is made that size before it is sent: a tenth of the upload.
-      // What the browser can't draw (HEIC outside Safari, a damaged file)
-      // goes up as it is and the server converts it.
-      const SHRINK_EDGE = 2400, SHRINK_QUALITY = 0.82, ALREADY_SMALL_BYTES = 700000;
-      async function shrink(file) {
-        if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) return file;
-        const url = URL.createObjectURL(file);
-        try {
-          const img = new Image();
-          img.src = url;
-          await img.decode();
-          const w = img.naturalWidth, h = img.naturalHeight;
-          const scale = Math.min(1, SHRINK_EDGE / Math.max(w, h));
-          const isJpeg = file.type === 'image/jpeg';
-          if (isJpeg && scale === 1 && file.size <= ALREADY_SMALL_BYTES) return file;
-          const draw = (src, cw, ch, white) => {
-            const c = document.createElement('canvas');
-            c.width = cw; c.height = ch;
-            const ctx = c.getContext('2d');
-            // A transparent PNG goes onto white, as it would print.
-            if (white) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); }
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(src, 0, 0, cw, ch);
-            return c;
-          };
-          const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
-          // Halved in steps on the way down: one big jump blurs small print.
-          let src = img, sw = w, sh = h;
-          while (sw / 2 >= tw && sh / 2 >= th) {
-            sw = Math.floor(sw / 2); sh = Math.floor(sh / 2);
-            src = draw(src, sw, sh, false);
-          }
-          const blob = await new Promise(done => draw(src, tw, th, true).toBlob(done, 'image/jpeg', SHRINK_QUALITY));
-          if (!blob || (isJpeg && blob.size >= file.size)) return file;
-          return new File([blob], file.name.replace(/\.[^.]*$/, '') + '.jpg',
-                          { type: 'image/jpeg', lastModified: file.lastModified });
-        } catch (e) {
-          return file;
-        } finally {
-          URL.revokeObjectURL(url);
-        }
-      }
-
-      function setFile(input, f) {
-        const dt = new DataTransfer();
-        dt.items.add(f);
-        input.files = dt.files;
-      }
-
-      function park(files) {
-        files.forEach(f => {
-          const input = document.createElement('input');
-          input.type = 'file'; input.name = 'cargo_receipts'; input.hidden = true;
-          input.className = 'od-rcpt-parked';
-          setFile(input, f);
-          rcptShots.insertBefore(input, pending);
-          // Shrunk while the rest of the card is filled in; Save waits for
-          // it, and a status change that doesn't posts the photo as it came.
-          input.shrunk = shrink(f).then(small => {
-            if (small === f) return;
-            setFile(input, small);
-            if (input.isConnected) renderPending();
-          });
-        });
-        renderPending();
-      }
-
-      function unpark(input) {
-        input.remove();
-        renderPending();
-      }
-
-      // A file's preview; its object URL is noted in `urls` to be revoked.
-      function thumbFor(f, urls) {
-        if (f.type === 'application/pdf') {
-          const pdf = document.createElement('span');
-          pdf.className = 'od-rcpt-thumb pdf';
-          pdf.innerHTML = '<i class="fa fa-file-pdf"></i>';
-          return pdf;
-        }
-        const thumb = document.createElement('img');
-        thumb.className = 'od-rcpt-thumb';
-        thumb.alt = '';
-        const url = URL.createObjectURL(f);
-        urls.push(url);
-        thumb.src = url;
-        // HEIC won't draw outside Safari; it is converted on upload.
-        thumb.onerror = () => {
-          const icon = document.createElement('span');
-          icon.className = 'od-rcpt-thumb';
-          icon.innerHTML = '<i class="fa fa-image"></i>';
-          thumb.replaceWith(icon);
-        };
-        return thumb;
-      }
-
-      function renderPending() {
-        previewUrls.forEach(u => URL.revokeObjectURL(u));
-        previewUrls = [];
-        pending.innerHTML = '';
-        const parked = Array.from(rcptShots.querySelectorAll('input.od-rcpt-parked'));
-        parked.forEach(input => {
-          const f = input.files[0];
-          const item = document.createElement('div');
-          item.className = 'od-rcpt-item pending';
-          const name = document.createElement('span');
-          name.className = 'od-rcpt-name';
-          name.textContent = f.name;
-          const del = document.createElement('button');
-          del.type = 'button';
-          del.className = 'od-rcpt-del';
-          del.title = REMOVE; del.setAttribute('aria-label', REMOVE);
-          del.innerHTML = '<i class="fa fa-xmark"></i>';
-          del.addEventListener('click', () => unpark(input));
-          item.append(thumbFor(f, previewUrls), name, del);
-          pending.appendChild(item);
-        });
-        rcptShots.hidden = !parked.length;
-      }
-
+    // Cargo receipts waiting to upload: the shared picker
+    // (operating/js/cargo_receipts.js) holds them in the form until a
+    // status change posts them or Save takes them.
+    const rcptField = document.querySelector('.od-rcpt .od-rcpt-field');
+    const receipts = rcptField && window.NjCargoReceipts ? NjCargoReceipts.attach(rcptField) : null;
+    if (receipts) {
       // Save takes the waiting receipts with it. They leave the form (a
       // status change pressed meanwhile must not post them a second time)
       // and come back only if the save is refused.
       takeReceipts = () => {
-        const inputs = Array.from(rcptShots.querySelectorAll('input.od-rcpt-parked'));
+        const inputs = receipts.parked();
         if (!inputs.length) return null;
         inputs.forEach(i => i.remove());
-        renderPending();
+        receipts.render();
         const urls = [];
         return {
           ready: Promise.all(inputs.map(i => i.shrunk)),
           files: () => inputs.map(i => i.files[0]),
-          thumb: (f) => thumbFor(f, urls),
-          putBack: () => { inputs.forEach(i => rcptShots.insertBefore(i, pending)); renderPending(); },
+          thumb: (f) => receipts.thumbFor(f, urls),
+          putBack: () => receipts.putBack(inputs),
           done: () => urls.forEach(u => URL.revokeObjectURL(u)),
         };
       };
 
       // Cancel edit: the receipts waiting to upload are dropped.
-      statusForm.addEventListener('od-ship-reset', () => {
-        rcptShots.querySelectorAll('input.od-rcpt-parked').forEach(i => i.remove());
-        renderPending();
-      });
-
-      [document.getElementById('od-rcpt-input'), document.getElementById('od-rcpt-cam')].forEach(src => {
-        if (!src) return;
-        src.removeAttribute('name');  // its files post from the parked copy
-        src.addEventListener('change', () => { park(Array.from(src.files)); src.value = ''; });
-      });
-
-      // Paste: an image copied anywhere (a screenshot, a photo in an email,
-      // the carrier's page) and pasted on this page joins the receipts. A
-      // paste that carries text into a text field (a tracking number) stays
-      // a text paste.
-      const PASTE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
-                            'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' };
-      let pastedCount = 0;
-      document.addEventListener('paste', (e) => {
-        // Hidden for a retail order sold over the counter: nothing to attach to.
-        if (!rcptField.offsetParent || !e.clipboardData) return;
-        const files = Array.from(e.clipboardData.files || []).filter(f => PASTE_TYPES[f.type]);
-        if (!files.length) return;
-        const t = e.target;
-        const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName));
-        if (typing && (e.clipboardData.getData('text/plain') || '').trim()) return;
-        e.preventDefault();
-        // A clipboard image is always "image.png" — name it for where it
-        // came from, and so the next one doesn't clash.
-        park(files.map(f => new File([f], 'pasted-receipt-' + (++pastedCount) + '.' + PASTE_TYPES[f.type],
-                                     { type: f.type })));
-        const picks = rcptField.querySelector('.od-rcpt-picks');
-        if (picks) {
-          picks.classList.add('pasted');
-          setTimeout(() => picks.classList.remove('pasted'), 900);
-        }
-      });
+      statusForm.addEventListener('od-ship-reset', () => receipts.clear());
     }
 
     document.querySelectorAll('.od-stage[data-status], .od-stage-mini[data-status], .od-spk-btn[data-status], #od-complete-btn').forEach(btn => {

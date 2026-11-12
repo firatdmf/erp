@@ -135,14 +135,14 @@ class CargoReceiptOnCompletion(_AnOrderToComplete, TestCase):
         # The file picker also takes PDFs, which on Android means no camera;
         # the second input asks for the rear camera outright.
         html = self.client.get(self.url).content.decode()
-        self.assertIn('id="od-rcpt-cam" accept="image/*" capture="environment"', html)
+        self.assertIn('name="cargo_receipts" accept="image/*" capture="environment"', html)
 
     def test_the_page_says_an_image_can_be_pasted(self, upload):
         # The paste itself happens in the browser; what reaches the server is
         # one more file under cargo_receipts, like a camera shot.
         html = self.client.get(self.url).content.decode()
         self.assertIn("paste it here", html)
-        self.assertIn("document.addEventListener('paste'", html)
+        self.assertIn("operating/js/cargo_receipts.js", html)
 
     def test_a_pasted_image_posts_like_any_other_file(self, upload):
         self._complete(_jpg("pasted-receipt-1.jpg"))

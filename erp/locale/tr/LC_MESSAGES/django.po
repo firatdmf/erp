@@ -16101,3 +16101,6 @@ msgstr "Paketleri değiştir"
 
 msgid "Back to shipping"
 msgstr "Gönderime dön"
+
+msgid "Uploaded when you press Ship:"
+msgstr "Gönder'e bastığınızda yüklenir:"

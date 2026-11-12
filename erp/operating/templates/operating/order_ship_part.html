@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{% trans "Ship part of the order" %} · {{ number }} | Nejum ERP{% endblock %}
 {% block css %}
+<link rel="stylesheet" href="{% static 'operating/css/cargo_receipts.css' %}">
 <style>
   .sp { max-width: 980px; margin: 0 auto; padding: 22px 16px 90px; font: 400 13.5px 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif; color: #0F1419; }
   .sp, .sp * { box-sizing: border-box; }
@@ -49,7 +50,7 @@
   .sp-cargo { display:grid; gap:10px; margin-bottom:14px; }
   .sp-cargo label { display:grid; gap:4px; font-weight:600; font-size:12px; color:#374151; }
   .sp-cargo select, .sp-cargo input[type=text] { padding:7px 9px; border:1px solid #D5DCE3; border-radius:8px; font:inherit; font-weight:400; }
-  .sp-cargo input[type=file] { font:inherit; font-weight:400; font-size:12px; max-width:100%; }
+  .sp-rcpt { display:grid; gap:6px; font-weight:600; font-size:12px; color:#374151; }
   @media (max-width: 600px) {
     .sp-lines thead { display:none; }
     .sp-lines tr.sp-line { display:grid; grid-template-columns:1fr auto; gap:4px 10px; padding:8px 0; border-bottom:1px solid #F1F4F7; }
@@ -173,9 +174,10 @@
           <label>{% trans "Tracking or receipt number" %}
             <input type="text" name="tracking_number" value="{{ order.tracking_number|default:'' }}">
           </label>
-          <label>{% trans "Cargo receipt" %}
-            <input type="file" name="cargo_receipts" multiple accept="image/*,application/pdf">
-          </label>
+          <div class="sp-rcpt">{% trans "Cargo receipt" %}
+            {% trans "Uploaded when you press Ship:" as pending_label %}
+            {% include "operating/partials/_cargo_receipt_picker.html" with pending_label=pending_label %}
+          </div>
         </div>
         <div class="sp-foot">
           <button type="button" class="sp-back" id="sp-modal-cancel">{% trans "Cancel" %}</button>
@@ -186,6 +188,7 @@
   </form>
 </div>
 
+<script src="{% static 'operating/js/cargo_receipts.js' %}"></script>
 <script>
 (function () {
   const form = document.getElementById('sp-form');
@@ -272,8 +275,17 @@
   document.getElementById('sp-modal-cancel').addEventListener('click', () => { modal.hidden = true; });
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.hidden = true; });
-  form.addEventListener('submit', () => {
+  // Receipts go up shrunk: Ship waits for any photo still being made small.
+  const rcptField = form.querySelector('.od-rcpt-field');
+  const receipts = rcptField && window.NjCargoReceipts ? NjCargoReceipts.attach(rcptField) : null;
+  let sending = false;
+  form.addEventListener('submit', (e) => {
+    if (sending) { e.preventDefault(); return; }
+    sending = true;
     form.querySelectorAll('button[type=submit]').forEach(b => { b.disabled = true; });
+    if (!receipts || !receipts.parked().length) return;
+    e.preventDefault();
+    receipts.ready().then(() => form.submit());
   });
 
   form.querySelectorAll('[data-pack-tick]').forEach(i => i.addEventListener('change', fill));

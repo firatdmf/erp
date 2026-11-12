@@ -1,0 +1,22 @@
+{% load i18n static %}
+{% comment %}Where cargo receipts are picked, photographed or pasted before the form posts them. Wired by operating/js/cargo_receipts.js, styled by operating/css/cargo_receipts.css. pending_label says when the waiting receipts go up. Phones only: a PDF-or-image picker can't open the camera on Android, so a second input asks for the rear camera outright. Each shot moves into its own hidden input (see the JS) so a second photo doesn't replace the first.{% endcomment %}
+<div class="od-rcpt-field" data-remove-label="{% trans 'Remove' %}">
+  <div class="od-rcpt-picks">
+    <label class="od-rcpt-pick od-rcpt-cam">
+      <input type="file" name="cargo_receipts" accept="image/*" capture="environment">
+      <i class="fa fa-camera"></i>
+      <span>{% trans "Take photo" %}</span>
+    </label>
+    <label class="od-rcpt-pick od-rcpt-file">
+      <input type="file" name="cargo_receipts" multiple
+             accept="image/*,application/pdf,.pdf,.heic,.heif">
+      <i class="fa fa-paperclip"></i>
+      <span>{% trans "Attach a photo or PDF of the receipt" %}</span>
+    </label>
+  </div>
+  <div class="od-rcpt-shots" hidden>
+    <div class="od-rcpt-pending-l">{{ pending_label }}</div>
+    <div class="od-rcpt-pending"></div>
+  </div>
+  <div class="od-rcpt-hint"><i class="fa fa-paste"></i>{% trans "Or copy an image and paste it here (⌘V / Ctrl+V)." %}</div>
+</div>

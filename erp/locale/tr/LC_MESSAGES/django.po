@@ -16096,8 +16096,8 @@ msgstr "Aktarılmak üzere işaretlenmedikçe bu siparişte kalırlar."
 msgid "Ship some packages now; the rest is carried to a new order"
 msgstr "Bazı paketleri şimdi gönderin; kalanı yeni bir siparişe aktarılır"
 
-msgid "Change packages"
-msgstr "Paketleri değiştir"
+msgid "Adjust packages"
+msgstr "Paketleri düzenle"
 
 msgid "Back to shipping"
 msgstr "Gönderime dön"

@@ -192,3 +192,31 @@ def line_roll_groups(item):
         group["label"] = f"{n} {units.pack_noun(pack, n)} · ≈ {floatformat(amount, '-2g')} {group['rolls'][0]['unit']}"
         group["warehouse"] = only(e["warehouse"] for e in group["rolls"])
     return {"held": held, "coming": coming}
+
+
+@register.simple_tag
+def waiting_purchase_rows(purchases, items):
+    """The purchases an order waits for, each with its supplier and what it
+    brings to this order ("3 rolls · ≈ 90 m"), read from the rolls its plan
+    says are coming for the order's lines (attach_line_purchases)."""
+    from decimal import Decimal
+    from django.template.defaultfilters import floatformat
+    from marketing import units
+
+    rows = []
+    for p in purchases:
+        counts, amounts = {}, {}
+        for it in items or []:
+            coming = [e for e in (getattr(it, "expected_rolls", None) or []) if e["purchase"].pk == p.pk]
+            if not coming:
+                continue
+            pack = getattr(getattr(it, "product", None), "pack_type", None) or units.DEFAULT_PACK
+            key = (pack, coming[0]["unit"])
+            counts[key] = counts.get(key, 0) + len(coming)
+            amounts[key] = amounts.get(key, Decimal("0")) + sum((e["qty"] for e in coming), Decimal("0"))
+        brings = " · ".join(
+            f"{n} {units.pack_noun(pack, n)} · ≈ {floatformat(amounts[(pack, unit)], '-2g')} {unit}"
+            for (pack, unit), n in counts.items())
+        account = getattr(p, "current_account", None)
+        rows.append({"purchase": p, "supplier": getattr(account, "name", ""), "brings": brings})
+    return rows

@@ -502,6 +502,25 @@ class PurchaseForCustomerTest(TestCase):
         self.assertContains(r, 'href="%s" target="_blank"'
                             % reverse("accounts:purchase_order_detail", args=[second.pk]))
 
+    def test_complete_lists_every_purchase_still_on_its_way(self):
+        """Two purchases not in yet: Complete's dialog lists each with its
+        supplier and what it brings, not a footer button apiece."""
+        first = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=first).for_order
+        second = Invoice.objects.create(
+            type="purchase", status="ordered", for_order=order, series="PUR", number="2",
+            current_account=self.supplier, book=self.book, currency=self.usd,
+            date=order.order_date, due_date=order.order_date, intake_warehouse=self.wh,
+            intake_plan=self._plan(variants=[self._variant(tops=(40,))]))
+        page = self.client.get(reverse("operating:order_detail", args=[order.pk]))
+        self.assertContains(page, 'class="odw-list"')
+        for inv_id in (first, second.pk):
+            self.assertContains(page, '<li><a href="%s">'
+                                % reverse("accounts:purchase_order_detail", args=[inv_id]))
+        self.assertContains(page, '<span class="odw-brings">2 rolls · ≈ 55 m</span>')
+        self.assertContains(page, '<span class="odw-brings">1 roll · ≈ 40 m</span>')
+        self.assertNotContains(page, "fa-file-invoice\"></i> Open ")
+
     def test_a_cancelled_purchase_is_named_on_no_line(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         order = Invoice.objects.get(pk=inv_id).for_order

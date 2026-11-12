@@ -16158,3 +16158,12 @@ msgstr "Diğer dillerde"
 
 msgid "“{sku}” is already the SKU of “{product}”. Pick that product from the list, or give this one another SKU."
 msgstr "“{sku}” zaten “{product}” ürününün SKU'su. O ürünü listeden seçin ya da bu ürüne başka bir SKU verin."
+
+msgid "Still on the way"
+msgstr "Hâlâ yolda"
+
+msgid "Open a purchase above"
+msgstr "Yukarıdaki bir alımı açın"
+
+msgid "ship what is here now. The rest, with the purchases still on their way, is carried to a new order."
+msgstr "elde olanı şimdi gönderin. Kalanı, yoldaki alımlarla birlikte yeni bir siparişe aktarılır."

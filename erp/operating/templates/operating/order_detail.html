@@ -1119,6 +1119,14 @@
   .odw-ways { margin: 0 0 14px; padding-left: 18px; font: 500 13px var(--font-sans); color: var(--gray-600); line-height: 1.5; }
   .odw-ways li + li { margin-top: 6px; }
   .odw-ways b { color: var(--ink); }
+  .odw-list { list-style: none; margin: 0 0 14px; padding: 0; }
+  .odw-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 8px 0;
+    border-top: 1px solid #EEF2F7; font: 500 12.5px var(--font-sans); color: var(--gray-600); }
+  .odw-list li:first-child { border-top: none; }
+  .odw-list a { color: #005354; text-decoration: none; }
+  .odw-list a:hover b { text-decoration: underline; }
+  .odw-list a b { font: 700 12.5px var(--font-mono); }
+  .odw-brings { margin-left: auto; font-weight: 700; color: var(--ink); white-space: nowrap; }
   .odc-sub-cell { white-space: nowrap; text-align: right; font: 700 13px var(--font-sans); color: var(--ink); padding-left: 14px !important; font-variant-numeric: tabular-nums; }
   .odc-empty { padding: 14px 0; font: 500 12.5px var(--font-sans); color: var(--gray-500); }
   .odc-foot { padding: 14px 18px 16px; border-top: 1px solid #EEF2F7; background: #FBFCFE; }
@@ -2320,25 +2328,45 @@
       <div class="odc-ic"><i class="fa fa-clock"></i></div>
       <div style="min-width:0;">
         <h3 id="odwTitle">{% trans "The goods aren't all in yet" %}</h3>
+        {% if billing_waits_for|length == 1 %}
         <p class="odc-sub">{% trans "The order can be completed once the goods bought for it are received:" %}
-          {% for p in billing_waits_for %}<b>{{ p.number }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+          <b>{{ billing_waits_for.0.number }}</b></p>
+        {% else %}
+        <p class="odc-sub">{% trans "The order can be completed once the goods bought for it are received." %}</p>
+        {% endif %}
       </div>
       <button type="button" class="odc-x" data-odw-close aria-label="{% trans 'Close' %}"><i class="fa fa-xmark"></i></button>
     </div>
     <div class="odc-body">
+      {% if billing_waits_for|length > 1 %}
+      {% comment %}Several purchases: each in its own row (who from, what it brings), instead of a button apiece in the footer.{% endcomment %}
+      {% waiting_purchase_rows billing_waits_for order_items_sorted as waiting %}
+      <div class="odc-lbl">{% trans "Still on the way" %}</div>
+      <ul class="odw-list">
+        {% for w in waiting %}
+        <li><a href="{% url 'accounts:purchase_order_detail' w.purchase.pk %}"><i class="fa fa-file-invoice"></i> <b>{{ w.purchase.number }}</b></a>
+          {% if w.supplier %}<span>{{ w.supplier }}</span>{% endif %}
+          {% if w.brings %}<span class="odw-brings">{{ w.brings }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
       <ul class="odw-ways">
         {% if not is_sales_rep and not order.is_retail_order and not needs_all_books %}
-        <li><b>{% trans "Ship part" %}</b> — {% trans "ship what is here now. The rest, with the purchase still on its way, is carried to a new order." %}</li>
+        <li><b>{% trans "Ship part" %}</b> — {% if billing_waits_for|length == 1 %}{% trans "ship what is here now. The rest, with the purchase still on its way, is carried to a new order." %}{% else %}{% trans "ship what is here now. The rest, with the purchases still on their way, is carried to a new order." %}{% endif %}</li>
         {% endif %}
+        {% if billing_waits_for|length == 1 %}
         <li><b>{% trans "Open the purchase" %}</b> — {% trans "receive it once the goods arrive, or cancel it if they won't come." %}</li>
+        {% else %}
+        <li><b>{% trans "Open a purchase above" %}</b> — {% trans "receive it once the goods arrive, or cancel it if they won't come." %}</li>
+        {% endif %}
       </ul>
     </div>
     <div class="odc-foot">
       <div class="odc-actions" style="flex-wrap:wrap;">
         <button type="button" class="ord-btn ghost" data-odw-close>{% trans "Close" %}</button>
-        {% for p in billing_waits_for %}
-        <a class="ord-btn ghost" href="{% url 'accounts:purchase_order_detail' p.pk %}"><i class="fa fa-file-invoice"></i> {% trans "Open" %} {{ p.number }}</a>
-        {% endfor %}
+        {% if billing_waits_for|length == 1 %}
+        <a class="ord-btn ghost" href="{% url 'accounts:purchase_order_detail' billing_waits_for.0.pk %}"><i class="fa fa-file-invoice"></i> {% trans "Open" %} {{ billing_waits_for.0.number }}</a>
+        {% endif %}
         {% if not is_sales_rep and not order.is_retail_order and not needs_all_books %}
         <a class="ord-btn primary" href="{% url 'operating:order_ship_part' order.pk %}"><i class="fa fa-boxes-stacked"></i> {% trans "Ship part" %}</a>
         {% endif %}

@@ -1,5 +1,7 @@
-"""Mini packing list for the outside of a package: 100 × 100 mm, one label
-per page, for the thermal label printer.
+"""Mini packing list for the outside of a package, on the 66 × 44 mm
+sticker the thermal label printers take in Ergene and Laleli: the page is
+that size, so nothing is scaled to fit, and the label stands up in it
+(44 × 66), one label per page.
 
 The order's brand (or none, or another name, as printed), the order number and
 "package 3 / 7" beside a QR that
@@ -18,10 +20,10 @@ from django.utils.translation import gettext as _
 from marketing import units
 
 from .models import Order, Pack
-from .split_orders import combined_number, order_packs, split_halves
+from .split_orders import combined_number, half_number, order_packs, split_halves
 from .warehouse_label import inline_pdf_response, label_brand
 
-LINES_PER_LABEL = 9
+LINES_PER_LABEL = 6
 
 
 def _pack_lines(pack):
@@ -89,13 +91,20 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
 
     from accounting.services_accounts import brand_name_for
 
-    from .order_notifications import _ensure_pdf_fonts, brand_width, draw_brand
+    from .order_notifications import (LABEL_BRAND_TRACKING, _ensure_pdf_fonts,
+                                      brand_width, draw_brand)
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "Helvetica-Bold" if reg == "Helvetica" else f"{reg}-Bold"
 
-    W, H, M = 100 * mm, 100 * mm, 5 * mm
-    qsize = 24 * mm
+    # The printer takes the 66 × 44 mm roll, so that is the page — any
+    # other size and the print dialog scales it. The label stands up in it,
+    # 44 wide and 66 tall, drawn turned a quarter: standing, a package's
+    # products fit two lines each, six to a sticker, where lying down
+    # took three. The sticker is turned when it goes on.
+    W, H = 66 * mm, 44 * mm
+    PW, PH, M = 44 * mm, 66 * mm, 3 * mm
+    qsize = 13 * mm
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=(W, H))
     c.setTitle(title)
@@ -106,6 +115,11 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
         while text and c.stringWidth(text + "…", font, size) > width:
             text = text[:-1]
         return text + "…"
+
+    def shrink(text, font, size, width, smallest):
+        while size > smallest and c.stringWidth(text, font, size) > width:
+            size -= 0.25
+        return size
 
     for pack in packs:
         order = pack.order
@@ -129,66 +143,87 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
         qr = Image.open(qbuf).convert("RGB")
 
         for page_no, page in enumerate(pages, start=1):
+            # From here on, coordinates are the standing label's: (0, 0)
+            # its bottom-left, PW across, PH up.
+            c.saveState()
+            c.translate(W, 0)
+            c.rotate(90)
+
             # ── Brand, across the top: who the sack is from ──
-            top = H - M
+            top = PH - M
             if name:
-                size = 14
-                while size > 8 and brand_width(name, bold, size) > W - 2 * M:
-                    size -= 0.5
+                size = 9
+                room = PW - 2 * M
+                while size > 6 and brand_width(name, bold, size, LABEL_BRAND_TRACKING) > room:
+                    size -= 0.25
                 shown = name
-                if brand_width(shown, bold, size) > W - 2 * M:
-                    while shown and brand_width(shown + "…", bold, size) > W - 2 * M:
+                if brand_width(shown, bold, size, LABEL_BRAND_TRACKING) > room:
+                    while shown and brand_width(shown + "…", bold, size, LABEL_BRAND_TRACKING) > room:
                         shown = shown[:-1]
                     shown += "…"
-                draw_brand(c, M, H - M - 4.5 * mm, shown, bold, size)
-                top -= 8 * mm
+                draw_brand(c, M, top - 3.2 * mm, shown, bold, size, LABEL_BRAND_TRACKING)
+                top -= 5 * mm
 
-            # ── Header: QR, then the order number over "3 / 12" ──
+            # ── Header: QR, then the order number over "3 / 12". Captions
+            #    bold: a regular stroke this small is a dot wide on the
+            #    printer and breaks up. ──
             c.drawInlineImage(qr, M, top - qsize, qsize, qsize)
-            x = M + qsize + 4 * mm
-            c.setFont(reg, 8)
-            c.drawString(x, top - 3 * mm, _("ORDER").upper())
+            x = M + qsize + 2.5 * mm
+            room = PW - M - x
+            c.setFont(bold, 5)
+            c.drawString(x, top - 1.8 * mm, _("ORDER").upper())
             package = _("PACKAGE").upper()
             if len(pages) > 1:
                 package += f" · {page_no}/{len(pages)}"
-            c.drawString(x, top - 15 * mm, package)
+            c.drawString(x, top - 9.2 * mm, package)
             # The order number is what people say and search for, so it
             # shrinks to fit rather than lose its tail. The package code
             # isn't printed: it is this number and "3 / 12" over again, and
             # the QR already opens this very package.
             number = combined_number(halves)
-            size = 20
-            while size > 10 and c.stringWidth(number, bold, size) > W - M - x:
-                size -= 0.5
-            c.setFont(bold, size)
-            c.drawString(x, top - 10 * mm, fit(number, bold, size, W - M - x))
-            c.setFont(bold, 20)
-            c.drawString(x, top - 22 * mm, f"{pack.pack_number} / {of}")
+            size = shrink(number, bold, 9, room, 5)
+            if c.stringWidth(number, bold, size) <= room or len(halves) < 2:
+                c.setFont(bold, size)
+                c.drawString(x, top - 5.2 * mm, fit(number, bold, size, room))
+            else:
+                # A split order's two numbers don't fit one line: each
+                # half's on a line of its own, "&" after the first, rather
+                # than the second losing its tail.
+                parts = [half_number(h) for h in halves[:2]]
+                parts[0] += " &"
+                size = min(shrink(p, bold, 6.5, room, 5) for p in parts)
+                c.setFont(bold, size)
+                c.drawString(x, top - 4.3 * mm, fit(parts[0], bold, size, room))
+                c.drawString(x, top - 6.7 * mm, fit(parts[1], bold, size, room))
+            c.setFont(bold, 11)
+            c.drawString(x, top - 13 * mm, f"{pack.pack_number} / {of}")
 
-            rule = top - qsize - 2.5 * mm
-            c.setLineWidth(0.6)
-            c.line(M, rule, W - M, rule)
+            rule = top - qsize - 1.4 * mm
+            c.setLineWidth(0.5)
+            c.line(M, rule, PW - M, rule)
 
-            # ── Contents, one line per SKU ──
-            y = rule - 6 * mm
+            # ── Contents: each SKU over what of it is inside ──
+            y = rule - 3.2 * mm
             for line in page:
                 amount = _describe(line["items"], line["quantity"], line["unit"], line["pack_type"],
                                    line["tracking"])
-                c.setFont(reg, 10)
-                c.drawRightString(W - M, y, amount)
-                sku_w = W - 2 * M - c.stringWidth(amount, reg, 10) - 3 * mm
-                c.setFont(bold, 10)
-                c.drawString(M, y, fit(line["sku"], bold, 10, sku_w))
-                y -= 4.8 * mm
+                c.setFont(bold, 7.5)
+                c.drawString(M, y, fit(line["sku"], bold, 7.5, PW - 2 * M))
+                c.setFont(reg, 7.5)
+                c.drawRightString(PW - M, y - 2.7 * mm, fit(amount, reg, 7.5, PW - 2 * M))
+                y -= 5.6 * mm
             if not lines:
-                c.setFont(reg, 10)
+                c.setFont(reg, 7.5)
                 c.drawString(M, y, _("Empty"))
 
             # ── Footer: the whole package's total ──
-            c.line(M, 14 * mm, W - M, 14 * mm)
-            c.setFont(bold, 11)
-            c.drawString(M, 8 * mm, fit(f"{_('Total')}: {total}", bold, 11, W - 2 * M))
+            c.line(M, 6.4 * mm, PW - M, 6.4 * mm)
+            text = f"{_('Total')}: {total}"
+            size = shrink(text, bold, 7.5, PW - 2 * M, 6)
+            c.setFont(bold, size)
+            c.drawString(M, 2.6 * mm, fit(text, bold, size, PW - 2 * M))
 
+            c.restoreState()
             c.showPage()
     c.save()
     buf.seek(0)

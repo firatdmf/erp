@@ -91,18 +91,22 @@ def _ensure_pdf_fonts():
 # (letter-spacing: 0.04em, print/_document_styles.html); these are
 # reportlab's, which has no letter-spacing in a Paragraph.
 BRAND_TRACKING = 0.04
+# Labels open it twice as far. A thermal printer lays the name down in
+# dots (8 to a millimetre), and the F–I gap is a dot or two: rounding
+# took one and the I still drifted toward the F on the sticker.
+LABEL_BRAND_TRACKING = 0.08
 
 
-def brand_width(text, font, size):
+def brand_width(text, font, size, tracking=BRAND_TRACKING):
     """How wide draw_brand sets `text`."""
     from reportlab.pdfbase.pdfmetrics import stringWidth
-    return stringWidth(text, font, size) + size * BRAND_TRACKING * max(len(text) - 1, 0)
+    return stringWidth(text, font, size) + size * tracking * max(len(text) - 1, 0)
 
 
-def draw_brand(c, x, y, text, font, size):
+def draw_brand(c, x, y, text, font, size, tracking=BRAND_TRACKING):
     """`text` on canvas `c` with its baseline at (x, y), letters set open."""
     c.setFont(font, size)
-    c.drawString(x, y, text, charSpace=size * BRAND_TRACKING)
+    c.drawString(x, y, text, charSpace=size * tracking)
 
 
 def brand_flowable(text, font, size, color, leading=None, space_after=0):

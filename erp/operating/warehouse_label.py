@@ -71,19 +71,37 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
     from accounting.services_accounts import brand_name_for
 
     from .catalog_sync import derive_catalog
-    from .order_notifications import _ensure_pdf_fonts, brand_width, draw_brand
+    from .order_notifications import (LABEL_BRAND_TRACKING, _ensure_pdf_fonts,
+                                      brand_width, draw_brand)
 
     reg = _ensure_pdf_fonts() or "Helvetica"
     bold = "Helvetica-Bold" if reg == "Helvetica" else f"{reg}-Bold"
     names = {}  # warehouse id → its business's name
 
-    W, H = 76 * mm, 58 * mm
+    # The sticker's own size, 66 × 44 mm, in Ergene and Laleli alike. Drawn
+    # any bigger, the print dialog shrank it to fit — to 76% when this was
+    # 76 × 58 — and on a thermal printer's 8 dots a millimetre the small
+    # words broke up ("SKU" printed as "SKLI") and the brand's letters
+    # rounded unevenly. Drawn at size, nothing is scaled.
+    W, H, M = 66 * mm, 44 * mm, 3 * mm
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=(W, H))
     # PDF metadata → browser tab title when opened inline.
     if title:
         c.setTitle(title)
         c.setSubject(title)
+
+    def fit(text, font, size, width, smallest):
+        """`text` at `size`, shrunk toward `smallest` until it fits
+        `width`, then cut with "…": (text, size)."""
+        text = str(text)
+        while size > smallest and c.stringWidth(text, font, size) > width:
+            size -= 0.25
+        if c.stringWidth(text, font, size) > width:
+            while text and c.stringWidth(text + "…", font, size) > width:
+                text = text[:-1]
+            text += "…"
+        return text, size
 
     for product, roll in pairs:
         cat = derive_catalog(product.sku, product.name)
@@ -111,13 +129,13 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
         #    identifiers if there's no roll (SKU/name), then to detail_url
         #    as a last resort so the QR is never empty. ──
         qr_val = bc_val or sku or (product.name or "") or detail_url
-        qsize = 21 * mm
+        qsize = 15 * mm
         if qr_val:
             qbuf = BytesIO()
             segno.make(str(qr_val), error="m").save(qbuf, kind="png", scale=8)
             qbuf.seek(0)
             c.drawInlineImage(Image.open(qbuf).convert("RGB"),
-                              W - qsize - 4 * mm, H - qsize - 4 * mm, qsize, qsize)
+                              W - M - qsize, H - M - qsize, qsize, qsize)
 
         # ── Brand: the business the roll belongs to ──
         name = brand
@@ -127,68 +145,74 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
             name = names[product.warehouse_id]
         second = roll and getattr(roll, 'is_second', False)
         tag = "2ND QUALITY"
-        pad = 2 * mm
-        # Left of the QR, leaving the badge its room on a factory second.
-        room = W - qsize - 11 * mm
-        if second:
-            room -= c.stringWidth(tag, bold, 7) + 2 * pad + 3 * mm
-        brand_w = 0
+        pad = 1.2 * mm
+        brand_y = H - M - 3.6 * mm
+        # Across the top, left of the QR.
+        room = W - 2 * M - qsize - 3 * mm
         if name:
-            size = 12
-            while size > 7 and brand_width(name, bold, size) > room:
-                size -= 0.5
-            while len(name) > 1 and brand_width(name, bold, size) > room:
-                name = name[:-1]
-            brand_w = brand_width(name, bold, size)
-            draw_brand(c, 4 * mm, H - 9 * mm, name, bold, size)
+            size = 10
+            while size > 6 and brand_width(name, bold, size, LABEL_BRAND_TRACKING) > room:
+                size -= 0.25
+            if brand_width(name, bold, size, LABEL_BRAND_TRACKING) > room:
+                while name and brand_width(name + "…", bold, size, LABEL_BRAND_TRACKING) > room:
+                    name = name[:-1]
+                name += "…"
+            draw_brand(c, M, brand_y, name, bold, size, LABEL_BRAND_TRACKING)
 
-        # ── "2nd" badge (right after the brand, only when factory second) ──
+        # ── "2nd" badge — a factory second says so under the QR, right-
+        #    aligned over the quantity, which steps down to make room.
+        #    Beside the brand it cut the business's name short. ──
+        below_qr = H - M - qsize
         if second:
-            bx = 4 * mm + (brand_w + 3 * mm if brand_w else 0)
-            by = H - 9.4 * mm
-            c.setFont(bold, 7)
-            tw = c.stringWidth(tag, bold, 7)
-            c.roundRect(bx, by - 1.2 * mm, tw + 2 * pad, 4 * mm, 1 * mm, stroke=1, fill=0)
+            c.setFont(bold, 5.5)
+            tw = c.stringWidth(tag, bold, 5.5)
+            bx, by = W - M - tw - 2 * pad, below_qr - 3.6 * mm
+            c.roundRect(bx, by - 1 * mm, tw + 2 * pad, 3.2 * mm, 0.8 * mm, stroke=1, fill=0)
             c.drawString(bx + pad, by, tag)
+            below_qr -= 3.6 * mm
 
-        # ── Field stack (left) ──
+        # ── QUANTITY (right, under the QR) — the stack beside it stops
+        #    short of it ──
+        amount = f"{float(quantity):.2f} {unit}".strip()
+        amount_w = c.stringWidth(amount, bold, 11)
+        c.setFont(bold, 5.5)
+        c.drawRightString(W - M, below_qr - 3.6 * mm, "QUANTITY")
+        c.setFont(bold, 11)
+        c.drawRightString(W - M, below_qr - 8 * mm, amount)
+
+        # ── Field stack (left): a small caption over its value. Captions
+        #    bold, not regular: Jakarta's regular strokes at this size are
+        #    a dot wide on the printer and came out broken. ──
+        value_room = W - 2 * M - max(amount_w, qsize) - 3 * mm
+
         def field(label, value, y):
-            c.setFont(reg, 6.5)
-            c.drawString(4 * mm, y, label)
-            c.setFont(bold, 9)
-            c.drawString(4 * mm, y - 4.4 * mm, str(value)[:26])
-            return y - 9.2 * mm
+            c.setFont(bold, 5.5)
+            c.drawString(M, y, label)
+            text, size = fit(value, bold, 9, value_room, 6.5)
+            c.setFont(bold, size)
+            c.drawString(M, y - 3.6 * mm, text)
+            return y - 7.2 * mm
 
-        y = H - 15 * mm
+        y = H - M - 8.6 * mm
         y = field("PRODUCT", base, y)
         if token:
             y = field("VARIANT", token, y)
         y = field("SKU", sku or "—", y)
 
-        # ── QUANTITY (right, under the QR) ──
-        c.setFont(reg, 6.5)
-        c.drawRightString(W - 4 * mm, H - qsize - 8 * mm, "QUANTITY")
-        c.setFont(bold, 12)
-        # The unit goes on the label now that the warehouse holds more than
-        # fabric — "20.00" alone reads as meters to anyone who has only ever
-        # seen a roll tag, and a box of 20 curtain sets is not 20 meters.
-        c.drawRightString(W - 4 * mm, H - qsize - 13.5 * mm,
-                          f"{float(quantity):.2f} {unit}".strip())
-
-        # ── Code128 barcode (bottom, auto-shrunk to fit) ──
+        # ── Code128 barcode (bottom, auto-shrunk to fit). Three dots a bar
+        #    (0.375 mm) when it fits, so every bar is whole dots wide. ──
         if bc_val:
-            maxw = W - 8 * mm
-            bw = 0.45 * mm
-            bc = code128.Code128(str(bc_val), barHeight=8.5 * mm, barWidth=bw)
+            maxw = W - 2 * M
+            bw = 0.375 * mm
+            bc = code128.Code128(str(bc_val), barHeight=6.5 * mm, barWidth=bw)
             if bc.width > maxw:
-                bc = code128.Code128(str(bc_val), barHeight=8.5 * mm,
+                bc = code128.Code128(str(bc_val), barHeight=6.5 * mm,
                                      barWidth=bw * maxw / bc.width)
-            bc.drawOn(c, (W - bc.width) / 2, 6.6 * mm)
-            # Human-readable digits: bumped from 7pt so they stay legible on
-            # a scuffed sticker when the scanner can't read the bars. Baseline
-            # keeps ~3mm of quiet space below, closer to the 4mm side margins.
-            c.setFont(bold, 9.5)
-            c.drawCentredString(W / 2, 3 * mm, str(bc_val))
+            bc.drawOn(c, (W - bc.width) / 2, 4.8 * mm)
+            # The digits under the bars, legible on a scuffed sticker when
+            # the scanner can't read the bars.
+            c.setFont(bold, 8)
+            c.drawCentredString(W / 2, 1.9 * mm, str(bc_val))
 
         c.showPage()
     c.save()

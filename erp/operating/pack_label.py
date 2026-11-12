@@ -23,7 +23,7 @@ from .models import Order, Pack
 from .split_orders import combined_number, half_number, order_packs, split_halves
 from .warehouse_label import inline_pdf_response, label_brand
 
-LINES_PER_LABEL = 6
+LINES_PER_LABEL = 8
 
 
 def _pack_lines(pack):
@@ -100,11 +100,14 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
     # The printer takes the 66 × 44 mm roll, so that is the page — any
     # other size and the print dialog scales it. The label stands up in it,
     # 44 wide and 66 tall, drawn turned a quarter: standing, a package's
-    # products fit two lines each, six to a sticker, where lying down
-    # took three. The sticker is turned when it goes on.
+    # products fit a line each, up to eight to a sticker, where lying
+    # down took three. The sticker is turned when it goes on.
     W, H = 66 * mm, 44 * mm
     PW, PH, M = 44 * mm, 66 * mm, 3 * mm
     qsize = 13 * mm
+    BRAND_BAND = 5 * mm     # the brand line's share of the top
+    ROW = 3.7 * mm          # one product line to the next
+    UNDER = 2.6 * mm        # a long code's amount, on the line under it
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=(W, H))
     c.setTitle(title)
@@ -134,8 +137,35 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
         of = order_packs(order).count()
         lines = _pack_lines(pack)
         total = _total(lines)
-        pages = [lines[i:i + LINES_PER_LABEL]
-                 for i in range(0, len(lines), LINES_PER_LABEL)] or [[]]
+        # Each product on one line — its code left, what of it is inside
+        # right, on one baseline — at a size that fits; a code too long for
+        # that takes two lines, the amount under it. Then as many as the
+        # sticker holds, up to LINES_PER_LABEL, the rest on the next.
+        top = PH - M - (BRAND_BAND if name else 0)
+        first = top - qsize - 1.4 * mm - 3.2 * mm   # first row's baseline
+        lowest = 7.8 * mm                           # last baseline, over the total
+        rows = []
+        for line in lines:
+            amount = _describe(line["items"], line["quantity"], line["unit"], line["pack_type"],
+                               line["tracking"])
+            size, single = 7.5, False
+            while size >= 6.5:
+                if (c.stringWidth(line["sku"], bold, size) + 2 * mm
+                        + c.stringWidth(amount, reg, size)) <= PW - 2 * M:
+                    single = True
+                    break
+                size -= 0.25
+            rows.append({"sku": line["sku"], "amount": amount,
+                         "size": size if single else 7.5, "single": single})
+        pages, page, y = [], [], first
+        for row in rows:
+            depth = 0 if row["single"] else UNDER
+            if page and (len(page) == LINES_PER_LABEL or y - depth < lowest):
+                pages.append(page)
+                page, y = [], first
+            page.append(row)
+            y -= ROW if row["single"] else ROW + UNDER
+        pages.append(page)
 
         qbuf = BytesIO()
         segno.make(link(pack) if link else (pack.code or str(pack.pk)), error="m").save(qbuf, kind="png", scale=8, border=1)
@@ -162,7 +192,7 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
                         shown = shown[:-1]
                     shown += "…"
                 draw_brand(c, M, top - 3.2 * mm, shown, bold, size, LABEL_BRAND_TRACKING)
-                top -= 5 * mm
+                top -= BRAND_BAND
 
             # ── Header: QR, then the order number over "3 / 12". Captions
             #    bold: a regular stroke this small is a dot wide on the
@@ -202,16 +232,22 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
             c.setLineWidth(0.5)
             c.line(M, rule, PW - M, rule)
 
-            # ── Contents: each SKU over what of it is inside ──
+            # ── Contents: a product a line, its code left and its amount
+            #    right on the same baseline (laid out above) ──
             y = rule - 3.2 * mm
-            for line in page:
-                amount = _describe(line["items"], line["quantity"], line["unit"], line["pack_type"],
-                                   line["tracking"])
-                c.setFont(bold, 7.5)
-                c.drawString(M, y, fit(line["sku"], bold, 7.5, PW - 2 * M))
-                c.setFont(reg, 7.5)
-                c.drawRightString(PW - M, y - 2.7 * mm, fit(amount, reg, 7.5, PW - 2 * M))
-                y -= 5.6 * mm
+            for row in page:
+                c.setFont(bold, row["size"])
+                if row["single"]:
+                    c.drawString(M, y, row["sku"])
+                    c.setFont(reg, row["size"])
+                    c.drawRightString(PW - M, y, row["amount"])
+                    y -= ROW
+                else:
+                    c.drawString(M, y, fit(row["sku"], bold, row["size"], PW - 2 * M))
+                    c.setFont(reg, row["size"])
+                    c.drawRightString(PW - M, y - UNDER,
+                                      fit(row["amount"], reg, row["size"], PW - 2 * M))
+                    y -= ROW + UNDER
             if not lines:
                 c.setFont(reg, 7.5)
                 c.drawString(M, y, _("Empty"))

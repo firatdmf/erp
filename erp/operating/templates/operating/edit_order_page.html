@@ -97,5 +97,6 @@
       {% include "operating/partials/create_order_form.html" %}
     </div>
   </div>
+  {% if buy_from_supplier %}{% include "operating/partials/purchase_panel.html" %}{% endif %}
 </div>
 {% endblock %}

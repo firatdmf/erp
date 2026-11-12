@@ -27,6 +27,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _, gettext as _gettext, ngettext
 from django.views import View
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .models import CurrencyCategory, Invoice, InvoiceItem
 from .models_accounts import CurrentAccount, CurrentAccountSettings
@@ -296,6 +297,10 @@ class PurchaseItemLabels(View):
         return inline_pdf_response(pdf, f"rolls-{invoice.display_number}-{item.line_no}")
 
 
+# The order's purchase panel shows this page in a frame (?embed=1), which
+# the site's default X-Frame-Options: DENY refuses. SAMEORIGIN lets our own
+# pages frame it and still no one else's.
+@method_decorator(xframe_options_sameorigin, name="dispatch")
 @method_decorator(login_required, name="dispatch")
 class GoodsReceipt(View):
     """"Mal kabul" — the full-page form that receives a delivery into a
@@ -324,6 +329,7 @@ class GoodsReceipt(View):
         # blocked everywhere else too, so they aren't offered here.
         warehouses = Warehouse.objects.exclude(kind="combined").order_by("name")
         for_order = None        # the customer order this purchase is bought for
+        prefill = None          # a new purchase's starting plan, from an order line
         cancelled_order = None  # ...or was, before that order was cancelled
         invoice = None          # a RECEIVED purchase: edited against the rolls it has
         order = None            # a DRAFT order: nothing received yet, just a plan
@@ -388,7 +394,7 @@ class GoodsReceipt(View):
                 if w:
                     warehouses.append(w)
         else:
-            # Opened from an existing customer order ("Link a purchase"):
+            # Opened from an existing customer order ("Attach a purchase"):
             # the new purchase is bought for that order, not a new one.
             asked_order = (request.GET.get("order") or "").strip()
             if asked_order.isdigit():
@@ -398,6 +404,11 @@ class GoodsReceipt(View):
                     messages.warning(request, str(exc))
                     return redirect("operating:order_detail", pk=int(asked_order))
                 back_url = reverse("operating:order_detail", args=[for_order.pk])
+                # "Buy from a supplier" on one of the order's lines: the
+                # purchase opens with that line's variant, the quantity
+                # asked for as one roll, and the order's sale price.
+                prefill = line_prefill_plan(for_order, request.GET.get("line"),
+                                            request.GET.get("qty"))
             asked = (request.GET.get("warehouse") or "").strip()
             if asked.isdigit() and any(w.pk == int(asked) for w in warehouses):
                 selected_id = int(asked)
@@ -412,7 +423,13 @@ class GoodsReceipt(View):
             "selected_warehouse_id": selected_id,
             "edit_invoice": invoice,
             "order_invoice": order,
-            "intake_plan": (order.intake_plan or {}) if order else None,
+            "intake_plan": (order.intake_plan or {}) if order else prefill,
+            # Opened inside the order's purchase panel: no site menus, and
+            # the page tells the panel when to close.
+            "embedded": request.GET.get("embed") == "1",
+            # A purchase started from an order goes back to that order
+            # once saved, rather than to the purchase's own page.
+            "return_url": (back_url if (pk is None and for_order is not None) else ""),
             "for_order": for_order,
             # The order's sale price per variant SKU: the rows naming one
             # show it read-only — it is changed on the order.
@@ -578,6 +595,47 @@ def rewrite_draft_plan(invoice, plan):
     invoice.intake_plan = plan
     invoice.save(update_fields=["intake_plan", "updated_at"])
     rebuild_draft_items(invoice, lines)
+
+
+def line_prefill_plan(order, line_pk, qty):
+    """The starting plan for a purchase bought for one of `order`'s lines:
+    its product picked, its variant's values and SKU, `qty` (else the whole
+    line) as one roll, and the order's sale price. None when `line_pk`
+    names no line of the order."""
+    from operating.models import OrderItem
+
+    line_pk = str(line_pk or "").strip()
+    if not line_pk.isdigit():
+        return None
+    item = (OrderItem.objects.select_related("product", "product_variant")
+            .prefetch_related("product_variant__product_variant_attribute_values"
+                              "__product_variant_attribute")
+            .filter(pk=int(line_pk), order=order, product_variant__isnull=False).first())
+    if item is None:
+        return None
+    try:
+        quantity = Decimal(str(qty).replace(",", ".")) if qty else None
+    except (InvalidOperation, ValueError):
+        quantity = None
+    if not quantity or quantity <= 0:
+        quantity = item.quantity
+    variant, product = item.product_variant, item.product_variant.product
+    return {
+        "products": [{
+            "main_product": {"mode": "existing", "id": product.pk,
+                             "title": product.title, "sku": product.sku or ""},
+            "has_variants": True,
+            "variants": [{
+                "sku": variant.variant_sku,
+                "attributes": [
+                    {"name": v.product_variant_attribute.name,
+                     "value": v.product_variant_attribute_value}
+                    for v in variant.product_variant_attribute_values.all()],
+                "sale_price": str(item.price),
+                "tops": [{"qty": str(quantity), "barcode": ""}],
+            }],
+        }],
+    }
 
 
 def order_line_prices(order):
@@ -774,11 +832,11 @@ class PurchaseOrderSave(View):
                                       if invoice.for_order_id else None))
                     diff_plans(invoice, {}, data, user=request.user)
                     if customer is None and invoice.for_order_id:
-                        # Linked to an order that already existed: its
+                        # Attached to an order that already existed: its
                         # history says where the purchase came from.
                         from operating.audit import log_change
                         log_change(invoice.for_order, "field", field="purchase",
-                                   new=_("purchase %(number)s linked") % {"number": invoice.number})
+                                   new=_("purchase %(number)s attached") % {"number": invoice.number})
                 else:
                     diff_fields(invoice, before_fields, user=request.user)
                     diff_plans(invoice, before_plan, data, user=request.user)
@@ -788,13 +846,20 @@ class PurchaseOrderSave(View):
             return JsonResponse({"success": False, "error": str(exc)}, status=400)
         except IntakeError as exc:
             return JsonResponse(exc.payload, status=exc.status)
-        if order_warning:
-            messages.warning(request, order_warning)
-        if price_note:
-            messages.info(request, price_note)
+        # Saved from a page that stays open (the order's edit form, through
+        # its purchase panel): it shows these itself. Otherwise they wait
+        # for the next page, as messages.
+        notices = [n for n in (order_warning, price_note) if n]
+        if not data.get("in_place"):
+            if order_warning:
+                messages.warning(request, order_warning)
+            if price_note:
+                messages.info(request, price_note)
+            notices = []
 
         return JsonResponse({
             "success": True,
+            "notices": notices,
             "invoice_id": invoice.pk,
             "number": invoice.display_number,
             "detail_url": reverse("accounts:purchase_order_detail", args=[invoice.pk]),

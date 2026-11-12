@@ -480,11 +480,20 @@ class OrderDetail(DetailView):
         ctx["cancel_needs_approval"] = (
             ctx["cancel_request"] is None
             and cancel_approval.needs_approval(self.request.user, self.object))
-        # "Link a purchase" opens a new purchase draft bought for this
+        # "Attach a purchase" opens a new purchase draft bought for this
         # order — while it is open, has an account (whose book the purchase
         # lands in), and isn't frozen by a cancel request.
         ctx["can_link_purchase"] = (ctx["billed_on_completion"]
                                     and ctx["cancel_request"] is None)
+        # Each purchase row's Cancel: only for whoever the cancel endpoint
+        # lets through (accounts:purchase_cancel is admin-gated), with what
+        # it does to this order said first, as on the purchase's own page.
+        from .views_warehouse import _is_admin
+        ctx["can_cancel_purchases"] = _is_admin(self.request.user)
+        if ctx["can_cancel_purchases"]:
+            from .order_purchases import purchase_cancel_warning
+            for p in ctx["supplier_purchases"]:
+                p.cancel_warning = purchase_cancel_warning(p)
         # Each line names the supplier purchases that bring it in — the
         # ones whose plans list its SKU — so which lines are bought for
         # the order, and from where, reads off the line itself. Until its
@@ -2205,6 +2214,23 @@ def order_create_barcode_check(request):
     })
 
 
+def _link_purchase_url(order, user):
+    """Where a new purchase bought for `order` is started, or None when it
+    can't be: the order must be open, have an account (whose book the
+    purchase lands in) and no cancel waiting, and the viewer not be a
+    sales rep — purchases are not shown to them yet."""
+    from erp.roles import is_sales_rep
+    from .cancel_approval import pending_request
+    from .order_purchases import order_is_open
+
+    if (is_sales_rep(user) or not order.current_account_id or not order_is_open(order)
+            or pending_request(order) is not None):
+        return None
+    return (reverse("accounts:goods_receipt",
+                    kwargs={"book_id": order.current_account.book_id})
+            + f"?order={order.pk}")
+
+
 def _locked_edit_error(orders, product_json_raw, deleted_raw):
     """Why the edit form's save would change a line a purchase still on
     its way in owns (order_purchases.purchase_locked_lines), or None. Those
@@ -2983,10 +3009,21 @@ def free_rolls_response(request, books):
     # true of the card: whether it is sold by count, and the barcode
     # printed on every piece of it (which a scan may hand the card).
     first = free[0][0].product if free else None
+    # What the line will cost per unit, in base: the variant's own cost,
+    # the same figure the order's cost and gross profit are built from
+    # (OrderItem.unit_cost_base). Only for whoever may read the margin.
+    from erp.roles import may_see_profit
+    line_cost = None
+    if may_see_profit(request.user):
+        from marketing.models import ProductVariant
+        variant = ProductVariant.objects.filter(variant_sku__iexact=sku).first()
+        if variant is not None and variant.live_cost is not None:
+            line_cost = float(variant.live_cost)
     return JsonResponse({
         "ok": True, "rolls": out, "cost_symbol": _base_currency_symbol(),
         "counted": bool(first and first.sold_by_count),
         "printed_barcode": (first.printed_barcode if first else ""),
+        "line_cost_base": line_cost,
     })
 
 
@@ -4679,10 +4716,15 @@ class OrderEdit(UpdateView):
         context["order_items"] = items
         # Lines a purchase still on its way in owns: shown read-only on
         # their cards, changed on the purchase (_locked_edit_error).
+        from erp.roles import may_see_profit
+        sees_profit = may_see_profit(self.request.user)
         from .order_purchases import purchase_locked_lines
         locked = {}
+        buy_from = {}   # order pk → where a purchase for it is started
         for o in {it.order for it in items}:
             locked.update(purchase_locked_lines(o))
+            buy_from[o.pk] = _link_purchase_url(o, self.request.user)
+        context["buy_from_supplier"] = any(buy_from.values())
         # JSON-safe payload for the JS to hydrate order_data with.
         # Using a dedicated list keeps it parser-tolerant of any title
         # containing apostrophes, quotes, or newlines.
@@ -4724,7 +4766,16 @@ class OrderEdit(UpdateView):
                 # its own shape from the start.
                 "counted": bool(it.product and it.product.sold_by_count),
                 # The draft purchases that own this line, if any.
-                "purchases": [p.number for p in locked.get(it.pk, [])],
+                "purchases": [{"number": p.number,
+                               "url": reverse("accounts:purchase_order_detail", args=[p.pk])}
+                              for p in locked.get(it.pk, [])],
+                # "Buy from a supplier" in the line's outsourced box: a new
+                # purchase for this line, opened over the form.
+                "buy_url": (f"{buy_from[it.order_id]}&line={it.pk}"
+                            if buy_from.get(it.order_id) and it.pk not in locked else None),
+                # Cost per unit in the order's currency, as the order's
+                # gross profit counts it — for whoever may read the margin.
+                "unit_cost": (float(it.unit_cost() or 0) if sees_profit else None),
                 # Stock items already reserved for this line — shown read-only in
                 # the product card. "available" excludes this reservation's
                 # OWN hold from the other-reservations subtraction (same
@@ -4770,6 +4821,15 @@ class OrderEdit(UpdateView):
         from .views_warehouse import _is_admin
         context["is_admin"] = _is_admin(self.request.user)
         return context
+
+    def get(self, request, *args, **kwargs):
+        # The order's lines as the form loads them, for a form already
+        # open: a purchase saved from its panel changed some, and the form
+        # puts those back in place (njPurchaseSaved) instead of reloading.
+        if request.GET.get("lines") == "1" and self._is_ajax():
+            self.object = self.get_object()
+            return JsonResponse({"items": self.get_context_data()["order_items_payload"]})
+        return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()

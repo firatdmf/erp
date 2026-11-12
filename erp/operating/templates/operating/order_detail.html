@@ -562,6 +562,28 @@
   .od-scan-chip.muted { color: #64748B; background: #F4F7FB; font-weight: 600; }
   /* Rolls a purchase is bringing: the pre-order purple, not stock's teal. */
   .od-scan-chip.expected { color: #6D28D9; background: #EDE9FE; }
+  /* Supplier purchases card: each purchase, and under it what can be
+     done to it from here. Wraps on a narrow card, never scrolls. */
+  .od-po-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+  .od-po-row { display:flex; flex-direction:column; gap:6px; font-size:12.5px; }
+  .od-po-row + .od-po-row { padding-top:10px; border-top:1px solid var(--border-color, #E2E8EE); }
+  .od-po-line { display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .od-po-acts { display:flex; gap:6px; flex-wrap:wrap; }
+  /* base.css pads every button: these set their own. */
+  .od-po-act { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border:1px solid var(--border-color, #E2E8EE);
+    border-radius:6px; background:transparent; color:inherit; font:600 11.5px var(--font-sans); text-decoration:none; cursor:pointer; }
+  .od-po-act:hover { border-color:#94A3B8; }
+  .od-po-act.danger { color:#B91C1C; border-color:#FCA5A5; }
+  .od-po-dlg { border:1px solid var(--border-color, #E2E8F0); border-radius:14px; padding:20px; background:var(--bg-primary, #fff); color:var(--text-primary, #0F1419); width:min(460px, calc(100vw - 32px)); box-shadow:0 20px 50px rgba(15,20,25,.18); }
+  .od-po-dlg::backdrop { background:rgba(15,20,25,.35); }
+  .od-po-dlg h3 { margin:0 0 10px; font:700 16px var(--font-sans); }
+  .od-po-dlg p { margin:0 0 12px; font:500 13px/1.45 var(--font-sans); color:var(--text-secondary, #475569); }
+  .od-po-dlg .od-po-dlg-warn { color:#92400E; background:#FEF3C7; border-radius:8px; padding:8px 10px; }
+  .od-po-dlg label { display:block; margin:10px 0 4px; font:600 12.5px var(--font-sans); }
+  .od-po-dlg textarea, .od-po-dlg input { width:100%; box-sizing:border-box; background:var(--bg-primary, #fff); color:inherit; border:1px solid var(--border-color, #CBD5E1); border-radius:8px; padding:8px 10px; font:500 13.5px var(--font-sans); }
+  .od-po-dlg-err { margin-top:10px; color:#B91C1C; font:600 12.5px var(--font-sans); }
+  .od-po-dlg-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .od-po-dlg-go { color:#fff; background:#B91C1C; border-color:#B91C1C; }
   /* The supplier purchase a line is bought in on — a document, not a
      roll, so an outlined indigo tag rather than the teal roll pill. */
   .od-po-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
@@ -1988,29 +2010,118 @@
           {% if can_link_purchase %}
           {% comment %}A new purchase draft bought for this order. Saving it is open to anyone; receiving it still needs the purchase-confirm permission.{% endcomment %}
           <a href="{% url 'accounts:goods_receipt' order.current_account.book_id %}?order={{ order.pk }}"
+             onclick="return window.njOpenPurchasePanel ? njOpenPurchasePanel(this.href) : true;"
              class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
-            <i class="fa fa-plus"></i> <span>{% trans "Link a purchase" %}</span>
+            <i class="fa fa-plus"></i> <span>{% trans "Attach a purchase" %}</span>
           </a>
           {% endif %}
         </div>
+        {% if can_link_purchase or supplier_purchases %}{% include "operating/partials/purchase_panel.html" %}{% endif %}
         {% if supplier_purchases %}
-          <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;">
+          <ul class="od-po-list">
           {% for p in supplier_purchases %}
-            <li style="display:flex; justify-content:space-between; gap:8px; font-size:12.5px;">
-              <span>
-                <a href="{% url 'accounts:purchase_order_detail' p.pk %}"><b>{{ p.number }}</b></a>
-                · {{ p.current_account.name }}
-              </span>
-              <span style="color:{% if p.status == 'ordered' %}#92400E{% else %}#0E6E4A{% endif %}; white-space:nowrap;">
-                {% if p.status == 'ordered' %}
-                  {% trans "Awaiting delivery" %}{% if p.delivery_date %} · {{ p.delivery_date|date:"d.m.Y" }}{% endif %}
-                {% else %}
-                  {% trans "Received" %} · {{ p.held_quantity|floatformat:"-2g" }} {% trans "reserved" %}
+            <li class="od-po-row">
+              <div class="od-po-line">
+                <span>
+                  <a href="{% url 'accounts:purchase_order_detail' p.pk %}"><b>{{ p.number }}</b></a>
+                  · {{ p.current_account.name }}
+                </span>
+                <span style="color:{% if p.status == 'ordered' %}#92400E{% else %}#0E6E4A{% endif %}; white-space:nowrap;">
+                  {% if p.status == 'ordered' %}
+                    {% trans "Awaiting delivery" %}{% if p.delivery_date %} · {{ p.delivery_date|date:"d.m.Y" }}{% endif %}
+                  {% else %}
+                    {% trans "Received" %} · {{ p.held_quantity|floatformat:"-2g" }} {% trans "reserved" %}
+                  {% endif %}
+                </span>
+              </div>
+              {% comment %}Adjusted from here: Edit opens the purchase in the panel
+                 (a draft, or a received one that knows its warehouse — as on
+                 its own page); Cancel asks the purchase page's questions.{% endcomment %}
+              {% if p.status == 'ordered' or p.intake_warehouse_id or can_cancel_purchases %}
+              <div class="od-po-acts">
+                {% if p.status == 'ordered' or p.intake_warehouse_id %}
+                <a href="{% url 'accounts:goods_receipt_edit' p.pk %}" class="od-po-act"
+                   onclick="return window.njOpenPurchasePanel ? njOpenPurchasePanel(this.href) : true;">
+                  <i class="fa fa-pen"></i> {% trans "Edit" %}</a>
                 {% endif %}
-              </span>
+                {% if can_cancel_purchases %}
+                <button type="button" class="od-po-act danger" onclick="odPoCancelOpen(this)"
+                        data-url="{% url 'accounts:purchase_cancel' p.pk %}"
+                        data-number="{{ p.display_number }}"
+                        data-warning="{{ p.cancel_warning }}">
+                  <i class="fa fa-ban"></i> {% trans "Cancel" %}</button>
+                {% endif %}
+              </div>
+              {% endif %}
             </li>
           {% endfor %}
           </ul>
+          {% if can_cancel_purchases %}
+          {% comment %}Cancelling a purchase deletes the stock it brought in — so,
+             as on its own page, a reason and the number typed out.{% endcomment %}
+          <dialog id="odPoCancelDlg" class="od-po-dlg">
+            <form onsubmit="return odPoCancel(event);">
+              <h3>{% trans "Cancel purchase" %} <span id="odPoCancelNo"></span></h3>
+              <p class="od-po-dlg-warn" id="odPoCancelWarn" hidden></p>
+              <p>{% trans "This permanently deletes the physical stock this purchase brought in and cannot be undone." %}</p>
+              <label for="odPoCancelReason">{% trans "Reason for cancelling" %}</label>
+              <textarea id="odPoCancelReason" rows="3" required maxlength="2000"></textarea>
+              <label for="odPoCancelNumber">{% trans "Type the purchase number to confirm:" %} <b id="odPoCancelNo2"></b></label>
+              <input id="odPoCancelNumber" type="text" required autocomplete="off">
+              <div class="od-po-dlg-err" id="odPoCancelErr" hidden></div>
+              <div class="od-po-dlg-foot">
+                <button type="button" class="ord-btn ghost" onclick="document.getElementById('odPoCancelDlg').close()">{% trans "Keep it" %}</button>
+                <button type="submit" class="ord-btn od-po-dlg-go" id="odPoCancelGo"><i class="fa fa-ban"></i> {% trans "Cancel purchase" %}</button>
+              </div>
+            </form>
+          </dialog>
+          <script>
+            (function () {
+              var dlg = document.getElementById('odPoCancelDlg');
+              var url = '', number = '';
+              window.odPoCancelOpen = function (btn) {
+                url = btn.dataset.url; number = btn.dataset.number;
+                document.getElementById('odPoCancelNo').textContent = number;
+                document.getElementById('odPoCancelNo2').textContent = number;
+                var warn = document.getElementById('odPoCancelWarn');
+                warn.textContent = btn.dataset.warning || '';
+                warn.hidden = !btn.dataset.warning;
+                document.getElementById('odPoCancelReason').value = '';
+                document.getElementById('odPoCancelNumber').value = '';
+                document.getElementById('odPoCancelErr').hidden = true;
+                document.getElementById('odPoCancelGo').disabled = false;
+                dlg.showModal();
+              };
+              window.odPoCancel = function (ev) {
+                ev.preventDefault();
+                var err = document.getElementById('odPoCancelErr');
+                var go = document.getElementById('odPoCancelGo');
+                if (document.getElementById('odPoCancelNumber').value.trim() !== number) {
+                  err.textContent = '{% filter escapejs %}{% trans "The purchase number does not match." %}{% endfilter %}';
+                  err.hidden = false;
+                  return false;
+                }
+                var body = new FormData();
+                body.append('reason', document.getElementById('odPoCancelReason').value.trim());
+                go.disabled = true; err.hidden = true;
+                fetch(url, { method: 'POST', body: body,
+                             headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' } })
+                  .then(function (r) { return r.json(); })
+                  .then(function (d) {
+                    // The order changed with it (lines off, or cancelled
+                    // too): the page shows it as it is now.
+                    if (d && d.success) { window.location.reload(); return; }
+                    err.textContent = (d && d.error) || '{% filter escapejs %}{% trans "Could not cancel." %}{% endfilter %}';
+                    err.hidden = false; go.disabled = false;
+                  }).catch(function () {
+                    err.textContent = '{% filter escapejs %}{% trans "Network error." %}{% endfilter %}';
+                    err.hidden = false; go.disabled = false;
+                  });
+                return false;
+              };
+            })();
+          </script>
+          {% endif %}
         {% else %}
           <div class="od-card-sub">{% trans "Nothing ordered from a supplier for this order." %}</div>
         {% endif %}

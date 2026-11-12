@@ -15917,8 +15917,8 @@ msgstr "Bu sefer öneri yok"
 msgid "What the warehouses hold. Stock changes in the warehouse, not here."
 msgstr "Depolardaki miktar. Stok burada değil, depoda değişir."
 
-msgid "Link a purchase"
-msgstr "Alım bağla"
+msgid "Attach a purchase"
+msgstr "Alım ekle"
 
 msgid "The order this purchase is for was not found."
 msgstr "Bu alımın yapıldığı sipariş bulunamadı."
@@ -15935,8 +15935,8 @@ msgstr "%(number)s siparişi başka bir defterde — alımı o defterden bağlay
 msgid "This purchase is already for an order — it can't also name a customer."
 msgstr "Bu alım zaten bir sipariş için — ayrıca bir müşteri seçilemez."
 
-msgid "purchase %(number)s linked"
-msgstr "%(number)s alımı bağlandı"
+msgid "purchase %(number)s attached"
+msgstr "%(number)s alımı eklendi"
 
 msgid "%(sku)s comes from purchase %(numbers)s — remove it there."
 msgstr "%(sku)s, %(numbers)s alımından geliyor — orada kaldırın."
@@ -16104,3 +16104,18 @@ msgstr "Gönderime dön"
 
 msgid "Uploaded when you press Ship:"
 msgstr "Gönder'e bastığınızda yüklenir:"
+
+msgid "No cost set on this product"
+msgstr "Bu ürün için maliyet girilmemiş"
+
+msgid "Purchase for this order"
+msgstr "Bu sipariş için alım"
+
+msgid "Close the purchase without saving it?"
+msgstr "Alım kaydedilmeden kapatılsın mı?"
+
+msgid "Buy from a supplier"
+msgstr "Tedarikçiden al"
+
+msgid "Purchase saved — the order lines are updated."
+msgstr "Alım kaydedildi — sipariş satırları güncellendi."

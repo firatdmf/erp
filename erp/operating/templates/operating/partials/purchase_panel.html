@@ -1,0 +1,97 @@
+{% load i18n %}
+{% comment %}
+The purchase panel: a purchase form opened over an order, sliding in like
+a side menu but as wide as the page's content. The form is the purchase
+page itself, in a frame (?embed=1) — one purchase form, with its own
+scripts, rather than a second copy inside the order's. Saving posts in the
+background and closes the panel; closing by hand asks first when something
+was typed in it.
+
+Open with njOpenPurchasePanel(url). Included once per page. When saved,
+the page's njPurchaseSaved(data) takes the result in place if it has one
+(the order's edit form); otherwise the page reloads.
+{% endcomment %}
+<div class="njpp" id="njPurchasePanel" hidden>
+  <div class="njpp-backdrop" onclick="njClosePurchasePanel()"></div>
+  <section class="njpp-sheet" role="dialog" aria-modal="true" aria-labelledby="njppTitle">
+    <header class="njpp-head">
+      <h2 id="njppTitle"><i class="fa fa-file-invoice"></i> {% trans "Purchase for this order" %}</h2>
+      <button type="button" class="njpp-x" onclick="njClosePurchasePanel()" aria-label="{% trans 'Close' %}"><i class="fa fa-xmark" aria-hidden="true"></i></button>
+    </header>
+    <iframe class="njpp-frame" id="njppFrame" title="{% trans 'Purchase for this order' %}"></iframe>
+  </section>
+</div>
+<style>
+  .njpp { position: fixed; inset: 0; z-index: 10500; }
+  .njpp[hidden] { display: none; }
+  .njpp-backdrop { position: absolute; inset: 0; background: rgba(15, 20, 25, 0.35); }
+  /* As wide as the page's content: it starts where main does, so the
+     site menu stays in view beside it, like any side panel. */
+  .njpp-sheet {
+    position: absolute; top: 0; right: 0; bottom: 0; left: 6rem;
+    display: flex; flex-direction: column; background: #F7F8FA;
+    box-shadow: -12px 0 32px rgba(15, 23, 31, 0.18);
+    animation: njppIn .24s cubic-bezier(.22, 1, .36, 1);
+  }
+  @media (max-width: 768px) { .njpp-sheet { left: 5rem; } }
+  @media (max-width: 480px) { .njpp-sheet { left: 0; } }
+  @keyframes njppIn { from { transform: translateX(40px); opacity: 0; } }
+  .njpp-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 16px; background: #FFF; border-bottom: 1px solid #E2E8EE;
+  }
+  .njpp-head h2 { margin: 0; font: 700 14px var(--font-sans, system-ui, sans-serif); color: #0F1419; }
+  .njpp-head h2 i { color: #6D28D9; margin-right: 6px; }
+  /* base.css makes every button a padded, left-packed flex row: reset the
+     padding and centre the icon both ways. An icon, not the × character,
+     whose glyph sits below its own middle. */
+  .njpp-x {
+    flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; gap: 0; width: 36px; height: 36px; border: 1px solid #E2E8EE; border-radius: 8px;
+    background: #FFF; color: #475569; font-size: 16px; line-height: 1; cursor: pointer;
+  }
+  .njpp-x i { width: auto; height: auto; line-height: 1; }
+  .njpp-x:hover { background: #F1F5F9; color: #0F1419; }
+  .njpp-frame { flex: 1; width: 100%; border: 0; background: #F7F8FA; }
+</style>
+<script>
+  (function () {
+    var panel = document.getElementById('njPurchasePanel');
+    var frame = document.getElementById('njppFrame');
+    if (!panel || window.njOpenPurchasePanel) return;
+
+    window.njOpenPurchasePanel = function (url) {
+      frame.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'embed=1';
+      panel.hidden = false;
+      document.documentElement.style.overflow = 'hidden';
+      return false;
+    };
+    window.njClosePurchasePanel = function () {
+      if (panel.hidden) return;
+      var w = frame.contentWindow;
+      if (w && w.npDirty && !confirm('{% filter escapejs %}{% trans "Close the purchase without saving it?" %}{% endfilter %}')) return;
+      panel.hidden = true;
+      frame.src = 'about:blank';
+      document.documentElement.style.overflow = '';
+    };
+    function closeNow() {
+      panel.hidden = true;
+      frame.src = 'about:blank';
+      document.documentElement.style.overflow = '';
+    }
+    window.addEventListener('message', function (e) {
+      if (e.origin !== window.location.origin || !e.data) return;
+      if (e.data.type === 'np-close') window.njClosePurchasePanel();
+      if (e.data.type === 'np-saved') {
+        // Saved: the page behind takes it in place where it can (the
+        // order's edit form), else shows the order as it is now.
+        closeNow();
+        if (typeof window.njPurchaseSaved === 'function') window.njPurchaseSaved(e.data);
+        else window.location.reload();
+      }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !panel.hidden) window.njClosePurchasePanel();
+    });
+  })();
+</script>

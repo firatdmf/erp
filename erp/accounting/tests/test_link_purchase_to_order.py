@@ -3,7 +3,7 @@
 
 """A new purchase linked to an order that already exists.
 
-"Link a purchase" on the order page opens a new purchase draft bought for
+"Attach a purchase" on the order page opens a new purchase draft bought for
 that order. Saving it feeds the order instead of creating another one: rows
 the order doesn't have become lines, and a line fed by several purchases
 comes to their sum. Lines the purchase doesn't name are the order's own and
@@ -131,7 +131,7 @@ class LinkPurchaseToOrderTest(TestCase):
         self.assertEqual(self._lines(), {"K24644.G07": Decimal("55.00"),
                                          "K24644.G08": Decimal("40.00")})
         self.assertTrue(OrderChange.objects.filter(
-            order=self.order, new_value__contains=f"{inv.number} linked").exists())
+            order=self.order, new_value__contains=f"{inv.number} attached").exists())
 
     # ── Two purchases on one variant: the sum ───────────────────────
     def _second(self, tops=(40,), sale="6.00"):
@@ -286,7 +286,12 @@ class LinkPurchaseToOrderTest(TestCase):
     def test_the_edit_form_shows_whose_it_is(self):
         r = self.client.get(reverse("operating:edit_order", kwargs={"pk": self.order.pk}))
         [row] = r.context["order_items_payload"]
-        self.assertEqual(row["purchases"], [Invoice.objects.get(pk=self.first_id).number])
+        first = Invoice.objects.get(pk=self.first_id)
+        self.assertEqual(row["purchases"], [{
+            "number": first.number,
+            "url": reverse("accounts:purchase_order_detail", args=[first.pk])}])
+        # A line a purchase already brings is not bought again from here.
+        self.assertIsNone(row["buy_url"])
 
     def test_once_received_the_line_is_the_orders_again(self):
         c = self.client.post(reverse("accounts:purchase_order_confirm", args=[self.first_id]))
@@ -331,3 +336,153 @@ class LinkPurchaseToOrderTest(TestCase):
                                   customer=True, for_order=self.order))
         self.assertEqual(r.status_code, 400)
         self.assertEqual(Invoice.objects.count(), before)
+
+    # ── The edit form's cards say what each line costs and makes ────
+    def test_saved_lines_bring_their_cost(self):
+        r = self.client.get(reverse("operating:edit_order", kwargs={"pk": self.order.pk}))
+        [row] = r.context["order_items_payload"]
+        self.assertIn("unit_cost", row)
+        self.assertIsNotNone(row["unit_cost"])
+        self.assertContains(r, "const CO_SHOW_PROFIT = true;")
+
+    def test_the_stock_list_brings_the_variants_cost(self):
+        from marketing.models import ProductVariant
+        ProductVariant.objects.filter(variant_sku="K24644.G07").update(variant_cost=Decimal("3.20"))
+        r = self.client.get(reverse("operating:order_create_roll_list"), {"sku": "K24644.G07"})
+        self.assertEqual(r.json()["line_cost_base"], 3.2)
+
+    def test_without_the_grant_no_cost_is_sent(self):
+        user = get_user_model().objects.create_user(username="clerk_fig", password="pw")
+        from authentication.models import Member
+        Member.objects.get_or_create(user=user)
+        self.client.force_login(user)
+        r = self.client.get(reverse("operating:order_create_roll_list"), {"sku": "K24644.G07"})
+        self.assertIsNone(r.json().get("line_cost_base"))
+
+    # ── Buying a line in from the order's edit form ─────────────────
+    def _own_line(self):
+        """A line the order holds by itself — no purchase brings it."""
+        from marketing.models import ProductVariant
+        from operating.models import OrderItem
+        variant = ProductVariant.objects.create(product=self.product, variant_sku="K24644.G09")
+        return OrderItem.objects.create(order=self.order, product=self.product,
+                                        product_variant=variant,
+                                        quantity=Decimal("12"), price=Decimal("4.40"))
+
+    def test_an_own_line_offers_to_buy_it(self):
+        line = self._own_line()
+        r = self.client.get(reverse("operating:edit_order", kwargs={"pk": self.order.pk}))
+        row = next(x for x in r.context["order_items_payload"] if x["item_id"] == line.pk)
+        self.assertEqual(row["buy_url"],
+                         reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk})
+                         + f"?order={self.order.pk}&line={line.pk}")
+        self.assertContains(r, 'id="njPurchasePanel"')
+
+    def test_a_sales_rep_is_not_offered_it(self):
+        line = self._own_line()
+        with patch("erp.roles.is_sales_rep", lambda user: True):
+            r = self.client.get(reverse("operating:edit_order", kwargs={"pk": self.order.pk}))
+        row = next(x for x in r.context["order_items_payload"] if x["item_id"] == line.pk)
+        self.assertIsNone(row["buy_url"])
+        self.assertNotContains(r, 'id="njPurchasePanel"')
+
+    def test_the_purchase_opens_filled_in_from_the_line(self):
+        line = self._own_line()
+        r = self.client.get(
+            reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}),
+            {"order": self.order.pk, "line": line.pk, "qty": "7.5", "embed": "1"})
+        self.assertEqual(r.status_code, 200)
+        [card] = r.context["intake_plan"]["products"]
+        self.assertEqual(card["main_product"]["id"], self.product.pk)
+        [v] = card["variants"]
+        self.assertEqual(v["sku"], "K24644.G09")
+        self.assertEqual(v["sale_price"], "4.40")
+        self.assertEqual(v["tops"], [{"qty": "7.5", "barcode": ""}])
+        self.assertTrue(r.context["embedded"])
+        self.assertContains(r, 'id="gr-plan-data"')
+
+    def test_a_line_of_another_order_fills_nothing_in(self):
+        other = Order.objects.create(contact=self.customer)
+        from operating.models import OrderItem
+        stray = OrderItem.objects.create(order=other, product=self.product,
+                                         product_variant=self.order.items.get().product_variant,
+                                         quantity=Decimal("1"), price=Decimal("1"))
+        r = self.client.get(
+            reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}),
+            {"order": self.order.pk, "line": stray.pk})
+        self.assertIsNone(r.context["intake_plan"])
+
+    def test_saving_it_goes_back_to_the_order(self):
+        r = self.client.get(
+            reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}),
+            {"order": self.order.pk})
+        self.assertEqual(r.context["return_url"],
+                         reverse("operating:order_detail", args=[self.order.pk]))
+        self.assertFalse(r.context["embedded"])
+
+    def test_the_order_page_opens_it_in_the_panel(self):
+        r = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
+        self.assertContains(r, 'id="njPurchasePanel"')
+        self.assertContains(r, "njOpenPurchasePanel(this.href)")
+
+    def test_the_form_may_be_framed_by_our_own_pages(self):
+        """The panel is a frame: DENY (the site default) showed "refused to
+        connect" in it."""
+        r = self.client.get(
+            reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}),
+            {"order": self.order.pk, "embed": "1"})
+        self.assertEqual(r["X-Frame-Options"], "SAMEORIGIN")
+        # Other pages keep refusing to be framed.
+        page = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
+        self.assertEqual(page["X-Frame-Options"], "DENY")
+
+    # ── Saved from the panel, taken in place ────────────────────────
+    def test_the_edit_form_reads_its_lines_back(self):
+        line = self._own_line()
+        r = self.client.get(reverse("operating:edit_order", kwargs={"pk": self.order.pk}),
+                            {"lines": "1"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(r.status_code, 200)
+        ids = {row["item_id"] for row in r.json()["items"]}
+        self.assertEqual(ids, set(self.order.items.values_list("pk", flat=True)))
+        self.assertIn(line.pk, ids)
+
+    def test_a_save_in_place_hands_its_notices_back(self):
+        plan = self._plan([self._variant(tops=(40,), sale="6.00")], for_order=self.order)
+        plan["in_place"] = True
+        r = self._save(plan)
+        self.assertEqual(r.status_code, 200, r.content)
+        [notice] = r.json()["notices"]
+        self.assertIn("K24644.G07", notice)
+        # …and leaves none for the next page.
+        page = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
+        self.assertEqual(list(page.context["messages"]), [])
+
+    def test_a_save_that_moves_on_leaves_its_notices_as_messages(self):
+        r = self._save(self._plan([self._variant(tops=(40,), sale="6.00")], for_order=self.order))
+        self.assertEqual(r.json()["notices"], [])
+        page = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
+        self.assertTrue(any("K24644.G07" in str(m) for m in page.context["messages"]))
+
+    # ── Each purchase row: Edit and Cancel ──────────────────────────
+    def test_each_purchase_row_offers_edit_and_cancel(self):
+        first = Invoice.objects.get(pk=self.first_id)
+        r = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
+        self.assertContains(r, reverse("accounts:goods_receipt_edit", args=[first.pk]))
+        self.assertContains(r, reverse("accounts:purchase_cancel", args=[first.pk]))
+        self.assertContains(r, 'id="odPoCancelDlg"')
+        [p] = r.context["supplier_purchases"]
+        self.assertIn("cancelled too", p.cancel_warning)   # its only line goes
+
+    def test_cancel_is_only_offered_to_whoever_may_cancel(self):
+        first = Invoice.objects.get(pk=self.first_id)
+        with patch("operating.views_warehouse._is_admin", lambda user: False):
+            r = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
+        self.assertNotContains(r, reverse("accounts:purchase_cancel", args=[first.pk]))
+        self.assertContains(r, reverse("accounts:goods_receipt_edit", args=[first.pk]))
+
+    def test_the_edit_form_opens_framed(self):
+        r = self.client.get(reverse("accounts:goods_receipt_edit", args=[self.first_id]),
+                            {"embed": "1"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["X-Frame-Options"], "SAMEORIGIN")
+        self.assertTrue(r.context["embedded"])

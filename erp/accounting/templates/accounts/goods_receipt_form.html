@@ -25,6 +25,15 @@
 {% block title %}{% if edit_invoice %}{{ edit_invoice.number }} · {% trans "Edit goods receipt" %}{% elif order_invoice %}{{ order_invoice.number }} · {% trans "Purchase order" %}{% else %}{% trans "New purchase order" %}{% endif %} · Nejum ERP{% endblock %}
 
 {% block css %}
+{% if embedded %}
+{% comment %}Inside the order's purchase panel: the panel is the frame, so the
+site's menus and the page's own way back are left out.{% endcomment %}
+<style>
+  .global-top-bar, .nj-sidebar, .m-shell-bar, .m-bottomnav, .m-drawer, .gr-crumbs { display: none !important; }
+  body { padding-top: 0 !important; }
+  main { margin: 0 !important; padding: 16px 20px 24px !important; max-width: none !important; }
+</style>
+{% endif %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -562,7 +571,7 @@
       <div class="gr-blocked">
         <h3>{% trans "No warehouse to receive into" %}</h3>
         <p>{% trans "Create a warehouse first — goods are received into a real depot, not a combined view." %}</p>
-        <a class="gr-btn" href="{% url 'operating:warehouse_list' %}">{% trans "Warehouses" %}</a>
+        <a class="gr-btn" href="{% url 'operating:warehouse_list' %}"{% if embedded %} target="_blank" rel="noopener"{% endif %}>{% trans "Warehouses" %}</a>
       </div>
     </div>
   {% else %}
@@ -680,17 +689,20 @@
         {% endif %}
         <!-- The customer this is bought for. Saving creates their order,
              priced at each variant's sale price; receiving reserves the
-             arriving rolls for it. Fixed once the order exists. -->
+             arriving rolls for it. Fixed once the order exists. Its links
+             open the order in a new tab: the form keeps what was typed, and
+             inside the order's purchase panel the order can't open in the
+             frame. -->
         <div class="np-field">
           <label>{% trans "For customer" %}</label>
           {% if for_order %}
             <div class="np-sup-chip">
               <i class="fa fa-user"></i>
               <span>{{ for_order.get_client }} ·
-                <a href="{% url 'operating:order_detail' for_order.pk %}">{{ for_order.order_number|default:for_order.pk }}</a></span>
+                <a href="{% url 'operating:order_detail' for_order.pk %}" target="_blank" rel="noopener">{{ for_order.order_number|default:for_order.pk }}</a></span>
             </div>
             <div class="np-hint">{% trans "The customer is the order's. To change who this is for," %}
-              <a href="{% url 'operating:order_detail' for_order.pk %}">{% trans "change the customer on the order" %}</a>
+              <a href="{% url 'operating:order_detail' for_order.pk %}" target="_blank" rel="noopener">{% trans "change the customer on the order" %}</a>
               {% trans "— this purchase follows it. Sale prices stay as typed." %}</div>
           {% elif cancelled_order %}
             <div class="np-sup-chip">
@@ -698,7 +710,7 @@
               <span>{% trans "None — for stock" %}</span>
             </div>
             <div class="np-hint">{% trans "Bought for" %} {{ cancelled_order.get_client }} ·
-              <a href="{% url 'operating:order_detail' cancelled_order.pk %}">{{ cancelled_order.order_number|default:cancelled_order.pk }}</a>,
+              <a href="{% url 'operating:order_detail' cancelled_order.pk %}" target="_blank" rel="noopener">{{ cancelled_order.order_number|default:cancelled_order.pk }}</a>,
               {% trans "which was cancelled. The goods are stock now, so no sale price is asked for." %}</div>
           {% elif edit_invoice %}
             <div class="np-input" style="display:flex; align-items:center;">—</div>
@@ -779,7 +791,7 @@
   <div class="gr-bar">
     <div class="np-summary" id="npSummary"></div>
     <div class="gr-actions">
-      <a class="gr-btn" href="{{ back_url }}">{% trans "Cancel" %}</a>
+      <a class="gr-btn" href="{{ back_url }}"{% if embedded %} onclick="window.parent.postMessage({type: 'np-close'}, window.location.origin); return false;"{% endif %}>{% trans "Cancel" %}</a>
       {% if edit_invoice %}
         <button type="button" class="gr-btn primary" id="npSaveBtn" onclick="npSave()">
           <i class="fa fa-check"></i> {% trans "Save changes" %}
@@ -1280,6 +1292,28 @@
   const GR_ORDER_UPDATE_TPL = "{% url 'accounts:purchase_order_update' 0 %}";
   const GR_CONFIRM_TPL = "{% url 'accounts:purchase_order_confirm' 0 %}";
   const GR_PLAN = JSON.parse((document.getElementById('gr-plan-data') || {}).textContent || 'null');
+  // Started from a customer order: once saved, back to that order — the
+  // whole window, when the form sits in the order's purchase panel.
+  const GR_RETURN_URL = "{{ return_url|escapejs }}";
+  const GR_EMBEDDED = {{ embedded|yesno:"true,false" }};
+  // The page that opened this panel keeps itself open and takes the
+  // saved purchase in place (njPurchaseSaved on the order's edit form).
+  function npSavesInPlace() {
+    try { return GR_EMBEDDED && typeof window.parent.njPurchaseSaved === 'function'; }
+    catch (e) { return false; }
+  }
+  function npGoAfterSave(detailUrl, notices) {
+    window.npDirty = false;
+    if (GR_EMBEDDED) {
+      // The panel closes; the page behind it shows the result.
+      window.parent.postMessage({ type: 'np-saved', detail_url: detailUrl,
+                                  notices: notices || [] }, window.location.origin);
+      return;
+    }
+    window.location.href = GR_RETURN_URL || detailUrl;
+  }
+  // Whether anything was typed, so the panel asks before it is closed.
+  window.npDirty = false;
   // The order's sale price per variant SKU (lowercased). One price per
   // item, set on the order: a row naming one of these shows it, read-only.
   const GR_ORDER_PRICES = JSON.parse((document.getElementById('gr-order-prices') || {}).textContent || '{}');
@@ -3091,7 +3125,11 @@
             alert('{% trans "Reserved quantities were reduced to fit the corrected items:" %}\n' +
                   trimmed.map(function (t) { return t.label + ': ' + t.was + ' → ' + t.now; }).join('\n'));
           }
-          window.location.href = NP_PURCHASE_DETAIL_TPL.replace('/0/', '/' + NP_EDIT_INVOICE_ID + '/');
+          const detail = NP_PURCHASE_DETAIL_TPL.replace('/0/', '/' + NP_EDIT_INVOICE_ID + '/');
+          // In the order's purchase panel: the panel closes and the order
+          // shows the result; on its own page, the purchase.
+          if (GR_EMBEDDED) npGoAfterSave(detail);
+          else window.location.href = detail;
         } else {
           let msg = (d && d.error) || '{% trans "Could not save." %}';
           if (d && d.blocked && d.blocked.length) {
@@ -3327,6 +3365,7 @@
     if (receivedOn) payload.received_on = receivedOn.value || '';
     payload.notes = (document.getElementById('npNotes') || {}).value || '';
     if (GR_FOR_ORDER_ID) payload.for_order_id = GR_FOR_ORDER_ID;
+    if (npSavesInPlace()) payload.in_place = true;
     return payload;
   }
 
@@ -3371,7 +3410,7 @@
       body: JSON.stringify(payload),
     }).then(npReadJson)
       .then(function (d) {
-        if (d && d.success) { window.location.href = d.detail_url; }
+        if (d && d.success) { npGoAfterSave(d.detail_url, d.notices); }
         else { alert((d && d.error) || '{% trans "Could not save." %}'); npUnbusy(btn); }
       }).catch(function (err) { npFailed(err); npUnbusy(btn); });
   };
@@ -3405,13 +3444,14 @@
           .then(function (c) {
             if (c && c.success) {
               (c.warnings || []).forEach(function (w) { console.warn('intake:', w); });
-              window.location.href = c.detail_url;
+              npGoAfterSave(c.detail_url, d.notices);
             } else if (!GR_ORDER_ID) {
               // The order was saved just now — go to it, so a retry confirms
               // that one instead of saving a second copy.
               alert(((c && c.error) || '{% trans "Could not save." %}') + '\n\n' +
                     '{% trans "The purchase order was saved; confirm it from its page." %}');
-              window.location.href = d.detail_url;
+              window.npDirty = false;
+              (GR_EMBEDDED ? window.top : window).location.href = d.detail_url;
             } else {
               alert((c && c.error) || '{% trans "Could not save." %}');
               npUnbusy(btn);
@@ -3692,6 +3732,11 @@
   }
 
   // ── Boot ─────────────────────────────────────────────────────────
+  ['input', 'change'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      if (e.isTrusted && e.target.closest && e.target.closest('#grDoc')) window.npDirty = true;
+    }, true);
+  });
   npCustMode();
   const whSelInit = document.getElementById('npWarehouse');
   if (whSelInit) whSelInit._npPrev = whSelInit.value;

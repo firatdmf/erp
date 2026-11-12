@@ -185,6 +185,18 @@
    line (the stock hint, on a narrow card) does not push its field down
    past its neighbour's. */
 .co-row-counted{align-items:flex-end;}
+/* Under a card's fields: whose line it is, and what it costs and makes. */
+.co-line-note{margin-top:6px;font-size:11.5px;color:#6D28D9;}
+.co-line-note a{color:inherit;font-weight:700;text-decoration:underline;}
+/* In the outsourced box: buy the line in from a supplier. */
+.co-buy-btn{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;padding:5px 9px;border:1px solid #C4B5FD;
+  border-radius:6px;background:#F5F3FF;color:#6D28D9;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.co-buy-btn:hover{background:#EDE9FE;}
+.co-figures{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;margin-top:6px;font-size:11.5px;color:#64748B;}
+.co-figures b{color:#0F1419;font-weight:600;}
+.co-figures .sep{color:#CBD5E1;}
+.co-figures .pos{color:#059669;}
+.co-figures .neg{color:#B91C1C;}
 /* On a phone: quantity and price share the first line as two full-size
    fields, and the total gets a line of its own — a third column there
    is three fields too narrow to read or tap. 16px in the fields, because
@@ -778,13 +790,9 @@
   //    OTHER (stale, hidden) sidebar's hydration payload — which made
   //    a fresh "new order" form open pre-filled with the last edited
   //    order's items. ──
-  var _coScopeRoot = (document.currentScript && document.currentScript.closest('.sidebar-content')) || document;
-  var editPayloadNode = _coScopeRoot.querySelector('#existing-order-items');
-  var editHydratedItems = [];
-  if (editPayloadNode) {
-    try {
-      var existing = JSON.parse(editPayloadNode.textContent || '[]');
-      existing.forEach(function (it) {
+  // One card's data from a saved line of the edit payload — at load,
+  // and again when a purchase saved from the panel changed the line.
+  function coItemFromSaved(it) {
         itemIndex++;
         var stableIndex = itemIndex;
         var rolls = (it.rolls || []).map(function (r) {
@@ -806,7 +814,7 @@
           : (parseFloat(it.outsourced) || 0);
         manual = Math.round(manual * 100) / 100;
         if (manual < 0.005) manual = 0;
-        orderItems.push({
+        return {
           index: stableIndex,
           sku: it.sku || '',
           variant: it.variant === true || it.variant === 'true',
@@ -817,7 +825,10 @@
           counted: it.counted === true,
           // Owned by these purchases still on their way in: quantity and
           // removal happen on the purchase, the card shows them read-only.
-          lockedBy: (it.purchases || []).slice(),
+          lockedBy: (it.purchases || []).map(function (p) { return p.number || p; }),
+          lockedLinks: (it.purchases || []).filter(function (p) { return p && p.url; }),
+          buyUrl: it.buy_url || null,
+          unitCost: (it.unit_cost != null ? parseFloat(it.unit_cost) : null),
           categoryName: '',
           is_custom_curtain: false,
           custom_width: '', custom_height: '',
@@ -851,7 +862,19 @@
           // Keep the section open when it holds a value, otherwise a line
           // that also has stock items would hide its out-of-warehouse meters.
           showManualEntry: manual > 0
-        });
+        };
+  }
+
+  var _coScopeRoot = (document.currentScript && document.currentScript.closest('.sidebar-content')) || document;
+  var editPayloadNode = _coScopeRoot.querySelector('#existing-order-items');
+  var editHydratedItems = [];
+  if (editPayloadNode) {
+    try {
+      var existing = JSON.parse(editPayloadNode.textContent || '[]');
+      existing.forEach(function (it) {
+        var built = coItemFromSaved(it);
+        var stableIndex = built.index;
+        orderItems.push(built);
         if (it.sku) editHydratedItems.push({ stableIndex: stableIndex, sku: it.sku });
       });
     } catch (e) { /* ignore — render empty */ }
@@ -1686,6 +1709,7 @@
           if (v != null) item.rollCosts[(r.barcode || '').toLowerCase()] = v;
         });
         item.costSymbol = (d && d.cost_symbol) || '';
+        if (d && d.line_cost_base != null) item.baseCost = parseFloat(d.line_cost_base);
         // One card is one SKU, so its items share a unit.
         item.rollUnit = (item.availableRolls[0] && item.availableRolls[0].unit) || item.rollUnit || 'm';
         item.rollsLoading = false;
@@ -2004,6 +2028,8 @@
           <div class="form-group"><label>{% trans "Unit Price" %}${coPriceFromHtml(item)}${(item.is_cost_price && !item.counted) ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input${(item.is_cost_price && item.counted) ? ' co-price-is-cost' : ''}" id="co-pricefield-${i}" value="${item.price}" min="0" step="0.01"${(item.is_cost_price && item.counted) ? ` title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}"` : ''} onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${fmtNum(item.quantity*item.price)}</div></div>
         </div>
+        ${coLockedNoteHtml(item)}
+        ${coFiguresHtml(item, i)}
         ${(item.counted || coLocked(item)) ? '' : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i)}
         ${coNoteHtml(item, i)}
       </div>`;
@@ -2256,11 +2282,125 @@
   function coLocked(item) { return !!(item && item.lockedBy && item.lockedBy.length); }
   function coLockedQtyHtml(item) {
     return '<div class="form-group"><label>{% trans "Quantity" %}</label>' +
-      '<input type="number" class="form-input" value="' + (item.quantity || 0) + '" disabled>' +
-      '<div style="font-size:11px;color:#6D28D9;margin-top:4px;"><i class="fas fa-file-invoice"></i> ' +
-        esc('{% filter escapejs %}{% trans "From purchase" %}{% endfilter %} ' + item.lockedBy.join(', ') + ' — ' +
-            '{% filter escapejs %}{% trans "change or remove it there" %}{% endfilter %}') +
-      '</div></div>';
+      '<input type="number" class="form-input" value="' + (item.quantity || 0) + '" disabled></div>';
+  }
+  // Below the row, so the three fields keep one line.
+  function coLockedNoteHtml(item) {
+    if (!coLocked(item)) return '';
+    // Each purchase is a link to its page, in a new tab: the form being
+    // edited stays as it is.
+    var names = (item.lockedLinks && item.lockedLinks.length)
+      ? item.lockedLinks.map(function (p) {
+          return '<a href="' + escAttr(p.url) + '" target="_blank" rel="noopener">' + esc(p.number) + '</a>';
+        }).join(', ')
+      : esc(item.lockedBy.join(', '));
+    return '<div class="co-line-note"><i class="fas fa-file-invoice"></i> ' +
+      esc('{% filter escapejs %}{% trans "From purchase" %}{% endfilter %}') + ' ' + names + ' — ' +
+      esc('{% filter escapejs %}{% trans "change or remove it there" %}{% endfilter %}') + '</div>';
+  }
+
+  // "Buy from a supplier": a new purchase for this saved line, filled in
+  // with its variant, the outsourced quantity and the order's price. It
+  // opens over the form, and once saved the lines it changed are read back
+  // into the form in place (njPurchaseSaved) — nothing typed here is lost.
+  var coBuyingIndex = null;   // the card the open purchase was started from
+  window.coBuyFromSupplier = function (i) {
+    var item = orderItems[i];
+    if (!item || !item.buyUrl) return;
+    coBuyingIndex = item.index;
+    var qty = parseFloat(item.manualMeters) || parseFloat(item.quantity) || 0;
+    var url = item.buyUrl + (qty > 0 ? '&qty=' + encodeURIComponent(qty) : '');
+    if (window.njOpenPurchasePanel) window.njOpenPurchasePanel(url);
+    else window.location.href = url;
+  };
+
+  // What a card says, to tell whether it was changed since it loaded.
+  function coSig(it) {
+    return JSON.stringify([parseFloat(it.quantity) || 0, parseFloat(it.price) || 0,
+      (it.rolls || []).map(function (r) { return [r.barcode, parseFloat(r.quantity) || 0]; }),
+      parseFloat(it.manualMeters) || 0, it.description || '', it.manualNote || '']);
+  }
+
+  // A purchase was saved from the panel: read the order's lines back and
+  // put what it changed on the form. A card is replaced by its saved line
+  // when nobody changed it here, or when it is the card the purchase was
+  // opened from; lines the purchase added join the form. Every other
+  // unsaved change stays as it is.
+  var CO_EDIT_LINES_URL = "{% if order %}{% url 'operating:edit_order' order.pk %}?lines=1{% endif %}";
+  window.njPurchaseSaved = function (d) {
+    var notices = (d && d.notices) || [];
+    if (!CO_EDIT_LINES_URL) { window.location.reload(); return; }
+    fetch(CO_EDIT_LINES_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var gone = deletedExistingItemIds.map(String);
+        (data.items || []).forEach(function (saved) {
+          if (gone.indexOf(String(saved.item_id)) !== -1) return;
+          var at = orderItems.findIndex(function (it) {
+            return String(it.existing_item_id) === String(saved.item_id);
+          });
+          var current = at === -1 ? null : orderItems[at];
+          if (current && current.index !== coBuyingIndex && coSig(current) !== current._savedSig) return;
+          var fresh = coItemFromSaved(saved);
+          if (current) { fresh.index = current.index; orderItems[at] = fresh; }
+          else { at = orderItems.length; orderItems.push(fresh); }
+          syncQtyFromRolls(at);
+          fresh._savedSig = coSig(fresh);
+          if (fresh.sku) fetchAvailableRolls(fresh.index, fresh.sku);
+        });
+        coBuyingIndex = null;
+        renderProducts();
+        updateTotal();
+        showToast('{% filter escapejs %}{% trans "Purchase saved — the order lines are updated." %}{% endfilter %}', 'success');
+        notices.forEach(function (n) { showToast(n, 'warning'); });
+      })
+      .catch(function () { window.location.reload(); });
+  };
+  function coBuyHtml(item, i) {
+    if (!item.buyUrl) return '';
+    return '<button type="button" class="co-buy-btn" onclick="coBuyFromSupplier(' + i + ')">' +
+      '<i class="fas fa-cart-shopping"></i> {% filter escapejs %}{% trans "Buy from a supplier" %}{% endfilter %}</button>';
+  }
+
+  // ── Cost and gross profit per line ──
+  // The order's own basis (OrderItem.unit_cost): the variant's cost, in
+  // the order's currency. Saved lines bring it; a new card reads it off
+  // its stock list (line_cost_base, in base, converted like a price).
+  // Only drawn for whoever may read the margin.
+  const CO_SHOW_PROFIT = {{ may_see_profit|yesno:"true,false" }};
+  function coUnitCost(item) {
+    if (item.unitCost != null) return item.unitCost;
+    if (item.baseCost != null) return coFromBase(item.baseCost);
+    return null;
+  }
+  function coFiguresInner(item) {
+    var qty = parseFloat(item.quantity) || 0;
+    var revenue = Math.round(qty * (parseFloat(item.price) || 0) * 100) / 100;
+    var uc = coUnitCost(item);
+    if (!uc) {
+      return '<span>{% filter escapejs %}{% trans "Cost" %}{% endfilter %}</span> <b>—</b>' +
+        '<span class="sep">·</span><span>{% filter escapejs %}{% trans "No cost set on this product" %}{% endfilter %}</span>';
+    }
+    var cost = Math.round(uc * qty * 100) / 100;
+    var profit = Math.round((revenue - cost) * 100) / 100;
+    var margin = revenue > 0 ? Math.round(profit / revenue * 1000) / 10 : null;
+    var unit = item.counted ? '' : '/' + esc(item.rollUnit || 'm');
+    return '<span>{% filter escapejs %}{% trans "Cost" %}{% endfilter %}</span> <b>' + CO_CUR.symbol + fmtNum(cost) + '</b>' +
+      '<span>(' + CO_CUR.symbol + fmtNum(Math.round(uc * 100) / 100) + unit + ')</span>' +
+      '<span class="sep">·</span><span>{% filter escapejs %}{% trans "Gross profit" %}{% endfilter %}</span> ' +
+      '<b class="' + (profit < 0 ? 'neg' : 'pos') + '">' + CO_CUR.symbol + fmtNum(profit) + '</b>' +
+      (margin != null ? '<span>(' + margin + '%)</span>' : '');
+  }
+  function coFiguresHtml(item, i) {
+    if (!CO_SHOW_PROFIT) return '';
+    return '<div class="co-figures" id="co-ifig-' + i + '">' + coFiguresInner(item) + '</div>';
+  }
+  function coRefreshFigures() {
+    if (!CO_SHOW_PROFIT) return;
+    orderItems.forEach(function (it, i) {
+      var el = document.getElementById('co-ifig-' + i);
+      if (el) el.innerHTML = coFiguresInner(it);
+    });
   }
 
   function coCountedQtyHtml(item, i) {
@@ -2426,6 +2566,7 @@
       '<input type="number" class="form-input" style="width:104px;flex:0 0 auto;" min="0" step="0.01" value="' + (item.manualMeters || '') + '" placeholder="0" onchange="coManualMeters(' + i + ',this.value)">' +
       '<span style="color:#9A3412;flex-shrink:0;">m</span>' +
       '<input type="text" class="form-input" style="flex:1;min-width:120px;" placeholder="{% trans "Note (optional) — e.g. to be sourced from another warehouse" %}" value="' + escAttr(item.manualNote || '') + '" onchange="coManualNote(' + i + ',this.value)">' +
+      coBuyHtml(item, i) +
       (removable ? '<button type="button" onclick="coToggleManualEntry(' + i + ',false)" style="color:#B91C1C;background:none;border:0;cursor:pointer;font-size:15px;line-height:1;padding:0 2px;flex-shrink:0;">×</button>' : '') +
     '</div>';
   }
@@ -3307,6 +3448,7 @@
   window.refreshStockState = refreshStockState;
 
   function updateTotal() {
+    coRefreshFigures();
     const amtEl = document.getElementById('co-total-amount');
     const cntEl = document.getElementById('co-total-count');
     const topsEl = document.getElementById('co-total-tops');
@@ -3579,6 +3721,8 @@
     fetchAvailableRolls(h.stableIndex, h.sku);
   });
   if (editHydratedItems.length) renderProducts();
+  // As loaded — what njPurchaseSaved compares a card against.
+  orderItems.forEach(function (it) { it._savedSig = coSig(it); });
 
   // Edit-mode finishing touches: prefill the customer chip + open
   // the Customer step so the user sees it immediately, and tag the
